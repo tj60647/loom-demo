@@ -120,7 +120,7 @@ export default function OpenTab() {
                     <div className="defrow">
                       <input 
                         placeholder="working definition..." 
-                        defaultValue={concept.def}
+                        defaultValue={concept.def ?? ""}
                         onBlur={(e) => editConcept(concept.id, { def: e.target.value })}
                       />
                     </div>

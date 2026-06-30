@@ -152,7 +152,7 @@ export default function ThrowTab() {
                   <span className="rm" onClick={() => removeEdge(e.id)}>remove</span>
                   <input 
                     placeholder="short handle (optional verb)" 
-                    defaultValue={e.handle}
+                    defaultValue={e.handle ?? ""}
                     onBlur={(ev) => editEdge(e.id, { handle: ev.target.value })}
                     style={{
                       fontFamily: "var(--mono)", fontSize: "10px", padding: "2px 6px", border: "1px solid var(--rule)", borderRadius: "3px"

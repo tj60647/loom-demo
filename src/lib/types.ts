@@ -2,8 +2,8 @@ export type Concept = {
   id: string
   userId: string
   label: string
-  def: string
-  note: string
+  def: string | null
+  note: string | null
   createdAt: Date
 }
 
@@ -11,8 +11,8 @@ export type Byte = {
   id: string
   userId: string
   conceptId: string
-  source: string
-  location: string
+  source: string | null
+  location: string | null
   content: string
   createdAt: Date
 }
@@ -22,7 +22,7 @@ export type Edge = {
   userId: string
   fromId: string
   toId: string
-  handle: string
+  handle: string | null
   sentence: string
   createdAt: Date
 }
