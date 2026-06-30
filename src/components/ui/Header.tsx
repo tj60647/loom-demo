@@ -11,7 +11,7 @@ export default function Header() {
       </div>
       <div className="spacer"></div>
       <AuthButton />
-      <button className="helpbtn" id="helpBtn" title="how Loom works" aria-label="how Loom works">?</button>
+      <a href="https://github.com/tj60647/loom-demo#readme" target="_blank" rel="noopener noreferrer" className="helpbtn" id="helpBtn" title="how Loom works" aria-label="how Loom works" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>?</a>
     </header>
   )
 }
