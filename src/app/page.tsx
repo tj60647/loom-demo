@@ -6,11 +6,12 @@ import { useLoom } from "@/components/providers/LoomProvider"
 import OpenTab from "@/components/tabs/OpenTab"
 import ThrowTab from "@/components/tabs/ThrowTab"
 import ReadTab from "@/components/tabs/ReadTab"
+import LibraryTab from "@/components/tabs/LibraryTab"
 
 export default function Home() {
   const { data: session } = useSession()
   const { isLoading } = useLoom()
-  const [activeTab, setActiveTab] = useState<"open" | "throw" | "read">("open")
+  const [activeTab, setActiveTab] = useState<"library" | "open" | "throw" | "read">("open")
 
   if (!session) {
     return (
@@ -37,6 +38,12 @@ export default function Home() {
     <>
       <nav>
         <button 
+          className={activeTab === "library" ? "active" : ""} 
+          onClick={() => setActiveTab("library")}
+        >
+          <span className="step">00</span> Library
+        </button>
+        <button 
           className={activeTab === "open" ? "active" : ""} 
           onClick={() => setActiveTab("open")}
         >
@@ -57,6 +64,9 @@ export default function Home() {
       </nav>
 
       <main>
+        <div className={`panel ${activeTab === "library" ? "active" : ""}`}>
+          {activeTab === "library" && <LibraryTab />}
+        </div>
         <div className={`panel ${activeTab === "open" ? "active" : ""}`}>
           {activeTab === "open" && <OpenTab />}
         </div>
