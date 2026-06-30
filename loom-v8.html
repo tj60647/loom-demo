@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loom v8</title>
+
+<!--
+  ============================================================================
+  LOOM · v8 — STRIP-DOWN PASS (from the June 29 KG meeting: "feels a little
+  overburdened"). Naming a relation is pulled OUT of the Throw tile, so Throw is
+  just pick · pick · say · throw. The "distil a handle" jargon becomes a plain,
+  optional "name it" on each thrown thread; the register tongues now appear
+  there as tap-to-use SUGGESTIONS ("more tongues" reveals other fields'
+  vocabularies — the answer to "where do these come from"). UI language
+  plainened: handle→name, beaten→named, loose pick→unnamed. The data field
+  stays `handle` for back-compat. No new mechanics; fewer terms at once.
+
+  ----------------------------------------------------------------------------
+  LOOM · v7 — LEGIBILITY PASS: the tool now narrates its own flow.
+
+  Diagnosis (from JC): the tool isn't complicated because it does too much —
+  it's complicated because everything arrives at once, in a private language
+  (warp, weft, byte, throw, beat, distil, tongue, shuttle). The metaphor that
+  was meant to make the work intuitive became a SECOND thing to learn. v7
+  keeps every capability but SEQUENCES it: a plain instruction sits above
+  every metaphor, the surface narrates "do this next," and optional machinery
+  recedes until the core loop is felt.
+
+   · FIRST-RUN WALKTHROUGH. A dismissible overlay names the three moves and
+     the rhythm. Re-openable from the header "?". Shown once (localStorage).
+   · OPEN narrates. Each card leads with a plain "do this" line; the loom
+     words stay as flavour underneath.
+   · THROW narrates + the bench sleeps. The warp tile leads with an
+     instruction that updates as you go ("Tap two…" → "Good — now tap a
+     second." → "Two picked — now say how they relate →"). The workbench
+     stays visibly ASLEEP (dimmed, inert) until a pair is loaded, so it can
+     never invite action before there's anything to act on. A pick·pick·say·
+     throw rail shows the whole rhythm. Distil is demoted to a quiet optional
+     disclosure — it stops competing with the required steps.
+   · READ becomes a guided interpretation. The tab states the TASK in plain
+     words ("Read the whole cloth: what argument runs through it, what does
+     it keep returning to, what's missing?"). The computed report is no
+     longer bare counts — each finding is now a QUESTION WITH A MOVE (the
+     spine, the centre, the gap, your words), tagged "you decide." Clicking a
+     prompt traces it on the cloth AND drops its raw material — the student's
+     OWN sentences — into a "Your read" pane, where the meta-narrative gets
+     WRITTEN. A look·trace·question·write rail. The machine counts and sorts
+     and poses generic questions; it never names what the reading means.
+     (Red line intact: posing a generic question = scaffold; naming the
+     relation/meaning = over the line. The synthesis is the student's.)
+
+  state.read (the student's written interpretation) is now persisted.
+
+  Below this line, v6's notes still apply:
+  ============================================================================
+  LOOM · v6 — tab 03 rebuilt: READ THE CLOTH.
+
+  Diagnosis behind it: a knowledge graph pays off in traversal and query,
+  not in its picture. v5 built the picture and skipped the query; the
+  insight lives in the full sentences (which hover-tooltips hid) and in
+  patterns across them (chains, hubs, islands, unwoven warp) which no
+  drawing shows.
+
+   · PULL A THREAD. Click a concept on the beam: the tool walks its
+     connected component and lays out every sentence along the way, full
+     text, in walking order — the student's own reasoning re-sequenced
+     into a draft argument. "Copy as draft" exports the chain. Click an
+     arc: that one crossing reads full-size with both concepts and their
+     bytes. Nothing is generated, only walked.
+   · WHAT THE CLOTH SAYS. A computed report — counted, not judged: most-
+     woven concepts, islands not yet tied to the mainland, unwoven warp,
+     handles that recur (coinages becoming vocabulary), loose picks.
+     Every word is the student's own label; the machine counts and sorts.
+   · RED = SELECTED, still and only. The scatter view is gone; arranging
+     a picture is not an operation on the graph.
+
+  Below this line, v5's notes still apply:
+  ============================================================================
+  LOOM · v5 — v4 plus three moves from JC's review:
+
+   · HEADER tightened (the zigzag glyph was looming over its own tool).
+   · SENTENCE OPENERS. The scaffold moves up a level: students arrive with
+     sentence-shapes ("this means that…"), not predicates. Opener chips sit
+     above the sentence box — generic, knowing nothing about the pair —
+     and deliberately include the adversarial and the null shapes
+     ("these pull against each other because…", "these don't obviously
+     touch, except…"), because relation ≠ agreement. Tension is a thread.
+     The tongues stay, demoted to the distill step where they belong.
+   · THE SHUTTLE DRAW. Election bias: students only weave where the cloth
+     is already easy. In a real loom the shuttle crosses ALL the warp. The
+     draw pulls two threads at chance — favoring pairs with no edge yet —
+     and asks only: do these cross? Chance picks; the student judges,
+     including "no crossing I can see" (a judgment too — draw again).
+     Randomness is not machine judgment; the red line holds.
+
+  Below this line, v4's notes still apply:
+  ============================================================================
+  LOOM · v4 — two changes at once: the bench, and the visual language.
+
+  STRUCTURE. Noticings are gone as objects. The principle they protected —
+  your own crude sentence precedes any typed structure — moves INTO the edge:
+
+    · An edge is born as a SENTENCE. Pick two concepts from the warp palette
+      (pointing, the easy move), then say how they hang together, however
+      awkwardly. That sentence IS the edge. Throw it.
+    · DISTILLING a short handle out of your own sentence is the later move —
+      same scaffold as concept coding: tap words from your own sentence,
+      with the register tongues as a side aid. Symmetry is the design:
+      concept = crude phrase distilled from the passage's words;
+      edge = crude sentence distilled from your words. The machine names
+      nothing.
+    · An undistilled edge is a LOOSE PICK — dashed grey in the weave,
+      labelled by its sentence. Distilling beats it tight (solid). The
+      "required to finish" discipline lives in craft terms, not gates.
+
+  Tabs: 01 Open (lay the warp) · 02 Throw (throw the weft) · 03 Weave.
+  Rhythm at the bench: pick, pick, say, beat.
+
+  VISUAL LANGUAGE (from JC's poster boards): cooler paper on a dot grid;
+  thin-line glyphs; mono-caps micro-captions; numbered footer rule; muted
+  sage / ochre / lavender / grey, with RED RESERVED for the one selected
+  thing. Ochre = warp (concepts). Sage = beaten weft. Grey dashed = loose.
+  Lavender = a verb borrowed from another field (the stretch).
+
+  Migration: v2/v3 files import — carved triples become beaten edges
+  (sentence = their noticing's text, handle = the relation); byte-notes fold
+  onto concepts. Uncarved noticings have no home and are dropped.
+
+  No dependencies, no backend, no AI. Editable knob: REGISTERS.
+  ============================================================================
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --paper:#edebe3;--paper-2:#e5e2d8;--ink:#1a1916;--ink-soft:#6b675c;
+    --rule:#cbc7ba;--dot:#c3bfb1;
+    --grey:#a39f92;        /* quiet glyphs, loose picks */
+    --ochre:#a8843f;       /* warp — concepts */
+    --sage:#6f7d5c;        /* weft — beaten (distilled) threads */
+    --lav:#8d89c0;         /* a verb borrowed from another field */
+    --red:#b23a2b;         /* RESERVED: the one selected thing */
+    --display:"Fraunces",Georgia,serif;--body:"Newsreader",Georgia,serif;--mono:ui-monospace,Menlo,Consolas,monospace;}
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/26px 26px,var(--paper);
+    color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:var(--display);font-weight:500;margin:0}
+  .label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+  .cap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--grey)}
+  header{border-bottom:1px solid var(--rule);padding:10px 26px 8px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--paper)}
+  .wordmark{font-family:var(--display);font-size:24px;font-weight:600;line-height:1;display:flex;align-items:center;gap:9px}
+  .wordmark small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);font-weight:400;margin-top:3px}
+  header .spacer{flex:1}
+  header .field{display:flex;flex-direction:column;gap:3px}
+  header input{font-family:var(--body);font-size:15px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:5px 8px;color:var(--ink)}
+  .btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:none;border-radius:3px;padding:7px 11px;cursor:pointer}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
+  .btn.mini{font-size:10px;padding:5px 9px;letter-spacing:.05em}
+  .btn:disabled{opacity:.35;cursor:default} .btn:hover:not(:disabled){opacity:.88}
+  #saveDot{font-family:var(--mono);font-size:10px;color:var(--ink-soft);align-self:center}
+  nav{display:flex;border-bottom:1px solid var(--rule);padding:0 26px;background:var(--paper-2);flex-wrap:wrap}
+  nav button{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px}
+  nav button.active{color:var(--ink);border-bottom-color:var(--ochre)}
+  nav .step{font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-right:7px;color:var(--grey)}
+  nav button.active .step{color:var(--ochre)}
+  main{padding:24px 26px 86px;max-width:1100px;margin:0 auto}
+  .panel{display:none} .panel.active{display:block}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+  @media(max-width:860px){.two{grid-template-columns:1fr}}
+  .card{border:1px solid var(--rule);border-radius:4px;padding:18px;background:rgba(255,255,255,.5)}
+  .card h2{font-size:21px;margin-bottom:2px} .card h2 .n{font-family:var(--mono);font-size:11px;color:var(--grey);font-weight:400;letter-spacing:.08em}
+  .card .hint{color:var(--ink-soft);font-size:14px;margin:2px 0 14px}
+  .form-row{display:flex;flex-direction:column;gap:4px;margin-bottom:11px}
+  textarea,.form-row input,.tinput{width:100%;font-family:var(--body);font-size:15px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:8px;color:var(--ink)}
+  textarea{min-height:62px;resize:vertical;line-height:1.45}
+  .mono-in{font-family:var(--mono);font-size:13px}
+  .scrollbox{max-height:380px;overflow:auto;border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.55)}
+  .empty{padding:26px 14px;text-align:center}
+  .empty .cap{display:block;margin-top:9px}
+  .quietrow{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dotted var(--rule)}
+  .quietrow input{flex:1;font-family:var(--body);font-size:13.5px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:6px 8px;color:var(--ink)}
+  /* stuck scaffold */
+  .scaffold{margin:-2px 0 11px;padding:9px 11px;border-left:2px solid var(--ochre);background:rgba(168,132,63,.06);border-radius:0 4px 4px 0}
+  .scaffold .snote{font-size:13px;color:var(--ink-soft);margin-bottom:6px} .scaffold .snote b{color:var(--ink);font-weight:500}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-family:var(--mono);font-size:12px;background:#fff;border:1px solid var(--rule);border-radius:12px;padding:3px 9px;cursor:pointer}
+  .chip:hover{border-color:var(--ochre);color:var(--ochre)}
+  .ladder{margin-top:9px;font-size:13.5px;color:var(--ink-soft)}
+  .ladder summary{cursor:pointer;color:var(--ochre);font-family:var(--mono);font-size:11px;letter-spacing:.04em}
+  .ladder ul{margin:7px 0 0;padding-left:18px} .ladder li{margin-bottom:3px}
+  .ladder .eg{font-style:italic}
+  /* coding log */
+  .lrow{border-bottom:1px dotted var(--rule)}
+  .lhead{display:flex;gap:10px;align-items:baseline;padding:9px 12px;cursor:pointer}
+  .lhead:hover{background:rgba(0,0,0,.025)}
+  .lrow.open .lhead{background:rgba(168,132,63,.08)}
+  .lhead .lconcept{font-size:15.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lhead .lsrc{font-family:var(--mono);font-size:10px;color:var(--ink-soft);white-space:nowrap}
+  .lbody{padding:2px 12px 12px 22px;border-left:2px solid var(--rule);margin:0 12px 10px}
+  .lbody .passage{font-size:13.5px;margin:4px 0 8px}
+  .lbody .src{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
+  .lbody .defrow{margin:7px 0 5px}
+  .lbody .defrow input{width:100%;font-family:var(--body);font-size:14px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:6px}
+  .rm{font-family:var(--mono);font-size:10px;color:var(--ink-soft);cursor:pointer;display:inline-block}
+  .rm:hover{color:var(--red)}
+  /* concept palette — clean: just the label, with a picked tag */
+  .crow{padding:10px 12px;border-bottom:1px dotted var(--rule);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;border-radius:4px}
+  .crow:hover{background:rgba(168,132,63,.08)}
+  .crow .clabel{font-size:16px}
+  .crow.picked{box-shadow:inset 3px 0 var(--ochre);background:rgba(168,132,63,.1)}
+  .pickedtag{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ochre);white-space:nowrap}
+  /* bench */
+  .slots{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:stretch;margin-bottom:11px}
+  @media(max-width:560px){.slots{grid-template-columns:1fr}}
+  .slot{border:1px dashed var(--rule);border-radius:4px;padding:9px 11px;min-height:54px;background:#fff;font-size:15px;position:relative}
+  .slot.filled{border-style:solid;border-color:var(--ochre)}
+  .slot .cap{display:block;margin-bottom:3px}
+  .slot .clear{position:absolute;top:7px;right:9px;font-family:var(--mono);font-size:10px;color:var(--grey);cursor:pointer}
+  .slot .clear:hover{color:var(--red)}
+  .slot .ph{color:var(--grey);font-style:italic;font-size:13.5px}
+  .swapcol{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--ink-soft)}
+  .swapcol .arr{font-size:20px}
+  .swapcol button{font-family:var(--mono);font-size:10px;background:none;border:1px solid var(--rule);border-radius:3px;color:var(--ink-soft);cursor:pointer;padding:2px 6px}
+  .distill{margin:10px 0 6px;padding:9px 11px;border-left:2px solid var(--sage);background:rgba(111,125,92,.06);border-radius:0 4px 4px 0}
+  .distill .rnote{font-size:13px;color:var(--ink-soft);margin-bottom:7px} .distill .rnote b{color:var(--ink);font-weight:500}
+  .verbchip{font-family:var(--mono);font-size:12px;background:#fff;border:1px solid var(--rule);border-radius:12px;padding:3px 9px;cursor:pointer;color:var(--sage)}
+  .verbchip:hover{border-color:var(--sage)}
+  .verbchip.borrowed{color:var(--lav)} .verbchip.borrowed:hover{border-color:var(--lav)}
+  .wordchip{font-family:var(--mono);font-size:12px;background:#fff;border:1px solid var(--rule);border-radius:12px;padding:3px 9px;cursor:pointer;color:var(--ink-soft)}
+  .wordchip:hover{border-color:var(--ink-soft)}
+  .openchip{font-family:var(--body);font-style:italic;font-size:13.5px;background:#fff;border:1px solid var(--rule);border-radius:12px;padding:3px 11px;cursor:pointer;color:var(--ink-soft)}
+  .openchip:hover{border-color:var(--sage);color:var(--sage)}
+  .benchbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;gap:10px}
+  .drawnote{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);margin:-4px 0 10px;line-height:1.7}
+  .borrowbtn{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;background:transparent;color:var(--lav);border:1px solid var(--lav);border-radius:3px;padding:5px 9px;cursor:pointer;margin-top:9px}
+  .readsas{font-size:13.5px;color:var(--ink-soft);margin:8px 0;font-style:italic}
+  .readsas b{font-style:normal;color:var(--ink);font-weight:500}
+  /* thread list */
+  .thread{padding:11px 13px;border-bottom:1px dotted var(--rule)}
+  .thread.sel{box-shadow:inset 3px 0 var(--red);background:rgba(178,58,43,.05)}
+  .thread .trip{font-size:15px}
+  .thread .v{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--sage);border:1px solid var(--sage);border-radius:10px;padding:1px 8px}
+  .thread .v.loosev{color:var(--grey);border-color:var(--grey);border-style:dashed;font-style:italic}
+  .thread .sent{font-size:13px;font-style:italic;color:var(--ink-soft);margin-top:4px}
+  .thread .tmeta{font-family:var(--mono);font-size:10px;margin-top:6px;display:flex;gap:12px;align-items:center}
+  .pill{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:1px 7px;border-radius:9px}
+  .pill.loose{color:var(--grey);border:1px dashed var(--grey)}
+  .pill.beaten{color:var(--sage);border:1px solid var(--sage)}
+  .act{font-family:var(--mono);font-size:10px;color:var(--sage);cursor:pointer;letter-spacing:.04em}
+  .act:hover{text-decoration:underline}
+  /* weave */
+  .mapbar{display:flex;gap:16px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  .loosebanner{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:10px}
+  #mapWrap{border:1px solid var(--rule);border-radius:4px;background:radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec}
+  #map{display:block;width:100%;height:400px;touch-action:none}
+  .readitem{padding:10px 0;border-bottom:1px dotted var(--rule)}
+  .readitem .trip{font-size:15px;margin-bottom:2px}
+  .vpill{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--sage);border:1px solid var(--sage);border-radius:10px;padding:1px 8px}
+  .vpill.loosev{color:var(--grey);border-color:var(--grey);border-style:dashed;font-style:italic}
+  .readitem .sent{font-size:14.5px;font-style:italic;color:var(--ink-soft);margin-top:3px}
+  .threadhead{font-family:var(--display);font-size:19px;line-height:1.35;margin-bottom:2px}
+  .threadhead .red{color:var(--red)}
+  .threadhead .n{font-family:var(--mono);font-size:11px;color:var(--grey)}
+  .report .cap{display:block;margin:13px 0 3px;color:var(--ink-soft)}
+  .report .line{font-size:14.5px;padding:1px 0}
+  .report .ct{font-family:var(--mono);font-size:11px;color:var(--grey)}
+  .bytequote{margin:5px 0 10px;padding-left:9px;border-left:2px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .bytequote .src{font-family:var(--mono);font-size:10px}
+  .legend{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-top:8px;display:flex;gap:22px;flex-wrap:wrap}
+  .legend .sw{display:inline-block;width:22px;height:0;border-top-width:2px;vertical-align:middle;margin-right:5px}
+  /* footer rule, poster-style */
+  footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;gap:12px;
+    padding:9px 26px;border-top:1px solid var(--ink);background:var(--paper);z-index:5}
+  footer span{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
+  footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
+
+  /* ===== v7 legibility pass ===== */
+  /* plain "do this" instruction line — sits above the metaphor */
+  .do{font-size:14.5px;color:var(--ochre);font-weight:500;margin:2px 0 12px;min-height:20px;line-height:1.4}
+  .do.calm{color:var(--ink-soft);font-weight:400}
+  /* rhythm rail: pick·pick·say·throw / look·trace·question·write */
+  .rail{display:flex;gap:6px;margin:0 0 16px;flex-wrap:wrap;align-items:center}
+  .rail .rstep{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);
+    border:1px solid var(--rule);border-radius:11px;padding:3px 10px;transition:all .15s}
+  .rail .rstep.now{color:var(--paper);background:var(--ink);border-color:var(--ink)}
+  .rail .rstep.done{color:var(--sage);border-color:var(--sage)}
+  .rail .rsep{color:var(--grey);font-size:11px}
+  /* workbench asleep until a pair is loaded */
+  .sleeper{position:relative;transition:opacity .2s}
+  .sleeper.asleep{opacity:.42}
+  .sleeper.asleep::after{content:"";position:absolute;inset:0;cursor:default;background:transparent}
+  .sleepmsg{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);
+    text-align:center;padding:8px 0 2px;display:none}
+  .sleeper.asleep .sleepmsg{display:block}
+  /* distil demoted to a quiet optional disclosure */
+  .distilltoggle{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--sage);cursor:pointer;
+    display:inline-flex;align-items:center;gap:6px;margin:4px 0 2px;user-select:none}
+  .distilltoggle:hover{opacity:.8}
+  .distilltoggle .tw{display:inline-block;transition:transform .15s}
+  .distilltoggle.open .tw{transform:rotate(90deg)}
+  .ghostnote{font-size:13px;color:var(--grey);font-style:italic;margin:4px 0 2px}
+  /* READ — task framing + interpretive prompts */
+  .tasktitle{font-family:var(--display);font-size:21px;font-weight:500;margin:0 0 3px}
+  .tasksub{font-size:14px;color:var(--ink-soft);margin:0 0 14px;max-width:70ch}
+  .prompt{border:1px solid var(--rule);border-radius:5px;padding:11px 12px;margin-bottom:9px;cursor:pointer;
+    background:rgba(255,255,255,.55);transition:border-color .15s}
+  .prompt:hover{border-color:var(--ochre)}
+  .prompt.on{border-color:var(--red);box-shadow:inset 3px 0 var(--red)}
+  .prompt .pk{font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ochre);display:block;margin-bottom:4px}
+  .prompt .pq{font-size:14.5px;line-height:1.45} .prompt .pq b{font-weight:500;color:var(--ink)}
+  .prompt .pm{font-family:var(--mono);font-size:10px;color:var(--sage);margin-top:7px;display:inline-block}
+  .prompt .youdecide{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);float:right}
+  #yourRead{min-height:170px}
+  .readq{font-size:13.5px;color:var(--ink-soft);font-style:italic;margin:0 0 7px}
+  .drafted{font-family:var(--mono);font-size:11px;color:var(--sage);margin-top:8px;min-height:14px}
+  /* first-run walkthrough overlay */
+  .scrim{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:40;display:none;align-items:center;justify-content:center;padding:22px}
+  .scrim.show{display:flex}
+  .guide{max-width:540px;width:100%;background:var(--paper);border:1px solid var(--ink);border-radius:6px;
+    box-shadow:0 18px 50px rgba(0,0,0,.3);padding:24px 26px 20px}
+  .guide .gk{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ochre)}
+  .guide h2{font-family:var(--display);font-size:25px;font-weight:600;margin:6px 0 8px;display:flex;align-items:center;gap:11px}
+  .guide p{font-size:15.5px;line-height:1.5;margin:0 0 10px}
+  .guide .gloom{font-size:13.5px;color:var(--ink-soft);border-left:2px solid var(--ochre);padding-left:11px;margin:12px 0}
+  .guide .gnav{display:flex;justify-content:space-between;align-items:center;margin-top:18px;border-top:1px solid var(--rule);padding-top:14px}
+  .guide .dots{display:flex;gap:6px}
+  .guide .dot{width:7px;height:7px;border-radius:50%;background:var(--rule)}
+  .guide .dot.on{background:var(--ochre)}
+  .guide .skip{font-family:var(--mono);font-size:11px;color:var(--ink-soft);cursor:pointer;letter-spacing:.04em}
+  .helpbtn{font-family:var(--display);font-size:17px;background:none;border:1px solid var(--rule);border-radius:50%;
+    width:28px;height:28px;cursor:pointer;color:var(--ink-soft);line-height:1;align-self:center}
+  .helpbtn:hover{border-color:var(--ochre);color:var(--ochre)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark">
+    <svg width="17" height="12" viewBox="0 0 26 18" fill="none" stroke="#a8843f" stroke-width="1.8"><path d="M2 15 L7 4 L12 15 L17 4 L22 15"/></svg>
+    <div>Loom<small>lay the warp · throw the weft</small></div>
+  </div>
+  <div class="spacer"></div>
+  <div class="field"><span class="label">Student</span><input id="student" placeholder="your name" style="width:150px"></div>
+  <button class="btn ghost" id="importBtn">Import</button>
+  <button class="btn" id="exportBtn">Export .json</button>
+  <button class="helpbtn" id="helpBtn" title="how Loom works" aria-label="how Loom works">?</button>
+  <span id="saveDot">—</span>
+  <input type="file" id="importFile" accept="application/json" style="display:none">
+</header>
+
+<nav>
+  <button data-mode="open" class="active"><span class="step">01 —</span>Open</button>
+  <button data-mode="throw"><span class="step">02 —</span>Throw</button>
+  <button data-mode="read"><span class="step">03 —</span>Read</button>
+</nav>
+
+<main>
+  <!-- ===== 01 OPEN: lay the warp ===== -->
+  <section class="panel active" id="panel-open">
+    <div class="two">
+      <div class="card">
+        <h2>Capture a byte</h2>
+        <p class="do">Do this — paste a passage, then say what it's about <i>in your own words</i>.</p>
+        <p class="hint">A “byte” is just a passage worth keeping. A crude concept name is fine — tap the passage's own words if you're stuck.</p>
+        <div class="form-row"><span class="label">Source — author, work</span><input id="bSource" class="mono-in" placeholder="Suchman, Plans and Situated Actions"></div>
+        <div class="form-row"><span class="label">Location</span><input id="bLoc" class="mono-in" placeholder="ch. 3, p. 49"></div>
+        <div class="form-row"><span class="label">Passage</span><textarea id="bText" placeholder="paste or type the passage…"></textarea></div>
+        <div class="form-row"><span class="label">Concept — what's this bit about, in your words</span>
+          <input id="bConcept" list="conceptOptions" placeholder="e.g. plans just point you, you work it out as you go"></div>
+        <div id="codeScaffold"></div>
+        <button class="btn" id="addByteBtn">Add byte</button>
+      </div>
+      <div class="card">
+        <h2>Coding log <span class="n" id="logCount"></span></h2>
+        <p class="do calm">Everything you capture lands here, newest on top — your growing pile of concepts.</p>
+        <p class="hint">The warp being laid, thread by thread. Click a row to open it; next, take these to <b>02 — Throw</b>.</p>
+        <div class="scrollbox" id="codingLog"></div>
+        <div class="quietrow">
+          <input id="cInput" list="conceptOptions" placeholder="add a concept with no byte yet (rare)">
+          <button class="btn ghost mini" id="addConceptBtn">Add</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 02 THROW: the bench ===== -->
+  <section class="panel" id="panel-throw">
+    <div class="rail" id="throwRail">
+      <span class="rstep" data-r="0">pick</span><span class="rsep">·</span>
+      <span class="rstep" data-r="1">pick</span><span class="rsep">·</span>
+      <span class="rstep" data-r="2">say</span><span class="rsep">·</span>
+      <span class="rstep" data-r="3">throw</span>
+    </div>
+    <div class="two">
+      <div class="card">
+        <h2>The warp <span class="n" id="conceptCount"></span></h2>
+        <p class="do" id="throwDo">Tap two of your concepts to connect them.</p>
+        <p class="hint">These are the concepts you made on <b>01 — Open</b>. Tap one, then a second.</p>
+        <div class="scrollbox" id="palette"></div>
+      </div>
+      <div class="card">
+        <h2>Throw a thread</h2>
+        <p class="hint calm">When two are picked, say how they hang together — long and awkward is fine. The sentence <i>is</i> the thread.</p>
+        <div class="benchbar"><span class="cap">the pair</span>
+          <button class="btn ghost mini" id="drawBtn" title="chance picks two threads you'd never elect — you do all the judging">⤳ let the shuttle draw</button></div>
+        <div class="slots" id="pairSlots"></div>
+        <div class="drawnote" id="drawNote"></div>
+        <div class="sleeper asleep" id="benchSleeper">
+          <div class="sleepmsg">pick two concepts on the left — the bench wakes when the pair is loaded</div>
+          <div class="form-row"><span class="label">The relationship, however awkwardly — your sentence</span>
+            <div class="chips" id="openerChips" style="margin:2px 0 6px"></div>
+            <textarea id="eSentence" placeholder="…or just start typing. Long and awkward is fine."></textarea></div>
+          <button class="btn" id="throwBtn" style="margin-top:6px">Throw it</button>
+          <p class="ghostnote" style="margin-top:7px">Thrown threads land below — name each one when you like (optional).</p>
+        </div>
+        <h3 style="font-family:var(--display);font-size:17px;border-bottom:1px solid var(--rule);padding-bottom:5px;margin:18px 0 6px">Threads thrown <span class="n" id="threadCount" style="font-family:var(--mono);font-size:11px;color:var(--grey)"></span></h3>
+        <div class="scrollbox" id="threadList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 03 READ THE CLOTH ===== -->
+  <section class="panel" id="panel-read">
+    <p class="tasktitle">Read the whole cloth.</p>
+    <p class="tasksub">What argument runs through it? What does it keep returning to? What's missing? The cloth shows you where to look — the reading is yours to write.</p>
+    <div class="rail" id="readRail">
+      <span class="rstep" data-r="0">look</span><span class="rsep">·</span>
+      <span class="rstep" data-r="1">trace</span><span class="rsep">·</span>
+      <span class="rstep" data-r="2">question</span><span class="rsep">·</span>
+      <span class="rstep" data-r="3">write</span>
+    </div>
+    <div class="mapbar">
+      <span class="label">The cloth</span>
+      <span style="color:var(--ink-soft);font-size:13px">Warp in reading order; weft arcs across. Click a prompt below to trace it here — or click a concept/arc directly to pull it.</span>
+    </div>
+    <div id="mapWrap"><svg id="map"></svg></div>
+    <div class="legend">
+      <span><span class="sw" style="border-top:2px solid var(--ochre)"></span>warp — concept</span>
+      <span><span class="sw" style="border-top:2px solid var(--sage)"></span>named relation</span>
+      <span><span class="sw" style="border-top:2px dashed var(--grey)"></span>unnamed — sentence only</span>
+      <span><span class="sw" style="border-top:2px solid var(--red)"></span>what you're tracing</span>
+    </div>
+    <div class="two" style="margin-top:22px">
+      <div class="card">
+        <h2>What the cloth shows you <span class="n">counted, not judged</span></h2>
+        <p class="hint">Each is a question with a move — click to trace it on the cloth and lay your threads out as material below. You weave them into your read. You make the call.</p>
+        <div id="clothPrompts"></div>
+        <div id="readingPane" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <h2>Your read</h2>
+        <p class="hint">The move: weave the findings into one narrative. The tool never writes it for you.</p>
+        <p class="readq">In a sentence — what is this reading <i>about</i>?</p>
+        <textarea id="yourRead" placeholder="Write your read here, in your own words. Trace a prompt on the left to lay your threads out as material to weave from."></textarea>
+        <div class="drafted" id="readDrafted"></div>
+        <button class="btn ghost mini" id="copyReadBtn" style="margin-top:8px">Copy as essay draft</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="scrim" id="guideScrim"><div class="guide" id="guideBox"></div></div>
+
+<footer><span class="fl" id="footLeft">01 — OPEN</span><span class="fr" id="footRight">LAY THE WARP</span></footer>
+
+<datalist id="conceptOptions"></datalist>
+
+<script>
+/* REGISTERS — tongues offered as naming suggestions (generic kinds of relation in
+   different registers). Author your cohort's here. The machine never picks. */
+const REGISTERS = [
+  {id:'plain',   name:'Plain',          tag:'everyday',          verbs:['leads to','depends on','is part of','goes against','is the same as','sets up']},
+  {id:'argue',   name:'Argument',       tag:'logic & claims',    verbs:['presupposes','contradicts','exemplifies','entails','qualifies','generalizes']},
+  {id:'system',  name:'Cause & system', tag:'forces & feedback', verbs:['drives','constrains','bottlenecks','damps','feeds back into','is upstream of']},
+  {id:'design',  name:'Design & making',tag:'craft & use',       verbs:['affords','scaffolds','reframes','trades off against','operationalizes','prototypes']},
+  {id:'practice',name:'Practice & power',tag:'people & norms',   verbs:['legitimizes','governs','mediates','enacts','situates','negotiates']},
+  {id:'stance',  name:'Stance & value', tag:'orientation',       verbs:['honors','resists','mourns','inherits from','answers','betrays']},
+];
+const regAt=i=>REGISTERS[((i%REGISTERS.length)+REGISTERS.length)%REGISTERS.length];
+
+/* OPENERS — sentence-shapes, not predicates. They know nothing about the
+   pair. The adversarial and the null shapes are here on purpose:
+   relation ≠ agreement. Tension is a thread. Author your cohort's. */
+const OPENERS = [
+  'this means that',
+  'this explains why',
+  'these are both about',
+  'you can’t have this without that —',
+  'this is an example of',
+  'these pull against each other because',
+  'these don’t obviously touch, except',
+];
+
+const KEY='loom-v8';
+const AUTO_GUIDE=true;   /* v7-example sets this false so the walkthrough doesn't pop */
+const uid=()=>Math.random().toString(36).slice(2,9);
+function blank(){return{student:'',concepts:[],bytes:[],edges:[],positions:{},read:''};}
+function seed(){
+  const s=blank();const mk=l=>{const c={id:uid(),label:l,def:'',note:''};s.concepts.push(c);return c;};
+  const a=mk('plans just point you, you work it out as you go');
+  const b=mk('tools go invisible until they break');
+  const c=mk('people just know how to go on without saying it');
+  s.bytes.push({id:uid(),conceptId:a.id,source:'Suchman, Plans and Situated Actions',location:'ch. 3, p. 49',text:'Plans do not control conduct so much as orient it; the actual course of action gets worked out moment to moment against the circumstances at hand.'});
+  s.bytes.push({id:uid(),conceptId:b.id,source:'Heidegger, Being and Time',location:'§15, p. 98',text:'Equipment is met first in use, ready-to-hand and unnoticed, and only when it fails does it obtrude as a mere object present-at-hand.'});
+  s.bytes.push({id:uid(),conceptId:c.id,source:'Giddens, The Constitution of Society',location:'ch. 1, p. 41',text:'Most of what agents know about how to go on is held in practical consciousness, a tacit competence enacted in conduct rather than spoken in words.'});
+  /* one seeded LOOSE pick — a sentence-only thread, waiting to be beaten */
+  s.edges.push({id:uid(),fromId:a.id,toId:b.id,handle:'',
+    sentence:'the plan and the tool both kind of disappear while you’re just doing the thing — stuff stays in the background until something goes wrong.'});
+  return s;
+}
+let state=seed();
+
+let st;function flash(m){const d=document.getElementById('saveDot');d.textContent='· '+m+' ·';clearTimeout(st);st=setTimeout(()=>d.textContent='—',1300);}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state));flash('saved');}catch(e){flash('export to save');}}
+function migrate(s){
+  ['concepts','bytes','edges'].forEach(k=>s[k]=s[k]||[]);s.positions=s.positions||{};s.read=s.read||'';
+  s.concepts.forEach(c=>{c.def=c.def||'';c.note=c.note||'';});
+  /* v2 → fold byte-notes onto concepts */
+  s.bytes.forEach(b=>{if(b.note){const c=s.concepts.find(x=>x.id===b.conceptId);
+    if(c)c.note=c.note?(c.note+' · '+b.note):b.note;delete b.note;}});
+  /* v2/v3 → triples become beaten edges; their noticing's text becomes the sentence */
+  if(s.triples&&s.triples.length){const nb=id=>{const n=(s.noticings||[]).find(x=>x.id===id);return n?n.text:'';};
+    s.triples.forEach(t=>s.edges.push({id:t.id||uid(),fromId:t.fromId,toId:t.toId,handle:t.rel||'',sentence:nb(t.noticingId)}));}
+  delete s.triples;delete s.noticings;
+  s.edges.forEach(e=>{e.sentence=e.sentence||'';e.handle=e.handle||'';});
+  return s;
+}
+function load(){try{const r=localStorage.getItem(KEY);if(r)state=migrate(JSON.parse(r));}catch(e){}}
+
+const conceptById=id=>state.concepts.find(c=>c.id===id);
+const edgeById=id=>state.edges.find(e=>e.id===id);
+const bytesOf=cid=>state.bytes.filter(b=>b.conceptId===cid);
+const conceptUse=cid=>bytesOf(cid).length+state.edges.filter(e=>e.fromId===cid||e.toId===cid).length;
+function getOrCreateConcept(label){label=(label||'').trim();if(!label)return null;let c=state.concepts.find(x=>x.label.toLowerCase()===label.toLowerCase());if(!c){c={id:uid(),label,def:'',note:''};state.concepts.push(c);}return c;}
+function esc(s){return (s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function short(s,n){s=s||'';return s.length>n?s.slice(0,n-1)+'…':s;}
+
+let openByte=null;                       /* 01 — expanded log row */
+let pairA=null,pairB=null,drawn=false;   /* 02 — bench slots; drawn = shuttle picked */
+let namingFor=null;                       /* per-thread namer (after the throw) */
+let moreTongues=false;                     /* reveal non-plain tongues in the namer */
+
+const STOP=new Set("the a an and or but of to in on at by for with as is are was were be been being do does did has have had that this these those it its they them their there here both one two also so than then thus into over under about not no nor only just more most very can could would should may might will what when where which who how each other another out off up down you your i we our it's don't kind sort bit".split(' '));
+function contentWords(t){return [...new Set((t.toLowerCase().match(/[a-z][a-z'\-]{2,}/g)||[]).filter(w=>!STOP.has(w)))].slice(0,14);}
+
+function renderAll(){
+  document.getElementById('student').value=state.student;
+  document.getElementById('conceptOptions').innerHTML=state.concepts.map(c=>`<option value="${esc(c.label)}">`).join('');
+  const yr=document.getElementById('yourRead');if(yr&&document.activeElement!==yr)yr.value=state.read||'';
+  renderLog();renderCodeScaffold();renderPalette();renderSlots();renderThreads();renderRead();
+}
+
+/* ---------- shared empty-state, poster-style ---------- */
+function emptyHtml(caption){
+  return `<div class="empty">
+    <svg width="34" height="18" viewBox="0 0 34 18" fill="none" stroke="#a39f92" stroke-width="1.3"><path d="M2 13 L7 5 L12 13 L17 5 L22 13 L27 5 L32 13"/></svg>
+    <span class="cap">${caption}</span></div>`;
+}
+
+/* ---------- 01 open: capture + coding log ---------- */
+function renderCodeScaffold(){
+  const box=document.getElementById('codeScaffold');const t=document.getElementById('bText').value.trim();
+  const ws=t?contentWords(t):[];
+  box.innerHTML=`<div class="scaffold">
+    <div class="snote">Stuck naming it? You don't need a clever term — <b>point at the words in the passage that carry the point</b> and tap to build the concept from the author's own words.</div>
+    ${ws.length?`<div class="chips">${ws.map(w=>`<span class="chip" data-codeword="${esc(w)}">${esc(w)}</span>`).join('')}</div>`:`<div class="snote" style="font-style:italic">…paste a passage above and its words appear here to tap.</div>`}
+    <details class="ladder"><summary>still stuck? a few ways in</summary>
+      <ul>
+        <li>What is this passage an <b>example of</b>?</li>
+        <li>Tell a friend what this bit is about in <b>five words</b>.</li>
+        <li>What's the <b>one move</b> the author is making here?</li>
+        <li class="eg">Just to show the shape — concepts in plain words: &nbsp;<i>"tools go invisible until they break" · "people just know how to go on"</i></li>
+      </ul>
+      <div style="margin-top:6px;color:var(--ink-soft)">A concept can be a phrase, not a word. It's provisional — rename it later, or type an existing name to reuse it.</div>
+    </details></div>`;
+}
+function renderLog(){
+  const box=document.getElementById('codingLog');
+  document.getElementById('logCount').textContent=state.bytes.length?`(${state.bytes.length} bytes · ${state.concepts.length} concepts)`:'';
+  if(!state.bytes.length){box.innerHTML=emptyHtml('the log fills as you lay warp');return;}
+  box.innerHTML=[...state.bytes].reverse().map(b=>{
+    const c=conceptById(b.conceptId);const isOpen=openByte===b.id;
+    return `<div class="lrow ${isOpen?'open':''}">
+      <div class="lhead" data-toggle-byte="${b.id}">
+        <span class="lconcept">${esc(short(c?c.label:'?',46))}</span>
+        <span class="lsrc">${esc(short(b.source||'—',34))}</span>
+      </div>
+      ${isOpen?`<div class="lbody">
+        <span class="src">${esc(b.source||'—')}${b.location?' · '+esc(b.location):''}</span>
+        <div class="passage">${esc(b.text)}</div>
+        <div class="label" style="letter-spacing:.08em">Concept</div>
+        <div style="font-size:15px;margin:2px 0 2px">${esc(c?c.label:'?')}</div>
+        <div class="defrow"><span class="label">Working definition</span>
+          <input data-concept-def="${c?c.id:''}" value="${esc(c?c.def:'')}" placeholder="in your words; same sense across your sources?"></div>
+        <span class="rm" data-del-byte="${b.id}">remove byte</span>
+        ${c?`<span class="rm" data-del-concept="${c.id}" style="margin-left:14px">remove concept</span>`:''}
+      </div>`:''}</div>`;
+  }).join('');
+}
+
+/* ---------- 02 throw: palette + bench + threads ---------- */
+function renderPalette(){
+  const box=document.getElementById('palette');
+  document.getElementById('conceptCount').textContent=state.concepts.length?`(${state.concepts.length})`:'';
+  if(!state.concepts.length){box.innerHTML=emptyHtml('lay some warp on 01 — open first');return;}
+  box.innerHTML=state.concepts.map(c=>{const picked=(pairA===c.id||pairB===c.id);
+    return `<div class="crow ${picked?'picked':''}" data-pick-concept="${c.id}" title="tap to load into the bench">
+      <span class="clabel">${esc(c.label)}</span>
+      ${picked?`<span class="pickedtag">picked</span>`:''}</div>`;
+  }).join('');
+}
+function slotHtml(which,cid){
+  const c=cid?conceptById(cid):null;
+  return `<div class="slot ${c?'filled':''}"><span class="cap">${which==='A'?'From':'To'}</span>
+    ${c?`${esc(c.label)}<span class="clear" data-clear-slot="${which}">×</span>`:`<span class="ph">tap a concept on the left</span>`}</div>`;
+}
+function renderSlots(){
+  document.getElementById('pairSlots').innerHTML=
+    slotHtml('A',pairA)+
+    `<div class="swapcol"><span class="arr">⟶</span><button id="swapBtn" title="swap direction">⇄</button></div>`+
+    slotHtml('B',pairB);
+  const dn=document.getElementById('drawNote');
+  if(dn)dn.textContent=(drawn&&pairA&&pairB)?'the shuttle drew these — do they cross? “no crossing I can see” is a judgment too. draw again.':'';
+  updateThrow();
+}
+/* v7 — the bench narrates its own flow and sleeps until a pair is loaded */
+function updateThrow(){
+  const both=!!(pairA&&pairB&&pairA!==pairB);
+  const sent=((document.getElementById('eSentence')||{}).value||'').trim();
+  const sl=document.getElementById('benchSleeper');if(sl)sl.classList.toggle('asleep',!both);
+  const tb=document.getElementById('throwBtn');if(tb)tb.disabled=!(both&&sent);
+  const dl=document.getElementById('throwDo');
+  if(dl){
+    if(!pairA&&!pairB)dl.textContent='Tap two of your concepts to connect them.';
+    else if(both)dl.textContent='Two picked — now say how they relate, on the right. →';
+    else dl.textContent='Good — now tap a second.';
+  }
+  const n=(!pairA&&!pairB)?0:(!both?1:(!sent?2:3));
+  document.querySelectorAll('#throwRail .rstep').forEach(s=>{const r=+s.dataset.r;s.classList.toggle('now',r===n);s.classList.toggle('done',r<n);});
+}
+function renderOpeners(){
+  document.getElementById('openerChips').innerHTML=
+    OPENERS.map(o=>`<span class="openchip" data-opener="${esc(o)}">${esc(o)}…</span>`).join('');
+}
+function drawPair(){
+  const cs=state.concepts;
+  if(cs.length<2){alert('Lay at least two concepts on 01 — Open first.');return;}
+  const crossed=(a,b)=>state.edges.some(e=>(e.fromId===a&&e.toId===b)||(e.fromId===b&&e.toId===a));
+  let pairs=[];
+  for(let i=0;i<cs.length;i++)for(let j=i+1;j<cs.length;j++)if(!crossed(cs[i].id,cs[j].id))pairs.push([cs[i].id,cs[j].id]);
+  if(!pairs.length){for(let i=0;i<cs.length;i++)for(let j=i+1;j<cs.length;j++)pairs.push([cs[i].id,cs[j].id]);flash('every pair crossed — drawing any');}
+  const p=pairs[Math.floor(Math.random()*pairs.length)];
+  if(Math.random()<.5)p.reverse();
+  pairA=p[0];pairB=p[1];drawn=true;
+  renderPalette();renderSlots();}
+function nameHtml(e){
+  const cur=e.handle||'';
+  const plain=REGISTERS[0],more=REGISTERS.slice(1);
+  return `<div class="distill">
+    <div class="rnote"><b>Name this relation</b> (optional) — a short word so it can recur and join your vocabulary.</div>
+    <div class="form-row" style="margin:6px 0 8px"><input class="tinput" id="nameInput" value="${esc(cur)}" placeholder="your word… e.g. leads to · contradicts · is part of"></div>
+    <div class="rnote">Stuck for a word? Tap an everyday suggestion — or open <b>more tongues</b> for other fields&#39; vocabularies:</div>
+    <div class="chips">${plain.verbs.map(v=>`<span class="verbchip" data-nameword="${esc(v)}">${esc(v)}</span>`).join('')}</div>
+    <span class="distilltoggle ${moreTongues?'open':''}" id="moreTongues" style="margin-top:8px"><span class="tw">▸</span> more tongues</span>
+    ${moreTongues?more.map(r=>`<div style="margin-top:8px"><span class="cap">${esc(r.name)} · ${esc(r.tag)}</span><div class="chips" style="margin-top:4px">${r.verbs.map(v=>`<span class="verbchip borrowed" data-nameword="${esc(v)}">${esc(v)}</span>`).join('')}</div></div>`).join(''):''}
+    <div style="margin-top:10px"><button class="btn mini" data-save-name="${e.id}">Save name</button></div>
+  </div>`;
+}
+function renderThreads(){
+  const box=document.getElementById('threadList');
+  document.getElementById('threadCount').textContent=state.edges.length?`(${state.edges.length})`:'';
+  if(!state.edges.length){box.innerHTML=emptyHtml('nothing thrown yet — pick, pick, say');return;}
+  const ord=[...state.edges].sort((a,b)=>((a.handle?1:0)-(b.handle?1:0)));
+  box.innerHTML=ord.map(e=>{
+    const f=conceptById(e.fromId),t=conceptById(e.toId);const sel=namingFor===e.id;
+    const v=e.handle?`<span class="v">${esc(e.handle)}</span>`:`<span class="v loosev">${esc(short(e.sentence,38))}</span>`;
+    return `<div class="thread ${sel?'sel':''}">
+      <div class="trip"><b>${esc(short(f?f.label:'?',30))}</b> ${v} <b>${esc(short(t?t.label:'?',30))}</b></div>
+      <div class="sent">“${esc(e.sentence)}”</div>
+      <div class="tmeta">${e.handle?`<span class="pill beaten">named</span>`:`<span class="pill loose">unnamed</span>`}
+        <span class="act" data-name-edge="${e.id}">${sel?'close':(e.handle?'rename':'name it')}</span>
+        <span class="rm" data-del-edge="${e.id}">remove</span></div>
+      ${sel?nameHtml(e):''}</div>`;
+  }).join('');
+}
+
+/* ---------- 03 read the cloth ---------- */
+const NS='http://www.w3.org/2000/svg';
+function getCss(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function mkel(tag,attrs){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+function haloText(x,y,str,fill,size,italic){const t=mkel('text',{x:x,y:y,'text-anchor':'middle','font-family':'ui-monospace,Menlo,monospace','font-size':size||10,fill:fill,stroke:'#f4f2ec','stroke-width':'4','paint-order':'stroke','letter-spacing':'.04em'});if(italic)t.setAttribute('font-style','italic');t.textContent=str;return t;}
+function addDefs(svg){const defs=mkel('defs',{});
+  [['arwS','--sage'],['arwG','--grey'],['arwR','--red']].forEach(([mid,cv])=>{
+    const m=mkel('marker',{id:mid,viewBox:'0 0 10 10',refX:'9',refY:'5',markerWidth:'6.5',markerHeight:'6.5',orient:'auto-start-reverse'});
+    m.appendChild(mkel('path',{d:'M0,0 L10,5 L0,10 z',fill:getCss(cv)}));defs.appendChild(m);});
+  svg.appendChild(defs);}
+let readSel=null;   /* {type:'concept'|'edge', id} — red is reserved for this */
+let readPrompts=[]; /* v7 — computed interpretive prompts for the Read tab */
+function adjacency(){const adj={};state.edges.forEach(e=>{(adj[e.fromId]=adj[e.fromId]||[]).push(e);(adj[e.toId]=adj[e.toId]||[]).push(e);});return adj;}
+function componentOf(cid,adj){adj=adj||adjacency();const nodes=new Set([cid]);const q=[cid];const edges=[];const seenE=new Set();
+  while(q.length){const id=q.shift();(adj[id]||[]).forEach(e=>{if(!seenE.has(e.id)){seenE.add(e.id);edges.push(e);}
+    [e.fromId,e.toId].forEach(o=>{if(!nodes.has(o)){nodes.add(o);q.push(o);}});});}
+  return {nodes,edges};}
+function allComponents(){const adj=adjacency();const seen=new Set();const comps=[];
+  state.concepts.forEach(c=>{if(seen.has(c.id)||!(adj[c.id]||[]).length)return;
+    const comp=componentOf(c.id,adj);comp.nodes.forEach(x=>seen.add(x));comps.push(comp);});
+  return comps.sort((a,b)=>b.nodes.size-a.nodes.size);}
+const degreeOf=cid=>state.edges.filter(e=>e.fromId===cid||e.toId===cid).length;
+function renderRead(){renderArcNav();renderReadingPane();renderClothPrompts();updateReadRail();}
+/* v7 — the report becomes interpretive PROMPTS: question + move + "you decide".
+   The machine counts and sorts and poses a generic question; it never names
+   what the reading means. Clicking traces on the cloth and drops the
+   student's OWN material into "Your read". */
+function renderClothPrompts(){
+  const box=document.getElementById('clothPrompts');if(!box)return;
+  readPrompts=[];
+  if(!state.concepts.length){box.innerHTML=`<p class="empty">Nothing laid yet — prompts appear as you weave.</p>`;return;}
+  const NL=String.fromCharCode(10);
+  const comps=allComponents();
+  const degs=state.concepts.map(c=>({c,d:degreeOf(c.id)})).filter(o=>o.d>0).sort((a,b)=>b.d-a.d);
+  /* 1 — THE SPINE: the largest weave, walked into a draft argument */
+  if(comps.length&&comps[0].edges.length>=2){
+    const main=comps[0],rep=[...main.nodes][0];
+    const walk=componentOf(rep).edges;
+    const drop=walk.map(e=>{const f=conceptById(e.fromId),t=conceptById(e.toId);
+      return (f?f.label:'?')+' — '+(e.handle||'(loose)')+' — '+(t?t.label:'?')+': “'+e.sentence+'”';}).join(NL);
+    readPrompts.push({key:'the spine',rep:rep,gap:false,
+      q:`Your largest weave links <b>${main.nodes.size} concepts</b> across <b>${main.edges.length} threads</b>. Pull it — it already makes an argument.`,
+      move:'trace the spine →',drop:drop});
+  }
+  /* 2 — THE CENTRE: top-degree concept(s) */
+  if(degs.length){
+    const top=degs[0],tied=degs.filter(o=>o.d===top.d).slice(0,2);
+    const names=tied.map(o=>`<b>${esc(short(o.c.label,40))}</b>`).join(' and ');
+    readPrompts.push({key:'the centre',rep:top.c.id,repHub:tied.map(o=>o.c.id),gap:false,
+      q:`${tied.length>1?'Two concepts carry':'One concept carries'} the most threads (${top.d}): ${names}. Your cloth keeps returning to ${tied.length>1?'them':'it'} — ${tied.length>1?'are they':'is it'} the core?`,
+      move:'trace the centre →'});
+  }
+  /* 3 — THE GAP: an island, else unwoven warp */
+  const islands=comps.slice(1),unwoven=state.concepts.filter(c=>degreeOf(c.id)===0);
+  if(islands.length){
+    const isl=islands[0],names=[...isl.nodes].map(id=>conceptById(id)).filter(Boolean);
+    readPrompts.push({key:'the gap',rep:[...isl.nodes][0],gap:true,
+      q:`<b>${names.map(c=>esc(short(c.label,28))).join('</b> and <b>')}</b> tie to each other but to nothing else. The sharpest question on the cloth: should they?`,
+      move:'note the question →',
+      drop:`OPEN QUESTION: ${names.map(c=>c.label).join(' / ')} ties to nothing else on the cloth. A real gap in the field — or just in my reading? → where the next reading goes.`});
+  } else if(unwoven.length){
+    readPrompts.push({key:'the gap',rep:unwoven[0].id,gap:true,
+      q:`<b>${esc(short(unwoven[0].label,38))}</b>${unwoven.length>1?` and ${unwoven.length-1} other${unwoven.length-1!==1?'s':''}`:''} cross nothing yet — warp with no weft. The sharpest question: where ${unwoven.length>1?'do they':'does it'} belong?`,
+      move:'note the question →',
+      drop:`OPEN QUESTION: ${unwoven.slice(0,4).map(c=>c.label).join(' / ')} not yet connected. Where ${unwoven.length>1?'do they':'does it'} belong on the cloth?`});
+  }
+  /* 4 — YOUR WORDS: a recurring handle becoming vocabulary */
+  const hc={};state.edges.forEach(e=>{if(e.handle){const k=e.handle.toLowerCase();hc[k]=(hc[k]||0)+1;}});
+  const rec=Object.entries(hc).filter(([k,v])=>v>1).sort((a,b)=>b[1]-a[1]);
+  if(rec.length){
+    readPrompts.push({key:'your words',rep:null,gap:false,
+      q:`You've reached for <b>“${esc(rec[0][0])}”</b> on ${rec[0][1]} threads — it's becoming one of your own terms.`,
+      move:'a coinage forming',drop:''});
+  }
+  const loose=state.edges.filter(e=>!e.handle).length;
+  box.innerHTML=readPrompts.map((p,i)=>
+    `<div class="prompt ${readSel&&readSel.promptIdx===i?'on':''}" data-prompt="${i}">`+
+    `<span class="youdecide">you decide</span><span class="pk">${p.key}</span>`+
+    `<div class="pq">${p.q}</div>${p.move?`<span class="pm">${p.move}</span>`:''}</div>`).join('')
+    +(loose?`<div class="ghostnote" style="margin-top:6px">${loose} unnamed thread${loose!==1?'s':''} — name ${loose!==1?'them':'it'} on 02 so a word can recur.</div>`:'');
+}
+function updateReadRail(){
+  const wrote=!!(state.read&&state.read.trim());
+  let n=0;
+  if(wrote)n=3;else if(readSel&&readSel.gap)n=2;else if(readSel)n=1;
+  document.querySelectorAll('#readRail .rstep').forEach(s=>{const r=+s.dataset.r;s.classList.toggle('now',r===n);s.classList.toggle('done',r<n);});
+}
+function renderArcNav(){
+  const svg=document.getElementById('map');if(!svg)return;svg.innerHTML='';addDefs(svg);
+  if(!state.concepts.length){renderEmptyField(svg);return;}
+  const W=Math.max((svg.getBoundingClientRect().width|0),720),H=400,baseY=H-128,mL=46,mR=34;
+  const cs=state.concepts,n=cs.length;
+  const X=i=>n===1?W/2:mL+i*(W-mL-mR)/(n-1);
+  const idx={};cs.forEach((c,i)=>idx[c.id]=i);
+  let selNodes=null,selEdges=null,selEdgeId=null;
+  if(readSel&&readSel.type==='concept'){const comp=componentOf(readSel.id);selNodes=comp.nodes;selEdges=new Set(comp.edges.map(e=>e.id));}
+  if(readSel&&readSel.type==='hub'){const ids=readSel.ids||[];selNodes=new Set(ids);selEdges=new Set();
+    state.edges.forEach(e=>{if(ids.includes(e.fromId)||ids.includes(e.toId)){selEdges.add(e.id);selNodes.add(e.fromId);selNodes.add(e.toId);}});}
+  if(readSel&&readSel.type==='edge')selEdgeId=readSel.id;
+  cs.forEach((c,i)=>svg.appendChild(mkel('line',{x1:X(i),y1:28,x2:X(i),y2:baseY,stroke:'rgba(168,132,63,.14)','stroke-width':1})));
+  svg.appendChild(mkel('line',{x1:mL-16,y1:baseY,x2:W-mR+14,y2:baseY,stroke:getCss('--rule'),'stroke-width':1.2}));
+  const eo=state.edges.map((e,k)=>({e,k})).filter(o=>idx[o.e.fromId]!=null&&idx[o.e.toId]!=null&&o.e.fromId!==o.e.toId);
+  eo.sort((a,b)=>Math.abs(X(idx[b.e.fromId])-X(idx[b.e.toId]))-Math.abs(X(idx[a.e.fromId])-X(idx[a.e.toId])));
+  eo.forEach(({e,k})=>{
+    const fx=X(idx[e.fromId]),tx=X(idx[e.toId]),span=Math.abs(tx-fx);if(!span)return;
+    const h=Math.min(baseY-44,28+span*0.2+(k%3)*11);
+    const beaten=!!e.handle,isSel=selEdgeId===e.id;
+    let col=getCss(isSel?'--red':(beaten?'--sage':'--grey')),op=1;
+    if(selEdgeId&&!isSel)op=.18;else if(selEdges&&!selEdges.has(e.id))op=.15;
+    const sel=()=>{readSel=(readSel&&readSel.type==='edge'&&readSel.id===e.id)?null:{type:'edge',id:e.id};renderRead();};
+    const p=mkel('path',{d:`M ${fx} ${baseY-6} A ${span/2} ${h} 0 0 ${fx<tx?1:0} ${tx} ${baseY-6}`,fill:'none',stroke:col,opacity:op,'stroke-width':isSel?2:1.5,'marker-end':`url(#${isSel?'arwR':(beaten?'arwS':'arwG')})`,cursor:'pointer'});
+    if(!beaten)p.setAttribute('stroke-dasharray','5 4');
+    const ti=mkel('title',{});ti.textContent='“'+e.sentence+'”';p.appendChild(ti);
+    p.addEventListener('click',sel);svg.appendChild(p);
+    const t=haloText((fx+tx)/2,baseY-6-h-5,e.handle||short(e.sentence,34),col,10,!beaten);
+    t.setAttribute('opacity',op);t.setAttribute('cursor','pointer');t.addEventListener('click',sel);svg.appendChild(t);});
+  cs.forEach((c,i)=>{const x=X(i);
+    const isSel=readSel&&readSel.type==='concept'&&readSel.id===c.id;
+    const op=(selNodes&&!selNodes.has(c.id))?.3:1;
+    const sel=()=>{readSel=isSel?null:{type:'concept',id:c.id};renderRead();};
+    const tick=mkel('circle',{cx:x,cy:baseY,r:isSel?4.6:3.4,fill:getCss(isSel?'--red':'--ochre'),cursor:'pointer',opacity:op});
+    tick.addEventListener('click',sel);svg.appendChild(tick);
+    const t=mkel('text',{transform:`translate(${x+4},${baseY+13}) rotate(30)`,'font-family':'"Newsreader",Georgia,serif','font-size':'11.5',fill:getCss(isSel?'--red':'--ink'),cursor:'pointer',opacity:op});
+    t.textContent=short(c.label,34);
+    const ti=mkel('title',{});ti.textContent=c.label+(c.def?' — '+c.def:'');t.appendChild(ti);
+    t.addEventListener('click',sel);svg.appendChild(t);});
+}
+function tripleHtml(e){const f=conceptById(e.fromId),t=conceptById(e.toId);
+  const v=e.handle?`<span class="vpill">${esc(e.handle)}</span>`:`<span class="vpill loosev">loose</span>`;
+  return `<b>${esc(short(f?f.label:'?',34))}</b> ${v} <b>${esc(short(t?t.label:'?',34))}</b>`;}
+function renderReadingPane(){
+  const box=document.getElementById('readingPane');if(!box)return;
+  if(!readSel){box.innerHTML=`<p class="empty">Click a prompt above — or a concept/arc on the cloth — to lay your threads out here as material to weave from.</p>`;return;}
+  if(readSel.type==='hub'){const ids=readSel.ids||[];
+    const inc=state.edges.filter(e=>ids.includes(e.fromId)||ids.includes(e.toId));
+    const names=ids.map(id=>conceptById(id)).filter(Boolean).map(x=>x.label);
+    box.innerHTML=`<div class="threadhead">${names.map(n=>`<span class="red">${esc(short(n,40))}</span>`).join(' · ')} <span class="n">· ${inc.length} thread${inc.length!==1?'s':''} meet here</span></div>
+      <p class="hint" style="margin:4px 0 9px">The threads that converge on your busiest concept${ids.length>1?'s':''} — your own sentences. <b>You</b> decide whether this is the core, and weave it into your read.</p>
+      <button class="btn ghost mini" id="copyDraft">copy these threads</button>
+      <div style="margin-top:4px">${inc.map(e=>`<div class="readitem"><div class="trip">${tripleHtml(e)}</div><div class="sent">“${esc(e.sentence)}”</div></div>`).join('')}</div>`;
+    return;}
+  if(readSel.type==='edge'){const e=edgeById(readSel.id);if(!e){readSel=null;renderReadingPane();return;}
+    const f=conceptById(e.fromId),t=conceptById(e.toId);
+    box.innerHTML=`<div class="threadhead"><span class="red">${esc(f?f.label:'?')}</span> ${e.handle?`<span class="vpill">${esc(e.handle)}</span>`:`<span class="vpill loosev">loose</span>`} <span class="red">${esc(t?t.label:'?')}</span></div>
+      <p style="font-size:15.5px;font-style:italic;margin:8px 0 14px">“${esc(e.sentence)}”</p>
+      ${[f,t].filter(Boolean).map(c=>`<div class="label" style="margin-top:8px">${esc(short(c.label,44))}</div>
+        ${c.def?`<div style="font-size:13.5px;color:var(--ink-soft)">${esc(c.def)}</div>`:''}
+        ${bytesOf(c.id).map(b=>`<div class="bytequote"><span class="src">${esc(b.source||'—')}${b.location?' · '+esc(b.location):''}</span><br>${esc(b.text)}</div>`).join('')}`).join('')}`;
+    return;}
+  const c=conceptById(readSel.id);if(!c){readSel=null;renderReadingPane();return;}
+  const comp=componentOf(c.id);
+  if(!comp.edges.length){box.innerHTML=`<div class="threadhead"><span class="red">${esc(c.label)}</span></div>
+    <p class="empty">This thread crosses nothing yet — warp waiting for weft. Take it to 02 — Throw.</p>`;return;}
+  box.innerHTML=`<div class="threadhead"><span class="red">${esc(c.label)}</span> <span class="n">· ${comp.edges.length} crossing${comp.edges.length!==1?'s':''}</span></div>
+    <p class="hint" style="margin:4px 0 9px">Your threads, in walking order — your own sentences, laid out as raw material. <b>You</b> weave them into a read on the right, in your own words. Copy to quote a line.</p>
+    <button class="btn ghost mini" id="copyDraft">copy these threads</button>
+    <div style="margin-top:4px">${comp.edges.map(e=>`<div class="readitem"><div class="trip">${tripleHtml(e)}</div><div class="sent">“${esc(e.sentence)}”</div></div>`).join('')}</div>`;
+}
+function buildDraft(){
+  if(!readSel)return '';
+  let edges=[],head='';
+  if(readSel.type==='concept'){const c=conceptById(readSel.id);if(!c)return '';head='Threads from: '+c.label;edges=componentOf(c.id).edges;}
+  else if(readSel.type==='hub'){const ids=readSel.ids||[];const names=ids.map(id=>(conceptById(id)||{}).label).filter(Boolean);
+    head='Threads meeting at: '+names.join(' / ');edges=state.edges.filter(e=>ids.includes(e.fromId)||ids.includes(e.toId));}
+  else return '';
+  const NL=String.fromCharCode(10);
+  let out=head+NL+(state.student?('('+state.student+')'+NL):'')+NL;
+  edges.forEach(e=>{const f=conceptById(e.fromId),t=conceptById(e.toId);
+    out+=(f?f.label:'?')+' — '+(e.handle||'(loose)')+' — '+(t?t.label:'?')+NL+'“'+e.sentence+'”'+NL+NL;});
+  return out;}
+function copyDraftToClipboard(){
+  const txt=buildDraft();if(!txt)return;
+  const done=()=>flash('copied to clipboard');
+  const fallback=()=>{const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done();}catch(e){flash('select & copy by hand');}document.body.removeChild(ta);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,fallback);else fallback();}
+function renderClothReport(){
+  const box=document.getElementById('clothReport');if(!box)return;
+  if(!state.concepts.length){box.innerHTML=`<p class="empty">Nothing laid yet — the report fills as you weave.</p>`;return;}
+  const comps=allComponents();
+  const degs=state.concepts.map(c=>({c,d:degreeOf(c.id)}));
+  const most=degs.filter(o=>o.d>0).sort((a,b)=>b.d-a.d).slice(0,3);
+  const unwoven=degs.filter(o=>!o.d).map(o=>o.c);
+  const islands=comps.slice(1);
+  const hc={};state.edges.forEach(e=>{if(e.handle){const k=e.handle.toLowerCase();hc[k]=(hc[k]||[]).concat(e);}});
+  const rec=Object.entries(hc).filter(([k,v])=>v.length>1).sort((a,b)=>b[1].length-a[1].length);
+  const loose=state.edges.filter(e=>!e.handle);
+  let h='';
+  h+=`<span class="cap">most woven</span>`+(most.length?most.map(o=>`<div class="line">${esc(short(o.c.label,46))} <span class="ct">· ${o.d} thread${o.d!==1?'s':''}</span></div>`).join(''):`<div class="line" style="font-style:italic">nothing woven yet.</div>`);
+  h+=`<span class="cap">islands</span>`+(islands.length?islands.map(co=>`<div class="line">${[...co.nodes].map(id=>esc(short((conceptById(id)||{}).label||'?',30))).join(' · ')} <span class="ct">· not yet tied to the mainland</span></div>`).join(''):`<div class="line" style="font-style:italic">${comps.length?'one cloth — everything ties together.':'no threads thrown yet.'}</div>`);
+  h+=`<span class="cap">unwoven warp</span>`+(unwoven.length?unwoven.map(c=>`<div class="line">${esc(short(c.label,46))} <span class="ct">· crosses nothing</span></div>`).join(''):`<div class="line" style="font-style:italic">every thread crosses at least once.</div>`);
+  h+=`<span class="cap">recurring handles</span>`+(rec.length?rec.map(([k,v])=>`<div class="line">“${esc(k)}” <span class="ct">· ×${v.length} — becoming vocabulary</span></div>`).join(''):`<div class="line" style="font-style:italic">no handle repeats yet — vocabulary still forming.</div>`);
+  h+=`<span class="cap">loose picks</span><div class="line">${loose.length?loose.length+' awaiting a beat — distil a handle to bind '+(loose.length!==1?'them':'it')+' in.':'none — the cloth is beaten tight.'}</div>`;
+  box.innerHTML=h;
+}
+function renderEmptyField(svg){
+  const g=mkel('g',{});
+  g.appendChild(mkel('circle',{cx:480,cy:170,r:7,fill:'none',stroke:getCss('--red'),'stroke-width':1.3}));
+  [[480,156,480,163],[480,177,480,184],[466,170,473,170],[487,170,494,170]].forEach(([x1,y1,x2,y2])=>
+    g.appendChild(mkel('line',{x1,y1,x2,y2,stroke:getCss('--red'),'stroke-width':1.3})));
+  const t1=mkel('text',{x:480,y:206,'text-anchor':'middle','font-family':'ui-monospace,Menlo,monospace','font-size':9,'letter-spacing':2,fill:getCss('--red')});t1.textContent='HERE.';g.appendChild(t1);
+  const t2=mkel('text',{x:480,y:226,'text-anchor':'middle','font-family':'ui-monospace,Menlo,monospace','font-size':9,'letter-spacing':2,fill:getCss('--grey')});t2.textContent='THE CLOTH BEGINS WITH ONE THROWN THREAD.';g.appendChild(t2);
+  svg.appendChild(g);
+}
+
+/* ---------- v7 first-run walkthrough ---------- */
+const GUIDE=[
+ {k:'how loom works',h:'Loom turns reading into weaving',
+  p:'You read anywhere — book, PDF, screen — and bring the good bits here. Over three steps the pieces become a map of your own understanding. The tool holds the structure; you do all the thinking.',
+  loom:'Three tabs = three moves, in order: 01 Open · 02 Throw · 03 Read.'},
+ {k:'01 — open',h:'① Lay the warp',
+  p:'Paste a passage and say what it’s about in your own words. Crude is fine — “tools go invisible until they break” is a perfectly good concept. Each one joins your coding log.',
+  loom:'Warp = your concepts: the threads held under tension first.'},
+ {k:'02 — throw',h:'② Throw the weft',
+  p:'Tap two of your concepts, then say — however awkwardly — how they hang together. That sentence is the connection. Optionally distil a short handle from your own words; the machine never names it for you.',
+  loom:'Weft = the relations thrown across to bind the warp. Pick · pick · say · throw.'},
+ {k:'03 — read',h:'③ Read the cloth',
+  p:'Now read the whole weave: what argument runs through it, what it keeps returning to, what’s missing. The tool points you to each as a question — you write the reading.',
+  loom:'Look · trace · question · write. The reading is yours; the tool only counts and asks.'},
+];
+let guideStep=0;
+function renderGuide(){
+  const b=document.getElementById('guideBox');if(!b)return;const g=GUIDE[guideStep];const last=guideStep===GUIDE.length-1;
+  b.innerHTML=`<div class="gk">${g.k}</div><h2>${esc(g.h)}</h2><p>${g.p}</p><div class="gloom">${g.loom}</div>
+    <div class="gnav"><span class="skip" id="guideSkip">${last?'':'skip'}</span>
+    <div class="dots">${GUIDE.map((_,i)=>`<span class="dot ${i===guideStep?'on':''}"></span>`).join('')}</div>
+    <button class="btn" id="guideNext">${last?'Start weaving':'Next →'}</button></div>`;
+}
+function showGuide(){guideStep=0;renderGuide();document.getElementById('guideScrim').classList.add('show');}
+function hideGuide(){document.getElementById('guideScrim').classList.remove('show');try{localStorage.setItem(KEY+'-seen','1');}catch(e){}}
+
+/* ---------- wiring ---------- */
+const FOOT={open:['01 — OPEN','LAY THE WARP'],throw:['02 — THROW','ONE THREAD AT A TIME'],read:['03 — READ','PULL A THREAD']};
+const on=(id,ev,fn)=>{const el=document.getElementById(id);if(el)el.addEventListener(ev,fn);};
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+b.dataset.mode).classList.add('active');
+  const f=FOOT[b.dataset.mode];document.getElementById('footLeft').textContent=f[0];document.getElementById('footRight').textContent=f[1];
+  if(b.dataset.mode==='read')renderRead();}));
+on('student','input',e=>{state.student=e.target.value;save();});
+on('yourRead','input',e=>{state.read=e.target.value;save();updateReadRail();});
+on('copyReadBtn','click',()=>{
+  const txt=(state.read||'').trim();
+  if(!txt){flash('your read is empty — trace a prompt or write first');return;}
+  const out=(state.student?state.student+' — ':'')+'my read of the cloth'+String.fromCharCode(10,10)+state.read;
+  const mark=()=>{flash('copied to clipboard');const d=document.getElementById('readDrafted');if(d)d.textContent='✓ copied — paste into your essay';};
+  const fb=()=>{const ta=document.createElement('textarea');ta.value=out;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');mark();}catch(e){flash('select & copy by hand');}document.body.removeChild(ta);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(out).then(mark,fb);else fb();
+});
+
+const bText=document.getElementById('bText');
+function tidy(t){return t.replace(/-\s*\n\s*/g,'').replace(/\s*\n\s*/g,' ').replace(/\s{2,}/g,' ').trim();}
+bText.addEventListener('paste',e=>{e.preventDefault();bText.value=tidy((e.clipboardData||window.clipboardData).getData('text'));renderCodeScaffold();});
+bText.addEventListener('input',renderCodeScaffold);
+on('addByteBtn','click',()=>{const text=bText.value.trim(),cname=document.getElementById('bConcept').value.trim();
+  if(!text){alert('Paste or type a passage.');return;}
+  if(!cname){alert('Name the concept this byte evidences — your own words. Tap words from the passage if you’re stuck.');return;}
+  const c=getOrCreateConcept(cname);
+  const b={id:uid(),conceptId:c.id,source:document.getElementById('bSource').value.trim(),location:document.getElementById('bLoc').value.trim(),text};
+  state.bytes.push(b);openByte=b.id;
+  ['bText','bLoc','bConcept'].forEach(id=>document.getElementById(id).value='');save();renderAll();});
+on('addConceptBtn','click',()=>{const v=document.getElementById('cInput').value.trim();if(!v)return;getOrCreateConcept(v);document.getElementById('cInput').value='';save();renderAll();});
+
+/* bench sentence: static textarea; only the distill zone re-renders */
+on('eSentence','input',updateThrow);
+on('throwBtn','click',()=>{
+  const s=document.getElementById('eSentence').value.trim();
+  if(!pairA||!pairB){alert('Load both slots — tap two concepts on the left.');return;}
+  if(pairA===pairB){alert('Pick two different concepts.');return;}
+  if(!s){alert('Say how they hang together — however awkwardly. The sentence is the thread.');return;}
+  state.edges.push({id:uid(),fromId:pairA,toId:pairB,sentence:s,handle:''});
+  pairA=null;pairB=null;drawn=false;document.getElementById('eSentence').value='';
+  save();renderAll();flash('thread thrown — name it below when you like');});
+
+document.body.addEventListener('click',e=>{
+  if(e.target.id==='guideNext'){if(guideStep>=GUIDE.length-1)hideGuide();else{guideStep++;renderGuide();}return;}
+  if(e.target.id==='guideSkip'){hideGuide();return;}
+  const cw=e.target.dataset.codeword;if(cw){const inp=document.getElementById('bConcept');inp.value=(inp.value+' '+cw).replace(/\s{2,}/g,' ').trim();inp.focus();return;}
+  const tb=e.target.closest('[data-toggle-byte]');if(tb){const id=tb.dataset.toggleByte;openByte=(openByte===id)?null:id;renderLog();return;}
+  if(e.target.dataset.delByte){const id=e.target.dataset.delByte;
+    state.bytes=state.bytes.filter(b=>b.id!==id);if(openByte===id)openByte=null;save();renderAll();return;}
+  if(e.target.id==='drawBtn'){drawPair();return;}
+  if(e.target.dataset.opener!==undefined){const ta=document.getElementById('eSentence');
+    const o=e.target.dataset.opener;
+    ta.value=ta.value.trim()?ta.value.replace(/\s+$/,'')+' '+o+' ':o+' ';
+    ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);updateThrow();return;}
+  const pcEl=e.target.closest('[data-pick-concept]');
+  if(pcEl){const id=pcEl.dataset.pickConcept;
+    if(pairA===id)pairA=null;else if(pairB===id)pairB=null;
+    else if(!pairA)pairA=id;else if(!pairB)pairB=id;else pairB=id;
+    drawn=false;renderPalette();renderSlots();return;}
+  if(e.target.dataset.clearSlot){if(e.target.dataset.clearSlot==='A')pairA=null;else pairB=null;drawn=false;renderPalette();renderSlots();return;}
+  if(e.target.id==='copyDraft'){copyDraftToClipboard();return;}
+  const pr=e.target.closest('[data-prompt]');
+  if(pr){const i=+pr.dataset.prompt;const p=readPrompts[i];if(!p)return;
+    if(p.repHub)readSel={type:'hub',ids:p.repHub,promptIdx:i,gap:false};
+    else readSel=p.rep?{type:'concept',id:p.rep,promptIdx:i,gap:p.gap}:null;
+    const d=document.getElementById('readDrafted');
+    if(d)d.textContent=p.rep?'traced on the cloth — your threads are laid out on the left, yours to weave here in your own words.':'just a pattern to notice — nothing to lay out.';
+    renderRead();return;}
+  if(e.target.id==='swapBtn'){const t=pairA;pairA=pairB;pairB=t;renderSlots();return;}
+  if(e.target.dataset.delConcept){const id=e.target.dataset.delConcept;
+    if(state.edges.some(x=>x.fromId===id||x.toId===id)){alert('Used in a thrown thread. Remove the thread first.');return;}
+    if(bytesOf(id).length&&!confirm('This concept has bytes; removing it removes them too. Continue?'))return;
+    state.concepts=state.concepts.filter(c=>c.id!==id);state.bytes=state.bytes.filter(b=>b.conceptId!==id);
+    if(pairA===id)pairA=null;if(pairB===id)pairB=null;delete state.positions[id];save();renderAll();return;}
+  /* tongue suggestions in the namer — tap to fill the name input */
+  if(e.target.dataset.nameword!==undefined){const i=document.getElementById('nameInput');
+    if(i){i.value=e.target.dataset.nameword;i.focus();}return;}
+  if(e.target.closest('#moreTongues')){moreTongues=!moreTongues;renderThreads();return;}
+  if(e.target.dataset.nameEdge){const id=e.target.dataset.nameEdge;
+    namingFor=(namingFor===id)?null:id;moreTongues=false;renderThreads();return;}
+  if(e.target.dataset.saveName){const ed=edgeById(e.target.dataset.saveName);if(!ed)return;
+    const h=((document.getElementById('nameInput')||{}).value||'').trim();
+    ed.handle=h;namingFor=null;save();renderAll();flash(h?'named':'left unnamed');return;}
+  if(e.target.dataset.delEdge){const id=e.target.dataset.delEdge;
+    state.edges=state.edges.filter(x=>x.id!==id);if(namingFor===id)namingFor=null;save();renderAll();return;}
+});
+document.body.addEventListener('input',e=>{
+  if(e.target.dataset.conceptDef){const c=conceptById(e.target.dataset.conceptDef);if(c){c.def=e.target.value;save();}}
+  if(e.target.dataset.conceptNote){const c=conceptById(e.target.dataset.conceptNote);if(c){c.note=e.target.value;save();}}
+});
+
+on('exportBtn','click',()=>{const name=(state.student||'loom').replace(/\s+/g,'_').toLowerCase();const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name+'-loom.json';a.click();URL.revokeObjectURL(a.href);});
+on('importBtn','click',()=>document.getElementById('importFile').click());
+on('importFile','change',e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{state=migrate(JSON.parse(rd.result));openByte=null;pairA=pairB=null;namingFor=null;save();renderAll();}catch(err){alert('That file did not parse as JSON.');}};rd.readAsText(f);});
+
+load();renderOpeners();renderAll();
+on('helpBtn','click',showGuide);
+const _scrim=document.getElementById('guideScrim');if(_scrim)_scrim.addEventListener('click',e=>{if(e.target.id==='guideScrim')hideGuide();});
+if(AUTO_GUIDE){try{if(!localStorage.getItem(KEY+'-seen'))showGuide();}catch(e){}}
+</script>
+</body>
+</html>
