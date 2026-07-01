@@ -122,6 +122,8 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
                 className: "loom-byte-highlight",
                 acrossElements: true,
                 diacritics: true,
+                ignoreJoiners: true,
+                ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'"],
                 done: (count) => {
                   matches += count;
                   console.log(`[Loom PDF] Marked "${passage.substring(0, 20)}..." -> ${count} matches`);
@@ -206,25 +208,26 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
         }
         
         .pdf-side-nav {
-          position: absolute;
-          top: 50%;
-          transform: translateY(-50%);
-          zIndex: 100;
-          fontSize: 32px;
-          padding: 20px 15px;
-          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 64px;
+          height: 64px;
+          border-radius: 50%;
           background: transparent;
           border: none;
           color: var(--ink-soft);
           cursor: pointer;
           transition: all 0.2s;
+          flex-shrink: 0;
         }
         .pdf-side-nav:hover:not(:disabled) {
           background: rgba(0,0,0,0.05);
           color: var(--ink);
+          transform: scale(1.1);
         }
         .pdf-side-nav:disabled {
-          opacity: 0.2;
+          opacity: 0.1;
           cursor: not-allowed;
         }
       `}</style>
@@ -275,27 +278,29 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
         </div>
       </div>
 
-      {/* Main Content Area with Side Nav */}
-      <div style={{ flex: 1, position: "relative", display: "flex", overflow: "hidden" }}>
+      {/* Main Content Area */}
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", display: "flex", justifyContent: "center", backgroundColor: "#eef0f2" }}>
         
-        {/* Left Arrow */}
-        <button 
-          className="pdf-side-nav"
-          style={{ left: "20px" }}
-          onClick={handlePrev}
-          disabled={!canGoPrev}
-          aria-label="Previous Page"
-        >
-          &lt;
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "20px", padding: "30px", minHeight: "100%" }}>
+          
+          {/* Left Arrow */}
+          <button 
+            className="pdf-side-nav"
+            onClick={handlePrev}
+            disabled={!canGoPrev}
+            aria-label="Previous Page"
+          >
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
 
-        {/* PDF Container */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "20px 80px", display: "flex", justifyContent: "center" }}>
+          {/* PDF Container */}
           <Document 
             file={url} 
             onLoadSuccess={onDocumentLoadSuccess} 
-            loading={<div className="hint" style={{ marginTop: "40px" }}>Loading PDF...</div>}
-            error={<div className="hint" style={{ marginTop: "40px", color: "var(--red)" }}>Failed to load PDF. Check file path.</div>}
+            loading={<div className="hint">Loading PDF...</div>}
+            error={<div className="hint" style={{ color: "var(--red)" }}>Failed to load PDF. Check file path.</div>}
           >
             <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
               <Page 
@@ -318,18 +323,19 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
               )}
             </div>
           </Document>
-        </div>
 
-        {/* Right Arrow */}
-        <button 
-          className="pdf-side-nav"
-          style={{ right: "20px" }}
-          onClick={handleNext}
-          disabled={!canGoNext}
-          aria-label="Next Page"
-        >
-          &gt;
-        </button>
+          {/* Right Arrow */}
+          <button 
+            className="pdf-side-nav"
+            onClick={handleNext}
+            disabled={!canGoNext}
+            aria-label="Next Page"
+          >
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Floating Capture Button */}
