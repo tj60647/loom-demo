@@ -6,6 +6,21 @@ import { users } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import type { Adapter } from "next-auth/adapters"
 
+const ALLOWED_EMAILS = [
+  "john@zerowidth.ai",
+  "caseysimone@berkeley.edu",
+  "hugh@dubberly.com",
+  "kevinma1515@berkeley.edu",
+  "kosa@berkeley.edu",
+  "maxkreminski@gmail.com",
+  "mkremins@berkeley.edu",
+  "shm.almeda@berkeley.edu",
+  "sophiawliu@berkeley.edu",
+  "tjm@tjmcleish.com",
+  "tjmcleish@berkeley.edu"
+  // Add your own email here if it's not already in the list!
+]
+
 export const authOptions: NextAuthOptions = {
   adapter: DrizzleAdapter(db) as Adapter,
   providers: [
@@ -15,6 +30,12 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user }) {
+      if (user.email && ALLOWED_EMAILS.includes(user.email)) {
+        return true
+      }
+      return false // Return false to deny access
+    },
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id;

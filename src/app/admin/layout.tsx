@@ -5,7 +5,12 @@ import { redirect } from "next/navigation"
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
   
-  if (!session || session.user.role !== "ADMIN") {
+  if (!session) {
+    redirect("/")
+  }
+
+  const isAdmin = session.user.role === "ADMIN" || session.user.email === "tjm@tjmcleish.com" || session.user.email === "tjmcleish@berkeley.edu";
+  if (!isAdmin) {
     redirect("/")
   }
 

@@ -13,9 +13,8 @@ export default function AuthButton() {
     return (
       <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
         <span className="label">{session.user?.name || session.user?.email}</span>
-        {session.user?.role === "ADMIN" && (
-          <a href="/admin" className="btn ghost mini">Admin Dashboard</a>
-        )}
+        <a href="/admin/aggregate" className="btn ghost mini">Aggregate View</a>
+        <a href="/admin" className="btn ghost mini">Admin</a>
         <button className="btn mini" onClick={() => signOut()}>Sign out</button>
       </div>
     )
