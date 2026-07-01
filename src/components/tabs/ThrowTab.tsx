@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import type { Concept } from "@/lib/types"
 
@@ -39,11 +39,10 @@ export default function ThrowTab() {
         e.preventDefault();
         
         if (e.shiftKey) {
-          // Redo
           setRedoStack(prevRedo => {
             if (prevRedo.length === 0) return prevRedo;
             const action = prevRedo[prevRedo.length - 1];
-            editEdge(action.edgeId, { handle: action.to });
+            editEdge(action.edgeId, { handle: action.to ?? undefined });
             setUndoStack(prevUndo => [...prevUndo, action]);
             return prevRedo.slice(0, -1);
           });
@@ -52,7 +51,7 @@ export default function ThrowTab() {
           setUndoStack(prevUndo => {
             if (prevUndo.length === 0) return prevUndo;
             const action = prevUndo[prevUndo.length - 1];
-            editEdge(action.edgeId, { handle: action.from });
+            editEdge(action.edgeId, { handle: action.from ?? undefined });
             setRedoStack(prevRedo => [...prevRedo, action]);
             return prevUndo.slice(0, -1);
           });
@@ -64,7 +63,7 @@ export default function ThrowTab() {
         setRedoStack(prevRedo => {
           if (prevRedo.length === 0) return prevRedo;
           const action = prevRedo[prevRedo.length - 1];
-          editEdge(action.edgeId, { handle: action.to });
+          editEdge(action.edgeId, { handle: action.to ?? undefined });
           setUndoStack(prevUndo => [...prevUndo, action]);
           return prevRedo.slice(0, -1);
         });
