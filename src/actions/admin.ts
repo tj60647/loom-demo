@@ -6,10 +6,12 @@ import { eq } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 
+import { redirect } from "next/navigation"
+
 export async function checkAdmin() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id || session.user.role !== "ADMIN") {
-    throw new Error("Unauthorized: Admin access required")
+    redirect("/")
   }
 }
 

@@ -1,9 +1,6 @@
 export default function LibraryTab() {
   return (
     <>
-      <p className="tasktitle">00 Library</p>
-      <p className="tasksub">Foundational texts for ethnographic coding, object worlds, and boundary objects.</p>
-      
       <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
         
         <div className="card" style={{ padding: "20px" }}>
