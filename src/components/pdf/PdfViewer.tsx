@@ -19,7 +19,11 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
   
   // Layout state
   const [isTwoPage, setIsTwoPage] = useState(false);
+  const [fitMode, setFitMode] = useState<"width" | "height">("height");
   const [pageHeight, setPageHeight] = useState(800);
+  const [containerWidth, setContainerWidth] = useState(800);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string} | null>(null);
   const [showCaptureModal, setShowCaptureModal] = useState(false);
@@ -28,11 +32,9 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
   // Responsive sizing and layout detection
   useEffect(() => {
     const updateLayout = () => {
-      // Calculate available height (viewport minus toolbar and some padding)
-      const availableHeight = window.innerHeight - 120;
+      const availableHeight = window.innerHeight - 150; // account for header and toolbar
       setPageHeight(Math.max(400, availableHeight));
       
-      // Auto-switch to single page if screen is too narrow (e.g. mobile/tablet portrait)
       if (window.innerWidth < 900) {
         setIsTwoPage(false);
       }
@@ -41,6 +43,20 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
     updateLayout();
     window.addEventListener('resize', updateLayout);
     return () => window.removeEventListener('resize', updateLayout);
+  }, []);
+
+  // Track container width for 'Fit to Width' mode
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
   }, []);
 
   // Text selection listener
@@ -86,10 +102,33 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
   const handlePrev = () => setPageNumber(p => Math.max(1, p - advance));
   const handleNext = () => setPageNumber(p => Math.min(numPages || p, p + advance));
 
+  // Calculate page dimensions based on fit mode
+  const calcPageProps = () => {
+    if (fitMode === "height") {
+      return { height: pageHeight };
+    } else {
+      // fit to width
+      const targetWidth = isTwoPage ? (containerWidth / 2) - 20 : containerWidth;
+      return { width: targetWidth };
+    }
+  };
+
   return (
-    <div style={{ position: "relative", width: "100%" }}>
+    <div style={{ 
+      position: "fixed", 
+      top: 0, left: 0, right: 0, bottom: 0, 
+      backgroundColor: "var(--paper)", 
+      zIndex: 5000, 
+      display: "flex", 
+      flexDirection: "column"
+    }} ref={containerRef}>
+      
       {/* Toolbar */}
-      <div className="card" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", marginBottom: "16px", position: "sticky", top: "10px", zIndex: 100 }}>
+      <div style={{ 
+        display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", 
+        padding: "10px 20px", borderBottom: "1px solid var(--rule)", backgroundColor: "var(--paper-alt)",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.05)"
+      }}>
         <div>
           <button className="btn ghost mini" onClick={onClose}>← Back to Library</button>
         </div>
@@ -102,7 +141,24 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
           <button className="btn ghost mini" disabled={!canGoNext} onClick={handleNext}>Next</button>
         </div>
         
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <div style={{ display: "flex", backgroundColor: "var(--paper)", borderRadius: "4px", padding: "2px", border: "1px solid var(--rule)" }}>
+            <button 
+              className={`btn mini ${fitMode === "height" ? "" : "ghost"}`} 
+              style={{ border: "none", margin: 0, padding: "4px 8px" }}
+              onClick={() => setFitMode("height")}
+            >
+              Fit Page
+            </button>
+            <button 
+              className={`btn mini ${fitMode === "width" ? "" : "ghost"}`} 
+              style={{ border: "none", margin: 0, padding: "4px 8px" }}
+              onClick={() => setFitMode("width")}
+            >
+              Fit Width
+            </button>
+          </div>
+
           <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }} className="label">
             <input 
               type="checkbox" 
@@ -116,7 +172,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
       </div>
 
       {/* PDF Container */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "20px", overflowX: "auto", paddingBottom: "20px" }}>
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "20px", display: "flex", justifyContent: "center" }}>
         <Document 
           file={url} 
           onLoadSuccess={onDocumentLoadSuccess} 
@@ -126,7 +182,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
           <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
             <Page 
               pageNumber={pageNumber} 
-              height={pageHeight}
+              {...calcPageProps()}
               renderTextLayer={true} 
               renderAnnotationLayer={true} 
               className="pdf-page-shadow"
@@ -134,7 +190,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
             {isTwoPage && pageNumber + 1 <= (numPages || 1) && (
               <Page 
                 pageNumber={pageNumber + 1} 
-                height={pageHeight}
+                {...calcPageProps()}
                 renderTextLayer={true} 
                 renderAnnotationLayer={true}
                 className="pdf-page-shadow"
@@ -153,7 +209,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
             top: `${highlightRect.top - 45}px`,
             left: `${highlightRect.left}px`,
             transform: "translateX(-50%)",
-            zIndex: 900,
+            zIndex: 9000,
             boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
             backgroundColor: "var(--ochre)",
             color: "#000"
