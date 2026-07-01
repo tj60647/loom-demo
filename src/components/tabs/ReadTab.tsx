@@ -113,6 +113,139 @@ export default function ReadTab() {
     }
   }
 
+  const handleCopyDraft = () => {
+    let text = "";
+    if (readSel?.type === "concept" && readSel.id) {
+      const c = state.concepts.find(x => x.id === readSel.id);
+      if (c) {
+        const comp = getComponentOf(c.id, getAdjacency());
+        text = `Threads from: ${c.label}\n\n` + comp.edges.map(e => e.sentence).join("\n\n");
+      }
+    } else if (readSel?.type === "hub" && readSel.ids) {
+      const names = readSel.ids.map(id => state.concepts.find(c => c.id === id)?.label).filter(Boolean);
+      const inc = state.edges.filter(e => readSel.ids!.includes(e.fromId) || readSel.ids!.includes(e.toId));
+      text = `Threads meeting at: ${names.join(' / ')}\n\n` + inc.map(e => e.sentence).join("\n\n");
+    }
+    if (text) {
+      navigator.clipboard.writeText(text);
+      // Optional: add a tiny flash or toast here if we had one
+    }
+  }
+
+  const handleCopyRead = () => {
+    navigator.clipboard.writeText(state.read || "");
+  }
+
+  // Generate reading pane content
+  let readingPane = null;
+  if (readSel) {
+    if (readSel.type === "hub" && readSel.ids) {
+      const inc = state.edges.filter(e => readSel.ids!.includes(e.fromId) || readSel.ids!.includes(e.toId));
+      const names = readSel.ids.map(id => state.concepts.find(c => c.id === id)).filter(Boolean);
+      
+      readingPane = (
+        <div id="readingPane" style={{ marginTop: "16px" }}>
+          <div className="threadhead" style={{ fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
+            {names.map((n, i) => <span key={n!.id}><span style={{ color: "var(--red)" }}>{n!.label}</span>{i < names.length - 1 ? " / " : ""}</span>)} 
+            <span className="n" style={{ color: "var(--grey)", fontWeight: "normal" }}> · {inc.length} thread{inc.length !== 1 ? 's' : ''} meet here</span>
+          </div>
+          <p className="hint" style={{ margin: "4px 0 9px" }}>
+            The threads that converge on your busiest concept{readSel.ids.length > 1 ? 's' : ''} — your own sentences. <b>You</b> decide whether this is the core, and weave it into your read.
+          </p>
+          <button className="btn ghost mini" onClick={handleCopyDraft} style={{ marginBottom: "12px" }}>copy these threads</button>
+          <div>
+            {inc.map(e => {
+              const f = state.concepts.find(c => c.id === e.fromId);
+              const t = state.concepts.find(c => c.id === e.toId);
+              return (
+                <div key={e.id} className="readitem" style={{ marginBottom: "12px", borderBottom: "1px dotted var(--rule)", paddingBottom: "12px" }}>
+                  <div className="trip" style={{ fontSize: "12px", marginBottom: "4px" }}>
+                    <b>{f?.label || "?"}</b> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">loose</span>} <b>{t?.label || "?"}</b>
+                  </div>
+                  <div className="sent" style={{ fontStyle: "italic", fontSize: "14px", color: "var(--ink)" }}>"{e.sentence}"</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    } else if (readSel.type === "edge" && readSel.id) {
+      const e = state.edges.find(x => x.id === readSel.id);
+      if (e) {
+        const f = state.concepts.find(c => c.id === e.fromId);
+        const t = state.concepts.find(c => c.id === e.toId);
+        const fBytes = state.bytes.filter(b => b.conceptId === f?.id);
+        const tBytes = state.bytes.filter(b => b.conceptId === t?.id);
+        
+        readingPane = (
+          <div id="readingPane" style={{ marginTop: "16px" }}>
+            <div className="threadhead" style={{ fontSize: "14px", fontWeight: 500 }}>
+              <span style={{ color: "var(--red)" }}>{f?.label || "?"}</span> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">loose</span>} <span style={{ color: "var(--red)" }}>{t?.label || "?"}</span>
+            </div>
+            <p style={{ fontSize: "15.5px", fontStyle: "italic", margin: "8px 0 14px", color: "var(--ink)" }}>"{e.sentence}"</p>
+            {[f, t].filter(Boolean).map(c => (
+              <div key={c!.id} style={{ marginBottom: "16px" }}>
+                <div className="label" style={{ marginTop: "8px", fontWeight: "bold" }}>{c!.label}</div>
+                {c!.def && <div style={{ fontSize: "13.5px", color: "var(--ink-soft)" }}>{c!.def}</div>}
+                {(c === f ? fBytes : tBytes).map(b => (
+                  <div key={b.id} className="bytequote" style={{ marginTop: "6px", paddingLeft: "8px", borderLeft: "2px solid var(--rule)" }}>
+                    <span className="src" style={{ fontSize: "11px", color: "var(--grey)" }}>{b.source || '-'} {b.location ? `· ${b.location}` : ''}</span><br/>
+                    <span style={{ fontSize: "13px" }}>{b.content}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        );
+      }
+    } else if (readSel.type === "concept" && readSel.id) {
+      const c = state.concepts.find(x => x.id === readSel.id);
+      if (c) {
+        const comp = getComponentOf(c.id, getAdjacency());
+        if (comp.edges.length === 0) {
+          readingPane = (
+            <div id="readingPane" style={{ marginTop: "16px" }}>
+              <div className="threadhead" style={{ fontSize: "14px", fontWeight: 500, color: "var(--red)" }}>{c.label}</div>
+              <p className="empty" style={{ marginTop: "8px" }}>This thread crosses nothing yet — warp waiting for weft. Take it to 02 — Throw.</p>
+            </div>
+          );
+        } else {
+          readingPane = (
+            <div id="readingPane" style={{ marginTop: "16px" }}>
+              <div className="threadhead" style={{ fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
+                <span style={{ color: "var(--red)" }}>{c.label}</span> <span className="n" style={{ color: "var(--grey)", fontWeight: "normal" }}> · {comp.edges.length} crossing{comp.edges.length !== 1 ? 's' : ''}</span>
+              </div>
+              <p className="hint" style={{ margin: "4px 0 9px" }}>
+                Your threads, in walking order — your own sentences, laid out as raw material. <b>You</b> weave them into a read on the right, in your own words. Copy to quote a line.
+              </p>
+              <button className="btn ghost mini" onClick={handleCopyDraft} style={{ marginBottom: "12px" }}>copy these threads</button>
+              <div>
+                {comp.edges.map(e => {
+                  const f = state.concepts.find(x => x.id === e.fromId);
+                  const t = state.concepts.find(x => x.id === e.toId);
+                  return (
+                    <div key={e.id} className="readitem" style={{ marginBottom: "12px", borderBottom: "1px dotted var(--rule)", paddingBottom: "12px" }}>
+                      <div className="trip" style={{ fontSize: "12px", marginBottom: "4px" }}>
+                        <b>{f?.label || "?"}</b> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">loose</span>} <b>{t?.label || "?"}</b>
+                      </div>
+                      <div className="sent" style={{ fontStyle: "italic", fontSize: "14px", color: "var(--ink)" }}>"{e.sentence}"</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+      }
+    }
+  } else {
+    readingPane = (
+      <div id="readingPane" style={{ marginTop: "16px" }}>
+        <p className="empty">Click a prompt above — or a concept/arc on the cloth — to lay your threads out here as material to weave from.</p>
+      </div>
+    );
+  }
+
   return (
     <>
       <p className="tasktitle">Read the whole cloth.</p>
@@ -156,6 +289,8 @@ export default function ReadTab() {
               </div>
             ))}
           </div>
+
+          {readingPane}
         </div>
 
         <div className="card">
@@ -168,6 +303,7 @@ export default function ReadTab() {
             value={state.read}
             onChange={(e) => setRead(e.target.value)}
           />
+          <button className="btn ghost mini" onClick={handleCopyRead} style={{ marginTop: "8px" }}>Copy as essay draft</button>
         </div>
       </div>
     </>

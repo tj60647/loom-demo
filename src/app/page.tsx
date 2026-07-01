@@ -7,6 +7,7 @@ import OpenTab from "@/components/tabs/OpenTab"
 import ThrowTab from "@/components/tabs/ThrowTab"
 import ReadTab from "@/components/tabs/ReadTab"
 import LibraryTab from "@/components/tabs/LibraryTab"
+import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 
 export default function Home() {
   const { data: session } = useSession()
@@ -76,6 +77,7 @@ export default function Home() {
         <div className={`panel ${activeTab === "read" ? "active" : ""}`}>
           {activeTab === "read" && <ReadTab />}
         </div>
+        <FirstRunWalkthrough />
       </main>
       
       <footer>
