@@ -111,9 +111,15 @@ export default function OpenTab() {
             
             return (
               <div key={concept.id} className={`lrow ${isOpen ? "open" : ""}`}>
-                <div className="lhead" onClick={() => toggleRow(concept.id)}>
-                  <div className="lconcept">{concept.label}</div>
+                <div className="lhead" onClick={() => toggleRow(concept.id)} style={{ display: "flex", alignItems: "center" }}>
+                  <div className="lconcept" style={{flex: 1}}>{concept.label}</div>
                   <div className="lsrc">{conceptBytes.length} bytes</div>
+                  <button 
+                    className="btn ghost mini" 
+                    style={{padding: "2px 6px", minHeight: 0, margin: "0 0 0 8px", opacity: 0.6}} 
+                    onClick={(e) => { e.stopPropagation(); removeConcept(concept.id); }}
+                    title="Delete concept"
+                  >✕</button>
                 </div>
                 {isOpen && (
                   <div className="lbody">
@@ -133,9 +139,6 @@ export default function OpenTab() {
                         </div>
                       </div>
                     ))}
-                    <div style={{ marginTop: "10px" }}>
-                      <span className="rm" onClick={() => removeConcept(concept.id)}>delete concept</span>
-                    </div>
                   </div>
                 )}
               </div>

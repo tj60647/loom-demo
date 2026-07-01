@@ -5,7 +5,7 @@ import { useLoom } from "@/components/providers/LoomProvider"
 import type { Concept } from "@/lib/types"
 
 export default function ThrowTab() {
-  const { state, addEdge, editEdge, removeEdge } = useLoom()
+  const { state, addEdge, editEdge, removeEdge, removeConcept } = useLoom()
   const [picks, setPicks] = useState<string[]>([]) // concept ids
   const [sentence, setSentence] = useState("")
 
