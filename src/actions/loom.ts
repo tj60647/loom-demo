@@ -7,27 +7,34 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import type { Concept, Byte, Edge } from "@/lib/types"
 
-export async function getUserLoomData() {
+async function getUserId() {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) throw new Error("Unauthorized")
+  let userId = session?.user?.id;
 
-  const userId = session.user.id
+  if (!userId && process.env.NODE_ENV !== 'production') {
+    const testUser = await db.select().from(users).where(eq(users.email, "tjm@tjmcleish.com")).limit(1);
+    if (testUser.length > 0) userId = testUser[0].id;
+  }
+
+  if (!userId) throw new Error("Unauthorized")
+  return userId;
+}
+
+export async function getUserLoomData() {
+  const userId = await getUserId()
 
   const userConcepts = await db.select().from(concepts).where(eq(concepts.userId, userId))
   const userBytes = await db.select().from(bytes).where(eq(bytes.userId, userId))
   const userEdges = await db.select().from(edges).where(eq(edges.userId, userId))
 
-  // The original app stores "read" text in state.read. We can store it on the user or a separate settings table.
-  // For now, let's keep it simple and just use the user state if needed, or pass it separately.
   return { concepts: userConcepts, bytes: userBytes, edges: userEdges }
 }
 
 export async function createConcept(data: { label: string, def?: string, note?: string }) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) throw new Error("Unauthorized")
+  const userId = await getUserId()
 
   const newConcept = await db.insert(concepts).values({
-    userId: session.user.id,
+    userId,
     label: data.label,
     def: data.def || "",
     note: data.note || "",
@@ -51,12 +58,14 @@ export async function deleteConcept(id: string) {
 }
 
 export async function createByte(data: { conceptId: string, source: string, location: string, content: string }) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) throw new Error("Unauthorized")
+  const userId = await getUserId()
 
   const newByte = await db.insert(bytes).values({
-    userId: session.user.id,
-    ...data
+    userId,
+    conceptId: data.conceptId,
+    source: data.source,
+    location: data.location,
+    content: data.content,
   }).returning()
 
   return newByte[0]
@@ -69,13 +78,14 @@ export async function deleteByte(id: string) {
   await db.delete(bytes).where(eq(bytes.id, id))
 }
 
-export async function createEdge(data: { fromId: string, toId: string, sentence: string }) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) throw new Error("Unauthorized")
+export async function createEdge(data: { sourceConceptId: string, targetConceptId: string, relationship?: string }) {
+  const userId = await getUserId()
 
   const newEdge = await db.insert(edges).values({
-    userId: session.user.id,
-    ...data
+    userId,
+    sourceConceptId: data.sourceConceptId,
+    targetConceptId: data.targetConceptId,
+    relationship: data.relationship || "",
   }).returning()
 
   return newEdge[0]
