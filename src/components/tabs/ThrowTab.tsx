@@ -27,9 +27,55 @@ export default function ThrowTab() {
   const { state, addEdge, editEdge, removeEdge, removeConcept } = useLoom()
   const [picks, setPicks] = useState<string[]>([]) // concept ids
   const [sentence, setSentence] = useState("")
-  
   const [namingFor, setNamingFor] = useState<string | null>(null)
   const [moreTongues, setMoreTongues] = useState(false)
+  
+  const [undoStack, setUndoStack] = useState<{edgeId: string, from: string | null, to: string | null}[]>([])
+  const [redoStack, setRedoStack] = useState<{edgeId: string, from: string | null, to: string | null}[]>([])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+          return; // Let native input undo/redo handle it
+        }
+        e.preventDefault();
+        
+        if (e.shiftKey) {
+          // Redo
+          setRedoStack(prevRedo => {
+            if (prevRedo.length === 0) return prevRedo;
+            const action = prevRedo[prevRedo.length - 1];
+            editEdge(action.edgeId, { handle: action.to });
+            setUndoStack(prevUndo => [...prevUndo, action]);
+            return prevRedo.slice(0, -1);
+          });
+        } else {
+          // Undo
+          setUndoStack(prevUndo => {
+            if (prevUndo.length === 0) return prevUndo;
+            const action = prevUndo[prevUndo.length - 1];
+            editEdge(action.edgeId, { handle: action.from });
+            setRedoStack(prevRedo => [...prevRedo, action]);
+            return prevUndo.slice(0, -1);
+          });
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+        e.preventDefault();
+        // Redo
+        setRedoStack(prevRedo => {
+          if (prevRedo.length === 0) return prevRedo;
+          const action = prevRedo[prevRedo.length - 1];
+          editEdge(action.edgeId, { handle: action.to });
+          setUndoStack(prevUndo => [...prevUndo, action]);
+          return prevRedo.slice(0, -1);
+        });
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editEdge]);
 
   const togglePick = (id: string) => {
     if (picks.includes(id)) {
@@ -79,8 +125,30 @@ export default function ThrowTab() {
     setSentence(opener + ' ' + newSentence);
   }
 
-  const handleNameWord = (edgeId: string, word: string) => {
-    editEdge(edgeId, { handle: word });
+  const handleNameWord = (edgeId: string, word: string, previousValue: string | null) => {
+    if (word !== previousValue) {
+      setUndoStack(prev => [...prev, { edgeId, from: previousValue, to: word }]);
+      setRedoStack([]);
+      editEdge(edgeId, { handle: word });
+    }
+    setNamingFor(null);
+    setMoreTongues(false);
+  }
+
+  const handleManualRename = (edgeId: string, word: string, previousValue: string | null) => {
+    if (word !== previousValue) {
+      setUndoStack(prev => [...prev, { edgeId, from: previousValue, to: word }]);
+      setRedoStack([]);
+      editEdge(edgeId, { handle: word });
+    }
+  }
+
+  const handleResetRename = (edgeId: string, previousValue: string | null) => {
+    if (previousValue !== null && previousValue !== "") {
+      setUndoStack(prev => [...prev, { edgeId, from: previousValue, to: null }]);
+      setRedoStack([]);
+      editEdge(edgeId, { handle: "" });
+    }
     setNamingFor(null);
     setMoreTongues(false);
   }
@@ -203,19 +271,33 @@ export default function ThrowTab() {
                 </div>
                 <div className="sent">{e.sentence}</div>
                 <div className="tmeta" style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginTop: "6px" }}>
-                  <span className="rm" onClick={() => removeEdge(e.id)} style={{ cursor: "pointer", marginTop: "2px" }}>remove</span>
+                  <span 
+                    className="rm" 
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to remove this thread?")) {
+                        removeEdge(e.id);
+                      }
+                    }} 
+                    style={{ cursor: "pointer", marginTop: "2px" }}
+                  >remove</span>
                   
                   {namingFor === e.id ? (
                     <div style={{ flex: 1 }}>
-                      <input 
-                        placeholder="short handle (optional verb)" 
-                        value={e.handle ?? ""}
-                        onChange={(ev) => editEdge(e.id, { handle: ev.target.value })}
-                        style={{
-                          fontFamily: "var(--mono)", fontSize: "10px", padding: "4px 6px", border: "1px solid var(--rule)", borderRadius: "3px", width: "100%", maxWidth: "200px"
-                        }}
-                        autoFocus
-                      />
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <input 
+                          placeholder="short handle (optional verb)" 
+                          defaultValue={e.handle ?? ""}
+                          onBlur={(ev) => handleManualRename(e.id, ev.target.value, e.handle)}
+                          style={{
+                            fontFamily: "var(--mono)", fontSize: "10px", padding: "4px 6px", border: "1px solid var(--rule)", borderRadius: "3px", width: "100%", maxWidth: "200px"
+                          }}
+                          autoFocus
+                        />
+                        <span 
+                          onClick={() => handleResetRename(e.id, e.handle)}
+                          style={{ fontFamily: "var(--mono)", fontSize: "10px", color: "var(--ink-soft)", cursor: "pointer" }}
+                        >reset</span>
+                      </div>
                       <div style={{ fontSize: "13px", color: "var(--ink-soft)", margin: "7px 0 4px" }}>
                         Stuck for a word? Tap an everyday suggestion — or open <b style={{color: "var(--ink)", fontWeight: 500}}>more tongues</b> for other fields' vocabularies:
                       </div>
@@ -223,7 +305,7 @@ export default function ThrowTab() {
                         {REGISTERS[0].verbs.map(v => (
                           <span 
                             key={v} 
-                            onClick={() => handleNameWord(e.id, v)}
+                            onClick={() => handleNameWord(e.id, v, e.handle)}
                             style={{
                               fontFamily: "var(--mono)", fontSize: "12px", background: "#fff", border: "1px solid var(--rule)", 
                               borderRadius: "12px", padding: "3px 9px", cursor: "pointer", color: "var(--sage)"
@@ -252,7 +334,7 @@ export default function ThrowTab() {
                             {r.verbs.map(v => (
                               <span 
                                 key={v} 
-                                onClick={() => handleNameWord(e.id, v)}
+                                onClick={() => handleNameWord(e.id, v, e.handle)}
                                 style={{
                                   fontFamily: "var(--mono)", fontSize: "12px", background: "#fff", border: "1px solid var(--rule)", 
                                   borderRadius: "12px", padding: "3px 9px", cursor: "pointer", color: "var(--lav)"
@@ -264,14 +346,16 @@ export default function ThrowTab() {
                       ))}
                     </div>
                   ) : (
-                    <span 
-                      onClick={() => setNamingFor(e.id)}
-                      style={{
-                        fontFamily: "var(--mono)", fontSize: "10px", color: "var(--sage)", cursor: "pointer", letterSpacing: ".04em", textDecoration: "underline", marginTop: "2px"
-                      }}
-                    >
-                      {e.handle ? "rename" : "name it"}
-                    </span>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <span 
+                        onClick={() => setNamingFor(e.id)}
+                        style={{
+                          fontFamily: "var(--mono)", fontSize: "10px", color: "var(--sage)", cursor: "pointer", letterSpacing: ".04em", textDecoration: "underline", marginTop: "2px"
+                        }}
+                      >
+                        {e.handle ? "rename" : "name it"}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
