@@ -4,10 +4,32 @@ import { useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import type { Concept } from "@/lib/types"
 
+const REGISTERS = [
+  {id:'plain',   name:'Plain',          tag:'everyday',          verbs:['leads to','depends on','is part of','goes against','is the same as','sets up']},
+  {id:'argue',   name:'Argument',       tag:'logic & claims',    verbs:['presupposes','contradicts','exemplifies','entails','qualifies','generalizes']},
+  {id:'system',  name:'Cause & system', tag:'forces & feedback', verbs:['drives','constrains','bottlenecks','damps','feeds back into','is upstream of']},
+  {id:'design',  name:'Design & making',tag:'craft & use',       verbs:['affords','scaffolds','reframes','trades off against','operationalizes','prototypes']},
+  {id:'practice',name:'Practice & power',tag:'people & norms',   verbs:['legitimizes','governs','mediates','enacts','situates','negotiates']},
+  {id:'stance',  name:'Stance & value', tag:'orientation',       verbs:['honors','resists','mourns','inherits from','answers','betrays']},
+];
+
+const OPENERS = [
+  'this means that',
+  'this explains why',
+  'these are both about',
+  'you can’t have this without that —',
+  'this is an example of',
+  'these pull against each other because',
+  'these don’t obviously touch, except',
+];
+
 export default function ThrowTab() {
   const { state, addEdge, editEdge, removeEdge, removeConcept } = useLoom()
   const [picks, setPicks] = useState<string[]>([]) // concept ids
   const [sentence, setSentence] = useState("")
+  
+  const [namingFor, setNamingFor] = useState<string | null>(null)
+  const [moreTongues, setMoreTongues] = useState(false)
 
   const togglePick = (id: string) => {
     if (picks.includes(id)) {
@@ -45,6 +67,22 @@ export default function ThrowTab() {
     await addEdge(picks[0], picks[1], sentence)
     setPicks([])
     setSentence("")
+  }
+
+  const handleOpenerClick = (opener: string) => {
+    let newSentence = sentence;
+    for (const o of OPENERS) {
+      if (newSentence.startsWith(o + ' ')) {
+        newSentence = newSentence.slice((o + ' ').length);
+      }
+    }
+    setSentence(opener + ' ' + newSentence);
+  }
+
+  const handleNameWord = (edgeId: string, word: string) => {
+    editEdge(edgeId, { handle: word });
+    setNamingFor(null);
+    setMoreTongues(false);
   }
 
   const c1 = state.concepts.find(c => c.id === picks[0])
@@ -121,6 +159,22 @@ export default function ThrowTab() {
           <div className="sleeper">
             <div className="form-row">
               <span className="label">The relationship, however awkwardly — your sentence</span>
+              <div className="chips" style={{ margin: "2px 0 6px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {OPENERS.map(o => (
+                  <span 
+                    key={o} 
+                    className="openchip" 
+                    onClick={() => handleOpenerClick(o)}
+                    style={{
+                      fontFamily: "var(--body)", fontStyle: "italic", fontSize: "13.5px", 
+                      background: "#fff", border: "1px solid var(--rule)", borderRadius: "12px", 
+                      padding: "3px 11px", cursor: "pointer", color: "var(--ink-soft)"
+                    }}
+                  >
+                    {o}…
+                  </span>
+                ))}
+              </div>
               <textarea 
                 placeholder="…or just start typing. Long and awkward is fine."
                 value={sentence}
@@ -148,16 +202,77 @@ export default function ThrowTab() {
                   {fromC.label} <span className="v">{e.handle || "→"}</span> {toC.label}
                 </div>
                 <div className="sent">{e.sentence}</div>
-                <div className="tmeta">
-                  <span className="rm" onClick={() => removeEdge(e.id)}>remove</span>
-                  <input 
-                    placeholder="short handle (optional verb)" 
-                    defaultValue={e.handle ?? ""}
-                    onBlur={(ev) => editEdge(e.id, { handle: ev.target.value })}
-                    style={{
-                      fontFamily: "var(--mono)", fontSize: "10px", padding: "2px 6px", border: "1px solid var(--rule)", borderRadius: "3px"
-                    }}
-                  />
+                <div className="tmeta" style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginTop: "6px" }}>
+                  <span className="rm" onClick={() => removeEdge(e.id)} style={{ cursor: "pointer", marginTop: "2px" }}>remove</span>
+                  
+                  {namingFor === e.id ? (
+                    <div style={{ flex: 1 }}>
+                      <input 
+                        placeholder="short handle (optional verb)" 
+                        value={e.handle ?? ""}
+                        onChange={(ev) => editEdge(e.id, { handle: ev.target.value })}
+                        style={{
+                          fontFamily: "var(--mono)", fontSize: "10px", padding: "4px 6px", border: "1px solid var(--rule)", borderRadius: "3px", width: "100%", maxWidth: "200px"
+                        }}
+                        autoFocus
+                      />
+                      <div style={{ fontSize: "13px", color: "var(--ink-soft)", margin: "7px 0 4px" }}>
+                        Stuck for a word? Tap an everyday suggestion — or open <b style={{color: "var(--ink)", fontWeight: 500}}>more tongues</b> for other fields' vocabularies:
+                      </div>
+                      <div className="chips" style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {REGISTERS[0].verbs.map(v => (
+                          <span 
+                            key={v} 
+                            onClick={() => handleNameWord(e.id, v)}
+                            style={{
+                              fontFamily: "var(--mono)", fontSize: "12px", background: "#fff", border: "1px solid var(--rule)", 
+                              borderRadius: "12px", padding: "3px 9px", cursor: "pointer", color: "var(--sage)"
+                            }}
+                          >{v}</span>
+                        ))}
+                      </div>
+                      
+                      <div 
+                        onClick={() => setMoreTongues(!moreTongues)}
+                        style={{
+                          fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: ".04em", color: "var(--sage)", 
+                          cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px", margin: "8px 0 2px", userSelect: "none"
+                        }}
+                      >
+                        <span style={{ display: "inline-block", transition: "transform .15s", transform: moreTongues ? "rotate(90deg)" : "none" }}>▸</span> 
+                        more tongues
+                      </div>
+                      
+                      {moreTongues && REGISTERS.slice(1).map(r => (
+                        <div key={r.id} style={{ marginTop: "8px" }}>
+                          <span className="cap" style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--grey)" }}>
+                            {r.name} · {r.tag}
+                          </span>
+                          <div className="chips" style={{ marginTop: "4px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                            {r.verbs.map(v => (
+                              <span 
+                                key={v} 
+                                onClick={() => handleNameWord(e.id, v)}
+                                style={{
+                                  fontFamily: "var(--mono)", fontSize: "12px", background: "#fff", border: "1px solid var(--rule)", 
+                                  borderRadius: "12px", padding: "3px 9px", cursor: "pointer", color: "var(--lav)"
+                                }}
+                              >{v}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span 
+                      onClick={() => setNamingFor(e.id)}
+                      style={{
+                        fontFamily: "var(--mono)", fontSize: "10px", color: "var(--sage)", cursor: "pointer", letterSpacing: ".04em", textDecoration: "underline", marginTop: "2px"
+                      }}
+                    >
+                      {e.handle ? "rename" : "name it"}
+                    </span>
+                  )}
                 </div>
               </div>
             )
