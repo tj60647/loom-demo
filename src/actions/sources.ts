@@ -46,6 +46,13 @@ export async function createSource(data: {
   const arrayBuffer = await data.file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
 
+  // Verify this is actually a PDF (magic bytes: "%PDF-") before storing it
+  // and serving it back with a `Content-Type: application/pdf` header —
+  // don't trust the client-supplied MIME type or file extension alone.
+  if (buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+    throw new Error("Uploaded file is not a valid PDF")
+  }
+
   const storageKey = `${crypto.randomUUID()}.pdf`
   await readingStorage.put(storageKey, buffer)
 
