@@ -57,7 +57,7 @@ export async function deleteConcept(id: string) {
   await db.delete(concepts).where(eq(concepts.id, id))
 }
 
-export async function createByte(data: { conceptId: string, source: string, location: string, content: string }) {
+export async function createByte(data: { conceptId: string, source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number }) {
   const userId = await getUserId()
 
   const newByte = await db.insert(bytes).values({
@@ -66,6 +66,9 @@ export async function createByte(data: { conceptId: string, source: string, loca
     source: data.source,
     location: data.location,
     content: data.content,
+    pageNumber: data.pageNumber,
+    startOffset: data.startOffset,
+    endOffset: data.endOffset,
   }).returning()
 
   return newByte[0]

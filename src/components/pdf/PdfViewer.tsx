@@ -5,6 +5,7 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import CaptureModal from './CaptureModal';
 import { useLoom } from '@/components/providers/LoomProvider';
+import { Byte } from '@/lib/types';
 import Mark from 'mark.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -28,7 +29,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
   
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string} | null>(null);
+  const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string, pageNum?: number, startOffset?: number, endOffset?: number} | null>(null);
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [capturedText, setCapturedText] = useState("");
 
@@ -70,11 +71,49 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
       if (text && text.length > 0 && !showCaptureModal) {
         const range = selection?.getRangeAt(0);
         const rect = range?.getBoundingClientRect();
+        
+        let selectedPageNum = pageNumber;
+        let startOffset = 0;
+        let endOffset = 0;
+        
+        if (range) {
+          // Find the react-pdf page element
+          let pageNode: HTMLElement | null = null;
+          let node = range.startContainer as Node | null;
+          while (node && node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+          let element = node as HTMLElement | null;
+          
+          while (element) {
+            if (element.classList?.contains('react-pdf__Page')) {
+              pageNode = element;
+              break;
+            }
+            element = element.parentElement;
+          }
+          
+          if (pageNode) {
+            const pageStr = pageNode.getAttribute('data-page-number');
+            if (pageStr) selectedPageNum = parseInt(pageStr, 10);
+            
+            const textLayer = pageNode.querySelector('.react-pdf__Page__textContent');
+            if (textLayer) {
+              const preRange = range.cloneRange();
+              preRange.selectNodeContents(textLayer);
+              preRange.setEnd(range.startContainer, range.startOffset);
+              startOffset = preRange.toString().length;
+              endOffset = startOffset + text.length;
+            }
+          }
+        }
+
         if (rect) {
           setHighlightRect({
             top: rect.top,
             left: rect.left + rect.width / 2,
-            text
+            text,
+            pageNum: selectedPageNum,
+            startOffset,
+            endOffset
           });
         }
       } else {
@@ -90,14 +129,12 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
     setNumPages(numPages);
   }
 
-  // Use a ref to store the latest passages so we don't need to depend on state.bytes in the observer
-  const passagesRef = useRef<string[]>([]);
+  // Use a ref to store the latest bytes so we don't need to depend on state.bytes in the observer
+  const bytesRef = useRef<Byte[]>([]);
 
-  // Update passagesRef whenever state.bytes changes
+  // Update bytesRef whenever state.bytes changes
   useEffect(() => {
-    passagesRef.current = state.bytes
-      .filter(b => b.source === sourceName)
-      .map(b => b.content);
+    bytesRef.current = state.bytes.filter(b => b.source === sourceName);
   }, [state.bytes, sourceName]);
 
   // Robust highlight applier using MutationObserver + React useEffect
@@ -106,8 +143,8 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
     let debounceTimer: NodeJS.Timeout;
 
     const applyHighlights = () => {
-      const passages = passagesRef.current;
-      if (passages.length === 0) return;
+      const bytes = bytesRef.current;
+      if (bytes.length === 0) return;
 
       const textLayers = containerRef.current!.querySelectorAll('.react-pdf__Page__textContent');
       
@@ -115,23 +152,40 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
         // Skip empty text layers
         if (layer.children.length === 0) return;
         
+        const pageStr = layer.parentElement?.getAttribute('data-page-number');
+        const parsedPage = pageStr ? parseInt(pageStr, 10) : 0;
+        const pageBytes = bytes.filter(b => b.pageNumber === parsedPage || !b.pageNumber);
+        if (pageBytes.length === 0) return;
+
         const instance = new Mark(layer as HTMLElement);
         instance.unmark({
           done: () => {
             let matches = 0;
-            passages.forEach(passage => {
-              instance.mark(passage, {
-                accuracy: "partially",
-                separateWordSearch: false,
-                className: "loom-byte-highlight",
-                acrossElements: true,
-                diacritics: true,
-                ignoreJoiners: true,
-                ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
-                done: (count) => matches += count
-              });
+            pageBytes.forEach(byte => {
+              if (byte.startOffset != null && byte.endOffset != null) {
+                // Precision mode!
+                instance.markRanges([{
+                  start: byte.startOffset,
+                  length: byte.endOffset - byte.startOffset
+                }], {
+                  className: "loom-byte-highlight",
+                  done: (count) => matches += count
+                });
+              } else {
+                // Legacy fuzzy mode
+                instance.mark(byte.content, {
+                  accuracy: "partially",
+                  separateWordSearch: false,
+                  className: "loom-byte-highlight",
+                  acrossElements: true,
+                  diacritics: true,
+                  ignoreJoiners: true,
+                  ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
+                  done: (count) => matches += count
+                });
+              }
             });
-            if (matches > 0) console.log(`[Loom PDF] Applied ${matches} highlights.`);
+            if (matches > 0) console.log(`[Loom PDF] Applied ${matches} highlights on Page ${parsedPage}.`);
           }
         });
       });
@@ -388,7 +442,10 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
         <CaptureModal 
           passage={capturedText}
           source={sourceName}
-          location={`p. ${pageNumber}`}
+          location={`p. ${highlightRect?.pageNum || pageNumber}`}
+          pageNumber={highlightRect?.pageNum}
+          startOffset={highlightRect?.startOffset}
+          endOffset={highlightRect?.endOffset}
           onClose={() => {
             setShowCaptureModal(false);
             window.getSelection()?.removeAllRanges();

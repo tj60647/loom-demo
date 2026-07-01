@@ -14,6 +14,9 @@ export type Byte = {
   source: string | null
   location: string | null
   content: string
+  pageNumber: number | null
+  startOffset: number | null
+  endOffset: number | null
   createdAt: Date
 }
 

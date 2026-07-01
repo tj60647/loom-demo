@@ -93,6 +93,9 @@ export const bytes = pgTable("byte", {
   source: text("source").default(""),
   location: text("location").default(""),
   content: text("content").notNull(),
+  pageNumber: integer("pageNumber"),
+  startOffset: integer("startOffset"),
+  endOffset: integer("endOffset"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 })
 

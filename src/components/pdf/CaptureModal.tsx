@@ -7,10 +7,13 @@ interface CaptureModalProps {
   passage: string;
   source: string;
   location: string;
+  pageNumber?: number;
+  startOffset?: number;
+  endOffset?: number;
   onClose: () => void;
 }
 
-export default function CaptureModal({ passage, source, location, onClose }: CaptureModalProps) {
+export default function CaptureModal({ passage, source, location, pageNumber, startOffset, endOffset, onClose }: CaptureModalProps) {
   const { state, addConcept, addByte } = useLoom()
   const [conceptLabel, setConceptLabel] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -23,7 +26,7 @@ export default function CaptureModal({ passage, source, location, onClose }: Cap
       if (!concept) {
         concept = await addConcept(conceptLabel)
       }
-      await addByte(concept.id, source, location, passage)
+      await addByte(concept.id, source, location, passage, pageNumber, startOffset, endOffset)
       onClose()
     } catch(e) {
       console.error(e)
