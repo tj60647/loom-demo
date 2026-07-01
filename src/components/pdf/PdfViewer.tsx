@@ -92,36 +92,46 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
 
   // Highlight previously captured bytes
   const highlightCapturedBytes = () => {
-    if (!containerRef.current) return;
-    
-    // Get all passages captured from this source
-    const passages = state.bytes
-      .filter(b => b.source === sourceName)
-      .map(b => b.content);
+    // Wait a beat for the text layer to actually populate the DOM
+    setTimeout(() => {
+      if (!containerRef.current) return;
       
-    if (passages.length === 0) return;
+      // Get all passages captured from this source
+      const passages = state.bytes
+        .filter(b => b.source === sourceName)
+        .map(b => b.content);
+        
+      console.log(`[Loom PDF] Found ${passages.length} bytes for source "${sourceName}"`);
+      if (passages.length === 0) return;
 
-    // We target the text layers rendered by react-pdf
-    const textLayers = containerRef.current.querySelectorAll('.react-pdf__Page__textContent');
-    
-    textLayers.forEach(layer => {
-      const instance = new Mark(layer as HTMLElement);
+      // We target the text layers rendered by react-pdf
+      const textLayers = containerRef.current.querySelectorAll('.react-pdf__Page__textContent');
+      console.log(`[Loom PDF] Found ${textLayers.length} text layers in DOM.`);
       
-      // Clear previous marks before reapplying
-      instance.unmark({
-        done: () => {
-          passages.forEach(passage => {
-            instance.mark(passage, {
-              accuracy: "partially",
-              separateWordSearch: false,
-              className: "loom-byte-highlight",
-              acrossElements: true,
-              diacritics: true,
+      textLayers.forEach(layer => {
+        const instance = new Mark(layer as HTMLElement);
+        
+        // Clear previous marks before reapplying
+        instance.unmark({
+          done: () => {
+            let matches = 0;
+            passages.forEach(passage => {
+              instance.mark(passage, {
+                accuracy: "partially",
+                separateWordSearch: false,
+                className: "loom-byte-highlight",
+                acrossElements: true,
+                diacritics: true,
+                done: (count) => {
+                  matches += count;
+                  console.log(`[Loom PDF] Marked "${passage.substring(0, 20)}..." -> ${count} matches`);
+                }
+              });
             });
-          });
-        }
+          }
+        });
       });
-    });
+    }, 250); // 250ms delay to let React finish rendering the span tags
   };
 
   const handleCaptureClick = () => {
