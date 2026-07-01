@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
+import { contentWords } from "@/lib/utils"
 
 interface CaptureModalProps {
   passage: string;
@@ -79,6 +80,42 @@ export default function CaptureModal({ passage, source, location, pageNumber, st
           <datalist id="conceptOptionsModal">
             {state.concepts.map(c => <option key={c.id} value={c.label} />)}
           </datalist>
+
+          <div className="scaffold" style={{marginTop: "12px"}}>
+            <div className="snote" style={{fontSize: "12px", color: "var(--ink-soft)"}}>
+              Stuck naming it? You don't need a clever term — <b style={{color: "var(--ink)", fontWeight: 500}}>point at the words in the passage that carry the point</b> and tap to build the concept from the author's own words.
+            </div>
+            {passage.trim() ? (
+              <div className="chips" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
+                {contentWords(passage).map(w => (
+                  <span 
+                    key={w} 
+                    className="chip" 
+                    onClick={() => setConceptLabel(prev => prev ? `${prev} ${w}` : w)}
+                    style={{
+                      fontFamily: "var(--mono)", fontSize: "12px", background: "#fff", border: "1px solid var(--rule)", 
+                      borderRadius: "12px", padding: "3px 9px", cursor: "pointer", color: "var(--ink)"
+                    }}
+                  >{w}</span>
+                ))}
+              </div>
+            ) : null}
+            
+            <details className="ladder" style={{marginTop: "12px", fontSize: "13px"}}>
+              <summary style={{cursor: "pointer", color: "var(--sage)"}}>still stuck? a few ways in</summary>
+              <ul style={{marginTop: "6px", paddingLeft: "20px", color: "var(--ink-soft)", lineHeight: "1.5"}}>
+                <li>What is this passage an <b style={{color: "var(--ink)", fontWeight: 500}}>example of</b>?</li>
+                <li>Tell a friend what this bit is about in <b style={{color: "var(--ink)", fontWeight: 500}}>five words</b>.</li>
+                <li>What's the <b style={{color: "var(--ink)", fontWeight: 500}}>one move</b> the author is making here?</li>
+                <li className="eg" style={{marginTop: "6px", color: "var(--ink-soft)"}}>
+                  Just to show the shape — concepts in plain words: &nbsp;<i>"tools go invisible until they break" · "people just know how to go on"</i>
+                </li>
+              </ul>
+              <div style={{marginTop: "6px", color: "var(--ink-soft)", fontSize: "12px"}}>
+                A concept can be a phrase, not a word. It's provisional — rename it later, or type an existing name to reuse it.
+              </div>
+            </details>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: "10px", marginTop: "24px", justifyContent: "flex-end" }}>

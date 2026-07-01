@@ -17,6 +17,10 @@ interface LoomContextType {
   editEdge: (id: string, data: Partial<{handle: string, sentence: string}>) => Promise<void>
   removeEdge: (id: string) => Promise<void>
   setRead: (readState: string) => void
+  undoStack: {edgeId: string, from: string | null, to: string | null}[]
+  setUndoStack: React.Dispatch<React.SetStateAction<{edgeId: string, from: string | null, to: string | null}[]>>
+  redoStack: {edgeId: string, from: string | null, to: string | null}[]
+  setRedoStack: React.Dispatch<React.SetStateAction<{edgeId: string, from: string | null, to: string | null}[]>>
 }
 
 const LoomContext = createContext<LoomContextType | null>(null)
@@ -25,6 +29,9 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession()
   const [state, setState] = useState<LoomState>({ concepts: [], bytes: [], edges: [], read: "" })
   const [isLoading, setIsLoading] = useState(true)
+  
+  const [undoStack, setUndoStack] = useState<{edgeId: string, from: string | null, to: string | null}[]>([])
+  const [redoStack, setRedoStack] = useState<{edgeId: string, from: string | null, to: string | null}[]>([])
 
   useEffect(() => {
     if (session?.user) {
@@ -138,7 +145,8 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       addConcept, editConcept, removeConcept,
       addByte, removeByte,
       addEdge, editEdge, removeEdge,
-      setRead
+      setRead,
+      undoStack, setUndoStack, redoStack, setRedoStack
     }}>
       {children}
     </LoomContext.Provider>

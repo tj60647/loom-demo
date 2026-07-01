@@ -24,14 +24,11 @@ const OPENERS = [
 ];
 
 export default function ThrowTab() {
-  const { state, addEdge, editEdge, removeEdge, removeConcept } = useLoom()
+  const { state, addEdge, editEdge, removeEdge, removeConcept, undoStack, setUndoStack, redoStack, setRedoStack } = useLoom()
   const [picks, setPicks] = useState<string[]>([]) // concept ids
   const [sentence, setSentence] = useState("")
   const [namingFor, setNamingFor] = useState<string | null>(null)
   const [moreTongues, setMoreTongues] = useState(false)
-  
-  const [undoStack, setUndoStack] = useState<{edgeId: string, from: string | null, to: string | null}[]>([])
-  const [redoStack, setRedoStack] = useState<{edgeId: string, from: string | null, to: string | null}[]>([])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
