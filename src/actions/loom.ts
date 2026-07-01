@@ -78,14 +78,14 @@ export async function deleteByte(id: string) {
   await db.delete(bytes).where(eq(bytes.id, id))
 }
 
-export async function createEdge(data: { sourceConceptId: string, targetConceptId: string, relationship?: string }) {
+export async function createEdge(data: { fromId: string, toId: string, sentence: string }) {
   const userId = await getUserId()
 
   const newEdge = await db.insert(edges).values({
     userId,
-    sourceConceptId: data.sourceConceptId,
-    targetConceptId: data.targetConceptId,
-    relationship: data.relationship || "",
+    fromId: data.fromId,
+    toId: data.toId,
+    sentence: data.sentence,
   }).returning()
 
   return newEdge[0]
