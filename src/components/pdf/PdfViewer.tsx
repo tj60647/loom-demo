@@ -31,7 +31,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
   
   const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string, pageNum?: number, startOffset?: number, endOffset?: number} | null>(null);
   const [showCaptureModal, setShowCaptureModal] = useState(false);
-  const [capturedText, setCapturedText] = useState("");
+  const [captureData, setCaptureData] = useState<{text: string, pageNum?: number, startOffset?: number, endOffset?: number} | null>(null);
 
   // Responsive sizing and layout detection
   useEffect(() => {
@@ -68,7 +68,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
     const handleSelection = () => {
       const selection = window.getSelection();
       const text = selection?.toString().trim();
-      if (text && text.length > 0 && !showCaptureModal) {
+      if (text && text.length > 0) {
         const range = selection?.getRangeAt(0);
         const rect = range?.getBoundingClientRect();
         
@@ -123,7 +123,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
     
     document.addEventListener("mouseup", handleSelection);
     return () => document.removeEventListener("mouseup", handleSelection);
-  }, [showCaptureModal]);
+  }, []);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
     setNumPages(numPages);
@@ -219,8 +219,14 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
 
   const handleCaptureClick = () => {
     if (highlightRect) {
-      setCapturedText(highlightRect.text);
+      setCaptureData({
+        text: highlightRect.text,
+        pageNum: highlightRect.pageNum,
+        startOffset: highlightRect.startOffset,
+        endOffset: highlightRect.endOffset
+      });
       setShowCaptureModal(true);
+      setHighlightRect(null);
     }
   };
 
@@ -426,7 +432,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
       </div>
 
       {/* Floating Capture Button */}
-      {highlightRect && !showCaptureModal && (
+      {highlightRect && (
         <button 
           className="btn mini"
           style={{
@@ -446,18 +452,17 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
       )}
 
       {/* Capture Modal */}
-      {showCaptureModal && (
+      {showCaptureModal && captureData && (
         <CaptureModal 
-          passage={capturedText}
+          passage={captureData.text}
           source={sourceName}
-          location={`p. ${highlightRect?.pageNum || pageNumber}`}
-          pageNumber={highlightRect?.pageNum}
-          startOffset={highlightRect?.startOffset}
-          endOffset={highlightRect?.endOffset}
+          location={`p. ${captureData.pageNum || pageNumber}`}
+          pageNumber={captureData.pageNum}
+          startOffset={captureData.startOffset}
+          endOffset={captureData.endOffset}
           onClose={() => {
             setShowCaptureModal(false);
-            setHighlightRect(null);
-            setCapturedText("");
+            setCaptureData(null);
             document.getSelection()?.removeAllRanges();
           }}
         />
