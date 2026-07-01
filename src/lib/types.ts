@@ -12,11 +12,23 @@ export type Byte = {
   userId: string
   conceptId: string
   source: string | null
+  sourceId: string | null
   location: string | null
   content: string
   pageNumber: number | null
   startOffset: number | null
   endOffset: number | null
+  pageContentHash: string | null
+  createdAt: Date
+}
+
+export type Source = {
+  id: string
+  title: string
+  author: string | null
+  description: string | null
+  storageKey: string
+  createdByUserId: string | null
   createdAt: Date
 }
 

@@ -11,7 +11,7 @@ interface LoomContextType {
   addConcept: (label: string, def?: string, note?: string) => Promise<Concept>
   editConcept: (id: string, data: Partial<{label: string, def: string, note: string}>) => Promise<void>
   removeConcept: (id: string) => Promise<void>
-  addByte: (conceptId: string, source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number) => Promise<Byte>
+  addByte: (conceptId: string, source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string) => Promise<Byte>
   removeByte: (id: string) => Promise<void>
   addEdge: (fromId: string, toId: string, sentence: string) => Promise<Edge>
   editEdge: (id: string, data: Partial<{handle: string, sentence: string}>) => Promise<void>
@@ -81,23 +81,25 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     await deleteConcept(id)
   }
 
-  const addByte = async (conceptId: string, source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number) => {
+  const addByte = async (conceptId: string, source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string) => {
     const tempId = crypto.randomUUID()
     const tempByte: Byte = { 
       id: tempId, 
       userId: session!.user!.id, 
       conceptId, 
       source, 
+      sourceId: sourceId ?? null,
       location, 
       content, 
       pageNumber: pageNumber ?? null,
       startOffset: startOffset ?? null,
       endOffset: endOffset ?? null,
+      pageContentHash: null,
       createdAt: new Date() 
     }
     setState(s => ({ ...s, bytes: [...s.bytes, tempByte] }))
     try {
-      const saved = await createByte({ conceptId, source, location, content, pageNumber, startOffset, endOffset })
+      const saved = await createByte({ conceptId, source, sourceId, location, content, pageNumber, startOffset, endOffset })
       setState(s => ({ ...s, bytes: s.bytes.map(b => b.id === tempId ? saved : b) }))
       return saved
     } catch (e) {

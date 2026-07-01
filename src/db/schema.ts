@@ -65,6 +65,45 @@ export const verificationTokens = pgTable(
   })
 )
 
+// --- SOURCE (PDF LIBRARY) TABLES ---
+
+// A reading/document available in the library. The underlying file lives in
+// backend-managed storage (see src/lib/storage.ts), not in /public, so access
+// can be gated behind authentication.
+export const sources = pgTable("source", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  title: text("title").notNull(),
+  author: text("author").default(""),
+  description: text("description").default(""),
+  // Key used to locate the file in the storage backend (see src/lib/storage.ts).
+  storageKey: text("storageKey").notNull(),
+  createdByUserId: text("createdByUserId").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+})
+
+// Canonical, server-extracted plain text for each page of a source. This is
+// the stable anchor used to compute and validate highlight offsets, since the
+// client-side pdf.js text layer is not guaranteed to be byte-stable across
+// renders/versions.
+export const sourcePages = pgTable("source_page", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  sourceId: text("sourceId")
+    .notNull()
+    .references(() => sources.id, { onDelete: "cascade" }),
+  pageNumber: integer("pageNumber").notNull(),
+  textContent: text("textContent").notNull(),
+  // Hash of textContent, duplicated onto bytes.pageContentHash at capture
+  // time so we can cheaply detect drift without re-fetching this row.
+  contentHash: text("contentHash").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+})
+
 // --- LOOM TABLES ---
 
 export const concepts = pgTable("concept", {
@@ -90,12 +129,22 @@ export const bytes = pgTable("byte", {
   conceptId: text("conceptId")
     .notNull()
     .references(() => concepts.id, { onDelete: "cascade" }),
+  // Free-text label, kept for manually-captured bytes (e.g. from OpenTab)
+  // that aren't tied to a library PDF.
   source: text("source").default(""),
+  // Set when the byte was captured from a library PDF via PdfViewer.
+  sourceId: text("sourceId").references(() => sources.id, {
+    onDelete: "set null",
+  }),
   location: text("location").default(""),
   content: text("content").notNull(),
   pageNumber: integer("pageNumber"),
   startOffset: integer("startOffset"),
   endOffset: integer("endOffset"),
+  // Hash of the sourcePages.textContent this byte's offsets were computed
+  // against. Used to detect drift between the canonical server-side text
+  // and the client's pdf.js text layer before trusting markRanges.
+  pageContentHash: text("pageContentHash"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 })
 
