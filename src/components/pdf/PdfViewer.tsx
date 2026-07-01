@@ -260,8 +260,17 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
       return { height: pageHeight };
     } else {
       // fit to width
-      const targetWidth = isTwoPage ? (containerWidth / 2) - 20 : containerWidth;
-      return { width: targetWidth };
+      // Non-page horizontal space:
+      // Padding (30*2=60) + Arrows (64*2=128) + Gaps around Document (20*2=40) = 228px
+      const nonPageSpace = 228;
+      if (isTwoPage) {
+        // Plus 20px gap between the two pages = 248px total non-page space
+        const targetWidth = (containerWidth - 248) / 2;
+        return { width: Math.max(targetWidth, 200) };
+      } else {
+        const targetWidth = containerWidth - nonPageSpace;
+        return { width: Math.max(targetWidth, 200) };
+      }
     }
   };
 

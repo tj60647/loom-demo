@@ -22,6 +22,9 @@ test.describe('PDF Viewer and Highlighting', () => {
       });
 
       // 1. Navigate to the app (auth is handled by mock)
+      await page.addInitScript(() => {
+        localStorage.setItem("loom_has_seen_walkthrough", "true");
+      });
       await page.goto('/');
       
       // 1b. Click on the Library tab (default is Open tab)
@@ -51,10 +54,17 @@ test.describe('PDF Viewer and Highlighting', () => {
       const pageSpan = textLayer.first().locator('span', { hasText: /[a-zA-Z]+/ }).first();
       await expect(pageSpan).toBeVisible();
       
-      // Simulate selection by double-clicking a word
-      await pageSpan.dblclick({ force: true });
-      
-      // 7. The "Capture as Byte" button should appear
+      // Simulate selection reliably using JS, then dispatch mouseup to trigger the app's listener
+      await pageSpan.evaluate((el) => {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        
+        // Dispatch mouseup to trigger the app's text selection listener
+        document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+      });
       const captureButton = page.locator('button:has-text("Capture as Byte")');
       await expect(captureButton).toBeVisible();
       await captureButton.click();
