@@ -221,7 +221,6 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
     if (highlightRect) {
       setCapturedText(highlightRect.text);
       setShowCaptureModal(true);
-      setHighlightRect(null);
     }
   };
 
@@ -427,7 +426,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
       </div>
 
       {/* Floating Capture Button */}
-      {highlightRect && (
+      {highlightRect && !showCaptureModal && (
         <button 
           className="btn mini"
           style={{
@@ -457,7 +456,9 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
           endOffset={highlightRect?.endOffset}
           onClose={() => {
             setShowCaptureModal(false);
-            window.getSelection()?.removeAllRanges();
+            setHighlightRect(null);
+            setCapturedText("");
+            document.getSelection()?.removeAllRanges();
           }}
         />
       )}
