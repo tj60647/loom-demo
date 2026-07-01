@@ -7,6 +7,7 @@ import { contentWords } from "@/lib/utils"
 interface CaptureModalProps {
   passage: string;
   source: string;
+  sourceId?: string;
   location: string;
   pageNumber?: number;
   startOffset?: number;
@@ -14,7 +15,7 @@ interface CaptureModalProps {
   onClose: () => void;
 }
 
-export default function CaptureModal({ passage, source, location, pageNumber, startOffset, endOffset, onClose }: CaptureModalProps) {
+export default function CaptureModal({ passage, source, sourceId, location, pageNumber, startOffset, endOffset, onClose }: CaptureModalProps) {
   const { state, addConcept, addByte } = useLoom()
   const [conceptLabel, setConceptLabel] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -27,7 +28,7 @@ export default function CaptureModal({ passage, source, location, pageNumber, st
       if (!concept) {
         concept = await addConcept(conceptLabel)
       }
-      await addByte(concept.id, source, location, passage, pageNumber, startOffset, endOffset)
+      await addByte(concept.id, source, location, passage, pageNumber, startOffset, endOffset, sourceId)
       onClose()
     } catch(e) {
       console.error(e)

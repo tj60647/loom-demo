@@ -1,20 +1,42 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import dynamic from 'next/dynamic'
+import { useSession } from "next-auth/react"
+import { getSources, createSource } from "@/actions/sources"
+import type { Source } from "@/lib/types"
 
 const PdfViewer = dynamic(() => import('@/components/pdf/PdfViewer'), {
   ssr: false,
 })
 
 export default function LibraryTab() {
-  const [activePdf, setActivePdf] = useState<{url: string, title: string} | null>(null)
+  const { data: session } = useSession()
+  const [activeSource, setActiveSource] = useState<Source | null>(null)
+  const [sources, setSources] = useState<Source[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  if (activePdf) {
+  const isAdmin = session?.user?.role === "ADMIN"
+
+  const refresh = () => {
+    setIsLoading(true)
+    getSources()
+      .then(setSources)
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load library"))
+      .finally(() => setIsLoading(false))
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  if (activeSource) {
     return (
       <PdfViewer 
-        url={activePdf.url} 
-        sourceName={activePdf.title} 
-        onClose={() => setActivePdf(null)} 
+        url={`/api/readings/${activeSource.id}`}
+        sourceName={activeSource.title}
+        sourceId={activeSource.id}
+        onClose={() => setActiveSource(null)} 
       />
     )
   }
@@ -22,50 +44,92 @@ export default function LibraryTab() {
   return (
     <>
       <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-        
-        <div className="card" style={{ padding: "20px" }}>
-          <h3 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>Object Worlds</h3>
-          <p className="hint" style={{ margin: "0 0 12px 0" }}>Bucciarelli — Designing Engineers</p>
-          <p style={{ fontSize: "14px", lineHeight: "1.4", marginBottom: "16px" }}>
-            Explores how different disciplines inhabit their own "worlds" with distinct instruments and languages. Useful for understanding how different experts might code the same concept in completely different ways.
-          </p>
-          <button 
-            className="btn mini" 
-            onClick={() => setActivePdf({ url: "/readings/Bucciarelli-Designing Engineers.pdf", title: "Bucciarelli, Designing Engineers" })}
-          >
-            Read in Loom
-          </button>
-        </div>
-        
-        <div className="card" style={{ padding: "20px" }}>
-          <h3 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>Communities of Practice</h3>
-          <p className="hint" style={{ margin: "0 0 12px 0" }}>Wenger</p>
-          <p style={{ fontSize: "14px", lineHeight: "1.4", marginBottom: "16px" }}>
-            Details how shared vocabularies are learned by participating in a community. In Loom, you grow a shared edge-vocabulary over time by coding together.
-          </p>
-          <button 
-            className="btn mini" 
-            onClick={() => setActivePdf({ url: "/readings/Wenger_communities-of-practice.pdf", title: "Wenger, Communities of Practice" })}
-          >
-            Read in Loom
-          </button>
-        </div>
-        
-        <div className="card" style={{ padding: "20px" }}>
-          <h3 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>Boundary Objects</h3>
-          <p className="hint" style={{ margin: "0 0 12px 0" }}>Star, 2010 — 'This Is Not A Boundary Object'</p>
-          <p style={{ fontSize: "14px", lineHeight: "1.4", marginBottom: "16px" }}>
-            How distinct fields coordinate around one shared object without agreeing on its exact meaning. Loom serves as a boundary object, holding a common identity across different disciplinary "tongues".
-          </p>
-          <button 
-            className="btn mini" 
-            onClick={() => setActivePdf({ url: "/readings/Star, 2010 'This Is Not A Boundary Object'.pdf", title: "Star, This Is Not A Boundary Object" })}
-          >
-            Read in Loom
-          </button>
-        </div>
-        
+
+        {isAdmin && <UploadSourceForm onUploaded={refresh} />}
+
+        {isLoading && <p className="hint">Loading library…</p>}
+        {error && <p className="hint" style={{ color: "var(--red)" }}>{error}</p>}
+        {!isLoading && !error && sources.length === 0 && (
+          <p className="hint">No readings in the library yet.</p>
+        )}
+
+        {sources.map((s) => (
+          <div className="card" key={s.id} style={{ padding: "20px" }}>
+            <h3 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>{s.title}</h3>
+            {s.author ? <p className="hint" style={{ margin: "0 0 12px 0" }}>{s.author}</p> : null}
+            {s.description ? (
+              <p style={{ fontSize: "14px", lineHeight: "1.4", marginBottom: "16px" }}>
+                {s.description}
+              </p>
+            ) : null}
+            <button
+              className="btn mini"
+              onClick={() => setActiveSource(s)}
+            >
+              Read in Loom
+            </button>
+          </div>
+        ))}
+
       </div>
     </>
+  )
+}
+
+function UploadSourceForm({ onUploaded }: { onUploaded: () => void }) {
+  const [title, setTitle] = useState("")
+  const [author, setAuthor] = useState("")
+  const [description, setDescription] = useState("")
+  const [file, setFile] = useState<File | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async () => {
+    if (!title || !file) return
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      await createSource({ title, author, description, file })
+      setTitle("")
+      setAuthor("")
+      setDescription("")
+      setFile(null)
+      onUploaded()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to upload reading")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="card" style={{ padding: "20px" }}>
+      <h3 style={{ margin: "0 0 12px 0", fontSize: "16px" }}>Add a Reading</h3>
+      <div className="form-row">
+        <span className="label">Title</span>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Designing Engineers" />
+      </div>
+      <div className="form-row" style={{ marginTop: "10px" }}>
+        <span className="label">Author</span>
+        <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="e.g. Bucciarelli" />
+      </div>
+      <div className="form-row" style={{ marginTop: "10px" }}>
+        <span className="label">Description</span>
+        <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short blurb" />
+      </div>
+      <div className="form-row" style={{ marginTop: "10px" }}>
+        <span className="label">PDF File</span>
+        <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+      </div>
+      {error && <p className="hint" style={{ color: "var(--red)" }}>{error}</p>}
+      <button
+        className="btn mini"
+        style={{ marginTop: "12px" }}
+        disabled={!title || !file || isSubmitting}
+        onClick={handleSubmit}
+      >
+        {isSubmitting ? "Uploading…" : "Upload Reading"}
+      </button>
+    </div>
   )
 }

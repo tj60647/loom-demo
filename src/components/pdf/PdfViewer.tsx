@@ -6,6 +6,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import CaptureModal from './CaptureModal';
 import { useLoom } from '@/components/providers/LoomProvider';
 import { Byte } from '@/lib/types';
+import { hashText } from '@/lib/hash';
 import Mark from 'mark.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -13,10 +14,11 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 interface PdfViewerProps {
   url: string;
   sourceName: string;
+  sourceId?: string;
   onClose: () => void;
 }
 
-export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) {
+export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfViewerProps) {
   const { state } = useLoom();
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -134,8 +136,8 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
 
   // Update bytesRef whenever state.bytes changes
   useEffect(() => {
-    bytesRef.current = state.bytes.filter(b => b.source === sourceName);
-  }, [state.bytes, sourceName]);
+    bytesRef.current = state.bytes.filter(b => (sourceId && b.sourceId === sourceId) || b.source === sourceName);
+  }, [state.bytes, sourceName, sourceId]);
 
   // Robust highlight applier using MutationObserver + React useEffect
   useEffect(() => {
@@ -161,18 +163,32 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
         instance.unmark({
           done: () => {
             let matches = 0;
+            // Compute the live text layer's content hash once per page so we
+            // can decide, per byte, whether the offsets we stored are still
+            // trustworthy against what pdf.js actually rendered this time.
+            const liveHash = hashText((layer as HTMLElement).textContent || "");
             pageBytes.forEach(byte => {
-              if (byte.startOffset != null && byte.endOffset != null) {
+              const hasOffsets = byte.startOffset != null && byte.endOffset != null;
+              const offsetsTrusted = hasOffsets && (
+                // No stored hash (legacy byte captured before this check
+                // existed) — fall back to trusting the offsets as before.
+                byte.pageContentHash == null || byte.pageContentHash === liveHash
+              );
+
+              if (offsetsTrusted) {
                 // Precision mode!
                 instance.markRanges([{
-                  start: byte.startOffset,
-                  length: byte.endOffset - byte.startOffset
+                  start: byte.startOffset!,
+                  length: byte.endOffset! - byte.startOffset!
                 }], {
                   className: "loom-byte-highlight",
                   done: (count) => matches += count
                 });
               } else {
-                // Legacy fuzzy mode
+                if (hasOffsets) {
+                  console.warn(`[Loom PDF] Page ${parsedPage} text layer has drifted from the anchored content (hash mismatch); falling back to fuzzy matching for byte ${byte.id}.`);
+                }
+                // Legacy / drifted fuzzy mode
                 instance.mark(byte.content, {
                   accuracy: "partially",
                   separateWordSearch: false,
@@ -456,6 +472,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
         <CaptureModal 
           passage={captureData.text}
           source={sourceName}
+          sourceId={sourceId}
           location={`p. ${captureData.pageNum || pageNumber}`}
           pageNumber={captureData.pageNum}
           startOffset={captureData.startOffset}

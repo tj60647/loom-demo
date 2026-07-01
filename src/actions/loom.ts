@@ -1,8 +1,8 @@
 "use server"
 
 import { db } from "@/db"
-import { concepts, bytes, edges, users } from "@/db/schema"
-import { eq } from "drizzle-orm"
+import { concepts, bytes, edges, users, sourcePages } from "@/db/schema"
+import { and, eq } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import type { Concept, Byte, Edge } from "@/lib/types"
@@ -57,18 +57,52 @@ export async function deleteConcept(id: string) {
   await db.delete(concepts).where(eq(concepts.id, id))
 }
 
-export async function createByte(data: { conceptId: string, source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number }) {
+export async function createByte(data: { conceptId: string, source: string, sourceId?: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number }) {
   const userId = await getUserId()
+
+  let startOffset = data.startOffset
+  let endOffset = data.endOffset
+  let pageContentHash: string | undefined
+
+  // If this byte comes from a library PDF, re-derive its offsets against the
+  // server's canonical extracted page text rather than trusting the client's
+  // pdf.js text-layer offsets outright. The canonical text is the stable
+  // anchor: pdf.js's browser text layer can differ subtly across renders,
+  // versions, or single vs. two-page layout, which would otherwise cause
+  // markRanges to silently highlight the wrong text (or nothing at all).
+  if (data.sourceId && data.pageNumber != null) {
+    const rows = await db.select().from(sourcePages).where(
+      and(eq(sourcePages.sourceId, data.sourceId), eq(sourcePages.pageNumber, data.pageNumber))
+    ).limit(1)
+    const page = rows[0]
+
+    if (page) {
+      pageContentHash = page.contentHash
+      const canonicalIndex = page.textContent.indexOf(data.content)
+      if (canonicalIndex !== -1) {
+        startOffset = canonicalIndex
+        endOffset = canonicalIndex + data.content.length
+      } else {
+        // Couldn't find an exact match in the canonical text (e.g. the
+        // selection crossed a hyphenated line-break). Keep the client's
+        // offsets as a best-effort fallback; the stored pageContentHash will
+        // still let the client detect drift and fall back to fuzzy matching.
+        console.warn(`[createByte] Could not anchor byte content to sourcePage ${data.sourceId}#${data.pageNumber}; falling back to client-provided offsets.`)
+      }
+    }
+  }
 
   const newByte = await db.insert(bytes).values({
     userId,
     conceptId: data.conceptId,
     source: data.source,
+    sourceId: data.sourceId,
     location: data.location,
     content: data.content,
     pageNumber: data.pageNumber,
-    startOffset: data.startOffset,
-    endOffset: data.endOffset,
+    startOffset,
+    endOffset,
+    pageContentHash,
   }).returning()
 
   return newByte[0]
