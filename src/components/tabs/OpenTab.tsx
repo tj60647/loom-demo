@@ -117,7 +117,12 @@ export default function OpenTab() {
                   <button 
                     className="btn ghost mini" 
                     style={{padding: "2px 6px", minHeight: 0, margin: "0 0 0 8px", opacity: 0.6}} 
-                    onClick={(e) => { e.stopPropagation(); removeConcept(concept.id); }}
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      if (window.confirm(`Are you sure you want to delete "${concept.label}"?\n\nThis will permanently delete all associated bytes and threads. This cannot be undone.`)) {
+                        removeConcept(concept.id); 
+                      }
+                    }}
                     title="Delete concept"
                   >✕</button>
                 </div>
