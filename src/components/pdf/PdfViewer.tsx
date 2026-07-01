@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -21,7 +21,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
   const [pageNumber, setPageNumber] = useState<number>(1);
   
   // Layout state
-  const [isTwoPage, setIsTwoPage] = useState(false);
+  const [isTwoPage, setIsTwoPage] = useState(true); // default to 2-page spread
   const [fitMode, setFitMode] = useState<"width" | "height">("height");
   const [pageHeight, setPageHeight] = useState(800);
   const [containerWidth, setContainerWidth] = useState(800);
@@ -146,8 +146,30 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
   const canGoPrev = pageNumber > 1;
   const canGoNext = numPages ? pageNumber + (isTwoPage ? 1 : 0) < numPages : false;
 
-  const handlePrev = () => setPageNumber(p => Math.max(1, p - advance));
-  const handleNext = () => setPageNumber(p => Math.min(numPages || p, p + advance));
+  const handlePrev = useCallback(() => {
+    setPageNumber(p => Math.max(1, p - advance));
+  }, [advance]);
+  
+  const handleNext = useCallback(() => {
+    setPageNumber(p => Math.min(numPages || p, p + advance));
+  }, [advance, numPages]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in a modal or input
+      if (showCaptureModal || document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
+      
+      if (e.key === 'ArrowLeft' && canGoPrev) {
+        handlePrev();
+      } else if (e.key === 'ArrowRight' && canGoNext) {
+        handleNext();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canGoPrev, canGoNext, handlePrev, handleNext, showCaptureModal]);
 
   // Calculate page dimensions based on fit mode
   const calcPageProps = () => {
@@ -182,6 +204,29 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
         .react-pdf__Page__textContent span {
           pointer-events: auto;
         }
+        
+        .pdf-side-nav {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          zIndex: 100;
+          fontSize: 32px;
+          padding: 20px 15px;
+          border-radius: 8px;
+          background: transparent;
+          border: none;
+          color: var(--ink-soft);
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .pdf-side-nav:hover:not(:disabled) {
+          background: rgba(0,0,0,0.05);
+          color: var(--ink);
+        }
+        .pdf-side-nav:disabled {
+          opacity: 0.2;
+          cursor: not-allowed;
+        }
       `}</style>
 
       {/* Toolbar */}
@@ -195,11 +240,9 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
         </div>
         
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <button className="btn ghost mini" disabled={!canGoPrev} onClick={handlePrev}>Prev</button>
           <span className="label" style={{ minWidth: "120px", textAlign: "center" }}>
             {isTwoPage ? `Pages ${pageNumber}-${Math.min(pageNumber + 1, numPages || pageNumber)}` : `Page ${pageNumber}`} of {numPages || '?'}
           </span>
-          <button className="btn ghost mini" disabled={!canGoNext} onClick={handleNext}>Next</button>
         </div>
         
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -232,35 +275,61 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
         </div>
       </div>
 
-      {/* PDF Container */}
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "20px", display: "flex", justifyContent: "center" }}>
-        <Document 
-          file={url} 
-          onLoadSuccess={onDocumentLoadSuccess} 
-          loading={<div className="hint" style={{ marginTop: "40px" }}>Loading PDF...</div>}
-          error={<div className="hint" style={{ marginTop: "40px", color: "var(--red)" }}>Failed to load PDF. Check file path.</div>}
+      {/* Main Content Area with Side Nav */}
+      <div style={{ flex: 1, position: "relative", display: "flex", overflow: "hidden" }}>
+        
+        {/* Left Arrow */}
+        <button 
+          className="pdf-side-nav"
+          style={{ left: "20px" }}
+          onClick={handlePrev}
+          disabled={!canGoPrev}
+          aria-label="Previous Page"
         >
-          <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
-            <Page 
-              pageNumber={pageNumber} 
-              {...calcPageProps()}
-              renderTextLayer={true} 
-              renderAnnotationLayer={true} 
-              onRenderSuccess={highlightCapturedBytes}
-              className="pdf-page-shadow"
-            />
-            {isTwoPage && pageNumber + 1 <= (numPages || 1) && (
+          &lt;
+        </button>
+
+        {/* PDF Container */}
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "20px 80px", display: "flex", justifyContent: "center" }}>
+          <Document 
+            file={url} 
+            onLoadSuccess={onDocumentLoadSuccess} 
+            loading={<div className="hint" style={{ marginTop: "40px" }}>Loading PDF...</div>}
+            error={<div className="hint" style={{ marginTop: "40px", color: "var(--red)" }}>Failed to load PDF. Check file path.</div>}
+          >
+            <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
               <Page 
-                pageNumber={pageNumber + 1} 
+                pageNumber={pageNumber} 
                 {...calcPageProps()}
                 renderTextLayer={true} 
-                renderAnnotationLayer={true}
+                renderAnnotationLayer={true} 
                 onRenderSuccess={highlightCapturedBytes}
                 className="pdf-page-shadow"
               />
-            )}
-          </div>
-        </Document>
+              {isTwoPage && pageNumber + 1 <= (numPages || 1) && (
+                <Page 
+                  pageNumber={pageNumber + 1} 
+                  {...calcPageProps()}
+                  renderTextLayer={true} 
+                  renderAnnotationLayer={true}
+                  onRenderSuccess={highlightCapturedBytes}
+                  className="pdf-page-shadow"
+                />
+              )}
+            </div>
+          </Document>
+        </div>
+
+        {/* Right Arrow */}
+        <button 
+          className="pdf-side-nav"
+          style={{ right: "20px" }}
+          onClick={handleNext}
+          disabled={!canGoNext}
+          aria-label="Next Page"
+        >
+          &gt;
+        </button>
       </div>
 
       {/* Floating Capture Button */}
@@ -292,7 +361,6 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
           onClose={() => {
             setShowCaptureModal(false);
             window.getSelection()?.removeAllRanges();
-            // Re-run highlight in case a new byte was added!
             highlightCapturedBytes();
           }}
         />
