@@ -4,6 +4,8 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import CaptureModal from './CaptureModal';
+import { useLoom } from '@/components/providers/LoomProvider';
+import Mark from 'mark.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -14,6 +16,7 @@ interface PdfViewerProps {
 }
 
 export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) {
+  const { state } = useLoom();
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
   
@@ -87,6 +90,40 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
     setNumPages(numPages);
   }
 
+  // Highlight previously captured bytes
+  const highlightCapturedBytes = () => {
+    if (!containerRef.current) return;
+    
+    // Get all passages captured from this source
+    const passages = state.bytes
+      .filter(b => b.source === sourceName)
+      .map(b => b.content);
+      
+    if (passages.length === 0) return;
+
+    // We target the text layers rendered by react-pdf
+    const textLayers = containerRef.current.querySelectorAll('.react-pdf__Page__textContent');
+    
+    textLayers.forEach(layer => {
+      const instance = new Mark(layer as HTMLElement);
+      
+      // Clear previous marks before reapplying
+      instance.unmark({
+        done: () => {
+          passages.forEach(passage => {
+            instance.mark(passage, {
+              accuracy: "partially",
+              separateWordSearch: false,
+              className: "loom-byte-highlight",
+              acrossElements: true,
+              diacritics: true,
+            });
+          });
+        }
+      });
+    });
+  };
+
   const handleCaptureClick = () => {
     if (highlightRect) {
       setCapturedText(highlightRect.text);
@@ -123,11 +160,25 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
       flexDirection: "column"
     }} ref={containerRef}>
       
+      <style>{`
+        .loom-byte-highlight {
+          background-color: rgba(255, 204, 0, 0.4);
+          border-bottom: 2px solid rgba(255, 204, 0, 0.8);
+          color: inherit;
+          /* Ensure the text stays selectable */
+          pointer-events: none;
+        }
+        /* Make sure the text layer passes pointer events down so we can select */
+        .react-pdf__Page__textContent span {
+          pointer-events: auto;
+        }
+      `}</style>
+
       {/* Toolbar */}
       <div style={{ 
         display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", 
         padding: "10px 20px", borderBottom: "1px solid var(--rule)", backgroundColor: "var(--paper-alt)",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.05)"
+        boxShadow: "0 2px 10px rgba(0,0,0,0.05)", zIndex: 10
       }}>
         <div>
           <button className="btn ghost mini" onClick={onClose}>← Back to Library</button>
@@ -185,6 +236,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
               {...calcPageProps()}
               renderTextLayer={true} 
               renderAnnotationLayer={true} 
+              onRenderSuccess={highlightCapturedBytes}
               className="pdf-page-shadow"
             />
             {isTwoPage && pageNumber + 1 <= (numPages || 1) && (
@@ -193,6 +245,7 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
                 {...calcPageProps()}
                 renderTextLayer={true} 
                 renderAnnotationLayer={true}
+                onRenderSuccess={highlightCapturedBytes}
                 className="pdf-page-shadow"
               />
             )}
@@ -229,6 +282,8 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
           onClose={() => {
             setShowCaptureModal(false);
             window.getSelection()?.removeAllRanges();
+            // Re-run highlight in case a new byte was added!
+            highlightCapturedBytes();
           }}
         />
       )}
