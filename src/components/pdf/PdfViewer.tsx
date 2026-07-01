@@ -90,28 +90,32 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
     setNumPages(numPages);
   }
 
-  // Highlight previously captured bytes
-  const highlightCapturedBytes = () => {
-    // Wait a beat for the text layer to actually populate the DOM
-    setTimeout(() => {
-      if (!containerRef.current) return;
-      
-      // Get all passages captured from this source
-      const passages = state.bytes
-        .filter(b => b.source === sourceName)
-        .map(b => b.content);
-        
-      console.log(`[Loom PDF] Found ${passages.length} bytes for source "${sourceName}"`);
+  // Use a ref to store the latest passages so we don't need to depend on state.bytes in the observer
+  const passagesRef = useRef<string[]>([]);
+
+  // Update passagesRef whenever state.bytes changes
+  useEffect(() => {
+    passagesRef.current = state.bytes
+      .filter(b => b.source === sourceName)
+      .map(b => b.content);
+  }, [state.bytes, sourceName]);
+
+  // Robust highlight applier using MutationObserver + React useEffect
+  useEffect(() => {
+    if (!containerRef.current) return;
+    let debounceTimer: NodeJS.Timeout;
+
+    const applyHighlights = () => {
+      const passages = passagesRef.current;
       if (passages.length === 0) return;
 
-      // We target the text layers rendered by react-pdf
-      const textLayers = containerRef.current.querySelectorAll('.react-pdf__Page__textContent');
-      console.log(`[Loom PDF] Found ${textLayers.length} text layers in DOM.`);
+      const textLayers = containerRef.current!.querySelectorAll('.react-pdf__Page__textContent');
       
       textLayers.forEach(layer => {
-        const instance = new Mark(layer as HTMLElement);
+        // Skip empty text layers
+        if (layer.children.length === 0) return;
         
-        // Clear previous marks before reapplying
+        const instance = new Mark(layer as HTMLElement);
         instance.unmark({
           done: () => {
             let matches = 0;
@@ -123,18 +127,41 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
                 acrossElements: true,
                 diacritics: true,
                 ignoreJoiners: true,
-                ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'"],
-                done: (count) => {
-                  matches += count;
-                  console.log(`[Loom PDF] Marked "${passage.substring(0, 20)}..." -> ${count} matches`);
-                }
+                ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
+                done: (count) => matches += count
               });
             });
+            if (matches > 0) console.log(`[Loom PDF] Applied ${matches} highlights.`);
           }
         });
       });
-    }, 250); // 250ms delay to let React finish rendering the span tags
-  };
+    };
+
+    // 1. Run whenever this effect triggers (e.g. when state.bytes changes)
+    applyHighlights();
+
+    // 2. Also observe the DOM for when react-pdf injects the text layer spans
+    const observer = new MutationObserver((mutations) => {
+      const hasTextLayerMutations = mutations.some(m => {
+        return Array.from(m.addedNodes).some(node => 
+          (node as HTMLElement).tagName === 'SPAN' || 
+          (node as HTMLElement).classList?.contains('react-pdf__Page__textContent')
+        );
+      });
+      
+      if (hasTextLayerMutations) {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(applyHighlights, 100);
+      }
+    });
+
+    observer.observe(containerRef.current, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(debounceTimer);
+    };
+  }, [state.bytes, pageNumber]); // Re-run effect when bytes or page changes
 
   const handleCaptureClick = () => {
     if (highlightRect) {
@@ -308,7 +335,6 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
                 {...calcPageProps()}
                 renderTextLayer={true} 
                 renderAnnotationLayer={true} 
-                onRenderSuccess={highlightCapturedBytes}
                 className="pdf-page-shadow"
               />
               {isTwoPage && pageNumber + 1 <= (numPages || 1) && (
@@ -317,7 +343,6 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
                   {...calcPageProps()}
                   renderTextLayer={true} 
                   renderAnnotationLayer={true}
-                  onRenderSuccess={highlightCapturedBytes}
                   className="pdf-page-shadow"
                 />
               )}
@@ -367,7 +392,6 @@ export default function PdfViewer({ url, sourceName, onClose }: PdfViewerProps) 
           onClose={() => {
             setShowCaptureModal(false);
             window.getSelection()?.removeAllRanges();
-            highlightCapturedBytes();
           }}
         />
       )}
