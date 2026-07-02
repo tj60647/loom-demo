@@ -15,10 +15,13 @@ interface PdfViewerProps {
   url: string;
   sourceName: string;
   sourceId?: string;
+  initialPageNumber?: number;
+  focusByteId?: string | null;
+  onGotoOpenByte?: (byteId: string) => void;
   onClose: () => void;
 }
 
-export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfViewerProps) {
+export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusByteId, onGotoOpenByte, onClose }: PdfViewerProps) {
   const { state } = useLoom();
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -27,6 +30,7 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
     conceptLabel: string;
     source: string;
     location: string;
+    byteId: string;
     startOffset: number | null;
     endOffset: number | null;
     x: number;
@@ -51,6 +55,7 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
       conceptLabel: string;
       source: string;
       location: string;
+      byteId: string;
       startOffset: number | null;
       endOffset: number | null;
     },
@@ -71,6 +76,7 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
       conceptLabel: string;
       source: string;
       location: string;
+      byteId: string;
       startOffset: number | null;
       endOffset: number | null;
     }
@@ -142,6 +148,25 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
   }, []);
 
   // Text selection listener
+  useEffect(() => {
+    if (!initialPageNumber || initialPageNumber < 1) return;
+    setPageNumber(initialPageNumber);
+  }, [initialPageNumber, sourceId, url]);
+
+  useEffect(() => {
+    if (!focusByteId) return;
+    const targetByte = state.bytes.find((b) => b.id === focusByteId);
+    if (targetByte?.pageNumber && targetByte.pageNumber > 0) {
+      setPageNumber(targetByte.pageNumber);
+    }
+  }, [focusByteId, state.bytes]);
+
+  useEffect(() => {
+    if (numPages && pageNumber > numPages) {
+      setPageNumber(numPages);
+    }
+  }, [numPages, pageNumber]);
+
   useEffect(() => {
     const handleSelection = () => {
       const selection = window.getSelection();
@@ -278,6 +303,7 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
                       conceptLabel: concept?.label || "Unlabeled byte",
                       source: byte.source || sourceName,
                       location: byte.location || "",
+                      byteId: byte.id,
                       startOffset: byte.startOffset,
                       endOffset: byte.endOffset,
                     };
@@ -307,6 +333,7 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
                       conceptLabel: concept?.label || "Unlabeled byte",
                       source: byte.source || sourceName,
                       location: byte.location || "",
+                      byteId: byte.id,
                       startOffset: byte.startOffset,
                       endOffset: byte.endOffset,
                     };
@@ -445,7 +472,7 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
           white-space: pre-wrap;
           box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
           backdrop-filter: blur(2px);
-          pointer-events: none;
+          pointer-events: auto;
         }
         .loom-highlight-tooltip .meta {
           font-family: var(--mono);
@@ -469,6 +496,23 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
           font-size: 10px;
           letter-spacing: 0.03em;
           color: rgba(255, 255, 255, 0.8);
+        }
+        .loom-highlight-tooltip button {
+          margin-top: 8px;
+          background: transparent;
+          border: 1px solid rgba(255, 204, 0, 0.45);
+          color: rgba(255, 204, 0, 0.98);
+          border-radius: 4px;
+          font-family: var(--mono);
+          font-size: 10px;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          padding: 4px 7px;
+          cursor: pointer;
+        }
+        .loom-highlight-tooltip button:hover {
+          border-color: rgba(255, 204, 0, 0.95);
+          color: #fff2cc;
         }
         /* Make sure the text layer passes pointer events down so we can select */
         .react-pdf__Page__textContent span {
@@ -687,6 +731,18 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
             {highlightTooltip.location ? ` | ${highlightTooltip.location}` : ""}
             {` | chars ${highlightTooltip.startOffset ?? "?"}-${highlightTooltip.endOffset ?? "?"}`}
           </div>
+          {onGotoOpenByte && highlightTooltip.byteId ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onGotoOpenByte(highlightTooltip.byteId);
+                hideHighlightTooltip();
+              }}
+            >
+              Goto Coding Log
+            </button>
+          ) : null}
         </div>
       )}
     </div>

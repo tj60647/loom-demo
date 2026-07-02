@@ -1,10 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
+import type { Byte } from "@/lib/types"
 import { contentWords } from "@/lib/utils"
 
-export default function OpenTab() {
+type OpenTabProps = {
+  onGotoByte?: (byte: Byte) => void
+  focusByteId?: string | null
+  onFocusHandled?: () => void
+}
+
+export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: OpenTabProps) {
   const { state, addConcept, addByte, editConcept, removeConcept, removeByte } = useLoom()
   const [source, setSource] = useState("")
   const [location, setLocation] = useState("")
@@ -41,6 +48,25 @@ export default function OpenTab() {
   const toggleRow = (id: string) => {
     setOpenLogRows(prev => ({ ...prev, [id]: !prev[id] }))
   }
+
+  useEffect(() => {
+    if (!focusByteId) return
+    const targetByte = state.bytes.find((b) => b.id === focusByteId)
+    if (!targetByte) {
+      onFocusHandled?.()
+      return
+    }
+
+    setOpenLogRows((prev) => ({ ...prev, [targetByte.conceptId]: true }))
+
+    const timer = window.setTimeout(() => {
+      const target = document.querySelector(`[data-byte-id="${focusByteId}"]`) as HTMLElement | null
+      target?.scrollIntoView({ behavior: "smooth", block: "center" })
+      onFocusHandled?.()
+    }, 40)
+
+    return () => window.clearTimeout(timer)
+  }, [focusByteId, onFocusHandled, state.bytes])
 
   return (
     <div className="two">
@@ -176,11 +202,37 @@ export default function OpenTab() {
                       />
                     </div>
                     {conceptBytes.map(b => (
-                      <div key={b.id} style={{ marginTop: "12px", borderBottom: "1px dotted var(--rule)", paddingBottom: "8px" }}>
+                      <div key={b.id} data-byte-id={b.id} style={{ marginTop: "12px", borderBottom: "1px dotted var(--rule)", paddingBottom: "8px" }}>
                         <div className="passage">"{b.content}"</div>
                         <div className="src">
-                          {b.source} {b.location} 
-                          <span className="rm" style={{ marginLeft: "8px" }} onClick={() => removeByte(b.id)}>remove</span>
+                          {b.source} {b.location}
+                          <span className="rm-actions" style={{ marginLeft: "8px" }}>
+                            <button
+                              type="button"
+                              className="rm"
+                              style={{ marginRight: "8px", background: "none", border: "none", padding: 0 }}
+                              onClick={() => onGotoByte?.(b)}
+                              disabled={!b.sourceId && !b.source}
+                              title={b.sourceId || b.source ? "Open this byte in the library PDF" : "No library source linked for this byte"}
+                            >
+                              goto
+                            </button>
+                            <button
+                              type="button"
+                              className="rm"
+                              style={{ background: "none", border: "none", padding: 0, display: "inline-flex", alignItems: "center" }}
+                              onClick={() => removeByte(b.id)}
+                              title="Delete byte"
+                              aria-label="Delete byte"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                <path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                <path d="M7 6l1 14h8l1-14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M10 10v6M14 10v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                            </button>
+                          </span>
                         </div>
                       </div>
                     ))}

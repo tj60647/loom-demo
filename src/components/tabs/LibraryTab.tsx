@@ -9,9 +9,24 @@ const PdfViewer = dynamic(() => import('@/components/pdf/PdfViewer'), {
   ssr: false,
 })
 
-export default function LibraryTab() {
+type LibraryNavTarget = {
+  byteId: string
+  sourceId: string | null
+  sourceName: string | null
+  pageNumber: number | null
+}
+
+type LibraryTabProps = {
+  target?: LibraryNavTarget | null
+  onTargetHandled?: () => void
+  onGotoOpenByte?: (byteId: string) => void
+}
+
+export default function LibraryTab({ target, onTargetHandled, onGotoOpenByte }: LibraryTabProps) {
   const { data: session } = useSession()
   const [activeSource, setActiveSource] = useState<Source | null>(null)
+  const [initialPageNumber, setInitialPageNumber] = useState<number>(1)
+  const [focusByteId, setFocusByteId] = useState<string | null>(null)
   const [sources, setSources] = useState<Source[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -30,13 +45,41 @@ export default function LibraryTab() {
     refresh()
   }, [])
 
+  useEffect(() => {
+    if (!target) return
+    if (sources.length === 0) return
+
+    const resolvedSource = target.sourceId
+      ? sources.find((s) => s.id === target.sourceId)
+      : target.sourceName
+        ? sources.find((s) => s.title === target.sourceName)
+        : undefined
+
+    if (!resolvedSource) {
+      onTargetHandled?.()
+      return
+    }
+
+    setInitialPageNumber(target.pageNumber && target.pageNumber > 0 ? target.pageNumber : 1)
+    setFocusByteId(target.byteId)
+    setActiveSource(resolvedSource)
+    onTargetHandled?.()
+  }, [onTargetHandled, sources, target])
+
   if (activeSource) {
     return (
       <PdfViewer 
         url={`/api/readings/${activeSource.id}`}
         sourceName={activeSource.title}
         sourceId={activeSource.id}
-        onClose={() => setActiveSource(null)} 
+        initialPageNumber={initialPageNumber}
+        focusByteId={focusByteId}
+        onGotoOpenByte={onGotoOpenByte}
+        onClose={() => {
+          setActiveSource(null)
+          setInitialPageNumber(1)
+          setFocusByteId(null)
+        }} 
       />
     )
   }
@@ -64,7 +107,11 @@ export default function LibraryTab() {
             ) : null}
             <button
               className="btn mini"
-              onClick={() => setActiveSource(s)}
+              onClick={() => {
+                setInitialPageNumber(1)
+                setFocusByteId(null)
+                setActiveSource(s)
+              }}
             >
               Read in Loom
             </button>

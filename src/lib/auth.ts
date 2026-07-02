@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
+import GoogleProvider from "next-auth/providers/google"
 import { DrizzleAdapter } from "@auth/drizzle-adapter"
 import { db } from "@/db"
 import { users } from "@/db/schema"
@@ -28,10 +29,18 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GITHUB_ID || "",
       clientSecret: process.env.GITHUB_SECRET || "",
     }),
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    }),
   ],
   callbacks: {
     async signIn({ user }) {
-      return true // Bypass auth for testing
+      const email = user.email?.toLowerCase().trim()
+      if (!email) return false
+
+      // Shared allowlist for all providers (GitHub + Google).
+      return ALLOWED_EMAILS.includes(email)
     },
     async session({ session, user }) {
       if (session.user) {

@@ -21,6 +21,9 @@ export default function AuthButton() {
   }
 
   return (
-    <button className="btn" onClick={() => signIn("github")}>Sign in with GitHub</button>
+    <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+      <button className="btn" onClick={() => signIn("github")}>Sign in with GitHub</button>
+      <button className="btn ghost" onClick={() => signIn("google")}>Sign in with Google</button>
+    </div>
   )
 }

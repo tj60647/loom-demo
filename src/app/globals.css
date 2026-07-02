@@ -72,6 +72,8 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .lbody .defrow input{width:100%;font-family:var(--body);font-size:14px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:6px}
 .rm{font-family:var(--mono);font-size:10px;color:var(--ink-soft);cursor:pointer;display:inline-block}
 .rm:hover{color:var(--red)}
+.rm:disabled{opacity:.45;cursor:not-allowed}
+.rm-actions button{font:inherit;color:inherit}
 /* concept palette — clean: just the label, with a picked tag */
 .crow{padding:10px 12px;border-bottom:1px dotted var(--rule);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;border-radius:4px}
 .crow:hover{background:rgba(168,132,63,.08)}

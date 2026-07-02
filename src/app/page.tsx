@@ -8,11 +8,36 @@ import ThrowTab from "@/components/tabs/ThrowTab"
 import ReadTab from "@/components/tabs/ReadTab"
 import LibraryTab from "@/components/tabs/LibraryTab"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
+import type { Byte } from "@/lib/types"
+
+type LibraryNavTarget = {
+  byteId: string
+  sourceId: string | null
+  sourceName: string | null
+  pageNumber: number | null
+}
 
 export default function Home() {
   const { data: session } = useSession()
   const { isLoading } = useLoom()
   const [activeTab, setActiveTab] = useState<"library" | "open" | "throw" | "read">("open")
+  const [libraryTarget, setLibraryTarget] = useState<LibraryNavTarget | null>(null)
+  const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
+
+  const handleGotoLibraryByte = (byte: Byte) => {
+    setLibraryTarget({
+      byteId: byte.id,
+      sourceId: byte.sourceId,
+      sourceName: byte.source,
+      pageNumber: byte.pageNumber,
+    })
+    setActiveTab("library")
+  }
+
+  const handleGotoOpenByte = (byteId: string) => {
+    setOpenTargetByteId(byteId)
+    setActiveTab("open")
+  }
 
   if (!session) {
     return (
@@ -66,10 +91,22 @@ export default function Home() {
 
       <main>
         <div className={`panel ${activeTab === "library" ? "active" : ""}`}>
-          {activeTab === "library" && <LibraryTab />}
+          {activeTab === "library" && (
+            <LibraryTab
+              target={libraryTarget}
+              onTargetHandled={() => setLibraryTarget(null)}
+              onGotoOpenByte={handleGotoOpenByte}
+            />
+          )}
         </div>
         <div className={`panel ${activeTab === "open" ? "active" : ""}`}>
-          {activeTab === "open" && <OpenTab />}
+          {activeTab === "open" && (
+            <OpenTab
+              onGotoByte={handleGotoLibraryByte}
+              focusByteId={openTargetByteId}
+              onFocusHandled={() => setOpenTargetByteId(null)}
+            />
+          )}
         </div>
         <div className={`panel ${activeTab === "throw" ? "active" : ""}`}>
           {activeTab === "throw" && <ThrowTab />}
