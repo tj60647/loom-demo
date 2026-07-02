@@ -23,6 +23,12 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [isNarrow, setIsNarrow] = useState(false);
+  const [highlightTooltip, setHighlightTooltip] = useState<{
+    text: string;
+    x: number;
+    y: number;
+    sticky: boolean;
+  } | null>(null);
   
   // Layout state
   const [isTwoPage, setIsTwoPage] = useState(true); // default to 2-page spread
@@ -35,6 +41,50 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
   const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string, pageNum?: number, startOffset?: number, endOffset?: number} | null>(null);
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [captureData, setCaptureData] = useState<{text: string, pageNum?: number, startOffset?: number, endOffset?: number} | null>(null);
+
+  const showHighlightTooltip = useCallback((text: string, x: number, y: number, sticky = false) => {
+    setHighlightTooltip({ text, x, y, sticky });
+  }, []);
+
+  const hideHighlightTooltip = useCallback(() => {
+    setHighlightTooltip(null);
+  }, []);
+
+  const bindHighlightTooltip = useCallback((node: HTMLElement, text: string) => {
+    const showFromEvent = (event: MouseEvent | PointerEvent | FocusEvent, sticky = false) => {
+      const target = event.target as HTMLElement | null;
+      const rect = target?.getBoundingClientRect();
+      const x = "clientX" in event && event.clientX ? event.clientX : rect ? rect.left + rect.width / 2 : 0;
+      const y = "clientY" in event && event.clientY ? event.clientY : rect ? rect.top : 0;
+      showHighlightTooltip(text, x, y, sticky);
+    };
+
+    const onEnter = (event: PointerEvent) => showFromEvent(event, false);
+    const onMove = (event: PointerEvent) => {
+      setHighlightTooltip((prev) => {
+        if (!prev || prev.sticky) return prev;
+        return { ...prev, x: event.clientX, y: event.clientY };
+      });
+    };
+    const onLeave = () => {
+      setHighlightTooltip((prev) => (prev && prev.sticky ? prev : null));
+    };
+    const onClick = (event: MouseEvent) => {
+      event.stopPropagation();
+      showFromEvent(event, true);
+    };
+    const onFocus = (event: FocusEvent) => showFromEvent(event, false);
+    const onBlur = () => {
+      setHighlightTooltip((prev) => (prev && prev.sticky ? prev : null));
+    };
+
+    node.addEventListener("pointerenter", onEnter);
+    node.addEventListener("pointermove", onMove);
+    node.addEventListener("pointerleave", onLeave);
+    node.addEventListener("click", onClick);
+    node.addEventListener("focus", onFocus);
+    node.addEventListener("blur", onBlur);
+  }, [showHighlightTooltip]);
 
   // Responsive sizing and layout detection
   useEffect(() => {
@@ -129,6 +179,20 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
     return () => document.removeEventListener("mouseup", handleSelection);
   }, []);
 
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest(".loom-byte-highlight") || target.closest(".loom-highlight-tooltip")) {
+        return;
+      }
+      hideHighlightTooltip();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [hideHighlightTooltip]);
+
   function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
     setNumPages(numPages);
   }
@@ -186,8 +250,10 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
                   className: "loom-byte-highlight",
                   each: (node) => {
                     const tip = `${byte.source || sourceName}${byte.location ? ` | ${byte.location}` : ""}\n${byte.content}`;
-                    (node as HTMLElement).setAttribute("title", tip);
+                    (node as HTMLElement).setAttribute("data-tip", tip);
                     (node as HTMLElement).setAttribute("aria-label", tip);
+                    (node as HTMLElement).setAttribute("tabindex", "0");
+                    bindHighlightTooltip(node as HTMLElement, tip);
                   },
                   done: (count) => matches += count
                 });
@@ -206,8 +272,10 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
                   ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
                   each: (node) => {
                     const tip = `${byte.source || sourceName}${byte.location ? ` | ${byte.location}` : ""}\n${byte.content}`;
-                    (node as HTMLElement).setAttribute("title", tip);
+                    (node as HTMLElement).setAttribute("data-tip", tip);
                     (node as HTMLElement).setAttribute("aria-label", tip);
+                    (node as HTMLElement).setAttribute("tabindex", "0");
+                    bindHighlightTooltip(node as HTMLElement, tip);
                   },
                   done: (count) => matches += count
                 });
@@ -243,7 +311,7 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
       observer.disconnect();
       clearTimeout(debounceTimer);
     };
-  }, [state.bytes, pageNumber]); // Re-run effect when bytes or page changes
+  }, [state.bytes, pageNumber, bindHighlightTooltip, sourceName]); // Re-run effect when bytes or page changes
 
   const handleCaptureClick = () => {
     if (highlightRect) {
@@ -324,6 +392,31 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
           color: inherit;
           cursor: help;
           pointer-events: auto;
+        }
+        .loom-highlight-tooltip {
+          position: fixed;
+          z-index: 9500;
+          max-width: min(320px, calc(100vw - 24px));
+          background: rgba(26, 25, 22, 0.95);
+          color: var(--paper);
+          border: 1px solid rgba(255, 204, 0, 0.4);
+          border-radius: 6px;
+          padding: 8px 10px;
+          font-size: 12px;
+          line-height: 1.4;
+          white-space: pre-wrap;
+          box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+          backdrop-filter: blur(2px);
+          pointer-events: none;
+        }
+        .loom-highlight-tooltip .meta {
+          font-family: var(--mono);
+          font-size: 10px;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          opacity: 0.88;
+          margin-bottom: 4px;
+          color: rgba(255, 204, 0, 0.9);
         }
         /* Make sure the text layer passes pointer events down so we can select */
         .react-pdf__Page__textContent span {
@@ -524,6 +617,20 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
             document.getSelection()?.removeAllRanges();
           }}
         />
+      )}
+
+      {highlightTooltip && (
+        <div
+          className="loom-highlight-tooltip"
+          style={{
+            left: `${highlightTooltip.x}px`,
+            top: `${highlightTooltip.y - 12}px`,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <div className="meta">highlight</div>
+          {highlightTooltip.text}
+        </div>
       )}
     </div>
   );
