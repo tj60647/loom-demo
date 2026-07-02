@@ -17,7 +17,7 @@ export default async function AuthErrorPage({ searchParams }: AuthErrorPageProps
           {isAccessDenied
             ? (
               <>
-                email tj at <a href="mailto:tjmcleish@berkeley.edu">tjmcleish@berkeley.edu</a> to be added.
+                email tj at <a href="mailto:tjmcleish@berkeley.edu">tjmcleish@berkeley.edu</a> with the email associated with your github account to be added.
               </>
             )
             : "Something went wrong during sign-in. Please try again."}
