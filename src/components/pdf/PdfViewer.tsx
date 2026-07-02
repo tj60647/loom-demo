@@ -469,14 +469,41 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           backdrop-filter: blur(2px);
           pointer-events: auto;
         }
+        .loom-highlight-tooltip .head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 2px;
+        }
         .loom-highlight-tooltip .meta {
           font-family: var(--mono);
           font-size: 10px;
           letter-spacing: 0.04em;
           text-transform: uppercase;
           opacity: 0.88;
-          margin-bottom: 5px;
+          margin-bottom: 0;
           color: rgba(255, 204, 0, 0.9);
+        }
+        .loom-highlight-tooltip .close {
+          margin: 0;
+          padding: 0;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          border: 1px solid rgba(255, 255, 255, 0.4);
+          background: transparent;
+          color: rgba(255, 255, 255, 0.85);
+          font-size: 10px;
+          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+        .loom-highlight-tooltip .close:hover {
+          border-color: rgba(255, 255, 255, 0.75);
+          color: #fff;
         }
         .loom-highlight-tooltip .coding {
           font-family: var(--display);
@@ -719,7 +746,20 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             transform: "translate(-50%, -100%)",
           }}
         >
-          <div className="meta">byte</div>
+          <div className="head">
+            <div className="meta">byte</div>
+            <button
+              type="button"
+              className="close"
+              aria-label="Close highlight details"
+              onClick={(event) => {
+                event.stopPropagation();
+                hideHighlightTooltip();
+              }}
+            >
+              ×
+            </button>
+          </div>
           <div className="coding">{highlightTooltip.conceptLabel}</div>
           <div className="foot">
             {highlightTooltip.source}
