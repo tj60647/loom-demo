@@ -12,7 +12,7 @@ type OpenTabProps = {
 }
 
 export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: OpenTabProps) {
-  const { state, addConcept, addByte, editConcept, removeConcept, removeByte } = useLoom()
+  const { state, addConcept, addByte, editConcept, removeConcept } = useLoom()
   const [source, setSource] = useState("")
   const [location, setLocation] = useState("")
   const [content, setContent] = useState("")
@@ -190,7 +190,14 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                       }
                     }}
                     title="Delete concept"
-                  >✕</button>
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M7 6l1 14h8l1-14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M10 10v6M14 10v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </button>
                 </div>
                 {isOpen && (
                   <div className="lbody">
@@ -216,21 +223,6 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                               title={b.sourceId || b.source ? "Open this byte in the library PDF" : "No library source linked for this byte"}
                             >
                               goto
-                            </button>
-                            <button
-                              type="button"
-                              className="rm"
-                              style={{ background: "none", border: "none", padding: 0, display: "inline-flex", alignItems: "center" }}
-                              onClick={() => removeByte(b.id)}
-                              title="Delete byte"
-                              aria-label="Delete byte"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                <path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                <path d="M7 6l1 14h8l1-14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M10 10v6M14 10v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                              </svg>
                             </button>
                           </span>
                         </div>

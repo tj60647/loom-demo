@@ -56,7 +56,7 @@ test.describe('Audit Seed Bytes', () => {
         diacritics: true,
         ignoreJoiners: true,
         ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
-        done: (c) => count += c
+        done: (c: number) => count += c
       });
       
       return count;

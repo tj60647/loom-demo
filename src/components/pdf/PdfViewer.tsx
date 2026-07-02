@@ -84,36 +84,26 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     const showFromEvent = (event: MouseEvent | PointerEvent | FocusEvent, sticky = false) => {
       const target = event.target as HTMLElement | null;
       const rect = target?.getBoundingClientRect();
-      const x = "clientX" in event && event.clientX ? event.clientX : rect ? rect.left + rect.width / 2 : 0;
-      const y = "clientY" in event && event.clientY ? event.clientY : rect ? rect.top : 0;
+      const x = rect ? rect.left + rect.width / 2 : ("clientX" in event && event.clientX ? event.clientX : 0);
+      const y = rect ? rect.top : ("clientY" in event && event.clientY ? event.clientY : 0);
       showHighlightTooltip(data, x, y, sticky);
     };
 
-    const onEnter = (event: PointerEvent) => showFromEvent(event, false);
-    const onMove = (event: PointerEvent) => {
-      setHighlightTooltip((prev) => {
-        if (!prev || prev.sticky) return prev;
-        return { ...prev, x: event.clientX, y: event.clientY };
-      });
-    };
-    const onLeave = () => {
-      setHighlightTooltip((prev) => (prev && prev.sticky ? prev : null));
-    };
     const onClick = (event: MouseEvent) => {
       event.stopPropagation();
       showFromEvent(event, true);
     };
-    const onFocus = (event: FocusEvent) => showFromEvent(event, false);
-    const onBlur = () => {
-      setHighlightTooltip((prev) => (prev && prev.sticky ? prev : null));
-    };
 
-    node.addEventListener("pointerenter", onEnter);
-    node.addEventListener("pointermove", onMove);
-    node.addEventListener("pointerleave", onLeave);
+    const onFocus = (event: FocusEvent) => showFromEvent(event, true);
+
     node.addEventListener("click", onClick);
     node.addEventListener("focus", onFocus);
-    node.addEventListener("blur", onBlur);
+    node.setAttribute("title", "Click highlight for actions");
+
+    return () => {
+      node.removeEventListener("click", onClick);
+      node.removeEventListener("focus", onFocus);
+    };
   }, [showHighlightTooltip]);
 
   // Responsive sizing and layout detection
@@ -408,6 +398,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in a modal or input
       if (showCaptureModal || document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
+
+      if (e.key === 'Escape') {
+        hideHighlightTooltip();
+        return;
+      }
       
       if (e.key === 'ArrowLeft' && canGoPrev) {
         handlePrev();
@@ -418,7 +413,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canGoPrev, canGoNext, handlePrev, handleNext, showCaptureModal]);
+  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal]);
 
   // Calculate page dimensions based on fit mode
   const calcPageProps = () => {
