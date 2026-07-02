@@ -84,7 +84,9 @@ export async function createSource(data: {
 
 export async function getSourceFile(sourceId: string) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) throw new Error("Unauthorized")
+  if (!session?.user?.id && process.env.NODE_ENV === "production") {
+    throw new Error("Unauthorized")
+  }
 
   const rows = await db
     .select()

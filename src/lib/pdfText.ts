@@ -7,6 +7,7 @@
  * dependency) rather than the browser build used by the PdfViewer component.
  */
 import path from "path"
+import { pathToFileURL } from "url"
 
 export interface ExtractedPage {
   pageNumber: number
@@ -21,7 +22,9 @@ export async function extractPdfPageText(data: Buffer): Promise<ExtractedPage[]>
     process.cwd(),
     "node_modules/pdfjs-dist/legacy/build/pdf.mjs"
   )
-  const pdfjsLib = await import(/* webpackIgnore: true */ pdfjsPath)
+  // Windows absolute paths (e.g. C:\\...) must be imported via file:// URL.
+  const pdfjsUrl = pathToFileURL(pdfjsPath).href
+  const pdfjsLib = await import(/* webpackIgnore: true */ pdfjsUrl)
 
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(data),
@@ -44,6 +47,13 @@ export async function extractPdfPageText(data: Buffer): Promise<ExtractedPage[]>
     pages.push({ pageNumber, textContent: text })
   }
 
-  await doc.destroy()
+  // pdf.js legacy builds differ on cleanup API shape across versions.
+  if (typeof (doc as { destroy?: () => Promise<void> }).destroy === "function") {
+    await (doc as { destroy: () => Promise<void> }).destroy()
+  } else if (
+    typeof (loadingTask as { destroy?: () => Promise<void> }).destroy === "function"
+  ) {
+    await (loadingTask as { destroy: () => Promise<void> }).destroy()
+  }
   return pages
 }

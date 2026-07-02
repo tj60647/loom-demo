@@ -44,40 +44,80 @@ const READINGS: { title: string; author: string; description: string; file: stri
 
 async function run() {
   for (const reading of READINGS) {
-    const existing = await db.select().from(sources).where(eq(sources.title, reading.title)).limit(1)
-    if (existing.length > 0) {
-      console.log(`[seed-sources] "${reading.title}" already exists, skipping.`)
-      continue
-    }
-
     const filePath = path.join(process.cwd(), "storage", "readings", reading.file)
     const buffer = await readFile(filePath)
+    const existing = await db
+      .select()
+      .from(sources)
+      .where(eq(sources.title, reading.title))
+      .limit(1)
 
-    const storageKey = `${crypto.randomUUID()}.pdf`
-    await readingStorage.put(storageKey, buffer)
+    let source = existing[0]
 
-    const [source] = await db.insert(sources).values({
-      title: reading.title,
-      author: reading.author,
-      description: reading.description,
-      storageKey,
-    }).returning()
+    if (!source) {
+      const storageKey = `${crypto.randomUUID()}.pdf`
+      await readingStorage.put(storageKey, buffer)
 
-    const pages = await extractPdfPageText(buffer)
-    if (pages.length > 0) {
-      await db.insert(sourcePages).values(
-        pages.map((p) => ({
-          sourceId: source.id,
-          pageNumber: p.pageNumber,
-          textContent: p.textContent,
-          contentHash: hashText(p.textContent),
-        }))
-      )
+      const [inserted] = await db
+        .insert(sources)
+        .values({
+          title: reading.title,
+          author: reading.author,
+          description: reading.description,
+          storageKey,
+        })
+        .returning()
+      source = inserted
+      console.log(`[seed-sources] Registered source row for "${reading.title}".`)
+    } else {
+      // Existing row may reference a stale storage key from a previous local
+      // run/deploy. If the file is missing, re-store it and update the key.
+      let hasStoredFile = true
+      try {
+        await readingStorage.get(source.storageKey)
+      } catch {
+        hasStoredFile = false
+      }
+
+      if (!hasStoredFile) {
+        const storageKey = `${crypto.randomUUID()}.pdf`
+        await readingStorage.put(storageKey, buffer)
+        const [updated] = await db
+          .update(sources)
+          .set({ storageKey })
+          .where(eq(sources.id, source.id))
+          .returning()
+        source = updated
+        console.log(`[seed-sources] Repaired missing storage file for "${reading.title}".`)
+      } else {
+        console.log(`[seed-sources] "${reading.title}" already exists.`)
+      }
     }
-    console.log(`[seed-sources] Registered "${reading.title}" (${pages.length} pages).`)
+
+    const existingPages = await db
+      .select({ id: sourcePages.id })
+      .from(sourcePages)
+      .where(eq(sourcePages.sourceId, source.id))
+      .limit(1)
+
+    if (existingPages.length === 0) {
+      const pages = await extractPdfPageText(buffer)
+      if (pages.length > 0) {
+        await db.insert(sourcePages).values(
+          pages.map((p) => ({
+            sourceId: source.id,
+            pageNumber: p.pageNumber,
+            textContent: p.textContent,
+            contentHash: hashText(p.textContent),
+          }))
+        )
+      }
+      console.log(`[seed-sources] Seeded ${pages.length} page(s) for "${reading.title}".`)
+    }
 
     for (const legacyLabel of reading.legacySourceLabels) {
-      const updated = await db.update(bytes)
+      const updated = await db
+        .update(bytes)
         .set({ sourceId: source.id })
         .where(eq(bytes.source, legacyLabel))
         .returning({ id: bytes.id })

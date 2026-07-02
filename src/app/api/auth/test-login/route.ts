@@ -35,12 +35,21 @@ export async function GET(request: Request) {
     expires,
   });
 
-  // 4. Return response with cookie
+  // 4. Return response with cookies. Different NextAuth/Auth.js versions
+  // may read different cookie names, so set both in non-production test flow.
   const response = NextResponse.json({ success: true, userId, sessionToken });
   response.cookies.set('next-auth.session-token', sessionToken, {
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
+    secure: false,
+    expires,
+  });
+  response.cookies.set('authjs.session-token', sessionToken, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: false,
     expires,
   });
 
