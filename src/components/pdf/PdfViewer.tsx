@@ -22,6 +22,7 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
   const { state } = useLoom();
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
+  const [isNarrow, setIsNarrow] = useState(false);
   
   // Layout state
   const [isTwoPage, setIsTwoPage] = useState(true); // default to 2-page spread
@@ -40,6 +41,7 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
     const updateLayout = () => {
       const availableHeight = window.innerHeight - 150; // account for header and toolbar
       setPageHeight(Math.max(400, availableHeight));
+      setIsNarrow(window.innerWidth < 900);
       
       if (window.innerWidth < 900) {
         setIsTwoPage(false);
@@ -182,6 +184,11 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
                   length: byte.endOffset! - byte.startOffset!
                 }], {
                   className: "loom-byte-highlight",
+                  each: (node) => {
+                    const tip = `${byte.source || sourceName}${byte.location ? ` | ${byte.location}` : ""}\n${byte.content}`;
+                    (node as HTMLElement).setAttribute("title", tip);
+                    (node as HTMLElement).setAttribute("aria-label", tip);
+                  },
                   done: (count) => matches += count
                 });
               } else {
@@ -197,6 +204,11 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
                   diacritics: true,
                   ignoreJoiners: true,
                   ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
+                  each: (node) => {
+                    const tip = `${byte.source || sourceName}${byte.location ? ` | ${byte.location}` : ""}\n${byte.content}`;
+                    (node as HTMLElement).setAttribute("title", tip);
+                    (node as HTMLElement).setAttribute("aria-label", tip);
+                  },
                   done: (count) => matches += count
                 });
               }
@@ -282,8 +294,8 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
     } else {
       // fit to width
       // Non-page horizontal space:
-      // Padding (30*2=60) + Arrows (64*2=128) + Gaps around Document (20*2=40) = 228px
-      const nonPageSpace = 228;
+      // Desktop: padding + side arrows + gaps. Mobile: tighter layout.
+      const nonPageSpace = isNarrow ? 56 : 228;
       if (isTwoPage) {
         // Plus 20px gap between the two pages = 248px total non-page space
         const targetWidth = (containerWidth - 248) / 2;
@@ -310,8 +322,8 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
           background-color: rgba(255, 204, 0, 0.4);
           border-bottom: 2px solid rgba(255, 204, 0, 0.8);
           color: inherit;
-          /* Ensure the text stays selectable */
-          pointer-events: none;
+          cursor: help;
+          pointer-events: auto;
         }
         /* Make sure the text layer passes pointer events down so we can select */
         .react-pdf__Page__textContent span {
@@ -390,12 +402,12 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
       </div>
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", display: "flex", justifyContent: "center", backgroundColor: "#eef0f2" }}>
+      <div style={{ flex: 1, overflowY: "auto", overflowX: isNarrow ? "hidden" : "auto", display: "flex", justifyContent: "center", backgroundColor: "#eef0f2" }}>
         
-        <div style={{ display: "flex", alignItems: "center", gap: "20px", padding: "30px", minHeight: "100%" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "20px", padding: isNarrow ? "12px" : "30px", minHeight: "100%" }}>
           
           {/* Left Arrow */}
-          <button 
+          {!isNarrow && <button 
             className="pdf-side-nav"
             onClick={handlePrev}
             disabled={!canGoPrev}
@@ -404,7 +416,7 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
-          </button>
+          </button>}
 
           {/* PDF Container */}
           <Document 
@@ -434,7 +446,7 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
           </Document>
 
           {/* Right Arrow */}
-          <button 
+          {!isNarrow && <button 
             className="pdf-side-nav"
             onClick={handleNext}
             disabled={!canGoNext}
@@ -443,9 +455,38 @@ export default function PdfViewer({ url, sourceName, sourceId, onClose }: PdfVie
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
-          </button>
+          </button>}
         </div>
       </div>
+
+      {isNarrow && (
+        <div
+          style={{
+            position: "fixed",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: "10px 12px calc(10px + env(safe-area-inset-bottom))",
+            background: "rgba(237, 235, 227, 0.95)",
+            borderTop: "1px solid var(--rule)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            zIndex: 8000,
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <button className="btn ghost mini" onClick={handlePrev} disabled={!canGoPrev} aria-label="Previous Page">
+            Prev
+          </button>
+          <span className="label" style={{ fontSize: "10px" }}>
+            {isTwoPage ? `Pages ${pageNumber}-${Math.min(pageNumber + 1, numPages || pageNumber)}` : `Page ${pageNumber}`} of {numPages || "?"}
+          </span>
+          <button className="btn ghost mini" onClick={handleNext} disabled={!canGoNext} aria-label="Next Page">
+            Next
+          </button>
+        </div>
+      )}
 
       {/* Floating Capture Button */}
       {highlightRect && (

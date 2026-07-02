@@ -24,7 +24,7 @@ header .field{display:flex;flex-direction:column;gap:3px}
 header input{font-family:var(--body);font-size:15px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:5px 8px;color:var(--ink)}
 .btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:none;border-radius:3px;padding:7px 11px;cursor:pointer}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
-.btn.mini{font-size:10px;padding:5px 9px;letter-spacing:.05em}
+.btn.mini{font-size:11px;padding:7px 10px;letter-spacing:.05em;min-height:36px}
 .btn:disabled{opacity:.35;cursor:default} .btn:hover:not(:disabled){opacity:.88}
 #saveDot{font-family:var(--mono);font-size:10px;color:var(--ink-soft);align-self:center}
 nav{display:flex;border-bottom:1px solid var(--rule);padding:0 26px;background:var(--paper-2);flex-wrap:wrap}
@@ -142,6 +142,21 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space
   padding:9px 26px;border-top:1px solid var(--ink);background:var(--paper);z-index:5}
 footer span{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
 footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
+
+@media (max-width: 900px){
+  header{padding:10px 14px 8px;gap:10px}
+  .wordmark{font-size:21px}
+  nav{
+    padding:0 10px;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+  }
+  nav button{flex:0 0 auto}
+  main{padding:18px 14px 20px}
+  footer{position:static;padding:10px 14px;z-index:1}
+}
 
 /* ===== v7 legibility pass ===== */
 /* plain "do this" instruction line — sits above the metaphor */

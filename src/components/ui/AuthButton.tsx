@@ -11,7 +11,7 @@ export default function AuthButton() {
 
   if (session) {
     return (
-      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
         <span className="label">{session.user?.name || session.user?.email}</span>
         <a href="/admin/aggregate" className="btn ghost mini">Aggregate View</a>
         <a href="/admin" className="btn ghost mini">Admin</a>
