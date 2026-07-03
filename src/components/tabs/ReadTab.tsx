@@ -1,15 +1,32 @@
 "use client"
 
 import { useLoom } from "@/components/providers/LoomProvider"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { Concept, Edge } from "@/lib/types"
 import ClothMap from "@/components/svg/ClothMap"
 
 export default function ReadTab() {
   const { state, setRead } = useLoom()
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number} | null>(null)
+  const [showClothInfo, setShowClothInfo] = useState(false)
+  const closeInfoButtonRef = useRef<HTMLButtonElement>(null)
 
   const degreeOf = (cid: string) => state.edges.filter(e => e.fromId === cid || e.toId === cid).length
+
+  useEffect(() => {
+    if (!showClothInfo) return
+
+    closeInfoButtonRef.current?.focus()
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowClothInfo(false)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [showClothInfo])
 
   // Generate prompts
   const getAdjacency = () => {
@@ -271,7 +288,63 @@ export default function ReadTab() {
 
       <div className="two" style={{marginTop: "22px"}}>
         <div className="card">
-          <h2>What the cloth shows you <span className="n">counted, not judged</span></h2>
+          <h2 className="heading-with-info">
+            What the cloth shows you <span className="n">counted, not judged</span>
+            <button
+              type="button"
+              className="iconbtn cloth-info-btn"
+              aria-label="How cloth prompts are derived"
+              aria-haspopup="dialog"
+              aria-expanded={showClothInfo}
+              aria-controls="clothInfoDialog"
+              onClick={() => setShowClothInfo(true)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </svg>
+            </button>
+          </h2>
+          {showClothInfo && (
+            <div className="info-scrim" onClick={() => setShowClothInfo(false)}>
+              <section
+                id="clothInfoDialog"
+                className="info-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="clothInfoTitle"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <button
+                  ref={closeInfoButtonRef}
+                  type="button"
+                  className="iconbtn info-close"
+                  aria-label="Close info"
+                  onClick={() => setShowClothInfo(false)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                  </svg>
+                </button>
+                <div className="info-k">counted, not judged</div>
+                <h2 id="clothInfoTitle">How these prompts are made</h2>
+                <p>
+                  This panel reads the structure of your own loom. It counts concepts and threads, then turns the visible patterns into questions for you to answer.
+                </p>
+                <ul>
+                  <li><b>The spine</b> is the largest connected weave of concepts and threads.</li>
+                  <li><b>The centre</b> is the concept, or tied concepts, with the most threads touching them.</li>
+                  <li><b>The gap</b> is either an island apart from the main weave, or a concept with no threads yet.</li>
+                </ul>
+                <p className="info-note">
+                  No agent writes the reading or decides what it means. The tool points; you interpret.
+                </p>
+                <button type="button" className="btn ghost mini" onClick={() => setShowClothInfo(false)}>Got it</button>
+              </section>
+            </div>
+          )}
           <p className="hint">Each is a question with a move — click to trace it on the cloth and lay your threads out as material below. You weave them into your read. You make the call.</p>
           
           <div id="clothPrompts">

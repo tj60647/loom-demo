@@ -199,6 +199,22 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 #yourRead{min-height:170px}
 .readq{font-size:13.5px;color:var(--ink-soft);font-style:italic;margin:0 0 7px}
 .drafted{font-family:var(--mono);font-size:11px;color:var(--sage);margin-top:8px;min-height:14px}
+.heading-with-info{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:1px solid var(--rule);border-radius:50%;background:transparent;color:var(--ink-soft);cursor:pointer;line-height:1}
+.iconbtn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn:hover,.iconbtn:focus-visible{border-color:var(--ochre);color:var(--ochre);outline:none}
+.cloth-info-btn{flex:0 0 auto;margin-left:2px}
+.info-scrim{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:22px}
+.info-dialog{position:relative;max-width:520px;width:100%;background:var(--paper);border:1px solid var(--ink);border-radius:6px;box-shadow:0 18px 50px rgba(0,0,0,.3);padding:24px 26px 20px}
+.info-dialog .info-k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ochre)}
+.info-dialog h2{font-family:var(--display);font-size:25px;font-weight:600;margin:6px 34px 8px 0}
+.info-dialog p{font-size:15.5px;line-height:1.5;margin:0 0 10px}
+.info-dialog ul{margin:10px 0 12px;padding-left:19px;font-size:15px;line-height:1.45}
+.info-dialog li{margin-bottom:6px}
+.info-dialog li b{font-weight:500;color:var(--ink)}
+.info-dialog .info-note{font-size:13.5px;color:var(--ink-soft);border-left:2px solid var(--ochre);padding-left:11px;margin:12px 0 16px}
+.info-close{position:absolute;top:12px;right:12px}
+@media(max-width:560px){.info-dialog{padding:22px 20px 18px}.info-dialog h2{font-size:23px}}
 /* first-run walkthrough overlay */
 .scrim{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:40;display:none;align-items:center;justify-content:center;padding:22px}
 .scrim.show{display:flex}
