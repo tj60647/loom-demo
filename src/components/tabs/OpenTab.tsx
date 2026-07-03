@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import type { Byte } from "@/lib/types"
 import { contentWords } from "@/lib/utils"
@@ -18,6 +18,8 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
   const [content, setContent] = useState("")
   const [conceptLabel, setConceptLabel] = useState("")
   const [newConceptOnly, setNewConceptOnly] = useState("")
+  const [showCaptureInfo, setShowCaptureInfo] = useState(false)
+  const closeCaptureInfoButtonRef = useRef<HTMLButtonElement>(null)
 
   const [openLogRows, setOpenLogRows] = useState<Record<string, boolean>>({})
 
@@ -50,6 +52,21 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
   }
 
   useEffect(() => {
+    if (!showCaptureInfo) return
+
+    closeCaptureInfoButtonRef.current?.focus()
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowCaptureInfo(false)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [showCaptureInfo])
+
+  useEffect(() => {
     if (!focusByteId) return
     const targetByte = state.bytes.find((b) => b.id === focusByteId)
     if (!targetByte) {
@@ -71,9 +88,69 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
   return (
     <div className="two">
       <div className="card">
-        <h2>Capture a byte</h2>
-        <p className="do">Do this — paste a passage, then say what it's about <i>in your own words</i>.</p>
-        <p className="hint">A “byte” is just a passage worth keeping. A crude concept name is fine — tap the passage's own words if you're stuck.</p>
+        <h2 className="heading-with-info">
+          Capture a byte
+          <button
+            type="button"
+            className="iconbtn"
+            aria-label="Two ways to capture a byte"
+            aria-haspopup="dialog"
+            aria-expanded={showCaptureInfo}
+            aria-controls="captureInfoDialog"
+            onClick={() => setShowCaptureInfo(true)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+          </button>
+        </h2>
+        {showCaptureInfo && (
+          <div className="info-scrim" onClick={() => setShowCaptureInfo(false)}>
+            <section
+              id="captureInfoDialog"
+              className="info-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="captureInfoTitle"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                ref={closeCaptureInfoButtonRef}
+                type="button"
+                className="iconbtn info-close"
+                aria-label="Close info"
+                onClick={() => setShowCaptureInfo(false)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+              <div className="info-k">same byte, different doorway</div>
+              <h2 id="captureInfoTitle">Two ways to capture a byte</h2>
+              <p>
+                A byte is always the same thing: a passage you want to keep, attached to a concept you name.
+              </p>
+              <p>
+                <b>Manual capture</b> starts here. Paste or type the passage, add source and location if you have them, then name what the passage is about.
+              </p>
+              <p>
+                <b>Assisted capture</b> starts in the Library. Open a PDF, select text, and capture it. Loom fills in the passage, source, page, and highlight anchor for you.
+              </p>
+              <p>
+                In both paths, the thinking stays yours. The word chips are only a scaffold: tap useful words from the passage, reuse an existing concept, or type a new phrase in your own language.
+              </p>
+              <p className="info-note">
+                Nothing is generated. Loom helps you carry the quote; you make the code.
+              </p>
+              <button type="button" className="btn ghost mini" onClick={() => setShowCaptureInfo(false)}>Got it</button>
+            </section>
+          </div>
+        )}
+        <p className="do">Do this — paste a passage here, or select text in a Library PDF. Then say what it is about <i>in your own words</i>.</p>
+        <p className="hint">A byte is a passage worth keeping plus your concept for it. Loom can carry over source details and offer passage words to tap; it does not summarize or choose the concept for you.</p>
         
         <div className="form-row">
           <span className="label">Source — author, work</span>

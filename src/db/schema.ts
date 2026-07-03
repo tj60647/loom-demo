@@ -141,9 +141,9 @@ export const bytes = pgTable("byte", {
   pageNumber: integer("pageNumber"),
   startOffset: integer("startOffset"),
   endOffset: integer("endOffset"),
-  // Hash of the sourcePages.textContent this byte's offsets were computed
-  // against. Used to detect drift between the canonical server-side text
-  // and the client's pdf.js text layer before trusting markRanges.
+  // Hash of the page text string these offsets were computed against. Usually
+  // this is sourcePages.textContent; when the browser pdf.js layer differs, it
+  // can be the live client text layer hash so markRanges remains precise.
   pageContentHash: text("pageContentHash"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 })

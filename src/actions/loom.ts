@@ -57,19 +57,36 @@ export async function deleteConcept(id: string) {
   await db.delete(concepts).where(eq(concepts.id, id))
 }
 
-export async function createByte(data: { conceptId: string, source: string, sourceId?: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number }) {
+function findClosestTextIndex(text: string, needle: string, preferredStart?: number) {
+  if (!needle) return -1
+
+  let bestIndex = -1
+  let bestDistance = Number.POSITIVE_INFINITY
+  let index = text.indexOf(needle)
+
+  while (index !== -1) {
+    const distance = preferredStart == null ? index : Math.abs(index - preferredStart)
+    if (distance < bestDistance) {
+      bestIndex = index
+      bestDistance = distance
+    }
+    index = text.indexOf(needle, index + Math.max(needle.length, 1))
+  }
+
+  return bestIndex
+}
+
+export async function createByte(data: { conceptId: string, source: string, sourceId?: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, pageContentHash?: string }) {
   const userId = await getUserId()
 
   let startOffset = data.startOffset
   let endOffset = data.endOffset
-  let pageContentHash: string | undefined
+  let pageContentHash = data.pageContentHash
 
-  // If this byte comes from a library PDF, re-derive its offsets against the
-  // server's canonical extracted page text rather than trusting the client's
-  // pdf.js text-layer offsets outright. The canonical text is the stable
-  // anchor: pdf.js's browser text layer can differ subtly across renders,
-  // versions, or single vs. two-page layout, which would otherwise cause
-  // markRanges to silently highlight the wrong text (or nothing at all).
+  // If the browser and server agree on the page text hash, prefer canonical
+  // server offsets. If they differ, keep the browser offsets with the browser
+  // text-layer hash they were computed against, so return-highlighting can use
+  // precise markRanges instead of broad fuzzy matching.
   if (data.sourceId && data.pageNumber != null) {
     const rows = await db.select().from(sourcePages).where(
       and(eq(sourcePages.sourceId, data.sourceId), eq(sourcePages.pageNumber, data.pageNumber))
@@ -77,17 +94,20 @@ export async function createByte(data: { conceptId: string, source: string, sour
     const page = rows[0]
 
     if (page) {
-      pageContentHash = page.contentHash
-      const canonicalIndex = page.textContent.indexOf(data.content)
-      if (canonicalIndex !== -1) {
+      const canonicalIndex = findClosestTextIndex(page.textContent, data.content, data.startOffset)
+      const clientTextMatchesCanonical = !data.pageContentHash || data.pageContentHash === page.contentHash
+
+      if (canonicalIndex !== -1 && clientTextMatchesCanonical) {
+        pageContentHash = page.contentHash
         startOffset = canonicalIndex
         endOffset = canonicalIndex + data.content.length
       } else {
-        // Couldn't find an exact match in the canonical text (e.g. the
-        // selection crossed a hyphenated line-break). Keep the client's
-        // offsets as a best-effort fallback; the stored pageContentHash will
-        // still let the client detect drift and fall back to fuzzy matching.
-        console.warn(`[createByte] Could not anchor byte content to sourcePage ${data.sourceId}#${data.pageNumber}; falling back to client-provided offsets.`)
+        pageContentHash = data.pageContentHash ?? page.contentHash
+        if (canonicalIndex === -1) {
+          console.warn(`[createByte] Could not anchor byte content to sourcePage ${data.sourceId}#${data.pageNumber}; falling back to client-provided offsets.`)
+        } else {
+          console.warn(`[createByte] Browser text layer differs from sourcePage ${data.sourceId}#${data.pageNumber}; preserving client-provided offsets.`)
+        }
       }
     }
   }

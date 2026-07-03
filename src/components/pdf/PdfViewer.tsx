@@ -46,9 +46,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string, pageNum?: number, startOffset?: number, endOffset?: number} | null>(null);
+  const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string, pageNum?: number, startOffset?: number, endOffset?: number, pageContentHash?: string} | null>(null);
   const [showCaptureModal, setShowCaptureModal] = useState(false);
-  const [captureData, setCaptureData] = useState<{text: string, pageNum?: number, startOffset?: number, endOffset?: number} | null>(null);
+  const [captureData, setCaptureData] = useState<{text: string, pageNum?: number, startOffset?: number, endOffset?: number, pageContentHash?: string} | null>(null);
 
   const showHighlightTooltip = useCallback((
     data: {
@@ -160,14 +160,16 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   useEffect(() => {
     const handleSelection = () => {
       const selection = window.getSelection();
-      const text = selection?.toString().trim();
+      const rawText = selection?.toString() ?? "";
+      const text = rawText.trim();
       if (text && text.length > 0) {
         const range = selection?.getRangeAt(0);
         const rect = range?.getBoundingClientRect();
         
         let selectedPageNum = pageNumber;
-        let startOffset = 0;
-        let endOffset = 0;
+        let startOffset: number | undefined;
+        let endOffset: number | undefined;
+        let pageContentHash: string | undefined;
         
         if (range) {
           // Find the react-pdf page element
@@ -193,8 +195,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               const preRange = range.cloneRange();
               preRange.selectNodeContents(textLayer);
               preRange.setEnd(range.startContainer, range.startOffset);
-              startOffset = preRange.toString().length;
-              endOffset = startOffset + text.length;
+              const rawStartOffset = preRange.toString().length;
+              const leadingTrim = rawText.length - rawText.trimStart().length;
+              const trailingTrim = rawText.length - rawText.trimEnd().length;
+              startOffset = rawStartOffset + leadingTrim;
+              endOffset = rawStartOffset + rawText.length - trailingTrim;
+              pageContentHash = hashText(textLayer.textContent || "");
             }
           }
         }
@@ -206,7 +212,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             text,
             pageNum: selectedPageNum,
             startOffset,
-            endOffset
+            endOffset,
+            pageContentHash
           });
         }
       } else {
@@ -216,7 +223,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     
     document.addEventListener("mouseup", handleSelection);
     return () => document.removeEventListener("mouseup", handleSelection);
-  }, []);
+  }, [pageNumber]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -374,7 +381,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         text: highlightRect.text,
         pageNum: highlightRect.pageNum,
         startOffset: highlightRect.startOffset,
-        endOffset: highlightRect.endOffset
+        endOffset: highlightRect.endOffset,
+        pageContentHash: highlightRect.pageContentHash
       });
       setShowCaptureModal(true);
       setHighlightRect(null);
@@ -729,6 +737,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           pageNumber={captureData.pageNum}
           startOffset={captureData.startOffset}
           endOffset={captureData.endOffset}
+          pageContentHash={captureData.pageContentHash}
           onClose={() => {
             setShowCaptureModal(false);
             setCaptureData(null);
