@@ -113,7 +113,12 @@ export default function LibraryTab({ target, onTargetHandled, onGotoOpenByte }: 
                 <div>
                   <h3 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>{s.title}</h3>
                   {s.author ? <p className="hint" style={{ margin: "0 0 12px 0" }}>{s.author}</p> : null}
-                  {s.description ? (
+                  {s.sourceReference ? (
+                    <p className="hint" style={{ margin: s.author ? "-6px 0 12px 0" : "0 0 12px 0", fontSize: "13px" }}>
+                      {s.sourceReference}
+                    </p>
+                  ) : null}
+                  {s.isDescriptionVisible && s.description ? (
                     <p style={{ fontSize: "14px", lineHeight: "1.4", marginBottom: "16px" }}>
                       {s.description}
                     </p>
@@ -226,21 +231,17 @@ function PdfThumbnail({ source }: { source: Source }) {
 
 function UploadSourceForm({ onUploaded }: { onUploaded: () => void }) {
   const [title, setTitle] = useState("")
-  const [author, setAuthor] = useState("")
-  const [description, setDescription] = useState("")
   const [file, setFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async () => {
-    if (!title || !file) return
+    if (!file) return
     setIsSubmitting(true)
     setError(null)
     try {
-      await createSource({ title, author, description, file })
+      await createSource({ title, file, metadataProvenance: "Pending review" })
       setTitle("")
-      setAuthor("")
-      setDescription("")
       setFile(null)
       onUploaded()
     } catch (e) {
@@ -253,17 +254,10 @@ function UploadSourceForm({ onUploaded }: { onUploaded: () => void }) {
   return (
     <div className="card" style={{ padding: "20px" }}>
       <h3 style={{ margin: "0 0 12px 0", fontSize: "16px" }}>Add a Reading</h3>
+      <p className="hint" style={{ margin: "0 0 12px 0" }}>Upload the PDF first. Review and approve metadata in Library Manager.</p>
       <div className="form-row">
-        <span className="label">Title</span>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Designing Engineers" />
-      </div>
-      <div className="form-row" style={{ marginTop: "10px" }}>
-        <span className="label">Author</span>
-        <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="e.g. Bucciarelli" />
-      </div>
-      <div className="form-row" style={{ marginTop: "10px" }}>
-        <span className="label">Description</span>
-        <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short blurb" />
+        <span className="label">Title Override (Optional)</span>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Defaults to the PDF filename" />
       </div>
       <div className="form-row" style={{ marginTop: "10px" }}>
         <span className="label">PDF File</span>
@@ -273,7 +267,7 @@ function UploadSourceForm({ onUploaded }: { onUploaded: () => void }) {
       <button
         className="btn mini"
         style={{ marginTop: "12px" }}
-        disabled={!title || !file || isSubmitting}
+        disabled={!file || isSubmitting}
         onClick={handleSubmit}
       >
         {isSubmitting ? "Uploading…" : "Upload Reading"}

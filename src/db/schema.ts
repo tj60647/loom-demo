@@ -81,7 +81,10 @@ export const sources = pgTable("source", {
     .$defaultFn(() => crypto.randomUUID()),
   title: text("title").notNull(),
   author: text("author").default(""),
+  sourceReference: text("sourceReference").default(""),
   description: text("description").default(""),
+  isDescriptionVisible: boolean("isDescriptionVisible").default(true).notNull(),
+  metadataProvenance: text("metadataProvenance").default(""),
   isVisible: boolean("isVisible").default(true).notNull(),
   // Key used to locate the file in the storage backend (see src/lib/storage.ts).
   storageKey: text("storageKey").notNull(),

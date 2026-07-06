@@ -26,7 +26,10 @@ export type Source = {
   id: string
   title: string
   author: string | null
+  sourceReference: string | null
   description: string | null
+  isDescriptionVisible: boolean
+  metadataProvenance: string | null
   isVisible: boolean
   storageKey: string
   createdByUserId: string | null

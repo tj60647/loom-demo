@@ -18,25 +18,43 @@ import { extractPdfPageText } from "../src/lib/pdfText"
 import { hashText } from "../src/lib/hash"
 import { readingStorage } from "../src/lib/storage"
 
-const READINGS: { title: string; author: string; description: string; file: string; legacySourceLabels: string[] }[] = [
+const READINGS: {
+  title: string
+  author: string
+  sourceReference: string
+  description: string
+  isDescriptionVisible: boolean
+  metadataProvenance: string
+  file: string
+  legacySourceLabels: string[]
+}[] = [
   {
     title: "Object Worlds",
     author: "Bucciarelli — Designing Engineers",
+    sourceReference: "Bucciarelli, Louis L. Designing Engineers.",
     description: "Explores how different disciplines inhabit their own \"worlds\" with distinct instruments and languages.",
+    isDescriptionVisible: true,
+    metadataProvenance: "Manual seed metadata written in scripts/seed-sources.ts.",
     file: "Bucciarelli-Designing Engineers.pdf",
     legacySourceLabels: ["Bucciarelli, Designing Engineers"],
   },
   {
     title: "Communities of Practice",
     author: "Wenger",
+    sourceReference: "Wenger, Etienne. Communities of Practice.",
     description: "Details how shared vocabularies are learned by participating in a community.",
+    isDescriptionVisible: true,
+    metadataProvenance: "Manual seed metadata written in scripts/seed-sources.ts.",
     file: "Wenger_communities-of-practice.pdf",
     legacySourceLabels: ["Wenger, Communities of Practice"],
   },
   {
     title: "Boundary Objects",
     author: "Star, 2010 — 'This Is Not A Boundary Object'",
+    sourceReference: "Star, Susan Leigh. 2010. 'This Is Not a Boundary Object'.",
     description: "How distinct fields coordinate around one shared object without agreeing on its exact meaning.",
+    isDescriptionVisible: true,
+    metadataProvenance: "Manual seed metadata written in scripts/seed-sources.ts.",
     file: "Star, 2010 'This Is Not A Boundary Object'.pdf",
     legacySourceLabels: ["Star, This Is Not A Boundary Object"],
   },
@@ -63,7 +81,10 @@ async function run() {
         .values({
           title: reading.title,
           author: reading.author,
+          sourceReference: reading.sourceReference,
           description: reading.description,
+          isDescriptionVisible: reading.isDescriptionVisible,
+          metadataProvenance: reading.metadataProvenance,
           storageKey,
         })
         .returning()
@@ -84,12 +105,31 @@ async function run() {
         await readingStorage.put(storageKey, buffer)
         const [updated] = await db
           .update(sources)
-          .set({ storageKey })
+          .set({
+            storageKey,
+            author: reading.author,
+            sourceReference: reading.sourceReference,
+            description: reading.description,
+            isDescriptionVisible: reading.isDescriptionVisible,
+            metadataProvenance: reading.metadataProvenance,
+          })
           .where(eq(sources.id, source.id))
           .returning()
         source = updated
         console.log(`[seed-sources] Repaired missing storage file for "${reading.title}".`)
       } else {
+        const [updated] = await db
+          .update(sources)
+          .set({
+            author: reading.author,
+            sourceReference: reading.sourceReference,
+            description: reading.description,
+            isDescriptionVisible: reading.isDescriptionVisible,
+            metadataProvenance: reading.metadataProvenance,
+          })
+          .where(eq(sources.id, source.id))
+          .returning()
+        source = updated
         console.log(`[seed-sources] "${reading.title}" already exists.`)
       }
     }

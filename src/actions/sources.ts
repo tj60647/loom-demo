@@ -54,9 +54,12 @@ export async function getManageableSources() {
  * canonical per-page text used to anchor highlight offsets.
  */
 export async function createSource(data: {
-  title: string
+  title?: string
   author?: string
+  sourceReference?: string
   description?: string
+  isDescriptionVisible?: boolean
+  metadataProvenance?: string
   file: File
 }) {
   const session = await requireAdmin()
@@ -72,15 +75,21 @@ export async function createSource(data: {
     throw new Error("Uploaded file is not a valid PDF")
   }
 
+  const fallbackTitle = data.file.name.replace(/\.pdf$/i, "").trim() || "Untitled Reading"
+  const title = data.title?.trim() || fallbackTitle
+
   const storageKey = `${crypto.randomUUID()}.pdf`
   await readingStorage.put(storageKey, buffer)
 
   const [source] = await db
     .insert(sources)
     .values({
-      title: data.title,
+      title,
       author: data.author || "",
+      sourceReference: data.sourceReference || "",
       description: data.description || "",
+      isDescriptionVisible: data.isDescriptionVisible ?? true,
+      metadataProvenance: data.metadataProvenance || "",
       storageKey,
       createdByUserId: userId,
     })
@@ -110,20 +119,48 @@ export async function createSource(data: {
 
 export async function createSourceFromForm(formData: FormData) {
   const title = formData.get("title")
-  const author = formData.get("author")
-  const description = formData.get("description")
   const file = formData.get("file")
 
-  if (typeof title !== "string" || !(file instanceof File) || !title.trim()) {
-    throw new Error("Title and PDF file are required")
+  if (!(file instanceof File)) {
+    throw new Error("PDF file is required")
   }
 
   await createSource({
-    title: title.trim(),
-    author: typeof author === "string" ? author.trim() : "",
-    description: typeof description === "string" ? description.trim() : "",
+    title: typeof title === "string" ? title.trim() : "",
     file,
+    metadataProvenance: "Pending review",
   })
+
+  revalidatePath("/admin/library")
+  revalidatePath("/")
+}
+
+export async function updateSourceMetadata(formData: FormData) {
+  await requireAdmin()
+
+  const sourceId = formData.get("sourceId")
+  if (typeof sourceId !== "string" || !sourceId.trim()) {
+    throw new Error("Source id is required")
+  }
+
+  const title = formData.get("title")
+  const author = formData.get("author")
+  const sourceReference = formData.get("sourceReference")
+  const description = formData.get("description")
+  const metadataProvenance = formData.get("metadataProvenance")
+  const isDescriptionVisible = formData.get("isDescriptionVisible") === "on"
+
+  await db
+    .update(sources)
+    .set({
+      title: typeof title === "string" && title.trim() ? title.trim() : "Untitled Reading",
+      author: typeof author === "string" ? author.trim() : "",
+      sourceReference: typeof sourceReference === "string" ? sourceReference.trim() : "",
+      description: typeof description === "string" ? description.trim() : "",
+      isDescriptionVisible,
+      metadataProvenance: typeof metadataProvenance === "string" ? metadataProvenance.trim() : "",
+    })
+    .where(eq(sources.id, sourceId))
 
   revalidatePath("/admin/library")
   revalidatePath("/")
@@ -156,6 +193,7 @@ export async function deleteSource(sourceId: string) {
 
   await db.delete(sources).where(eq(sources.id, sourceId))
   await readingStorage.delete(source.storageKey)
+  await readingStorage.delete(getSourceCoverKey(source.id))
 
   revalidatePath("/admin/library")
   revalidatePath("/")
