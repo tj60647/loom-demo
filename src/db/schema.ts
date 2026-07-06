@@ -4,6 +4,7 @@ import {
   text,
   primaryKey,
   integer,
+  boolean,
 } from "drizzle-orm/pg-core"
 import type { AdapterAccount } from "@auth/core/adapters"
 
@@ -81,6 +82,7 @@ export const sources = pgTable("source", {
   title: text("title").notNull(),
   author: text("author").default(""),
   description: text("description").default(""),
+  isVisible: boolean("isVisible").default(true).notNull(),
   // Key used to locate the file in the storage backend (see src/lib/storage.ts).
   storageKey: text("storageKey").notNull(),
   createdByUserId: text("createdByUserId").references(() => users.id, {

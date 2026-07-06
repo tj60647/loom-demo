@@ -27,6 +27,7 @@ export type Source = {
   title: string
   author: string | null
   description: string | null
+  isVisible: boolean
   storageKey: string
   createdByUserId: string | null
   createdAt: Date

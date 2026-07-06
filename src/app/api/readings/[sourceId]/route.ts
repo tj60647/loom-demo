@@ -20,14 +20,16 @@ export async function GET(
   }
 
   const { sourceId } = await params
+  const shouldDownload = new URL(request.url).searchParams.get("download") === "1"
 
   try {
     const { source, buffer } = await getSourceFile(sourceId)
+    const safeFilename = `${source.title.replace(/"/g, "")}.pdf`
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${source.title.replace(/"/g, "")}.pdf"`,
+        "Content-Disposition": `${shouldDownload ? "attachment" : "inline"}; filename="${safeFilename}"`,
         "Cache-Control": "private, max-age=3600",
       },
     })

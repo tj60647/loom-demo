@@ -2,18 +2,20 @@
 
 import { db } from "@/db"
 import { sources, sourcePages, users } from "@/db/schema"
-import { eq } from "drizzle-orm"
+import { and, asc, eq } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
+import { authOptions, isAdminUser } from "@/lib/auth"
 import { readingStorage } from "@/lib/storage"
+import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
 import { extractPdfPageText } from "@/lib/pdfText"
 import { hashText } from "@/lib/hash"
+import { revalidatePath } from "next/cache"
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) throw new Error("Unauthorized")
 
-  if (session.user.role !== "ADMIN") {
+  if (!isAdminUser(session.user)) {
     const dbUser = await db
       .select()
       .from(users)
@@ -22,11 +24,27 @@ async function requireAdmin() {
     if (dbUser[0]?.role !== "ADMIN") throw new Error("Unauthorized")
   }
 
-  return session.user.id
+  return session
 }
 
 export async function getSources() {
-  return db.select().from(sources).orderBy(sources.createdAt)
+  const session = await getServerSession(authOptions)
+  const admin = isAdminUser(session?.user)
+
+  if (admin) {
+    return db.select().from(sources).orderBy(asc(sources.createdAt))
+  }
+
+  return db
+    .select()
+    .from(sources)
+    .where(eq(sources.isVisible, true))
+    .orderBy(asc(sources.createdAt))
+}
+
+export async function getManageableSources() {
+  await requireAdmin()
+  return db.select().from(sources).orderBy(asc(sources.createdAt))
 }
 
 /**
@@ -41,7 +59,8 @@ export async function createSource(data: {
   description?: string
   file: File
 }) {
-  const userId = await requireAdmin()
+  const session = await requireAdmin()
+  const userId = session.user.id
 
   const arrayBuffer = await data.file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
@@ -79,11 +98,72 @@ export async function createSource(data: {
     )
   }
 
+  try {
+    const coverBuffer = await renderPdfCoverImage(buffer)
+    await readingStorage.put(getSourceCoverKey(source.id), coverBuffer)
+  } catch (error) {
+    console.warn("[Loom] Failed to generate PDF cover image", error)
+  }
+
   return source
+}
+
+export async function createSourceFromForm(formData: FormData) {
+  const title = formData.get("title")
+  const author = formData.get("author")
+  const description = formData.get("description")
+  const file = formData.get("file")
+
+  if (typeof title !== "string" || !(file instanceof File) || !title.trim()) {
+    throw new Error("Title and PDF file are required")
+  }
+
+  await createSource({
+    title: title.trim(),
+    author: typeof author === "string" ? author.trim() : "",
+    description: typeof description === "string" ? description.trim() : "",
+    file,
+  })
+
+  revalidatePath("/admin/library")
+  revalidatePath("/")
+}
+
+export async function setSourceVisibility(sourceId: string, isVisible: boolean) {
+  await requireAdmin()
+
+  await db
+    .update(sources)
+    .set({ isVisible })
+    .where(eq(sources.id, sourceId))
+
+  revalidatePath("/admin/library")
+  revalidatePath("/")
+}
+
+export async function deleteSource(sourceId: string) {
+  await requireAdmin()
+
+  const rows = await db
+    .select()
+    .from(sources)
+    .where(eq(sources.id, sourceId))
+    .limit(1)
+  const source = rows[0]
+  if (!source) {
+    return
+  }
+
+  await db.delete(sources).where(eq(sources.id, sourceId))
+  await readingStorage.delete(source.storageKey)
+
+  revalidatePath("/admin/library")
+  revalidatePath("/")
 }
 
 export async function getSourceFile(sourceId: string) {
   const session = await getServerSession(authOptions)
+  const admin = isAdminUser(session?.user)
   if (!session?.user?.id && process.env.NODE_ENV === "production") {
     throw new Error("Unauthorized")
   }
@@ -91,7 +171,11 @@ export async function getSourceFile(sourceId: string) {
   const rows = await db
     .select()
     .from(sources)
-    .where(eq(sources.id, sourceId))
+    .where(
+      admin
+        ? eq(sources.id, sourceId)
+        : and(eq(sources.id, sourceId), eq(sources.isVisible, true))
+    )
     .limit(1)
   const source = rows[0]
   if (!source) throw new Error("Not found")

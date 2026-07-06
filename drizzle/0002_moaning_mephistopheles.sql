@@ -1,0 +1,1 @@
+ALTER TABLE "source" ADD COLUMN "isVisible" boolean DEFAULT true NOT NULL;

@@ -23,6 +23,8 @@ export interface ReadingStorage {
   put(key: string, data: Buffer): Promise<void>
   /** Retrieve a previously stored file's bytes. */
   get(key: string): Promise<Buffer>
+  /** Remove a previously stored file if it exists. */
+  delete(key: string): Promise<void>
 }
 
 const STORAGE_ROOT = path.join(process.cwd(), "storage", "readings")
@@ -52,6 +54,11 @@ class LocalFileStorage implements ReadingStorage {
   async get(key: string): Promise<Buffer> {
     const dest = this.resolveSafe(key)
     return fs.readFile(dest)
+  }
+
+  async delete(key: string): Promise<void> {
+    const dest = this.resolveSafe(key)
+    await fs.rm(dest, { force: true })
   }
 }
 

@@ -20,6 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <Link href="/" className="btn ghost mini">← Back to my Loom</Link>
         <Link href="/admin" className="btn mini">Class View</Link>
         <Link href="/admin/aggregate" className="btn mini">Aggregate View</Link>
+        <Link href="/admin/library" className="btn mini">Library Manager</Link>
       </nav>
       {children}
     </div>
