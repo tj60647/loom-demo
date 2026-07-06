@@ -6,7 +6,6 @@ import {
   integer,
 } from "drizzle-orm/pg-core"
 import type { AdapterAccount } from "@auth/core/adapters"
-import { sql } from "drizzle-orm"
 
 // --- NEXTAUTH TABLES ---
 
@@ -19,6 +18,11 @@ export const users = pgTable("user", {
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
   role: text("role").default("USER").notNull(),
+})
+
+export const allowedEmails = pgTable("allowed_email", {
+  email: text("email").primaryKey(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
 })
 
 export const accounts = pgTable(

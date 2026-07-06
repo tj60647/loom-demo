@@ -1,18 +1,21 @@
 "use server"
 
 import { db } from "@/db"
-import { users, concepts, bytes, edges } from "@/db/schema"
+import { allowedEmails, users, concepts, bytes, edges } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
+import { authOptions, isAdminUser } from "@/lib/auth"
+import { revalidatePath } from "next/cache"
 
 import { redirect } from "next/navigation"
 
 export async function checkAdmin() {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id || session.user.role !== "ADMIN") {
+  if (!session?.user?.id || !isAdminUser(session.user)) {
     redirect("/")
   }
+
+  return session
 }
 
 export async function getClassData() {
@@ -31,6 +34,46 @@ export async function getClassData() {
   }))
   
   return userStats
+}
+
+export async function getAllowedEmails() {
+  await checkAdmin()
+
+  return db.select().from(allowedEmails).orderBy(allowedEmails.email)
+}
+
+export async function addAllowedEmail(formData: FormData) {
+  await checkAdmin()
+
+  const rawEmail = formData.get("email")
+  if (typeof rawEmail !== "string") {
+    return
+  }
+
+  const email = rawEmail.toLowerCase().trim()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return
+  }
+
+  await db.insert(allowedEmails).values({ email }).onConflictDoNothing()
+  revalidatePath("/admin")
+}
+
+export async function removeAllowedEmail(formData: FormData) {
+  await checkAdmin()
+
+  const rawEmail = formData.get("email")
+  if (typeof rawEmail !== "string") {
+    return
+  }
+
+  const email = rawEmail.toLowerCase().trim()
+  if (!email) {
+    return
+  }
+
+  await db.delete(allowedEmails).where(eq(allowedEmails.email, email))
+  revalidatePath("/admin")
 }
 
 export async function getUserLoomDataAsAdmin(targetUserId: string) {

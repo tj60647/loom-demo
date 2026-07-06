@@ -2,24 +2,19 @@ import { NextAuthOptions } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
 import { DrizzleAdapter } from "@auth/drizzle-adapter"
 import { db } from "@/db"
-import { users } from "@/db/schema"
+import { allowedEmails, users } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import type { Adapter } from "next-auth/adapters"
 
-const ALLOWED_EMAILS = [
-  "john@zerowidth.ai",
-  "caseysimone@berkeley.edu",
-  "hugh@dubberly.com",
-  "kevinma1515@berkeley.edu",
-  "kosa@berkeley.edu",
-  "maxkreminski@gmail.com",
-  "mkremins@berkeley.edu",
-  "shm.almeda@berkeley.edu",
-  "sophiawliu@berkeley.edu",
+const ADMIN_FALLBACK_EMAILS = new Set([
   "tjm@tjmcleish.com",
-  "tjmcleish@berkeley.edu"
-  // Add your own email here if it's not already in the list!
-]
+  "tjmcleish@berkeley.edu",
+])
+
+export function isAdminUser(user?: { role?: string | null; email?: string | null }) {
+  const email = user?.email?.toLowerCase().trim()
+  return user?.role === "ADMIN" || (email ? ADMIN_FALLBACK_EMAILS.has(email) : false)
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: DrizzleAdapter(db) as Adapter,
@@ -37,8 +32,13 @@ export const authOptions: NextAuthOptions = {
       const email = user.email?.toLowerCase().trim()
       if (!email) return false
 
-      // Shared allowlist for all enabled providers.
-      return ALLOWED_EMAILS.includes(email)
+      const approvedEmail = await db
+        .select({ email: allowedEmails.email })
+        .from(allowedEmails)
+        .where(eq(allowedEmails.email, email))
+        .limit(1)
+
+      return approvedEmail.length > 0
     },
     async session({ session, user }) {
       if (session.user) {
