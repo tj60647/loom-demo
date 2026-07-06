@@ -1,10 +1,10 @@
 "use client"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import dynamic from 'next/dynamic'
-import Image from 'next/image'
 import { useSession } from "next-auth/react"
 import { getSources, createSource } from "@/actions/sources"
 import type { Source } from "@/lib/types"
+import SourceThumbnail from "@/components/library/SourceThumbnail"
 
 const PdfViewer = dynamic(() => import('@/components/pdf/PdfViewer'), {
   ssr: false,
@@ -108,7 +108,7 @@ export default function LibraryTab({ target, onTargetHandled, onGotoOpenByte }: 
         {sources.map((s) => (
           <div className="card" key={s.id} style={{ padding: "20px" }}>
             <div style={{ display: "flex", gap: "18px", alignItems: "stretch", flexWrap: "wrap" }}>
-              <PdfThumbnail source={s} />
+              <SourceThumbnail sourceId={s.id} title={s.title} />
               <div style={{ flex: "1 1 340px", minWidth: "240px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                 <div>
                   <h3 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>{s.title}</h3>
@@ -149,83 +149,6 @@ export default function LibraryTab({ target, onTargetHandled, onGotoOpenByte }: 
 
       </div>
     </>
-  )
-}
-
-function PdfThumbnail({ source }: { source: Source }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [coverHeight, setCoverHeight] = useState(180)
-  const [loadError, setLoadError] = useState(false)
-
-  useEffect(() => {
-    const element = containerRef.current
-    if (!element) return
-
-    const updateHeight = () => {
-      const measuredHeight = Math.max(160, Math.floor(element.getBoundingClientRect().height))
-      setCoverHeight(measuredHeight)
-    }
-
-    updateHeight()
-    const observer = new ResizeObserver(() => updateHeight())
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [])
-
-  return (
-    <div
-      ref={containerRef}
-      style={{
-        width: "140px",
-        minHeight: "160px",
-        alignSelf: "stretch",
-        border: "1px solid rgba(26,25,22,.14)",
-        borderRadius: "6px",
-        background: "linear-gradient(180deg, #f7f4ea 0%, #ece6d7 100%)",
-        overflow: "hidden",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flex: "0 0 140px",
-        boxShadow: "0 12px 24px rgba(26,25,22,.09), 0 2px 6px rgba(26,25,22,.08)",
-        position: "relative",
-      }}
-    >
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "linear-gradient(135deg, rgba(255,255,255,.32), rgba(255,255,255,0))",
-          pointerEvents: "none",
-        }}
-      />
-      {loadError ? (
-        <span className="cap" style={{ padding: "12px", textAlign: "center" }}>Preview unavailable</span>
-      ) : (
-        <div
-          style={{
-            width: "100%",
-            height: `${coverHeight}px`,
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          <Image
-            alt={`Preview of ${source.title}`}
-            src={`/api/readings/${source.id}/cover`}
-            fill
-            unoptimized
-            sizes="140px"
-            style={{
-              objectFit: "cover",
-              objectPosition: "top center",
-            }}
-            onError={() => setLoadError(true)}
-          />
-        </div>
-      )}
-    </div>
   )
 }
 

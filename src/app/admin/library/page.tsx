@@ -5,7 +5,7 @@ import {
   setSourceVisibility,
   updateSourceMetadata,
 } from "@/actions/sources"
-import Image from "next/image"
+import SourceThumbnail from "@/components/library/SourceThumbnail"
 
 export default async function AdminLibraryPage() {
   const sources = await getManageableSources()
@@ -53,43 +53,7 @@ export default async function AdminLibraryPage() {
               return (
                 <div className="card" key={source.id} style={{ padding: "20px" }}>
                   <div style={{ display: "flex", gap: "18px", alignItems: "stretch", flexWrap: "wrap" }}>
-                    <div
-                      style={{
-                        width: "140px",
-                        minHeight: "160px",
-                        alignSelf: "stretch",
-                        border: "1px solid rgba(26,25,22,.14)",
-                        borderRadius: "6px",
-                        background: "linear-gradient(180deg, #f7f4ea 0%, #ece6d7 100%)",
-                        overflow: "hidden",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flex: "0 0 140px",
-                        boxShadow: "0 12px 24px rgba(26,25,22,.09), 0 2px 6px rgba(26,25,22,.08)",
-                        position: "relative",
-                      }}
-                    >
-                      <div
-                        aria-hidden="true"
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          background: "linear-gradient(135deg, rgba(255,255,255,.32), rgba(255,255,255,0))",
-                          pointerEvents: "none",
-                        }}
-                      />
-                      <div style={{ width: "100%", height: "220px", position: "relative", zIndex: 1 }}>
-                        <Image
-                          alt={`Preview of ${source.title}`}
-                          src={`/api/readings/${source.id}/cover`}
-                          fill
-                          unoptimized
-                          sizes="140px"
-                          style={{ objectFit: "cover", objectPosition: "top center" }}
-                        />
-                      </div>
-                    </div>
+                    <SourceThumbnail sourceId={source.id} title={source.title} fixedHeight={220} />
                     <div style={{ flex: "1 1 340px", minWidth: "240px", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "12px" }}>
                       <div>
                         <div className="heading-with-info">
@@ -110,42 +74,48 @@ export default async function AdminLibraryPage() {
                           </p>
                         ) : null}
                       </div>
-
-                      <form action={updateSourceMetadata} style={{ display: "grid", gap: "10px" }}>
-                        <input type="hidden" name="sourceId" value={source.id} />
-                        <div className="form-row">
-                          <span className="label">Title</span>
-                          <input name="title" defaultValue={source.title} required />
-                        </div>
-                        <div className="form-row">
-                          <span className="label">Author</span>
-                          <input name="author" defaultValue={source.author ?? ""} />
-                        </div>
-                        <div className="form-row">
-                          <span className="label">Source Reference</span>
-                          <input name="sourceReference" defaultValue={source.sourceReference ?? ""} placeholder="Bibliographic citation or canonical source reference" />
-                        </div>
-                        <div className="form-row">
-                          <span className="label">Description</span>
-                          <textarea name="description" defaultValue={source.description ?? ""} placeholder="Optional summary or note for approval" />
-                        </div>
-                        <label className="hint" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <input type="checkbox" name="isDescriptionVisible" defaultChecked={source.isDescriptionVisible} />
-                          Show description on library cards
-                        </label>
-                        <div className="form-row">
-                          <span className="label">Metadata Provenance</span>
-                          <textarea name="metadataProvenance" defaultValue={source.metadataProvenance ?? ""} placeholder="Where this metadata came from, e.g. email text, PDF front matter, manual review" />
-                        </div>
-                        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                          <button className="btn mini" type="submit">Save Metadata</button>
-                          <button className="btn ghost mini" type="submit" formAction={toggleVisibility}>
+                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                        <details>
+                          <summary className="btn ghost mini" style={{ listStyle: "none", cursor: "pointer" }}>Edit</summary>
+                          <form action={updateSourceMetadata} style={{ display: "grid", gap: "10px", marginTop: "12px" }}>
+                            <input type="hidden" name="sourceId" value={source.id} />
+                            <div className="form-row">
+                              <span className="label">Title</span>
+                              <input name="title" defaultValue={source.title} required />
+                            </div>
+                            <div className="form-row">
+                              <span className="label">Author</span>
+                              <input name="author" defaultValue={source.author ?? ""} />
+                            </div>
+                            <div className="form-row">
+                              <span className="label">Source Reference</span>
+                              <input name="sourceReference" defaultValue={source.sourceReference ?? ""} placeholder="Bibliographic citation or canonical source reference" />
+                            </div>
+                            <div className="form-row">
+                              <span className="label">Description</span>
+                              <textarea name="description" defaultValue={source.description ?? ""} placeholder="Optional summary or note for approval" />
+                            </div>
+                            <label className="hint" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <input type="checkbox" name="isDescriptionVisible" defaultChecked={source.isDescriptionVisible} />
+                              Show description on library cards
+                            </label>
+                            <div className="form-row">
+                              <span className="label">Metadata Provenance</span>
+                              <textarea name="metadataProvenance" defaultValue={source.metadataProvenance ?? ""} placeholder="Where this metadata came from, e.g. email text, PDF front matter, manual review" />
+                            </div>
+                            <button className="btn mini" type="submit">Save Metadata</button>
+                          </form>
+                        </details>
+                        <form action={toggleVisibility}>
+                          <button className="btn ghost mini" type="submit">
                             {source.isVisible ? "Hide" : "Reveal"}
                           </button>
-                          <a className="btn ghost mini" href={`/api/readings/${source.id}?download=1`}>Download PDF</a>
-                          <button className="btn mini" type="submit" formAction={removeSource}>Remove</button>
-                        </div>
-                      </form>
+                        </form>
+                        <a className="btn ghost mini" href={`/api/readings/${source.id}?download=1`}>Download PDF</a>
+                        <form action={removeSource}>
+                          <button className="btn mini" type="submit">Remove</button>
+                        </form>
+                      </div>
                     </div>
                   </div>
                 </div>

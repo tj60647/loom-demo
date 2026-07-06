@@ -3,6 +3,8 @@ import { getSourceFile } from "@/actions/sources"
 import { readingStorage } from "@/lib/storage"
 import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
 
+const MIN_COVER_BYTES = 2048
+
 function renderCoverFallbackSvg(title: string) {
   const safeTitle = title
     .replace(/&/g, "&amp;")
@@ -43,6 +45,9 @@ export async function GET(
 
     try {
       const coverBuffer = await readingStorage.get(coverKey)
+      if (coverBuffer.length < MIN_COVER_BYTES) {
+        throw new Error("Cached cover image is too small to be usable")
+      }
       return new NextResponse(new Uint8Array(coverBuffer), {
         status: 200,
         headers: {
