@@ -1,5 +1,5 @@
 import { getUserLoomDataAsAdmin } from "@/actions/admin"
-import ClothMap from "@/components/svg/ClothMap"
+import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
 import { normalizeCourseId } from "@/lib/courseConfig"
 import type { LoomState } from "@/lib/types"
 
@@ -38,7 +38,7 @@ export default async function UserLoomPage({
             </span>
           </div>
           <div id="mapWrap">
-            <ClothMap state={state} readSel={null} setReadSel={() => {}} />
+            <ReadOnlyClothMap state={state} />
           </div>
         </div>
       </div>

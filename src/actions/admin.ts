@@ -165,37 +165,53 @@ export async function getUserLoomDataAsAdmin(targetUserId: string, courseIdRaw: 
 export async function getAggregateLoomData(courseIdRaw: string = DEFAULT_COURSE_ID) {
   await checkAdmin()
 
-  const courseId = await ensureCourseContext(courseIdRaw)
-
-  const memberships = await db
-    .select({ userId: courseMemberships.userId })
-    .from(courseMemberships)
-    .where(eq(courseMemberships.courseId, courseId))
-
-  if (memberships.length === 0) {
-    return { concepts: [], bytes: [], edges: [], bytesUnavailable: false }
-  }
-
-  const userIds = memberships.map((membership) => membership.userId)
-
-  const allConcepts = await db
-    .select()
-    .from(concepts)
-    .where(and(eq(concepts.courseId, courseId), inArray(concepts.userId, userIds)))
-  const allEdges = await db
-    .select()
-    .from(edges)
-    .where(and(eq(edges.courseId, courseId), inArray(edges.userId, userIds)))
-
   try {
-    const allBytes = await db
+    const courseId = await ensureCourseContext(courseIdRaw)
+
+    const memberships = await db
+      .select({ userId: courseMemberships.userId })
+      .from(courseMemberships)
+      .where(eq(courseMemberships.courseId, courseId))
+
+    if (memberships.length === 0) {
+      return { concepts: [], bytes: [], edges: [], bytesUnavailable: false }
+    }
+
+    const userIds = memberships.map((membership) => membership.userId)
+
+    const allConcepts = await db
       .select()
-      .from(bytes)
-      .where(and(eq(bytes.courseId, courseId), inArray(bytes.userId, userIds)))
-    return { concepts: allConcepts, bytes: allBytes, edges: allEdges, bytesUnavailable: false }
+      .from(concepts)
+      .where(and(eq(concepts.courseId, courseId), inArray(concepts.userId, userIds)))
+    const allEdges = await db
+      .select()
+      .from(edges)
+      .where(and(eq(edges.courseId, courseId), inArray(edges.userId, userIds)))
+
+    try {
+      const allBytes = await db
+        .select()
+        .from(bytes)
+        .where(and(eq(bytes.courseId, courseId), inArray(bytes.userId, userIds)))
+      return { concepts: allConcepts, bytes: allBytes, edges: allEdges, bytesUnavailable: false }
+    } catch (error) {
+      // Fail soft so aggregate map still renders if byte schema/data is temporarily inconsistent.
+      console.error("[getAggregateLoomData] Failed to load bytes for aggregate view", error)
+      return { concepts: allConcepts, bytes: [], edges: allEdges, bytesUnavailable: true }
+    }
   } catch (error) {
-    // Fail soft so aggregate map still renders if byte schema/data is temporarily inconsistent.
-    console.error("[getAggregateLoomData] Failed to load bytes for aggregate view", error)
-    return { concepts: allConcepts, bytes: [], edges: allEdges, bytesUnavailable: true }
+    // Compatibility fallback for environments that have not applied course-scoping columns yet.
+    console.error("[getAggregateLoomData] Falling back to legacy aggregate query", error)
+
+    const allConcepts = await db.select().from(concepts)
+    const allEdges = await db.select().from(edges)
+
+    try {
+      const allBytes = await db.select().from(bytes)
+      return { concepts: allConcepts, bytes: allBytes, edges: allEdges, bytesUnavailable: false }
+    } catch (bytesError) {
+      console.error("[getAggregateLoomData] Failed to load bytes in legacy fallback", bytesError)
+      return { concepts: allConcepts, bytes: [], edges: allEdges, bytesUnavailable: true }
+    }
   }
 }

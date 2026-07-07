@@ -1,5 +1,5 @@
 import { getAggregateLoomData } from "@/actions/admin"
-import ClothMap from "@/components/svg/ClothMap"
+import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
 import { normalizeCourseId } from "@/lib/courseConfig"
 import type { LoomState } from "@/lib/types"
 
@@ -13,7 +13,22 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     ? resolvedSearchParams.course[0]
     : resolvedSearchParams.course
   const courseId = normalizeCourseId(rawCourseId)
-  const { concepts, bytes, edges, bytesUnavailable } = await getAggregateLoomData(courseId)
+  let concepts: LoomState["concepts"] = []
+  let bytes: LoomState["bytes"] = []
+  let edges: LoomState["edges"] = []
+  let bytesUnavailable = false
+  let aggregateUnavailable = false
+
+  try {
+    const aggregate = await getAggregateLoomData(courseId)
+    concepts = aggregate.concepts
+    bytes = aggregate.bytes
+    edges = aggregate.edges
+    bytesUnavailable = aggregate.bytesUnavailable
+  } catch (error) {
+    console.error("[AggregateLoomPage] Aggregate query failed", error)
+    aggregateUnavailable = true
+  }
 
   const state: LoomState = { concepts, bytes, edges, read: "" }
   
@@ -21,6 +36,12 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     <main>
       <h1>Cohort Map</h1>
       <p className="tasksub" style={{ marginBottom: "20px" }}>A macro view of concepts, bytes, and threads across the current learner group.</p>
+
+      {aggregateUnavailable && (
+        <p className="tasksub" style={{ marginBottom: "12px", color: "var(--red)" }}>
+          Aggregate data is temporarily unavailable. Check recent migrations and server logs.
+        </p>
+      )}
 
       {bytesUnavailable && (
         <p className="tasksub" style={{ marginBottom: "12px", color: "var(--red)" }}>
@@ -37,7 +58,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
             </span>
           </div>
           <div id="mapWrap">
-            <ClothMap state={state} readSel={null} setReadSel={() => {}} />
+            <ReadOnlyClothMap state={state} />
           </div>
         </div>
       </div>
