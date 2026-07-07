@@ -1,6 +1,7 @@
 import { getUserLoomDataAsAdmin } from "@/actions/admin"
 import ClothMap from "@/components/svg/ClothMap"
 import { normalizeCourseId } from "@/lib/courseConfig"
+import type { LoomState } from "@/lib/types"
 
 // In Next.js 15, route segment params are promises.
 type UserLoomSearchParams = {
@@ -22,7 +23,7 @@ export default async function UserLoomPage({
   const courseId = normalizeCourseId(rawCourseId)
   const { concepts, bytes, edges } = await getUserLoomDataAsAdmin(resolvedParams.id, courseId)
 
-  const state = { concepts, bytes, edges, read: "" }
+  const state: LoomState = { concepts, bytes, edges, read: "" }
   
   // Note: We use a simple read-only wrapper around ClothMap here
   return (
@@ -37,7 +38,7 @@ export default async function UserLoomPage({
             </span>
           </div>
           <div id="mapWrap">
-            <ClothMap state={state as any} readSel={null} setReadSel={() => {}} />
+            <ClothMap state={state} readSel={null} setReadSel={() => {}} />
           </div>
         </div>
       </div>

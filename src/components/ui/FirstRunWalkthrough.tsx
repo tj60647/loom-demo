@@ -23,7 +23,7 @@ export default function FirstRunWalkthrough() {
   useEffect(() => {
     const hasSeen = localStorage.getItem("loom_has_seen_walkthrough");
     if (!hasSeen) {
-      setShow(true);
+      setTimeout(() => setShow(true), 0);
     }
   }, []);
 

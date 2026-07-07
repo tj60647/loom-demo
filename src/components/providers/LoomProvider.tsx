@@ -35,7 +35,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (session?.user) {
-      setIsLoading(true)
+      const startTimer = window.setTimeout(() => setIsLoading(true), 0)
       getUserLoomData().then(data => {
         setState({ ...data, read: "" })
         setIsLoading(false)
@@ -43,9 +43,13 @@ export function LoomProvider({ children }: { children: ReactNode }) {
         console.error("Failed to load loom data", err)
         setIsLoading(false)
       })
+      return () => window.clearTimeout(startTimer)
     } else {
-      setState({ concepts: [], bytes: [], edges: [], read: "" })
-      setIsLoading(false)
+      const resetTimer = window.setTimeout(() => {
+        setState({ concepts: [], bytes: [], edges: [], read: "" })
+        setIsLoading(false)
+      }, 0)
+      return () => window.clearTimeout(resetTimer)
     }
   }, [session])
 

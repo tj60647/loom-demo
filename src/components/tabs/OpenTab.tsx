@@ -74,7 +74,9 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
       return
     }
 
-    setOpenLogRows((prev) => ({ ...prev, [targetByte.conceptId]: true }))
+    const rowTimer = window.setTimeout(() => {
+      setOpenLogRows((prev) => ({ ...prev, [targetByte.conceptId]: true }))
+    }, 0)
 
     const timer = window.setTimeout(() => {
       const target = document.querySelector(`[data-byte-id="${focusByteId}"]`) as HTMLElement | null
@@ -82,7 +84,10 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
       onFocusHandled?.()
     }, 40)
 
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(rowTimer)
+      window.clearTimeout(timer)
+    }
   }, [focusByteId, onFocusHandled, state.bytes])
 
   return (

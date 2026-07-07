@@ -36,7 +36,7 @@ test.describe('Audit Seed Bytes', () => {
     
     // Evaluate mark.js directly on the page!
     const matches = await page.evaluate(() => {
-      // @ts-ignore
+      // @ts-expect-error window.Mark is injected in browser runtime only
       const Mark = window.Mark;
       if (!Mark) return 'Mark not found';
       

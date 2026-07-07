@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 type AuthErrorPageProps = {
   searchParams?: Promise<{
     error?: string
@@ -23,7 +25,7 @@ export default async function AuthErrorPage({ searchParams }: AuthErrorPageProps
             : "Something went wrong during sign-in. Please try again."}
         </span>
         <div style={{ marginTop: "20px", display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap" }}>
-          <a href="/" className="btn">Back to Loom</a>
+          <Link href="/" className="btn">Back to Loom</Link>
         </div>
       </div>
     </main>

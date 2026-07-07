@@ -35,8 +35,8 @@ export default function ClothMap({
   const idx: Record<string, number> = {}
   cs.forEach((c, i) => idx[c.id] = i)
 
-  let selNodes = new Set<string>()
-  let selEdges = new Set<string>()
+  const selNodes = new Set<string>()
+  const selEdges = new Set<string>()
   let selEdgeId: string | null = null
 
   if (readSel?.type === "concept" && readSel.id) {
@@ -104,7 +104,7 @@ export default function ClothMap({
         const beaten = !!e.handle
         const isSel = selEdgeId === e.id
         
-        let col = isSel ? "var(--red)" : (beaten ? "var(--sage)" : "var(--grey)")
+        const col = isSel ? "var(--red)" : (beaten ? "var(--sage)" : "var(--grey)")
         let op = 1
         if (selEdgeId && !isSel) op = 0.18
         else if (readSel && readSel.type !== "edge" && !selEdges.has(e.id)) op = 0.15

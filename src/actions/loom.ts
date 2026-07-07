@@ -6,7 +6,6 @@ import { and, eq, isNull } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { DEFAULT_COURSE_ID, getCourseLabel, normalizeCourseId } from "@/lib/courseConfig"
-import type { Concept, Byte, Edge } from "@/lib/types"
 
 async function getUserId() {
   const session = await getServerSession(authOptions)

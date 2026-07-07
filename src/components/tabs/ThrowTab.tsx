@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
-import type { Concept } from "@/lib/types"
 
 const REGISTERS = [
   {id:'plain',   name:'Plain',          tag:'everyday',          verbs:['leads to','depends on','is part of','goes against','is the same as','sets up']},
@@ -24,7 +23,7 @@ const OPENERS = [
 ];
 
 export default function ThrowTab() {
-  const { state, addEdge, editEdge, removeEdge, removeConcept, undoStack, setUndoStack, redoStack, setRedoStack } = useLoom()
+  const { state, addEdge, editEdge, removeEdge, setUndoStack, setRedoStack } = useLoom()
   const [picks, setPicks] = useState<string[]>([]) // concept ids
   const [sentence, setSentence] = useState("")
   const [namingFor, setNamingFor] = useState<string | null>(null)
@@ -71,7 +70,7 @@ export default function ThrowTab() {
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editEdge]);
+  }, [editEdge, setRedoStack, setUndoStack]);
 
   const togglePick = (id: string) => {
     if (picks.includes(id)) {

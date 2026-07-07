@@ -1,6 +1,7 @@
 import { getAggregateLoomData } from "@/actions/admin"
 import ClothMap from "@/components/svg/ClothMap"
 import { normalizeCourseId } from "@/lib/courseConfig"
+import type { LoomState } from "@/lib/types"
 
 type AggregatePageSearchParams = {
   course?: string | string[]
@@ -14,7 +15,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   const courseId = normalizeCourseId(rawCourseId)
   const { concepts, bytes, edges, bytesUnavailable } = await getAggregateLoomData(courseId)
 
-  const state = { concepts, bytes, edges, read: "" }
+  const state: LoomState = { concepts, bytes, edges, read: "" }
   
   return (
     <main>
@@ -36,7 +37,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
             </span>
           </div>
           <div id="mapWrap">
-            <ClothMap state={state as any} readSel={null} setReadSel={() => {}} />
+            <ClothMap state={state} readSel={null} setReadSel={() => {}} />
           </div>
         </div>
       </div>

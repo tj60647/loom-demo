@@ -4,14 +4,14 @@ import { users, sessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
 
-export async function GET(request: Request) {
+export async function GET() {
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Not allowed in production' }, { status: 403 });
   }
 
   // 1. Find or create a test user
   const email = "tjm@tjmcleish.com";
-  let dbUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  const dbUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
   let userId = dbUser[0]?.id;
 
   if (!userId) {

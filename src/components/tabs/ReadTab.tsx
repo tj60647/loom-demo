@@ -2,7 +2,7 @@
 
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useEffect, useRef, useState } from "react"
-import type { Concept, Edge } from "@/lib/types"
+import type { Edge } from "@/lib/types"
 import ClothMap from "@/components/svg/ClothMap"
 
 export default function ReadTab() {
@@ -10,6 +10,15 @@ export default function ReadTab() {
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number} | null>(null)
   const [showClothInfo, setShowClothInfo] = useState(false)
   const closeInfoButtonRef = useRef<HTMLButtonElement>(null)
+
+  type ReadPrompt = {
+    key: string
+    rep?: string
+    repHub?: string[]
+    gap: boolean
+    q: string
+    move: string
+  }
 
   const degreeOf = (cid: string) => state.edges.filter(e => e.fromId === cid || e.toId === cid).length
 
@@ -76,7 +85,7 @@ export default function ReadTab() {
     return comps.sort((a,b) => b.nodes.size - a.nodes.size)
   }
 
-  const readPrompts: any[] = []
+  const readPrompts: ReadPrompt[] = []
   if (state.concepts.length > 0) {
     const comps = getAllComponents()
     const degs = state.concepts.map(c => ({c, d: degreeOf(c.id)})).filter(o => o.d > 0).sort((a,b) => b.d - a.d)
@@ -122,7 +131,7 @@ export default function ReadTab() {
     }
   }
 
-  const handlePromptClick = (p: any, idx: number) => {
+  const handlePromptClick = (p: ReadPrompt, idx: number) => {
     if (p.repHub) {
       setReadSel({ type: "hub", ids: p.repHub, promptIdx: idx })
     } else if (p.rep) {

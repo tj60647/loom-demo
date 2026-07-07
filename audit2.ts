@@ -1,6 +1,5 @@
 import { db } from "./src/db";
 import { bytes } from "./src/db/schema";
-import { eq } from "drizzle-orm";
 
 async function run() {
   const allBytes = await db.select().from(bytes);

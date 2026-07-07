@@ -128,7 +128,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     if (!containerRef.current) return;
     
     const observer = new ResizeObserver((entries) => {
-      for (let entry of entries) {
+      for (const entry of entries) {
         setContainerWidth(entry.contentRect.width);
       }
     });
@@ -140,20 +140,23 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // Text selection listener
   useEffect(() => {
     if (!initialPageNumber || initialPageNumber < 1) return;
-    setPageNumber(initialPageNumber);
+    const timer = window.setTimeout(() => setPageNumber(initialPageNumber), 0);
+    return () => window.clearTimeout(timer);
   }, [initialPageNumber, sourceId, url]);
 
   useEffect(() => {
     if (!focusByteId) return;
     const targetByte = state.bytes.find((b) => b.id === focusByteId);
     if (targetByte?.pageNumber && targetByte.pageNumber > 0) {
-      setPageNumber(targetByte.pageNumber);
+      const timer = window.setTimeout(() => setPageNumber(targetByte.pageNumber!), 0);
+      return () => window.clearTimeout(timer);
     }
   }, [focusByteId, state.bytes]);
 
   useEffect(() => {
     if (numPages && pageNumber > numPages) {
-      setPageNumber(numPages);
+      const timer = window.setTimeout(() => setPageNumber(numPages), 0);
+      return () => window.clearTimeout(timer);
     }
   }, [numPages, pageNumber]);
 
@@ -373,7 +376,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       observer.disconnect();
       clearTimeout(debounceTimer);
     };
-  }, [state.bytes, pageNumber, bindHighlightTooltip, sourceName]); // Re-run effect when bytes or page changes
+  }, [state.bytes, state.concepts, pageNumber, bindHighlightTooltip, sourceName]); // Re-run effect when bytes or page changes
 
   const handleCaptureClick = () => {
     if (highlightRect) {
