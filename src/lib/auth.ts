@@ -46,6 +46,10 @@ export const authOptions: NextAuthOptions = {
         // Fetch role from the database
         const dbUser = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
         session.user.role = dbUser[0]?.role || "USER";
+        session.user.isAdmin = isAdminUser({
+          role: session.user.role,
+          email: session.user.email,
+        });
       }
       return session;
     }
