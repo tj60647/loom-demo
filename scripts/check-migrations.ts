@@ -11,10 +11,15 @@ function normalize(value?: string) {
   return value
 }
 
-const url = normalize(process.env.DATABASE_URL)
-if (!url) {
-  throw new Error("DATABASE_URL is not set")
+function getDatabaseUrl(): string {
+  const url = normalize(process.env.DATABASE_URL)
+  if (!url) {
+    throw new Error("DATABASE_URL is not set")
+  }
+  return url
 }
+
+const url = getDatabaseUrl()
 
 async function main() {
   const sql = neon(url)
