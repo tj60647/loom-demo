@@ -26,6 +26,46 @@ export const allowedEmails = pgTable("allowed_email", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 })
 
+export const courses = pgTable("course", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  slug: text("slug").notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+})
+
+export const courseMemberships = pgTable(
+  "course_membership",
+  {
+    courseId: text("courseId")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").default("LEARNER").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (membership) => ({
+    compoundKey: primaryKey({ columns: [membership.courseId, membership.userId] }),
+  })
+)
+
+export const courseAllowedEmails = pgTable(
+  "course_allowed_email",
+  {
+    courseId: text("courseId")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (row) => ({
+    compoundKey: primaryKey({ columns: [row.courseId, row.email] }),
+  })
+)
+
 export const accounts = pgTable(
   "account",
   {
@@ -79,6 +119,9 @@ export const sources = pgTable("source", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
+  courseId: text("courseId").references(() => courses.id, {
+    onDelete: "set null",
+  }),
   title: text("title").notNull(),
   author: text("author").default(""),
   sourceReference: text("sourceReference").default(""),
@@ -119,6 +162,9 @@ export const concepts = pgTable("concept", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
+  courseId: text("courseId").references(() => courses.id, {
+    onDelete: "set null",
+  }),
   userId: text("userId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -132,6 +178,9 @@ export const bytes = pgTable("byte", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
+  courseId: text("courseId").references(() => courses.id, {
+    onDelete: "set null",
+  }),
   userId: text("userId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -161,6 +210,9 @@ export const edges = pgTable("edge", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
+  courseId: text("courseId").references(() => courses.id, {
+    onDelete: "set null",
+  }),
   userId: text("userId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),

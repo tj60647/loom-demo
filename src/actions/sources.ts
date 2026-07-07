@@ -1,8 +1,8 @@
 "use server"
 
 import { db } from "@/db"
-import { sources, sourcePages, users } from "@/db/schema"
-import { and, asc, eq } from "drizzle-orm"
+import { courses, sources, sourcePages, users } from "@/db/schema"
+import { and, asc, eq, isNull } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, isAdminUser } from "@/lib/auth"
 import { readingStorage } from "@/lib/storage"
@@ -10,6 +10,26 @@ import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
 import { extractPdfPageText } from "@/lib/pdfText"
 import { hashText } from "@/lib/hash"
 import { revalidatePath } from "next/cache"
+import { DEFAULT_COURSE_ID, getCourseLabel, normalizeCourseId } from "@/lib/courseConfig"
+
+async function ensureCourseExists(courseIdRaw: string) {
+  const courseId = normalizeCourseId(courseIdRaw)
+  await db
+    .insert(courses)
+    .values({ id: courseId, slug: courseId, name: getCourseLabel(courseId) })
+    .onConflictDoNothing()
+
+  // During migration, older readings have null courseId; assign them to the
+  // default course so existing libraries remain visible.
+  if (courseId === DEFAULT_COURSE_ID) {
+    await db
+      .update(sources)
+      .set({ courseId })
+      .where(isNull(sources.courseId))
+  }
+
+  return courseId
+}
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -27,24 +47,35 @@ async function requireAdmin() {
   return session
 }
 
-export async function getSources() {
+export async function getSources(courseIdRaw: string = DEFAULT_COURSE_ID) {
+  const courseId = await ensureCourseExists(courseIdRaw)
   const session = await getServerSession(authOptions)
   const admin = isAdminUser(session?.user)
 
   if (admin) {
-    return db.select().from(sources).orderBy(asc(sources.createdAt))
+    return db
+      .select()
+      .from(sources)
+      .where(eq(sources.courseId, courseId))
+      .orderBy(asc(sources.createdAt))
   }
 
   return db
     .select()
     .from(sources)
-    .where(eq(sources.isVisible, true))
+    .where(and(eq(sources.isVisible, true), eq(sources.courseId, courseId)))
     .orderBy(asc(sources.createdAt))
 }
 
-export async function getManageableSources() {
+export async function getManageableSources(courseIdRaw: string = DEFAULT_COURSE_ID) {
   await requireAdmin()
-  return db.select().from(sources).orderBy(asc(sources.createdAt))
+  const courseId = await ensureCourseExists(courseIdRaw)
+
+  return db
+    .select()
+    .from(sources)
+    .where(eq(sources.courseId, courseId))
+    .orderBy(asc(sources.createdAt))
 }
 
 /**
@@ -54,6 +85,7 @@ export async function getManageableSources() {
  * canonical per-page text used to anchor highlight offsets.
  */
 export async function createSource(data: {
+  courseId?: string
   title?: string
   author?: string
   sourceReference?: string
@@ -84,6 +116,7 @@ export async function createSource(data: {
   const [source] = await db
     .insert(sources)
     .values({
+      courseId: await ensureCourseExists(data.courseId ?? DEFAULT_COURSE_ID),
       title,
       author: data.author || "",
       sourceReference: data.sourceReference || "",
@@ -118,6 +151,8 @@ export async function createSource(data: {
 }
 
 export async function createSourceFromForm(formData: FormData) {
+  const courseIdRaw = formData.get("courseId")
+  const courseId = typeof courseIdRaw === "string" ? courseIdRaw : DEFAULT_COURSE_ID
   const title = formData.get("title")
   const file = formData.get("file")
 
@@ -126,6 +161,7 @@ export async function createSourceFromForm(formData: FormData) {
   }
 
   await createSource({
+    courseId,
     title: typeof title === "string" ? title.trim() : "",
     file,
     metadataProvenance: "Pending review",
@@ -137,6 +173,8 @@ export async function createSourceFromForm(formData: FormData) {
 
 export async function updateSourceMetadata(formData: FormData) {
   await requireAdmin()
+  const courseIdRaw = formData.get("courseId")
+  const courseId = await ensureCourseExists(typeof courseIdRaw === "string" ? courseIdRaw : DEFAULT_COURSE_ID)
 
   const sourceId = formData.get("sourceId")
   if (typeof sourceId !== "string" || !sourceId.trim()) {
@@ -160,38 +198,57 @@ export async function updateSourceMetadata(formData: FormData) {
       isDescriptionVisible,
       metadataProvenance: typeof metadataProvenance === "string" ? metadataProvenance.trim() : "",
     })
-    .where(eq(sources.id, sourceId))
+    .where(and(eq(sources.id, sourceId), eq(sources.courseId, courseId)))
 
   revalidatePath("/admin/library")
   revalidatePath("/")
 }
 
-export async function setSourceVisibility(sourceId: string, isVisible: boolean) {
+export async function setSourceVisibility(formData: FormData) {
   await requireAdmin()
+
+  const courseIdRaw = formData.get("courseId")
+  const courseId = await ensureCourseExists(typeof courseIdRaw === "string" ? courseIdRaw : DEFAULT_COURSE_ID)
+  const sourceIdRaw = formData.get("sourceId")
+  const isVisibleRaw = formData.get("isVisible")
+
+  if (typeof sourceIdRaw !== "string") {
+    throw new Error("Source id is required")
+  }
+
+  const isVisible = isVisibleRaw === "true"
 
   await db
     .update(sources)
     .set({ isVisible })
-    .where(eq(sources.id, sourceId))
+    .where(and(eq(sources.id, sourceIdRaw), eq(sources.courseId, courseId)))
 
   revalidatePath("/admin/library")
   revalidatePath("/")
 }
 
-export async function deleteSource(sourceId: string) {
+export async function deleteSource(formData: FormData) {
   await requireAdmin()
+
+  const courseIdRaw = formData.get("courseId")
+  const courseId = await ensureCourseExists(typeof courseIdRaw === "string" ? courseIdRaw : DEFAULT_COURSE_ID)
+  const sourceIdRaw = formData.get("sourceId")
+
+  if (typeof sourceIdRaw !== "string") {
+    throw new Error("Source id is required")
+  }
 
   const rows = await db
     .select()
     .from(sources)
-    .where(eq(sources.id, sourceId))
+    .where(and(eq(sources.id, sourceIdRaw), eq(sources.courseId, courseId)))
     .limit(1)
   const source = rows[0]
   if (!source) {
     return
   }
 
-  await db.delete(sources).where(eq(sources.id, sourceId))
+  await db.delete(sources).where(eq(sources.id, sourceIdRaw))
   await readingStorage.delete(source.storageKey)
   await readingStorage.delete(getSourceCoverKey(source.id))
 

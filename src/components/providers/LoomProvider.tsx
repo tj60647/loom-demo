@@ -51,7 +51,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const addConcept = async (label: string, def?: string, note?: string) => {
     const tempId = crypto.randomUUID()
-    const tempConcept: Concept = { id: tempId, userId: session!.user!.id, label, def: def || "", note: note || "", createdAt: new Date() }
+    const tempConcept: Concept = { id: tempId, courseId: null, userId: session!.user!.id, label, def: def || "", note: note || "", createdAt: new Date() }
     setState(s => ({ ...s, concepts: [...s.concepts, tempConcept] }))
     try {
       const saved = await createConcept({ label, def, note })
@@ -85,6 +85,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     const tempId = crypto.randomUUID()
     const tempByte: Byte = { 
       id: tempId, 
+      courseId: null,
       userId: session!.user!.id, 
       conceptId, 
       source, 
@@ -115,7 +116,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const addEdge = async (fromId: string, toId: string, sentence: string) => {
     const tempId = crypto.randomUUID()
-    const tempEdge: Edge = { id: tempId, userId: session!.user!.id, fromId, toId, handle: "", sentence, createdAt: new Date() }
+    const tempEdge: Edge = { id: tempId, courseId: null, userId: session!.user!.id, fromId, toId, handle: "", sentence, createdAt: new Date() }
     setState(s => ({ ...s, edges: [...s.edges, tempEdge] }))
     try {
       const saved = await createEdge({ fromId, toId, sentence })

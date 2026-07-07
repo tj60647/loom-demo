@@ -1,10 +1,11 @@
 "use server"
 
 import { db } from "@/db"
-import { concepts, bytes, edges, users, sourcePages } from "@/db/schema"
-import { and, eq } from "drizzle-orm"
+import { concepts, bytes, courses, edges, users, sourcePages } from "@/db/schema"
+import { and, eq, isNull } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
+import { DEFAULT_COURSE_ID, getCourseLabel, normalizeCourseId } from "@/lib/courseConfig"
 import type { Concept, Byte, Edge } from "@/lib/types"
 
 async function getUserId() {
@@ -20,20 +21,40 @@ async function getUserId() {
   return userId;
 }
 
+async function resolveActiveCourseId(userId: string, courseIdRaw: string = DEFAULT_COURSE_ID) {
+  const courseId = normalizeCourseId(courseIdRaw)
+
+  await db
+    .insert(courses)
+    .values({ id: courseId, slug: courseId, name: getCourseLabel(courseId) })
+    .onConflictDoNothing()
+
+  if (courseId === DEFAULT_COURSE_ID) {
+    await db.update(concepts).set({ courseId }).where(and(eq(concepts.userId, userId), isNull(concepts.courseId)))
+    await db.update(bytes).set({ courseId }).where(and(eq(bytes.userId, userId), isNull(bytes.courseId)))
+    await db.update(edges).set({ courseId }).where(and(eq(edges.userId, userId), isNull(edges.courseId)))
+  }
+
+  return courseId
+}
+
 export async function getUserLoomData() {
   const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
 
-  const userConcepts = await db.select().from(concepts).where(eq(concepts.userId, userId))
-  const userBytes = await db.select().from(bytes).where(eq(bytes.userId, userId))
-  const userEdges = await db.select().from(edges).where(eq(edges.userId, userId))
+  const userConcepts = await db.select().from(concepts).where(and(eq(concepts.userId, userId), eq(concepts.courseId, courseId)))
+  const userBytes = await db.select().from(bytes).where(and(eq(bytes.userId, userId), eq(bytes.courseId, courseId)))
+  const userEdges = await db.select().from(edges).where(and(eq(edges.userId, userId), eq(edges.courseId, courseId)))
 
   return { concepts: userConcepts, bytes: userBytes, edges: userEdges }
 }
 
 export async function createConcept(data: { label: string, def?: string, note?: string }) {
   const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
 
   const newConcept = await db.insert(concepts).values({
+    courseId,
     userId,
     label: data.label,
     def: data.def || "",
@@ -44,17 +65,17 @@ export async function createConcept(data: { label: string, def?: string, note?: 
 }
 
 export async function updateConcept(id: string, data: Partial<{ label: string, def: string, note: string }>) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) throw new Error("Unauthorized")
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
 
-  await db.update(concepts).set(data).where(eq(concepts.id, id))
+  await db.update(concepts).set(data).where(and(eq(concepts.id, id), eq(concepts.userId, userId), eq(concepts.courseId, courseId)))
 }
 
 export async function deleteConcept(id: string) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) throw new Error("Unauthorized")
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
   
-  await db.delete(concepts).where(eq(concepts.id, id))
+  await db.delete(concepts).where(and(eq(concepts.id, id), eq(concepts.userId, userId), eq(concepts.courseId, courseId)))
 }
 
 function findClosestTextIndex(text: string, needle: string, preferredStart?: number) {
@@ -78,6 +99,7 @@ function findClosestTextIndex(text: string, needle: string, preferredStart?: num
 
 export async function createByte(data: { conceptId: string, source: string, sourceId?: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, pageContentHash?: string }) {
   const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
 
   let startOffset = data.startOffset
   let endOffset = data.endOffset
@@ -113,6 +135,7 @@ export async function createByte(data: { conceptId: string, source: string, sour
   }
 
   const newByte = await db.insert(bytes).values({
+    courseId,
     userId,
     conceptId: data.conceptId,
     source: data.source,
@@ -129,16 +152,18 @@ export async function createByte(data: { conceptId: string, source: string, sour
 }
 
 export async function deleteByte(id: string) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) throw new Error("Unauthorized")
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
   
-  await db.delete(bytes).where(eq(bytes.id, id))
+  await db.delete(bytes).where(and(eq(bytes.id, id), eq(bytes.userId, userId), eq(bytes.courseId, courseId)))
 }
 
 export async function createEdge(data: { fromId: string, toId: string, sentence: string }) {
   const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
 
   const newEdge = await db.insert(edges).values({
+    courseId,
     userId,
     fromId: data.fromId,
     toId: data.toId,
@@ -149,15 +174,15 @@ export async function createEdge(data: { fromId: string, toId: string, sentence:
 }
 
 export async function updateEdge(id: string, data: Partial<{ handle: string, sentence: string }>) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) throw new Error("Unauthorized")
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
 
-  await db.update(edges).set(data).where(eq(edges.id, id))
+  await db.update(edges).set(data).where(and(eq(edges.id, id), eq(edges.userId, userId), eq(edges.courseId, courseId)))
 }
 
 export async function deleteEdge(id: string) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) throw new Error("Unauthorized")
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
   
-  await db.delete(edges).where(eq(edges.id, id))
+  await db.delete(edges).where(and(eq(edges.id, id), eq(edges.userId, userId), eq(edges.courseId, courseId)))
 }

@@ -1,19 +1,31 @@
 import { addAllowedEmail, getAllowedEmails, getClassData, removeAllowedEmail } from "@/actions/admin"
+import { normalizeCourseId } from "@/lib/courseConfig"
 
-export default async function AdminPage() {
-  const [users, approvedEmails] = await Promise.all([getClassData(), getAllowedEmails()])
+type AdminPageSearchParams = {
+  course?: string | string[]
+}
+
+export default async function AdminPage({ searchParams }: { searchParams: Promise<AdminPageSearchParams> }) {
+  const resolvedSearchParams = await searchParams
+  const rawCourseId = Array.isArray(resolvedSearchParams.course)
+    ? resolvedSearchParams.course[0]
+    : resolvedSearchParams.course
+  const courseId = normalizeCourseId(rawCourseId)
+
+  const [users, approvedEmails] = await Promise.all([getClassData(courseId), getAllowedEmails(courseId)])
 
   return (
     <main>
-      <h1>Class View</h1>
-      <p style={{ marginBottom: "20px" }}>Select a student to view their loom.</p>
+      <h1>Learners</h1>
+      <p style={{ marginBottom: "20px" }}>Select a learner to view their loom.</p>
 
       <section className="card" style={{ marginBottom: "24px" }}>
-        <h2>Approved Emails</h2>
+        <h2>Allowed Sign-in Emails</h2>
         <p className="hint" style={{ marginTop: "6px" }}>
           Sign-in succeeds only when the GitHub email is present in the backend allowlist.
         </p>
         <form action={addAllowedEmail} className="quietrow" style={{ marginTop: "0", paddingTop: "0", borderTop: "none", alignItems: "stretch" }}>
+          <input type="hidden" name="courseId" value={courseId} />
           <input
             aria-label="Add approved email"
             name="email"
@@ -26,7 +38,7 @@ export default async function AdminPage() {
         <div className="scrollbox" style={{ marginTop: "12px" }}>
           {approvedEmails.length === 0 ? (
             <div className="empty">
-              <span className="cap">No approved emails yet</span>
+              <span className="cap">No allowed emails yet</span>
             </div>
           ) : (
             approvedEmails.map(({ email }) => (
@@ -36,6 +48,7 @@ export default async function AdminPage() {
                 className="quietrow"
                 style={{ marginTop: "0", padding: "10px 12px", borderTop: "none", justifyContent: "space-between", alignItems: "center" }}
               >
+                <input type="hidden" name="courseId" value={courseId} />
                 <input type="hidden" name="email" value={email} />
                 <span style={{ fontFamily: "var(--mono)", fontSize: "13px", wordBreak: "break-word" }}>{email}</span>
                 <button className="btn ghost mini" type="submit">Remove</button>
@@ -54,7 +67,7 @@ export default async function AdminPage() {
               <span className="pill beaten">{u.conceptsCount} concepts</span>
               <span className="pill loose" style={{ marginLeft: "10px" }}>{u.edgesCount} edges</span>
             </div>
-            <a href={`/admin/user/${u.id}`} className="btn mini" style={{ display: "inline-block", marginTop: "15px" }}>View Loom</a>
+            <a href={`/admin/user/${u.id}?course=${encodeURIComponent(courseId)}`} className="btn mini" style={{ display: "inline-block", marginTop: "15px" }}>Open Loom</a>
           </div>
         ))}
       </div>

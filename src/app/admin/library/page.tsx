@@ -6,13 +6,24 @@ import {
   updateSourceMetadata,
 } from "@/actions/sources"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
+import { normalizeCourseId } from "@/lib/courseConfig"
 
-export default async function AdminLibraryPage() {
-  const sources = await getManageableSources()
+type AdminLibrarySearchParams = {
+  course?: string | string[]
+}
+
+export default async function AdminLibraryPage({ searchParams }: { searchParams: Promise<AdminLibrarySearchParams> }) {
+  const resolvedSearchParams = await searchParams
+  const rawCourseId = Array.isArray(resolvedSearchParams.course)
+    ? resolvedSearchParams.course[0]
+    : resolvedSearchParams.course
+  const courseId = normalizeCourseId(rawCourseId)
+
+  const sources = await getManageableSources(courseId)
 
   return (
     <main>
-      <h1>Library Manager</h1>
+      <h1>Readings</h1>
       <p className="tasksub" style={{ marginBottom: "20px" }}>
         Add readings, hide them from the student library, reveal them again, or remove them entirely.
       </p>
@@ -23,6 +34,7 @@ export default async function AdminLibraryPage() {
           Upload the PDF first. Then review source reference, provenance, title, and optional description below.
         </p>
         <form action={createSourceFromForm} style={{ marginTop: "14px" }}>
+          <input type="hidden" name="courseId" value={courseId} />
           <div className="form-row">
             <span className="label">Title Override (Optional)</span>
             <input name="title" placeholder="Defaults to the PDF filename" />
@@ -47,9 +59,6 @@ export default async function AdminLibraryPage() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             {sources.map((source) => {
-              const toggleVisibility = setSourceVisibility.bind(null, source.id, !source.isVisible)
-              const removeSource = deleteSource.bind(null, source.id)
-
               return (
                 <div className="card" key={source.id} style={{ padding: "20px" }}>
                   <div style={{ display: "flex", gap: "18px", alignItems: "stretch", flexWrap: "wrap" }}>
@@ -78,6 +87,7 @@ export default async function AdminLibraryPage() {
                         <details>
                           <summary className="btn ghost mini" style={{ listStyle: "none", cursor: "pointer" }}>Edit</summary>
                           <form action={updateSourceMetadata} style={{ display: "grid", gap: "10px", marginTop: "12px" }}>
+                            <input type="hidden" name="courseId" value={courseId} />
                             <input type="hidden" name="sourceId" value={source.id} />
                             <div className="form-row">
                               <span className="label">Title</span>
@@ -106,13 +116,18 @@ export default async function AdminLibraryPage() {
                             <button className="btn mini" type="submit">Save Metadata</button>
                           </form>
                         </details>
-                        <form action={toggleVisibility}>
+                        <form action={setSourceVisibility}>
+                          <input type="hidden" name="courseId" value={courseId} />
+                          <input type="hidden" name="sourceId" value={source.id} />
+                          <input type="hidden" name="isVisible" value={source.isVisible ? "false" : "true"} />
                           <button className="btn ghost mini" type="submit">
                             {source.isVisible ? "Hide" : "Reveal"}
                           </button>
                         </form>
                         <a className="btn ghost mini" href={`/api/readings/${source.id}?download=1`}>Download PDF</a>
-                        <form action={removeSource}>
+                        <form action={deleteSource}>
+                          <input type="hidden" name="courseId" value={courseId} />
+                          <input type="hidden" name="sourceId" value={source.id} />
                           <button className="btn mini" type="submit">Remove</button>
                         </form>
                       </div>

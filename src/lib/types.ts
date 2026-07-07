@@ -1,5 +1,6 @@
 export type Concept = {
   id: string
+  courseId: string | null
   userId: string
   label: string
   def: string | null
@@ -9,6 +10,7 @@ export type Concept = {
 
 export type Byte = {
   id: string
+  courseId: string | null
   userId: string
   conceptId: string
   source: string | null
@@ -38,6 +40,7 @@ export type Source = {
 
 export type Edge = {
   id: string
+  courseId: string | null
   userId: string
   fromId: string
   toId: string

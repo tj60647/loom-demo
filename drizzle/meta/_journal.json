@@ -29,6 +29,20 @@
       "when": 1783377629842,
       "tag": "0003_silent_zombie",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783389500000,
+      "tag": "0004_tidy_schoolhouse",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783390400000,
+      "tag": "0005_watery_justice",
+      "breakpoints": true
     }
   ]
 }
