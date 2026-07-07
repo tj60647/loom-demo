@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import Image from "next/image"
 
 type SourceThumbnailProps = {
@@ -10,37 +10,15 @@ type SourceThumbnailProps = {
 }
 
 export default function SourceThumbnail({ sourceId, title, fixedHeight }: SourceThumbnailProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [measuredHeight, setMeasuredHeight] = useState(180)
   const [loadError, setLoadError] = useState(false)
-  const coverHeight = fixedHeight ?? measuredHeight
-
-  useEffect(() => {
-    if (fixedHeight) {
-      return
-    }
-
-    const element = containerRef.current
-    if (!element) return
-
-    const updateHeight = () => {
-      const measuredHeight = Math.max(160, Math.floor(element.getBoundingClientRect().height))
-      setMeasuredHeight(measuredHeight)
-    }
-
-    updateHeight()
-    const observer = new ResizeObserver(() => updateHeight())
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [fixedHeight])
 
   return (
     <div
-      ref={containerRef}
       style={{
         width: "140px",
-        minHeight: `${fixedHeight ?? 160}px`,
+        flex: "0 0 140px",
         alignSelf: "stretch",
+        ...(fixedHeight ? { height: `${fixedHeight}px` } : { minHeight: "160px" }),
         border: "1px solid rgba(26,25,22,.14)",
         borderRadius: "6px",
         background: "linear-gradient(180deg, #f7f4ea 0%, #ece6d7 100%)",
@@ -48,7 +26,6 @@ export default function SourceThumbnail({ sourceId, title, fixedHeight }: Source
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        flex: "0 0 140px",
         boxShadow: "0 12px 24px rgba(26,25,22,.09), 0 2px 6px rgba(26,25,22,.08)",
         position: "relative",
       }}
@@ -60,6 +37,7 @@ export default function SourceThumbnail({ sourceId, title, fixedHeight }: Source
           inset: 0,
           background: "linear-gradient(135deg, rgba(255,255,255,.32), rgba(255,255,255,0))",
           pointerEvents: "none",
+          zIndex: 1,
         }}
       />
       {loadError ? (
@@ -67,27 +45,18 @@ export default function SourceThumbnail({ sourceId, title, fixedHeight }: Source
           Preview unavailable
         </span>
       ) : (
-        <div
+        <Image
+          alt={`Preview of ${title}`}
+          src={`/api/readings/${sourceId}/cover`}
+          fill
+          unoptimized
+          sizes="140px"
           style={{
-            width: "100%",
-            height: `${coverHeight}px`,
-            position: "relative",
-            zIndex: 1,
+            objectFit: "cover",
+            objectPosition: "top center",
           }}
-        >
-          <Image
-            alt={`Preview of ${title}`}
-            src={`/api/readings/${sourceId}/cover`}
-            fill
-            unoptimized
-            sizes="140px"
-            style={{
-              objectFit: "cover",
-              objectPosition: "top center",
-            }}
-            onError={() => setLoadError(true)}
-          />
-        </div>
+          onError={() => setLoadError(true)}
+        />
       )}
     </div>
   )

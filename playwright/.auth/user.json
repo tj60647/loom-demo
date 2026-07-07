@@ -2,20 +2,20 @@
   "cookies": [
     {
       "name": "next-auth.session-token",
-      "value": "a072f823-2b83-4923-b449-c4faccb3a20f",
+      "value": "dbefd024-4563-4aef-a082-efaba055645a",
       "domain": "localhost",
       "path": "/",
-      "expires": 1785972013,
+      "expires": 1785975543,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "authjs.session-token",
-      "value": "a072f823-2b83-4923-b449-c4faccb3a20f",
+      "value": "dbefd024-4563-4aef-a082-efaba055645a",
       "domain": "localhost",
       "path": "/",
-      "expires": 1785972013,
+      "expires": 1785975543,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"

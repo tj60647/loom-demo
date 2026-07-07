@@ -78,7 +78,10 @@ export async function GET(
           status: 200,
           headers: {
             "Content-Type": "image/svg+xml; charset=utf-8",
-            "Cache-Control": "private, max-age=3600",
+            // Never cache the fallback: it's only served on a transient render
+            // failure, so caching it would pin "preview unavailable" in the
+            // browser even after a real cover becomes available.
+            "Cache-Control": "no-store",
           },
         })
       }
