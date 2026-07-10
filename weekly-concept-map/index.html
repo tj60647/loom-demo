@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loom — weekly concept map (prototype)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap');
+:root{
+  --paper:#edebe3;--paper-2:#e5e2d8;--ink:#1a1916;--ink-soft:#6b675c;
+  --rule:#cbc7ba;--dot:#c3bfb1;
+  --grey:#a39f92;--ochre:#a8843f;--sage:#6f7d5c;--red:#b23a2b;
+  --display:"Fraunces",Georgia,serif;--body:"Newsreader",Georgia,serif;--mono:ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box} html,body{margin:0}
+body{background:radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/26px 26px,var(--paper);
+  color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--display);font-weight:500;margin:0}
+header{border-bottom:1px solid var(--rule);padding:14px 26px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--paper)}
+.wordmark{font-family:var(--display);font-size:24px;font-weight:600;line-height:1}
+.wordmark small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);font-weight:400;margin-top:3px}
+header .spacer{flex:1}
+.label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+main{padding:24px 26px 60px;max-width:1000px;margin:0 auto}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--rule);margin-bottom:16px}
+.tabs button{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:9px 16px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.active{color:var(--ink);border-bottom-color:var(--ochre)}
+.card{border:1px solid var(--rule);border-radius:4px;padding:18px;background:rgba(255,255,255,.5)}
+.card h2{font-size:21px;margin-bottom:4px}
+.hint{color:var(--ink-soft);font-size:14px;margin:2px 0 14px}
+.view{display:none} .view.active{display:block}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-soft);margin-top:12px}
+.legend .sw{display:inline-block;width:18px;margin-right:5px;vertical-align:middle}
+svg{width:100%;touch-action:none}
+.footnote{font-size:13px;color:var(--ink-soft);margin-top:18px;border-top:1px dotted var(--rule);padding-top:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">Loom<small>weekly concept map — prototype</small></div>
+  <div class="spacer"></div>
+  <span class="label">Frameworks · week 4</span>
+</header>
+<main>
+  <p class="hint">Answering: <b>How might we adapt Loom for weekly concept maps?</b> — sample data for one week's worth of reading (Kuhn &amp; Popper on scientific method). Same underlying concepts and threads, shown two ways.</p>
+
+  <div class="tabs">
+    <button id="tabCloth" class="active">Cloth</button>
+    <button id="tabMap">Concept map</button>
+  </div>
+
+  <div class="card">
+    <div id="viewCloth" class="view active">
+      <h2>The cloth <span class="label" style="text-transform:none;letter-spacing:0">— warp in reading order</span></h2>
+      <p class="hint">Concepts laid out in the order they were introduced this week; threads arc between them.</p>
+      <svg id="clothSvg" height="360"></svg>
+    </div>
+    <div id="viewMap" class="view">
+      <h2>Concept map <span class="label" style="text-transform:none;letter-spacing:0">— same threads, spatial layout</span></h2>
+      <p class="hint">The same concepts and connections, laid out by how densely they connect rather than reading order — closer to how a weekly review map should read.</p>
+      <svg id="mapSvg" height="440"></svg>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="border-top:2px solid var(--ochre)"></span>concept</span>
+      <span><span class="sw" style="border-top:2px solid var(--sage)"></span>named relation</span>
+      <span><span class="sw" style="border-top:2px dashed var(--grey)"></span>unnamed — sentence only</span>
+    </div>
+  </div>
+
+  <p class="footnote">Static HTML prototype for Limion review — no backend, sample data only.</p>
+</main>
+
+<script>
+// Sample week: Kuhn/Popper on scientific method. ponytail: hand-authored fixture, swap for real state.concepts/edges when wired up.
+const concepts = [
+  { id:"c1", label:"Paradigm", def:"A shared framework of theory, method, and standards a field works within." },
+  { id:"c2", label:"Normal science", def:"Puzzle-solving research conducted inside an accepted paradigm." },
+  { id:"c3", label:"Anomaly", def:"An observation the current paradigm can't explain." },
+  { id:"c4", label:"Crisis", def:"A buildup of unresolved anomalies that destabilizes a paradigm." },
+  { id:"c5", label:"Paradigm shift", def:"A revolutionary replacement of one paradigm by another." },
+  { id:"c6", label:"Incommensurability", def:"Rival paradigms lack a common measure to judge between them." },
+  { id:"c7", label:"Falsifiability", def:"Popper's criterion: a theory must be capable of being proven false." },
+  { id:"c8", label:"Demarcation problem", def:"The question of what separates science from non-science." },
+  { id:"c9", label:"Conjecture and refutation", def:"Popper's model: bold guesses, then attempts to disprove them." },
+];
+
+const edges = [
+  { fromId:"c1", toId:"c2", handle:"grounds", sentence:"Normal science is puzzle-solving carried out inside a paradigm's rules." },
+  { fromId:"c2", toId:"c3", handle:null, sentence:"Enough normal science eventually turns up results the paradigm didn't predict." },
+  { fromId:"c3", toId:"c4", handle:"accumulates into", sentence:"Anomalies pile up until confidence in the paradigm itself erodes." },
+  { fromId:"c4", toId:"c5", handle:"resolves in", sentence:"A crisis is resolved not by patching the old paradigm but replacing it." },
+  { fromId:"c5", toId:"c1", handle:"replaces", sentence:"The new paradigm sets a different set of shared rules than the one it displaced." },
+  { fromId:"c5", toId:"c6", handle:null, sentence:"Kuhn argued successive paradigms can't be compared on fully neutral terms." },
+  { fromId:"c1", toId:"c6", handle:"produces", sentence:"Incommensurability is a consequence of paradigms defining their own standards." },
+  { fromId:"c7", toId:"c8", handle:"answers", sentence:"Popper offered falsifiability as his answer to the demarcation problem." },
+  { fromId:"c7", toId:"c9", handle:"operationalized as", sentence:"In practice, falsifiability becomes a cycle of conjecture and refutation." },
+  { fromId:"c8", toId:"c1", handle:null, sentence:"Kuhn's paradigms complicate Popper's line between science and non-science." },
+  { fromId:"c9", toId:"c2", handle:null, sentence:"Conjecture-and-refutation and normal science describe research very differently." },
+];
+
+const idx = {}; concepts.forEach((c,i)=>idx[c.id]=i);
+const adj = {}; concepts.forEach(c=>adj[c.id]=[]);
+edges.forEach(e=>{ adj[e.fromId].push(e); adj[e.toId].push(e); });
+
+// ---- Cloth view: warp in list order, weft arcs across ----
+function renderCloth(){
+  const svg = document.getElementById("clothSvg");
+  const width = Math.max(svg.getBoundingClientRect().width, 720);
+  const H = 360, baseY = H - 118, mL = 46, mR = 34;
+  const n = concepts.length;
+  const X = i => n===1 ? width/2 : mL + i*(width-mL-mR)/(n-1);
+
+  const eo = edges.map((e,k)=>({e,k})).filter(o=>o.e.fromId!==o.e.toId);
+  eo.sort((a,b)=>Math.abs(X(idx[b.e.fromId])-X(idx[b.e.toId])) - Math.abs(X(idx[a.e.fromId])-X(idx[a.e.toId])));
+
+  svg.setAttribute("viewBox", `0 0 ${width} ${H}`);
+  svg.setAttribute("height", H);
+  let s = `<defs>
+    <marker id="arwS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--sage)"/></marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--grey)"/></marker>
+  </defs>`;
+  s += `<line x1="${mL-16}" y1="${baseY}" x2="${width-mR+14}" y2="${baseY}" stroke="var(--rule)" stroke-width="1.2"/>`;
+  concepts.forEach((c,i)=>{ s += `<line x1="${X(i)}" y1="28" x2="${X(i)}" y2="${baseY}" stroke="rgba(168,132,63,.14)" stroke-width="1"/>`; });
+
+  eo.forEach(({e,k})=>{
+    const fx = X(idx[e.fromId]), tx = X(idx[e.toId]);
+    const span = Math.abs(tx-fx); if(!span) return;
+    const h = Math.min(baseY-44, 28 + span*0.2 + (k%3)*11);
+    const named = !!e.handle;
+    const col = named ? "var(--sage)" : "var(--grey)";
+    const label = e.handle || (e.sentence.length>34 ? e.sentence.slice(0,33)+"…" : e.sentence);
+    s += `<path d="M ${fx} ${baseY-6} A ${span/2} ${h} 0 0 ${fx<tx?1:0} ${tx} ${baseY-6}" fill="none" stroke="${col}" stroke-width="1.5" ${named?"":'stroke-dasharray="5 4"'} marker-end="url(#${named?"arwS":"arwG"})"><title>"${escXml(e.sentence)}"</title></path>`;
+    s += `<text x="${(fx+tx)/2}" y="${baseY-6-h-5}" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="10" font-style="${named?"normal":"italic"}" fill="${col}" stroke="#f4f2ec" stroke-width="4" paint-order="stroke" letter-spacing=".04em">${escXml(label)}</text>`;
+  });
+
+  concepts.forEach((c,i)=>{
+    const x = X(i);
+    s += `<circle cx="${x}" cy="${baseY}" r="3.4" fill="var(--ochre)"/>`;
+    s += `<text transform="translate(${x+4},${baseY+13}) rotate(30)" font-family="Newsreader,Georgia,serif" font-size="11.5" fill="var(--ink)"><title>${escXml(c.label + (c.def?` — ${c.def}`:""))}</title>${escXml(c.label)}</text>`;
+  });
+  svg.innerHTML = s;
+}
+
+// ---- Concept map view: force layout, run once, drawn static ----
+function layoutForceMap(){
+  const width = 1200, height = 620;
+  const pos = {};
+  concepts.forEach((c,i)=>{
+    const a = (i/concepts.length) * Math.PI*2;
+    pos[c.id] = { x: width/2 + Math.cos(a)*320, y: height/2 + Math.sin(a)*240 };
+  });
+  const ITER = 400;
+  for(let it=0; it<ITER; it++){
+    const disp = {}; concepts.forEach(c=>disp[c.id]={x:0,y:0});
+    // repulsion between all pairs
+    for(let i=0;i<concepts.length;i++){
+      for(let j=i+1;j<concepts.length;j++){
+        const a=concepts[i].id, b=concepts[j].id;
+        let dx=pos[a].x-pos[b].x, dy=pos[a].y-pos[b].y;
+        let d2 = dx*dx+dy*dy || 0.01;
+        const f = 16000/d2;
+        const d = Math.sqrt(d2);
+        disp[a].x += f*dx/d; disp[a].y += f*dy/d;
+        disp[b].x -= f*dx/d; disp[b].y -= f*dy/d;
+      }
+    }
+    // spring attraction along edges
+    edges.forEach(e=>{
+      const a=e.fromId, b=e.toId;
+      let dx=pos[b].x-pos[a].x, dy=pos[b].y-pos[a].y;
+      const d = Math.sqrt(dx*dx+dy*dy) || 0.01;
+      const target = 240;
+      const f = (d-target)*0.02;
+      disp[a].x += f*dx/d; disp[a].y += f*dy/d;
+      disp[b].x -= f*dx/d; disp[b].y -= f*dy/d;
+    });
+    concepts.forEach(c=>{
+      pos[c.id].x += Math.max(-8,Math.min(8,disp[c.id].x));
+      pos[c.id].y += Math.max(-8,Math.min(8,disp[c.id].y));
+      pos[c.id].x = Math.max(90, Math.min(width-90, pos[c.id].x));
+      pos[c.id].y = Math.max(50, Math.min(height-50, pos[c.id].y));
+    });
+  }
+  return { width, height, pos };
+}
+
+function renderMap(){
+  const svg = document.getElementById("mapSvg");
+  const { width, height, pos } = layoutForceMap();
+
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("height", height);
+  let s = `<defs>
+    <marker id="marwS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--sage)"/></marker>
+    <marker id="marwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--grey)"/></marker>
+  </defs>`;
+
+  const box = {};
+  concepts.forEach(c=>{ box[c.id] = { hw: Math.max(60, c.label.length*7.2+24)/2, hh: 15 }; });
+
+  const edgeOfBox = (cx, cy, hw, hh, dx, dy) => {
+    if (!dx && !dy) return { x: cx, y: cy };
+    const scale = 1 / Math.max(Math.abs(dx)/hw, Math.abs(dy)/hh);
+    return { x: cx + dx*scale, y: cy + dy*scale };
+  };
+
+  edges.forEach(e=>{
+    const a = pos[e.fromId], b = pos[e.toId];
+    const named = !!e.handle;
+    const col = named ? "var(--sage)" : "var(--grey)";
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const p1 = edgeOfBox(a.x, a.y, box[e.fromId].hw, box[e.fromId].hh, dx, dy);
+    const p2 = edgeOfBox(b.x, b.y, box[e.toId].hw, box[e.toId].hh, -dx, -dy);
+    const mx = (p1.x+p2.x)/2, my = (p1.y+p2.y)/2;
+    const label = e.handle || (e.sentence.length>28 ? e.sentence.slice(0,27)+"…" : e.sentence);
+    s += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${col}" stroke-width="1.5" ${named?"":'stroke-dasharray="5 4"'} marker-end="url(#${named?"marwS":"marwG"})"><title>"${escXml(e.sentence)}"</title></line>`;
+    s += `<text x="${mx}" y="${my-4}" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="9.5" font-style="${named?"normal":"italic"}" fill="${col}" stroke="#f4f2ec" stroke-width="4" paint-order="stroke" letter-spacing=".03em">${escXml(label)}</text>`;
+  });
+
+  concepts.forEach(c=>{
+    const p = pos[c.id];
+    const bw = box[c.id].hw*2, bh = box[c.id].hh*2;
+    s += `<rect x="${p.x - bw/2}" y="${p.y - bh/2}" width="${bw}" height="${bh}" rx="15" fill="rgba(168,132,63,.16)" stroke="var(--ochre)" stroke-width="1.3"><title>${escXml(c.label + (c.def?` — ${c.def}`:""))}</title></rect>`;
+    s += `<text x="${p.x}" y="${p.y}" dominant-baseline="middle" text-anchor="middle" font-family="Newsreader,Georgia,serif" font-size="13" fill="var(--ink)">${escXml(c.label)}</text>`;
+  });
+  svg.innerHTML = s;
+}
+
+function escXml(str){
+  return String(str).replace(/[&<>"']/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch]));
+}
+
+document.getElementById("tabCloth").addEventListener("click", () => setTab("cloth"));
+document.getElementById("tabMap").addEventListener("click", () => setTab("map"));
+function setTab(which){
+  document.getElementById("tabCloth").classList.toggle("active", which==="cloth");
+  document.getElementById("tabMap").classList.toggle("active", which==="map");
+  document.getElementById("viewCloth").classList.toggle("active", which==="cloth");
+  document.getElementById("viewMap").classList.toggle("active", which==="map");
+}
+
+renderCloth();
+renderMap();
+window.addEventListener("resize", renderCloth);
+</script>
+</body>
+</html>
