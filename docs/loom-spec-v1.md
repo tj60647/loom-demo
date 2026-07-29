@@ -2,7 +2,7 @@
 
 Build contract. Functionality only — pedagogy, staging, and governance live in the [Course Deployment notes](course-deployment-notes.md). This is the target the build freezes to and the release gate checks against.
 
-**Status:** DRAFT (freeze target) · **Version** v1 · rev July 29 (reflects tool v14 + the July 28–29 calls) · **Freeze date:** TBD
+**Status:** DRAFT (freeze target) · **Version** v1 · rev July 29b (reflects tool v14 + the July 28–29 calls; §6 splits the artifact from view state) · **Freeze date:** TBD
 
 ## 1. What Loom is
 
@@ -92,7 +92,7 @@ Export `.json`; export markdown (production); import; reset; student name.
 4. Every concept must be able to trace to a byte; evidence-less concepts show as a visible failure state.
 5. The export is the student's artifact; their work is never inaccessible to them.
 6. No AI runs inside the tool. AI use happens outside it, on the export, by course policy, disclosed.
-7. Render and count, never decide. The tool may draw what the student authored and count what it sees; it never tiers, places, links, or arranges for them. Auto-layout as output is out.
+7. Render and count, never decide. The tool may draw what the student authored and count what it sees; it never tiers, places, links, or arranges for them. Auto-layout as output is out. Derived geometry may be computed for display and discarded; only student gestures write to `views`.
 8. Social displays wait. Cohort views (highlight heat maps, group overlays — production) render for a student only after they have coded that reading themselves; instructor views are exempt. The crowd must not pre-code the text.
 
 ## 5. Scope
@@ -122,18 +122,29 @@ One JSON document per student (kilobytes). Schema:
 
 ```json
 {
-  "student":   "",
-  "concepts":  [ { "id": "", "label": "", "def": "", "note": "", "tier": "" } ],
-  "bytes":     [ { "id": "", "conceptId": "", "source": "", "location": "", "text": "" } ],
-  "edges":     [ { "id": "", "fromId": "", "toId": "", "sentence": "", "handle": "" } ],
-  "positions": { "conceptId": { "x": 0, "y": 0 } },
-  "bends":     { "edgeId": { "dx": 0, "dy": 0 } },
-  "read":      ""
+  "graph": {
+    "student":  "",
+    "concepts": [ { "id": "", "label": "", "def": "", "note": "", "tier": "" } ],
+    "bytes":    [ { "id": "", "conceptId": "", "source": "", "location": "", "text": "" } ],
+    "edges":    [ { "id": "", "fromId": "", "toId": "", "sentence": "", "handle": "" } ],
+    "read":     ""
+  },
+  "views": {
+    "cardTable": {
+      "positions": { "conceptId": { "x": 0, "y": 0 } },
+      "bends":     { "edgeId":    { "dx": 0, "dy": 0 } }
+    }
+  }
 }
 ```
 
 `tier`: `''` unsorted · `p`/`s`/`t` · `x` left off the map.
-`positions`/`bends` are display geometry (production: store proportionally, and byte→concept becomes many-to-many).
+
+`graph` is the artifact and the export contract — view-agnostic, portable, the thing an agent or a future reader consumes.
+`views` holds per-view student-authored geometry; it round-trips on export so no arrangement work is lost, but no consumer of the graph is required to read it.
+Adding a view adds a key under `views`, never a field on a concept or edge.
+
+Placement is a decision (§3), but its meaning is already extracted into `tier` — the residual x/y is display geometry and belongs to the renderer, not the artifact. `bends` are display-only by §3's own wording. (Production: byte→concept becomes many-to-many.)
 
 **Export:** `.json` (contract above) and markdown (production) — for Obsidian / notes / agents.
 
