@@ -5,6 +5,7 @@ import {
   primaryKey,
   integer,
   boolean,
+  unique,
 } from "drizzle-orm/pg-core"
 import type { AdapterAccount } from "@auth/core/adapters"
 
@@ -30,10 +31,36 @@ export const courses = pgTable("course", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  slug: text("slug").notNull(),
+  slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
+  // Free-text run label, e.g. "Fall 2026". Lets the same course be offered
+  // again without cloning the reading library (see courseSources).
+  term: text("term").default("").notNull(),
+  description: text("description").default("").notNull(),
+  isArchived: boolean("isArchived").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 })
+
+// A course runs as several sections (~14 students each). Quilting and cohort
+// views scope to a section; the reading library scopes to the course.
+export const sections = pgTable(
+  "section",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    courseId: text("courseId")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    lead: text("lead").default("").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (section) => ({
+    slugPerCourse: unique().on(section.courseId, section.slug),
+  })
+)
 
 export const courseMemberships = pgTable(
   "course_membership",
@@ -44,6 +71,10 @@ export const courseMemberships = pgTable(
     userId: text("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    // Null until an instructor assigns the learner to a section.
+    sectionId: text("sectionId").references(() => sections.id, {
+      onDelete: "set null",
+    }),
     role: text("role").default("LEARNER").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
@@ -59,6 +90,11 @@ export const courseAllowedEmails = pgTable(
       .notNull()
       .references(() => courses.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
+    // Optional pre-assignment: the learner lands in this section on first
+    // sign-in instead of needing to be placed by hand afterwards.
+    sectionId: text("sectionId").references(() => sections.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (row) => ({
@@ -115,20 +151,23 @@ export const verificationTokens = pgTable(
 // A reading/document available in the library. The underlying file lives in
 // backend-managed storage (see src/lib/storage.ts), not in /public, so access
 // can be gated behind authentication.
+// A reading in the shared library. Deliberately course-agnostic: the same PDF
+// is uploaded, OCR'd, and stored once, then included in any number of courses
+// via courseSources. Per-course facts (published? which week? core or
+// supplemental?) live on the join, not here.
 export const sources = pgTable("source", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  courseId: text("courseId").references(() => courses.id, {
-    onDelete: "set null",
-  }),
   title: text("title").notNull(),
   author: text("author").default(""),
   sourceReference: text("sourceReference").default(""),
   description: text("description").default(""),
   isDescriptionVisible: boolean("isDescriptionVisible").default(true).notNull(),
   metadataProvenance: text("metadataProvenance").default(""),
-  isVisible: boolean("isVisible").default(true).notNull(),
+  // Retires a reading from the shared library without deleting the file or
+  // disturbing courses that already include it.
+  isArchived: boolean("isArchived").default(false).notNull(),
   // Key used to locate the file in the storage backend (see src/lib/storage.ts).
   storageKey: text("storageKey").notNull(),
   createdByUserId: text("createdByUserId").references(() => users.id, {
@@ -136,6 +175,33 @@ export const sources = pgTable("source", {
   }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 })
+
+// Inclusion of a library reading in one course, plus the facts that are true
+// only in that course's context.
+export const courseSources = pgTable(
+  "course_source",
+  {
+    courseId: text("courseId")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    sourceId: text("sourceId")
+      .notNull()
+      .references(() => sources.id, { onDelete: "cascade" }),
+    // Published to learners in this course. A reading can be visible in one
+    // course and staged-but-hidden in another.
+    isVisible: boolean("isVisible").default(true).notNull(),
+    // Course week the reading is assigned to; null means unscheduled.
+    week: integer("week"),
+    // Core readings are the instrumented set students must graph; supplemental
+    // readings are available but not required.
+    isCore: boolean("isCore").default(true).notNull(),
+    position: integer("position").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (row) => ({
+    compoundKey: primaryKey({ columns: [row.courseId, row.sourceId] }),
+  })
+)
 
 // Canonical, server-extracted plain text for each page of a source. This is
 // the stable anchor used to compute and validate highlight offsets, since the

@@ -1,0 +1,1 @@
+ALTER TABLE "source" ADD COLUMN "isArchived" boolean DEFAULT false NOT NULL;

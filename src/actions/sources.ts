@@ -1,8 +1,8 @@
 "use server"
 
 import { db } from "@/db"
-import { courses, sources, sourcePages, users } from "@/db/schema"
-import { and, asc, eq, isNull } from "drizzle-orm"
+import { courseMemberships, courseSources, sources, sourcePages, users } from "@/db/schema"
+import { and, asc, eq, inArray } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, isAdminUser } from "@/lib/auth"
 import { readingStorage } from "@/lib/storage"
@@ -10,26 +10,7 @@ import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
 import { extractPdfPageText } from "@/lib/pdfText"
 import { hashText } from "@/lib/hash"
 import { revalidatePath } from "next/cache"
-import { DEFAULT_COURSE_ID, getCourseLabel, normalizeCourseId } from "@/lib/courseConfig"
-
-async function ensureCourseExists(courseIdRaw: string) {
-  const courseId = normalizeCourseId(courseIdRaw)
-  await db
-    .insert(courses)
-    .values({ id: courseId, slug: courseId, name: getCourseLabel(courseId) })
-    .onConflictDoNothing()
-
-  // During migration, older readings have null courseId; assign them to the
-  // default course so existing libraries remain visible.
-  if (courseId === DEFAULT_COURSE_ID) {
-    await db
-      .update(sources)
-      .set({ courseId })
-      .where(isNull(sources.courseId))
-  }
-
-  return courseId
-}
+import { resolveCourseId, resolveCourseIdForUser } from "@/lib/courses"
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -47,45 +28,107 @@ async function requireAdmin() {
   return session
 }
 
-export async function getSources(courseIdRaw: string = DEFAULT_COURSE_ID) {
-  const courseId = await ensureCourseExists(courseIdRaw)
-  const session = await getServerSession(authOptions)
-  const admin = isAdminUser(session?.user)
-
-  if (admin) {
-    return db
-      .select()
-      .from(sources)
-      .where(eq(sources.courseId, courseId))
-      .orderBy(asc(sources.createdAt))
-  }
-
-  return db
-    .select()
-    .from(sources)
-    .where(and(eq(sources.isVisible, true), eq(sources.courseId, courseId)))
-    .orderBy(asc(sources.createdAt))
+function readText(formData: FormData, key: string) {
+  const value = formData.get(key)
+  return typeof value === "string" ? value.trim() : ""
 }
 
-export async function getManageableSources(courseIdRaw: string = DEFAULT_COURSE_ID) {
-  await requireAdmin()
-  const courseId = await ensureCourseExists(courseIdRaw)
+function readInt(formData: FormData, key: string) {
+  const raw = readText(formData, key)
+  if (!raw) return null
+  const parsed = Number.parseInt(raw, 10)
+  return Number.isFinite(parsed) ? parsed : null
+}
 
-  return db
-    .select()
-    .from(sources)
-    .where(eq(sources.courseId, courseId))
-    .orderBy(asc(sources.createdAt))
+function revalidateLibrary() {
+  revalidatePath("/admin/library")
+  revalidatePath("/")
 }
 
 /**
- * Registers a new reading in the library: stores the uploaded PDF bytes in
- * backend-managed storage (not /public, so it's only reachable via the
+ * The whole shared library, independent of any course. This is the set an
+ * instructor picks from when building a course reading list.
+ */
+export async function getLibrarySources({ includeArchived = false } = {}) {
+  await requireAdmin()
+
+  const rows = await db.select().from(sources).orderBy(asc(sources.title))
+  return includeArchived ? rows : rows.filter((source) => !source.isArchived)
+}
+
+/**
+ * Readings included in one course, with the per-course facts from the join.
+ * Ordered the way a syllabus reads: by week, then explicit position, then title.
+ */
+export async function getCourseSources(courseIdRaw?: string | null) {
+  await requireAdmin()
+
+  const courseId = await resolveCourseId(courseIdRaw)
+  if (!courseId) return []
+
+  const rows = await db
+    .select({ source: sources, link: courseSources })
+    .from(courseSources)
+    .innerJoin(sources, eq(sources.id, courseSources.sourceId))
+    .where(eq(courseSources.courseId, courseId))
+
+  return rows
+    .map((row) => ({ ...row.source, link: row.link }))
+    .sort((a, b) => {
+      const aWeek = a.link.week ?? Number.MAX_SAFE_INTEGER
+      const bWeek = b.link.week ?? Number.MAX_SAFE_INTEGER
+      if (aWeek !== bWeek) return aWeek - bWeek
+      if (a.link.position !== b.link.position) return a.link.position - b.link.position
+      return a.title.localeCompare(b.title)
+    })
+}
+
+/**
+ * The learner-facing reading list: readings published to the course this user
+ * is working in.
+ */
+export async function getSources(courseIdRaw?: string | null) {
+  const session = await getServerSession(authOptions)
+
+  const courseId = session?.user?.id
+    ? await resolveCourseIdForUser(session.user.id, courseIdRaw)
+    : await resolveCourseId(courseIdRaw)
+
+  if (!courseId) return []
+
+  const admin = isAdminUser(session?.user)
+
+  const rows = await db
+    .select({ source: sources, link: courseSources })
+    .from(courseSources)
+    .innerJoin(sources, eq(sources.id, courseSources.sourceId))
+    .where(
+      admin
+        ? eq(courseSources.courseId, courseId)
+        : and(eq(courseSources.courseId, courseId), eq(courseSources.isVisible, true))
+    )
+
+  return rows
+    .map((row) => ({ ...row.source, isVisible: row.link.isVisible, week: row.link.week }))
+    .sort((a, b) => {
+      const aWeek = a.week ?? Number.MAX_SAFE_INTEGER
+      const bWeek = b.week ?? Number.MAX_SAFE_INTEGER
+      if (aWeek !== bWeek) return aWeek - bWeek
+      return a.title.localeCompare(b.title)
+    })
+}
+
+/**
+ * Registers a new reading in the shared library: stores the uploaded PDF bytes
+ * in backend-managed storage (not /public, so it's only reachable via the
  * authenticated /api/readings/[sourceId] route) and extracts + persists the
  * canonical per-page text used to anchor highlight offsets.
+ *
+ * When `courseId` is given the reading is also included in that course, so the
+ * common "upload straight into the course I'm building" path stays one step.
  */
 export async function createSource(data: {
-  courseId?: string
+  courseId?: string | null
   title?: string
   author?: string
   sourceReference?: string
@@ -116,7 +159,6 @@ export async function createSource(data: {
   const [source] = await db
     .insert(sources)
     .values({
-      courseId: await ensureCourseExists(data.courseId ?? DEFAULT_COURSE_ID),
       title,
       author: data.author || "",
       sourceReference: data.sourceReference || "",
@@ -127,6 +169,16 @@ export async function createSource(data: {
       createdByUserId: userId,
     })
     .returning()
+
+  if (data.courseId) {
+    const courseId = await resolveCourseId(data.courseId)
+    if (courseId) {
+      await db
+        .insert(courseSources)
+        .values({ courseId, sourceId: source.id })
+        .onConflictDoNothing()
+    }
+  }
 
   const pages = await extractPdfPageText(buffer)
   if (pages.length > 0) {
@@ -151,129 +203,192 @@ export async function createSource(data: {
 }
 
 export async function createSourceFromForm(formData: FormData) {
-  const courseIdRaw = formData.get("courseId")
-  const courseId = typeof courseIdRaw === "string" ? courseIdRaw : DEFAULT_COURSE_ID
-  const title = formData.get("title")
-  const file = formData.get("file")
-
-  if (!(file instanceof File)) {
-    throw new Error("PDF file is required")
-  }
+  const courseId = readText(formData, "courseId")
 
   await createSource({
-    courseId,
-    title: typeof title === "string" ? title.trim() : "",
-    file,
+    courseId: formData.get("addToCourse") === "on" ? courseId || null : null,
+    title: readText(formData, "title"),
+    file: (() => {
+      const file = formData.get("file")
+      if (!(file instanceof File)) throw new Error("PDF file is required")
+      return file
+    })(),
     metadataProvenance: "Pending review",
   })
 
-  revalidatePath("/admin/library")
-  revalidatePath("/")
+  revalidateLibrary()
 }
 
+/** Library-wide metadata. Not scoped to a course — the record is shared. */
 export async function updateSourceMetadata(formData: FormData) {
   await requireAdmin()
-  const courseIdRaw = formData.get("courseId")
-  const courseId = await ensureCourseExists(typeof courseIdRaw === "string" ? courseIdRaw : DEFAULT_COURSE_ID)
 
-  const sourceId = formData.get("sourceId")
-  if (typeof sourceId !== "string" || !sourceId.trim()) {
-    throw new Error("Source id is required")
-  }
-
-  const title = formData.get("title")
-  const author = formData.get("author")
-  const sourceReference = formData.get("sourceReference")
-  const description = formData.get("description")
-  const metadataProvenance = formData.get("metadataProvenance")
-  const isDescriptionVisible = formData.get("isDescriptionVisible") === "on"
+  const sourceId = readText(formData, "sourceId")
+  if (!sourceId) throw new Error("Source id is required")
 
   await db
     .update(sources)
     .set({
-      title: typeof title === "string" && title.trim() ? title.trim() : "Untitled Reading",
-      author: typeof author === "string" ? author.trim() : "",
-      sourceReference: typeof sourceReference === "string" ? sourceReference.trim() : "",
-      description: typeof description === "string" ? description.trim() : "",
-      isDescriptionVisible,
-      metadataProvenance: typeof metadataProvenance === "string" ? metadataProvenance.trim() : "",
+      title: readText(formData, "title") || "Untitled Reading",
+      author: readText(formData, "author"),
+      sourceReference: readText(formData, "sourceReference"),
+      description: readText(formData, "description"),
+      isDescriptionVisible: formData.get("isDescriptionVisible") === "on",
+      metadataProvenance: readText(formData, "metadataProvenance"),
     })
-    .where(and(eq(sources.id, sourceId), eq(sources.courseId, courseId)))
+    .where(eq(sources.id, sourceId))
 
-  revalidatePath("/admin/library")
-  revalidatePath("/")
+  revalidateLibrary()
 }
 
-export async function setSourceVisibility(formData: FormData) {
+export async function addSourceToCourse(formData: FormData) {
   await requireAdmin()
 
-  const courseIdRaw = formData.get("courseId")
-  const courseId = await ensureCourseExists(typeof courseIdRaw === "string" ? courseIdRaw : DEFAULT_COURSE_ID)
-  const sourceIdRaw = formData.get("sourceId")
-  const isVisibleRaw = formData.get("isVisible")
+  const courseId = await resolveCourseId(readText(formData, "courseId"))
+  const sourceId = readText(formData, "sourceId")
+  if (!courseId || !sourceId) return
 
-  if (typeof sourceIdRaw !== "string") {
-    throw new Error("Source id is required")
-  }
+  await db
+    .insert(courseSources)
+    .values({
+      courseId,
+      sourceId,
+      week: readInt(formData, "week"),
+      isCore: formData.get("isCore") !== "false",
+    })
+    .onConflictDoNothing()
 
-  const isVisible = isVisibleRaw === "true"
+  revalidateLibrary()
+}
+
+/** Removes the reading from this course only. The library keeps the file. */
+export async function removeSourceFromCourse(formData: FormData) {
+  await requireAdmin()
+
+  const courseId = await resolveCourseId(readText(formData, "courseId"))
+  const sourceId = readText(formData, "sourceId")
+  if (!courseId || !sourceId) return
+
+  await db
+    .delete(courseSources)
+    .where(and(eq(courseSources.courseId, courseId), eq(courseSources.sourceId, sourceId)))
+
+  revalidateLibrary()
+}
+
+export async function setCourseSourceVisibility(formData: FormData) {
+  await requireAdmin()
+
+  const courseId = await resolveCourseId(readText(formData, "courseId"))
+  const sourceId = readText(formData, "sourceId")
+  if (!courseId || !sourceId) return
+
+  await db
+    .update(courseSources)
+    .set({ isVisible: formData.get("isVisible") === "true" })
+    .where(and(eq(courseSources.courseId, courseId), eq(courseSources.sourceId, sourceId)))
+
+  revalidateLibrary()
+}
+
+export async function updateCourseSourcePlacement(formData: FormData) {
+  await requireAdmin()
+
+  const courseId = await resolveCourseId(readText(formData, "courseId"))
+  const sourceId = readText(formData, "sourceId")
+  if (!courseId || !sourceId) return
+
+  await db
+    .update(courseSources)
+    .set({
+      week: readInt(formData, "week"),
+      position: readInt(formData, "position") ?? 0,
+      isCore: formData.get("isCore") === "on",
+    })
+    .where(and(eq(courseSources.courseId, courseId), eq(courseSources.sourceId, sourceId)))
+
+  revalidateLibrary()
+}
+
+export async function setSourceArchived(formData: FormData) {
+  await requireAdmin()
+
+  const sourceId = readText(formData, "sourceId")
+  if (!sourceId) return
 
   await db
     .update(sources)
-    .set({ isVisible })
-    .where(and(eq(sources.id, sourceIdRaw), eq(sources.courseId, courseId)))
+    .set({ isArchived: formData.get("isArchived") === "true" })
+    .where(eq(sources.id, sourceId))
 
-  revalidatePath("/admin/library")
-  revalidatePath("/")
+  revalidateLibrary()
 }
 
+/**
+ * Deletes a reading from the shared library entirely, including its stored PDF
+ * and cover. Course inclusions cascade away. Use setSourceArchived to retire a
+ * reading without destroying it.
+ */
 export async function deleteSource(formData: FormData) {
   await requireAdmin()
 
-  const courseIdRaw = formData.get("courseId")
-  const courseId = await ensureCourseExists(typeof courseIdRaw === "string" ? courseIdRaw : DEFAULT_COURSE_ID)
-  const sourceIdRaw = formData.get("sourceId")
+  const sourceId = readText(formData, "sourceId")
+  if (!sourceId) throw new Error("Source id is required")
 
-  if (typeof sourceIdRaw !== "string") {
-    throw new Error("Source id is required")
-  }
-
-  const rows = await db
-    .select()
-    .from(sources)
-    .where(and(eq(sources.id, sourceIdRaw), eq(sources.courseId, courseId)))
-    .limit(1)
+  const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
   const source = rows[0]
-  if (!source) {
-    return
-  }
+  if (!source) return
 
-  await db.delete(sources).where(eq(sources.id, sourceIdRaw))
+  await db.delete(sources).where(eq(sources.id, sourceId))
   await readingStorage.delete(source.storageKey)
   await readingStorage.delete(getSourceCoverKey(source.id))
 
-  revalidatePath("/admin/library")
-  revalidatePath("/")
+  revalidateLibrary()
 }
 
+/**
+ * Fetches the stored PDF. Admins can read anything; a learner may read a
+ * reading only if it is published in a course they belong to. Visibility now
+ * lives on the join, so this is a membership question rather than a flag on
+ * the source.
+ */
 export async function getSourceFile(sourceId: string) {
   const session = await getServerSession(authOptions)
   const admin = isAdminUser(session?.user)
+
   if (!session?.user?.id && process.env.NODE_ENV === "production") {
     throw new Error("Unauthorized")
   }
 
-  const rows = await db
-    .select()
-    .from(sources)
-    .where(
-      admin
-        ? eq(sources.id, sourceId)
-        : and(eq(sources.id, sourceId), eq(sources.isVisible, true))
-    )
-    .limit(1)
+  const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
   const source = rows[0]
   if (!source) throw new Error("Not found")
+
+  if (!admin && session?.user?.id) {
+    const memberships = await db
+      .select({ courseId: courseMemberships.courseId })
+      .from(courseMemberships)
+      .where(eq(courseMemberships.userId, session.user.id))
+
+    if (memberships.length === 0) throw new Error("Not found")
+
+    const published = await db
+      .select({ sourceId: courseSources.sourceId })
+      .from(courseSources)
+      .where(
+        and(
+          eq(courseSources.sourceId, sourceId),
+          eq(courseSources.isVisible, true),
+          inArray(
+            courseSources.courseId,
+            memberships.map((row) => row.courseId)
+          )
+        )
+      )
+      .limit(1)
+
+    if (published.length === 0) throw new Error("Not found")
+  }
 
   const buffer = await readingStorage.get(source.storageKey)
   return { source, buffer }

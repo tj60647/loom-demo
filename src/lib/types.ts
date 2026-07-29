@@ -24,6 +24,9 @@ export type Byte = {
   createdAt: Date
 }
 
+// A reading in the shared library. Course-specific facts (published? which
+// week?) live on course_source, not here — see LibrarySource below for the
+// shape the learner-facing library returns.
 export type Source = {
   id: string
   title: string
@@ -32,9 +35,20 @@ export type Source = {
   description: string | null
   isDescriptionVisible: boolean
   metadataProvenance: string | null
-  isVisible: boolean
+  isArchived: boolean
   storageKey: string
   createdByUserId: string | null
+  createdAt: Date
+}
+
+/** A library reading as seen from inside one course. */
+export type CourseSourceLink = {
+  courseId: string
+  sourceId: string
+  isVisible: boolean
+  week: number | null
+  isCore: boolean
+  position: number
   createdAt: Date
 }
 

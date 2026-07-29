@@ -2,7 +2,7 @@ import { NextAuthOptions } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
 import { DrizzleAdapter } from "@auth/drizzle-adapter"
 import { db } from "@/db"
-import { allowedEmails, users } from "@/db/schema"
+import { allowedEmails, courseAllowedEmails, courseMemberships, users } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import type { Adapter } from "next-auth/adapters"
 
@@ -31,6 +31,37 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user }) {
       const email = user.email?.toLowerCase().trim()
       if (!email) return false
+
+      // Per-course allowlist is the primary gate; the site-wide allowedEmails
+      // table is kept as a fallback for accounts approved before courses were
+      // introduced.
+      const courseInvites = await db
+        .select({
+          courseId: courseAllowedEmails.courseId,
+          sectionId: courseAllowedEmails.sectionId,
+        })
+        .from(courseAllowedEmails)
+        .where(eq(courseAllowedEmails.email, email))
+
+      if (courseInvites.length > 0) {
+        // Enrol on first sign-in, placing the learner in whichever section the
+        // instructor pre-assigned. Admins are enrolled as instructors.
+        if (user.id) {
+          const role = isAdminUser({ email }) ? "INSTRUCTOR" : "LEARNER"
+          await db
+            .insert(courseMemberships)
+            .values(
+              courseInvites.map((invite) => ({
+                courseId: invite.courseId,
+                userId: user.id as string,
+                sectionId: invite.sectionId,
+                role,
+              }))
+            )
+            .onConflictDoNothing()
+        }
+        return true
+      }
 
       const approvedEmail = await db
         .select({ email: allowedEmails.email })

@@ -1,9 +1,9 @@
 import { getUserLoomDataAsAdmin } from "@/actions/admin"
 import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
-import { normalizeCourseId } from "@/lib/courseConfig"
+import { firstParam, resolveCourseId } from "@/lib/courses"
 import type { LoomState } from "@/lib/types"
 
-// In Next.js 15, route segment params are promises.
+// Route segment params and searchParams are promises (Next 16 async request APIs).
 type UserLoomSearchParams = {
   course?: string | string[]
 }
@@ -17,10 +17,7 @@ export default async function UserLoomPage({
 }) {
   const resolvedParams = await params
   const resolvedSearchParams = await searchParams
-  const rawCourseId = Array.isArray(resolvedSearchParams.course)
-    ? resolvedSearchParams.course[0]
-    : resolvedSearchParams.course
-  const courseId = normalizeCourseId(rawCourseId)
+  const courseId = await resolveCourseId(firstParam(resolvedSearchParams.course))
   const { concepts, bytes, edges } = await getUserLoomDataAsAdmin(resolvedParams.id, courseId)
 
   const state: LoomState = { concepts, bytes, edges, read: "" }

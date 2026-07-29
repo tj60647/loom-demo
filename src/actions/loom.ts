@@ -1,11 +1,12 @@
 "use server"
 
 import { db } from "@/db"
-import { concepts, bytes, courses, edges, users, sourcePages } from "@/db/schema"
-import { and, eq, isNull } from "drizzle-orm"
+import { concepts, bytes, edges, users, sourcePages } from "@/db/schema"
+import { and, eq, isNull, type SQL } from "drizzle-orm"
+import type { PgColumn } from "drizzle-orm/pg-core"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
-import { DEFAULT_COURSE_ID, getCourseLabel, normalizeCourseId } from "@/lib/courseConfig"
+import { resolveCourseIdForUser } from "@/lib/courses"
 
 async function getUserId() {
   const session = await getServerSession(authOptions)
@@ -20,30 +21,41 @@ async function getUserId() {
   return userId;
 }
 
-async function resolveActiveCourseId(userId: string, courseIdRaw: string = DEFAULT_COURSE_ID) {
-  const courseId = normalizeCourseId(courseIdRaw)
+/**
+ * The course this learner's work belongs to. Courses now come from the
+ * database rather than a hardcoded list, so this can legitimately be null on a
+ * site with no courses yet; callers store null and the work stays unscoped
+ * until a course exists.
+ */
+async function resolveActiveCourseId(userId: string, courseIdRaw?: string | null) {
+  const courseId = await resolveCourseIdForUser(userId, courseIdRaw)
+  if (!courseId) return null
 
-  await db
-    .insert(courses)
-    .values({ id: courseId, slug: courseId, name: getCourseLabel(courseId) })
-    .onConflictDoNothing()
-
-  if (courseId === DEFAULT_COURSE_ID) {
-    await db.update(concepts).set({ courseId }).where(and(eq(concepts.userId, userId), isNull(concepts.courseId)))
-    await db.update(bytes).set({ courseId }).where(and(eq(bytes.userId, userId), isNull(bytes.courseId)))
-    await db.update(edges).set({ courseId }).where(and(eq(edges.userId, userId), isNull(edges.courseId)))
-  }
+  // Pre-course-scoping rows carry a null courseId. Adopt them into whichever
+  // course this learner is actually working in.
+  await db.update(concepts).set({ courseId }).where(and(eq(concepts.userId, userId), isNull(concepts.courseId)))
+  await db.update(bytes).set({ courseId }).where(and(eq(bytes.userId, userId), isNull(bytes.courseId)))
+  await db.update(edges).set({ courseId }).where(and(eq(edges.userId, userId), isNull(edges.courseId)))
 
   return courseId
+}
+
+/**
+ * Matches rows for the active course. With no course on the site yet, that
+ * means the rows whose courseId is still null, so a learner's work stays
+ * reachable until an instructor creates one.
+ */
+function inCourse(column: PgColumn, courseId: string | null): SQL {
+  return courseId ? eq(column, courseId) : isNull(column)
 }
 
 export async function getUserLoomData() {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
-  const userConcepts = await db.select().from(concepts).where(and(eq(concepts.userId, userId), eq(concepts.courseId, courseId)))
-  const userBytes = await db.select().from(bytes).where(and(eq(bytes.userId, userId), eq(bytes.courseId, courseId)))
-  const userEdges = await db.select().from(edges).where(and(eq(edges.userId, userId), eq(edges.courseId, courseId)))
+  const userConcepts = await db.select().from(concepts).where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))
+  const userBytes = await db.select().from(bytes).where(and(eq(bytes.userId, userId), inCourse(bytes.courseId, courseId)))
+  const userEdges = await db.select().from(edges).where(and(eq(edges.userId, userId), inCourse(edges.courseId, courseId)))
 
   return { concepts: userConcepts, bytes: userBytes, edges: userEdges }
 }
@@ -67,14 +79,14 @@ export async function updateConcept(id: string, data: Partial<{ label: string, d
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
-  await db.update(concepts).set(data).where(and(eq(concepts.id, id), eq(concepts.userId, userId), eq(concepts.courseId, courseId)))
+  await db.update(concepts).set(data).where(and(eq(concepts.id, id), eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))
 }
 
 export async function deleteConcept(id: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
   
-  await db.delete(concepts).where(and(eq(concepts.id, id), eq(concepts.userId, userId), eq(concepts.courseId, courseId)))
+  await db.delete(concepts).where(and(eq(concepts.id, id), eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))
 }
 
 function findClosestTextIndex(text: string, needle: string, preferredStart?: number) {
@@ -154,7 +166,7 @@ export async function deleteByte(id: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
   
-  await db.delete(bytes).where(and(eq(bytes.id, id), eq(bytes.userId, userId), eq(bytes.courseId, courseId)))
+  await db.delete(bytes).where(and(eq(bytes.id, id), eq(bytes.userId, userId), inCourse(bytes.courseId, courseId)))
 }
 
 export async function createEdge(data: { fromId: string, toId: string, sentence: string }) {
@@ -176,12 +188,12 @@ export async function updateEdge(id: string, data: Partial<{ handle: string, sen
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
-  await db.update(edges).set(data).where(and(eq(edges.id, id), eq(edges.userId, userId), eq(edges.courseId, courseId)))
+  await db.update(edges).set(data).where(and(eq(edges.id, id), eq(edges.userId, userId), inCourse(edges.courseId, courseId)))
 }
 
 export async function deleteEdge(id: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
   
-  await db.delete(edges).where(and(eq(edges.id, id), eq(edges.userId, userId), eq(edges.courseId, courseId)))
+  await db.delete(edges).where(and(eq(edges.id, id), eq(edges.userId, userId), inCourse(edges.courseId, courseId)))
 }

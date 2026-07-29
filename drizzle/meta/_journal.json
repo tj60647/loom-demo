@@ -43,6 +43,20 @@
       "when": 1783390400000,
       "tag": "0005_watery_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785366161212,
+      "tag": "0006_sections_and_shared_readings",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785366172630,
+      "tag": "0007_source_archive_flag",
+      "breakpoints": true
     }
   ]
 }
