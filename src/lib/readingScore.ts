@@ -46,11 +46,167 @@ const JUDGE_SAMPLE_PAGES = 4
 const JUDGE_SAMPLE_CHARS = 1200
 
 // U+FFFD replacement, C0/C1 control codes (minus tab/newline/CR), and the BMP
-// private use area — the three signatures of a PDF whose fonts carry no usable
-// ToUnicode map, where extraction returns glyph indices dressed up as text.
+// private use area — the signatures of a font map that resolved to *no*
+// character. Necessary but nowhere near sufficient: the more common break is a
+// map that resolves to the *wrong* character, which is ordinary ASCII and looks
+// perfectly clean here. That case is caught by languageLikeness below.
 const JUNK_CHAR = /[\uFFFD\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\uE000-\uF8FF]/g
 
+/**
+ * Relative frequency of a–z in English prose, used as a reference profile. A
+ * wrong-but-valid character mapping permutes the distribution, so comparing
+ * against this catches substitution-style breakage that byte inspection can't.
+ */
+const ENGLISH_LETTER_FREQ: Record<string, number> = {
+  a: 0.08167, b: 0.01492, c: 0.02782, d: 0.04253, e: 0.12702, f: 0.02228,
+  g: 0.02015, h: 0.06094, i: 0.06966, j: 0.00153, k: 0.00772, l: 0.04025,
+  m: 0.02406, n: 0.06749, o: 0.07507, p: 0.01929, q: 0.00095, r: 0.05987,
+  s: 0.06327, t: 0.09056, u: 0.02758, v: 0.00978, w: 0.02360, x: 0.00150,
+  y: 0.01974, z: 0.00074,
+}
+
+/**
+ * Common English words, three letters and up, matched as substrings rather than
+ * tokens: extractPdfPageText joins text runs without inserting spaces, so word
+ * boundaries are not reliable — but "the" occurring hundreds of times across a
+ * page of real prose is. The three-letter minimum keeps chance hits rare, since
+ * random letters produce a given trigram about once per 17,576 positions.
+ */
+const FUNCTION_WORDS = [
+  "the", "and", "that", "for", "with", "was", "this", "are", "from", "which",
+  "but", "not", "have", "has", "they", "their", "been", "would", "there",
+  "when", "what", "will", "can", "all", "one", "our", "out", "more", "than",
+  "into", "such", "only", "other", "some", "these", "also", "may", "its",
+  "use", "between", "about", "through", "however", "where", "were", "each",
+]
+
+/** Below this there is too little signal to judge, and the check abstains. */
+const LIKENESS_MIN_CHARS = 600
+
+/** Cap on the text inspected — enough to be representative, cheap to scan. */
+const LIKENESS_SAMPLE_CHARS = 40_000
+
 type ScorablePage = { pageNumber: number; textContent: string }
+
+export type LanguageLikeness = {
+  /**
+   * Cosine similarity of the a–z profile against English (~1 for real prose),
+   * and occurrences of common English words per 1,000 characters.
+   *
+   * Both null when the document is largely non-Latin script: the measures are
+   * Latin-alphabet-specific, and reporting a number computed from a handful of
+   * stray ASCII characters would be worse than admitting they don't apply.
+   */
+  letterFreqSimilarity: number | null
+  functionWordsPerKChar: number | null
+  /** Share of letters (any script) that are a–z. Low means the two above abstain. */
+  latinShare: number
+}
+
+/**
+ * Does this read as natural language, or merely as characters?
+ *
+ * Two independent signals, because each alone has a blind spot. Letter
+ * frequency catches a permuted mapping but is largely shared across Latin-script
+ * languages; function words catch a permuted mapping *and* pin the language to
+ * English, but drop on maths-heavy or tabular pages. Read together they
+ * separate "wrong characters" from "unusual but real prose" — see
+ * legibilityCeiling for how the two are combined.
+ *
+ * Returns null when there is too little text to say anything honest.
+ */
+export function computeLanguageLikeness(text: string): LanguageLikeness | null {
+  const sample = text.slice(0, LIKENESS_SAMPLE_CHARS).toLowerCase()
+  const allLetters = sample.match(/\p{L}/gu)?.length ?? 0
+  const letters = sample.replace(/[^a-z]/g, "")
+
+  // Too little text of any kind to say anything honest.
+  if (allLetters < LIKENESS_MIN_CHARS) return null
+
+  const latinShare = allLetters > 0 ? letters.length / allLetters : 0
+
+  // Plenty of text, but not in the alphabet these measures are built for.
+  // Report that rather than computing a similarity from the stray ASCII.
+  if (letters.length < LIKENESS_MIN_CHARS) {
+    return { letterFreqSimilarity: null, functionWordsPerKChar: null, latinShare }
+  }
+
+  const counts: Record<string, number> = {}
+  for (const char of letters) counts[char] = (counts[char] ?? 0) + 1
+
+  // Cosine similarity between the observed profile and English.
+  let dot = 0
+  let observedNorm = 0
+  let referenceNorm = 0
+  for (const letter of Object.keys(ENGLISH_LETTER_FREQ)) {
+    const observed = (counts[letter] ?? 0) / letters.length
+    const reference = ENGLISH_LETTER_FREQ[letter]
+    dot += observed * reference
+    observedNorm += observed * observed
+    referenceNorm += reference * reference
+  }
+  const letterFreqSimilarity =
+    observedNorm > 0 ? dot / (Math.sqrt(observedNorm) * Math.sqrt(referenceNorm)) : 0
+
+  let hits = 0
+  for (const word of FUNCTION_WORDS) {
+    // Count overlapping-safe occurrences without a regex, so the word list
+    // needs no escaping and long texts stay cheap.
+    let index = sample.indexOf(word)
+    while (index !== -1) {
+      hits += 1
+      index = sample.indexOf(word, index + word.length)
+    }
+  }
+
+  return {
+    letterFreqSimilarity: Math.round(letterFreqSimilarity * 1000) / 1000,
+    functionWordsPerKChar: Math.round((hits / sample.length) * 1000 * 10) / 10,
+    latinShare: Math.round(latinShare * 1000) / 1000,
+  }
+}
+
+/**
+ * The highest legibility a document may claim given how language-like it reads,
+ * plus why — the reason is surfaced in the notes so a flagged reading explains
+ * itself instead of just showing a low number.
+ *
+ * Asymmetric on purpose. A broken letter distribution is strong evidence of
+ * wrong characters in any Latin-script language, so it caps hard. Missing
+ * English function words alone is weak evidence — a French reading, a maths
+ * paper, or a table of figures all look like that — so it only caps to
+ * "borderline, look at it", and the judge can raise it back.
+ */
+function legibilityCeiling(likeness: LanguageLikeness | null): { ceiling: number; reason: string | null } {
+  if (!likeness) return { ceiling: 5, reason: null }
+
+  // Plenty of text, but not in the Latin alphabet. That is either a genuinely
+  // non-Latin reading or a mis-mapped codepage, and these measures cannot tell
+  // the two apart — so flag it for a human rather than passing it silently.
+  if (likeness.letterFreqSimilarity == null || likeness.functionWordsPerKChar == null) {
+    return {
+      ceiling: 3,
+      reason: "largely non-Latin script — legibility could not be checked automatically",
+    }
+  }
+
+  const distributionOff = likeness.letterFreqSimilarity < 0.85
+  const wordsMissing = likeness.functionWordsPerKChar < 8
+
+  if (distributionOff && wordsMissing) {
+    return { ceiling: 1, reason: "extracted characters do not read as language — likely a broken font map" }
+  }
+  if (distributionOff) {
+    return { ceiling: 2, reason: "letter distribution is unlike prose — characters may be mis-mapped" }
+  }
+  if (wordsMissing) {
+    return {
+      ceiling: 3,
+      reason: "few common English words — may be non-English, heavily technical, or mis-mapped",
+    }
+  }
+  return { ceiling: 5, reason: null }
+}
 
 function median(values: number[]) {
   if (values.length === 0) return 0
@@ -79,6 +235,8 @@ export function computeExtractionMetrics(
     0
   )
 
+  const likeness = computeLanguageLikeness(pages.map((page) => page.textContent).join(" "))
+
   return {
     pageCount: pages.length,
     pagesWithText: pages.filter((page) => page.textContent.length >= PAGE_TEXT_FLOOR).length,
@@ -86,6 +244,9 @@ export function computeExtractionMetrics(
     medianCharsPerPage: median(lengths),
     junkCharRatio: totalChars > 0 ? junkChars / totalChars : 0,
     coverRendered,
+    letterFreqSimilarity: likeness?.letterFreqSimilarity ?? undefined,
+    functionWordsPerKChar: likeness?.functionWordsPerKChar ?? undefined,
+    latinShare: likeness?.latinShare,
   }
 }
 
@@ -122,6 +283,23 @@ export function scoreFromMetrics(metrics: ExtractionMetrics, pages: ScorablePage
   // "cleanly" by the junk measure while being useless to read. Cap it.
   if (metrics.medianCharsPerPage < 200) legibility = Math.min(legibility, 3)
 
+  // The junk-character count only sees characters that failed to resolve. A
+  // font map that resolves to the *wrong* character produces clean ASCII and
+  // scores 5 here, so gate the result on whether the text reads as language.
+  // `latinShare` is the presence flag: it is set whenever the check ran at all,
+  // including the non-Latin case where the two similarity measures abstain.
+  // Keying off those measures instead would silently re-admit that case.
+  const likeness: LanguageLikeness | null =
+    metrics.latinShare != null
+      ? {
+          letterFreqSimilarity: metrics.letterFreqSimilarity ?? null,
+          functionWordsPerKChar: metrics.functionWordsPerKChar ?? null,
+          latinShare: metrics.latinShare,
+        }
+      : null
+  const { ceiling, reason } = legibilityCeiling(likeness)
+  legibility = Math.min(legibility, ceiling)
+
   const anchorablePages = pages.filter(
     (page) => page.textContent.length >= ANCHOR_TEXT_FLOOR
   ).length
@@ -135,6 +313,7 @@ export function scoreFromMetrics(metrics: ExtractionMetrics, pages: ScorablePage
   if (metrics.junkCharRatio > 0.005) {
     parts.push(`${(metrics.junkCharRatio * 100).toFixed(1)}% unreadable characters`)
   }
+  if (reason) parts.push(reason)
   if (!metrics.coverRendered) parts.push("cover preview failed to render")
 
   return { coverage, legibility, anchorability, notes: `${parts.join("; ")}.` }

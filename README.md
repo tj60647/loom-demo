@@ -92,15 +92,20 @@ Many course PDFs are scans with no usable text layer, which looks identical to a
 | Dimension | Measures | Source |
 | --- | --- | --- |
 | `coverage` | Share of pages with extractable text. | deterministic |
-| `legibility` | Readable text vs. glyph soup from a missing ToUnicode map. | deterministic, refined by judge |
+| `legibility` | Whether the characters read as language at all. | deterministic, refined by judge |
 | `anchorability` | Enough text per page for highlight offsets to hold. | deterministic |
 | `structure` | Whether extraction preserved reading order. | judge only |
 
 The deterministic pass runs at upload from the pages already in memory — no extra queries, no network. The judge runs afterwards via `after()`, so a twenty-file upload doesn't wait on twenty round trips.
 
-Two invariants worth preserving if you touch this:
+**How `legibility` is checked.** Counting junk bytes (U+FFFD, control codes, private-use glyphs) only catches a font map that resolved to *no* character. The more common break resolves to the *wrong* character — ordinary ASCII, zero junk bytes, and unreadable. So the text is also tested for whether it reads as language, on two signals: cosine similarity of its a–z profile against English, and the density of common English words matched as substrings (word boundaries are unreliable, since `extractPdfPageText` joins runs without spaces).
+
+The two are weighted differently because they fail differently. A broken letter distribution is strong evidence of mis-mapped characters in any Latin-script language, so it caps hard. Missing English function words alone is weak evidence — French prose, a maths paper, and a bibliography all look like that — so it only caps to "borderline, look at it". A largely non-Latin document caps at 3 with a note saying the check couldn't apply, rather than passing silently. Real readings in this library score ~0.99 similarity and ~50 words/1k, well clear of the 0.85 / 8 thresholds.
+
+Three invariants worth preserving if you touch this:
 
 - **An unscored dimension abstains.** No key, a judge error, or unparseable output leaves the dimension `null` and the row at `status: "heuristic"` — never a substituted default, which would make "we didn't check" indistinguishable from "we checked and it failed."
 - **The dimensions are not compensatory.** `pass` requires *every* scored dimension to clear 3, not the mean. A PDF whose fonts carry no ToUnicode map scores 5 on coverage and anchorability while being pure mojibake; averaging would call it usable.
+- **A clean byte count is not legibility.** Any future tightening should be tested against text that is *valid characters in the wrong order or the wrong mapping*, not just against mojibake — that's the case a byte-level check cannot see.
 
 The score is advisory. A reading below the bar is flagged "Needs review", never auto-hidden — see red line #7 in the [spec](./docs/loom-spec-v1.md), and the open question there about running a model inside the tool at all.

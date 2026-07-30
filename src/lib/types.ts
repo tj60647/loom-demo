@@ -54,10 +54,27 @@ export type ExtractionMetrics = {
   medianCharsPerPage: number
   /**
    * Share of characters that are replacement chars, control codes, or
-   * private-use glyphs. The signal for a PDF whose fonts have no usable
-   * ToUnicode map, where extraction returns confident-looking garbage.
+   * private-use glyphs — a font map that resolved to no character at all.
+   * Catches only that: a map resolving to the *wrong* character is clean ASCII
+   * and registers 0 here, which is what the two fields below are for.
    */
   junkCharRatio: number
+  /**
+   * Cosine similarity of the document's a–z profile against English prose
+   * (~1 for real text, well below for a permuted character mapping), and
+   * occurrences of common English words per 1,000 characters.
+   *
+   * Optional: absent on rows scored before the language check existed, and on
+   * documents with too little text to judge honestly.
+   */
+  letterFreqSimilarity?: number
+  functionWordsPerKChar?: number
+  /**
+   * Share of letters that are a–z. Set whenever the language check ran, and so
+   * the flag for whether it ran at all — the two measures above are themselves
+   * absent for a largely non-Latin document, where they cannot apply.
+   */
+  latinShare?: number
   /** Whether the first page rendered to a cover image. */
   coverRendered: boolean
 }
