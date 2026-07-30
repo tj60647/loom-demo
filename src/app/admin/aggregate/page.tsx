@@ -46,7 +46,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     aggregateUnavailable = true
   }
 
-  const state: LoomState = { concepts, bytes, edges, read: "" }
+  const state: LoomState = { concepts, bytes, edges, read: "", views: { cardTable: { positions: {}, bends: {} } } }
 
   return (
     <main>

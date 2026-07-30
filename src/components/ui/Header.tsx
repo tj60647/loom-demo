@@ -1,9 +1,71 @@
 "use client"
-import { useState } from "react"
+import { useRef, useState } from "react"
+import { useSession } from "next-auth/react"
+import { useLoom } from "@/components/providers/LoomProvider"
+import { buildExport, buildMarkdown, exportFilename, parseImport } from "@/lib/graphExport"
 import AuthButton from "./AuthButton"
 
 export default function Header() {
+  const { data: session } = useSession()
+  const { state, studentName, flashMsg, importFromText, resetAll } = useLoom()
   const [showAbout, setShowAbout] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
+
+  const download = (text: string, filename: string, type: string) => {
+    const blob = new Blob([text], { type })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  const handleExportJson = () => {
+    download(JSON.stringify(buildExport(state, studentName), null, 2), exportFilename(studentName, "json"), "application/json")
+  }
+
+  const handleExportMd = () => {
+    download(buildMarkdown(state, studentName), exportFilename(studentName, "md"), "text/markdown")
+  }
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target
+    const file = input.files?.[0]
+    if (!file) {
+      input.value = ""
+      return
+    }
+    try {
+      const text = await file.text()
+      let parsed
+      try {
+        parsed = parseImport(text)
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err))
+        return
+      }
+      if (!confirm(
+        "Importing replaces your current cloth with " + parsed.concepts.length + " concepts, " +
+        parsed.bytes.length + " passages, " + parsed.edges.length + " threads. Your weaving history is kept. Continue?"
+      )) return
+      try {
+        await importFromText(text)
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err))
+      }
+    } finally {
+      input.value = ""
+    }
+  }
+
+  const handleReset = () => {
+    if (confirm("Clear everything and start blank? This wipes your cloth for this course (Export first if you want to keep it). Your weaving history is kept.")) {
+      resetAll()
+    }
+  }
 
   return (
     <>
@@ -15,13 +77,35 @@ export default function Header() {
           <div>Loom<small>lay the warp · throw the weft</small></div>
         </div>
         <div className="spacer"></div>
+        {session && (
+          <>
+            <span id="saveDot">{flashMsg ? `· ${flashMsg} ·` : "—"}</span>
+            <button className="btn ghost mini" onClick={handleExportJson}>Export .json</button>
+            <button className="btn ghost mini" onClick={handleExportMd}>Export .md</button>
+            <button className="btn ghost mini" onClick={() => importInputRef.current?.click()}>Import</button>
+            <button className="btn ghost mini" onClick={handleReset}>Reset</button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json"
+              style={{ display: "none" }}
+              onChange={handleImportFile}
+            />
+          </>
+        )}
         <AuthButton />
-        <button 
-          onClick={() => setShowAbout(true)} 
-          className="helpbtn" 
-          id="helpBtn" 
-          title="how Loom works" 
-          aria-label="how Loom works" 
+        <span
+          onClick={() => setShowAbout(true)}
+          style={{ fontFamily: "var(--mono)", fontSize: "11px", color: "var(--ink-soft)", cursor: "pointer", letterSpacing: ".04em", alignSelf: "center" }}
+        >
+          about
+        </span>
+        <button
+          onClick={() => window.dispatchEvent(new Event("loom:walkthrough"))}
+          className="helpbtn"
+          id="helpBtn"
+          title="how Loom works"
+          aria-label="how Loom works"
           style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}
         >
           ?
@@ -40,11 +124,11 @@ export default function Header() {
           zIndex: 10000
         }}>
           <div className="card" style={{ width: "90%", maxWidth: "600px", maxHeight: "85vh", overflowY: "auto", padding: "32px", boxShadow: "0 10px 40px rgba(0,0,0,0.15)", position: "relative" }}>
-            <button 
+            <button
               onClick={() => setShowAbout(false)}
               style={{ position: "absolute", top: "16px", right: "16px", background: "none", border: "none", fontSize: "20px", cursor: "pointer", opacity: 0.5 }}
             >✕</button>
-            
+
             <h2 style={{ fontSize: "24px", marginBottom: "4px" }}>Loom</h2>
             <p className="hint" style={{ marginBottom: "24px" }}>Weaving Knowledge Through Shared Practice</p>
 
@@ -55,8 +139,8 @@ export default function Header() {
 
             <p style={{ lineHeight: "1.6", marginBottom: "8px" }}>The core workflow is simple:</p>
             <ul style={{ lineHeight: "1.6", marginBottom: "24px", paddingLeft: "20px" }}>
-              <li style={{ marginBottom: "6px" }}><b>Read & Capture:</b> Read texts and distill passages into short "bytes" in your own words.</li>
-              <li style={{ marginBottom: "6px" }}><b>Throw:</b> Pick two bytes and connect them.</li>
+              <li style={{ marginBottom: "6px" }}><b>Read & Capture:</b> Keep passages worth keeping as short "bytes" — the author's words, verbatim, with citation. Name the concept each passage evidences, and gloss it in your own words in the working definition.</li>
+              <li style={{ marginBottom: "6px" }}><b>Throw:</b> Pick two concepts and connect them.</li>
               <li style={{ marginBottom: "6px" }}><b>Name the Relation:</b> Define the "edge" between these ideas yourself, using your own phrasing or pulling a verb from one of the "tongues" (disciplinary thought styles).</li>
             </ul>
             <p style={{ lineHeight: "1.6", marginBottom: "24px" }}>Nothing is auto-generated. The tool only counts your own throws. The structure emerges organically from your coding: from open codes first, to axial reads across texts.</p>

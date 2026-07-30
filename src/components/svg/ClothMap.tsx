@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useRef } from "react"
 import type { LoomState } from "@/lib/types"
+import { adjacency, componentOf } from "@/lib/clothMath"
 
-type ReadSel = { type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number } | null
+type ReadSel = { type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean } | null
 
 export default function ClothMap({ 
   state, 
@@ -35,31 +36,28 @@ export default function ClothMap({
   const idx: Record<string, number> = {}
   cs.forEach((c, i) => idx[c.id] = i)
 
-  const selNodes = new Set<string>()
-  const selEdges = new Set<string>()
+  let selNodes: Set<string> | null = null
+  let selEdges: Set<string> | null = null
   let selEdgeId: string | null = null
 
   if (readSel?.type === "concept" && readSel.id) {
-    // We would trace the component here, but for simplicity let's just highlight the node and its immediate edges
-    // The original app highlights the entire component (island). We can just do immediate edges for now,
-    // or calculate the component if we port `componentOf`.
-    selNodes.add(readSel.id)
-    state.edges.forEach(e => {
-      if (e.fromId === readSel.id || e.toId === readSel.id) {
-        selEdges.add(e.id)
-        selNodes.add(e.fromId)
-        selNodes.add(e.toId)
-      }
-    })
+    // Pulling a thread lights the FULL connected component, as in v14.
+    const comp = componentOf(readSel.id, adjacency(state.edges))
+    selNodes = comp.nodes
+    selEdges = new Set(comp.edges.map(e => e.id))
   } else if (readSel?.type === "hub" && readSel.ids) {
-    readSel.ids.forEach(id => selNodes.add(id))
+    const ids = readSel.ids
+    const nodes = new Set(ids)
+    const edgeIds = new Set<string>()
     state.edges.forEach(e => {
-      if (readSel.ids!.includes(e.fromId) || readSel.ids!.includes(e.toId)) {
-        selEdges.add(e.id)
-        selNodes.add(e.fromId)
-        selNodes.add(e.toId)
+      if (ids.includes(e.fromId) || ids.includes(e.toId)) {
+        edgeIds.add(e.id)
+        nodes.add(e.fromId)
+        nodes.add(e.toId)
       }
     })
+    selNodes = nodes
+    selEdges = edgeIds
   } else if (readSel?.type === "edge" && readSel.id) {
     selEdgeId = readSel.id
   }
@@ -84,6 +82,17 @@ export default function ClothMap({
         </marker>
       </defs>
 
+      {cs.length === 0 && (
+        <g>
+          <circle cx={480} cy={170} r={7} fill="none" stroke="var(--red)" strokeWidth={1.3} />
+          {[[480, 156, 480, 163], [480, 177, 480, 184], [466, 170, 473, 170], [487, 170, 494, 170]].map(([x1, y1, x2, y2], i) => (
+            <line key={`tick-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--red)" strokeWidth={1.3} />
+          ))}
+          <text x={480} y={206} textAnchor="middle" fontFamily="ui-monospace,Menlo,monospace" fontSize={9} letterSpacing={2} fill="var(--red)">HERE.</text>
+          <text x={480} y={226} textAnchor="middle" fontFamily="ui-monospace,Menlo,monospace" fontSize={9} letterSpacing={2} fill="var(--grey)">THE CLOTH BEGINS WITH ONE THROWN THREAD.</text>
+        </g>
+      )}
+
       {cs.length > 0 && (
         <line x1={mL - 16} y1={baseY} x2={width - mR + 14} y2={baseY} stroke="var(--rule)" strokeWidth={1.2} />
       )}
@@ -107,7 +116,7 @@ export default function ClothMap({
         const col = isSel ? "var(--red)" : (beaten ? "var(--sage)" : "var(--grey)")
         let op = 1
         if (selEdgeId && !isSel) op = 0.18
-        else if (readSel && readSel.type !== "edge" && !selEdges.has(e.id)) op = 0.15
+        else if (selEdges && !selEdges.has(e.id)) op = 0.15
 
         const handleSelect = () => {
           if (readSel?.type === "edge" && readSel.id === e.id) {
@@ -159,7 +168,7 @@ export default function ClothMap({
       {cs.map((c, i) => {
         const x = X(i)
         const isSel = readSel?.type === "concept" && readSel.id === c.id
-        const op = (selNodes.size > 0 && !selNodes.has(c.id)) ? 0.3 : 1
+        const op = (selNodes && !selNodes.has(c.id)) ? 0.3 : 1
         
         const handleSelect = () => {
           if (isSel) setReadSel(null)

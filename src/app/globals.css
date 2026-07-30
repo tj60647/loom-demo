@@ -185,6 +185,14 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .distilltoggle .tw{display:inline-block;transition:transform .15s}
 .distilltoggle.open .tw{transform:rotate(90deg)}
 .ghostnote{font-size:13px;color:var(--grey);font-style:italic;margin:4px 0 2px}
+/* MAP — triage rows (sort into tiers) */
+.trow{display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px dotted var(--rule)}
+.trow .tlabel{flex:1;font-size:15px;min-width:0}
+.tierchips{display:flex;gap:4px}
+.tchip{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;border:1px solid var(--rule);background:#fff;border-radius:3px;padding:3px 8px;cursor:pointer;color:var(--ink-soft)}
+.tchip:hover{border-color:var(--ochre)}
+.tchip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.tchip.on.off{background:var(--grey);border-color:var(--grey)}
 /* READ — task framing + interpretive prompts */
 .tasktitle{font-family:var(--display);font-size:21px;font-weight:500;margin:0 0 3px}
 .tasksub{font-size:14px;color:var(--ink-soft);margin:0 0 14px;max-width:70ch}

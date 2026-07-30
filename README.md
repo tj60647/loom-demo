@@ -9,8 +9,8 @@ Loom is a tool for emergent sense-making and collaborative synthesis. It provide
 Loom was born from the intersection of ethnographic research, theory, and practice. It is designed to help individuals and cross-disciplinary teams build shared understanding not by enforcing uniformity, but by negotiating differences.
 
 The core workflow is simple:
-1. **Read & Capture:** Read texts and distill passages into short "bytes" in your own words.
-2. **Throw:** Pick two bytes and connect them.
+1. **Read & Capture:** Keep passages worth keeping as short "bytes"—the author's words, verbatim, with citation. Name the concept each passage evidences (a short noun phrase, often the author's own term), and gloss it in your own words in the working definition.
+2. **Throw:** Pick two concepts and connect them.
 3. **Name the Relation:** Define the "edge" between these ideas yourself, using your own phrasing or pulling a verb from one of the "tongues" (disciplinary thought styles).
 
 Nothing is auto-generated. The tool only counts your own throws. The structure emerges organically from your coding: from open codes first, to axial reads across texts.
@@ -21,6 +21,9 @@ Nothing is auto-generated. The tool only counts your own throws. The structure e
 - **Intentional Connections ("Throws"):** The power of Loom lies in the edges. You decide exactly how two concepts relate. 
 - **Disciplinary "Tongues":** The verbs we reach for to name a relation (e.g., *constrains*, *refutes*, *betrays*) aren't neutral; each belongs to a specific way of seeing the world. Loom lets you apply different lenses (e.g., "Cause & system" vs. "Stance & value") to the same connections to see how meaning shifts.
 - **The Woven Graph:** View your interconnected graph ("Read") and generate an "axial read"—a synthesized narrative spanning multiple texts that you can instantly copy as a draft.
+- **The Card Table ("Map"):** Sort your concepts into tiers (primary / secondary / tertiary), then arrange them as cards on a three-band table—general above, specific below. The tool draws the links you already threw and counts what it sees; the sorting and arranging are yours. The "map kit" hands the whole thing off to paper for the real, hand-drawn concept map.
+- **Your Artifact:** Export your graph as JSON (the spec §6 contract: the `graph` is the artifact, `views` are your arrangements riding along) or as markdown for Obsidian and notes. Import and reset round it out—your work is never locked in.
+- **The Cloth, Over Time:** Loom keeps an append-only history of your own acts—capture, throw, coin, re-tier—and replays how your weave grew. It counts; it never grades. Reset clears the cloth, not the history.
 
 ## The Theory Behind the Tool
 
@@ -75,6 +78,17 @@ npx drizzle-kit migrate                        # apply anything pending
 ```
 
 Check what the database already has before applying, especially in a shared environment — `drizzle.__drizzle_migrations` is the record of truth, and the journal alone can disagree with it.
+
+#### Graph storage (spec §6)
+
+The knowledge graph is kept strictly apart from its projections:
+
+| Table | Holds | §6 role |
+| --- | --- | --- |
+| `concept`, `byte`, `edge` | The student's graph, including `concept.tier` (placement's *meaning*). | `graph` — the artifact |
+| `read` | "Your read", one row per student × course. | `graph.read` |
+| `view` | Student-authored geometry per view key (`cardTable`: positions, bends). A new view adds a row, never a column on a concept or edge. Only student gestures write here — derived layout is computed for display and discarded. | `views` — projections |
+| `graph_event` | Append-only history of the student's own acts. Survives reset and import; rendered only as exploratory counts/replay ("the cloth, over time"), never judgment. | development history |
 
 ### The reading library
 

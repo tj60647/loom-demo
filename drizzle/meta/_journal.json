@@ -64,6 +64,20 @@
       "when": 1785372442703,
       "tag": "0008_source_extraction_scores",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785384198767,
+      "tag": "0009_graph_tier_read_views_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785386660340,
+      "tag": "0010_unique_reads_views_nulls_not_distinct",
+      "breakpoints": true
     }
   ]
 }

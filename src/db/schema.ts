@@ -271,6 +271,10 @@ export const concepts = pgTable("concept", {
   label: text("label").notNull(),
   def: text("def").default(""),
   note: text("note").default(""),
+  // Map-tab sort: '' unsorted · p/s/t tiers · x left off the map. Tier lives on
+  // the concept — it is the *meaning* of placement, extracted into the graph
+  // (spec §6); the residual x/y stays in `views`, never here.
+  tier: text("tier").$type<"" | "p" | "s" | "t" | "x">().default("").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 })
 
@@ -304,6 +308,85 @@ export const bytes = pgTable("byte", {
   // can be the live client text layer hash so markRanges remains precise.
   pageContentHash: text("pageContentHash"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+})
+
+// "Your read" — the student's one-paragraph synthesis. Part of the graph
+// artifact (spec §6 graph.read), not a view, so it gets a real table: losing it
+// on refresh would make the student's work inaccessible (red line #5).
+export const reads = pgTable(
+  "read",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    courseId: text("courseId").references(() => courses.id, {
+      onDelete: "set null",
+    }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    text: text("text").default("").notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  },
+  (row) => ({
+    // NULLS NOT DISTINCT so the pre-course (courseId null) row is unique too —
+    // without it, concurrent saves could mint duplicates and the student's
+    // read would flap between them.
+    onePerCourse: unique().on(row.userId, row.courseId).nullsNotDistinct(),
+  })
+)
+
+// Per-view, student-authored display geometry — a projection of the graph,
+// never part of it. Spec §6: adding a view adds a row here (a key under
+// `views`), never a field on a concept or edge; only student gestures write
+// rows (red line #7 — derived layout is computed for display and discarded).
+// key: 'cardTable' first; data: { positions: {conceptId:{x,y}}, bends: {edgeId:{dx,dy}} }.
+export const views = pgTable(
+  "view",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    courseId: text("courseId").references(() => courses.id, {
+      onDelete: "set null",
+    }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    data: jsonb("data").$type<Record<string, unknown>>().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  },
+  (row) => ({
+    onePerView: unique().on(row.userId, row.courseId, row.key).nullsNotDistinct(),
+  })
+)
+
+// Append-only record of the student's own graph acts (create / rename / re-tier
+// / throw / coin / delete / import / reset). This is the development history of
+// the knowledge graph — provenance the student can explore ("the cloth, over
+// time"), never a surface that grades or advises (red line #7: counted, not
+// judged). Deliberately survives reset and import: reset clears the cloth, not
+// the loom's memory of weaving. Best-effort writes (neon-http has no
+// transactions): the graph tables stay the source of truth.
+export const graphEvents = pgTable("graph_event", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  courseId: text("courseId").references(() => courses.id, {
+    onDelete: "set null",
+  }),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // '<entity>.<act>', e.g. 'concept.create', 'concept.retier', 'edge.coin',
+  // 'graph.import', 'graph.reset', 'graph.example'.
+  kind: text("kind").notNull(),
+  entityType: text("entityType").$type<"concept" | "byte" | "edge" | "graph">().notNull(),
+  entityId: text("entityId"),
+  // Enough of the entity to replay the graph at any point in the timeline.
+  payload: jsonb("payload").$type<Record<string, unknown>>(),
+  at: timestamp("at").defaultNow().notNull(),
 })
 
 export const edges = pgTable("edge", {

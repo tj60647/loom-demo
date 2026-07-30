@@ -1,3 +1,6 @@
+/** Map-tab sort: '' unsorted · p/s/t tiers · x left off the map. */
+export type Tier = "" | "p" | "s" | "t" | "x"
+
 export type Concept = {
   id: string
   courseId: string | null
@@ -5,6 +8,7 @@ export type Concept = {
   label: string
   def: string | null
   note: string | null
+  tier: Tier
   createdAt: Date
 }
 
@@ -122,9 +126,84 @@ export type Edge = {
   createdAt: Date
 }
 
+/**
+ * Student-authored geometry for the card table. A projection of the graph,
+ * never part of it (spec §6): stored per view key in the `view` table, written
+ * only by student gestures (red line #7) — derived auto-layout is computed for
+ * display and discarded.
+ *
+ * `positions[..].x` is stored PROPORTIONALLY (0..1, fraction of table width —
+ * spec §5 "positions stored proportionally") so an arrangement survives a
+ * narrower screen; `y` is absolute within the fixed-height table. Legacy or
+ * v14-imported values > 1.5 are treated as pixels and converted on first
+ * render; the next drag persists the fraction.
+ */
+export type CardTableView = {
+  positions: Record<string, { x: number; y: number }>
+  bends: Record<string, { dx: number; dy: number }>
+}
+
+export type LoomViews = {
+  cardTable: CardTableView
+}
+
+/** One student act on the graph, as recorded in the append-only history. */
+export type GraphEvent = {
+  id: string
+  courseId: string | null
+  userId: string
+  kind: string
+  entityType: "concept" | "byte" | "edge" | "graph"
+  entityId: string | null
+  payload: Record<string, unknown> | null
+  at: Date
+}
+
 export type LoomState = {
   concepts: Concept[]
   bytes: Byte[]
   edges: Edge[]
   read: string
+  views: LoomViews
+}
+
+// --- EXPORT CONTRACT (spec §6) ---
+// `graph` is the artifact — view-agnostic, portable, the thing an agent or a
+// future reader consumes. `views` round-trips so no arrangement work is lost,
+// but no consumer of the graph is required to read it.
+
+/**
+ * Capture provenance for a byte taken from a library PDF. An extension to the
+ * §6 byte shape (recorded in the spec changelog): part of the student's own
+ * record, safe for consumers to ignore.
+ */
+export type ExportByteAnchor = {
+  sourceId: string
+  pageNumber: number | null
+  startOffset: number | null
+  endOffset: number | null
+  pageContentHash: string | null
+}
+
+export type LoomExport = {
+  graph: {
+    student: string
+    concepts: { id: string; label: string; def: string; note: string; tier: Tier }[]
+    bytes: {
+      id: string
+      conceptId: string
+      source: string
+      location: string
+      text: string
+      anchor?: ExportByteAnchor
+    }[]
+    edges: { id: string; fromId: string; toId: string; sentence: string; handle: string }[]
+    read: string
+  }
+  views: {
+    cardTable: {
+      positions: Record<string, { x: number; y: number }>
+      bends: Record<string, { dx: number; dy: number }>
+    }
+  }
 }

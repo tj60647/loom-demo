@@ -2,7 +2,7 @@
 
 Build contract. Functionality only — pedagogy, staging, and governance live in the [Course Deployment notes](course-deployment-notes.md). This is the target the build freezes to and the release gate checks against.
 
-**Status:** DRAFT (freeze target) · **Version** v1 · rev July 29d (reflects tool v14 + the July 28–29 calls; §6 splits the artifact from view state; §5 records how the OCR quality gate is met; §4 red line #6 gains a ratified, bounded exception for library ingest) · **Freeze date:** TBD
+**Status:** DRAFT (freeze target) · **Version** v1 · rev July 29e (29d reflected tool v14 + the July 28–29 calls; §6 split the artifact from view state; §5 recorded how the OCR quality gate is met; §4 red line #6 gained a ratified, bounded exception for library ingest. 29e, TJ: §6 adds the graph **development history** — an append-only record of the student's own acts, exploratory only — and an optional capture-provenance `anchor` on exported bytes; both production-build only) · **Freeze date:** TBD
 
 ## 1. What Loom is
 
@@ -151,11 +151,20 @@ Adding a view adds a key under `views`, never a field on a concept or edge.
 
 Placement is a decision (§3), but its meaning is already extracted into `tier` — the residual x/y is display geometry and belongs to the renderer, not the artifact. `bends` are display-only by §3's own wording. (Production: byte→concept becomes many-to-many.)
 
+**Anchors (production, 29 July 2026).** A byte captured from a library PDF carries optional provenance — `anchor: { sourceId, pageNumber, startOffset, endOffset, pageContentHash }` — in the export. It records where the passage was taken from, nothing more; consumers may ignore it. It extends the byte shape above without changing it.
+
 **Export:** `.json` (contract above) and markdown (production) — for Obsidian / notes / agents.
 
-**Stored:** student name + graph. Nothing else.
+**Stored (v1 single-file):** student name + graph. Nothing else.
 
-v1 persistence is browser-local; the hosted version persists per signed-in student, tagged by section.
+**Stored (production, ratified TJ 29 July 2026):** graph + views as above, plus a **development history** — an append-only record of the student's own graph acts (capture, name, rename, re-tier, throw, coin, remove, import, reset). The graph is the artifact; the history is how it came to be, and it belongs to the same student. Constraints, reviewed against §4:
+
+- It records **gestures, never judgments** — no scores, no comparisons, no advice derive from it (red line #7: the tool may count what it sees; the history view renders counts and replay only).
+- It is **student-facing as an exploratory instrument** ("the cloth, over time"), not an audit or grading surface; it is never shown to another student (red line #8 untouched).
+- It **survives reset and import** — reset clears the cloth, not the loom's memory of weaving.
+- View geometry is *not* history: positions and bends are projections, and only the graph's development is recorded.
+
+v1 persistence is browser-local; the hosted version persists per signed-in student, tagged by section. Hosted storage maps §6 onto Postgres: `graph` → the concept/byte/edge tables plus a `read` row; `views` → one row per view key (`cardTable` first) — a new view adds a row, never a column on a concept or edge; the history → `graph_event` rows.
 
 ## 7. Change control
 

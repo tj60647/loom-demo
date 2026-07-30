@@ -6,9 +6,18 @@ import { useLoom } from "@/components/providers/LoomProvider"
 import OpenTab from "@/components/tabs/OpenTab"
 import ThrowTab from "@/components/tabs/ThrowTab"
 import ReadTab from "@/components/tabs/ReadTab"
+import MapTab from "@/components/tabs/MapTab"
 import LibraryTab from "@/components/tabs/LibraryTab"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import type { Byte } from "@/lib/types"
+
+const FOOT: Record<"library" | "open" | "throw" | "read" | "map", [string, string]> = {
+  library: ["00 — LIBRARY", "CHOOSE A READING"],
+  open: ["01 — OPEN", "LAY THE WARP"],
+  throw: ["02 — THROW", "ONE THREAD AT A TIME"],
+  read: ["03 — READ", "PULL A THREAD"],
+  map: ["04 — MAP", "THE CARD TABLE"],
+}
 
 type LibraryNavTarget = {
   byteId: string
@@ -20,7 +29,7 @@ type LibraryNavTarget = {
 export default function Home() {
   const { data: session } = useSession()
   const { isLoading } = useLoom()
-  const [activeTab, setActiveTab] = useState<"library" | "open" | "throw" | "read">("open")
+  const [activeTab, setActiveTab] = useState<"library" | "open" | "throw" | "read" | "map">("open")
   const [libraryTarget, setLibraryTarget] = useState<LibraryNavTarget | null>(null)
   const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
 
@@ -87,6 +96,12 @@ export default function Home() {
         >
           <span className="step">03</span> Read
         </button>
+        <button
+          className={activeTab === "map" ? "active" : ""}
+          onClick={() => setActiveTab("map")}
+        >
+          <span className="step">04</span> Map
+        </button>
       </nav>
 
       <main>
@@ -114,12 +129,15 @@ export default function Home() {
         <div className={`panel ${activeTab === "read" ? "active" : ""}`}>
           {activeTab === "read" && <ReadTab />}
         </div>
+        <div className={`panel ${activeTab === "map" ? "active" : ""}`}>
+          {activeTab === "map" && <MapTab />}
+        </div>
         <FirstRunWalkthrough />
       </main>
-      
+
       <footer>
-        <span className="fl">Loom</span>
-        <span className="fr">v8—Next</span>
+        <span className="fl">{FOOT[activeTab][0]}</span>
+        <span className="fr">{FOOT[activeTab][1]}</span>
       </footer>
     </>
   )

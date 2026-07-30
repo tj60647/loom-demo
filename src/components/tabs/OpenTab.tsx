@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import type { Byte } from "@/lib/types"
 import { contentWords } from "@/lib/utils"
+import { tidy } from "@/lib/clothMath"
 
 type OpenTabProps = {
   onGotoByte?: (byte: Byte) => void
@@ -12,31 +13,90 @@ type OpenTabProps = {
 }
 
 export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: OpenTabProps) {
-  const { state, addConcept, addByte, editConcept, removeConcept } = useLoom()
+  const { state, isLoading, addConcept, addByte, editConcept, removeConcept, removeByte, refileByte, loadExample, flash } = useLoom()
   const [source, setSource] = useState("")
   const [location, setLocation] = useState("")
   const [content, setContent] = useState("")
   const [conceptLabel, setConceptLabel] = useState("")
+  const [workingDef, setWorkingDef] = useState("")
   const [newConceptOnly, setNewConceptOnly] = useState("")
   const [showCaptureInfo, setShowCaptureInfo] = useState(false)
+  const [refileInputs, setRefileInputs] = useState<Record<string, string>>({})
+  const [refileBusy, setRefileBusy] = useState<Record<string, boolean>>({})
+  const [exampleBusy, setExampleBusy] = useState(false)
   const closeCaptureInfoButtonRef = useRef<HTMLButtonElement>(null)
 
   const [openLogRows, setOpenLogRows] = useState<Record<string, boolean>>({})
 
+  const findConcept = (label: string) =>
+    state.concepts.find(c => c.label.toLowerCase() === label.toLowerCase())
+
   const handleAddByte = async () => {
     if (!content || !conceptLabel) return
-    
+
+    const wdef = workingDef.trim()
     // Find concept or create it
-    let concept = state.concepts.find(c => c.label.toLowerCase() === conceptLabel.toLowerCase())
+    let concept = findConcept(conceptLabel)
     if (!concept) {
-      concept = await addConcept(conceptLabel)
+      concept = await addConcept(conceptLabel, wdef || undefined)
+    } else if (wdef && !concept.def) {
+      await editConcept(concept.id, { def: wdef })
     }
 
     await addByte(concept.id, source, location, content)
-    
+
     // reset form (keep source/location if user wants to enter multiple passages from same place)
     setContent("")
     setConceptLabel("")
+    setWorkingDef("")
+    flash("byte added — in its log row you can also file it under a second concept")
+  }
+
+  const handleRefile = async (b: Byte) => {
+    if (refileBusy[b.id]) return
+    const nm = (refileInputs[b.id] ?? "").trim()
+    if (!nm) {
+      window.alert("Name the second concept this passage evidences.")
+      return
+    }
+    let concept = findConcept(nm)
+    if (concept && state.bytes.some(x => x.content === b.content && x.conceptId === concept!.id)) {
+      window.alert("Already filed under that concept.")
+      return
+    }
+    setRefileBusy(prev => ({ ...prev, [b.id]: true }))
+    try {
+      if (!concept) {
+        concept = await addConcept(nm)
+      }
+      await refileByte(b.id, concept.id)
+      setRefileInputs(prev => ({ ...prev, [b.id]: "" }))
+      setOpenLogRows(prev => ({ ...prev, [concept!.id]: true }))
+      flash("filed under a second concept")
+    } catch {
+      // refileByte resyncs and flashes the server message before rethrowing;
+      // swallow here to avoid an unhandled rejection.
+    } finally {
+      setRefileBusy(prev => ({ ...prev, [b.id]: false }))
+    }
+  }
+
+  const handleRemoveConcept = (conceptId: string, byteCount: number) => {
+    if (state.edges.some(e => e.fromId === conceptId || e.toId === conceptId)) {
+      window.alert("Used in a thrown thread. Remove the thread first.")
+      return
+    }
+    if (byteCount && !window.confirm("This concept has bytes; removing it removes them too. Continue?")) return
+    removeConcept(conceptId)
+  }
+
+  const handleLoadExample = async () => {
+    setExampleBusy(true)
+    try {
+      await loadExample()
+    } finally {
+      setExampleBusy(false)
+    }
   }
 
   const handleAddConceptOnly = async () => {
@@ -154,7 +214,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
             </section>
           </div>
         )}
-        <p className="do">Do this — paste a passage here, or select text in a Library PDF. Then say what it is about <i>in your own words</i>.</p>
+        <p className="do">Do this — paste a passage here, or select text in a Library PDF. Then name the concept it evidences, and gloss it in your own words.</p>
         <p className="hint">A byte is a passage worth keeping plus your concept for it. Loom can carry over source details and offer passage words to tap; it does not summarize or choose the concept for you.</p>
         
         <div className="form-row">
@@ -179,14 +239,24 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
         
         <div className="form-row">
           <span className="label">Passage</span>
-          <textarea 
+          <textarea
             placeholder="paste or type the passage…"
             value={content}
             onChange={(e) => setContent(e.target.value)}
+            onPaste={(e) => {
+              e.preventDefault()
+              setContent(tidy(e.clipboardData.getData("text")))
+            }}
           />
           <div className="scaffold" style={{marginTop: "12px"}}>
-            <div className="snote" style={{fontSize: "12px", color: "var(--ink-soft)"}}>
-              Stuck naming it? You don't need a clever term — <b style={{color: "var(--ink)", fontWeight: 500}}>point at the words in the passage that carry the point</b> and tap to build the concept from the author's own words.
+            <div className="snote">
+              A <b>concept</b> is the idea this passage evidences — a <b>short noun phrase</b>, often the author's own words. If she names it ("boundary objects"), use her name for it. Your own-words gloss goes in the <b>working definition</b> — a sentence is fine there, crude is welcome. Rename anything later.
+            </div>
+            <div className="snote" style={{marginTop: "5px", color: "var(--ink-soft)"}}>
+              One passage can hold several concepts — capture it once, then "also file under another concept" from the log.
+            </div>
+            <div className="snote" style={{fontSize: "12px", color: "var(--ink-soft)", marginTop: "8px"}}>
+              Stuck naming it? <b style={{color: "var(--ink)", fontWeight: 500}}>Point at the words in the passage that carry the point</b> and tap to build the concept from the author's own words.
             </div>
             {content.trim() ? (
               <div className="chips" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
@@ -215,7 +285,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                 <li>Tell a friend what this bit is about in <b style={{color: "var(--ink)", fontWeight: 500}}>five words</b>.</li>
                 <li>What's the <b style={{color: "var(--ink)", fontWeight: 500}}>one move</b> the author is making here?</li>
                 <li className="eg" style={{marginTop: "6px", color: "var(--ink-soft)"}}>
-                  Just to show the shape — concepts in plain words: &nbsp;<i>"tools go invisible until they break" · "people just know how to go on"</i>
+                  Just to show the shape — concepts in plain words: &nbsp;<i>"boundary objects" · "tools go invisible until they break"</i>
                 </li>
               </ul>
               <div style={{marginTop: "6px", color: "var(--ink-soft)", fontSize: "12px"}}>
@@ -226,10 +296,10 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
         </div>
         
         <div className="form-row">
-          <span className="label">Concept — what's this bit about, in your words</span>
-          <input 
-            list="conceptOptions" 
-            placeholder="e.g. plans just point you, you work it out as you go"
+          <span className="label">Concept — a short noun phrase naming the idea <span style={{textTransform: "none", letterSpacing: 0, color: "var(--grey)"}}>(one per byte — you can file the same passage under a second concept from the log)</span></span>
+          <input
+            list="conceptOptions"
+            placeholder="e.g. boundary objects · the central tension"
             value={conceptLabel}
             onChange={(e) => setConceptLabel(e.target.value)}
           />
@@ -237,7 +307,17 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
             {state.concepts.map(c => <option key={c.id} value={c.label} />)}
           </datalist>
         </div>
-        
+
+        <div className="form-row">
+          <span className="label">Working definition — the concept in your own words <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
+          <input
+            placeholder="e.g. a thing that means different things to different groups but still holds them together"
+            title="your own-words gloss — a sentence is fine; this is where crude is welcome"
+            value={workingDef}
+            onChange={(e) => setWorkingDef(e.target.value)}
+          />
+        </div>
+
         <button 
           className="btn" 
           onClick={handleAddByte}
@@ -248,11 +328,25 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
       </div>
 
       <div className="card">
-        <h2>Coding log <span className="n">{state.concepts.length}</span></h2>
+        <h2>Coding log <span className="n">{state.bytes.length ? `(${state.bytes.length} bytes · ${state.concepts.length} concepts)` : ""}</span></h2>
         <p className="do calm">Everything you capture lands here, newest on top — your growing pile of concepts.</p>
         <p className="hint">The warp being laid, thread by thread. Click a row to open it; next, take these to <b>02 — Throw</b>.</p>
         
         <div className="scrollbox">
+          {state.concepts.length === 0 && (
+            <div className="empty">
+              <svg width="34" height="18" viewBox="0 0 34 18" fill="none" stroke="#a39f92" strokeWidth="1.3"><path d="M2 13 L7 5 L12 13 L17 5 L22 13 L27 5 L32 13"/></svg>
+              <span className="cap">the log fills as you lay warp</span>
+            </div>
+          )}
+          {state.concepts.length === 0 && !isLoading && (
+            <div style={{ textAlign: "center", marginTop: "4px" }}>
+              <button className="btn ghost mini" onClick={handleLoadExample} disabled={exampleBusy}>
+                load the worked example (Star &amp; Griesemer)
+              </button>
+              <p className="hint" style={{ marginTop: "6px" }}>a finished weave to poke at — explore it, then Reset to start your own.</p>
+            </div>
+          )}
           {state.concepts.slice().reverse().map(concept => {
             const isOpen = openLogRows[concept.id]
             const conceptBytes = state.bytes.filter(b => b.conceptId === concept.id)
@@ -262,14 +356,12 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                 <div className="lhead" onClick={() => toggleRow(concept.id)} style={{ display: "flex", alignItems: "center" }}>
                   <div className="lconcept" style={{flex: 1}}>{concept.label}</div>
                   <div className="lsrc">{conceptBytes.length} bytes</div>
-                  <button 
-                    className="btn ghost mini" 
-                    style={{padding: "2px 6px", minHeight: 0, margin: "0 0 0 8px", opacity: 0.6}} 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      if (window.confirm(`Are you sure you want to delete "${concept.label}"?\n\nThis will permanently delete all associated bytes and threads. This cannot be undone.`)) {
-                        removeConcept(concept.id); 
-                      }
+                  <button
+                    className="btn ghost mini"
+                    style={{padding: "2px 6px", minHeight: 0, margin: "0 0 0 8px", opacity: 0.6}}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveConcept(concept.id, conceptBytes.length)
                     }}
                     title="Delete concept"
                   >
@@ -284,10 +376,37 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                 {isOpen && (
                   <div className="lbody">
                     <div className="defrow">
-                      <input 
-                        placeholder="working definition..." 
+                      <span className="label">Concept</span>
+                      <input
+                        key={concept.label}
+                        placeholder="concept label…"
+                        defaultValue={concept.label}
+                        onBlur={(e) => {
+                          const v = e.target.value.trim()
+                          if (!v || v === concept.label) return
+                          const clash = state.concepts.find(
+                            c => c.id !== concept.id && c.label.toLowerCase() === v.toLowerCase()
+                          )
+                          if (clash) {
+                            flash("That name is already one of your concepts.")
+                            e.target.value = concept.label
+                            return
+                          }
+                          editConcept(concept.id, { label: v })
+                          flash("renamed")
+                        }}
+                      />
+                    </div>
+                    <div className="defrow">
+                      <span className="label">Working definition</span>
+                      <input
+                        placeholder="in your words; same sense across your sources?"
                         defaultValue={concept.def ?? ""}
-                        onBlur={(e) => editConcept(concept.id, { def: e.target.value })}
+                        onBlur={(e) => {
+                          if (e.target.value !== (concept.def ?? "")) {
+                            editConcept(concept.id, { def: e.target.value })
+                          }
+                        }}
                       />
                     </div>
                     {conceptBytes.map(b => (
@@ -306,7 +425,24 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                             >
                               goto
                             </button>
+                            <button
+                              type="button"
+                              className="rm"
+                              style={{ background: "none", border: "none", padding: 0 }}
+                              onClick={() => removeByte(b.id)}
+                            >
+                              remove byte
+                            </button>
                           </span>
+                        </div>
+                        <div className="quietrow" style={{ marginTop: "9px" }}>
+                          <input
+                            placeholder="also file this passage under another concept…"
+                            title="one passage can evidence several concepts — name a second one here"
+                            value={refileInputs[b.id] ?? ""}
+                            onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
+                          />
+                          <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>File</button>
                         </div>
                       </div>
                     ))}

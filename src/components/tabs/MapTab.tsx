@@ -1,0 +1,396 @@
+"use client"
+
+// 04 · Map — the card table, ported from v14 (loom-v14-example.html).
+// Red line #7: render and count, never decide. Cards without a stored position
+// get a DEFAULT position computed fresh each render (v14's drift grid) that is
+// NEVER persisted — only a student drag (card drop, line bend) or a de-tier
+// cleanup writes to views.cardTable via setCardTable.
+
+import { useEffect, useRef, useState } from "react"
+import { useLoom } from "@/components/providers/LoomProvider"
+import type { Concept, Tier } from "@/lib/types"
+import { short } from "@/lib/clothMath"
+import { buildMapKit } from "@/lib/mapKit"
+import { copyText } from "@/lib/clipboard"
+
+const TIERS: [Tier, string][] = [["p", "PRIMARY"], ["s", "SECONDARY"], ["t", "TERTIARY"]]
+const TABLE_H = 560
+const BAND_H = (TABLE_H - 20) / 3
+
+const isPlaced = (t: Tier) => t === "p" || t === "s" || t === "t"
+
+export default function MapTab() {
+  const { state, editConcept, setCardTable, setRead, flushRead, flash, studentName } = useLoom()
+  const [showDefs, setShowDefs] = useState(true)
+
+  const svgRef = useRef<SVGSVGElement>(null)
+  const [width, setWidth] = useState(720)
+  useEffect(() => {
+    const measure = () => {
+      if (svgRef.current) setWidth(Math.max(Math.floor(svgRef.current.getBoundingClientRect().width), 720))
+    }
+    measure()
+    window.addEventListener("resize", measure)
+    return () => window.removeEventListener("resize", measure)
+  }, [])
+  const W = width
+  // Usable width — the denominator for proportional x (spec §5): stored x is a
+  // 0..1 fraction of this; y stays absolute px.
+  const usableW = Math.max(1, W - 20)
+
+  // Live drag geometry — local only; persisted once, on pointer-up.
+  const [livePos, setLivePos] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [liveBend, setLiveBend] = useState<{ id: string; dx: number; dy: number } | null>(null)
+  const livePosRef = useRef<typeof livePos>(null)
+  const liveBendRef = useRef<typeof liveBend>(null)
+  const setLive = (p: typeof livePos) => { livePosRef.current = p; setLivePos(p) }
+  const setBend = (b: typeof liveBend) => { liveBendRef.current = b; setLiveBend(b) }
+  const dragCard = useRef<string | null>(null)
+  const dragOff = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 })
+  const dragEdge = useRef<string | null>(null)
+  const dragEdgeStart = useRef<{ px: number; py: number; dx: number; dy: number } | null>(null)
+  // The one pointer allowed to drive the current gesture — events from any
+  // other pointerId are ignored while it is set.
+  const activePointer = useRef<number | null>(null)
+
+  const conceptById = (id: string) => state.concepts.find(c => c.id === id)
+
+  const cardH = (c: Concept) => (showDefs && c.def) ? 50 : 34
+  const cardW = (c: Concept) => {
+    const dl = (showDefs && c.def) ? Math.min(c.def.length, 46) * 5.2 + 22 : 0
+    return Math.min(240, Math.max(90, Math.max(c.label.length * 6.4 + 22, dl)))
+  }
+  const bandRange = (t: Tier, h: number): [number, number] => {
+    const i = TIERS.findIndex(x => x[0] === t)
+    const top = 10 + i * BAND_H
+    return [top + 8, top + BAND_H - (h || 34) - 8]
+  }
+
+  const placed = state.concepts.filter(c => isPlaced(c.tier))
+  const stored = state.views.cardTable.positions
+  const bends = state.views.cardTable.bends
+
+  // Effective positions: stored (student-authored) where present, else v14's
+  // 4-column drift grid per band — computed for display, discarded (red line #7).
+  const effPos: Record<string, { x: number; y: number }> = {}
+  {
+    const perTier: Record<string, number> = { p: 0, s: 0, t: 0 }
+    placed.forEach(c => {
+      const p = stored[c.id]
+      if (p) {
+        // Stored x is a 0..1 fraction of the usable width (spec §5); values
+        // > 1.5 are legacy pixels (v14 import or earlier build) and are used
+        // as px directly. Clamp into the visible table so out-of-range values
+        // stay draggable. y is absolute px.
+        const w = cardW(c), h = cardH(c)
+        const px = p.x > 1.5 ? p.x : p.x * usableW
+        effPos[c.id] = {
+          x: Math.max(10, Math.min(W - w - 10, px)),
+          y: Math.max(10, Math.min(TABLE_H - h - 10, p.y)),
+        }
+      } else {
+        const k = perTier[c.tier]
+        const [y0, y1] = bandRange(c.tier, cardH(c))
+        effPos[c.id] = {
+          x: 30 + (k % 4) * ((W - 60) / 4) + Math.floor(k / 4) * 24,
+          y: y0 + ((k % 3) * (y1 - y0) / 3),
+        }
+      }
+      perTier[c.tier]++
+    })
+  }
+  if (livePos && effPos[livePos.id]) effPos[livePos.id] = { x: livePos.x, y: livePos.y }
+
+  const center = (c: Concept) => {
+    const p = effPos[c.id]
+    return { x: p.x + cardW(c) / 2, y: p.y + cardH(c) / 2 }
+  }
+
+  // --- mirror counts (counted, not judged) ---
+  const n: Record<string, number> = { p: 0, s: 0, t: 0 }
+  const placedIds: string[] = []
+  state.concepts.forEach(c => { if (isPlaced(c.tier)) { n[c.tier]++; placedIds.push(c.id) } })
+  const unsorted = state.concepts.filter(c => !c.tier).length
+  const off = state.concepts.filter(c => c.tier === "x").length
+  const onTable = state.edges.filter(e => placedIds.includes(e.fromId) && placedIds.includes(e.toId))
+  const cross = onTable.filter(e => {
+    const a = conceptById(e.fromId)!.tier, b = conceptById(e.toId)!.tier
+    return a === b || Math.abs("pst".indexOf(a) - "pst".indexOf(b)) > 1
+  }).length
+  let level = "a list"
+  if (n.p && (n.s || n.t)) level = "tiers"
+  if (level === "tiers" && cross) level = "tiers + cross-links"
+  const done1 = n.p + n.s + n.t > 0
+  const done2 = done1 && Object.keys(stored).some(id => placedIds.includes(id))
+  const done3 = done2 && cross > 0
+
+  const onCount = state.concepts.filter(c => c.tier && c.tier !== "x").length
+
+  // --- sort: every assignment is a student act ---
+  const setTier = (c: Concept, t: Tier) => {
+    const next: Tier = c.tier === t ? "" : t
+    editConcept(c.id, { tier: next })
+    if (!isPlaced(next) && stored[c.id]) {
+      // Leaving the table clears the card's stored spot — a student gesture.
+      const positions = { ...stored }
+      delete positions[c.id]
+      setCardTable({ positions, bends })
+    }
+  }
+
+  // --- drag machinery ---
+  const svgPoint = (e: React.PointerEvent<SVGSVGElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    return { x: e.clientX - r.left, y: e.clientY - r.top }
+  }
+
+  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    // A drag is already live — a second finger must not hijack the gesture.
+    if (dragCard.current || dragEdge.current) return
+    const target = e.target as Element
+    const g = target.closest("[data-card]")
+    if (g) {
+      const id = g.getAttribute("data-card")!
+      const pos = effPos[id]
+      if (!pos) return
+      const pt = svgPoint(e)
+      dragCard.current = id
+      dragOff.current = { dx: pt.x - pos.x, dy: pt.y - pos.y }
+      activePointer.current = e.pointerId
+      e.currentTarget.setPointerCapture(e.pointerId)
+      return
+    }
+    const h = target.closest("[data-ebend]")
+    if (h) {
+      const id = h.getAttribute("data-ebend")!
+      const pt = svgPoint(e)
+      const cur = bends[id] || { dx: 0, dy: 0 }
+      dragEdge.current = id
+      dragEdgeStart.current = { px: pt.x, py: pt.y, dx: cur.dx, dy: cur.dy }
+      activePointer.current = e.pointerId
+      e.currentTarget.setPointerCapture(e.pointerId)
+    }
+  }
+
+  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (activePointer.current === null || e.pointerId !== activePointer.current) return
+    const pt = svgPoint(e)
+    if (dragCard.current) {
+      const c = conceptById(dragCard.current)
+      if (!c) return
+      const w = cardW(c), h = cardH(c)
+      setLive({
+        id: dragCard.current,
+        x: Math.max(10, Math.min(W - w - 10, pt.x - dragOff.current.dx)),
+        y: Math.max(10, Math.min(TABLE_H - h - 10, pt.y - dragOff.current.dy)),
+      })
+      return
+    }
+    if (dragEdge.current && dragEdgeStart.current) {
+      const s = dragEdgeStart.current
+      setBend({ id: dragEdge.current, dx: s.dx + 2 * (pt.x - s.px), dy: s.dy + 2 * (pt.y - s.py) })
+    }
+  }
+
+  const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (activePointer.current === null || e.pointerId !== activePointer.current) return
+    activePointer.current = null
+    if (dragCard.current) {
+      const id = dragCard.current
+      dragCard.current = null
+      const c = conceptById(id)
+      const pos = livePosRef.current && livePosRef.current.id === id
+        ? { x: livePosRef.current.x, y: livePosRef.current.y }
+        : null
+      if (c && pos) {
+        // Dropping decides the band: re-tier from the card's centre-y.
+        const cy = pos.y + cardH(c) / 2
+        const idx = Math.max(0, Math.min(2, Math.floor((cy - 10) / BAND_H)))
+        const newTier = TIERS[idx][0]
+        if (c.tier !== newTier) {
+          editConcept(c.id, { tier: newTier })
+          flash("re-tiered to " + TIERS[idx][1].toLowerCase() + " — placement is the decision")
+        }
+        // The drag is the student gesture — persist this card's spot, once.
+        // x is stored as a fraction of the usable width (spec §5), y in px.
+        setCardTable({ positions: { ...stored, [id]: { x: pos.x / usableW, y: pos.y } }, bends })
+      }
+      setLive(null)
+      return
+    }
+    if (dragEdge.current) {
+      const id = dragEdge.current
+      dragEdge.current = null
+      dragEdgeStart.current = null
+      const b = liveBendRef.current
+      if (b && b.id === id) {
+        setCardTable({ positions: stored, bends: { ...bends, [id]: { dx: b.dx, dy: b.dy } } })
+      }
+      setBend(null)
+    }
+  }
+
+  // Cancelled or hijacked gestures abandon the drag outright — nothing is
+  // persisted; the card/bend snaps back to its stored (or default) place.
+  const abandonDrag = () => {
+    activePointer.current = null
+    dragCard.current = null
+    dragEdge.current = null
+    dragEdgeStart.current = null
+    setLive(null)
+    setBend(null)
+  }
+
+  const handleMapKit = () => {
+    if (!state.concepts.length) { flash("nothing to map yet — lay some warp first"); return }
+    copyText(buildMapKit(state.concepts, state.edges, studentName)).then(ok => {
+      if (ok) flash("map kit copied — take it to paper or Figma")
+      else flash("select & copy by hand")
+    })
+  }
+
+  const drawnEdges = state.edges.filter(e => {
+    const f = conceptById(e.fromId), t2 = conceptById(e.toId)
+    return f && t2 && isPlaced(f.tier) && isPlaced(t2.tier) && effPos[f.id] && effPos[t2.id]
+  })
+
+  return (
+    <>
+      <p className="tasktitle">Lay out your map.</p>
+      <p className="tasksub">Your map, laid out like cards on a table (Novak &amp; Gowin&apos;s own method): sort your concepts into tiers, then arrange them by hand. The tool draws the lines you already threw and counts what it sees — it never sorts, places, or links for you. When the map reads right here, draw the real one (paper or Figma) and build your chalk talk from it.</p>
+
+      <div className="rail" id="mapRail">
+        <span className={`rstep${done1 ? " done" : ""}${!done1 ? " now" : ""}`}>sort</span>
+        <span className="rsep">·</span>
+        <span className={`rstep${done2 ? " done" : ""}${!done2 && done1 ? " now" : ""}`}>arrange</span>
+        <span className="rsep">·</span>
+        <span className={`rstep${done3 ? " done" : ""}${!done3 && done2 ? " now" : ""}`}>check</span>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h2>Sort <span className="n" id="triageCount">{state.concepts.length ? `(${onCount} of ${state.concepts.length} on the table)` : ""}</span></h2>
+        <p className="do">Give each concept a tier: <b>P</b>rimary (the map hangs on it) · <b>S</b>econdary · <b>T</b>ertiary (example / detail) · <b>–</b> leave off. Sorted concepts land on the table below.</p>
+        <div id="triageList">
+          {!state.concepts.length ? (
+            <div className="empty">
+              <svg width={34} height={18} viewBox="0 0 34 18" fill="none" stroke="#a39f92" strokeWidth={1.3}><path d="M2 13 L7 5 L12 13 L17 5 L22 13 L27 5 L32 13" /></svg>
+              <span className="cap">lay some warp on 01 — open first</span>
+            </div>
+          ) : state.concepts.map(c => (
+            <div key={c.id} className="trow">
+              <span className="tlabel">{c.label}</span>
+              <span className="tierchips">
+                {TIERS.map(([k, name]) => (
+                  <span key={k} className={`tchip${c.tier === k ? " on" : ""}`} title={name.toLowerCase()} onClick={() => setTier(c, k)}>{k.toUpperCase()}</span>
+                ))}
+                <span className={`tchip off${c.tier === "x" ? " on" : ""}`} title="leave off the map" onClick={() => setTier(c, "x")}>–</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mapbar">
+        <span className="label">The map</span>
+        <span style={{ color: "var(--ink-soft)", fontSize: 13 }}>Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label.</span>
+        <label className="cap" style={{ cursor: "pointer", marginLeft: "auto" }}>
+          <input type="checkbox" checked={showDefs} onChange={e => setShowDefs(e.target.checked)} style={{ verticalAlign: -2 }} /> show definitions
+        </label>
+      </div>
+
+      <div id="tableWrap" style={{ border: "1px solid var(--rule)", borderRadius: 4, background: "radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec" }}>
+        <svg
+          ref={svgRef}
+          id="cardTable"
+          style={{ display: "block", width: "100%", height: 560, touchAction: "none" }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={abandonDrag}
+          onLostPointerCapture={abandonDrag}
+        >
+          {TIERS.map(([k, name], i) => {
+            const top = 10 + i * BAND_H
+            return (
+              <g key={k}>
+                {i > 0 && <line x1={14} y1={top} x2={W - 14} y2={top} stroke="var(--rule)" strokeWidth={1} strokeDasharray="2 5" />}
+                <text x={W - 18} y={top + 18} textAnchor="end" fontFamily="ui-monospace,Menlo,monospace" fontSize={9} letterSpacing={2} fill="var(--grey)">{name}</text>
+              </g>
+            )
+          })}
+          {!placed.length && (
+            <text x={W / 2} y={TABLE_H / 2} textAnchor="middle" fontFamily="ui-monospace,Menlo,monospace" fontSize={9} letterSpacing={2} fill="var(--grey)">SORT CONCEPTS ABOVE — THEY LAND HERE AS CARDS</text>
+          )}
+          {/* edges first, under the cards — quadratic, bendable by drag */}
+          {drawnEdges.map(e => {
+            const f = conceptById(e.fromId)!, t2 = conceptById(e.toId)!
+            const a = center(f), b = center(t2)
+            const bend = (liveBend && liveBend.id === e.id) ? liveBend : (bends[e.id] || { dx: 0, dy: 0 })
+            // Bends stay px deltas, but the control point is clamped so a
+            // stored bend can never fling a curve off-table.
+            const cx = Math.max(10, Math.min(W - 10, (a.x + b.x) / 2 + bend.dx))
+            const cy = Math.max(10, Math.min(TABLE_H - 10, (a.y + b.y) / 2 + bend.dy))
+            const named = !!e.handle
+            const col = named ? "var(--sage)" : "var(--grey)"
+            const d = `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`
+            const lx = 0.25 * a.x + 0.5 * cx + 0.25 * b.x, ly = 0.25 * a.y + 0.5 * cy + 0.25 * b.y
+            return (
+              <g key={e.id}>
+                <path d={d} fill="none" stroke={col} strokeWidth={1.4} opacity={0.8} strokeDasharray={named ? undefined : "5 4"} />
+                {/* wide invisible twin — the drag handle for bending */}
+                <path d={d} fill="none" stroke="rgba(0,0,0,0)" strokeWidth={14} cursor="grab" data-ebend={e.id}>
+                  <title>{`“${e.sentence}” — drag to bend this line`}</title>
+                </path>
+                {/* label at the curve's apex */}
+                <text
+                  x={lx} y={ly - 4} textAnchor="middle"
+                  fontFamily="ui-monospace,Menlo,monospace" fontSize={10} letterSpacing=".04em"
+                  fill={col} stroke="#f4f2ec" strokeWidth={4} paintOrder="stroke"
+                  fontStyle={named ? undefined : "italic"} pointerEvents="none"
+                >{e.handle || short(e.sentence, 26)}</text>
+              </g>
+            )
+          })}
+          {placed.map(c => {
+            const pos = effPos[c.id], w = cardW(c), h = cardH(c)
+            const twoLine = !!(showDefs && c.def)
+            return (
+              <g key={c.id} cursor="grab" data-card={c.id}>
+                <rect x={pos.x} y={pos.y} width={w} height={h} rx={4} fill="#fff" stroke="var(--ochre)" strokeWidth={1.2} />
+                <text x={pos.x + w / 2} y={pos.y + (twoLine ? 19 : h / 2 + 4)} textAnchor="middle" fontFamily='"Newsreader",Georgia,serif' fontSize={12.5} fill="var(--ink)">
+                  {short(c.label, Math.floor(w / 6.4))}
+                  <title>{c.label + (c.def ? " — " + c.def : "")}</title>
+                </text>
+                {twoLine && (
+                  <text x={pos.x + w / 2} y={pos.y + 36} textAnchor="middle" fontFamily='"Newsreader",Georgia,serif' fontSize={10} fontStyle="italic" fill="var(--ink-soft)">{short(c.def, 46)}</text>
+                )}
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+
+      <div className="ghostnote" id="mapMirror" style={{ marginTop: 8 }}>
+        {state.concepts.length > 0 && (
+          <>On the table: <b>{n.p}</b> primary · <b>{n.s}</b> secondary · <b>{n.t}</b> tertiary{off ? ` · ${off} left off` : ""}{unsorted ? <> · <span style={{ color: "var(--red)" }}>{unsorted} unsorted</span></> : ""} — {onTable.length} proposition{onTable.length !== 1 ? "s" : ""} drawn, <b>{cross}</b> running level-to-level or sideways (possible cross-links — the level-3 move; you decide if they&apos;re real). Right now this reads as: <b>{level}</b>. Counted, not judged.</>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 14 }}>
+        <h2>Your read <span className="n">same one as 03 — write it while you look</span></h2>
+        <p className="hint">Arranging and articulating feed each other: as the map settles, say in one short paragraph what the reading is about and what holds it together.</p>
+        <textarea
+          id="yourRead2"
+          placeholder="Write (or refine) your read here — it's the same text as on 03 · Read."
+          value={state.read}
+          onChange={e => setRead(e.target.value)}
+          onBlur={flushRead}
+        />
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <button className="btn ghost mini" data-tip="same map kit — now grouped by your tiers" onClick={handleMapKit}>Copy map kit → draw the real map</button>
+      </div>
+    </>
+  )
+}
