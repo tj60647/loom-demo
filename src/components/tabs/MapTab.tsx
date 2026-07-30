@@ -98,9 +98,15 @@ export default function MapTab() {
 
   // Effective positions: stored (student-authored) where present, else v14's
   // 4-column drift grid per band — computed for display, discarded (red line #7).
+  //
+  // The drift index is the concept's own capture position, NOT a running count
+  // over the current band. A running count made every un-dragged card in two
+  // bands jump the moment one card was dropped into another tier — dragging one
+  // entry re-arranged the rest. Capture order is fixed, so a card only moves
+  // when the student moves it.
+  const captureIndex = new Map(state.concepts.map((c, i) => [c.id, i]))
   const effPos: Record<string, { x: number; y: number }> = {}
   {
-    const perTier: Record<string, number> = { p: 0, s: 0, t: 0 }
     placed.forEach(c => {
       const p = stored[c.id]
       if (p) {
@@ -115,14 +121,13 @@ export default function MapTab() {
           y: Math.max(10, Math.min(TABLE_H - h - 10, p.y)),
         }
       } else {
-        const k = perTier[c.tier]
+        const k = captureIndex.get(c.id) ?? 0
         const [y0, y1] = bandRange(c.tier, cardH(c))
         effPos[c.id] = {
-          x: 30 + (k % 4) * ((W - 60) / 4) + Math.floor(k / 4) * 24,
+          x: Math.max(10, Math.min(W - cardW(c) - 10, 30 + (k % 4) * ((W - 60) / 4) + (Math.floor(k / 4) % 4) * 24)),
           y: y0 + ((k % 3) * (y1 - y0) / 3),
         }
       }
-      perTier[c.tier]++
     })
   }
   if (livePos && effPos[livePos.id]) effPos[livePos.id] = { x: livePos.x, y: livePos.y }
@@ -130,6 +135,34 @@ export default function MapTab() {
   const center = (c: Concept) => {
     const p = effPos[c.id]
     return { x: p.x + cardW(c) / 2, y: p.y + cardH(c) / 2 }
+  }
+
+  /**
+   * Where a link should meet a card: the point on the card's border in the
+   * direction of `toward`, pushed out by `gap`. Centre-to-centre lines would
+   * bury the arrowhead under the card it points at.
+   */
+  const borderPoint = (c: Concept, toward: { x: number; y: number }, gap = 4) => {
+    const p = effPos[c.id], w = cardW(c), h = cardH(c)
+    const cx = p.x + w / 2, cy = p.y + h / 2
+    const dx = toward.x - cx, dy = toward.y - cy
+    const len = Math.hypot(dx, dy)
+    if (!len) return { x: cx, y: cy }
+    const t = Math.min(dx ? (w / 2) / Math.abs(dx) : Infinity, dy ? (h / 2) / Math.abs(dy) : Infinity)
+    return { x: cx + dx * t + (dx / len) * gap, y: cy + dy * t + (dy / len) * gap }
+  }
+
+  /** Wrap a label onto as many lines as it needs — link text is never cut. */
+  const wrapLabel = (text: string, maxChars = 24) => {
+    const lines: string[] = []
+    let line = ""
+    text.split(/\s+/).filter(Boolean).forEach(word => {
+      if (!line) line = word
+      else if ((line + " " + word).length <= maxChars) line += " " + word
+      else { lines.push(line); line = word }
+    })
+    if (line) lines.push(line)
+    return lines.length ? lines : [text]
   }
 
   // --- mirror counts (counted, not judged) ---
@@ -352,7 +385,7 @@ export default function MapTab() {
         <div className="heading-with-info">
           <h2>Sort <span className="n" id="triageCount">{state.concepts.length ? `(${onCount} of ${state.concepts.length} on the table)` : ""}</span></h2>
           <button
-            className="btn ghost mini"
+            className="btn ghost mini compact"
             id="makeAllPrimary"
             disabled={!state.concepts.length}
             data-tip="tiers every concept primary in one gesture — you demote from there"
@@ -429,13 +462,23 @@ export default function MapTab() {
         <svg
           ref={svgRef}
           id="cardTable"
-          style={{ display: "block", width: "100%", height: 560, touchAction: "none" }}
+          // userSelect: dragging a card used to sweep-select its label text.
+          style={{ display: "block", width: "100%", height: 560, touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={abandonDrag}
           onLostPointerCapture={abandonDrag}
         >
+          <defs>
+            {/* Direction markers. orient auto-start-reverse keeps the head
+                aligned with the curve however the cards are arranged. */}
+            {([["ctArrowNamed", "var(--sage)"], ["ctArrowLoose", "var(--grey)"]] as const).map(([id, color]) => (
+              <marker key={id} id={id} viewBox="0 0 10 10" refX={9} refY={5} markerWidth={6.5} markerHeight={6.5} orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill={color} />
+              </marker>
+            ))}
+          </defs>
           {TIERS.map(([k, name], i) => {
             const top = 10 + i * BAND_H
             return (
@@ -451,30 +494,41 @@ export default function MapTab() {
           {/* edges first, under the cards — quadratic, bendable by drag */}
           {drawnEdges.map(e => {
             const f = conceptById(e.fromId)!, t2 = conceptById(e.toId)!
-            const a = center(f), b = center(t2)
+            const a0 = center(f), b0 = center(t2)
             const bend = (liveBend && liveBend.id === e.id) ? liveBend : (bends[e.id] || { dx: 0, dy: 0 })
             // Bends stay px deltas, but the control point is clamped so a
             // stored bend can never fling a curve off-table.
-            const cx = Math.max(10, Math.min(W - 10, (a.x + b.x) / 2 + bend.dx))
-            const cy = Math.max(10, Math.min(TABLE_H - 10, (a.y + b.y) / 2 + bend.dy))
+            const cx = Math.max(10, Math.min(W - 10, (a0.x + b0.x) / 2 + bend.dx))
+            const cy = Math.max(10, Math.min(TABLE_H - 10, (a0.y + b0.y) / 2 + bend.dy))
+            // Meet the cards at their borders, aimed at the control point, so
+            // the arrowhead sits in the open rather than under the target card.
+            const a = borderPoint(f, { x: cx, y: cy })
+            const b = borderPoint(t2, { x: cx, y: cy })
             const named = !!e.handle
             const col = named ? "var(--sage)" : "var(--grey)"
             const d = `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`
             const lx = 0.25 * a.x + 0.5 * cx + 0.25 * b.x, ly = 0.25 * a.y + 0.5 * cy + 0.25 * b.y
+            const lines = wrapLabel(e.handle || e.sentence)
             return (
               <g key={e.id}>
-                <path d={d} fill="none" stroke={col} strokeWidth={1.4} opacity={0.8} strokeDasharray={named ? undefined : "5 4"} />
+                <path
+                  d={d} fill="none" stroke={col} strokeWidth={1.4} opacity={0.8}
+                  strokeDasharray={named ? undefined : "5 4"}
+                  markerEnd={`url(#${named ? "ctArrowNamed" : "ctArrowLoose"})`}
+                />
                 {/* wide invisible twin — the drag handle for bending */}
                 <path d={d} fill="none" stroke="rgba(0,0,0,0)" strokeWidth={14} cursor="grab" data-ebend={e.id}>
                   <title>{`“${e.sentence}” — drag to bend this line`}</title>
                 </path>
-                {/* label at the curve's apex */}
+                {/* label at the curve's apex, wrapped rather than cut */}
                 <text
-                  x={lx} y={ly - 4} textAnchor="middle"
+                  x={lx} y={ly - 4 - (lines.length - 1) * 5.5} textAnchor="middle"
                   fontFamily="ui-monospace,Menlo,monospace" fontSize={10} letterSpacing=".04em"
                   fill={col} stroke="#f4f2ec" strokeWidth={4} paintOrder="stroke"
                   fontStyle={named ? undefined : "italic"} pointerEvents="none"
-                >{e.handle || short(e.sentence, 26)}</text>
+                >
+                  {lines.map((ln, i) => <tspan key={i} x={lx} dy={i ? 11 : 0}>{ln}</tspan>)}
+                </text>
               </g>
             )
           })}

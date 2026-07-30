@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import { useSession } from "next-auth/react"
+import { usePathname } from "next/navigation"
 import { useLoom } from "@/components/providers/LoomProvider"
 import AuthButton from "./AuthButton"
 
@@ -8,6 +9,9 @@ export default function Header() {
   const { data: session } = useSession()
   const { flashMsg } = useLoom()
   const [showAbout, setShowAbout] = useState(false)
+  // Nothing on an admin page writes to a loom, so the save dot sat there as a
+  // bare em dash for the whole visit and read as a stray character.
+  const inAdmin = usePathname()?.startsWith("/admin") ?? false
 
   return (
     <>
@@ -19,7 +23,7 @@ export default function Header() {
           <div>Loom<small>lay the warp · throw the weft</small></div>
         </div>
         <div className="spacer"></div>
-        {session && (
+        {session && !inAdmin && (
           <span id="saveDot">{flashMsg ? `· ${flashMsg} ·` : "—"}</span>
         )}
         <AuthButton />

@@ -59,14 +59,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             required
           />
           {courseSections.length > 0 ? (
-            <select name="sectionId" className="tinput" aria-label="Assign to section" style={{ flex: "0 0 auto", minWidth: "150px" }}>
+            <select name="sectionId" className="tinput inline" aria-label="Assign to section" style={{ flex: "0 0 auto", minWidth: "150px" }}>
               <option value="">No section</option>
               {courseSections.map((section) => (
                 <option key={section.id} value={section.id}>{section.name}</option>
               ))}
             </select>
           ) : null}
-          <button className="btn mini" type="submit">Add Email</button>
+          <button className="btn mini nowrapbtn" type="submit">Add Email</button>
         </form>
         <div className="scrollbox" style={{ marginTop: "12px" }}>
           {approvedEmails.length === 0 ? (

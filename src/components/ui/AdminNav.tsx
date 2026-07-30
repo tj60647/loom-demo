@@ -53,11 +53,24 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
 
   return (
     <nav style={{ marginBottom: "20px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+      {/* Only the section you are on is filled; the rest are quiet. Five equally
+          loud black blocks gave no sense of where you were. */}
       <Link href={withParams("/", activeCourseId, null)} className="btn ghost mini">← My Loom</Link>
-      <Link href={withParams("/admin", activeCourseId, activeSectionId)} className="btn mini">Learners</Link>
-      <Link href={withParams("/admin/aggregate", activeCourseId, activeSectionId)} className="btn mini">Cohort Map</Link>
-      <Link href={withParams("/admin/library", activeCourseId, null)} className="btn mini">Readings</Link>
-      <Link href={withParams("/admin/courses", activeCourseId, null)} className="btn mini">Courses</Link>
+      {([
+        ["/admin", "Learners", activeSectionId] as const,
+        ["/admin/aggregate", "Cohort Map", activeSectionId] as const,
+        ["/admin/library", "Readings", null] as const,
+        ["/admin/courses", "Courses", null] as const,
+      ]).map(([href, label, section]) => (
+        <Link
+          key={href}
+          href={withParams(href, activeCourseId, section)}
+          className={`btn mini${pathname === href ? "" : " ghost"}`}
+          aria-current={pathname === href ? "page" : undefined}
+        >
+          {label}
+        </Link>
+      ))}
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
         {courses.length === 0 ? (
@@ -66,7 +79,7 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
           <>
             <span className="label">Course</span>
             <select
-              className="tinput"
+              className="tinput inline"
               value={activeCourseId ?? ""}
               aria-label="Select active course"
               style={{ minWidth: "220px" }}
@@ -85,7 +98,7 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
               <>
                 <span className="label">Section</span>
                 <select
-                  className="tinput"
+                  className="tinput inline"
                   value={activeSectionId ?? ""}
                   aria-label="Select active section"
                   style={{ minWidth: "160px" }}

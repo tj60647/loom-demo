@@ -261,6 +261,14 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
    tip carries information not already in its visible label needs that meaning
    in the label or an aria-label — never in data-tip alone. Do not add `title`
    alongside: the browser would draw its own bubble on top of this one. */
+/* Compact modifier: .btn.mini carries min-height:36px, which is too tall for a
+   control sitting inline beside a card heading. */
+.btn.compact{min-height:0;padding:4px 9px}
+/* .tinput is width:100% (it shares a rule with form-row inputs and textareas).
+   A <select> sitting inline in a flex row then eats the whole row and squeezes
+   its neighbours — this opts one back out. */
+.tinput.inline{width:auto;font-size:14px;padding:6px 8px}
+.nowrapbtn{flex:0 0 auto;white-space:nowrap}
 [data-tip]{position:relative}
 [data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);
   background:var(--ink);color:var(--paper);font-family:var(--body);font-size:12.5px;font-style:normal;letter-spacing:0;text-transform:none;

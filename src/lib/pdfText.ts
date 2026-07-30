@@ -26,6 +26,15 @@ export async function extractPdfPageText(data: Buffer): Promise<ExtractedPage[]>
   const pdfjsUrl = pathToFileURL(pdfjsPath).href
   const pdfjsLib = await import(/* webpackIgnore: true */ pdfjsUrl)
 
+  // Even in Node, pdf.js loads its worker module ("fake worker") rather than
+  // running inline. Point it at the file explicitly instead of letting it
+  // derive a path relative to pdf.mjs — the derived path is what failed on
+  // Vercel, and an explicit one fails loudly here rather than deep inside
+  // getDocument. next.config.ts keeps both files in the traced output.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(
+    path.join(process.cwd(), "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs")
+  ).href
+
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(data),
     useWorkerFetch: false,
