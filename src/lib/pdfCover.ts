@@ -2,7 +2,20 @@ import path from "path"
 import { pathToFileURL } from "url"
 import { createCanvas } from "@napi-rs/canvas"
 
-const COVER_SCALE = 0.38
+/**
+ * Covers render to a fixed WIDTH rather than a fixed scale.
+ *
+ * A fixed scale produced whatever the page's own dimensions gave: across one
+ * course's readings that ranged 144px to 234px wide, because page sizes run
+ * from 396x612pt digest pages to 612x792pt US Letter. Every one of those is
+ * narrower than the 140px frame at 2x pixel density, so all of them were
+ * upscaled and soft — the smaller ones by nearly double.
+ *
+ * 320px is 140px at 2x, plus headroom. Height follows the page's own aspect,
+ * which varies (0.65-0.81 across the same set); the frame letterboxes rather
+ * than crops, so a wide page is not trimmed to fit.
+ */
+const COVER_TARGET_WIDTH = 320
 /** How far to look for a page with ink on it before giving up on a cover. */
 const COVER_PAGE_ATTEMPTS = 4
 
@@ -69,7 +82,10 @@ export async function renderPdfCoverImage(data: Buffer): Promise<Buffer> {
     const lastPage = Math.min(COVER_PAGE_ATTEMPTS, doc.numPages)
     for (let pageNumber = 1; pageNumber <= lastPage; pageNumber++) {
       const page = await doc.getPage(pageNumber)
-      const viewport = page.getViewport({ scale: COVER_SCALE })
+      const unscaled = page.getViewport({ scale: 1 })
+      const viewport = page.getViewport({
+        scale: unscaled.width > 0 ? COVER_TARGET_WIDTH / unscaled.width : 1,
+      })
       const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
       const context = canvas.getContext("2d")
 

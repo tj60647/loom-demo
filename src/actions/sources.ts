@@ -402,6 +402,26 @@ export async function rescoreSourceAction(formData: FormData) {
   const sourceId = readText(formData, "sourceId")
   if (!sourceId) return
 
+  // Rebuild the cover too, not just the scores. Cover rendering used to be
+  // treated as decided once at upload, but the renderer itself changes — it
+  // now targets a fixed width and skips blank opening pages — so readings
+  // uploaded before those changes keep a stale, undersized or empty thumbnail
+  // with no way to refresh it. Re-rendering here gives every existing reading
+  // a route back to a correct cover.
+  const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
+  const source = rows[0]
+  if (source) {
+    try {
+      const pdf = await readingStorage.get(source.storageKey)
+      const cover = await renderPdfCoverImage(pdf)
+      await readingStorage.put(getSourceCoverKey(sourceId), cover)
+    } catch (error) {
+      // A reading whose opening pages are genuinely blank has no cover to
+      // rebuild; that is recorded by the score, not a reason to fail a rescore.
+      console.warn("[Loom] Cover rebuild failed during rescore", error)
+    }
+  }
+
   await rescoreSource(sourceId)
   revalidateLibrary()
 }

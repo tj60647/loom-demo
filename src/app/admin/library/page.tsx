@@ -221,7 +221,7 @@ export default async function AdminLibraryPage({
                               <textarea
                                 name="description"
                                 defaultValue={reading.description ?? ""}
-                                placeholder="Optional summary or note for approval"
+                                placeholder="One sentence — where the reading sits and what it is doing, not what it concludes"
                               />
                             </div>
                             <label

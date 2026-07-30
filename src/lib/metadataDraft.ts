@@ -46,8 +46,19 @@ const SYSTEM = [
   "title: the work's own title, as printed. Not the filename.",
   "author: author(s) as printed, e.g. \"Star, S. L. & Griesemer, J. R.\". Empty string if not stated.",
   "sourceReference: a citation line — journal or publisher, volume, year, pages — if the pages state it.",
-  "description: two or three plain sentences saying what the reading argues, for an instructor",
-  "  choosing readings. Describe the text; do not evaluate it or address the reader.",
+  "description: ONE short sentence — aim for 20 words, never more than 25.",
+  "  It is a signpost, not a summary: say what kind of text this is and what it looks",
+  "  at, and stop. Not what it concludes, not its stages, not its examples. The",
+  "  student has to arrive at the argument themselves; a description that hands over",
+  "  the thesis has done their reading for them, and one that lists everything the",
+  "  text covers has done it slowly.",
+  "  Good: 'A 1945 essay asking what new photographic and electronic tools might do",
+  "  about research nobody can keep up with.'",
+  "  Too long: 'Written as wartime scientific mobilization wound down, this essay",
+  "  surveys emerging photographic, microfilm, and electromechanical technologies and",
+  "  asks what they might do about the growing mass of published research that",
+  "  specialists can no longer keep up with.'",
+  "  Describe the text; do not evaluate it or address the reader. No second sentence.",
   "",
   "Report only what the pages actually state. Leave a field as an empty string rather than",
   "guessing or inferring from general knowledge — an empty field is corrected in seconds,",
@@ -58,7 +69,10 @@ function parseDraft(raw: string): Omit<MetadataDraft, "provenance"> {
   // Models sometimes fence JSON despite instruction; take the outermost object.
   const start = raw.indexOf("{")
   const end = raw.lastIndexOf("}")
-  if (start === -1 || end <= start) throw new Error("The model did not return usable JSON.")
+  if (start === -1) throw new Error("The model did not return usable JSON.")
+  // An opening brace with no closing one means the reply was cut off rather
+  // than misformatted — worth saying, since the remedy is different.
+  if (end <= start) throw new Error("The model's reply was cut off before it finished.")
 
   let parsed: Record<string, unknown>
   try {
@@ -104,14 +118,18 @@ export async function draftMetadataFromPages(
     .join("\n\n")
 
   const model = judgeModelName()
-  const raw = await requestChatCompletion({
-    system: SYSTEM,
-    message: `Filename (may be wrong or abbreviated): ${filenameHint}\n\n${body}`,
-    model,
-    maxTokens: 700,
-  })
+  const message = `Filename (may be wrong or abbreviated): ${filenameHint}\n\n${body}`
 
-  const draft = parseDraft(raw)
+  // Retried once: the JSON comes back malformed occasionally — the same
+  // request that failed succeeded unchanged on a second attempt — and losing a
+  // whole draft to a one-off formatting slip is a worse trade than one extra
+  // call. A second failure is reported rather than retried again.
+  let draft: Omit<MetadataDraft, "provenance">
+  try {
+    draft = parseDraft(await requestChatCompletion({ system: SYSTEM, message, model, maxTokens: 1000 }))
+  } catch {
+    draft = parseDraft(await requestChatCompletion({ system: SYSTEM, message, model, maxTokens: 1000 }))
+  }
   const today = new Date().toISOString().slice(0, 10)
   return {
     ...draft,
