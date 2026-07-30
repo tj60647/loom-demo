@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
+import { useDialog } from "@/components/providers/DialogProvider"
 import { short } from "@/lib/clothMath"
 
 const REGISTERS = [
@@ -34,6 +35,7 @@ function EmptyState({ caption }: { caption: string }) {
 
 export default function ThrowTab() {
   const { state, addEdge, editEdge, removeEdge, flash, setUndoStack, setRedoStack } = useLoom()
+  const { confirm, notify } = useDialog()
   const [pairA, setPairA] = useState<string | null>(null)
   const [pairB, setPairB] = useState<string | null>(null)
   const [drawn, setDrawn] = useState(false)
@@ -104,9 +106,15 @@ export default function ThrowTab() {
     setDrawn(false)
   }
 
-  const drawPair = () => {
+  const drawPair = async () => {
     const cs = state.concepts
-    if (cs.length < 2) { alert('Lay at least two concepts on 01 — Open first.'); return }
+    if (cs.length < 2) {
+      await notify({
+        title: "Not enough warp yet.",
+        body: "Lay at least two concepts on 01 · Open, then the shuttle has something to draw between.",
+      })
+      return
+    }
     const crossed = (a: string, b: string) =>
       state.edges.some(e => (e.fromId === a && e.toId === b) || (e.fromId === b && e.toId === a))
     let pairs: [string, string][] = []
@@ -335,11 +343,16 @@ export default function ThrowTab() {
                     </span>
                     <span
                       className="rm"
-                      onClick={() => {
-                        if (window.confirm("Are you sure you want to remove this thread?")) {
-                          if (namingFor === e.id) setNamingFor(null);
-                          removeEdge(e.id);
-                        }
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: "Remove this thread?",
+                          body: <>The sentence goes with it: <i>&ldquo;{short(e.sentence, 120)}&rdquo;</i> Both concepts stay.</>,
+                          confirmLabel: "Remove thread",
+                          danger: true,
+                        })
+                        if (!ok) return
+                        if (namingFor === e.id) setNamingFor(null)
+                        removeEdge(e.id)
                       }}
                     >remove</span>
                   </div>

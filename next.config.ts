@@ -11,8 +11,15 @@ const nextConfig: NextConfig = {
   // pdf.js loads the worker module even in Node (as a "fake worker"), so both
   // files must ship. Keyed to /** because the upload action is reachable from
   // more than one route.
+  // The wasm/ directory is passed to getDocument by src/lib/pdfCover.ts and is
+  // equally invisible to the tracer — cover rendering fails in production for
+  // the same reason, silently, since the caller only warns. ~4MB total.
   outputFileTracingIncludes: {
-    "/**": ["./node_modules/pdfjs-dist/legacy/build/pdf.mjs", "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+    "/**": [
+      "./node_modules/pdfjs-dist/legacy/build/pdf.mjs",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "./node_modules/pdfjs-dist/wasm/**",
+    ],
   },
 };
 

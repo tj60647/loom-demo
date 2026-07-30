@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { LoomProvider } from "@/components/providers/LoomProvider";
+import { DialogProvider } from "@/components/providers/DialogProvider";
 import Header from "@/components/ui/Header";
 
 export const metadata: Metadata = {
@@ -21,8 +22,10 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <LoomProvider>
-            <Header />
-            {children}
+            <DialogProvider>
+              <Header />
+              {children}
+            </DialogProvider>
           </LoomProvider>
         </AuthProvider>
       </body>

@@ -6,10 +6,12 @@
 
 import { useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
+import { useDialog } from "@/components/providers/DialogProvider"
 import { buildExport, buildMarkdown, exportFilename, parseImport } from "@/lib/graphExport"
 
 export default function KeepTab() {
   const { state, studentName, importFromText, resetAll, flash } = useLoom()
+  const { confirm, notify } = useDialog()
   const importInputRef = useRef<HTMLInputElement>(null)
 
   const download = (text: string, filename: string, type: string) => {
@@ -47,27 +49,40 @@ export default function KeepTab() {
       try {
         parsed = parseImport(text)
       } catch (err) {
-        alert(err instanceof Error ? err.message : String(err))
+        await notify({
+          title: "That file is not a Loom export.",
+          body: err instanceof Error ? err.message : String(err),
+        })
         return
       }
-      if (!confirm(
-        "Importing replaces your current cloth with " + parsed.concepts.length + " concepts, " +
-        parsed.bytes.length + " passages, " + parsed.edges.length + " threads. Your weaving history is kept. Continue?"
-      )) return
+      const ok = await confirm({
+        title: "Replace your cloth with this file?",
+        body: `It holds ${parsed.concepts.length} concept${parsed.concepts.length !== 1 ? "s" : ""}, ${parsed.bytes.length} passage${parsed.bytes.length !== 1 ? "s" : ""} and ${parsed.edges.length} thread${parsed.edges.length !== 1 ? "s" : ""}. What is on the table now is replaced, not merged. Your weaving history is kept either way.`,
+        confirmLabel: "Replace my cloth",
+        danger: true,
+      })
+      if (!ok) return
       try {
         await importFromText(text)
       } catch (err) {
-        alert(err instanceof Error ? err.message : String(err))
+        await notify({
+          title: "The import did not go through.",
+          body: err instanceof Error ? err.message : String(err),
+        })
       }
     } finally {
       input.value = ""
     }
   }
 
-  const handleReset = () => {
-    if (confirm("Clear everything and start blank? This wipes your cloth for this course (Export first if you want to keep it). Your weaving history is kept.")) {
-      resetAll()
-    }
+  const handleReset = async () => {
+    const ok = await confirm({
+      title: "Clear this course's cloth?",
+      body: `${state.concepts.length} concept${state.concepts.length !== 1 ? "s" : ""}, ${state.bytes.length} passage${state.bytes.length !== 1 ? "s" : ""}, ${state.edges.length} thread${state.edges.length !== 1 ? "s" : ""}, your read and your arrangement all go. Export first — a .json makes this reversible. Your weaving history on 03 · Read survives either way.`,
+      confirmLabel: "Clear the table",
+      danger: true,
+    })
+    if (ok) resetAll()
   }
 
   return (

@@ -43,6 +43,12 @@ export async function renderPdfCoverImage(data: Buffer): Promise<Buffer> {
   const pdfjsWasmUrl = pathToFileURL(pdfjsWasmPath).href
   const pdfjsLib = await import(/* webpackIgnore: true */ pdfjsUrl)
 
+  // See the note in pdfText.ts: pdf.js loads its worker module even in Node,
+  // and the path it derives on its own is what fails once bundled.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(
+    path.join(process.cwd(), "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs")
+  ).href
+
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(data),
     useWorkerFetch: false,

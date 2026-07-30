@@ -20,6 +20,7 @@ import { extractPdfPageText } from "@/lib/pdfText"
 import { hashText } from "@/lib/hash"
 import { judgeSourceScore, recordHeuristicScore, rescoreSource } from "@/lib/readingScore"
 import { isJudgeConfigured } from "@/lib/openrouter"
+import { draftMetadataFromPages, type MetadataDraft } from "@/lib/metadataDraft"
 import { revalidatePath } from "next/cache"
 import { resolveCourseId, resolveCourseIdForUser } from "@/lib/courses"
 
@@ -391,6 +392,33 @@ export async function rescoreSourceAction(formData: FormData) {
 }
 
 /** Library-wide metadata. Not scoped to a course — the record is shared. */
+/**
+ * Draft this reading's metadata from its own extracted pages, for an
+ * instructor to review.
+ *
+ * Ratified against red line #6 (TJ, 30 July 2026) and bounded by the same
+ * shape as the extraction judge, plus one condition the judge did not need:
+ * this returns a draft and writes NOTHING. The instructor edits and saves via
+ * updateSourceMetadata, so no model-written text reaches a student unread.
+ * Admin-only, like everything else in this file.
+ */
+export async function draftMetadataForSource(sourceId: string): Promise<MetadataDraft> {
+  await requireAdmin()
+  if (!sourceId) throw new Error("Source id is required")
+
+  const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
+  const source = rows[0]
+  if (!source) throw new Error("Reading not found")
+
+  const pages = await db
+    .select({ pageNumber: sourcePages.pageNumber, textContent: sourcePages.textContent })
+    .from(sourcePages)
+    .where(eq(sourcePages.sourceId, sourceId))
+    .orderBy(asc(sourcePages.pageNumber))
+
+  return draftMetadataFromPages(pages, source.title)
+}
+
 export async function updateSourceMetadata(formData: FormData) {
   await requireAdmin()
 

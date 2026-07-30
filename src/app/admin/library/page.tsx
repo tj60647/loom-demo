@@ -6,6 +6,7 @@ import {
   setSourceArchived,
   updateSourceMetadata,
 } from "@/actions/sources"
+import DraftMetadataButton from "@/components/library/DraftMetadataButton"
 import ExtractionScore from "@/components/library/ExtractionScore"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 import UploadReadingsForm from "@/components/library/UploadReadingsForm"
@@ -198,6 +199,7 @@ export default async function AdminLibraryPage({
                             style={{ display: "grid", gap: "10px", marginTop: "10px" }}
                           >
                             <input type="hidden" name="sourceId" value={reading.id} />
+                            <DraftMetadataButton sourceId={reading.id} />
                             <div className="form-row">
                               <span className="label">Title</span>
                               <input name="title" defaultValue={reading.title} required />

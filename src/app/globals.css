@@ -261,6 +261,14 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
    tip carries information not already in its visible label needs that meaning
    in the label or an aria-label — never in data-tip alone. Do not add `title`
    alongside: the browser would draw its own bubble on top of this one. */
+/* Loom's confirm/alert (see DialogProvider). Sits on the same .info-scrim and
+   .info-dialog as the tab info panels so overlays stay one visual language. */
+.askbox{max-width:440px}
+.askbox h2{font-family:var(--display);font-size:21px;font-weight:600;margin:6px 0 8px}
+.askbox p{font-size:14.5px;line-height:1.5;color:var(--ink-soft);margin:0}
+.asknav{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;border-top:1px solid var(--rule);padding-top:14px}
+.btn.danger{background:var(--red);color:var(--paper)}
+.btn.danger:hover:not(:disabled){opacity:.88}
 /* Compact modifier: .btn.mini carries min-height:36px, which is too tall for a
    control sitting inline beside a card heading. */
 .btn.compact{min-height:0;padding:4px 9px}

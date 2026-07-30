@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
+import { useDialog } from "@/components/providers/DialogProvider"
 import type { Byte } from "@/lib/types"
 import { contentWords } from "@/lib/utils"
 import { tidy } from "@/lib/clothMath"
@@ -14,6 +15,7 @@ type OpenTabProps = {
 
 export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: OpenTabProps) {
   const { state, isLoading, addConcept, addByte, editConcept, removeConcept, removeByte, refileByte, loadExample, flash } = useLoom()
+  const { confirm, notify } = useDialog()
   const [source, setSource] = useState("")
   const [location, setLocation] = useState("")
   const [content, setContent] = useState("")
@@ -63,12 +65,18 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     if (refileBusy[b.id]) return
     const nm = (refileInputs[b.id] ?? "").trim()
     if (!nm) {
-      window.alert("Name the second concept this passage evidences.")
+      await notify({
+        title: "Name the second concept first.",
+        body: "Type the concept this passage also evidences, then File.",
+      })
       return
     }
     let concept = findConcept(nm)
     if (concept && state.bytes.some(x => x.content === b.content && x.conceptId === concept!.id)) {
-      window.alert("Already filed under that concept.")
+      await notify({
+        title: "Already filed under that concept.",
+        body: `This passage is already evidence for “${concept.label}”.`,
+      })
       return
     }
     setRefileBusy(prev => ({ ...prev, [b.id]: true }))
@@ -88,13 +96,29 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     }
   }
 
-  const handleRemoveConcept = (conceptId: string, byteCount: number) => {
+  const handleRemoveConcept = async (conceptId: string, byteCount: number) => {
+    // Threads first: a concept woven into one cannot be deleted out from under
+    // it. The server enforces this too — this is the readable version.
     if (state.edges.some(e => e.fromId === conceptId || e.toId === conceptId)) {
-      window.alert("Used in a thrown thread. Remove the thread first.")
+      await notify({
+        title: "This concept is woven into a thread.",
+        body: "Remove the thread on 02 · Throw first — deleting the concept now would take your thread with it.",
+      })
       return
     }
-    if (byteCount && !window.confirm("This concept has bytes; removing it removes them too. Continue?")) return
-    removeConcept(conceptId)
+    // Always confirm, and name what goes. v14 only asked when the concept had
+    // bytes, which it could afford: its state was browser-local. Here the
+    // delete is a server-side cascade with no undo.
+    const label = state.concepts.find(c => c.id === conceptId)?.label ?? "this concept"
+    const ok = await confirm({
+      title: `Delete “${label}”?`,
+      body: byteCount
+        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s go" : " goes"} with it. Export from 05 · Keep first if you might want this back.`
+        : "Export from 05 · Keep first if you might want this back.",
+      confirmLabel: "Delete concept",
+      danger: true,
+    })
+    if (ok) removeConcept(conceptId)
   }
 
   const handleLoadExample = async () => {

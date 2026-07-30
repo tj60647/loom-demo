@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
+import { useDialog } from "@/components/providers/DialogProvider"
 import type { Concept, Tier } from "@/lib/types"
 import { short } from "@/lib/clothMath"
 import { buildMapKit } from "@/lib/mapKit"
@@ -42,6 +43,7 @@ const sortOrder = (concepts: Concept[], order?: string[]): Concept[] => {
 
 export default function MapTab() {
   const { state, editConcept, setCardTable, setRead, flushRead, flash, studentName } = useLoom()
+  const { confirm } = useDialog()
   const [showDefs, setShowDefs] = useState(true)
 
   const svgRef = useRef<SVGSVGElement>(null)
@@ -201,10 +203,18 @@ export default function MapTab() {
   // The tool is not advising that everything is primary; it is doing in one
   // move what the student would otherwise do chip by chip, and saying plainly
   // that the demoting is still theirs.
-  const makeAllPrimary = () => {
+  const makeAllPrimary = async () => {
     const all = state.concepts
     if (!all.length) return
-    if (!window.confirm(`Make all ${all.length} concept${all.length !== 1 ? "s" : ""} primary? This overwrites the tiers you have already set.`)) return
+    const alreadySorted = all.filter(c => c.tier && c.tier !== "p").length
+    const ok = await confirm({
+      title: `Make all ${all.length} concept${all.length !== 1 ? "s" : ""} primary?`,
+      body: alreadySorted
+        ? `This overwrites the ${alreadySorted} tier${alreadySorted !== 1 ? "s" : ""} you have already set. It is a starting point to demote from, not a recommendation.`
+        : "A starting point to demote from, not a recommendation.",
+      confirmLabel: "Make all primary",
+    })
+    if (!ok) return
     all.forEach(c => { if (c.tier !== "p") editConcept(c.id, { tier: "p" }) })
     flash("all primary — re-sort any that aren't")
   }
