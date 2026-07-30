@@ -63,7 +63,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 | `GITHUB_ID`, `GITHUB_SECRET` | yes | GitHub OAuth app credentials. |
 | `BLOB_READ_WRITE_TOKEN` | local dev | Vercel Blob access. On Vercel this is resolved from the OIDC token + `BLOB_STORE_ID` instead. |
 | `OPENROUTER_API_KEY` | no | Enables the reading-quality judge. Absent, readings are still scored deterministically. |
-| `LOOM_JUDGE_MODEL` | no | Judge model override. Defaults to `anthropic/claude-opus-5`; `anthropic/claude-haiku-4.5` is a cheaper fit for the task. |
+| `LOOM_JUDGE_MODEL` | no | Judge model override. Defaults to `anthropic/claude-opus-5` — see the note below before changing it. |
 
 ### Database migrations
 

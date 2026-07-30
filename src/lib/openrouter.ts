@@ -14,10 +14,13 @@
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-// Judging is a narrow, mechanical question about text quality, so a cheaper
-// tier (e.g. anthropic/claude-haiku-4.5, ~1/5 the price) is a reasonable
-// override — set LOOM_JUDGE_MODEL. The default stays on the current flagship
-// rather than picking a cost/quality tradeoff on the operator's behalf.
+// Opus, deliberately. A cheaper tier looks tempting because the output is just
+// three fields, but the judge is the only thing in the pipeline that catches
+// what the deterministic checks structurally cannot — sparse OCR substitutions
+// ("chat" for "that"), and reading order. Those are exactly the judgements a
+// weaker model gets wrong, and a judge that misses them is worse than no judge,
+// because it converts an unscored dimension into a confident wrong number.
+// Ruled 2026-07-29: do not downgrade this to Haiku.
 const DEFAULT_JUDGE_MODEL = "anthropic/claude-opus-5"
 
 const REQUEST_TIMEOUT_MS = 30_000
