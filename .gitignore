@@ -12,6 +12,15 @@
 
 # testing
 /coverage
+# Playwright output — regenerated on every run, so tracking it means a dirty
+# tree after each test and conflicts whenever two people run the suite.
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+# Holds a LIVE session token, rewritten by each run. Never commit it: a token
+# pushed here is a valid credential for anyone who can read the repo.
+/playwright/.auth/
 
 # next.js
 /.next/
