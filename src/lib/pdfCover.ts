@@ -3,6 +3,8 @@ import { pathToFileURL } from "url"
 import { createCanvas } from "@napi-rs/canvas"
 
 const COVER_SCALE = 0.38
+/** How far to look for a page with ink on it before giving up on a cover. */
+const COVER_PAGE_ATTEMPTS = 4
 
 function isCanvasVisuallyBlank(context: ReturnType<ReturnType<typeof createCanvas>["getContext"]>, width: number, height: number) {
   const { data } = context.getImageData(0, 0, width, height)
@@ -60,21 +62,30 @@ export async function renderPdfCoverImage(data: Buffer): Promise<Buffer> {
   const doc = await loadingTask.promise
 
   try {
-    const page = await doc.getPage(1)
-    const viewport = page.getViewport({ scale: COVER_SCALE })
-    const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
-    const context = canvas.getContext("2d")
+    // Scanned books routinely open on a blank recto or an empty inside cover,
+    // so page 1 being blank is normal rather than a failure. Walk forward to
+    // the first page that actually has ink on it; only give up if the opening
+    // pages are all empty.
+    const lastPage = Math.min(COVER_PAGE_ATTEMPTS, doc.numPages)
+    for (let pageNumber = 1; pageNumber <= lastPage; pageNumber++) {
+      const page = await doc.getPage(pageNumber)
+      const viewport = page.getViewport({ scale: COVER_SCALE })
+      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
+      const context = canvas.getContext("2d")
 
-    context.fillStyle = "#f8f6ef"
-    context.fillRect(0, 0, canvas.width, canvas.height)
+      context.fillStyle = "#f8f6ef"
+      context.fillRect(0, 0, canvas.width, canvas.height)
 
-    await page.render({ canvasContext: context, viewport }).promise
+      await page.render({ canvasContext: context, viewport }).promise
 
-    if (isCanvasVisuallyBlank(context, canvas.width, canvas.height)) {
-      throw new Error("Rendered cover was visually blank")
+      if (!isCanvasVisuallyBlank(context, canvas.width, canvas.height)) {
+        return canvas.toBuffer("image/png")
+      }
     }
 
-    return canvas.toBuffer("image/png")
+    throw new Error(
+      `First ${lastPage} page${lastPage === 1 ? "" : "s"} rendered blank — no cover image`
+    )
   } finally {
     if (typeof (doc as { destroy?: () => Promise<void> }).destroy === "function") {
       await (doc as { destroy: () => Promise<void> }).destroy()

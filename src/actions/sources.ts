@@ -21,6 +21,7 @@ import { hashText } from "@/lib/hash"
 import { judgeSourceScore, recordHeuristicScore, rescoreSource } from "@/lib/readingScore"
 import { isJudgeConfigured } from "@/lib/openrouter"
 import { draftMetadataFromPages, type MetadataDraft } from "@/lib/metadataDraft"
+import { MAX_READING_BYTES, MAX_READING_LABEL, READING_UPLOAD_PREFIX, formatBytes } from "@/lib/readingUpload"
 import { revalidatePath } from "next/cache"
 import { resolveCourseId, resolveCourseIdForUser } from "@/lib/courses"
 
@@ -238,11 +239,38 @@ export async function createSource(data: {
   metadataProvenance?: string
   file: File
 }) {
-  const session = await requireAdmin()
-  const userId = session.user.id
-
   const arrayBuffer = await data.file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
+  const storageKey = `${crypto.randomUUID()}.pdf`
+  await readingStorage.put(storageKey, buffer)
+
+  return ingestReading({ ...data, buffer, storageKey, filename: data.file.name })
+}
+
+/**
+ * Everything that happens once a reading's bytes are in storage, wherever they
+ * came from: validate, record the row, extract the canonical page text, render
+ * a cover.
+ *
+ * Shared by the two upload paths — the server-side `createSource` (used by
+ * seed scripts) and `registerUploadedReading` (the browser → Blob path) — so
+ * neither can drift into ingesting a reading differently from the other.
+ */
+async function ingestReading(data: {
+  courseId?: string | null
+  title?: string
+  author?: string
+  sourceReference?: string
+  description?: string
+  isDescriptionVisible?: boolean
+  metadataProvenance?: string
+  buffer: Buffer
+  storageKey: string
+  filename: string
+}) {
+  const session = await requireAdmin()
+  const userId = session.user.id
+  const buffer = data.buffer
 
   // Verify this is actually a PDF (magic bytes: "%PDF-") before storing it
   // and serving it back with a `Content-Type: application/pdf` header —
@@ -251,11 +279,9 @@ export async function createSource(data: {
     throw new Error("Uploaded file is not a valid PDF")
   }
 
-  const fallbackTitle = data.file.name.replace(/\.pdf$/i, "").trim() || "Untitled Reading"
+  const fallbackTitle = data.filename.replace(/\.pdf$/i, "").trim() || "Untitled Reading"
   const title = data.title?.trim() || fallbackTitle
-
-  const storageKey = `${crypto.randomUUID()}.pdf`
-  await readingStorage.put(storageKey, buffer)
+  const storageKey = data.storageKey
 
   const [source] = await db
     .insert(sources)
@@ -313,71 +339,60 @@ export async function createSource(data: {
   return source
 }
 
-export type UploadOutcome = {
-  uploaded: number
-  failures: { filename: string; message: string }[]
-}
-
 /**
- * Uploads one or more PDFs into the library in a single submission.
+ * Second half of the browser → Blob upload: the bytes are already in storage,
+ * so this records the reading and runs the same ingest as any other upload.
  *
- * Files are processed sequentially and independently: a corrupt or
- * password-protected PDF in the middle of a 20-file batch fails on its own and
- * is reported by name, rather than aborting the files behind it. Returning the
- * outcome (instead of throwing on the first failure) is what makes a partial
- * batch recoverable — the instructor re-uploads the two that failed, not all 20.
+ * `storageKey` is the pathname the Blob SDK returned to the browser. It is
+ * treated as untrusted input — the prefix is checked, the blob is fetched
+ * server-side, and its real size and PDF magic bytes are verified here rather
+ * than taken on the client's word.
  */
-export async function createSourcesFromForm(
-  _previous: UploadOutcome | null,
-  formData: FormData
-): Promise<UploadOutcome> {
+export async function registerUploadedReading(data: {
+  storageKey: string
+  filename: string
+  title?: string
+  courseId?: string | null
+}) {
   await requireAdmin()
 
-  const courseId = readText(formData, "courseId")
-  const addToCourse = formData.get("addToCourse") === "on" ? courseId || null : null
+  if (!data.storageKey.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
+    throw new Error("That upload is not in the readings area.")
+  }
 
-  const files = formData.getAll("files").filter((entry): entry is File => entry instanceof File)
-  // A title override only makes sense for a single file; with a batch, each
-  // reading takes its own filename.
-  const titleOverride = files.length === 1 ? readText(formData, "title") : ""
+  const buffer = await readingStorage.get(data.storageKey)
 
-  const failures: UploadOutcome["failures"] = []
-  const createdIds: string[] = []
+  // The token route caps this too, but a cap enforced only where the token is
+  // minted is a cap on the polite path; re-check what actually landed.
+  if (buffer.byteLength > MAX_READING_BYTES) {
+    await readingStorage.delete(data.storageKey).catch(() => {})
+    throw new Error(`That file is ${formatBytes(buffer.byteLength)} — the limit is ${MAX_READING_LABEL}.`)
+  }
 
-  for (const file of files) {
-    if (file.size === 0) continue
-    try {
-      const source = await createSource({
-        courseId: addToCourse,
-        title: titleOverride,
-        file,
-        metadataProvenance: "Pending review",
-      })
-      createdIds.push(source.id)
-    } catch (error) {
-      failures.push({
-        filename: file.name,
-        message: error instanceof Error ? error.message : "Upload failed",
+  try {
+    const source = await ingestReading({
+      buffer,
+      storageKey: data.storageKey,
+      filename: data.filename,
+      title: data.title,
+      courseId: data.courseId,
+      metadataProvenance: "Pending review",
+    })
+
+    revalidateLibrary()
+    if (isJudgeConfigured()) {
+      after(async () => {
+        await judgeSourceScore(source.id)
+        revalidateLibrary()
       })
     }
+    return { id: source.id, title: source.title }
+  } catch (error) {
+    // Nothing references the blob yet, so a failed ingest should not leave it
+    // sitting in storage costing money and confusing later audits.
+    await readingStorage.delete(data.storageKey).catch(() => {})
+    throw error
   }
-
-  revalidateLibrary()
-
-  // The judge is a network call per reading; running it here would make a
-  // 20-file upload wait on 20 round trips. `after` runs it once the response
-  // is sent, so the page returns with heuristic scores and fills in the judged
-  // ones on the next load.
-  if (createdIds.length > 0 && isJudgeConfigured()) {
-    after(async () => {
-      for (const sourceId of createdIds) {
-        await judgeSourceScore(sourceId)
-      }
-      revalidateLibrary()
-    })
-  }
-
-  return { uploaded: createdIds.length, failures }
 }
 
 /** Re-runs both scoring passes, e.g. after a reading was re-uploaded. */

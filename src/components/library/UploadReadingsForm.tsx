@@ -1,112 +1,216 @@
 "use client"
 
-import { useActionState, useRef, useState } from "react"
-import { createSourcesFromForm, type UploadOutcome } from "@/actions/sources"
+import { useRef, useState } from "react"
+import { uploadReading } from "@/lib/readingUploadClient"
+import { MAX_READING_BYTES, MAX_READING_LABEL, formatBytes } from "@/lib/readingUpload"
 
 type UploadReadingsFormProps = {
   /** Offer "also add these to this course" when the admin arrived from one. */
   course?: { id: string; name: string } | null
 }
 
-const INITIAL: UploadOutcome | null = null
+type Phase = "waiting" | "sending" | "reading" | "done" | "failed" | "skipped"
+
+type FileState = {
+  file: File
+  phase: Phase
+  /** 0–100 while the bytes are in flight. */
+  percent: number
+  message?: string
+}
+
+const PHASE_LABEL: Record<Phase, string> = {
+  waiting: "waiting",
+  sending: "sending",
+  reading: "extracting",
+  done: "added",
+  failed: "failed",
+  skipped: "skipped",
+}
+
+function phaseColor(phase: Phase) {
+  if (phase === "done") return "var(--sage)"
+  if (phase === "failed") return "var(--red)"
+  if (phase === "skipped") return "var(--ochre)"
+  return "var(--grey)"
+}
 
 export default function UploadReadingsForm({ course }: UploadReadingsFormProps) {
-  const [outcome, formAction, isPending] = useActionState(createSourcesFromForm, INITIAL)
-  const [selected, setSelected] = useState<File[]>([])
-  const formRef = useRef<HTMLFormElement>(null)
+  const [items, setItems] = useState<FileState[]>([])
+  const [running, setRunning] = useState(false)
+  const [finished, setFinished] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const titleRef = useRef<HTMLInputElement>(null)
+  const addToCourseRef = useRef<HTMLInputElement>(null)
 
-  // A title override applies to one reading. With a batch, each takes its
-  // filename, so the field would be a lie — hide it rather than ignore it.
-  const isBatch = selected.length > 1
+  const isBatch = items.length > 1
+  const tooBig = items.filter((i) => i.file.size > MAX_READING_BYTES)
+
+  const patch = (index: number, next: Partial<FileState>) =>
+    setItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...next } : it)))
+
+  const pick = (files: FileList | null) => {
+    setFinished(false)
+    setItems(Array.from(files ?? []).map((file) => ({ file, phase: "waiting" as const, percent: 0 })))
+  }
+
+  /**
+   * Each reading goes browser → Blob directly, then a short action records it.
+   *
+   * The bytes never pass through a Server Action, so the 4.5MB request-body cap
+   * that used to reject most course readings does not apply; the ceiling is now
+   * our own MAX_READING_BYTES. Files are handled one at a time so each succeeds,
+   * fails and can be retried on its own, and so progress is per reading rather
+   * than one opaque wait.
+   */
+  const startUpload = async () => {
+    if (!items.length || running) return
+    setRunning(true)
+    setFinished(false)
+
+    const titleOverride = items.length === 1 ? (titleRef.current?.value ?? "") : ""
+    const addToCourse = addToCourseRef.current?.checked ?? false
+
+    for (let index = 0; index < items.length; index++) {
+      const { file } = items[index]
+
+      // Refused here as well as in the token route: failing before the bytes
+      // move is faster and says something useful, rather than surfacing as a
+      // rejected upload halfway through.
+      if (file.size > MAX_READING_BYTES) {
+        patch(index, {
+          phase: "skipped",
+          message: `${formatBytes(file.size)} — over the ${MAX_READING_LABEL} limit. Split the chapter, or reduce the scan resolution.`,
+        })
+        continue
+      }
+
+      try {
+        patch(index, { phase: "sending", percent: 0 })
+        await uploadReading(file, {
+          title: titleOverride,
+          courseId: addToCourse && course ? course.id : null,
+          onPhase: (phase) => patch(index, { phase, percent: phase === "reading" ? 100 : 0 }),
+          onProgress: (percent) => patch(index, { percent }),
+        })
+        patch(index, { phase: "done" })
+      } catch (error) {
+        patch(index, {
+          phase: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
+    setRunning(false)
+    setFinished(true)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const added = items.filter((i) => i.phase === "done").length
+  const unfinished = items.filter((i) => i.phase === "failed" || i.phase === "skipped").length
 
   return (
     <section className="card" style={{ marginBottom: "24px" }}>
       <h2>Add Readings to the Library</h2>
       <p className="hint" style={{ marginTop: "8px" }}>
-        Select one or more PDFs. Each is stored, OCR&apos;d, and scored for extraction
-        quality on upload. Review titles and provenance afterwards.
+        Select one or more PDFs, up to {MAX_READING_LABEL} each. They upload straight from
+        your browser to storage, one at a time — each is stored, OCR&apos;d and scored on
+        its own, so one bad file never takes the others down. Review titles and
+        provenance afterwards.
       </p>
 
-      <form
-        ref={formRef}
-        action={(formData) => {
-          formAction(formData)
-          setSelected([])
-          formRef.current?.reset()
-        }}
-        style={{ marginTop: "14px" }}
-      >
-        <input type="hidden" name="courseId" value={course?.id ?? ""} />
-
+      <div style={{ marginTop: "14px" }}>
         <div className="form-row">
           <span className="label">PDF Files</span>
           <input
-            name="files"
+            ref={fileInputRef}
             type="file"
             accept="application/pdf"
             multiple
-            required
-            onChange={(event) => setSelected(Array.from(event.target.files ?? []))}
+            disabled={running}
+            onChange={(event) => pick(event.target.files)}
           />
         </div>
 
-        {selected.length > 0 ? (
+        {items.length > 0 && (
           <p className="hint" style={{ margin: "6px 0 0" }}>
-            {selected.length} file{selected.length === 1 ? "" : "s"} selected
+            {items.length} file{items.length === 1 ? "" : "s"} selected
             {isBatch ? " — each reading takes its filename as the title" : ""}
           </p>
-        ) : null}
+        )}
 
-        {!isBatch ? (
+        {tooBig.length > 0 && (
+          <p className="hint" style={{ margin: "6px 0 0", color: "var(--red)" }}>
+            {tooBig.length} file{tooBig.length === 1 ? " is" : "s are"} over the{" "}
+            {MAX_READING_LABEL} limit and will be skipped:{" "}
+            {tooBig.map((i) => `${i.file.name} (${formatBytes(i.file.size)})`).join(", ")}.
+          </p>
+        )}
+
+        {!isBatch && (
           <div className="form-row" style={{ marginTop: "10px" }}>
             <span className="label">Title Override (Optional)</span>
-            <input name="title" placeholder="Defaults to the PDF filename" />
+            <input ref={titleRef} placeholder="Defaults to the PDF filename" />
           </div>
-        ) : null}
+        )}
 
-        {course ? (
+        {course && (
           <label
             className="hint"
             style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px" }}
           >
-            <input type="checkbox" name="addToCourse" defaultChecked />
+            <input ref={addToCourseRef} type="checkbox" defaultChecked />
             Also include them in {course.name}
           </label>
-        ) : null}
+        )}
 
-        <button className="btn mini" style={{ marginTop: "12px" }} type="submit" disabled={isPending}>
-          {isPending
-            ? "Uploading…"
-            : `Upload ${selected.length > 1 ? `${selected.length} Readings` : "Reading"}`}
+        <button
+          className="btn mini"
+          style={{ marginTop: "12px" }}
+          type="button"
+          onClick={startUpload}
+          disabled={running || !items.length}
+        >
+          {running
+            ? `Uploading ${Math.min(added + unfinished + 1, items.length)} of ${items.length}…`
+            : `Upload ${items.length > 1 ? `${items.length} Readings` : "Reading"}`}
         </button>
-      </form>
-
-      {/* A partial batch is the normal failure mode, so report both halves:
-          what landed, and exactly which files need re-uploading. */}
-      <div aria-live="polite">
-        {outcome && outcome.uploaded > 0 ? (
-          <p className="hint" style={{ marginTop: "12px", color: "var(--sage)" }}>
-            Uploaded {outcome.uploaded} reading{outcome.uploaded === 1 ? "" : "s"}.
-          </p>
-        ) : null}
-
-        {outcome && outcome.failures.length > 0 ? (
-          <div style={{ marginTop: "10px" }}>
-            <p className="hint" style={{ margin: 0, color: "var(--red)" }}>
-              {outcome.failures.length} file{outcome.failures.length === 1 ? "" : "s"} failed —
-              the rest were added:
-            </p>
-            <ul style={{ margin: "6px 0 0", paddingLeft: "18px" }}>
-              {outcome.failures.map((failure) => (
-                <li key={failure.filename} className="hint" style={{ fontSize: "13px" }}>
-                  <span style={{ fontFamily: "var(--mono)" }}>{failure.filename}</span> —{" "}
-                  {failure.message}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
       </div>
+
+      {/* Per-file state, live. A partial batch is the normal outcome, so this
+          shows what landed and exactly what still needs attention. */}
+      {items.length > 0 && (
+        <ul aria-live="polite" style={{ margin: "14px 0 0", padding: 0, listStyle: "none" }}>
+          {items.map((item) => (
+            <li
+              key={item.file.name}
+              className="hint"
+              style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "baseline", padding: "3px 0", fontSize: "13px" }}
+            >
+              <span style={{ fontFamily: "var(--mono)", fontSize: "11px", minWidth: "76px", color: phaseColor(item.phase) }}>
+                {item.phase === "sending" ? `${item.percent}%` : PHASE_LABEL[item.phase]}
+              </span>
+              <span style={{ fontFamily: "var(--mono)", flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
+                {item.file.name}
+              </span>
+              <span style={{ color: "var(--grey)", fontSize: "11px" }}>{formatBytes(item.file.size)}</span>
+              {item.message && (
+                <span style={{ color: phaseColor(item.phase), flexBasis: "100%", fontSize: "12px" }}>
+                  {item.message}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {finished && (
+        <p className="hint" style={{ marginTop: "10px", color: unfinished ? "var(--red)" : "var(--sage)" }}>
+          {added} of {items.length} added
+          {unfinished ? ` — ${unfinished} still to deal with.` : "."}
+        </p>
+      )}
     </section>
   )
 }

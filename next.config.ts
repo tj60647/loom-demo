@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.0.66"],
+  // No serverActions.bodySizeLimit override: reading PDFs now go browser →
+  // Blob (see src/lib/readingUploadClient.ts), so nothing large travels
+  // through a Server Action and the 1MB default is the right, tighter setting.
   // pdfjs-dist is required from node_modules at runtime (see src/lib/pdfText.ts),
   // never bundled, so it has to stay external.
   serverExternalPackages: ["@napi-rs/canvas", "pdfjs-dist"],

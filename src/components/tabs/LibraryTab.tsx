@@ -2,7 +2,9 @@
 import { useEffect, useState } from "react"
 import dynamic from 'next/dynamic'
 import { useSession } from "next-auth/react"
-import { getSources, createSource } from "@/actions/sources"
+import { getSources } from "@/actions/sources"
+import { uploadReading } from "@/lib/readingUploadClient"
+import { MAX_READING_LABEL } from "@/lib/readingUpload"
 import type { Source } from "@/lib/types"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 
@@ -172,11 +174,9 @@ function UploadSourceForm({ onUploaded }: { onUploaded: () => void }) {
     const failed: { filename: string; message: string }[] = []
     for (const [index, file] of files.entries()) {
       try {
-        await createSource({
-          title: isBatch ? "" : title,
-          file,
-          metadataProvenance: "Pending review",
-        })
+        // Browser → Blob, same as the admin form: a Server Action body is
+        // capped at 4.5MB on Vercel and course readings routinely exceed it.
+        await uploadReading(file, { title: isBatch ? "" : title })
       } catch (e) {
         failed.push({
           filename: file.name,
@@ -197,7 +197,7 @@ function UploadSourceForm({ onUploaded }: { onUploaded: () => void }) {
     <div className="card" style={{ padding: "20px" }}>
       <h3 style={{ margin: "0 0 12px 0", fontSize: "16px" }}>Add Readings</h3>
       <p className="hint" style={{ margin: "0 0 12px 0" }}>
-        Upload one or more PDFs. Review and approve metadata in Library Manager.
+        Upload one or more PDFs, up to {MAX_READING_LABEL} each. Review and approve metadata in Library Manager.
       </p>
       {!isBatch && (
         <div className="form-row">
