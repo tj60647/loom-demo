@@ -1,7 +1,7 @@
 import * as dotenv from "dotenv"
 import { neon } from "@neondatabase/serverless"
 
-dotenv.config({ path: ".env.local" })
+dotenv.config({ path: ".env.local", quiet: true })
 
 function normalize(value?: string) {
   if (!value) return value

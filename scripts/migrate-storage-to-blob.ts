@@ -5,7 +5,7 @@ import { put, list } from "@vercel/blob"
 
 // Load local env the same way the app's db module does, and strip any
 // surrounding quotes so the Blob SDK receives clean credential values.
-dotenv.config({ path: ".env.local" })
+dotenv.config({ path: ".env.local", quiet: true })
 function unquote(value?: string) {
   if (!value) return value
   if (

@@ -3,7 +3,9 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from './schema';
 
-dotenv.config({ path: ".env.local" })
+// quiet: dotenv v17 logs a line (with a rotating promo "tip") to STDOUT on
+// every config() call, which corrupts the output of any script that pipes it.
+dotenv.config({ path: ".env.local", quiet: true })
 
 function normalizeEnvValue(value?: string) {
 	if (!value) return value
