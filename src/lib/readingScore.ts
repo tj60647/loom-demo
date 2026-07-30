@@ -394,8 +394,15 @@ export function buildJudgePrompt(sample: ScorablePage[]) {
     `The text below was extracted from a PDF by pdf.js. Judge the QUALITY OF THE ` +
     `EXTRACTION, not the quality of the writing — a brilliant essay that extracted ` +
     `as mojibake scores 1, and a dull memo that extracted perfectly scores 5.\n\n` +
-    `Note that the extractor joins text runs without inserting spaces, so missing ` +
-    `spaces between words are expected and must NOT be penalised.\n\n` +
+    `HOW THIS SAMPLE WAS BUILT — these are artefacts of the sampling, not defects ` +
+    `in the document, and must NOT be penalised:\n` +
+    `- It is a SAMPLE of a few pages spread through a longer document, so the page ` +
+    `numbers are non-contiguous and jump. No pages are missing from the PDF.\n` +
+    `- Each page is truncated at a fixed character budget, so every excerpt ends ` +
+    `mid-sentence. That is the budget, not a truncated extraction.\n` +
+    `- The extractor joins text runs without inserting spaces, so missing spaces ` +
+    `between words are expected.\n` +
+    `Judge only what is visible WITHIN each excerpt.\n\n` +
     `legibility: are these real, readable words in a real script? 5 = clean text. ` +
     `1 = mojibake, glyph soup, or character substitution making it unreadable.\n\n` +
     `structure: did extraction preserve reading order? 5 = paragraphs follow in the ` +
