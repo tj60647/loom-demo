@@ -1,10 +1,14 @@
 "use client"
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
+
+/** Pre-per-user key; still read once so existing students aren't re-onboarded. */
+const LEGACY_SEEN_KEY = "loom_has_seen_walkthrough"
 
 const GUIDE = [
  {k:'how loom works', h:'Loom turns reading into weaving',
   p:'You read anywhere — paper, PDF, screen — marking what strikes you. Then you bring the best passages here. Over three moves, the pieces become a graph of your own understanding. The tool holds the structure; you do all the thinking.',
-  loom:'Three tabs = three moves, in order: 01 Open · 02 Throw · 03 Read.'},
+  loom:'Three moves, in order: 01 Open · 02 Throw · 03 Read. Then 04 Map to lay it out. 00 Library holds the readings; 05 Keep is where your work comes out.'},
  {k:'01 — open', h:'① Capture and name',
   p:'Paste a passage worth keeping (a "byte"), with its citation. Name the concept it evidences — a short noun phrase, often the author\'s own term ("boundary objects"). Then gloss it in your own words in the working definition; crude is welcome there.',
   loom:'Warp = your concepts: the threads held under tension first. Choosing the passage is the judgment.'},
@@ -18,20 +22,41 @@ const GUIDE = [
   p:'Sort your concepts into tiers (primary / secondary / tertiary), then drag the cards to arrange them — general above, specific below. The tool draws the links you already threw and counts what it sees; the sorting and arranging are yours.',
   loom:'Sort · arrange · check. Placement is the decision.'},
  {k:'after loom', h:'⑤ Where this goes next',
-  p:'Your weave is the middle step, not the deliverable. Copy the map kit and draw your real concept map by hand (arranging is thinking), build your chalk talk from it, and export your graph (JSON) — yours to keep, submit, or explore further.',
+  p:'Your weave is the middle step, not the deliverable. Copy the map kit and draw your real concept map by hand (arranging is thinking), build your chalk talk from it, and export your graph from 05 · Keep (JSON) — yours to keep, submit, or explore further.',
   loom:'text → notes → concepts → weave → concept map → chalk talk → questions → discussion.'},
 ];
 
-export default function FirstRunWalkthrough() {
+/**
+ * `autoOpen` gates only the unprompted first-visit pop-up. The component is
+ * mounted signed-out too, so the header's "?" can always open it — a visitor
+ * can read what Loom is before committing to a sign-in — but the sign-in
+ * screen stays quiet.
+ */
+export default function FirstRunWalkthrough({ autoOpen = true }: { autoOpen?: boolean }) {
+  const { data: session } = useSession();
   const [show, setShow] = useState(false);
   const [step, setStep] = useState(0);
 
+  // Keyed per student: a shared lab machine used to swallow the walkthrough
+  // for everyone after the first sign-in. Null when signed out, where the
+  // walkthrough is reachable from "?" but is never marked seen for anybody.
+  const userId = session?.user?.id;
+  const storageKey = userId ? `${LEGACY_SEEN_KEY}:${userId}` : null;
+
   useEffect(() => {
-    const hasSeen = localStorage.getItem("loom_has_seen_walkthrough");
-    if (!hasSeen) {
-      setTimeout(() => setShow(true), 0);
+    if (!autoOpen || !storageKey) return;
+    // Adopt the pre-per-user flag once, then clear it, so this student keeps
+    // their "already seen" state without suppressing the next student's.
+    const legacy = localStorage.getItem(LEGACY_SEEN_KEY);
+    if (legacy) {
+      localStorage.setItem(storageKey, legacy);
+      localStorage.removeItem(LEGACY_SEEN_KEY);
     }
-  }, []);
+    if (!localStorage.getItem(storageKey)) {
+      const timer = window.setTimeout(() => setShow(true), 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [autoOpen, storageKey]);
 
   useEffect(() => {
     const reopen = () => {
@@ -43,7 +68,7 @@ export default function FirstRunWalkthrough() {
   }, []);
 
   const dismiss = () => {
-    localStorage.setItem("loom_has_seen_walkthrough", "true");
+    if (storageKey) localStorage.setItem(storageKey, "true");
     setShow(false);
   }
 
@@ -52,52 +77,29 @@ export default function FirstRunWalkthrough() {
   const g = GUIDE[step];
   const isLast = step === GUIDE.length - 1;
 
+  // Uses the ported .scrim/.guide classes rather than restating them inline,
+  // so the overlay stays in step with the rest of the visual language.
   return (
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}
-      style={{
-        position: "fixed", inset: 0, backgroundColor: "rgba(26,25,22,.55)",
-        zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", padding: "22px"
-      }}
-    >
-      <div style={{
-        maxWidth: "540px", width: "100%", background: "var(--paper)", border: "1px solid var(--ink)",
-        borderRadius: "6px", boxShadow: "0 18px 50px rgba(0,0,0,.3)", padding: "24px 26px 20px", position: "relative"
-      }}>
-        <div style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: ".16em", textTransform: "uppercase", color: "var(--ochre)" }}>
-          {g.k}
-        </div>
-        <h2 style={{ fontFamily: "var(--display)", fontSize: "25px", fontWeight: 600, margin: "6px 0 8px" }}>
-          {g.h}
-        </h2>
-        <p style={{ fontSize: "15.5px", lineHeight: 1.5, margin: "0 0 10px" }}>
-          {g.p}
-        </p>
-        <div style={{ fontSize: "13.5px", color: "var(--ink-soft)", borderLeft: "2px solid var(--ochre)", paddingLeft: "11px", margin: "12px 0" }}>
-          {g.loom}
-        </div>
+    <div className="scrim show" onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}>
+      <div className="guide">
+        <div className="gk">{g.k}</div>
+        <h2>{g.h}</h2>
+        <p>{g.p}</p>
+        <div className="gloom">{g.loom}</div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "18px", borderTop: "1px solid var(--rule)", paddingTop: "14px" }}>
-          <span
-            onClick={dismiss}
-            style={{ fontFamily: "var(--mono)", fontSize: "11px", color: "var(--ink-soft)", cursor: "pointer", letterSpacing: ".04em" }}
-          >
-            {isLast ? '' : 'skip'}
-          </span>
-          <div style={{ display: "flex", gap: "6px" }}>
+        <div className="gnav">
+          <span className="skip" onClick={dismiss}>{isLast ? '' : 'skip'}</span>
+          <div className="dots">
             {GUIDE.map((_, i) => (
-              <span key={i} style={{
-                width: "7px", height: "7px", borderRadius: "50%",
-                background: i === step ? "var(--ochre)" : "var(--rule)",
-                cursor: "pointer"
-              }} onClick={() => setStep(i)} />
+              <span
+                key={i}
+                className={`dot ${i === step ? 'on' : ''}`}
+                style={{ cursor: "pointer" }}
+                onClick={() => setStep(i)}
+              />
             ))}
           </div>
-          <button
-            className="btn ghost mini"
-            onClick={() => isLast ? dismiss() : setStep(s => s + 1)}
-            style={{ margin: 0 }}
-          >
+          <button className="btn" onClick={() => isLast ? dismiss() : setStep(s => s + 1)} style={{ margin: 0 }}>
             {isLast ? "Start weaving" : "Next →"}
           </button>
         </div>

@@ -102,7 +102,7 @@ async function recordEvent(
 async function pruneCardTable(
   userId: string,
   courseId: string | null,
-  prune: { positions?: string[]; bends?: string[] }
+  prune: { positions?: string[]; bends?: string[]; order?: string[] }
 ) {
   try {
     const rows = await db.select().from(views)
@@ -114,11 +114,20 @@ async function pruneCardTable(
     const data = row.data as Partial<CardTableView>
     const positions = { ...(data.positions ?? {}) }
     const bends = { ...(data.bends ?? {}) }
+    let order = data.order ? [...data.order] : undefined
     let changed = false
     prune.positions?.forEach((id) => { if (id in positions) { delete positions[id]; changed = true } })
     prune.bends?.forEach((id) => { if (id in bends) { delete bends[id]; changed = true } })
+    if (order && prune.order?.length) {
+      const drop = new Set(prune.order)
+      const next = order.filter((id) => !drop.has(id))
+      if (next.length !== order.length) { order = next; changed = true }
+    }
     if (changed) {
-      await db.update(views).set({ data: { positions, bends }, updatedAt: new Date() }).where(eq(views.id, row.id))
+      await db.update(views).set({
+        data: order ? { positions, bends, order } : { positions, bends },
+        updatedAt: new Date(),
+      }).where(eq(views.id, row.id))
     }
   } catch (e) {
     console.warn("[pruneCardTable] failed", e)
@@ -153,6 +162,7 @@ export async function getUserLoomData() {
   const cardTable: CardTableView = {
     positions: cardTableData.positions ?? {},
     bends: cardTableData.bends ?? {},
+    ...(cardTableData.order ? { order: cardTableData.order } : {}),
   }
 
   return {
@@ -235,7 +245,7 @@ export async function deleteConcept(id: string) {
     .returning({ label: concepts.label })
   if (removed.length > 0) {
     await recordEvent(userId, courseId, "concept.delete", "concept", id, { label: removed[0].label })
-    await pruneCardTable(userId, courseId, { positions: [id] })
+    await pruneCardTable(userId, courseId, { positions: [id], order: [id] })
   }
 }
 
@@ -618,6 +628,9 @@ export async function importGraph(parsed: ParsedImport) {
     const id = edgeIdByKey.get(key)
     if (id) bends[id] = b
   })
+  const order = (parsed.cardTable.order ?? [])
+    .map((key) => conceptIdByKey.get(key))
+    .filter((id): id is string => !!id)
 
   const snapshot: GraphSnapshot = {
     concepts: conceptRows.map((c) => ({ id: c.id, label: c.label, tier: c.tier })),
@@ -641,8 +654,8 @@ export async function importGraph(parsed: ParsedImport) {
     ...(byteRows.length ? [db.insert(bytes).values(byteRows)] : []),
     ...(edgeRows.length ? [db.insert(edges).values(edgeRows)] : []),
     ...(parsed.read ? [db.insert(reads).values({ userId, courseId, text: parsed.read })] : []),
-    ...(Object.keys(positions).length || Object.keys(bends).length
-      ? [db.insert(views).values({ userId, courseId, key: "cardTable", data: { positions, bends } })]
+    ...(Object.keys(positions).length || Object.keys(bends).length || order.length
+      ? [db.insert(views).values({ userId, courseId, key: "cardTable", data: { positions, bends, order } })]
       : []),
   ]
   await db.batch(statements as unknown as Parameters<typeof db.batch>[0])

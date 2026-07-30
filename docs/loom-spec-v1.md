@@ -2,7 +2,9 @@
 
 Build contract. Functionality only — pedagogy, staging, and governance live in the [Course Deployment notes](course-deployment-notes.md). This is the target the build freezes to and the release gate checks against.
 
-**Status:** DRAFT (freeze target) · **Version** v1 · rev July 29e (29d reflected tool v14 + the July 28–29 calls; §6 split the artifact from view state; §5 recorded how the OCR quality gate is met; §4 red line #6 gained a ratified, bounded exception for library ingest. 29e, TJ: §6 adds the graph **development history** — an append-only record of the student's own acts, exploratory only — and an optional capture-provenance `anchor` on exported bytes; both production-build only) · **Freeze date:** TBD
+**Status:** DRAFT (freeze target) · **Version** v1 · rev July 30a · **Freeze date:** TBD
+
+**Revision history.** *29d* — reflects tool v14 and the July 28–29 calls; §6 splits the artifact from view state; §5 records how the OCR quality gate is met; §4 red line #6 gains a ratified, bounded exception for library ingest. *29e (TJ)* — §6 adds the graph **development history**, an append-only record of the student's own acts, exploratory only, and an optional capture-provenance `anchor` on exported bytes; both production-build only. *30a (TJ)* — §3 Global moves export / import / reset onto their own tab (**05 — Keep**) with instructions for each; §6 `views.cardTable` gains `order`, the student's chosen sequence for the sort list.
 
 ## 1. What Loom is
 
@@ -84,6 +86,8 @@ The coined handle is free text in the student's words, never chosen from a fixed
 
 Export `.json`; export markdown (production); import; reset; student name.
 
+In the production build these live on their own tab (**05 — Keep**) rather than in the header chrome, each with a plain statement of what it is and when to use it: `.json` is the exact record and the only re-importable form, markdown is a readable outline, import replaces rather than merges, and reset clears the cloth but not the development history.
+
 ## 4. Red lines (acceptance criteria)
 
 1. No AI inference, suggestion, or naming of a relation between two concepts. Ever.
@@ -137,7 +141,8 @@ One JSON document per student (kilobytes). Schema:
   "views": {
     "cardTable": {
       "positions": { "conceptId": { "x": 0, "y": 0 } },
-      "bends":     { "edgeId":    { "dx": 0, "dy": 0 } }
+      "bends":     { "edgeId":    { "dx": 0, "dy": 0 } },
+      "order":     [ "conceptId" ]
     }
   }
 }
@@ -149,7 +154,7 @@ One JSON document per student (kilobytes). Schema:
 `views` holds per-view student-authored geometry; it round-trips on export so no arrangement work is lost, but no consumer of the graph is required to read it.
 Adding a view adds a key under `views`, never a field on a concept or edge.
 
-Placement is a decision (§3), but its meaning is already extracted into `tier` — the residual x/y is display geometry and belongs to the renderer, not the artifact. `bends` are display-only by §3's own wording. (Production: byte→concept becomes many-to-many.)
+Placement is a decision (§3), but its meaning is already extracted into `tier` — the residual x/y is display geometry and belongs to the renderer, not the artifact. `bends` are display-only by §3's own wording. `order` is the student's chosen sequence for the sort list; it re-sequences that list only and never the graph's own capture order, which the arc map reads as reading order — so it too is display state. (Production: byte→concept becomes many-to-many.)
 
 **Anchors (production, 29 July 2026).** A byte captured from a library PDF carries optional provenance — `anchor: { sourceId, pageNumber, startOffset, endOffset, pageContentHash }` — in the export. It records where the passage was taken from, nothing more; consumers may ignore it. It extends the byte shape above without changing it.
 

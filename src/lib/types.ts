@@ -141,6 +141,13 @@ export type Edge = {
 export type CardTableView = {
   positions: Record<string, { x: number; y: number }>
   bends: Record<string, { dx: number; dy: number }>
+  /**
+   * Student-chosen order of the sort list (concept ids). A projection like the
+   * rest of this view — it re-sequences the Map tab's list only, and never the
+   * graph's own capture order, which the arc map reads as "reading order".
+   * Concepts missing from the array fall back to capture order after it.
+   */
+  order?: string[]
 }
 
 export type LoomViews = {
@@ -204,6 +211,7 @@ export type LoomExport = {
     cardTable: {
       positions: Record<string, { x: number; y: number }>
       bends: Record<string, { dx: number; dy: number }>
+      order?: string[]
     }
   }
 }

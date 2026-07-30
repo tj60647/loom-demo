@@ -1,71 +1,13 @@
 "use client"
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
-import { buildExport, buildMarkdown, exportFilename, parseImport } from "@/lib/graphExport"
 import AuthButton from "./AuthButton"
 
 export default function Header() {
   const { data: session } = useSession()
-  const { state, studentName, flashMsg, importFromText, resetAll } = useLoom()
+  const { flashMsg } = useLoom()
   const [showAbout, setShowAbout] = useState(false)
-  const importInputRef = useRef<HTMLInputElement>(null)
-
-  const download = (text: string, filename: string, type: string) => {
-    const blob = new Blob([text], { type })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }
-
-  const handleExportJson = () => {
-    download(JSON.stringify(buildExport(state, studentName), null, 2), exportFilename(studentName, "json"), "application/json")
-  }
-
-  const handleExportMd = () => {
-    download(buildMarkdown(state, studentName), exportFilename(studentName, "md"), "text/markdown")
-  }
-
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target
-    const file = input.files?.[0]
-    if (!file) {
-      input.value = ""
-      return
-    }
-    try {
-      const text = await file.text()
-      let parsed
-      try {
-        parsed = parseImport(text)
-      } catch (err) {
-        alert(err instanceof Error ? err.message : String(err))
-        return
-      }
-      if (!confirm(
-        "Importing replaces your current cloth with " + parsed.concepts.length + " concepts, " +
-        parsed.bytes.length + " passages, " + parsed.edges.length + " threads. Your weaving history is kept. Continue?"
-      )) return
-      try {
-        await importFromText(text)
-      } catch (err) {
-        alert(err instanceof Error ? err.message : String(err))
-      }
-    } finally {
-      input.value = ""
-    }
-  }
-
-  const handleReset = () => {
-    if (confirm("Clear everything and start blank? This wipes your cloth for this course (Export first if you want to keep it). Your weaving history is kept.")) {
-      resetAll()
-    }
-  }
 
   return (
     <>
@@ -78,20 +20,7 @@ export default function Header() {
         </div>
         <div className="spacer"></div>
         {session && (
-          <>
-            <span id="saveDot">{flashMsg ? `· ${flashMsg} ·` : "—"}</span>
-            <button className="btn ghost mini" onClick={handleExportJson}>Export .json</button>
-            <button className="btn ghost mini" onClick={handleExportMd}>Export .md</button>
-            <button className="btn ghost mini" onClick={() => importInputRef.current?.click()}>Import</button>
-            <button className="btn ghost mini" onClick={handleReset}>Reset</button>
-            <input
-              ref={importInputRef}
-              type="file"
-              accept="application/json"
-              style={{ display: "none" }}
-              onChange={handleImportFile}
-            />
-          </>
+          <span id="saveDot">{flashMsg ? `· ${flashMsg} ·` : "—"}</span>
         )}
         <AuthButton />
         <span
@@ -104,25 +33,18 @@ export default function Header() {
           onClick={() => window.dispatchEvent(new Event("loom:walkthrough"))}
           className="helpbtn"
           id="helpBtn"
-          title="how Loom works"
-          aria-label="how Loom works"
-          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}
+          data-tip="how Loom works — the walkthrough"
+          aria-label="how Loom works — open the walkthrough"
+          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontFamily: "inherit" }}
         >
           ?
         </button>
       </header>
 
+      {/* Same ink scrim as every other overlay — the light blurred backdrop
+          was the one exception to the app's visual language. */}
       {showAbout && (
-        <div style={{
-          position: "fixed",
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(240, 240, 240, 0.8)",
-          backdropFilter: "blur(4px)",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 10000
-        }}>
+        <div className="info-scrim" onClick={(e) => { if (e.target === e.currentTarget) setShowAbout(false) }}>
           <div className="card" style={{ width: "90%", maxWidth: "600px", maxHeight: "85vh", overflowY: "auto", padding: "32px", boxShadow: "0 10px 40px rgba(0,0,0,0.15)", position: "relative" }}>
             <button
               onClick={() => setShowAbout(false)}
@@ -147,10 +69,10 @@ export default function Header() {
 
             <h3 style={{ fontSize: "16px", marginBottom: "12px", borderBottom: "1px solid var(--rule)", paddingBottom: "4px" }}>Features</h3>
             <ul style={{ lineHeight: "1.6", marginBottom: "24px", paddingLeft: "20px" }}>
-              <li style={{ marginBottom: "6px" }}><b>Bite-Sized Capture:</b> Synthesize complex readings into discrete, manageable nodes ("bytes").</li>
+              <li style={{ marginBottom: "6px" }}><b>Bite-Sized Capture:</b> Keep the passages that matter as discrete "bytes" — the author's words, verbatim, with their citation — each filed under a concept you name.</li>
               <li style={{ marginBottom: "6px" }}><b>Intentional Connections ("Throws"):</b> The power of Loom lies in the edges. You decide exactly how two concepts relate.</li>
-              <li style={{ marginBottom: "6px" }}><b>Disciplinary "Tongues":</b> The verbs we reach for to name a relation (e.g., constrains, refutes, betrays) aren't neutral; each belongs to a specific way of seeing the world. Loom lets you apply different lenses (e.g., "Cause & system" vs. "Stance & value") to the same connections to see how meaning shifts.</li>
-              <li style={{ marginBottom: "6px" }}><b>The Woven Graph:</b> View your interconnected graph ("Read") and generate an "axial read"—a synthesized narrative spanning multiple texts that you can instantly copy as a draft.</li>
+              <li style={{ marginBottom: "6px" }}><b>Disciplinary "Tongues":</b> The verbs we reach for to name a relation (e.g., constrains, refutes, betrays) aren't neutral; each belongs to a specific way of seeing the world. When you coin a term, Loom offers registers from several fields — "Cause &amp; system", "Stance &amp; value" — as suggestions to tap or ignore. You pick the word, or write your own; the machine never names the relation.</li>
+              <li style={{ marginBottom: "6px" }}><b>The Woven Graph:</b> View your interconnected graph ("Read"), then write your own "axial read" across texts. Loom lays your threads out as material and counts what it sees; you write the reading, and copy it out as a draft.</li>
             </ul>
 
             <h3 style={{ fontSize: "16px", marginBottom: "12px", borderBottom: "1px solid var(--rule)", paddingBottom: "4px" }}>The Theory Behind the Tool</h3>

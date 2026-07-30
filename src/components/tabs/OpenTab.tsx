@@ -32,23 +32,30 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     state.concepts.find(c => c.label.toLowerCase() === label.toLowerCase())
 
   const handleAddByte = async () => {
-    if (!content || !conceptLabel) return
+    // Trim before testing: whitespace is not a passage, and " boundary objects "
+    // must match the existing "boundary objects" rather than mint a duplicate.
+    const text = content.trim()
+    const cname = conceptLabel.trim()
+    if (!text || !cname) return
 
     const wdef = workingDef.trim()
     // Find concept or create it
-    let concept = findConcept(conceptLabel)
+    let concept = findConcept(cname)
     if (!concept) {
-      concept = await addConcept(conceptLabel, wdef || undefined)
+      concept = await addConcept(cname, wdef || undefined)
     } else if (wdef && !concept.def) {
       await editConcept(concept.id, { def: wdef })
     }
 
-    await addByte(concept.id, source, location, content)
+    await addByte(concept.id, source.trim(), location.trim(), text)
 
     // reset form (keep source/location if user wants to enter multiple passages from same place)
     setContent("")
     setConceptLabel("")
     setWorkingDef("")
+    // The flash points at "its log row", so open that row — otherwise the
+    // affordance it advertises is off screen (v14 set openByte on add).
+    setOpenLogRows(prev => ({ ...prev, [concept.id]: true }))
     flash("byte added — in its log row you can also file it under a second concept")
   }
 
@@ -215,32 +222,36 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
           </div>
         )}
         <p className="do">Do this — paste a passage here, or select text in a Library PDF. Then name the concept it evidences, and gloss it in your own words.</p>
-        <p className="hint">A byte is a passage worth keeping plus your concept for it. Loom can carry over source details and offer passage words to tap; it does not summarize or choose the concept for you.</p>
+        <p className="hint">A &ldquo;byte&rdquo; = one passage + its citation. Choosing the passage is <i>your</i> judgment — that&apos;s the point. Loom can carry over source details and offer passage words to tap; it does not summarize or choose the concept for you.</p>
         
         <div className="form-row">
           <span className="label">Source — author, work</span>
-          <input 
-            className="mono-in" 
+          <input
+            className="mono-in"
             placeholder="Suchman, Plans and Situated Actions"
+            title="who wrote it, and what work it's from"
             value={source}
             onChange={(e) => setSource(e.target.value)}
           />
         </div>
-        
+
         <div className="form-row">
           <span className="label">Location</span>
-          <input 
-            className="mono-in" 
+          <input
+            className="mono-in"
             placeholder="ch. 3, p. 49"
+            title="page, chapter, or timestamp — so you (and readers) can get back to the source"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
           />
         </div>
-        
+
         <div className="form-row">
-          <span className="label">Passage</span>
+          <span className="label">Passage — the author&apos;s words, verbatim</span>
           <textarea
+            id="bText"
             placeholder="paste or type the passage…"
+            title="verbatim, with citation — this is your evidence"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onPaste={(e) => {
@@ -285,7 +296,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                 <li>Tell a friend what this bit is about in <b style={{color: "var(--ink)", fontWeight: 500}}>five words</b>.</li>
                 <li>What's the <b style={{color: "var(--ink)", fontWeight: 500}}>one move</b> the author is making here?</li>
                 <li className="eg" style={{marginTop: "6px", color: "var(--ink-soft)"}}>
-                  Just to show the shape — concepts in plain words: &nbsp;<i>"boundary objects" · "tools go invisible until they break"</i>
+                  Just to show the shape — concepts as noun phrases: &nbsp;<i>&ldquo;boundary objects&rdquo; · &ldquo;the central tension&rdquo;</i>
                 </li>
               </ul>
               <div style={{marginTop: "6px", color: "var(--ink-soft)", fontSize: "12px"}}>
@@ -299,7 +310,8 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
           <span className="label">Concept — a short noun phrase naming the idea <span style={{textTransform: "none", letterSpacing: 0, color: "var(--grey)"}}>(one per byte — you can file the same passage under a second concept from the log)</span></span>
           <input
             list="conceptOptions"
-            placeholder="e.g. boundary objects · the central tension"
+            placeholder="e.g. boundary objects · satisficing · valence"
+            title="a noun phrase, not a sentence — if the author names it, use her name for it"
             value={conceptLabel}
             onChange={(e) => setConceptLabel(e.target.value)}
           />
@@ -318,19 +330,31 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
           />
         </div>
 
-        <button 
-          className="btn" 
+        <button
+          className="btn"
           onClick={handleAddByte}
-          disabled={!content || !conceptLabel}
+          disabled={!content.trim() || !conceptLabel.trim()}
+          title="files the passage under its concept in your coding log"
         >
           Add byte
         </button>
+        {/* v14 alerted the reason on click; the button here is disabled instead,
+            so the same coaching has to be visible without one. */}
+        {(!content.trim() || !conceptLabel.trim()) && (
+          <p className="ghostnote" style={{ marginTop: "7px" }}>
+            {!content.trim() && !conceptLabel.trim()
+              ? "Paste or type a passage, then name the concept it evidences."
+              : !content.trim()
+                ? "Paste or type a passage."
+                : "Name the concept this byte evidences — a short noun phrase (the author's own term is often best)."}
+          </p>
+        )}
       </div>
 
       <div className="card">
         <h2>Coding log <span className="n">{state.bytes.length ? `(${state.bytes.length} bytes · ${state.concepts.length} concepts)` : ""}</span></h2>
         <p className="do calm">Everything you capture lands here, newest on top — your growing pile of concepts.</p>
-        <p className="hint">The warp being laid, thread by thread. Click a row to open it; next, take these to <b>02 — Throw</b>.</p>
+        <p className="hint">Click a row to open it — edit the working definition, or file the same passage under another concept. When you have a handful, go to <b>02 — Throw</b> and start connecting them.</p>
         
         <div className="scrollbox">
           {state.concepts.length === 0 && (
@@ -344,7 +368,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
               <button className="btn ghost mini" onClick={handleLoadExample} disabled={exampleBusy}>
                 load the worked example (Star &amp; Griesemer)
               </button>
-              <p className="hint" style={{ marginTop: "6px" }}>a finished weave to poke at — explore it, then Reset to start your own.</p>
+              <p className="hint" style={{ marginTop: "6px" }}>a finished weave to poke at — explore it, then clear it from 05 · Keep to start your own.</p>
             </div>
           )}
           {state.concepts.slice().reverse().map(concept => {
@@ -353,25 +377,12 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
             
             return (
               <div key={concept.id} className={`lrow ${isOpen ? "open" : ""}`}>
+                {/* No destructive control here: this header is the row's
+                    expand/collapse target, so "remove concept" lives inside the
+                    opened row next to "remove byte", labelled, as in v14. */}
                 <div className="lhead" onClick={() => toggleRow(concept.id)} style={{ display: "flex", alignItems: "center" }}>
                   <div className="lconcept" style={{flex: 1}}>{concept.label}</div>
                   <div className="lsrc">{conceptBytes.length} bytes</div>
-                  <button
-                    className="btn ghost mini"
-                    style={{padding: "2px 6px", minHeight: 0, margin: "0 0 0 8px", opacity: 0.6}}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveConcept(concept.id, conceptBytes.length)
-                    }}
-                    title="Delete concept"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      <path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      <path d="M7 6l1 14h8l1-14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M10 10v6M14 10v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                  </button>
                 </div>
                 {isOpen && (
                   <div className="lbody">
@@ -413,7 +424,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                       <div key={b.id} data-byte-id={b.id} style={{ marginTop: "12px", borderBottom: "1px dotted var(--rule)", paddingBottom: "8px" }}>
                         <div className="passage">"{b.content}"</div>
                         <div className="src">
-                          {b.source} {b.location}
+                          {b.source || "—"}{b.location ? ` · ${b.location}` : ""}
                           <span className="rm-actions" style={{ marginLeft: "8px" }}>
                             <button
                               type="button"
@@ -446,6 +457,14 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                         </div>
                       </div>
                     ))}
+                    <button
+                      type="button"
+                      className="rm"
+                      style={{ background: "none", border: "none", padding: 0, marginTop: "12px" }}
+                      onClick={() => handleRemoveConcept(concept.id, conceptBytes.length)}
+                    >
+                      remove concept
+                    </button>
                   </div>
                 )}
               </div>

@@ -30,11 +30,14 @@ test.describe('PDF Viewer and Highlighting', () => {
       // 1b. Click on the Library tab (default is Open tab)
       await page.getByRole('button', { name: /Library/i }).click();
       
-      // 2. Wait for the Library to load
-      await expect(page.locator(`text=${pdf.expectedText}`)).toBeVisible();
-      
+      // 2. Wait for the Library to load. Tabs 01-04 stay mounted once visited
+      // and are hidden with CSS, so scope to the visible panel rather than
+      // matching a concealed one.
+      const panel = page.locator('.panel.active');
+      await expect(panel.locator(`text=${pdf.expectedText}`).first()).toBeVisible();
+
       // 3. Click "Read in Loom" on the respective card
-      const card = page.locator('.card', { hasText: pdf.cardTitle });
+      const card = panel.locator('.card', { hasText: pdf.cardTitle });
       await card.locator('button:has-text("Read in Loom")').click();
       
       // 4. Wait for PDF to load
@@ -69,8 +72,9 @@ test.describe('PDF Viewer and Highlighting', () => {
       await expect(captureButton).toBeVisible();
       await captureButton.click();
       
-      // 8. Modal appears, save the byte
-      const conceptInput = page.getByPlaceholder('e.g. boundary objects');
+      // 8. Modal appears, save the byte. Exact match: the Open tab's concept
+      // input starts with the same words and is still mounted behind this.
+      const conceptInput = page.getByPlaceholder('e.g. boundary objects', { exact: true });
       await conceptInput.fill(`Test Concept for ${pdf.cardTitle}`);
       
       const saveButton = page.locator('button:has-text("Save Byte")');

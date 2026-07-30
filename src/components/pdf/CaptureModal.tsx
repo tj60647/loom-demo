@@ -17,17 +17,24 @@ interface CaptureModalProps {
 }
 
 export default function CaptureModal({ passage, source, sourceId, location, pageNumber, startOffset, endOffset, pageContentHash, onClose }: CaptureModalProps) {
-  const { state, addConcept, addByte } = useLoom()
+  const { state, addConcept, addByte, editConcept } = useLoom()
   const [conceptLabel, setConceptLabel] = useState("")
+  const [workingDef, setWorkingDef] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleCapture = async () => {
-    if (!conceptLabel || !passage) return
+    const cname = conceptLabel.trim()
+    if (!cname || !passage) return
     setIsSubmitting(true)
     try {
-      let concept = state.concepts.find(c => c.label.toLowerCase() === conceptLabel.toLowerCase())
+      // Same rule as manual capture: the gloss fills a new concept, or an
+      // existing one that has none, and never overwrites what you wrote before.
+      const wdef = workingDef.trim()
+      let concept = state.concepts.find(c => c.label.toLowerCase() === cname.toLowerCase())
       if (!concept) {
-        concept = await addConcept(conceptLabel)
+        concept = await addConcept(cname, wdef || undefined)
+      } else if (wdef && !concept.def) {
+        await editConcept(concept.id, { def: wdef })
       }
       await addByte(concept.id, source, location, passage, pageNumber, startOffset, endOffset, sourceId, pageContentHash)
       onClose()
@@ -39,16 +46,7 @@ export default function CaptureModal({ passage, source, sourceId, location, page
   }
 
   return (
-    <div style={{
-      position: "fixed",
-      top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: "rgba(240, 240, 240, 0.8)",
-      backdropFilter: "blur(4px)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 10000
-    }}>
+    <div className="info-scrim">
       <div className="card" style={{ width: "100%", maxWidth: "450px", padding: "24px", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
         <h2 style={{ marginBottom: "16px", fontSize: "18px" }}>Capture Byte</h2>
         
@@ -71,10 +69,11 @@ export default function CaptureModal({ passage, source, sourceId, location, page
         </div>
 
         <div className="form-row">
-          <span className="label">Concept — what's this bit about?</span>
-          <input 
-            list="conceptOptionsModal" 
+          <span className="label">Concept — a short noun phrase naming the idea</span>
+          <input
+            list="conceptOptionsModal"
             placeholder="e.g. boundary objects"
+            title="a noun phrase, not a sentence — if the author names it, use her name for it"
             value={conceptLabel}
             onChange={(e) => setConceptLabel(e.target.value)}
             autoFocus
@@ -110,19 +109,29 @@ export default function CaptureModal({ passage, source, sourceId, location, page
                 <li>Tell a friend what this bit is about in <b style={{color: "var(--ink)", fontWeight: 500}}>five words</b>.</li>
                 <li>What's the <b style={{color: "var(--ink)", fontWeight: 500}}>one move</b> the author is making here?</li>
                 <li className="eg" style={{marginTop: "6px", color: "var(--ink-soft)"}}>
-                  Just to show the shape — concepts in plain words: &nbsp;<i>"tools go invisible until they break" · "people just know how to go on"</i>
+                  Just to show the shape — concepts as noun phrases: &nbsp;<i>&ldquo;boundary objects&rdquo; · &ldquo;the central tension&rdquo;</i>
                 </li>
               </ul>
               <div style={{marginTop: "6px", color: "var(--ink-soft)", fontSize: "12px"}}>
-                A concept can be a phrase, not a word. It's provisional — rename it later, or type an existing name to reuse it.
+                A concept can be a phrase, not a word. It&apos;s provisional — rename it later, or type an existing name to reuse it.
               </div>
             </details>
           </div>
         </div>
 
+        <div className="form-row">
+          <span className="label">Working definition — the concept in your own words <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
+          <input
+            placeholder="e.g. a thing that means different things to different groups but still holds them together"
+            title="your own-words gloss — a sentence is fine; this is where crude is welcome"
+            value={workingDef}
+            onChange={(e) => setWorkingDef(e.target.value)}
+          />
+        </div>
+
         <div style={{ display: "flex", gap: "10px", marginTop: "24px", justifyContent: "flex-end" }}>
           <button className="btn ghost" onClick={onClose} disabled={isSubmitting}>Cancel</button>
-          <button className="btn" onClick={handleCapture} disabled={!conceptLabel || isSubmitting}>
+          <button className="btn" onClick={handleCapture} disabled={!conceptLabel.trim() || isSubmitting}>
             {isSubmitting ? "Saving..." : "Save Byte"}
           </button>
         </div>

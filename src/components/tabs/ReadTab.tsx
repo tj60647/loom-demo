@@ -180,6 +180,22 @@ export default function ReadTab() {
     copyWithFeedback(buildMapKit(state.concepts, state.edges, studentName), "map kit copied — take it to paper or Figma")
   }
 
+  // v14's tripleHtml + .readitem. Sizes come from globals.css (.threadhead is
+  // 19px display, .trip 15px, .sent 14.5px) — this pane is material to read
+  // from, and the inline overrides that used to sit here shrank it to 12-14px.
+  const threadItem = (e: Edge) => {
+    const f = state.concepts.find(c => c.id === e.fromId)
+    const t = state.concepts.find(c => c.id === e.toId)
+    return (
+      <div key={e.id} className="readitem">
+        <div className="trip">
+          <b>{f?.label || "?"}</b> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">sentence</span>} <b>{t?.label || "?"}</b>
+        </div>
+        <div className="sent">&ldquo;{e.sentence}&rdquo;</div>
+      </div>
+    )
+  }
+
   // Generate reading pane content
   let readingPane = null;
   if (readSel) {
@@ -189,28 +205,15 @@ export default function ReadTab() {
 
       readingPane = (
         <div id="readingPane" style={{ marginTop: "16px" }}>
-          <div className="threadhead" style={{ fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
-            {names.map((n, i) => <span key={n!.id}><span style={{ color: "var(--red)" }}>{n!.label}</span>{i < names.length - 1 ? " / " : ""}</span>)}
-            <span className="n" style={{ color: "var(--grey)", fontWeight: "normal" }}> · {inc.length} thread{inc.length !== 1 ? 's' : ''} meet here</span>
+          <div className="threadhead">
+            {names.map((n, i) => <span key={n!.id}><span className="red">{n!.label}</span>{i < names.length - 1 ? " · " : ""}</span>)}
+            <span className="n"> · {inc.length} thread{inc.length !== 1 ? 's' : ''} meet here</span>
           </div>
           <p className="hint" style={{ margin: "4px 0 9px" }}>
             The threads that converge on your busiest concept{readSel.ids.length > 1 ? 's' : ''} — your own sentences. <b>You</b> decide whether this is the core, and weave it into your read.
           </p>
           <button className="btn ghost mini" onClick={handleCopyDraft} style={{ marginBottom: "12px" }}>copy these threads</button>
-          <div>
-            {inc.map(e => {
-              const f = state.concepts.find(c => c.id === e.fromId);
-              const t = state.concepts.find(c => c.id === e.toId);
-              return (
-                <div key={e.id} className="readitem" style={{ marginBottom: "12px", borderBottom: "1px dotted var(--rule)", paddingBottom: "12px" }}>
-                  <div className="trip" style={{ fontSize: "12px", marginBottom: "4px" }}>
-                    <b>{f?.label || "?"}</b> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">loose</span>} <b>{t?.label || "?"}</b>
-                  </div>
-                  <div className="sent" style={{ fontStyle: "italic", fontSize: "14px", color: "var(--ink)" }}>"{e.sentence}"</div>
-                </div>
-              );
-            })}
-          </div>
+          <div>{inc.map(threadItem)}</div>
         </div>
       );
     } else if (readSel.type === "edge" && readSel.id) {
@@ -223,18 +226,18 @@ export default function ReadTab() {
 
         readingPane = (
           <div id="readingPane" style={{ marginTop: "16px" }}>
-            <div className="threadhead" style={{ fontSize: "14px", fontWeight: 500 }}>
-              <span style={{ color: "var(--red)" }}>{f?.label || "?"}</span> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">loose</span>} <span style={{ color: "var(--red)" }}>{t?.label || "?"}</span>
+            <div className="threadhead">
+              <span className="red">{f?.label || "?"}</span> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">sentence</span>} <span className="red">{t?.label || "?"}</span>
             </div>
-            <p style={{ fontSize: "15.5px", fontStyle: "italic", margin: "8px 0 14px", color: "var(--ink)" }}>"{e.sentence}"</p>
+            <p style={{ fontSize: "15.5px", fontStyle: "italic", margin: "8px 0 14px" }}>&ldquo;{e.sentence}&rdquo;</p>
             {[f, t].filter(Boolean).map(c => (
               <div key={c!.id} style={{ marginBottom: "16px" }}>
-                <div className="label" style={{ marginTop: "8px", fontWeight: "bold" }}>{c!.label}</div>
+                <div className="label" style={{ marginTop: "8px" }}>{c!.label}</div>
                 {c!.def && <div style={{ fontSize: "13.5px", color: "var(--ink-soft)" }}>{c!.def}</div>}
                 {(c === f ? fBytes : tBytes).map(b => (
-                  <div key={b.id} className="bytequote" style={{ marginTop: "6px", paddingLeft: "8px", borderLeft: "2px solid var(--rule)" }}>
-                    <span className="src" style={{ fontSize: "11px", color: "var(--grey)" }}>{b.source || '-'} {b.location ? `· ${b.location}` : ''}</span><br/>
-                    <span style={{ fontSize: "13px" }}>{b.content}</span>
+                  <div key={b.id} className="bytequote">
+                    <span className="src">{b.source || '—'}{b.location ? ` · ${b.location}` : ''}</span><br/>
+                    {b.content}
                   </div>
                 ))}
               </div>
@@ -249,34 +252,21 @@ export default function ReadTab() {
         if (comp.edges.length === 0) {
           readingPane = (
             <div id="readingPane" style={{ marginTop: "16px" }}>
-              <div className="threadhead" style={{ fontSize: "14px", fontWeight: 500, color: "var(--red)" }}>{c.label}</div>
+              <div className="threadhead"><span className="red">{c.label}</span></div>
               <p className="empty" style={{ marginTop: "8px" }}>This thread crosses nothing yet — warp waiting for weft. Take it to 02 — Throw.</p>
             </div>
           );
         } else {
           readingPane = (
             <div id="readingPane" style={{ marginTop: "16px" }}>
-              <div className="threadhead" style={{ fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
-                <span style={{ color: "var(--red)" }}>{c.label}</span> <span className="n" style={{ color: "var(--grey)", fontWeight: "normal" }}> · {comp.edges.length} crossing{comp.edges.length !== 1 ? 's' : ''}</span>
+              <div className="threadhead">
+                <span className="red">{c.label}</span> <span className="n"> · {comp.edges.length} crossing{comp.edges.length !== 1 ? 's' : ''}</span>
               </div>
               <p className="hint" style={{ margin: "4px 0 9px" }}>
                 Your threads, in walking order — your own sentences, laid out as raw material. <b>You</b> weave them into a read on the right, in your own words. Copy to quote a line.
               </p>
               <button className="btn ghost mini" onClick={handleCopyDraft} style={{ marginBottom: "12px" }}>copy these threads</button>
-              <div>
-                {comp.edges.map(e => {
-                  const f = state.concepts.find(x => x.id === e.fromId);
-                  const t = state.concepts.find(x => x.id === e.toId);
-                  return (
-                    <div key={e.id} className="readitem" style={{ marginBottom: "12px", borderBottom: "1px dotted var(--rule)", paddingBottom: "12px" }}>
-                      <div className="trip" style={{ fontSize: "12px", marginBottom: "4px" }}>
-                        <b>{f?.label || "?"}</b> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">loose</span>} <b>{t?.label || "?"}</b>
-                      </div>
-                      <div className="sent" style={{ fontStyle: "italic", fontSize: "14px", color: "var(--ink)" }}>"{e.sentence}"</div>
-                    </div>
-                  );
-                })}
-              </div>
+              <div>{comp.edges.map(threadItem)}</div>
             </div>
           );
         }
@@ -293,7 +283,7 @@ export default function ReadTab() {
   return (
     <>
       <p className="tasktitle">Read the whole cloth.</p>
-      <p className="tasksub">What argument runs through it? What does it keep returning to? What's missing? The cloth shows you where to look — the reading is yours to write.</p>
+      <p className="tasksub">What argument runs through it? What does it keep returning to? What&apos;s missing? The cloth shows you where to look — the reading is yours to write. From here, your weave feeds the work <i>outside</i> Loom: the concept map you draw by hand, and the chalk talk you build from it.</p>
 
       <div className="rail" id="readRail">
         {["look", "trace", "question", "write"].map((s, i) => (
@@ -317,7 +307,7 @@ export default function ReadTab() {
 
       <div className="legend">
         <span><span className="sw" style={{borderTop: "2px solid var(--ochre)"}}></span>warp — concept</span>
-        <span><span className="sw" style={{borderTop: "2px solid var(--sage)"}}></span>named relation</span>
+        <span><span className="sw" style={{borderTop: "2px solid var(--sage)"}}></span>coined term</span>
         <span><span className="sw" style={{borderTop: "2px dashed var(--grey)"}}></span>unnamed — sentence only</span>
         <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>what you're tracing</span>
       </div>
@@ -381,7 +371,7 @@ export default function ReadTab() {
               </section>
             </div>
           )}
-          <p className="hint">Each is a question with a move — click to trace it on the cloth and lay your threads out as material below. You weave them into your read. You make the call.</p>
+          <p className="hint">Click a prompt to light it up on the cloth and lay those threads out below. <b>You don&apos;t write anything here</b> — your one short read goes on the right.</p>
 
           <div id="clothPrompts">
             {state.concepts.length === 0 && <p className="empty">Nothing laid yet — prompts appear as you weave.</p>}
@@ -410,19 +400,19 @@ export default function ReadTab() {
 
         <div className="card">
           <h2>Your read</h2>
-          <p className="hint">The move: weave the findings into one narrative. The tool never writes it for you.</p>
+          <p className="hint">One short paragraph, in your own words: what is this reading about, and what holds it together? The tool never writes it for you.</p>
           <p className="readq">In a sentence — what is this reading <i>about</i>?</p>
           <textarea
             id="yourRead"
-            placeholder="Write your read here, in your own words. Trace a prompt on the left to lay your threads out as material to weave from."
+            placeholder="Write your read here — a paragraph is enough. Trace the prompts on the left first if you want your threads laid out to work from."
             value={state.read}
             onChange={(e) => setRead(e.target.value)}
             onBlur={flushRead}
           />
           <div className="drafted" id="readDrafted">{drafted}</div>
           <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
-            <button className="btn ghost mini" onClick={handleCopyRead}>Copy as essay draft</button>
-            <button className="btn ghost mini" onClick={handleMapKit}>Copy map kit → draw your map</button>
+            <button className="btn ghost mini" data-tip="copies your paragraph to the clipboard" onClick={handleCopyRead}>Copy your read</button>
+            <button className="btn ghost mini" data-tip="copies your concepts, propositions, and spine — everything you need to draw your concept map by hand" onClick={handleMapKit}>Copy map kit → draw your map</button>
           </div>
         </div>
       </div>

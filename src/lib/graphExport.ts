@@ -56,6 +56,7 @@ export function buildExport(state: LoomState, student: string): LoomExport {
       cardTable: {
         positions: state.views.cardTable.positions,
         bends: state.views.cardTable.bends,
+        ...(state.views.cardTable.order?.length ? { order: state.views.cardTable.order } : {}),
       },
     },
   }
@@ -169,6 +170,7 @@ export function parseImport(raw: string): ParsedImport {
       ...g,
       positions: cardTableRaw.positions ?? {},
       bends: cardTableRaw.bends ?? {},
+      order: cardTableRaw.order ?? [],
     }
   }
 
@@ -261,6 +263,14 @@ export function parseImport(raw: string): ParsedImport {
       bends[key] = { dx: b.dx, dy: b.dy }
     }
   })
+  const rawOrder = Array.isArray(data.order) ? (data.order as unknown[]) : []
+  const order: string[] = []
+  const seenOrder = new Set<string>()
+  rawOrder.forEach((key) => {
+    if (typeof key !== "string" || !conceptKeys.has(key) || seenOrder.has(key)) return
+    seenOrder.add(key)
+    order.push(key)
+  })
 
   return {
     student: str(data.student),
@@ -268,7 +278,7 @@ export function parseImport(raw: string): ParsedImport {
     concepts,
     bytes,
     edges,
-    cardTable: { positions, bends },
+    cardTable: { positions, bends, order },
   }
 }
 

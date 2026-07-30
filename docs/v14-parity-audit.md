@@ -213,6 +213,64 @@ confirmed 29 findings; all were fixed the same day. The load-bearing ones:
   backdoor appears never to have worked in this environment. Fix belongs with
   the auth/ops residue already tracked in `NEXT_SESSION.md`.
 
+## 6b. Follow-on work (2026-07-30)
+
+Three requested changes, then a full UI/language reconciliation against v14.
+
+**05 — Keep.** Export / import / reset moved off the header chrome onto their own
+tab, each explained rather than merely offered: `.json` is the exact record and
+the only re-importable form, `.md` a readable outline, import *replaces* rather
+than merges, and reset spares the development history. Spec §3 Global records
+the move.
+
+**Sort list re-ordering.** The Map tab's sort list takes a drag handle (mouse and
+keyboard). The order is stored as `views.cardTable.order` — a projection, so it
+re-sequences that list alone and never the graph's capture order, which the arc
+map reads as reading order. Spec §6 records the new key.
+
+**"Make all primary."** A bulk tier assignment with a confirm naming how many
+tiers it overwrites. v14 has no bulk tier operation; this is a deliberate
+addition, framed as a starting point to demote from, and it stays a student
+gesture (red line #7).
+
+**UI / language reconciliation.** A four-lens read-only audit (Open+Throw,
+Read+Map, chrome, and a whole-app voice pass) produced
+[v14-ui-language-diff.md](v14-ui-language-diff.md): 123 differences sorted into
+divergences from v14 (66), deliberate app changes (40), and production-only
+surfaces (15). All 66 divergences are now closed, worked in batches of three.
+The ones that were more than wording:
+
+- The help "?" dispatched an event whose only listener lived in the signed-in
+  branch — a visible control that did nothing. The walkthrough now mounts in
+  every state and only auto-opens when signed in.
+- v14's `[data-tip]` tooltip system had never been ported, while two `data-tip`
+  attributes sat in `MapTab` pretending otherwise.
+- The About dialog promised an auto-generated "axial read" seven lines after
+  "Nothing is auto-generated", and claimed a lens-switching capability the tool
+  does not have.
+- Validation had gone silent on Open and Throw. Restoring the reason inline
+  required trimming too, or a whitespace-only passage still passed the guard.
+- **Tabs unmounted on switch**, destroying a half-typed throw sentence, the
+  active trace, and the definitions toggle. Tabs 01–04 now stay mounted and hide
+  with CSS, as v14 did. This required moving the cloth to `ResizeObserver`
+  first: a panel mounted while hidden measures zero width, and a resize listener
+  never fires on a `display` change.
+- The two capture doorways had drifted apart — the PDF capture modal still
+  taught the pre-7/29 model and offered no working-definition field, so a
+  library capture silently skipped the gloss manual capture asks for.
+- The save dot confirmed only the read; every graph mutation succeeded silently.
+
+Two ports were adapted rather than copied, and say so in place: `.scrim`'s
+`z-index` (v14's 40 was top-of-stack there; this app has overlays up to 10000)
+and the reset tooltip (v14 says "this browser's cloth"; here reset is
+server-side and course-scoped).
+
+Keep-alive legitimately broke three Playwright selectors, which were matching
+hidden panels once more than one tab lived in the DOM; they are now scoped to
+`.panel.active`. That is a test change following an intentional app change, not
+a test bent to fit a bug — checked first for the more serious hazard, duplicate
+element ids across co-mounted tabs, and found none.
+
 ## 7. Workflow verification note
 
 The gap matrix above was verified by a five-agent audit workflow (independent

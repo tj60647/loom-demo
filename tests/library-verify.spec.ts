@@ -31,8 +31,9 @@ test.describe('Library verification', () => {
 
     await page.getByRole('button', { name: /Library/i }).click();
 
-    // Source cards carry a thumbnail image.
-    const cards = page.locator('.card').filter({ has: page.locator('img') });
+    // Source cards carry a thumbnail image. Scope to the visible panel: tabs
+    // 01-04 stay mounted once visited, hidden with CSS.
+    const cards = page.locator('.panel.active .card').filter({ has: page.locator('img') });
     await expect(cards.first()).toBeVisible({ timeout: 15000 });
     expect(await cards.count()).toBeGreaterThan(0);
 

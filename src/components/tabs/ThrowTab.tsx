@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { short } from "@/lib/clothMath"
 
@@ -41,6 +41,14 @@ export default function ThrowTab() {
   const [namingFor, setNamingFor] = useState<string | null>(null)
   const [nameDraft, setNameDraft] = useState("")
   const [moreTongues, setMoreTongues] = useState(false)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  // A tapped suggestion is a starting point, not the answer — return focus to
+  // the field (v14 did the same) so the student can edit it into their own word.
+  const pickWord = (word: string) => {
+    setNameDraft(word)
+    nameInputRef.current?.focus()
+  }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -241,7 +249,7 @@ export default function ThrowTab() {
                   <span className="clear" onClick={() => handleClearSlot('A')}>✕</span>
                   {c1.label}
                 </>
-              ) : <span className="ph">pick on left</span>}
+              ) : <span className="ph">tap a concept on the left</span>}
             </div>
 
             <div className="swapcol">
@@ -256,46 +264,42 @@ export default function ThrowTab() {
                   <span className="clear" onClick={() => handleClearSlot('B')}>✕</span>
                   {c2.label}
                 </>
-              ) : <span className="ph">pick on left</span>}
+              ) : <span className="ph">tap a concept on the left</span>}
             </div>
           </div>
 
           <div className="drawnote">{drawn && pairA && pairB ? 'the shuttle drew these — do they cross? “no crossing I can see” is a judgment too. draw again.' : ''}</div>
 
-          {!both ? (
-            <div className="sleeper asleep">
-              <div className="sleepmsg">pick two concepts on the left — the bench wakes when the pair is loaded</div>
-            </div>
-          ) : (
-            <div className="sleeper">
-              <div className="form-row">
-                <span className="label">The relationship, however awkwardly — your sentence</span>
-                <div className="chips" style={{ margin: "2px 0 6px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                  {OPENERS.map(o => (
-                    <span
-                      key={o}
-                      className="openchip"
-                      onClick={() => handleOpenerClick(o)}
-                      style={{
-                        fontFamily: "var(--body)", fontStyle: "italic", fontSize: "13.5px",
-                        background: "#fff", border: "1px solid var(--rule)", borderRadius: "12px",
-                        padding: "3px 11px", cursor: "pointer", color: "var(--ink-soft)"
-                      }}
-                    >
-                      {o}…
-                    </span>
-                  ))}
-                </div>
-                <textarea
-                  placeholder="…or just start typing. Long and awkward is fine."
-                  value={sentence}
-                  onChange={(e) => setSentence(e.target.value)}
-                />
+          {/* The bench always renders and only dims when no pair is loaded, as
+              in v14: you can see what the move will ask of you before you pick.
+              `.sleeper.asleep` fades it and blocks clicks with its ::after. */}
+          <div className={`sleeper ${both ? "" : "asleep"}`}>
+            <div className="sleepmsg">pick two concepts on the left — the bench wakes when the pair is loaded</div>
+            <div className="form-row">
+              <span className="label">The relationship, however awkwardly — your sentence</span>
+              <div className="chips" style={{ margin: "2px 0 6px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {OPENERS.map(o => (
+                  <span key={o} className="openchip" onClick={() => handleOpenerClick(o)}>
+                    {o}…
+                  </span>
+                ))}
               </div>
-              <button className="btn" onClick={handleThrow} disabled={!sent}>Throw it</button>
-              <p className="ghostnote" style={{marginTop: "7px"}}>Thrown threads land below. When a relationship recurs, coin a short term for it (optional) — that&apos;s how your vocabulary grows.</p>
+              <textarea
+                placeholder="…or just start typing. Long and awkward is fine."
+                value={sentence}
+                onChange={(e) => setSentence(e.target.value)}
+              />
             </div>
-          )}
+            <button className="btn" onClick={handleThrow} disabled={!sent}>Throw it</button>
+            {/* v14 alerted the reason on click and showed the standing note
+                always; with a disabled button the reason has to be visible
+                instead — so the two take turns rather than stacking. */}
+            <p className="ghostnote" style={{marginTop: "7px"}}>
+              {sent
+                ? "Thrown threads land below. When a relationship recurs, coin a short term for it (optional) — that's how your vocabulary grows."
+                : "Say how they hang together — however awkwardly. The sentence is the thread."}
+            </p>
+          </div>
 
           <h3 style={{fontFamily: "var(--display)", fontSize: "17px", borderBottom: "1px solid var(--rule)", paddingBottom: "5px", margin: "18px 0 6px"}}>
             Threads thrown <span className="n" style={{fontFamily: "var(--mono)", fontSize: "11px", color: "var(--grey)"}}>{state.edges.length ? `(${state.edges.length})` : ''}</span>
@@ -307,17 +311,19 @@ export default function ThrowTab() {
             ) : orderedEdges.map(e => {
               const fromC = state.concepts.find(c => c.id === e.fromId)
               const toC = state.concepts.find(c => c.id === e.toId)
-              if (!fromC || !toC) return null
+              // v14 renders a dangling end as "?" rather than dropping the row:
+              // a thread the student threw should stay visible and removable,
+              // not vanish silently because one end went missing.
               const sel = namingFor === e.id
 
               return (
                 <div key={e.id} className={`thread ${sel ? "sel" : ""}`}>
                   <div className="trip">
-                    <b>{short(fromC.label, 30)}</b>{' '}
+                    <b>{fromC ? short(fromC.label, 30) : "?"}</b>{' '}
                     {e.handle
                       ? <span className="v">{e.handle}</span>
                       : <span className="v loosev">{short(e.sentence, 38)}</span>}{' '}
-                    <b>{short(toC.label, 30)}</b>
+                    <b>{toC ? short(toC.label, 30) : "?"}</b>
                   </div>
                   <div className="sent">“{e.sentence}”</div>
                   <div className="tmeta">
@@ -342,6 +348,7 @@ export default function ThrowTab() {
                       <div className="rnote"><b>Coin a term</b> (optional) — you&apos;ve already said how they relate; a short word lets this <i>kind</i> of link recur across your weave.</div>
                       <div className="form-row" style={{ margin: "6px 0 8px" }}>
                         <input
+                          ref={nameInputRef}
                           className="tinput"
                           value={nameDraft}
                           onChange={(ev) => setNameDraft(ev.target.value)}
@@ -352,7 +359,7 @@ export default function ThrowTab() {
                       <div className="rnote">Stuck for a word? Tap an everyday suggestion — or open <b>more tongues</b> for other fields&apos; vocabularies:</div>
                       <div className="chips">
                         {REGISTERS[0].verbs.map(v => (
-                          <span key={v} className="verbchip" onClick={() => setNameDraft(v)}>{v}</span>
+                          <span key={v} className="verbchip" onClick={() => pickWord(v)}>{v}</span>
                         ))}
                       </div>
                       <span
@@ -367,7 +374,7 @@ export default function ThrowTab() {
                           <span className="cap">{r.name} · {r.tag}</span>
                           <div className="chips" style={{ marginTop: "4px" }}>
                             {r.verbs.map(v => (
-                              <span key={v} className="verbchip borrowed" onClick={() => setNameDraft(v)}>{v}</span>
+                              <span key={v} className="verbchip borrowed" onClick={() => pickWord(v)}>{v}</span>
                             ))}
                           </div>
                         </div>

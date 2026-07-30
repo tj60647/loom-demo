@@ -19,19 +19,45 @@ const BAND_H = (TABLE_H - 20) / 3
 
 const isPlaced = (t: Tier) => t === "p" || t === "s" || t === "t"
 
+/**
+ * The sort list's effective sequence: ids named in views.cardTable.order first,
+ * in that sequence, then every concept the order does not mention, in capture
+ * order. Used for RENDERING THE SORT LIST ONLY — the card table, the mirror
+ * counts, the map kit and the arc map all keep reading state.concepts as it
+ * comes. Computing this never writes (red line #7): the default sequence is a
+ * display fact until a student drags or arrows a row.
+ */
+const sortOrder = (concepts: Concept[], order?: string[]): Concept[] => {
+  if (!order?.length) return concepts
+  const byId = new Map(concepts.map(c => [c.id, c]))
+  const taken = new Set<string>()
+  const out: Concept[] = []
+  order.forEach(id => {
+    const c = byId.get(id)
+    if (c && !taken.has(id)) { out.push(c); taken.add(id) }
+  })
+  concepts.forEach(c => { if (!taken.has(c.id)) out.push(c) })
+  return out
+}
+
 export default function MapTab() {
   const { state, editConcept, setCardTable, setRead, flushRead, flash, studentName } = useLoom()
   const [showDefs, setShowDefs] = useState(true)
 
   const svgRef = useRef<SVGSVGElement>(null)
   const [width, setWidth] = useState(720)
+  // ResizeObserver also fires when a hidden panel becomes visible, which a
+  // window resize listener does not. Zero width means display:none — hold the
+  // last good width rather than reflowing the table to the fallback.
   useEffect(() => {
-    const measure = () => {
-      if (svgRef.current) setWidth(Math.max(Math.floor(svgRef.current.getBoundingClientRect().width), 720))
-    }
-    measure()
-    window.addEventListener("resize", measure)
-    return () => window.removeEventListener("resize", measure)
+    const svg = svgRef.current
+    if (!svg) return
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0
+      if (w > 0) setWidth(Math.max(Math.floor(w), 720))
+    })
+    observer.observe(svg)
+    return () => observer.disconnect()
   }, [])
   const W = width
   // Usable width — the denominator for proportional x (spec §5): stored x is a
@@ -134,8 +160,63 @@ export default function MapTab() {
       // Leaving the table clears the card's stored spot — a student gesture.
       const positions = { ...stored }
       delete positions[c.id]
-      setCardTable({ positions, bends })
+      setCardTable({ ...state.views.cardTable, positions })
     }
+  }
+
+  // "make all primary" — one student gesture that tiers everything at once.
+  // The tool is not advising that everything is primary; it is doing in one
+  // move what the student would otherwise do chip by chip, and saying plainly
+  // that the demoting is still theirs.
+  const makeAllPrimary = () => {
+    const all = state.concepts
+    if (!all.length) return
+    if (!window.confirm(`Make all ${all.length} concept${all.length !== 1 ? "s" : ""} primary? This overwrites the tiers you have already set.`)) return
+    all.forEach(c => { if (c.tier !== "p") editConcept(c.id, { tier: "p" }) })
+    flash("all primary — re-sort any that aren't")
+  }
+
+  // --- sort list order: a view projection, written only by drag or arrow ---
+  const sortList = sortOrder(state.concepts, state.views.cardTable.order)
+  const [dragId, setDragId] = useState<string | null>(null)
+  // Insertion index under the pointer (0..sortList.length), not a row index.
+  const [dropAt, setDropAt] = useState<number | null>(null)
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+
+  // Persist the FULL id list, so the sequence stays stable as concepts arrive.
+  const moveRow = (fromIdx: number, toIdx: number) => {
+    if (fromIdx < 0 || toIdx < 0 || toIdx >= sortList.length || toIdx === fromIdx) return false
+    const ids = sortList.map(c => c.id)
+    const [moved] = ids.splice(fromIdx, 1)
+    ids.splice(toIdx, 0, moved)
+    setCardTable({ ...state.views.cardTable, order: ids })
+    return true
+  }
+
+  const onHandleKeyDown = (e: React.KeyboardEvent<HTMLSpanElement>, idx: number) => {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return
+    e.preventDefault()
+    if (moveRow(idx, e.key === "ArrowUp" ? idx - 1 : idx + 1)) {
+      flash("sort list re-ordered — the map itself is unchanged")
+    }
+  }
+
+  const onRowDragOver = (e: React.DragEvent<HTMLDivElement>, idx: number) => {
+    if (!dragId) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+    const r = e.currentTarget.getBoundingClientRect()
+    setDropAt(e.clientY < r.top + r.height / 2 ? idx : idx + 1)
+  }
+
+  const onRowDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!dragId || dropAt === null) return
+    e.preventDefault()
+    const fromIdx = sortList.findIndex(c => c.id === dragId)
+    const toIdx = dropAt > fromIdx ? dropAt - 1 : dropAt
+    if (moveRow(fromIdx, toIdx)) flash("sort list re-ordered — the map itself is unchanged")
+    setDragId(null)
+    setDropAt(null)
   }
 
   // --- drag machinery ---
@@ -213,7 +294,7 @@ export default function MapTab() {
         }
         // The drag is the student gesture — persist this card's spot, once.
         // x is stored as a fraction of the usable width (spec §5), y in px.
-        setCardTable({ positions: { ...stored, [id]: { x: pos.x / usableW, y: pos.y } }, bends })
+        setCardTable({ ...state.views.cardTable, positions: { ...stored, [id]: { x: pos.x / usableW, y: pos.y } } })
       }
       setLive(null)
       return
@@ -224,7 +305,7 @@ export default function MapTab() {
       dragEdgeStart.current = null
       const b = liveBendRef.current
       if (b && b.id === id) {
-        setCardTable({ positions: stored, bends: { ...bends, [id]: { dx: b.dx, dy: b.dy } } })
+        setCardTable({ ...state.views.cardTable, bends: { ...bends, [id]: { dx: b.dx, dy: b.dy } } })
       }
       setBend(null)
     }
@@ -268,16 +349,62 @@ export default function MapTab() {
       </div>
 
       <div className="card" style={{ marginBottom: 14 }}>
-        <h2>Sort <span className="n" id="triageCount">{state.concepts.length ? `(${onCount} of ${state.concepts.length} on the table)` : ""}</span></h2>
+        <div className="heading-with-info">
+          <h2>Sort <span className="n" id="triageCount">{state.concepts.length ? `(${onCount} of ${state.concepts.length} on the table)` : ""}</span></h2>
+          <button
+            className="btn ghost mini"
+            id="makeAllPrimary"
+            disabled={!state.concepts.length}
+            data-tip="tiers every concept primary in one gesture — you demote from there"
+            onClick={makeAllPrimary}
+          >make all primary</button>
+        </div>
         <p className="do">Give each concept a tier: <b>P</b>rimary (the map hangs on it) · <b>S</b>econdary · <b>T</b>ertiary (example / detail) · <b>–</b> leave off. Sorted concepts land on the table below.</p>
-        <div id="triageList">
+        <p className="hint">Drag a row by its handle — or focus the handle and press ↑ / ↓ — to re-order this list. That re-sequences the list only; the table, the counts and the map kit are untouched. <b>Make all primary</b> is a starting point, not a recommendation: it puts everything on the top tier in one move so you can demote from there.</p>
+        <div id="triageList" onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropAt(null) }}>
           {!state.concepts.length ? (
             <div className="empty">
               <svg width={34} height={18} viewBox="0 0 34 18" fill="none" stroke="#a39f92" strokeWidth={1.3}><path d="M2 13 L7 5 L12 13 L17 5 L22 13 L27 5 L32 13" /></svg>
               <span className="cap">lay some warp on 01 — open first</span>
             </div>
-          ) : state.concepts.map(c => (
-            <div key={c.id} className="trow">
+          ) : sortList.map((c, i) => (
+            <div
+              key={c.id}
+              className={`trow${dragId === c.id ? " dragging" : ""}${dropAt === i ? " dropbefore" : ""}${dropAt === sortList.length && i === sortList.length - 1 ? " dropafter" : ""}`}
+              ref={el => {
+                if (el) rowRefs.current.set(c.id, el)
+                else rowRefs.current.delete(c.id)
+              }}
+              onDragOver={e => onRowDragOver(e, i)}
+              onDrop={onRowDrop}
+            >
+              <span
+                className="thandle"
+                role="button"
+                tabIndex={0}
+                aria-label={`Reorder ${c.label}`}
+                title="drag to re-order — or press ↑ / ↓"
+                draggable
+                onDragStart={e => {
+                  setDragId(c.id)
+                  setDropAt(i)
+                  e.dataTransfer.effectAllowed = "move"
+                  e.dataTransfer.setData("text/plain", c.id)
+                  const row = rowRefs.current.get(c.id)
+                  if (row) e.dataTransfer.setDragImage(row, 14, row.offsetHeight / 2)
+                }}
+                onDragEnd={() => { setDragId(null); setDropAt(null) }}
+                onKeyDown={e => onHandleKeyDown(e, i)}
+              >
+                <svg width={10} height={16} viewBox="0 0 10 16" aria-hidden="true" focusable="false">
+                  {[3, 8, 13].map(y => (
+                    <g key={y}>
+                      <circle cx={3} cy={y} r={1.25} />
+                      <circle cx={7} cy={y} r={1.25} />
+                    </g>
+                  ))}
+                </svg>
+              </span>
               <span className="tlabel">{c.label}</span>
               <span className="tierchips">
                 {TIERS.map(([k, name]) => (

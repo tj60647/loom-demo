@@ -18,10 +18,19 @@ export default function ClothMap({
   const svgRef = useRef<SVGSVGElement>(null)
   const [width, setWidth] = useState(720)
 
+  // ResizeObserver rather than a one-shot measure: it catches window resizes
+  // and the moment a hidden panel becomes visible. A zero width means the
+  // panel is display:none — keep the last good width instead of collapsing to
+  // the fallback and re-laying out on every tab switch.
   useEffect(() => {
-    if (svgRef.current) {
-      setWidth(Math.max(svgRef.current.getBoundingClientRect().width, 720))
-    }
+    const svg = svgRef.current
+    if (!svg) return
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0
+      if (w > 0) setWidth(Math.max(w, 720))
+    })
+    observer.observe(svg)
+    return () => observer.disconnect()
   }, [])
 
   const H = 400

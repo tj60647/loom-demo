@@ -5,7 +5,9 @@ import { LoomProvider } from "@/components/providers/LoomProvider";
 import Header from "@/components/ui/Header";
 
 export const metadata: Metadata = {
-  title: "Loom v8",
+  // No version here: this is the student's browser tab, not a build label —
+  // and it has gone stale every time the tool moved.
+  title: "Loom",
   description: "Lay the warp, throw the weft",
 };
 

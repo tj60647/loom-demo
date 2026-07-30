@@ -84,6 +84,12 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }, [session])
 
+  // v14 flashed on every save; here the graph mutations were silent on success,
+  // so the save dot only ever confirmed the read. Callers that have something
+  // more specific to say ("byte added", "thread thrown") flash after this and
+  // simply win, since the last message displayed is the one that shows.
+  const savedOk = useCallback(() => flash("saved"), [flash])
+
   // A failed edit or delete leaves optimistic state lying about the server.
   // Reload the truth and say so, instead of diverging silently.
   const resync = useCallback(async (err: unknown) => {
@@ -103,6 +109,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     try {
       const saved = await createConcept({ label, def, note })
       setState(s => ({ ...s, concepts: s.concepts.map(c => c.id === tempId ? saved : c) }))
+      savedOk()
       return saved
     } catch (e) {
       setState(s => ({ ...s, concepts: s.concepts.filter(c => c.id !== tempId) }))
@@ -117,6 +124,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }))
     try {
       await updateConcept(id, data)
+      savedOk()
     } catch (e) {
       await resync(e)
     }
@@ -130,13 +138,15 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       edges: s.edges.filter(e => e.fromId !== id && e.toId !== id),
       views: {
         cardTable: {
+          ...s.views.cardTable,
           positions: Object.fromEntries(Object.entries(s.views.cardTable.positions).filter(([k]) => k !== id)),
-          bends: s.views.cardTable.bends,
+          order: s.views.cardTable.order?.filter((cid) => cid !== id),
         },
       },
     }))
     try {
       await deleteConcept(id)
+      savedOk()
     } catch (e) {
       await resync(e)
     }
@@ -163,6 +173,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     try {
       const saved = await createByte({ conceptId, source, sourceId, location, content, pageNumber, startOffset, endOffset, pageContentHash })
       setState(s => ({ ...s, bytes: s.bytes.map(b => b.id === tempId ? saved : b) }))
+      savedOk()
       return saved
     } catch (e) {
       setState(s => ({ ...s, bytes: s.bytes.filter(b => b.id !== tempId) }))
@@ -174,6 +185,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, bytes: s.bytes.filter(b => b.id !== id) }))
     try {
       await deleteByte(id)
+      savedOk()
     } catch (e) {
       await resync(e)
     }
@@ -183,6 +195,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     try {
       const saved = await refileByteAction(byteId, conceptId)
       setState(s => ({ ...s, bytes: [...s.bytes, saved] }))
+      savedOk()
       return saved
     } catch (e) {
       await resync(e)
@@ -197,6 +210,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     try {
       const saved = await createEdge({ fromId, toId, sentence })
       setState(s => ({ ...s, edges: s.edges.map(e => e.id === tempId ? saved : e) }))
+      savedOk()
       return saved
     } catch (e) {
       setState(s => ({ ...s, edges: s.edges.filter(e => e.id !== tempId) }))
@@ -208,6 +222,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, edges: s.edges.map(e => e.id === id ? { ...e, ...data } : e) }))
     try {
       await updateEdge(id, data)
+      savedOk()
     } catch (e) {
       await resync(e)
     }
@@ -219,13 +234,14 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       edges: s.edges.filter(e => e.id !== id),
       views: {
         cardTable: {
-          positions: s.views.cardTable.positions,
+          ...s.views.cardTable,
           bends: Object.fromEntries(Object.entries(s.views.cardTable.bends).filter(([k]) => k !== id)),
         },
       },
     }))
     try {
       await deleteEdge(id)
+      savedOk()
     } catch (e) {
       await resync(e)
     }
