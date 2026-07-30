@@ -154,46 +154,89 @@ export default function LibraryTab({ target, onTargetHandled, onGotoOpenByte }: 
 
 function UploadSourceForm({ onUploaded }: { onUploaded: () => void }) {
   const [title, setTitle] = useState("")
-  const [file, setFile] = useState<File | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [failures, setFailures] = useState<{ filename: string; message: string }[]>([])
+
+  const isSubmitting = progress !== null
+  // A title override names one reading; in a batch each takes its filename.
+  const isBatch = files.length > 1
 
   const handleSubmit = async () => {
-    if (!file) return
-    setIsSubmitting(true)
-    setError(null)
-    try {
-      await createSource({ title, file, metadataProvenance: "Pending review" })
-      setTitle("")
-      setFile(null)
-      onUploaded()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to upload reading")
-    } finally {
-      setIsSubmitting(false)
+    if (files.length === 0) return
+    setProgress({ done: 0, total: files.length })
+    setFailures([])
+
+    // Sequential and independent, matching the admin path: one bad PDF fails on
+    // its own and is named, rather than discarding the rest of the batch.
+    const failed: { filename: string; message: string }[] = []
+    for (const [index, file] of files.entries()) {
+      try {
+        await createSource({
+          title: isBatch ? "" : title,
+          file,
+          metadataProvenance: "Pending review",
+        })
+      } catch (e) {
+        failed.push({
+          filename: file.name,
+          message: e instanceof Error ? e.message : "Failed to upload reading",
+        })
+      }
+      setProgress({ done: index + 1, total: files.length })
     }
+
+    setFailures(failed)
+    setTitle("")
+    setFiles([])
+    setProgress(null)
+    onUploaded()
   }
 
   return (
     <div className="card" style={{ padding: "20px" }}>
-      <h3 style={{ margin: "0 0 12px 0", fontSize: "16px" }}>Add a Reading</h3>
-      <p className="hint" style={{ margin: "0 0 12px 0" }}>Upload the PDF first. Review and approve metadata in Library Manager.</p>
-      <div className="form-row">
-        <span className="label">Title Override (Optional)</span>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Defaults to the PDF filename" />
-      </div>
+      <h3 style={{ margin: "0 0 12px 0", fontSize: "16px" }}>Add Readings</h3>
+      <p className="hint" style={{ margin: "0 0 12px 0" }}>
+        Upload one or more PDFs. Review and approve metadata in Library Manager.
+      </p>
+      {!isBatch && (
+        <div className="form-row">
+          <span className="label">Title Override (Optional)</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Defaults to the PDF filename" />
+        </div>
+      )}
       <div className="form-row" style={{ marginTop: "10px" }}>
-        <span className="label">PDF File</span>
-        <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        <span className="label">PDF Files</span>
+        <input
+          type="file"
+          accept="application/pdf"
+          multiple
+          onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+        />
       </div>
-      {error && <p className="hint" style={{ color: "var(--red)" }}>{error}</p>}
+      {files.length > 0 && !isSubmitting && (
+        <p className="hint" style={{ margin: "6px 0 0" }}>
+          {files.length} file{files.length === 1 ? "" : "s"} selected
+        </p>
+      )}
+      {failures.length > 0 && (
+        <ul style={{ margin: "10px 0 0", paddingLeft: "18px" }}>
+          {failures.map((failure) => (
+            <li key={failure.filename} className="hint" style={{ color: "var(--red)", fontSize: "13px" }}>
+              <span style={{ fontFamily: "var(--mono)" }}>{failure.filename}</span> — {failure.message}
+            </li>
+          ))}
+        </ul>
+      )}
       <button
         className="btn mini"
         style={{ marginTop: "12px" }}
-        disabled={!file || isSubmitting}
+        disabled={files.length === 0 || isSubmitting}
         onClick={handleSubmit}
       >
-        {isSubmitting ? "Uploading…" : "Upload Reading"}
+        {progress
+          ? `Uploading ${progress.done + 1}/${progress.total}…`
+          : `Upload ${files.length > 1 ? `${files.length} Readings` : "Reading"}`}
       </button>
     </div>
   )

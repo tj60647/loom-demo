@@ -7,9 +7,15 @@ import {
   updateCourse,
   updateSection,
 } from "@/actions/courses"
+import {
+  getReadingsByCourse,
+  removeSourceFromCourse,
+  setCourseSourceVisibility,
+  updateCourseSourcePlacement,
+} from "@/actions/sources"
 import { checkAdmin } from "@/actions/admin"
 import { db } from "@/db"
-import { courseMemberships, courseSources, sections } from "@/db/schema"
+import { courseMemberships, sections } from "@/db/schema"
 import { asc } from "drizzle-orm"
 import { listCourses, firstParam } from "@/lib/courses"
 
@@ -27,11 +33,11 @@ export default async function AdminCoursesPage({
   const resolved = await searchParams
   const focusedCourseId = firstParam(resolved.course) ?? null
 
-  const [allCourses, allSections, allMemberships, allCourseSources] = await Promise.all([
+  const [allCourses, allSections, allMemberships, readingsByCourse] = await Promise.all([
     listCourses({ includeArchived: true }),
     db.select().from(sections).orderBy(asc(sections.name)),
     db.select({ courseId: courseMemberships.courseId, sectionId: courseMemberships.sectionId }).from(courseMemberships),
-    db.select({ courseId: courseSources.courseId }).from(courseSources),
+    getReadingsByCourse(),
   ])
 
   return (
@@ -73,7 +79,8 @@ export default async function AdminCoursesPage({
           {allCourses.map((course) => {
             const courseSectionRows = allSections.filter((s) => s.courseId === course.id)
             const memberships = allMemberships.filter((m) => m.courseId === course.id)
-            const readingCount = allCourseSources.filter((r) => r.courseId === course.id).length
+            const readings = readingsByCourse.get(course.id) ?? []
+            const readingCount = readings.length
             const unassigned = memberships.filter((m) => !m.sectionId).length
             const isFocused = focusedCourseId === course.id
 
@@ -149,6 +156,107 @@ export default async function AdminCoursesPage({
                       <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>Delete Course</button>
                     </form>
                   </details>
+                </div>
+
+                <div style={{ marginTop: "18px", borderTop: "1px dotted var(--rule)", paddingTop: "14px" }}>
+                  <div className="heading-with-info">
+                    <span className="label">Readings</span>
+                    <span className="hint" style={{ fontSize: "13px" }}>
+                      {readingCount} in this course
+                    </span>
+                  </div>
+
+                  {readings.length === 0 ? (
+                    <p className="hint" style={{ marginTop: "8px" }}>
+                      No readings yet — add them from the{" "}
+                      <a href={`/admin/library?course=${course.id}`}>Readings tab</a>.
+                    </p>
+                  ) : (
+                    <div className="scrollbox" style={{ marginTop: "10px" }}>
+                      {readings.map((reading) => (
+                        <div key={reading.id} className="lrow" style={{ padding: "10px 12px" }}>
+                          <div style={{ display: "flex", gap: "10px", alignItems: "baseline", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "15px", flex: "1 1 220px", minWidth: 0 }}>
+                              {reading.title}
+                            </span>
+                            {reading.author ? (
+                              <span className="hint" style={{ fontSize: "13px" }}>{reading.author}</span>
+                            ) : null}
+                            <span className={`pill ${reading.link.week != null ? "beaten" : "loose"}`}>
+                              {reading.link.week != null ? `Week ${reading.link.week}` : "Unscheduled"}
+                            </span>
+                            <span className={`pill ${reading.link.isCore ? "beaten" : "loose"}`}>
+                              {reading.link.isCore ? "Core" : "Supplemental"}
+                            </span>
+                            <span className={`pill ${reading.link.isVisible ? "beaten" : "loose"}`}>
+                              {reading.link.isVisible ? "Visible" : "Hidden"}
+                            </span>
+                          </div>
+
+                          <div style={{ display: "flex", gap: "10px", marginTop: "8px", flexWrap: "wrap", alignItems: "flex-start" }}>
+                            <details>
+                              <summary className="act" style={{ listStyle: "none", cursor: "pointer" }}>
+                                placement
+                              </summary>
+                              <form
+                                action={updateCourseSourcePlacement}
+                                style={{ display: "grid", gap: "8px", marginTop: "8px" }}
+                              >
+                                <input type="hidden" name="courseId" value={course.id} />
+                                <input type="hidden" name="sourceId" value={reading.id} />
+                                <div className="form-row">
+                                  <span className="label">Week</span>
+                                  <input
+                                    name="week"
+                                    type="number"
+                                    min="1"
+                                    max="20"
+                                    defaultValue={reading.link.week ?? ""}
+                                    placeholder="Unscheduled"
+                                  />
+                                </div>
+                                <div className="form-row">
+                                  <span className="label">Order Within Week</span>
+                                  <input
+                                    name="position"
+                                    type="number"
+                                    min="0"
+                                    defaultValue={reading.link.position}
+                                  />
+                                </div>
+                                <label className="hint" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                  <input type="checkbox" name="isCore" defaultChecked={reading.link.isCore} />
+                                  Core reading (students graph this one)
+                                </label>
+                                <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>
+                                  Save Placement
+                                </button>
+                              </form>
+                            </details>
+
+                            <form action={setCourseSourceVisibility}>
+                              <input type="hidden" name="courseId" value={course.id} />
+                              <input type="hidden" name="sourceId" value={reading.id} />
+                              <input
+                                type="hidden"
+                                name="isVisible"
+                                value={reading.link.isVisible ? "false" : "true"}
+                              />
+                              <button className="act" type="submit">
+                                {reading.link.isVisible ? "hide" : "reveal"}
+                              </button>
+                            </form>
+
+                            <form action={removeSourceFromCourse}>
+                              <input type="hidden" name="courseId" value={course.id} />
+                              <input type="hidden" name="sourceId" value={reading.id} />
+                              <button className="rm" type="submit">remove from course</button>
+                            </form>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ marginTop: "18px", borderTop: "1px dotted var(--rule)", paddingTop: "14px" }}>

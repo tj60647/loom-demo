@@ -1,38 +1,42 @@
 import {
   addSourceToCourse,
-  createSourceFromForm,
   deleteSource,
-  getCourseSources,
-  getLibrarySources,
-  removeSourceFromCourse,
-  setCourseSourceVisibility,
+  getLibraryOverview,
+  rescoreSourceAction,
   setSourceArchived,
-  updateCourseSourcePlacement,
   updateSourceMetadata,
 } from "@/actions/sources"
+import ExtractionScore from "@/components/library/ExtractionScore"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
+import UploadReadingsForm from "@/components/library/UploadReadingsForm"
 import { firstParam, getCourse, resolveCourseId } from "@/lib/courses"
 
 type AdminLibrarySearchParams = {
   course?: string | string[]
 }
 
+/**
+ * The Readings tab: every reading in the library, on its own terms.
+ *
+ * Course membership is shown here as a badge and edited with "Add to course",
+ * but a reading is never *scoped* to a course on this page — that view belongs
+ * to the Courses tab, which lists each course's full reading list. The `?course`
+ * param only pre-selects a default in the add-to-course pickers.
+ */
 export default async function AdminLibraryPage({
   searchParams,
 }: {
   searchParams: Promise<AdminLibrarySearchParams>
 }) {
   const resolved = await searchParams
-  const courseId = await resolveCourseId(firstParam(resolved.course))
-  const course = courseId ? await getCourse(courseId) : null
+  const activeCourseId = await resolveCourseId(firstParam(resolved.course))
+  const activeCourse = activeCourseId ? await getCourse(activeCourseId) : null
 
-  const [library, included] = await Promise.all([
-    getLibrarySources({ includeArchived: true }),
-    getCourseSources(courseId),
-  ])
+  const { readings, courses } = await getLibraryOverview()
 
-  const includedIds = new Set(included.map((source) => source.id))
-  const available = library.filter((source) => !includedIds.has(source.id) && !source.isArchived)
+  const live = readings.filter((reading) => !reading.isArchived)
+  const archived = readings.filter((reading) => reading.isArchived)
+  const unscheduled = live.filter((reading) => reading.courses.length === 0).length
 
   return (
     <main>
@@ -42,222 +46,239 @@ export default async function AdminLibraryPage({
         number of courses — each with its own week, visibility, and core/supplemental status.
       </p>
 
-      <section className="card" style={{ marginBottom: "24px" }}>
-        <h2>Add a Reading to the Library</h2>
-        <p className="hint" style={{ marginTop: "8px" }}>
-          Upload the PDF first. Then review source reference, provenance, title, and optional description below.
-        </p>
-        <form action={createSourceFromForm} style={{ marginTop: "14px" }}>
-          <input type="hidden" name="courseId" value={courseId ?? ""} />
-          <div className="form-row">
-            <span className="label">Title Override (Optional)</span>
-            <input name="title" placeholder="Defaults to the PDF filename" />
-          </div>
-          <div className="form-row" style={{ marginTop: "10px" }}>
-            <span className="label">PDF File</span>
-            <input name="file" type="file" accept="application/pdf" required />
-          </div>
-          {course ? (
-            <label className="hint" style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px" }}>
-              <input type="checkbox" name="addToCourse" defaultChecked />
-              Also include it in {course.name}
-            </label>
-          ) : null}
-          <button className="btn mini" style={{ marginTop: "12px" }} type="submit">Upload Reading</button>
-        </form>
-      </section>
-
-      {!course ? (
-        <div className="card empty">
-          <span className="cap">Create a course before building a reading list</span>
-        </div>
-      ) : (
-        <section style={{ marginBottom: "30px" }}>
-          <div className="heading-with-info" style={{ marginBottom: "6px" }}>
-            <h2>In {course.name}</h2>
-            <span className="hint">{included.length} reading(s)</span>
-          </div>
-          <p className="hint" style={{ marginBottom: "14px" }}>
-            Hiding a reading affects this course only. Removing it returns it to the library.
-          </p>
-
-          {included.length === 0 ? (
-            <div className="card empty">
-              <span className="cap">No readings in this course yet — add them from the library below</span>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              {included.map((source) => (
-                <div className="card" key={source.id} style={{ padding: "20px" }}>
-                  <div style={{ display: "flex", gap: "18px", alignItems: "stretch", flexWrap: "wrap" }}>
-                    <SourceThumbnail sourceId={source.id} title={source.title} fixedHeight={220} />
-                    <div style={{ flex: "1 1 340px", minWidth: "240px", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "12px" }}>
-                      <div>
-                        <div className="heading-with-info">
-                          <h3 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>{source.title}</h3>
-                          <span className={`pill ${source.link.isVisible ? "beaten" : "loose"}`}>
-                            {source.link.isVisible ? "Visible" : "Hidden"}
-                          </span>
-                          <span className={`pill ${source.link.isCore ? "beaten" : "loose"}`}>
-                            {source.link.isCore ? "Core" : "Supplemental"}
-                          </span>
-                          {source.link.week != null ? (
-                            <span className="pill beaten">Week {source.link.week}</span>
-                          ) : (
-                            <span className="pill loose">Unscheduled</span>
-                          )}
-                        </div>
-                        {source.author ? <p className="hint" style={{ margin: "0 0 12px 0" }}>{source.author}</p> : null}
-                        {source.sourceReference ? (
-                          <p className="hint" style={{ margin: source.author ? "-6px 0 12px 0" : "0 0 12px 0", fontSize: "13px" }}>
-                            {source.sourceReference}
-                          </p>
-                        ) : null}
-                        {source.isDescriptionVisible && source.description ? (
-                          <p style={{ fontSize: "14px", lineHeight: "1.4", marginBottom: "16px" }}>
-                            {source.description}
-                          </p>
-                        ) : null}
-                      </div>
-
-                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                        <details>
-                          <summary className="btn ghost mini" style={{ listStyle: "none", cursor: "pointer" }}>Placement</summary>
-                          <form action={updateCourseSourcePlacement} style={{ display: "grid", gap: "10px", marginTop: "12px" }}>
-                            <input type="hidden" name="courseId" value={course.id} />
-                            <input type="hidden" name="sourceId" value={source.id} />
-                            <div className="form-row">
-                              <span className="label">Week</span>
-                              <input name="week" type="number" min="1" max="20" defaultValue={source.link.week ?? ""} placeholder="Unscheduled" />
-                            </div>
-                            <div className="form-row">
-                              <span className="label">Order Within Week</span>
-                              <input name="position" type="number" min="0" defaultValue={source.link.position} />
-                            </div>
-                            <label className="hint" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                              <input type="checkbox" name="isCore" defaultChecked={source.link.isCore} />
-                              Core reading (students graph this one)
-                            </label>
-                            <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>Save Placement</button>
-                          </form>
-                        </details>
-
-                        <details>
-                          <summary className="btn ghost mini" style={{ listStyle: "none", cursor: "pointer" }}>Edit</summary>
-                          <p className="hint" style={{ marginTop: "10px", maxWidth: "46ch" }}>
-                            Metadata is shared across every course that includes this reading.
-                          </p>
-                          <form action={updateSourceMetadata} style={{ display: "grid", gap: "10px", marginTop: "10px" }}>
-                            <input type="hidden" name="sourceId" value={source.id} />
-                            <div className="form-row">
-                              <span className="label">Title</span>
-                              <input name="title" defaultValue={source.title} required />
-                            </div>
-                            <div className="form-row">
-                              <span className="label">Author</span>
-                              <input name="author" defaultValue={source.author ?? ""} />
-                            </div>
-                            <div className="form-row">
-                              <span className="label">Source Reference</span>
-                              <input name="sourceReference" defaultValue={source.sourceReference ?? ""} placeholder="Bibliographic citation or canonical source reference" />
-                            </div>
-                            <div className="form-row">
-                              <span className="label">Description</span>
-                              <textarea name="description" defaultValue={source.description ?? ""} placeholder="Optional summary or note for approval" />
-                            </div>
-                            <label className="hint" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                              <input type="checkbox" name="isDescriptionVisible" defaultChecked={source.isDescriptionVisible} />
-                              Show description on library cards
-                            </label>
-                            <div className="form-row">
-                              <span className="label">Metadata Provenance</span>
-                              <textarea name="metadataProvenance" defaultValue={source.metadataProvenance ?? ""} placeholder="Where this metadata came from, e.g. email text, PDF front matter, manual review" />
-                            </div>
-                            <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>Save Metadata</button>
-                          </form>
-                        </details>
-
-                        <form action={setCourseSourceVisibility}>
-                          <input type="hidden" name="courseId" value={course.id} />
-                          <input type="hidden" name="sourceId" value={source.id} />
-                          <input type="hidden" name="isVisible" value={source.link.isVisible ? "false" : "true"} />
-                          <button className="btn ghost mini" type="submit">
-                            {source.link.isVisible ? "Hide" : "Reveal"}
-                          </button>
-                        </form>
-
-                        <a className="btn ghost mini" href={`/api/readings/${source.id}?download=1`}>Download PDF</a>
-
-                        <form action={removeSourceFromCourse}>
-                          <input type="hidden" name="courseId" value={course.id} />
-                          <input type="hidden" name="sourceId" value={source.id} />
-                          <button className="btn ghost mini" type="submit">Remove from Course</button>
-                        </form>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+      <UploadReadingsForm
+        course={activeCourse ? { id: activeCourse.id, name: activeCourse.name } : null}
+      />
 
       <section>
         <div className="heading-with-info" style={{ marginBottom: "6px" }}>
-          <h2>Shared Library</h2>
-          <span className="hint">{library.length} reading(s)</span>
+          <h2>All Readings</h2>
+          <span className="hint">{live.length} reading(s)</span>
+          {unscheduled > 0 ? (
+            <span className="pill loose">{unscheduled} in no course</span>
+          ) : null}
         </div>
         <p className="hint" style={{ marginBottom: "14px" }}>
-          Available to every course. {course ? `${available.length} not yet in ${course.name}.` : ""}
+          Metadata and scores are shared across every course that includes a reading. Week,
+          visibility, and core status are per-course — set those on the Courses tab.
         </p>
 
-        {library.length === 0 ? (
+        {live.length === 0 ? (
           <div className="card empty">
             <span className="cap">No readings uploaded yet</span>
           </div>
         ) : (
-          <div className="scrollbox">
-            {library.map((source) => {
-              const isIncluded = includedIds.has(source.id)
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {live.map((reading) => {
+              const memberOf = new Set(reading.courses.map((course) => course.id))
+              const addable = courses.filter((course) => !memberOf.has(course.id))
+
               return (
-                <div key={source.id} className="lrow" style={{ padding: "12px 14px" }}>
-                  <div style={{ display: "flex", gap: "12px", alignItems: "baseline", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: "15px", flex: "1 1 260px", minWidth: 0 }}>{source.title}</span>
-                    {source.author ? <span className="hint" style={{ fontSize: "13px" }}>{source.author}</span> : null}
-                    {source.isArchived ? <span className="pill loose">Archived</span> : null}
-                    {isIncluded && course ? <span className="pickedtag">in {course.name}</span> : null}
-                  </div>
+                <div className="card" key={reading.id} style={{ padding: "20px" }}>
+                  <div style={{ display: "flex", gap: "18px", alignItems: "stretch", flexWrap: "wrap" }}>
+                    <SourceThumbnail sourceId={reading.id} title={reading.title} fixedHeight={220} />
 
-                  <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                    {course && !isIncluded && !source.isArchived ? (
-                      <form action={addSourceToCourse} style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                        <input type="hidden" name="courseId" value={course.id} />
-                        <input type="hidden" name="sourceId" value={source.id} />
-                        <input name="week" type="number" min="1" max="20" placeholder="Week" style={{ width: "88px" }} />
-                        <button className="btn mini" type="submit">Add to {course.name}</button>
-                      </form>
-                    ) : null}
+                    <div
+                      style={{
+                        flex: "1 1 340px",
+                        minWidth: "240px",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        gap: "12px",
+                      }}
+                    >
+                      <div>
+                        <div className="heading-with-info">
+                          <h3 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>{reading.title}</h3>
+                          {reading.courses.length === 0 ? (
+                            <span className="pill loose">In no course</span>
+                          ) : (
+                            reading.courses.map((course) => (
+                              <span
+                                key={course.id}
+                                className={`pill ${course.isVisible ? "beaten" : "loose"}`}
+                                title={
+                                  course.isVisible
+                                    ? `Published in ${course.name}${course.week != null ? `, week ${course.week}` : ", unscheduled"}`
+                                    : `Staged but hidden in ${course.name}`
+                                }
+                              >
+                                {course.name}
+                                {course.week != null ? ` · wk ${course.week}` : ""}
+                                {course.isVisible ? "" : " · hidden"}
+                              </span>
+                            ))
+                          )}
+                        </div>
 
-                    <form action={setSourceArchived}>
-                      <input type="hidden" name="sourceId" value={source.id} />
-                      <input type="hidden" name="isArchived" value={source.isArchived ? "false" : "true"} />
-                      <button className="act" type="submit">{source.isArchived ? "restore" : "archive"}</button>
-                    </form>
+                        {reading.author ? (
+                          <p className="hint" style={{ margin: "0 0 8px 0" }}>{reading.author}</p>
+                        ) : null}
+                        {reading.sourceReference ? (
+                          <p
+                            className="hint"
+                            style={{
+                              margin: reading.author ? "-4px 0 8px 0" : "0 0 8px 0",
+                              fontSize: "13px",
+                            }}
+                          >
+                            {reading.sourceReference}
+                          </p>
+                        ) : null}
+                        {reading.isDescriptionVisible && reading.description ? (
+                          <p style={{ fontSize: "14px", lineHeight: "1.4", marginBottom: "12px" }}>
+                            {reading.description}
+                          </p>
+                        ) : null}
 
-                    <a className="act" href={`/api/readings/${source.id}?download=1`}>download</a>
+                        <div style={{ marginTop: "10px" }}>
+                          <ExtractionScore score={reading.score} />
+                        </div>
+                      </div>
 
-                    <details>
-                      <summary className="rm" style={{ listStyle: "none", cursor: "pointer" }}>delete from library</summary>
-                      <form action={deleteSource} style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
-                        <input type="hidden" name="sourceId" value={source.id} />
-                        <p className="hint" style={{ margin: 0, maxWidth: "46ch" }}>
-                          Permanently deletes the PDF and removes it from every course. Student
-                          bytes captured from it keep their quoted text but lose the source link.
-                        </p>
-                        <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>Delete Permanently</button>
-                      </form>
-                    </details>
+                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-start" }}>
+                        {addable.length > 0 ? (
+                          <details>
+                            <summary className="btn mini" style={{ listStyle: "none", cursor: "pointer" }}>
+                              Add to Course
+                            </summary>
+                            <form
+                              action={addSourceToCourse}
+                              style={{ display: "grid", gap: "10px", marginTop: "12px" }}
+                            >
+                              <input type="hidden" name="sourceId" value={reading.id} />
+                              <div className="form-row">
+                                <span className="label">Course</span>
+                                <select
+                                  name="courseId"
+                                  className="tinput"
+                                  defaultValue={
+                                    addable.find((course) => course.id === activeCourseId)?.id ??
+                                    addable[0].id
+                                  }
+                                >
+                                  {addable.map((course) => (
+                                    <option key={course.id} value={course.id}>
+                                      {course.term ? `${course.name} · ${course.term}` : course.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="form-row">
+                                <span className="label">Week (Optional)</span>
+                                <input name="week" type="number" min="1" max="20" placeholder="Unscheduled" />
+                              </div>
+                              <label
+                                className="hint"
+                                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                              >
+                                <input type="checkbox" name="isCore" defaultChecked value="on" />
+                                Core reading (students graph this one)
+                              </label>
+                              <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>
+                                Add to Course
+                              </button>
+                            </form>
+                          </details>
+                        ) : (
+                          <span className="hint" style={{ fontSize: "13px" }}>
+                            {courses.length === 0
+                              ? "Create a course to assign this reading"
+                              : "In every course already"}
+                          </span>
+                        )}
+
+                        <details>
+                          <summary className="btn ghost mini" style={{ listStyle: "none", cursor: "pointer" }}>
+                            Edit
+                          </summary>
+                          <form
+                            action={updateSourceMetadata}
+                            style={{ display: "grid", gap: "10px", marginTop: "10px" }}
+                          >
+                            <input type="hidden" name="sourceId" value={reading.id} />
+                            <div className="form-row">
+                              <span className="label">Title</span>
+                              <input name="title" defaultValue={reading.title} required />
+                            </div>
+                            <div className="form-row">
+                              <span className="label">Author</span>
+                              <input name="author" defaultValue={reading.author ?? ""} />
+                            </div>
+                            <div className="form-row">
+                              <span className="label">Source Reference</span>
+                              <input
+                                name="sourceReference"
+                                defaultValue={reading.sourceReference ?? ""}
+                                placeholder="Bibliographic citation or canonical source reference"
+                              />
+                            </div>
+                            <div className="form-row">
+                              <span className="label">Description</span>
+                              <textarea
+                                name="description"
+                                defaultValue={reading.description ?? ""}
+                                placeholder="Optional summary or note for approval"
+                              />
+                            </div>
+                            <label
+                              className="hint"
+                              style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                            >
+                              <input
+                                type="checkbox"
+                                name="isDescriptionVisible"
+                                defaultChecked={reading.isDescriptionVisible}
+                              />
+                              Show description on library cards
+                            </label>
+                            <div className="form-row">
+                              <span className="label">Metadata Provenance</span>
+                              <textarea
+                                name="metadataProvenance"
+                                defaultValue={reading.metadataProvenance ?? ""}
+                                placeholder="Where this metadata came from, e.g. email text, PDF front matter, manual review"
+                              />
+                            </div>
+                            <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>
+                              Save Metadata
+                            </button>
+                          </form>
+                        </details>
+
+                        <a className="btn ghost mini" href={`/api/readings/${reading.id}?download=1`}>
+                          Download PDF
+                        </a>
+
+                        <form action={rescoreSourceAction}>
+                          <input type="hidden" name="sourceId" value={reading.id} />
+                          <button className="act" type="submit">rescore</button>
+                        </form>
+
+                        <form action={setSourceArchived}>
+                          <input type="hidden" name="sourceId" value={reading.id} />
+                          <input type="hidden" name="isArchived" value="true" />
+                          <button className="act" type="submit">archive</button>
+                        </form>
+
+                        <details>
+                          <summary className="rm" style={{ listStyle: "none", cursor: "pointer" }}>
+                            delete
+                          </summary>
+                          <form action={deleteSource} style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
+                            <input type="hidden" name="sourceId" value={reading.id} />
+                            <p className="hint" style={{ margin: 0, maxWidth: "46ch" }}>
+                              Permanently deletes the PDF and removes it from every course. Student
+                              bytes captured from it keep their quoted text but lose the source link.
+                            </p>
+                            <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>
+                              Delete Permanently
+                            </button>
+                          </form>
+                        </details>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )
@@ -265,6 +286,43 @@ export default async function AdminLibraryPage({
           </div>
         )}
       </section>
+
+      {archived.length > 0 ? (
+        <section style={{ marginTop: "30px" }}>
+          <div className="heading-with-info" style={{ marginBottom: "6px" }}>
+            <h2>Archived</h2>
+            <span className="hint">{archived.length} reading(s)</span>
+          </div>
+          <p className="hint" style={{ marginBottom: "14px" }}>
+            Retired from the library. Courses that already include them are unaffected.
+          </p>
+          <div className="scrollbox">
+            {archived.map((reading) => (
+              <div key={reading.id} className="lrow" style={{ padding: "12px 14px" }}>
+                <div style={{ display: "flex", gap: "12px", alignItems: "baseline", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "15px", flex: "1 1 260px", minWidth: 0 }}>
+                    {reading.title}
+                  </span>
+                  {reading.author ? (
+                    <span className="hint" style={{ fontSize: "13px" }}>{reading.author}</span>
+                  ) : null}
+                  {reading.courses.map((course) => (
+                    <span key={course.id} className="pickedtag">in {course.name}</span>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: "10px", marginTop: "8px", flexWrap: "wrap" }}>
+                  <form action={setSourceArchived}>
+                    <input type="hidden" name="sourceId" value={reading.id} />
+                    <input type="hidden" name="isArchived" value="false" />
+                    <button className="act" type="submit">restore</button>
+                  </form>
+                  <a className="act" href={`/api/readings/${reading.id}?download=1`}>download</a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </main>
   )
 }

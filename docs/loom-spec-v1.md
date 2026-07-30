@@ -2,7 +2,7 @@
 
 Build contract. Functionality only — pedagogy, staging, and governance live in the [Course Deployment notes](course-deployment-notes.md). This is the target the build freezes to and the release gate checks against.
 
-**Status:** DRAFT (freeze target) · **Version** v1 · rev July 29b (reflects tool v14 + the July 28–29 calls; §6 splits the artifact from view state) · **Freeze date:** TBD
+**Status:** DRAFT (freeze target) · **Version** v1 · rev July 29c (reflects tool v14 + the July 28–29 calls; §6 splits the artifact from view state; §5 records how the OCR quality gate is met) · **Freeze date:** TBD
 
 ## 1. What Loom is
 
@@ -104,6 +104,10 @@ Byte capture (+ re-file under a second concept); noun-phrase concept coding with
 ### Production v1 (TJ build — ratified 7/28–29)
 
 - Reading library: preloaded, standardized "gold" texts (approved by HD/JC); student-added papers with dedupe-and-redirect; OCR quality gate before release (many course PDFs are scans with no text layer).
+  - The library is course-agnostic: a PDF is uploaded, OCR'd, and scored once, then included in any number of courses. Week, visibility, and core/supplemental are per-course facts on the join, not properties of the reading. Readings are managed on the Readings tab; a course's reading list is assembled on the Courses tab.
+  - **The OCR quality gate is an extraction score** on each reading, four dimensions scored 1–5: `coverage` (share of pages with extractable text), `legibility` (readable text vs. glyph soup from a missing ToUnicode map), `anchorability` (enough text per page for highlight offsets to hold), and `structure` (reading order survived). The first three are measured deterministically at upload; `structure` and a refined `legibility` come from an optional LLM judge. A reading passes only if *every* scored dimension clears 3 — the dimensions are not compensatory, since a pure-mojibake PDF scores full marks on coverage and anchorability while being unusable.
+  - Scoring is advisory, not blocking: a reading below the bar is flagged "Needs review" for an instructor, never auto-hidden. Per red line #7 the gate reports what it measured; the decision to admit or re-scan a text stays with the instructor.
+  - **Open against red line #6 — needs ratification.** "No AI runs inside the tool" is absolute as written, and the `structure` / refined-`legibility` pass is a model call made inside the tool. The case for admitting it: it runs on the instructor's side at upload, reads the PDF's own text rather than any student's work, and produces a number about scan quality — it never sees, names, suggests, or influences a concept, byte, or edge, and no student-facing surface consumes it. The case against: the red line does not carve out an admin exemption, and this establishes one by precedent. Until this is settled the judge is opt-in and off by default (absent `OPENROUTER_API_KEY` the gate runs deterministic-only and reports `structure` as unscored rather than guessing), so the shipped default configuration does not cross the line.
 - In-tool highlights → bytes (capture only; the student still names every concept).
 - Highlight heat maps per reading group + comparisons — subject to red line #8 (timing).
 - Hosting (Vercel), GitHub OAuth, per-student persistence in Postgres, section tags (enables December quilting), positions stored proportionally, markdown export (reconcile from Lingxiu's fork), weekly class export.

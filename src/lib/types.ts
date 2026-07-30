@@ -41,6 +41,48 @@ export type Source = {
   createdAt: Date
 }
 
+/**
+ * Raw, deterministic facts about how well a PDF's text came out of extraction.
+ * Kept alongside the derived 1–5 scores so a low score can always be traced
+ * back to the numbers that produced it.
+ */
+export type ExtractionMetrics = {
+  pageCount: number
+  /** Pages carrying enough text to quote from — see PAGE_TEXT_FLOOR. */
+  pagesWithText: number
+  totalChars: number
+  medianCharsPerPage: number
+  /**
+   * Share of characters that are replacement chars, control codes, or
+   * private-use glyphs. The signal for a PDF whose fonts have no usable
+   * ToUnicode map, where extraction returns confident-looking garbage.
+   */
+  junkCharRatio: number
+  /** Whether the first page rendered to a cover image. */
+  coverRendered: boolean
+}
+
+/** Extraction-quality score for one reading. Dimensions are 1–5, or null when unscored. */
+export type SourceScore = {
+  sourceId: string
+  status: "heuristic" | "judged" | "unscorable"
+  /** How much of the document has extractable text at all. */
+  coverage: number | null
+  /** Whether the extracted characters are legible text rather than garble. */
+  legibility: number | null
+  /** Whether pages carry enough text for highlight offsets to anchor. */
+  anchorability: number | null
+  /** Reading order / paragraph structure. Judge-only — null until judged. */
+  structure: number | null
+  overall: number | null
+  pass: boolean | null
+  notes: string
+  judgeNotes: string
+  judgeModel: string | null
+  metrics: ExtractionMetrics | null
+  scoredAt: Date
+}
+
 /** A library reading as seen from inside one course. */
 export type CourseSourceLink = {
   courseId: string

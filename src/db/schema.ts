@@ -4,10 +4,13 @@ import {
   text,
   primaryKey,
   integer,
+  real,
+  jsonb,
   boolean,
   unique,
 } from "drizzle-orm/pg-core"
 import type { AdapterAccount } from "@auth/core/adapters"
+import type { ExtractionMetrics } from "@/lib/types"
 
 // --- NEXTAUTH TABLES ---
 
@@ -220,6 +223,37 @@ export const sourcePages = pgTable("source_page", {
   // time so we can cheaply detect drift without re-fetching this row.
   contentHash: text("contentHash").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+})
+
+// How well a reading survived PDF text extraction: one row per source, holding
+// 1–5 scores on the dimensions that decide whether the PDF is actually usable
+// inside Loom (can students quote it? will highlights anchor?).
+//
+// Scoring runs in two passes. The deterministic pass runs at upload time from
+// the pages already in hand, and is what `status: "heuristic"` means. An
+// optional LLM judge then reads sampled pages and refines `legibility` while
+// filling in `structure`, giving `status: "judged"`. A judge that is not
+// configured, errors, or returns unparseable output leaves the row heuristic
+// with its dimension null rather than folding a guess in as a real score.
+export const sourceScores = pgTable("source_score", {
+  sourceId: text("sourceId")
+    .primaryKey()
+    .references(() => sources.id, { onDelete: "cascade" }),
+  status: text("status").$type<"heuristic" | "judged" | "unscorable">().default("heuristic").notNull(),
+  coverage: integer("coverage"),
+  legibility: integer("legibility"),
+  anchorability: integer("anchorability"),
+  // Judge-only: no heuristic can tell scrambled column order from prose.
+  structure: integer("structure"),
+  // Mean of whichever dimensions are non-null, so an unscored dimension
+  // abstains instead of dragging the average down as a zero.
+  overall: real("overall"),
+  pass: boolean("pass"),
+  notes: text("notes").default("").notNull(),
+  judgeNotes: text("judgeNotes").default("").notNull(),
+  judgeModel: text("judgeModel"),
+  metrics: jsonb("metrics").$type<ExtractionMetrics>(),
+  scoredAt: timestamp("scoredAt").defaultNow().notNull(),
 })
 
 // --- LOOM TABLES ---
