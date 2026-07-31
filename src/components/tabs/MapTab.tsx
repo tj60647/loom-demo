@@ -20,6 +20,8 @@ import CardMenu from "@/components/map/CardMenu"
 const TIERS: [Tier, string][] = [["p", "PRIMARY"], ["s", "SECONDARY"], ["t", "TERTIARY"]]
 const TABLE_H = 560
 const BAND_H = (TABLE_H - 20) / 3
+/** Matches .cardmenu's max-height — used only to decide which way it opens. */
+const MENU_MAX_H = 330
 
 const isPlaced = (t: Tier) => t === "p" || t === "s" || t === "t"
 
@@ -646,9 +648,12 @@ export default function MapTab() {
             where={readingsOf(menuConcept.id, state.bytes).map(titleOf)}
             pinned={pins.includes(menuConcept.id)}
             // Clamped so a card near the right edge does not push its menu off
-            // the table.
+            // the table, and flipped above the card when it sits low enough
+            // that opening downward would hang off the table's bottom.
             left={Math.min(menuPos.x, Math.max(0, W - 268))}
-            top={menuPos.y + cardH(menuConcept) + 6}
+            {...(menuPos.y + cardH(menuConcept) + MENU_MAX_H > TABLE_H
+              ? { bottom: TABLE_H - menuPos.y + 6 }
+              : { top: menuPos.y + cardH(menuConcept) + 6 })}
             onHold={holdMenu}
             onRelease={releaseMenu}
             onTogglePin={handleTogglePin}

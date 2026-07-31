@@ -29,7 +29,11 @@ test.describe('PDF Viewer and Highlighting', () => {
       // 1b-4. The shelf is the home screen: pick the reading off it, which opens
       // that reading's workbench, and read the text from tab 00 inside it.
       await openReading(page, pdf.cardTitle);
-      await expect(page.locator('.scopetitle')).toContainText(pdf.expectedText);
+      // Case-insensitive: shelf titles are the readings' own ("Communities of
+      // practice and social learning systems"), not the test's shorthand.
+      await expect(page.locator('.scopetitle')).toContainText(
+        new RegExp(pdf.expectedText, 'i')
+      );
 
       // Wait for the text layer to render on the first page
       const textLayer = page.locator('.react-pdf__Page__textContent');

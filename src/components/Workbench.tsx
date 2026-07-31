@@ -130,7 +130,7 @@ export default function Workbench({ source }: { source: WorkbenchSource | null }
             <span className="scopetitle">{source.title}</span>
             {source.author ? <span className="scopemeta">{source.author}</span> : null}
             <span className="scopemeta">
-              {scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} here
+              {scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} evidenced here
               {scoped.bridges.length
                 ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out`
                 : ""}

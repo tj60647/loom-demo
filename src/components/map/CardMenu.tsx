@@ -18,7 +18,13 @@ type CardMenuProps = {
   where: string[]
   pinned: boolean
   left: number
-  top: number
+  /**
+   * Distance from the table's top or bottom edge. A card low on the table gets
+   * `bottom`, so the menu opens upward instead of hanging off the table into
+   * the page below it.
+   */
+  top?: number
+  bottom?: number
   onHold: (conceptId: string) => void
   onRelease: () => void
   onTogglePin: () => void
@@ -27,12 +33,12 @@ type CardMenuProps = {
 const SHOWN = 4
 
 export default function CardMenu({
-  concept, bytes, where, pinned, left, top, onHold, onRelease, onTogglePin,
+  concept, bytes, where, pinned, left, top, bottom, onHold, onRelease, onTogglePin,
 }: CardMenuProps) {
   return (
     <div
       className="cardmenu"
-      style={{ left, top }}
+      style={{ left, top, bottom }}
       onPointerEnter={() => onHold(concept.id)}
       onPointerLeave={onRelease}
     >

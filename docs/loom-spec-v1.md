@@ -42,7 +42,9 @@ The working definition is the student's own-words gloss — a sentence is fine; 
 
 **Identity:** deduplicated by label, case-insensitive — one label is one concept, reused across readings and weeks.
 
-A reading is a **door into one graph**, never one of many graphs. Which reading a concept belongs to is *derived* from its bytes — a concept is evidenced in a reading when one of its passages came from it — and is computed for display and discarded. Nothing re-homes a concept, and meeting the same idea in a second text joins the evidence rather than minting a second concept. That reuse is the island-bridging the course is for, so the tool says plainly when it happens (counted, never advised). A concept with no bytes appears in every reading, flagged "no evidence" per red line #4.
+**A concept does not belong to a reading.** A byte does. A concept *emerges from* a reading — it is discovered while coding one — and it may then be evidenced in several, which is the whole point of reusing one label across readings and weeks.
+
+So a reading is a **door into one graph**, never one of many graphs. Which readings a concept is *evidenced in* is derived from its bytes, computed for display and discarded; nothing re-homes it and nothing owns it. Meeting the same idea in a second text joins the evidence rather than minting a second concept, and the tool says plainly when that happens (counted, never advised). A concept with no bytes yet appears in every reading, flagged "no evidence" per red line #4.
 
 **State:** a concept with zero bytes shows as "no evidence" (a visible failure state, not a block).
 

@@ -1,9 +1,12 @@
 // The reading lens (docs/reading-scope-and-map-passes.md §A.3).
 //
-// A reading is a DOOR into one graph, never one of many graphs. Membership is
-// derived from byte provenance and discarded per render — the tool counts what
-// the student's own captures say, and never re-homes a concept (spec §2: one
-// label is one concept, reused across readings and weeks). Nothing here writes.
+// A CONCEPT DOES NOT BELONG TO A READING — A BYTE DOES. A concept emerges from
+// a reading and may then be evidenced in several; spec §2 makes one label one
+// concept, reused across readings and weeks. So the only stored relation is the
+// byte's `sourceId`, and everything below derives from it per render and throws
+// the result away. Nothing here owns a concept, re-homes one, or writes.
+//
+// A reading is a door into one graph, never one of many graphs.
 
 import type { Byte, Concept, Edge, LoomState } from "@/lib/types"
 
@@ -58,8 +61,9 @@ export type ScopedGraph = {
 }
 
 /**
- * A concept is in scope when one of its bytes came from one of the scope's
- * readings.
+ * A concept is *evidenced in* a scope when one of its bytes came from one of
+ * the scope's readings. It is not thereby the reading's — the same concept is
+ * evidenced in every reading whose passages support it.
  *
  * Two deliberate exceptions:
  * - the whole weave (`key === ''`) contains everything, with no bridges and

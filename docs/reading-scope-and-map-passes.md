@@ -80,8 +80,11 @@ section quilt, and week 11 is "mine your graph for final-project themes".
 
 ### A.3 Membership stays derived — the doors change, the graph does not
 
-**A concept belongs to a reading if one of its bytes came from that reading.** Nothing
-else. No `concept.sourceId`, no per-reading concept identity, no copies.
+**A concept does not belong to a reading — a byte does.** A concept *emerges from* a
+reading, and may then be evidenced in several. So the only relation the tool records is
+the byte's, and a concept is *evidenced in* a reading when one of its bytes came from
+there. Nothing else: no `concept.sourceId`, no per-reading concept identity, no copies,
+no ownership.
 
 This is not optional. Spec §2 makes a concept *"deduplicated by label, case-insensitive
 — one label is one concept, reused across readings and weeks"*, and that reuse is the

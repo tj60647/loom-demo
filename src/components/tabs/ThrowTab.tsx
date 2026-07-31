@@ -235,7 +235,7 @@ export default function ThrowTab() {
         key={c.id}
         className={`crow ${isPicked ? "picked" : ""}`}
         onClick={() => togglePick(c.id)}
-        title={fromElsewhere ? "from another reading — tap to thread it to this one" : "tap to load into the bench"}
+        title={fromElsewhere ? "evidenced in another reading — tap to thread it to this one" : "tap to load into the bench"}
       >
         <div className="clabel">
           {c.label}

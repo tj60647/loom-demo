@@ -81,7 +81,12 @@ export default function Shelf() {
             ) : null}
           </div>
           <p className="shelftally">
-            {tally ? (
+            {/* Say nothing until the loom has actually loaded: "nothing
+                captured here yet" on a full loom is a lie, and it is the
+                first thing a student would read on every card. */}
+            {isLoading ? (
+              <span className="shelfquiet">…</span>
+            ) : tally ? (
               <>
                 {tally.bytes} byte{tally.bytes !== 1 ? "s" : ""} ·{" "}
                 {tally.concepts} concept{tally.concepts !== 1 ? "s" : ""} ·{" "}
@@ -122,9 +127,13 @@ export default function Shelf() {
           <Link className="btn ghost mini" href="/weave">Your whole weave →</Link>
           <Link className="btn ghost mini" href="/keep">05 · Keep — export, import, reset</Link>
           <span className="cap shelfcount">
-            {state.concepts.length} concept{state.concepts.length !== 1 ? "s" : ""} ·{" "}
-            {state.bytes.length} passage{state.bytes.length !== 1 ? "s" : ""} ·{" "}
-            {state.edges.length} thread{state.edges.length !== 1 ? "s" : ""} in all
+            {isLoading ? "reading your loom…" : (
+              <>
+                {state.concepts.length} concept{state.concepts.length !== 1 ? "s" : ""} ·{" "}
+                {state.bytes.length} passage{state.bytes.length !== 1 ? "s" : ""} ·{" "}
+                {state.edges.length} thread{state.edges.length !== 1 ? "s" : ""} in all
+              </>
+            )}
           </span>
         </div>
 

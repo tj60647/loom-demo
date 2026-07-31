@@ -46,7 +46,9 @@ test.describe('Library verification', () => {
     await expect(page).toHaveURL(/\/reading\//);
     // Download moved off the library card onto the reading's scope bar.
     await expect(page.getByRole('link', { name: /Download PDF/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Open/i })).toBeVisible();
+    // Scoped to the workbench nav: "open" also matches the help button and the
+    // Next dev-tools button in a dev build.
+    await expect(page.locator('nav').getByRole('button', { name: /Open/i })).toBeVisible();
 
     await page.screenshot({ path: 'test-results/reading-workbench.png', fullPage: true });
   });
