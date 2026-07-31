@@ -6,13 +6,16 @@
 // NEVER persisted — only a student drag (card drop, line bend) or a de-tier
 // cleanup writes to views.cardTable via setCardTable.
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
+import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import type { Concept, Tier } from "@/lib/types"
+import { readingsOf } from "@/lib/scope"
 import { short } from "@/lib/clothMath"
 import { buildMapKit } from "@/lib/mapKit"
 import { copyText } from "@/lib/clipboard"
+import CardMenu from "@/components/map/CardMenu"
 
 const TIERS: [Tier, string][] = [["p", "PRIMARY"], ["s", "SECONDARY"], ["t", "TERTIARY"]]
 const TABLE_H = 560
@@ -43,8 +46,22 @@ const sortOrder = (concepts: Concept[], order?: string[]): Concept[] => {
 
 export default function MapTab() {
   const { state, editConcept, setCardTable, setRead, flushRead, flash, studentName } = useLoom()
+  const { titleOf } = useReadings()
   const { confirm } = useDialog()
-  const [showDefs, setShowDefs] = useState(true)
+  // The card menu: hover, focus or tap a card's corner. Held here rather than
+  // per-card so only one is ever open.
+  const [menuFor, setMenuFor] = useState<string | null>(null)
+  const closeTimer = useRef<number | undefined>(undefined)
+  const holdMenu = useCallback((id: string) => {
+    window.clearTimeout(closeTimer.current)
+    setMenuFor(id)
+  }, [])
+  // A small grace period: the pointer has to cross a gap between the corner
+  // affordance and the popover, and closing instantly makes that a race.
+  const releaseMenu = useCallback(() => {
+    window.clearTimeout(closeTimer.current)
+    closeTimer.current = window.setTimeout(() => setMenuFor(null), 160)
+  }, [])
 
   const svgRef = useRef<SVGSVGElement>(null)
   const [width, setWidth] = useState(720)
@@ -66,6 +83,17 @@ export default function MapTab() {
   // 0..1 fraction of this; y stays absolute px.
   const usableW = Math.max(1, W - 20)
 
+  useEffect(() => {
+    if (!menuFor) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuFor(null)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [menuFor])
+
+  useEffect(() => () => window.clearTimeout(closeTimer.current), [])
+
   // Live drag geometry — local only; persisted once, on pointer-up.
   const [livePos, setLivePos] = useState<{ id: string; x: number; y: number } | null>(null)
   const [liveBend, setLiveBend] = useState<{ id: string; dx: number; dy: number } | null>(null)
@@ -83,10 +111,21 @@ export default function MapTab() {
 
   const conceptById = (id: string) => state.concepts.find(c => c.id === id)
 
-  const cardH = (c: Concept) => (showDefs && c.def) ? 50 : 34
+  // Only a PINNED definition changes a card's size, so an unpinned card is a
+  // fixed size and a stored position keeps meaning what it meant. The old
+  // global toggle resized every card on the table at once.
+  const pins = state.views.cardTable.pins ?? []
+  const isPinned = (c: Concept) => !!c.def && pins.includes(c.id)
+  const cardH = (c: Concept) => isPinned(c) ? 50 : 34
   const cardW = (c: Concept) => {
-    const dl = (showDefs && c.def) ? Math.min(c.def.length, 46) * 5.2 + 22 : 0
+    const dl = isPinned(c) ? Math.min(c.def!.length, 46) * 5.2 + 22 : 0
     return Math.min(240, Math.max(90, Math.max(c.label.length * 6.4 + 22, dl)))
+  }
+
+  const togglePin = (c: Concept) => {
+    const next = pins.includes(c.id) ? pins.filter(id => id !== c.id) : [...pins, c.id]
+    setCardTable({ ...state.views.cardTable, pins: next })
+    flash(next.includes(c.id) ? "definition pinned to the card" : "definition unpinned")
   }
   const bandRange = (t: Tier, h: number): [number, number] => {
     const i = TIERS.findIndex(x => x[0] === t)
@@ -272,6 +311,9 @@ export default function MapTab() {
     // A drag is already live — a second finger must not hijack the gesture.
     if (dragCard.current || dragEdge.current) return
     const target = e.target as Element
+    // The menu's corner affordance sits INSIDE the card group, so it would
+    // otherwise resolve to [data-card] and every tap on it would start a drag.
+    if (target.closest("[data-cardmenu]")) return
     const g = target.closest("[data-card]")
     if (g) {
       const id = g.getAttribute("data-card")!
@@ -373,6 +415,12 @@ export default function MapTab() {
     })
   }
 
+  // Resolved before the return so the menu's handlers are props on a component
+  // rather than closures built inside an IIFE mid-render.
+  const menuConcept = menuFor ? conceptById(menuFor) : undefined
+  const menuPos = menuConcept ? effPos[menuConcept.id] : undefined
+  const handleTogglePin = () => { if (menuConcept) togglePin(menuConcept) }
+
   const drawnEdges = state.edges.filter(e => {
     const f = conceptById(e.fromId), t2 = conceptById(e.toId)
     return f && t2 && isPlaced(f.tier) && isPlaced(t2.tier) && effPos[f.id] && effPos[t2.id]
@@ -462,13 +510,11 @@ export default function MapTab() {
 
       <div className="mapbar">
         <span className="label">The map</span>
-        <span style={{ color: "var(--ink-soft)", fontSize: 13 }}>Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label.</span>
-        <label className="cap" style={{ cursor: "pointer", marginLeft: "auto" }}>
-          <input type="checkbox" checked={showDefs} onChange={e => setShowDefs(e.target.checked)} style={{ verticalAlign: -2 }} /> show definitions
-        </label>
+        <span style={{ color: "var(--ink-soft)", fontSize: 13 }}>Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋯</b> — its definition, the passages behind it, and where else you met it.</span>
       </div>
 
-      <div id="tableWrap" style={{ border: "1px solid var(--rule)", borderRadius: 4, background: "radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec" }}>
+      {/* position:relative anchors the card menus, which are HTML over the SVG. */}
+      <div id="tableWrap" style={{ position: "relative", border: "1px solid var(--rule)", borderRadius: 4, background: "radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec" }}>
         <svg
           ref={svgRef}
           id="cardTable"
@@ -544,21 +590,70 @@ export default function MapTab() {
           })}
           {placed.map(c => {
             const pos = effPos[c.id], w = cardW(c), h = cardH(c)
-            const twoLine = !!(showDefs && c.def)
+            const twoLine = isPinned(c)
             return (
               <g key={c.id} cursor="grab" data-card={c.id}>
                 <rect x={pos.x} y={pos.y} width={w} height={h} rx={4} fill="#fff" stroke="var(--ochre)" strokeWidth={1.2} />
                 <text x={pos.x + w / 2} y={pos.y + (twoLine ? 19 : h / 2 + 4)} textAnchor="middle" fontFamily='"Newsreader",Georgia,serif' fontSize={12.5} fill="var(--ink)">
                   {short(c.label, Math.floor(w / 6.4))}
-                  <title>{c.label + (c.def ? " — " + c.def : "")}</title>
+                  <title>{c.label}</title>
                 </text>
                 {twoLine && (
-                  <text x={pos.x + w / 2} y={pos.y + 36} textAnchor="middle" fontFamily='"Newsreader",Georgia,serif' fontSize={10} fontStyle="italic" fill="var(--ink-soft)">{short(c.def, 46)}</text>
+                  <text x={pos.x + w / 2} y={pos.y + 36} textAnchor="middle" fontFamily='"Newsreader",Georgia,serif' fontSize={10} fontStyle="italic" fill="var(--ink-soft)">{short(c.def!, 46)}</text>
                 )}
+                {/* The card's own menu. Hover, focus or tap — the whole card is
+                    a drag handle, so this must be a small target of its own or
+                    it fights every drag. */}
+                <g
+                  data-cardmenu={c.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`What ${c.label} is made of`}
+                  aria-expanded={menuFor === c.id}
+                  cursor="pointer"
+                  onPointerEnter={() => holdMenu(c.id)}
+                  onPointerLeave={releaseMenu}
+                  onFocus={() => holdMenu(c.id)}
+                  onBlur={releaseMenu}
+                  onClick={() => (menuFor === c.id ? setMenuFor(null) : holdMenu(c.id))}
+                  onKeyDown={ev => {
+                    if (ev.key === "Enter" || ev.key === " ") {
+                      ev.preventDefault()
+                      setMenuFor(menuFor === c.id ? null : c.id)
+                    }
+                  }}
+                >
+                  <rect x={pos.x + w - 18} y={pos.y} width={18} height={16} fill="transparent" />
+                  {[0, 1, 2].map(i => (
+                    <circle
+                      key={i}
+                      cx={pos.x + w - 13 + i * 4}
+                      cy={pos.y + 8}
+                      r={1.1}
+                      fill={menuFor === c.id ? "var(--ochre)" : "var(--grey)"}
+                    />
+                  ))}
+                </g>
               </g>
             )
           })}
         </svg>
+
+        {menuConcept && menuPos && (
+          <CardMenu
+            concept={menuConcept}
+            bytes={state.bytes.filter(b => b.conceptId === menuConcept.id)}
+            where={readingsOf(menuConcept.id, state.bytes).map(titleOf)}
+            pinned={pins.includes(menuConcept.id)}
+            // Clamped so a card near the right edge does not push its menu off
+            // the table.
+            left={Math.min(menuPos.x, Math.max(0, W - 268))}
+            top={menuPos.y + cardH(menuConcept) + 6}
+            onHold={holdMenu}
+            onRelease={releaseMenu}
+            onTogglePin={handleTogglePin}
+          />
+        )}
       </div>
 
       <div className="ghostnote" id="mapMirror" style={{ marginTop: 8 }}>

@@ -333,3 +333,15 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .untethered:last-child{border-bottom:none}
 .untetheredsrc{font-family:var(--mono);font-size:12px;margin-bottom:6px}
 .untetheredsrc .n{color:var(--grey)}
+
+/* A card's own menu — HTML over the SVG table, because a quote needs real
+   text wrapping and SVG has none. */
+.cardmenu{position:absolute;z-index:6;width:260px;max-height:330px;overflow:auto;
+  padding:12px 13px;background:var(--paper);border:1px solid var(--ink);border-radius:4px;
+  box-shadow:0 6px 22px rgba(0,0,0,.13)}
+.cardmenuhead{font-family:var(--display);font-size:16px;margin-bottom:8px;
+  border-bottom:1px solid var(--rule);padding-bottom:5px}
+.cardmenudef{font-size:13.5px;line-height:1.45;color:var(--ink);margin:3px 0 9px}
+.cardmenuwhere{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin:3px 0 0;line-height:1.5}
+.cardmenu .bytequote{margin:6px 0 8px}
+.cardmenu .ghostnote{margin:3px 0 0}

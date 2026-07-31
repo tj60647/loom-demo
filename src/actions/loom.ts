@@ -102,7 +102,7 @@ async function recordEvent(
 async function pruneCardTable(
   userId: string,
   courseId: string | null,
-  prune: { positions?: string[]; bends?: string[]; order?: string[] }
+  prune: { positions?: string[]; bends?: string[]; order?: string[]; pins?: string[] }
 ) {
   try {
     const rows = await db.select().from(views)
@@ -115,6 +115,7 @@ async function pruneCardTable(
     const positions = { ...(data.positions ?? {}) }
     const bends = { ...(data.bends ?? {}) }
     let order = data.order ? [...data.order] : undefined
+    let pins = data.pins ? [...data.pins] : undefined
     let changed = false
     prune.positions?.forEach((id) => { if (id in positions) { delete positions[id]; changed = true } })
     prune.bends?.forEach((id) => { if (id in bends) { delete bends[id]; changed = true } })
@@ -123,9 +124,19 @@ async function pruneCardTable(
       const next = order.filter((id) => !drop.has(id))
       if (next.length !== order.length) { order = next; changed = true }
     }
+    if (pins && prune.pins?.length) {
+      const drop = new Set(prune.pins)
+      const next = pins.filter((id) => !drop.has(id))
+      if (next.length !== pins.length) { pins = next; changed = true }
+    }
     if (changed) {
       await db.update(views).set({
-        data: order ? { positions, bends, order } : { positions, bends },
+        data: {
+          positions,
+          bends,
+          ...(order ? { order } : {}),
+          ...(pins ? { pins } : {}),
+        },
         updatedAt: new Date(),
       }).where(eq(views.id, row.id))
     }
@@ -163,6 +174,7 @@ export async function getUserLoomData() {
     positions: cardTableData.positions ?? {},
     bends: cardTableData.bends ?? {},
     ...(cardTableData.order ? { order: cardTableData.order } : {}),
+    ...(cardTableData.pins ? { pins: cardTableData.pins } : {}),
   }
 
   return {
@@ -245,7 +257,7 @@ export async function deleteConcept(id: string) {
     .returning({ label: concepts.label })
   if (removed.length > 0) {
     await recordEvent(userId, courseId, "concept.delete", "concept", id, { label: removed[0].label })
-    await pruneCardTable(userId, courseId, { positions: [id], order: [id] })
+    await pruneCardTable(userId, courseId, { positions: [id], order: [id], pins: [id] })
   }
 }
 
@@ -667,6 +679,9 @@ export async function importGraph(parsed: ParsedImport) {
   const order = (parsed.cardTable.order ?? [])
     .map((key) => conceptIdByKey.get(key))
     .filter((id): id is string => !!id)
+  const pins = (parsed.cardTable.pins ?? [])
+    .map((key) => conceptIdByKey.get(key))
+    .filter((id): id is string => !!id)
 
   const snapshot: GraphSnapshot = {
     concepts: conceptRows.map((c) => ({ id: c.id, label: c.label, tier: c.tier })),
@@ -690,8 +705,8 @@ export async function importGraph(parsed: ParsedImport) {
     ...(byteRows.length ? [db.insert(bytes).values(byteRows)] : []),
     ...(edgeRows.length ? [db.insert(edges).values(edgeRows)] : []),
     ...(parsed.read ? [db.insert(reads).values({ userId, courseId, text: parsed.read })] : []),
-    ...(Object.keys(positions).length || Object.keys(bends).length || order.length
-      ? [db.insert(views).values({ userId, courseId, key: "cardTable", data: { positions, bends, order } })]
+    ...(Object.keys(positions).length || Object.keys(bends).length || order.length || pins.length
+      ? [db.insert(views).values({ userId, courseId, key: "cardTable", data: { positions, bends, order, pins } })]
       : []),
   ]
   await db.batch(statements as unknown as Parameters<typeof db.batch>[0])

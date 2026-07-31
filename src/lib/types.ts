@@ -150,6 +150,13 @@ export type CardTableView = {
    * Concepts missing from the array fall back to capture order after it.
    */
   order?: string[]
+  /**
+   * Cards whose working definition the student pinned open on the table
+   * (concept ids). Replaces the global "show definitions" toggle: that one
+   * resized every card at once, on a table whose positions were arranged at
+   * the other size. A pin is a student gesture, so it belongs here.
+   */
+  pins?: string[]
 }
 
 export type LoomViews = {
@@ -214,6 +221,7 @@ export type LoomExport = {
       positions: Record<string, { x: number; y: number }>
       bends: Record<string, { dx: number; dy: number }>
       order?: string[]
+      pins?: string[]
     }
   }
 }
