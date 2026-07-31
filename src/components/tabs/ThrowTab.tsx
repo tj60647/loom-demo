@@ -5,6 +5,7 @@ import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import { isWholeWeave, readingsOf } from "@/lib/scope"
+import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 
 const REGISTERS = [
@@ -222,9 +223,13 @@ export default function ThrowTab() {
   // Concepts from the student's other readings, reachable and searchable but
   // out of the way. Never removed: threading this reading to an earlier one is
   // the move weeks 6-13 are built on.
-  const outside = outsideFilter.trim()
-    ? scoped.outside.filter(c => c.label.toLowerCase().includes(outsideFilter.trim().toLowerCase()))
-    : scoped.outside
+  // Both bands are lists you SEARCH for a concept to pick, so both are A-Z.
+  const warp = sortedByLabel(scoped.concepts)
+  const outside = sortedByLabel(
+    outsideFilter.trim()
+      ? scoped.outside.filter(c => c.label.toLowerCase().includes(outsideFilter.trim().toLowerCase()))
+      : scoped.outside
+  )
 
   const conceptRow = (c: typeof state.concepts[number], fromElsewhere: boolean) => {
     const isPicked = pairA === c.id || pairB === c.id
@@ -362,9 +367,9 @@ export default function ThrowTab() {
           </p>
 
           <div className="scrollbox">
-            {scoped.concepts.length === 0 ? (
+            {warp.length === 0 ? (
               <EmptyState caption="lay some warp on 01 — open first" />
-            ) : scoped.concepts.map(c => conceptRow(c, false))}
+            ) : warp.map(c => conceptRow(c, false))}
 
             {scoped.outside.length > 0 && (
               <div className="outsideband">

@@ -3,3 +3,21 @@ export const STOP = new Set("the a an and or but of to in on at by for with as i
 export function contentWords(t: string){
   return [...new Set((t.toLowerCase().match(/[a-z][a-z'\-]{2,}/g)||[]).filter(w=>!STOP.has(w)))].slice(0,14);
 }
+
+/**
+ * Alphabetical by label, case- and accent-insensitively — so "Artificial
+ * Things" and "artificial things" sort together rather than in two blocks with
+ * everything lowercase after everything capitalised.
+ *
+ * For lists you SEARCH (pick a concept, name one you already have). Lists that
+ * carry meaning in their sequence keep it: the arc map reads capture order as
+ * reading order, and the Map tab's sort list keeps whatever the student
+ * dragged it into.
+ */
+export function byLabel<T extends { label: string }>(a: T, b: T) {
+  return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+}
+
+export function sortedByLabel<T extends { label: string }>(items: T[]): T[] {
+  return [...items].sort(byLabel);
+}

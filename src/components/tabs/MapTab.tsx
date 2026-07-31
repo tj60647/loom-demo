@@ -12,6 +12,7 @@ import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import type { Concept, Tier } from "@/lib/types"
 import { readingsOf } from "@/lib/scope"
+import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import { buildMapKit } from "@/lib/mapKit"
 import { copyText } from "@/lib/clipboard"
@@ -27,14 +28,20 @@ const isPlaced = (t: Tier) => t === "p" || t === "s" || t === "t"
 
 /**
  * The sort list's effective sequence: ids named in views.cardTable.order first,
- * in that sequence, then every concept the order does not mention, in capture
- * order. Used for RENDERING THE SORT LIST ONLY — the card table, the mirror
- * counts, the map kit and the arc map all keep reading state.concepts as it
- * comes. Computing this never writes (red line #7): the default sequence is a
- * display fact until a student drags or arrows a row.
+ * in that sequence, then every concept the order does not mention, A-Z.
+ *
+ * Alphabetical is only the DEFAULT — a list you scan to find a concept to tier.
+ * A student who has dragged the list keeps their sequence, because that is a
+ * persisted gesture and re-sorting it would throw their work away.
+ *
+ * Used for RENDERING THE SORT LIST ONLY — the card table, the mirror counts,
+ * the map kit and the arc map all keep reading state.concepts as it comes,
+ * since the arc map reads capture order as reading order. Computing this never
+ * writes (red line #7): the default sequence is a display fact until a student
+ * drags or arrows a row.
  */
 const sortOrder = (concepts: Concept[], order?: string[]): Concept[] => {
-  if (!order?.length) return concepts
+  if (!order?.length) return sortedByLabel(concepts)
   const byId = new Map(concepts.map(c => [c.id, c]))
   const taken = new Set<string>()
   const out: Concept[] = []
@@ -42,7 +49,7 @@ const sortOrder = (concepts: Concept[], order?: string[]): Concept[] => {
     const c = byId.get(id)
     if (c && !taken.has(id)) { out.push(c); taken.add(id) }
   })
-  concepts.forEach(c => { if (!taken.has(c.id)) out.push(c) })
+  sortedByLabel(concepts).forEach(c => { if (!taken.has(c.id)) out.push(c) })
   return out
 }
 
@@ -453,7 +460,7 @@ export default function MapTab() {
           >make all primary</button>
         </div>
         <p className="do">Give each concept a tier: <b>P</b>rimary (the map hangs on it) · <b>S</b>econdary · <b>T</b>ertiary (example / detail) · <b>–</b> leave off. Sorted concepts land on the table below.</p>
-        <p className="hint">Drag a row by its handle — or focus the handle and press ↑ / ↓ — to re-order this list. That re-sequences the list only; the table, the counts and the map kit are untouched. <b>Make all primary</b> is a starting point, not a recommendation: it puts everything on the top tier in one move so you can demote from there.</p>
+        <p className="hint">A–Z until you say otherwise: drag a row by its handle — or focus the handle and press ↑ / ↓ — to re-order this list, and your sequence sticks. That re-sequences the list only; the table, the counts and the map kit are untouched. <b>Make all primary</b> is a starting point, not a recommendation: it puts everything on the top tier in one move so you can demote from there.</p>
         <div id="triageList" onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropAt(null) }}>
           {!state.concepts.length ? (
             <div className="empty">

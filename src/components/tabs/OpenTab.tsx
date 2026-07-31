@@ -7,7 +7,7 @@ import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import type { Byte } from "@/lib/types"
 import { readingsOf, soleSourceId } from "@/lib/scope"
-import { contentWords } from "@/lib/utils"
+import { contentWords, sortedByLabel } from "@/lib/utils"
 import { tidy } from "@/lib/clothMath"
 
 type OpenTabProps = {
@@ -368,8 +368,11 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
             value={conceptLabel}
             onChange={(e) => setConceptLabel(e.target.value)}
           />
+          {/* Every concept, alphabetically — this is how you find one you
+              already made, including from another reading, so that it joins its
+              evidence instead of becoming a duplicate. */}
           <datalist id="conceptOptions">
-            {state.concepts.map(c => <option key={c.id} value={c.label} />)}
+            {sortedByLabel(state.concepts).map(c => <option key={c.id} value={c.label} />)}
           </datalist>
         </div>
 
@@ -424,7 +427,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
 
       <div className="card">
         <h2>Coding log <span className="n">{scoped.bytes.length ? `(${scoped.bytes.length} bytes · ${scoped.concepts.length} concepts)` : ""}</span></h2>
-        <p className="do calm">Everything you capture from this reading lands here, newest on top.</p>
+        <p className="do calm">Everything you capture from this reading lands here, A–Z.</p>
         <p className="hint">Click a row to open it — edit the working definition, or file the same passage under another concept. When you have a handful, go to <b>02 — Throw</b> and start connecting them.</p>
 
         <div className="scrollbox">
@@ -434,7 +437,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
               <span className="cap">the log fills as you lay warp</span>
             </div>
           )}
-          {scoped.concepts.slice().reverse().map(concept => {
+          {sortedByLabel(scoped.concepts).map(concept => {
             const isOpen = openLogRows[concept.id]
             // This reading's evidence for the concept. A concept met in an
             // earlier text keeps that evidence — it is counted below rather
