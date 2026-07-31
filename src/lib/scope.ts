@@ -1,0 +1,165 @@
+// The reading lens (docs/reading-scope-and-map-passes.md §A.3).
+//
+// A reading is a DOOR into one graph, never one of many graphs. Membership is
+// derived from byte provenance and discarded per render — the tool counts what
+// the student's own captures say, and never re-homes a concept (spec §2: one
+// label is one concept, reused across readings and weeks). Nothing here writes.
+
+import type { Byte, Concept, Edge, LoomState } from "@/lib/types"
+
+/**
+ * A selection of readings the student is working in.
+ *
+ * `key` is the canonical form — sorted and comma-joined — and `''` means the
+ * whole weave, every reading at once. Every row written before scoping existed
+ * already means exactly that, which is why the empty key is the default rather
+ * than a special case.
+ */
+export type Scope = { sourceIds: string[]; key: string }
+
+export const WHOLE_WEAVE: Scope = { sourceIds: [], key: "" }
+
+export function scopeOf(sourceIds: string[]): Scope {
+  const ids = [...new Set(sourceIds.filter(Boolean))].sort()
+  return { sourceIds: ids, key: ids.join(",") }
+}
+
+export function scopeFromKey(key: string): Scope {
+  return scopeOf(key ? key.split(",") : [])
+}
+
+export const isWholeWeave = (scope: Scope) => scope.key === ""
+
+/** The one reading this scope is, or null when it is a set or the whole weave. */
+export function soleSourceId(scope: Scope): string | null {
+  return scope.sourceIds.length === 1 ? scope.sourceIds[0] : null
+}
+
+/**
+ * The graph as seen through one scope. Shaped so a tab can swap `state` for
+ * this and keep reading `.concepts` / `.bytes` / `.edges`, with the
+ * cross-reading facts alongside rather than hidden.
+ */
+export type ScopedGraph = {
+  /** Concepts evidenced in this scope, in capture order. */
+  concepts: Concept[]
+  /** Bytes captured from this scope's readings. */
+  bytes: Byte[]
+  /** Threads with both ends in scope — this reading's internal weave. */
+  edges: Edge[]
+  /**
+   * Threads with exactly one end in scope: the ones that run OUT of this
+   * reading. The payoff of the back half of the term, so they are counted and
+   * shown, never quietly filtered away.
+   */
+  bridges: Edge[]
+  /** Concepts outside this scope, in capture order — reachable, not hidden. */
+  outside: Concept[]
+}
+
+/**
+ * A concept is in scope when one of its bytes came from one of the scope's
+ * readings.
+ *
+ * Two deliberate exceptions:
+ * - the whole weave (`key === ''`) contains everything, with no bridges and
+ *   nothing outside;
+ * - a concept with NO bytes appears in every scope, flagged "no evidence" by
+ *   its tab. Red line #4 already makes that a visible failure state, so it
+ *   stays visible rather than being placed by an invented reading link.
+ */
+export function scopedGraph(state: LoomState, scope: Scope): ScopedGraph {
+  if (isWholeWeave(scope)) {
+    return {
+      concepts: state.concepts,
+      bytes: state.bytes,
+      edges: state.edges,
+      bridges: [],
+      outside: [],
+    }
+  }
+
+  const inScope = new Set(scope.sourceIds)
+  const evidenced = new Set<string>()
+  const hasByte = new Set<string>()
+  const bytes: Byte[] = []
+
+  state.bytes.forEach((b) => {
+    hasByte.add(b.conceptId)
+    if (b.sourceId && inScope.has(b.sourceId)) {
+      evidenced.add(b.conceptId)
+      bytes.push(b)
+    }
+  })
+
+  const isIn = (conceptId: string) => evidenced.has(conceptId) || !hasByte.has(conceptId)
+
+  const concepts: Concept[] = []
+  const outside: Concept[] = []
+  state.concepts.forEach((c) => (isIn(c.id) ? concepts : outside).push(c))
+
+  const edges: Edge[] = []
+  const bridges: Edge[] = []
+  state.edges.forEach((e) => {
+    const from = isIn(e.fromId)
+    const to = isIn(e.toId)
+    if (from && to) edges.push(e)
+    else if (from || to) bridges.push(e)
+  })
+
+  return { concepts, bytes, edges, bridges, outside }
+}
+
+/** A scoped graph in the shape the tabs already consume. */
+export function asLoomState(state: LoomState, graph: ScopedGraph): LoomState {
+  return { ...state, concepts: graph.concepts, bytes: graph.bytes, edges: graph.edges }
+}
+
+/**
+ * Which readings a concept is evidenced in. The seam that stitches the readings
+ * together (§A.4): when this returns more than one id, the student has met the
+ * same idea in two texts, which is the move the course is trying to teach.
+ */
+export function readingsOf(conceptId: string, bytes: Byte[]): string[] {
+  const ids = new Set<string>()
+  bytes.forEach((b) => {
+    if (b.conceptId === conceptId && b.sourceId) ids.add(b.sourceId)
+  })
+  return [...ids]
+}
+
+/** Per-reading tallies of the student's own acts. Counted, never scored. */
+export type ReadingTally = { bytes: number; concepts: number; threads: number }
+
+/**
+ * What the shelf shows on each card. Pure counting over the student's own
+ * captures — no completion, no grade, no comparison (red line #7).
+ */
+export function tallyByReading(state: LoomState): Map<string, ReadingTally> {
+  const conceptsBySource = new Map<string, Set<string>>()
+  const byteCount = new Map<string, number>()
+
+  state.bytes.forEach((b) => {
+    if (!b.sourceId) return
+    byteCount.set(b.sourceId, (byteCount.get(b.sourceId) ?? 0) + 1)
+    const set = conceptsBySource.get(b.sourceId) ?? new Set<string>()
+    set.add(b.conceptId)
+    conceptsBySource.set(b.sourceId, set)
+  })
+
+  const tallies = new Map<string, ReadingTally>()
+  conceptsBySource.forEach((conceptIds, sourceId) => {
+    // A thread counts for a reading when either end is evidenced in it — the
+    // same rule the workbench uses, so the card and the tab agree.
+    const threads = state.edges.filter(
+      (e) => conceptIds.has(e.fromId) || conceptIds.has(e.toId)
+    ).length
+    tallies.set(sourceId, {
+      bytes: byteCount.get(sourceId) ?? 0,
+      concepts: conceptIds.size,
+      threads,
+    })
+  })
+
+  return tallies
+}

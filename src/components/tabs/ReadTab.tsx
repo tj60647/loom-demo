@@ -4,13 +4,19 @@ import { useLoom } from "@/components/providers/LoomProvider"
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import type { Edge } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
+import { isWholeWeave } from "@/lib/scope"
 import { buildMapKit } from "@/lib/mapKit"
 import { copyText } from "@/lib/clipboard"
 import ClothMap from "@/components/svg/ClothMap"
 import HistoryPanel from "@/components/ui/HistoryPanel"
 
 export default function ReadTab() {
-  const { state, setRead, flushRead, flash, studentName } = useLoom()
+  // The cloth, the prompts and the counted report are all this reading's — the
+  // scoped graph's edges have both ends in scope by construction, so every
+  // concept lookup below resolves. Bridges are named but not drawn: they are
+  // 02 Throw's material, and drawing half a thread would be a lie.
+  const { scopedState: state, scoped, scope, setRead, flushRead, flash, studentName } = useLoom()
+  const wholeWeave = isWholeWeave(scope)
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
   const [drafted, setDrafted] = useState("")
   const [showClothInfo, setShowClothInfo] = useState(false)
@@ -282,8 +288,14 @@ export default function ReadTab() {
 
   return (
     <>
-      <p className="tasktitle">Read the whole cloth.</p>
+      <p className="tasktitle">{wholeWeave ? "Read the whole cloth." : "Read this reading's cloth."}</p>
       <p className="tasksub">What argument runs through it? What does it keep returning to? What&apos;s missing? The cloth shows you where to look — the reading is yours to write. From here, your weave feeds the work <i>outside</i> Loom: the concept map you draw by hand, and the chalk talk you build from it.</p>
+      {!wholeWeave && scoped.bridges.length > 0 && (
+        <p className="ghostnote" style={{ marginTop: -6, marginBottom: 12 }}>
+          {scoped.bridges.length} thread{scoped.bridges.length !== 1 ? "s" : ""} also run{scoped.bridges.length === 1 ? "s" : ""} out of this reading to concepts you met elsewhere.
+          They are not drawn here — half a thread would be a lie — but they are listed on <b>02 · Throw</b>.
+        </p>
+      )}
 
       <div className="rail" id="readRail">
         {["look", "trace", "question", "write"].map((s, i) => (
@@ -401,6 +413,12 @@ export default function ReadTab() {
         <div className="card">
           <h2>Your read</h2>
           <p className="hint">One short paragraph, in your own words: what is this reading about, and what holds it together? The tool never writes it for you.</p>
+          {!wholeWeave && (
+            <p className="ghostnote" style={{ marginTop: -8, marginBottom: 10 }}>
+              This is still your read <i>across everything</i> — the same text you would see on any reading.
+              A read of its own per reading arrives with map passes.
+            </p>
+          )}
           <p className="readq">In a sentence — what is this reading <i>about</i>?</p>
           <textarea
             id="yourRead"
@@ -417,9 +435,14 @@ export default function ReadTab() {
         </div>
       </div>
 
-      <div style={{ marginTop: "22px" }}>
-        <HistoryPanel />
-      </div>
+      {/* The record is of the whole weaving, not one reading's share of it, so
+          it belongs where the whole weave does rather than repeating itself
+          identically inside all twenty-six readings. */}
+      {wholeWeave && (
+        <div style={{ marginTop: "22px" }}>
+          <HistoryPanel />
+        </div>
+      )}
     </>
   )
 }

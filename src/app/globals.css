@@ -283,3 +283,47 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
   padding:6px 10px;border-radius:4px;white-space:normal;width:max-content;max-width:240px;text-align:left;line-height:1.4;z-index:30;pointer-events:none}
 [data-tip]:hover::before{content:"";position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);
   border:5px solid transparent;border-top-color:var(--ink);z-index:30;pointer-events:none}
+
+/* --- reading-first: the shelf, the scope bar, the seam --- */
+
+/* Where you are, above the tabs: which reading, and the way back to the shelf. */
+.scopebar{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  padding:9px 26px;border-bottom:1px solid var(--rule);background:var(--paper)}
+.scopeback{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-soft);text-decoration:none}
+.scopeback:hover{color:var(--ochre)}
+.scopetitle{font-family:var(--display);font-size:18px}
+.scopemeta{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--grey)}
+
+.shelfbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 20px}
+.shelfbar .shelfcount{margin-left:auto}
+.weekhead{display:flex;align-items:center;gap:12px;margin:0 0 10px}
+.weekrule{flex:1;height:0;border-top:1px solid var(--rule)}
+.shelfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+
+/* A shelf card is a link, so the whole card is the target. */
+.shelfcard{display:flex;gap:14px;padding:14px;text-decoration:none;color:inherit;
+  border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.5)}
+.shelfcard:hover{border-color:var(--ochre);background:rgba(168,132,63,.06)}
+.shelfbody{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+.shelfbody h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0 0 3px}
+.shelfauthor{font-size:13px;color:var(--ink-soft);margin:0 0 6px}
+.shelfdesc{font-size:13.5px;line-height:1.4;color:var(--ink-soft);margin:0}
+.shelftally{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:0}
+.shelfquiet{color:var(--grey)}
+
+/* The seam: the same concept met in a second text. Counted, never advised. */
+.seam{margin-top:12px;padding:11px 13px;border-left:2px solid var(--sage);background:rgba(122,138,110,.09);border-radius:0 4px 4px 0}
+.seam p{font-size:14px;line-height:1.45;margin:4px 0 9px}
+.fromwhere{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--grey);margin-top:2px}
+
+/* Concepts from the student's other readings — reachable, out of the way. */
+.outsideband{border-top:1px solid var(--rule);background:rgba(0,0,0,.015)}
+.bandtoggle{display:flex;align-items:center;gap:6px;width:100%;padding:9px 12px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-soft);background:none;border:none;cursor:pointer;text-align:left}
+.bandtoggle:hover{color:var(--ochre)}
+.bandtoggle .tw{display:inline-block;transition:transform .15s}
+.bandtoggle.open .tw{transform:rotate(90deg)}
+.bandtoggle .n{color:var(--grey);letter-spacing:.04em}
+.scopebar .scopedl{margin-left:auto}

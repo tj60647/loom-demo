@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { LoomProvider } from "@/components/providers/LoomProvider";
+import { ReadingsProvider } from "@/components/providers/ReadingsProvider";
 import { DialogProvider } from "@/components/providers/DialogProvider";
 import Header from "@/components/ui/Header";
 
@@ -22,10 +23,12 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <LoomProvider>
-            <DialogProvider>
-              <Header />
-              {children}
-            </DialogProvider>
+            <ReadingsProvider>
+              <DialogProvider>
+                <Header />
+                {children}
+              </DialogProvider>
+            </ReadingsProvider>
           </LoomProvider>
         </AuthProvider>
       </body>

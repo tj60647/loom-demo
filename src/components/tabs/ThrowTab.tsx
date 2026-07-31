@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
+import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
+import { isWholeWeave, readingsOf } from "@/lib/scope"
 import { short } from "@/lib/clothMath"
 
 const REGISTERS = [
@@ -34,7 +36,11 @@ function EmptyState({ caption }: { caption: string }) {
 }
 
 export default function ThrowTab() {
-  const { state, addEdge, editEdge, removeEdge, flash, setUndoStack, setRedoStack } = useLoom()
+  // Scoped for what this reading is about; whole for anything that has to be
+  // TRUE. A thread that runs out of this reading has one end outside it, so
+  // label lookups and the evidence check both read the whole graph.
+  const { state, scoped, scope, addEdge, editEdge, removeEdge, flash, setUndoStack, setRedoStack } = useLoom()
+  const { titleOf } = useReadings()
   const { confirm, notify } = useDialog()
   const [pairA, setPairA] = useState<string | null>(null)
   const [pairB, setPairB] = useState<string | null>(null)
@@ -43,6 +49,8 @@ export default function ThrowTab() {
   const [namingFor, setNamingFor] = useState<string | null>(null)
   const [nameDraft, setNameDraft] = useState("")
   const [moreTongues, setMoreTongues] = useState(false)
+  const [showOutside, setShowOutside] = useState(false)
+  const [outsideFilter, setOutsideFilter] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   // A tapped suggestion is a starting point, not the answer — return focus to
@@ -95,7 +103,10 @@ export default function ThrowTab() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [editEdge, setRedoStack, setUndoStack]);
 
+  // Whole-graph: a concept evidenced in an earlier reading is not evidence-less
+  // just because this reading has not quoted it.
   const bytesOf = (conceptId: string) => state.bytes.filter(b => b.conceptId === conceptId)
+  const conceptById = (id: string) => state.concepts.find(c => c.id === id)
 
   const togglePick = (id: string) => {
     if (pairA === id) setPairA(null)
@@ -106,12 +117,17 @@ export default function ThrowTab() {
     setDrawn(false)
   }
 
-  const drawPair = async () => {
-    const cs = state.concepts
+  // The shuttle draws inside this reading by default; `across` opens it to the
+  // whole graph once another reading has concepts. Chance picks the pair —
+  // every judgment about whether they cross is still the student's.
+  const drawPair = async (across = false) => {
+    const cs = across ? state.concepts : scoped.concepts
     if (cs.length < 2) {
       await notify({
         title: "Not enough warp yet.",
-        body: "Lay at least two concepts on 01 · Open, then the shuttle has something to draw between.",
+        body: across
+          ? "Lay at least two concepts, then the shuttle has something to draw between."
+          : "Lay at least two concepts in this reading on 01 · Open, then the shuttle has something to draw between.",
       })
       return
     }
@@ -188,8 +204,8 @@ export default function ThrowTab() {
     flash(h ? 'term coined' : 'left as a sentence');
   }
 
-  const c1 = state.concepts.find(c => c.id === pairA)
-  const c2 = state.concepts.find(c => c.id === pairB)
+  const c1 = conceptById(pairA ?? "")
+  const c2 = conceptById(pairB ?? "")
   const both = !!(pairA && pairB && pairA !== pairB)
   const sent = sentence.trim()
   const railN = (!pairA && !pairB) ? 0 : (!both ? 1 : (!sent ? 2 : 3))
@@ -197,7 +213,133 @@ export default function ThrowTab() {
     ? 'Tap two of your concepts to connect them.'
     : (both ? 'Two picked — now say how they relate, on the right. →' : 'Good — now tap a second.')
 
-  const orderedEdges = [...state.edges].sort((a, b) => ((a.handle ? 1 : 0) - (b.handle ? 1 : 0)))
+  const byNamed = (a: { handle: string | null }, b: { handle: string | null }) =>
+    (a.handle ? 1 : 0) - (b.handle ? 1 : 0)
+  const orderedEdges = [...scoped.edges].sort(byNamed)
+  const orderedBridges = [...scoped.bridges].sort(byNamed)
+  const wholeWeave = isWholeWeave(scope)
+
+  // Concepts from the student's other readings, reachable and searchable but
+  // out of the way. Never removed: threading this reading to an earlier one is
+  // the move weeks 6-13 are built on.
+  const outside = outsideFilter.trim()
+    ? scoped.outside.filter(c => c.label.toLowerCase().includes(outsideFilter.trim().toLowerCase()))
+    : scoped.outside
+
+  const conceptRow = (c: typeof state.concepts[number], fromElsewhere: boolean) => {
+    const isPicked = pairA === c.id || pairB === c.id
+    const noev = bytesOf(c.id).length === 0
+    const where = fromElsewhere ? readingsOf(c.id, state.bytes).map(titleOf) : []
+    return (
+      <div
+        key={c.id}
+        className={`crow ${isPicked ? "picked" : ""}`}
+        onClick={() => togglePick(c.id)}
+        title={fromElsewhere ? "from another reading — tap to thread it to this one" : "tap to load into the bench"}
+      >
+        <div className="clabel">
+          {c.label}
+          {where.length > 0 && <span className="fromwhere">{where.join(" · ")}</span>}
+        </div>
+        {isPicked
+          ? <div className="pickedtag">PICK {pairA === c.id ? 1 : 2}</div>
+          : (noev && <div className="pickedtag" style={{ color: "var(--red)" }} title="no captured passage — every concept should trace to a byte">no evidence</div>)}
+      </div>
+    )
+  }
+
+  const threadRow = (e: typeof state.edges[number]) => {
+    const fromC = conceptById(e.fromId)
+    const toC = conceptById(e.toId)
+    // v14 renders a dangling end as "?" rather than dropping the row:
+    // a thread the student threw should stay visible and removable,
+    // not vanish silently because one end went missing.
+    const sel = namingFor === e.id
+    // On a bridge, name the reading the far end came from — otherwise the row
+    // reads as an unexplained stranger among this reading's concepts.
+    const inScope = new Set(scoped.concepts.map(c => c.id))
+    const far = !wholeWeave
+      ? [e.fromId, e.toId].find(id => !inScope.has(id))
+      : undefined
+    const farWhere = far ? readingsOf(far, state.bytes).map(titleOf) : []
+
+    return (
+      <div key={e.id} className={`thread ${sel ? "sel" : ""}`}>
+        <div className="trip">
+          <b>{fromC ? short(fromC.label, 30) : "?"}</b>{' '}
+          {e.handle
+            ? <span className="v">{e.handle}</span>
+            : <span className="v loosev">{short(e.sentence, 38)}</span>}{' '}
+          <b>{toC ? short(toC.label, 30) : "?"}</b>
+        </div>
+        <div className="sent">“{e.sentence}”</div>
+        <div className="tmeta">
+          {e.handle
+            ? <span className="pill beaten">term</span>
+            : <span className="pill loose">sentence</span>}
+          {farWhere.length > 0 && <span className="pill">from {farWhere.join(" · ")}</span>}
+          <span className="act" onClick={() => toggleNamer(e.id, e.handle)}>
+            {sel ? 'close' : (e.handle ? 'edit term' : 'coin a term')}
+          </span>
+          <span
+            className="rm"
+            onClick={async () => {
+              const ok = await confirm({
+                title: "Remove this thread?",
+                body: <>The sentence goes with it: <i>&ldquo;{short(e.sentence, 120)}&rdquo;</i> Both concepts stay.</>,
+                confirmLabel: "Remove thread",
+                danger: true,
+              })
+              if (!ok) return
+              if (namingFor === e.id) setNamingFor(null)
+              removeEdge(e.id)
+            }}
+          >remove</span>
+        </div>
+        {sel && (
+          <div className="distill">
+            <div className="rnote"><b>Coin a term</b> (optional) — you&apos;ve already said how they relate; a short word lets this <i>kind</i> of link recur across your weave.</div>
+            <div className="form-row" style={{ margin: "6px 0 8px" }}>
+              <input
+                ref={nameInputRef}
+                className="tinput"
+                value={nameDraft}
+                onChange={(ev) => setNameDraft(ev.target.value)}
+                placeholder="your word… e.g. leads to · contradicts · is part of"
+                autoFocus
+              />
+            </div>
+            <div className="rnote">Stuck for a word? Tap an everyday suggestion — or open <b>more tongues</b> for other fields&apos; vocabularies:</div>
+            <div className="chips">
+              {REGISTERS[0].verbs.map(v => (
+                <span key={v} className="verbchip" onClick={() => pickWord(v)}>{v}</span>
+              ))}
+            </div>
+            <span
+              className={`distilltoggle ${moreTongues ? 'open' : ''}`}
+              style={{ marginTop: "8px" }}
+              onClick={() => setMoreTongues(!moreTongues)}
+            >
+              <span className="tw">▸</span> more tongues
+            </span>
+            {moreTongues && REGISTERS.slice(1).map(r => (
+              <div key={r.id} style={{ marginTop: "8px" }}>
+                <span className="cap">{r.name} · {r.tag}</span>
+                <div className="chips" style={{ marginTop: "4px" }}>
+                  {r.verbs.map(v => (
+                    <span key={v} className="verbchip borrowed" onClick={() => pickWord(v)}>{v}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div style={{ marginTop: "10px" }}>
+              <button className="btn mini" onClick={() => handleSaveName(e.id, e.handle)}>Save term</button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <>
@@ -211,30 +353,46 @@ export default function ThrowTab() {
       </div>
       <div className="two">
         <div className="card">
-          <h2>The warp <span className="n">{state.concepts.length ? `(${state.concepts.length})` : ''}</span></h2>
+          <h2>The warp <span className="n">{scoped.concepts.length ? `(${scoped.concepts.length})` : ''}</span></h2>
           <p className="do">{doLine}</p>
-          <p className="hint">These are the concepts you made on <b>01 — Open</b>. Tap one, then a second.</p>
+          <p className="hint">
+            {wholeWeave
+              ? <>Every concept you have made, across all your readings. Tap one, then a second.</>
+              : <>The concepts this reading evidences. Tap one, then a second — or reach into another reading below, which is how a thread comes to run between texts.</>}
+          </p>
 
           <div className="scrollbox">
-            {state.concepts.length === 0 ? (
+            {scoped.concepts.length === 0 ? (
               <EmptyState caption="lay some warp on 01 — open first" />
-            ) : state.concepts.map(c => {
-              const isPicked = pairA === c.id || pairB === c.id
-              const noev = bytesOf(c.id).length === 0
-              return (
-                <div
-                  key={c.id}
-                  className={`crow ${isPicked ? "picked" : ""}`}
-                  onClick={() => togglePick(c.id)}
-                  title="tap to load into the bench"
+            ) : scoped.concepts.map(c => conceptRow(c, false))}
+
+            {scoped.outside.length > 0 && (
+              <div className="outsideband">
+                <button
+                  type="button"
+                  className={`bandtoggle ${showOutside ? "open" : ""}`}
+                  aria-expanded={showOutside}
+                  onClick={() => setShowOutside(v => !v)}
                 >
-                  <div className="clabel">{c.label}</div>
-                  {isPicked
-                    ? <div className="pickedtag">PICK {pairA === c.id ? 1 : 2}</div>
-                    : (noev && <div className="pickedtag" style={{ color: "var(--red)" }} title="no captured passage — every concept should trace to a byte">no evidence</div>)}
-                </div>
-              )
-            })}
+                  <span className="tw">▸</span> from your other readings
+                  <span className="n">({scoped.outside.length})</span>
+                </button>
+                {showOutside && (
+                  <>
+                    <div className="quietrow" style={{ padding: "6px 10px" }}>
+                      <input
+                        value={outsideFilter}
+                        onChange={e => setOutsideFilter(e.target.value)}
+                        placeholder="find a concept from another reading…"
+                      />
+                    </div>
+                    {outside.length === 0
+                      ? <p className="ghostnote" style={{ padding: "0 10px 10px" }}>nothing by that name.</p>
+                      : outside.map(c => conceptRow(c, true))}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -244,9 +402,20 @@ export default function ThrowTab() {
 
           <div className="benchbar">
             <span className="cap">the pair</span>
-            <button className="btn ghost mini" onClick={drawPair} title="chance picks two threads you'd never elect — you do all the judging">
+            {/* Wrapped, not passed by reference: the click event would arrive
+                as `across` and turn every draw into a cross-reading one. */}
+            <button className="btn ghost mini" onClick={() => drawPair()} title="chance picks two threads you'd never elect — you do all the judging">
               ⤳ let the shuttle draw
             </button>
+            {!wholeWeave && scoped.outside.length > 0 && (
+              <button
+                className="btn ghost mini"
+                onClick={() => drawPair(true)}
+                title="chance reaches into your other readings too — you still do all the judging"
+              >
+                ⤳ across readings
+              </button>
+            )}
           </div>
 
           <div className="slots">
@@ -310,97 +479,32 @@ export default function ThrowTab() {
           </div>
 
           <h3 style={{fontFamily: "var(--display)", fontSize: "17px", borderBottom: "1px solid var(--rule)", paddingBottom: "5px", margin: "18px 0 6px"}}>
-            Threads thrown <span className="n" style={{fontFamily: "var(--mono)", fontSize: "11px", color: "var(--grey)"}}>{state.edges.length ? `(${state.edges.length})` : ''}</span>
+            {wholeWeave ? "Threads thrown" : "Threads in this reading"}
+            {' '}
+            <span className="n" style={{fontFamily: "var(--mono)", fontSize: "11px", color: "var(--grey)"}}>{orderedEdges.length ? `(${orderedEdges.length})` : ''}</span>
           </h3>
 
           <div className="scrollbox">
-            {state.edges.length === 0 ? (
+            {orderedEdges.length === 0 ? (
               <EmptyState caption="nothing thrown yet — pick, pick, say" />
-            ) : orderedEdges.map(e => {
-              const fromC = state.concepts.find(c => c.id === e.fromId)
-              const toC = state.concepts.find(c => c.id === e.toId)
-              // v14 renders a dangling end as "?" rather than dropping the row:
-              // a thread the student threw should stay visible and removable,
-              // not vanish silently because one end went missing.
-              const sel = namingFor === e.id
-
-              return (
-                <div key={e.id} className={`thread ${sel ? "sel" : ""}`}>
-                  <div className="trip">
-                    <b>{fromC ? short(fromC.label, 30) : "?"}</b>{' '}
-                    {e.handle
-                      ? <span className="v">{e.handle}</span>
-                      : <span className="v loosev">{short(e.sentence, 38)}</span>}{' '}
-                    <b>{toC ? short(toC.label, 30) : "?"}</b>
-                  </div>
-                  <div className="sent">“{e.sentence}”</div>
-                  <div className="tmeta">
-                    {e.handle
-                      ? <span className="pill beaten">term</span>
-                      : <span className="pill loose">sentence</span>}
-                    <span className="act" onClick={() => toggleNamer(e.id, e.handle)}>
-                      {sel ? 'close' : (e.handle ? 'edit term' : 'coin a term')}
-                    </span>
-                    <span
-                      className="rm"
-                      onClick={async () => {
-                        const ok = await confirm({
-                          title: "Remove this thread?",
-                          body: <>The sentence goes with it: <i>&ldquo;{short(e.sentence, 120)}&rdquo;</i> Both concepts stay.</>,
-                          confirmLabel: "Remove thread",
-                          danger: true,
-                        })
-                        if (!ok) return
-                        if (namingFor === e.id) setNamingFor(null)
-                        removeEdge(e.id)
-                      }}
-                    >remove</span>
-                  </div>
-                  {sel && (
-                    <div className="distill">
-                      <div className="rnote"><b>Coin a term</b> (optional) — you&apos;ve already said how they relate; a short word lets this <i>kind</i> of link recur across your weave.</div>
-                      <div className="form-row" style={{ margin: "6px 0 8px" }}>
-                        <input
-                          ref={nameInputRef}
-                          className="tinput"
-                          value={nameDraft}
-                          onChange={(ev) => setNameDraft(ev.target.value)}
-                          placeholder="your word… e.g. leads to · contradicts · is part of"
-                          autoFocus
-                        />
-                      </div>
-                      <div className="rnote">Stuck for a word? Tap an everyday suggestion — or open <b>more tongues</b> for other fields&apos; vocabularies:</div>
-                      <div className="chips">
-                        {REGISTERS[0].verbs.map(v => (
-                          <span key={v} className="verbchip" onClick={() => pickWord(v)}>{v}</span>
-                        ))}
-                      </div>
-                      <span
-                        className={`distilltoggle ${moreTongues ? 'open' : ''}`}
-                        style={{ marginTop: "8px" }}
-                        onClick={() => setMoreTongues(!moreTongues)}
-                      >
-                        <span className="tw">▸</span> more tongues
-                      </span>
-                      {moreTongues && REGISTERS.slice(1).map(r => (
-                        <div key={r.id} style={{ marginTop: "8px" }}>
-                          <span className="cap">{r.name} · {r.tag}</span>
-                          <div className="chips" style={{ marginTop: "4px" }}>
-                            {r.verbs.map(v => (
-                              <span key={v} className="verbchip borrowed" onClick={() => pickWord(v)}>{v}</span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      <div style={{ marginTop: "10px" }}>
-                        <button className="btn mini" onClick={() => handleSaveName(e.id, e.handle)}>Save term</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+            ) : orderedEdges.map(threadRow)}
           </div>
+
+          {/* Bridges are the point of the back half of the term, so they get
+              their own band and their own count rather than being filtered out
+              of sight. Counted, never judged. */}
+          {!wholeWeave && orderedBridges.length > 0 && (
+            <>
+              <h3 style={{fontFamily: "var(--display)", fontSize: "17px", borderBottom: "1px solid var(--rule)", paddingBottom: "5px", margin: "18px 0 6px"}}>
+                Threads that run out of this reading{' '}
+                <span className="n" style={{fontFamily: "var(--mono)", fontSize: "11px", color: "var(--grey)"}}>({orderedBridges.length})</span>
+              </h3>
+              <p className="hint">Each of these ties a concept here to one you met in another text. They belong to both readings and show up in either.</p>
+              <div className="scrollbox">
+                {orderedBridges.map(threadRow)}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </>

@@ -1,9 +1,12 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { useLoom } from "@/components/providers/LoomProvider"
+import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import type { Byte } from "@/lib/types"
+import { readingsOf, soleSourceId } from "@/lib/scope"
 import { contentWords } from "@/lib/utils"
 import { tidy } from "@/lib/clothMath"
 
@@ -14,8 +17,22 @@ type OpenTabProps = {
 }
 
 export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: OpenTabProps) {
-  const { state, isLoading, addConcept, addByte, editConcept, removeConcept, removeByte, refileByte, loadExample, flash } = useLoom()
+  // `state` is the WHOLE graph and `scoped` is this reading's slice of it. The
+  // split is load-bearing: the log renders what this reading evidences, but
+  // naming, dedup and the delete guards must see every concept the student has
+  // — otherwise capturing a concept met in an earlier text would mint a
+  // duplicate instead of joining its evidence (spec §2 identity).
+  const { state, scope, scoped, addConcept, addByte, editConcept, removeConcept, removeByte, refileByte, flash } = useLoom()
+  const { byId, titleOf } = useReadings()
   const { confirm, notify } = useDialog()
+  const activeSourceId = soleSourceId(scope)
+  const activeReading = activeSourceId ? byId.get(activeSourceId) : undefined
+  // Working inside a reading, the citation is already known — offer it rather
+  // than making the student retype it. Still editable: the passage may be
+  // quoting someone else.
+  const citation = activeReading
+    ? [activeReading.author, activeReading.title].filter(Boolean).join(", ")
+    : ""
   const [source, setSource] = useState("")
   const [location, setLocation] = useState("")
   const [content, setContent] = useState("")
@@ -23,9 +40,9 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
   const [workingDef, setWorkingDef] = useState("")
   const [newConceptOnly, setNewConceptOnly] = useState("")
   const [showCaptureInfo, setShowCaptureInfo] = useState(false)
+  const [reuseNote, setReuseNote] = useState<{ label: string; where: string[] } | null>(null)
   const [refileInputs, setRefileInputs] = useState<Record<string, string>>({})
   const [refileBusy, setRefileBusy] = useState<Record<string, boolean>>({})
-  const [exampleBusy, setExampleBusy] = useState(false)
   const closeCaptureInfoButtonRef = useRef<HTMLButtonElement>(null)
 
   const [openLogRows, setOpenLogRows] = useState<Record<string, boolean>>({})
@@ -41,15 +58,21 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     if (!text || !cname) return
 
     const wdef = workingDef.trim()
-    // Find concept or create it
+    // Find concept or create it. `findConcept` searches the WHOLE graph, so
+    // naming an idea met in an earlier text reuses that concept rather than
+    // minting a second one under the same label (spec §2 identity).
     let concept = findConcept(cname)
+    // Captured before the byte lands, so it says where the concept had ALREADY
+    // been met rather than counting the capture about to happen.
+    const metIn = concept ? readingsOf(concept.id, state.bytes) : []
+    const metElsewhere = metIn.filter(id => id !== activeSourceId)
     if (!concept) {
       concept = await addConcept(cname, wdef || undefined)
     } else if (wdef && !concept.def) {
       await editConcept(concept.id, { def: wdef })
     }
 
-    await addByte(concept.id, source.trim(), location.trim(), text)
+    await addByte(concept.id, source.trim() || citation, location.trim(), text)
 
     // reset form (keep source/location if user wants to enter multiple passages from same place)
     setContent("")
@@ -58,7 +81,19 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     // The flash points at "its log row", so open that row — otherwise the
     // affordance it advertises is off screen (v14 set openByte on add).
     setOpenLogRows(prev => ({ ...prev, [concept.id]: true }))
-    flash("byte added — in its log row you can also file it under a second concept")
+    // The seam between readings: meeting the same concept in a second text is
+    // the move the course is trying to teach, and it used to happen silently.
+    // Counted, not judged — it says the reuse happened, never that it is right.
+    if (metElsewhere.length) {
+      setReuseNote({
+        label: concept.label,
+        where: metElsewhere.map(titleOf),
+      })
+      flash("byte added — you've named this concept before")
+    } else {
+      setReuseNote(null)
+      flash("byte added — in its log row you can also file it under a second concept")
+    }
   }
 
   const handleRefile = async (b: Byte) => {
@@ -119,15 +154,6 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
       danger: true,
     })
     if (ok) removeConcept(conceptId)
-  }
-
-  const handleLoadExample = async () => {
-    setExampleBusy(true)
-    try {
-      await loadExample()
-    } finally {
-      setExampleBusy(false)
-    }
   }
 
   const handleAddConceptOnly = async () => {
@@ -249,10 +275,13 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
         <p className="hint">A &ldquo;byte&rdquo; = one passage + its citation. Choosing the passage is <i>your</i> judgment — that&apos;s the point. Loom can carry over source details and offer passage words to tap; it does not summarize or choose the concept for you.</p>
         
         <div className="form-row">
-          <span className="label">Source — author, work</span>
+          <span className="label">
+            Source — author, work
+            {citation ? <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--grey)" }}> (this reading, unless you say otherwise)</span> : null}
+          </span>
           <input
             className="mono-in"
-            placeholder="Suchman, Plans and Situated Actions"
+            placeholder={citation || "Suchman, Plans and Situated Actions"}
             title="who wrote it, and what work it's from"
             value={source}
             onChange={(e) => setSource(e.target.value)}
@@ -373,31 +402,47 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                 : "Name the concept this byte evidences — a short noun phrase (the author's own term is often best)."}
           </p>
         )}
+        {reuseNote && (
+          <div className="seam" role="status">
+            <span className="cap">the same concept, twice</span>
+            <p>
+              You&apos;ve named <b>{reuseNote.label}</b> before — in{" "}
+              {reuseNote.where.map((w, i) => (
+                <span key={w + i}>
+                  {i > 0 && (i === reuseNote.where.length - 1 ? " and " : ", ")}
+                  <i>{w}</i>
+                </span>
+              ))}
+              . This passage joins its evidence there; it is one concept, not two.
+            </p>
+            <button type="button" className="btn ghost mini compact" onClick={() => setReuseNote(null)}>
+              noted
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="card">
-        <h2>Coding log <span className="n">{state.bytes.length ? `(${state.bytes.length} bytes · ${state.concepts.length} concepts)` : ""}</span></h2>
-        <p className="do calm">Everything you capture lands here, newest on top — your growing pile of concepts.</p>
+        <h2>Coding log <span className="n">{scoped.bytes.length ? `(${scoped.bytes.length} bytes · ${scoped.concepts.length} concepts)` : ""}</span></h2>
+        <p className="do calm">Everything you capture from this reading lands here, newest on top.</p>
         <p className="hint">Click a row to open it — edit the working definition, or file the same passage under another concept. When you have a handful, go to <b>02 — Throw</b> and start connecting them.</p>
-        
+
         <div className="scrollbox">
-          {state.concepts.length === 0 && (
+          {scoped.concepts.length === 0 && (
             <div className="empty">
               <svg width="34" height="18" viewBox="0 0 34 18" fill="none" stroke="#a39f92" strokeWidth="1.3"><path d="M2 13 L7 5 L12 13 L17 5 L22 13 L27 5 L32 13"/></svg>
               <span className="cap">the log fills as you lay warp</span>
             </div>
           )}
-          {state.concepts.length === 0 && !isLoading && (
-            <div style={{ textAlign: "center", marginTop: "4px" }}>
-              <button className="btn ghost mini" onClick={handleLoadExample} disabled={exampleBusy}>
-                load the worked example (Star &amp; Griesemer)
-              </button>
-              <p className="hint" style={{ marginTop: "6px" }}>a finished weave to poke at — explore it, then clear it from 05 · Keep to start your own.</p>
-            </div>
-          )}
-          {state.concepts.slice().reverse().map(concept => {
+          {scoped.concepts.slice().reverse().map(concept => {
             const isOpen = openLogRows[concept.id]
-            const conceptBytes = state.bytes.filter(b => b.conceptId === concept.id)
+            // This reading's evidence for the concept. A concept met in an
+            // earlier text keeps that evidence — it is counted below rather
+            // than shown here, so the log stays this reading's own work.
+            const conceptBytes = scoped.bytes.filter(b => b.conceptId === concept.id)
+            const elsewhere = state.bytes.filter(
+              b => b.conceptId === concept.id && !conceptBytes.some(x => x.id === b.id)
+            ).length
             
             return (
               <div key={concept.id} className={`lrow ${isOpen ? "open" : ""}`}>
@@ -406,7 +451,10 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                     opened row next to "remove byte", labelled, as in v14. */}
                 <div className="lhead" onClick={() => toggleRow(concept.id)} style={{ display: "flex", alignItems: "center" }}>
                   <div className="lconcept" style={{flex: 1}}>{concept.label}</div>
-                  <div className="lsrc">{conceptBytes.length} bytes</div>
+                  <div className="lsrc">
+                    {conceptBytes.length} byte{conceptBytes.length !== 1 ? "s" : ""}
+                    {elsewhere ? ` · ${elsewhere} elsewhere` : ""}
+                  </div>
                 </div>
                 {isOpen && (
                   <div className="lbody">
@@ -481,11 +529,16 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                         </div>
                       </div>
                     ))}
+                    {elsewhere > 0 && (
+                      <p className="ghostnote" style={{ marginTop: "10px" }}>
+                        {elsewhere} more passage{elsewhere !== 1 ? "s" : ""} evidence{elsewhere === 1 ? "s" : ""} this concept in your other readings — one concept, evidence from several texts.
+                      </p>
+                    )}
                     <button
                       type="button"
                       className="rm"
                       style={{ background: "none", border: "none", padding: 0, marginTop: "12px" }}
-                      onClick={() => handleRemoveConcept(concept.id, conceptBytes.length)}
+                      onClick={() => handleRemoveConcept(concept.id, conceptBytes.length + elsewhere)}
                     >
                       remove concept
                     </button>
@@ -496,9 +549,17 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
           })}
         </div>
 
+        {scoped.outside.length > 0 && (
+          <p className="ghostnote" style={{ marginTop: "10px" }}>
+            {scoped.outside.length} concept{scoped.outside.length !== 1 ? "s" : ""} from your other readings —
+            not hidden, just not evidenced here. Type one&apos;s name above to file a passage from this
+            reading under it, or see them all in <Link href="/weave">your whole weave</Link>.
+          </p>
+        )}
+
         <div className="quietrow">
-          <input 
-            list="conceptOptions" 
+          <input
+            list="conceptOptions"
             placeholder="add a concept with no byte yet (rare)"
             value={newConceptOnly}
             onChange={(e) => setNewConceptOnly(e.target.value)}

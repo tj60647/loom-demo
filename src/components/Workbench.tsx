@@ -1,0 +1,205 @@
+"use client"
+
+// The workbench for one scope — a reading, or the whole weave.
+//
+// Reading-first (docs/reading-scope-and-map-passes.md §A.1): the shelf is the
+// home screen and this is what opens when you pick a reading off it, so the
+// 01-03 sequence runs INSIDE a text rather than across the course. `04 Map`
+// stays at the whole weave until placement is per-map (§A.8) — a reading's map
+// showing tiers sorted against another reading's concepts would be a map that
+// lies, and the map is what the chalk talk is drawn from.
+
+import { useState } from "react"
+import Link from "next/link"
+import dynamic from "next/dynamic"
+import { useSession } from "next-auth/react"
+import { useLoom } from "@/components/providers/LoomProvider"
+import OpenTab from "@/components/tabs/OpenTab"
+import ThrowTab from "@/components/tabs/ThrowTab"
+import ReadTab from "@/components/tabs/ReadTab"
+import MapTab from "@/components/tabs/MapTab"
+import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
+import type { Byte } from "@/lib/types"
+
+const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
+
+export type WorkbenchSource = {
+  id: string
+  title: string
+  author: string
+  week: number | null
+}
+
+type Tab = "reading" | "open" | "throw" | "read" | "map"
+
+const FOOT: Record<Tab, [string, string]> = {
+  reading: ["00 — READING", "THE TEXT ITSELF"],
+  open: ["01 — OPEN", "LAY THE WARP"],
+  throw: ["02 — THROW", "ONE THREAD AT A TIME"],
+  read: ["03 — READ", "PULL A THREAD"],
+  map: ["04 — MAP", "THE CARD TABLE"],
+}
+
+const LABEL: Record<Tab, [string, string]> = {
+  reading: ["00 —", "Reading"],
+  open: ["01 —", "Open"],
+  throw: ["02 —", "Throw"],
+  read: ["03 —", "Read"],
+  map: ["04 —", "Map"],
+}
+
+/**
+ * Tabs that stay mounted once visited, hidden by `.panel`'s display rule, the
+ * way v14 kept every panel in the DOM. These hold work in progress — a
+ * half-typed throw sentence, the traced prompt on Read — which unmounting
+ * destroys. The whole workbench is keyed by scope at the route level, so those
+ * drafts belong to one reading and cannot follow the student into another.
+ */
+const KEEP_ALIVE: ReadonlySet<Tab> = new Set<Tab>(["open", "throw", "read", "map"])
+
+export default function Workbench({ source }: { source: WorkbenchSource | null }) {
+  const { data: session } = useSession()
+  const { isLoading, scoped } = useLoom()
+  const tabs: Tab[] = source ? ["reading", "open", "throw", "read"] : ["throw", "read", "map"]
+  const [activeTab, setActiveTab] = useState<Tab>(source ? "open" : "throw")
+  const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([source ? "open" : "throw"]))
+  const [pdfPage, setPdfPage] = useState(1)
+  const [pdfFocusByteId, setPdfFocusByteId] = useState<string | null>(null)
+  const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
+
+  const goTo = (tab: Tab) => {
+    setActiveTab(tab)
+    setVisited((seen) => (seen.has(tab) ? seen : new Set(seen).add(tab)))
+  }
+
+  const shouldRender = (tab: Tab) => (KEEP_ALIVE.has(tab) ? visited.has(tab) : activeTab === tab)
+
+  // Inside a reading, "goto" is a tab away rather than a page away: the text is
+  // already open in this workbench.
+  const handleGotoByte = (byte: Byte) => {
+    if (!source) return
+    setPdfPage(byte.pageNumber && byte.pageNumber > 0 ? byte.pageNumber : 1)
+    setPdfFocusByteId(byte.id)
+    goTo("reading")
+  }
+
+  const handleGotoOpenByte = (byteId: string) => {
+    setOpenTargetByteId(byteId)
+    goTo("open")
+  }
+
+  if (!session) {
+    return (
+      <main>
+        <div className="empty" style={{ marginTop: "100px" }}>
+          <h2>Welcome to Loom.</h2>
+          <span className="cap">Please sign in to continue</span>
+        </div>
+        <FirstRunWalkthrough autoOpen={false} />
+      </main>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <main>
+        <div className="empty" style={{ marginTop: "100px" }}>
+          <h2>Loading your loom...</h2>
+        </div>
+        <FirstRunWalkthrough autoOpen={false} />
+      </main>
+    )
+  }
+
+  return (
+    <>
+      <div className="scopebar">
+        <Link href="/" className="scopeback">‹ the shelf</Link>
+        {source ? (
+          <>
+            <span className="scopetitle">{source.title}</span>
+            {source.author ? <span className="scopemeta">{source.author}</span> : null}
+            <span className="scopemeta">
+              {scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} here
+              {scoped.bridges.length
+                ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out`
+                : ""}
+            </span>
+            {/* The library card used to carry this; the reading is the library
+                card now, so the affordance moves here rather than disappearing. */}
+            <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>
+              Download PDF
+            </a>
+          </>
+        ) : (
+          <>
+            <span className="scopetitle">Your whole weave</span>
+            <span className="scopemeta">every reading at once</span>
+          </>
+        )}
+      </div>
+
+      <nav>
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            className={activeTab === tab ? "active" : ""}
+            onClick={() => goTo(tab)}
+          >
+            <span className="step">{LABEL[tab][0]}</span>
+            {LABEL[tab][1]}
+          </button>
+        ))}
+      </nav>
+
+      <main>
+        {source && (
+          <div className={`panel ${activeTab === "reading" ? "active" : ""}`}>
+            {activeTab === "reading" && (
+              <PdfViewer
+                url={`/api/readings/${source.id}`}
+                sourceName={source.title}
+                sourceId={source.id}
+                initialPageNumber={pdfPage}
+                focusByteId={pdfFocusByteId}
+                onGotoOpenByte={handleGotoOpenByte}
+                onClose={() => {
+                  setPdfFocusByteId(null)
+                  goTo("open")
+                }}
+              />
+            )}
+          </div>
+        )}
+        {source && (
+          <div className={`panel ${activeTab === "open" ? "active" : ""}`}>
+            {shouldRender("open") && (
+              <OpenTab
+                onGotoByte={handleGotoByte}
+                focusByteId={openTargetByteId}
+                onFocusHandled={() => setOpenTargetByteId(null)}
+              />
+            )}
+          </div>
+        )}
+        <div className={`panel ${activeTab === "throw" ? "active" : ""}`}>
+          {shouldRender("throw") && <ThrowTab />}
+        </div>
+        <div className={`panel ${activeTab === "read" ? "active" : ""}`}>
+          {shouldRender("read") && <ReadTab />}
+        </div>
+        {!source && (
+          <div className={`panel ${activeTab === "map" ? "active" : ""}`}>
+            {shouldRender("map") && <MapTab />}
+          </div>
+        )}
+        <FirstRunWalkthrough />
+      </main>
+
+      <footer>
+        <span className="fl">{FOOT[activeTab][0]}</span>
+        <span className="fr">{FOOT[activeTab][1]}</span>
+      </footer>
+    </>
+  )
+}

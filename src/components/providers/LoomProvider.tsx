@@ -1,8 +1,10 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from "react"
 import { useSession } from "next-auth/react"
+import { useParams } from "next/navigation"
 import type { Byte, CardTableView, Concept, Edge, LoomState, Tier } from "@/lib/types"
+import { asLoomState, scopeOf, scopedGraph, soleSourceId, WHOLE_WEAVE, type Scope, type ScopedGraph } from "@/lib/scope"
 import { emptyViews, parseImport } from "@/lib/graphExport"
 import {
   getUserLoomData,
@@ -14,7 +16,20 @@ import {
 } from "@/actions/loom"
 
 interface LoomContextType {
+  /**
+   * The WHOLE graph, always. Export, import and reset work on this — the
+   * artifact is never a slice (red line #5).
+   */
   state: LoomState
+  /**
+   * The reading the student is working in, read off the route. `WHOLE_WEAVE`
+   * everywhere except `/reading/[sourceId]`.
+   */
+  scope: Scope
+  /** The graph seen through `scope`, plus its bridges — derived, never stored. */
+  scoped: ScopedGraph
+  /** `scoped` in the shape the tabs consume, so they can swap it for `state`. */
+  scopedState: LoomState
   isLoading: boolean
   /** Signed-in student's display name — graph.student in the export contract. */
   studentName: string
@@ -56,6 +71,18 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const [undoStack, setUndoStack] = useState<{edgeId: string, from: string | null, to: string | null}[]>([])
   const [redoStack, setRedoStack] = useState<{edgeId: string, from: string | null, to: string | null}[]>([])
+
+  // Scope comes from the URL, not from state a gesture has to set: `/reading/x`
+  // IS the act of working in that reading, so there is no window where the app
+  // has rendered against the wrong one. Everywhere else is the whole weave.
+  const params = useParams<{ sourceId?: string }>()
+  const routeSourceId = typeof params?.sourceId === "string" ? params.sourceId : null
+  const scope = useMemo(
+    () => (routeSourceId ? scopeOf([routeSourceId]) : WHOLE_WEAVE),
+    [routeSourceId]
+  )
+  const scoped = useMemo(() => scopedGraph(state, scope), [state, scope])
+  const scopedState = useMemo(() => asLoomState(state, scoped), [state, scoped])
 
   const flashTimer = useRef<number | undefined>(undefined)
   const flash = useCallback((msg: string) => {
@@ -154,13 +181,17 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const addByte = async (conceptId: string, source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => {
     const tempId = crypto.randomUUID()
+    // Capturing inside a reading stamps that reading, so a byte taken by hand
+    // has the same provenance as one taken from the PDF and lands in the same
+    // lens. An explicit sourceId (the PDF capture path) always wins.
+    const stampedSourceId = sourceId ?? soleSourceId(scope) ?? undefined
     const tempByte: Byte = {
       id: tempId,
       courseId: null,
       userId: session!.user!.id,
       conceptId,
       source,
-      sourceId: sourceId ?? null,
+      sourceId: stampedSourceId ?? null,
       location,
       content,
       pageNumber: pageNumber ?? null,
@@ -171,7 +202,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
     setState(s => ({ ...s, bytes: [...s.bytes, tempByte] }))
     try {
-      const saved = await createByte({ conceptId, source, sourceId, location, content, pageNumber, startOffset, endOffset, pageContentHash })
+      const saved = await createByte({ conceptId, source, sourceId: stampedSourceId, location, content, pageNumber, startOffset, endOffset, pageContentHash })
       setState(s => ({ ...s, bytes: s.bytes.map(b => b.id === tempId ? saved : b) }))
       savedOk()
       return saved
@@ -348,7 +379,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   return (
     <LoomContext.Provider value={{
-      state, isLoading,
+      state, scope, scoped, scopedState, isLoading,
       studentName: session?.user?.name || "",
       addConcept, editConcept, removeConcept,
       addByte, removeByte, refileByte,
