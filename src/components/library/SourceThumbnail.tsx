@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import Image from "next/image"
+import { useRef, useState } from "react"
 
 type SourceThumbnailProps = {
   sourceId: string
@@ -19,8 +18,49 @@ const FRAME_WIDTH = 140
  */
 const FRAME_ASPECT = 1.414
 
+/**
+ * Reads the cover's own edge colour so the letterbox continues the page
+ * instead of framing it.
+ *
+ * The border ring is sampled rather than the whole image: what should fill the
+ * space beside a page is the colour at that page's margin — white for a plain
+ * scan, dark for a black book cover — not the average of its content, which on
+ * a text page is a muddy grey. Falls back to white, which is also the starting
+ * value, so a failure here is invisible rather than wrong.
+ */
+function edgeColor(image: HTMLImageElement): string | null {
+  const SIZE = 24
+  try {
+    const canvas = document.createElement("canvas")
+    canvas.width = SIZE
+    canvas.height = SIZE
+    const context = canvas.getContext("2d", { willReadFrequently: true })
+    if (!context) return null
+    context.drawImage(image, 0, 0, SIZE, SIZE)
+    const { data } = context.getImageData(0, 0, SIZE, SIZE)
+
+    let r = 0, g = 0, b = 0, n = 0
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        // Border ring only.
+        if (x > 1 && x < SIZE - 2 && y > 1 && y < SIZE - 2) continue
+        const i = (y * SIZE + x) * 4
+        if (data[i + 3] === 0) continue
+        r += data[i]; g += data[i + 1]; b += data[i + 2]; n++
+      }
+    }
+    if (!n) return null
+    return `rgb(${Math.round(r / n)}, ${Math.round(g / n)}, ${Math.round(b / n)})`
+  } catch {
+    // Tainted canvas or no 2d context — keep the default rather than guess.
+    return null
+  }
+}
+
 export default function SourceThumbnail({ sourceId, title, fixedHeight }: SourceThumbnailProps) {
   const [loadError, setLoadError] = useState(false)
+  const [background, setBackground] = useState("#ffffff")
+  const imageRef = useRef<HTMLImageElement>(null)
 
   return (
     <div
@@ -34,7 +74,8 @@ export default function SourceThumbnail({ sourceId, title, fixedHeight }: Source
         alignSelf: "flex-start",
         border: "1px solid rgba(26,25,22,.14)",
         borderRadius: "6px",
-        background: "linear-gradient(180deg, #f7f4ea 0%, #ece6d7 100%)",
+        background,
+        transition: "background-color .2s",
         overflow: "hidden",
         display: "flex",
         alignItems: "center",
@@ -43,34 +84,33 @@ export default function SourceThumbnail({ sourceId, title, fixedHeight }: Source
         position: "relative",
       }}
     >
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "linear-gradient(135deg, rgba(255,255,255,.32), rgba(255,255,255,0))",
-          pointerEvents: "none",
-          zIndex: 1,
-        }}
-      />
       {loadError ? (
-        <span className="cap" style={{ padding: "12px", textAlign: "center", position: "relative", zIndex: 1 }}>
+        <span className="cap" style={{ padding: "12px", textAlign: "center" }}>
           Preview unavailable
         </span>
       ) : (
-        <Image
+        // A plain <img>, not next/image: these were already `unoptimized`, so
+        // the component added nothing here, and the element reference is what
+        // makes reading the cover's own colour possible.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          ref={imageRef}
           alt={`Preview of ${title}`}
           src={`/api/readings/${sourceId}/cover`}
-          fill
-          unoptimized
-          sizes={`${FRAME_WIDTH}px`}
+          width={FRAME_WIDTH}
           style={{
             // contain, not cover: this is a document's own cover page, and
             // cropping it cut the margins off wider scans and sometimes the
-            // title with them. Letterboxing against the paper background reads
-            // as a page on a shelf.
+            // title with them.
+            width: "100%",
+            height: "100%",
             objectFit: "contain",
             objectPosition: "center",
+            display: "block",
+          }}
+          onLoad={() => {
+            const found = imageRef.current ? edgeColor(imageRef.current) : null
+            if (found) setBackground(found)
           }}
           onError={() => setLoadError(true)}
         />
