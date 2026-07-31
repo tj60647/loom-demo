@@ -1,0 +1,12 @@
+{
+  "schema": "limion.capture.storyboard/v1",
+  "target": { "url": "http://localhost:8940/index.html" },
+  "viewport": { "w": 1280, "h": 800 },
+  "steps": [
+    { "action": "goto", "url": "http://localhost:8940/index.html", "label": "Loom cloth view loads with this week's concepts", "kind": "load" },
+    { "action": "wait", "ms": 500 },
+    { "action": "click", "selector": { "role": "button", "name": "Concept map" }, "label": "Switch to concept map view", "kind": "nav", "settle_ms": 500 },
+    { "action": "wait", "ms": 800 },
+    { "action": "end", "label": "Done", "kind": "end" }
+  ]
+}

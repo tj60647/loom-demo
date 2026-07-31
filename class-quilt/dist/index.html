@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loom — class quilt (prototype)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap');
+:root{
+  --paper:#edebe3;--paper-2:#e5e2d8;--ink:#1a1916;--ink-soft:#6b675c;
+  --rule:#cbc7ba;--dot:#c3bfb1;
+  --grey:#a39f92;--ochre:#a8843f;--sage:#6f7d5c;--red:#b23a2b;--slate:#5b6a86;
+  --display:"Fraunces",Georgia,serif;--body:"Newsreader",Georgia,serif;--mono:ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box} html,body{margin:0;height:100%}
+body{background:radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/26px 26px,var(--paper);
+  color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+header{border-bottom:1px solid var(--rule);padding:10px 22px;display:flex;align-items:center;gap:16px;background:var(--paper)}
+.wordmark{font-family:var(--display);font-size:19px;font-weight:600}
+.spacer{flex:1}
+.nav{display:flex;gap:6px}
+.nav button{font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;background:none;border:1px solid var(--rule);color:var(--ink-soft);border-radius:12px;padding:5px 12px;cursor:pointer}
+.nav button.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+main{padding:0}
+.screen{display:none;padding:36px 5vw 30px;min-height:calc(100vh - 46px)}
+.screen.active{display:flex;flex-direction:column;gap:16px}
+.bigCap h1{font-family:var(--display);font-weight:600;font-size:clamp(34px,5.6vw,66px);line-height:1.03;margin:0}
+.bigCap h2{font-family:var(--display);font-weight:500;font-size:clamp(22px,3.6vw,40px);line-height:1.08;margin:2px 0 0;color:var(--ink-soft)}
+.instruction{font-family:var(--body);font-size:14.5px;color:var(--ink-soft);margin:0}
+.canvasArea{position:relative;flex:1;min-height:0}
+svg{width:100%;height:100%;touch-action:none;display:block}
+.node{cursor:pointer}
+.miniLegend{position:absolute;left:2px;bottom:2px;display:flex;gap:12px;font-size:11px;font-family:var(--mono);color:var(--ink-soft)}
+.miniLegend .sw{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px;border:1px dashed var(--rule);border-radius:4px;background:rgba(255,255,255,.4)}
+.toolbar .selCount{font-family:var(--mono);font-size:12px;color:var(--ink-soft);letter-spacing:.03em}
+button.primary{font-family:var(--body);font-size:13.5px;background:var(--ink);color:var(--paper);border:none;border-radius:3px;padding:6px 12px;cursor:pointer}
+button.primary:disabled{background:var(--grey);cursor:not-allowed}
+button.ghost{font-family:var(--body);font-size:13px;background:none;border:1px solid var(--rule);color:var(--ink-soft);border-radius:3px;padding:5px 10px;cursor:pointer}
+.inlineForm{display:none;gap:8px;align-items:flex-end;flex-wrap:wrap;padding:11px;border:1px solid var(--ink);border-radius:4px;background:rgba(26,25,22,.05)}
+.inlineForm.show{display:flex}
+.inlineForm .field{display:flex;flex-direction:column;gap:3px}
+.inlineForm label{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+.inlineForm input{font-family:var(--body);font-size:14px;padding:6px 8px;border:1px solid var(--rule);border-radius:3px;background:#fff;min-width:170px}
+.inlineForm input.wide{min-width:280px}
+.sharedLayout{display:flex;gap:20px;flex:1;min-height:0}
+.sharedLayout .canvasArea{flex:1}
+.rightCol{width:270px;flex:0 0 270px;display:flex;flex-direction:column;gap:14px;overflow:auto}
+.panel{border:1px solid var(--rule);border-radius:4px;padding:13px;background:rgba(255,255,255,.6);font-size:13px}
+.panel h3{font-family:var(--display);font-size:14px;margin:0 0 8px;font-weight:600}
+.panel h4{font-family:var(--display);font-size:16px;margin:0 0 3px;font-weight:600}
+.panel h5{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);margin:10px 0 3px}
+.panel .row{font-size:12.5px;margin-bottom:3px;color:var(--ink-soft)}
+.panel .row b{color:var(--ink);font-weight:600}
+.panel .actions{display:flex;gap:7px;margin-top:10px}
+.panel .empty{color:var(--ink-soft);font-style:italic;font-size:12.5px;margin:0}
+.panel li{border:1px solid var(--rule);border-radius:4px;padding:7px 9px;margin-bottom:6px;list-style:none;background:rgba(255,255,255,.6)}
+.panel ul{margin:0;padding:0}
+.panel .commentInput{display:flex;gap:6px;margin-top:8px}
+.panel .commentInput input{flex:1;font-family:var(--body);font-size:13px;padding:5px 7px;border:1px solid var(--rule);border-radius:3px}
+.editBox{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.editBox input{font-family:var(--body);font-size:13.5px;padding:5px 7px;border:1px solid var(--rule);border-radius:3px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">Loom</div>
+  <div class="spacer"></div>
+  <div class="nav" id="nav">
+    <button data-mode="base" class="active">1 · Base layer</button>
+    <button data-mode="riseup">2 · Rise up</button>
+    <button data-mode="connectup">3 · Connect up</button>
+    <button data-mode="shared">4 · Shared graph</button>
+  </div>
+</header>
+<main>
+
+  <section class="screen active" id="scr-base">
+    <div class="bigCap"><h1>Aggregated personal view</h1><h2>by embedding distances</h2></div>
+    <div class="canvasArea">
+      <svg id="svgBase"></svg>
+      <div class="miniLegend" id="legendBase"></div>
+    </div>
+  </section>
+
+  <section class="screen" id="scr-riseup">
+    <div class="bigCap"><h1>Rise up a concept</h1></div>
+    <p class="instruction">Concepts with the exact same name are combined automatically. Different names for the same idea? Select them and fold them in. Once a concept has more than one contributor, rise it up into the shared graph as-is.</p>
+    <div class="toolbar">
+      <span class="selCount" id="selCountRise">0 selected</span>
+      <button class="primary" id="foldInBtn" disabled>Fold in</button>
+      <button class="primary" id="riseUpBtn" disabled>Rise up</button>
+      <button class="ghost" id="clearSelBtnRise" disabled>Clear selection</button>
+    </div>
+    <div class="inlineForm" id="foldForm">
+      <div class="field"><label for="foldNameInput">Canonical name</label><input id="foldNameInput" type="text"></div>
+      <button class="primary" id="saveFoldBtn">Merge</button>
+      <button class="ghost" id="cancelFoldBtn">Cancel</button>
+    </div>
+    <div class="inlineForm" id="riseForm">
+      <div class="field"><label for="riseDefInput">Shared definition</label><input id="riseDefInput" type="text" class="wide"></div>
+      <button class="primary" id="saveRiseBtn">Publish</button>
+      <button class="ghost" id="cancelRiseBtn">Cancel</button>
+    </div>
+    <div class="canvasArea"><svg id="svgRiseUp"></svg></div>
+  </section>
+
+  <section class="screen" id="scr-connectup">
+    <div class="bigCap"><h1>Connect up a concept</h1></div>
+    <p class="instruction">Select two or more different concepts — from anyone, or from the shared graph itself — and connect them into something new, or add a direct link between two that already exist.</p>
+    <div class="toolbar">
+      <span class="selCount" id="selCountConnect">0 selected</span>
+      <button class="primary" id="connectUpBtn" disabled>Connect up</button>
+      <button class="primary" id="addLinkBtn" disabled>Add direct link</button>
+      <button class="ghost" id="clearSelBtnConnect" disabled>Clear selection</button>
+    </div>
+    <div class="inlineForm" id="connectForm">
+      <div class="field"><label for="connectLabelInput">Name</label><input id="connectLabelInput" type="text"></div>
+      <div class="field"><label for="connectDefInput">Definition</label><input id="connectDefInput" type="text" class="wide"></div>
+      <button class="primary" id="saveConnectBtn">Create</button>
+      <button class="ghost" id="cancelConnectBtn">Cancel</button>
+    </div>
+    <div class="inlineForm" id="connectLinkForm">
+      <div class="field"><label for="connectLinkSentenceInput">How they relate</label><input id="connectLinkSentenceInput" type="text" class="wide"></div>
+      <button class="primary" id="saveConnectLinkBtn">Add link</button>
+      <button class="ghost" id="cancelConnectLinkBtn">Cancel</button>
+    </div>
+    <div class="canvasArea"><svg id="svgConnectUp"></svg></div>
+  </section>
+
+  <section class="screen" id="scr-shared">
+    <div class="bigCap"><h1>Shared graph</h1></div>
+    <div class="sharedLayout">
+      <div class="canvasArea"><svg id="svgShared"></svg></div>
+      <div class="rightCol">
+        <div class="panel" id="inspector"><p class="empty">Click a concept or a link to see its story.</p></div>
+        <div class="panel" id="deletedPanel">
+          <h3>Deleted</h3>
+          <div id="deletedList"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// ponytail: hand-authored fixture — four students' concepts on one shared reading
+// (Donella Meadows, "Thinking in Systems," Chapter 1: The Basics),
+// plus a seeded shared graph (as if other students had already started it) so the flow is legible on load.
+const PEOPLE = [
+  { id:"ana",     name:"Ana",     color:"var(--ochre)" },
+  { id:"ben",     name:"Ben",     color:"var(--sage)" },
+  { id:"cleo",    name:"Cleo",    color:"var(--red)" },
+  { id:"dmitri",  name:"Dmitri",  color:"var(--slate)" },
+];
+
+const concepts = [
+  { id:"a1", personId:"ana", topic:"structure", label:"System", def:"A set of elements interconnected in a way that produces its own pattern of behavior over time." },
+  { id:"a2", personId:"ana", topic:"structure", label:"Elements", def:"The visible, tangible parts of a system — often the easiest part to name, and the least important for understanding it." },
+  { id:"a3", personId:"ana", topic:"structure", label:"Interconnections", def:"The relationships that hold a system's elements together, often flows of information rather than material." },
+  { id:"a4", personId:"ana", topic:"purpose", label:"Function or purpose", def:"The least obvious part of a system, but the part that most determines its behavior." },
+  { id:"a5", personId:"ana", topic:"boundary", label:"System boundary", def:"Where a system 'ends' is a choice the observer makes, not a fact given by nature." },
+  { id:"a6", personId:"ana", topic:"stockflow", label:"Flow", def:"Ana's gloss: anything moving through the system fast enough to change a stock's level in the time you're watching it." },
+
+  { id:"b1", personId:"ben", topic:"stockflow", label:"Stock", def:"The accumulated memory of a system's history — the amount of something at a point in time." },
+  { id:"b2", personId:"ben", topic:"stockflow", label:"Flow", def:"The rate at which a stock fills or drains — inflows and outflows." },
+  { id:"b3", personId:"ben", topic:"stockflow", label:"Inflow", def:"A flow that adds to a stock." },
+  { id:"b4", personId:"ben", topic:"stockflow", label:"Outflow", def:"A flow that subtracts from a stock." },
+
+  { id:"c1", personId:"cleo", topic:"feedback", label:"Feedback loop", def:"A closed chain of cause and effect that loops back to affect the stock that started it." },
+  { id:"c2", personId:"cleo", topic:"feedback", label:"Balancing feedback loop", def:"A loop that pushes a stock toward a goal or keeps it within a range." },
+  { id:"c3", personId:"cleo", topic:"feedback", label:"Reinforcing feedback loop", def:"A loop that amplifies change, driving exponential growth or collapse." },
+  { id:"c4", personId:"cleo", topic:"boundary", label:"Resilience", def:"A system's ability to survive and adapt to disturbance, distinct from its stability at any one moment." },
+  { id:"c5", personId:"cleo", topic:"stockflow", label:"stock", def:"The level of something you can measure at any moment — water in a tub, money in an account." },
+
+  { id:"d1", personId:"dmitri", topic:"boundary", label:"Emergent behavior", def:"Behavior that arises from a system's structure rather than being dictated by any single element." },
+  { id:"d2", personId:"dmitri", topic:"purpose", label:"Purpose isn't always stated", def:"A system's real purpose is revealed by what it does, not by what its designers claim it does." },
+  { id:"d3", personId:"dmitri", topic:"stockflow", label:"Stock as a buffer", def:"A stock can absorb shocks by changing level instead of forcing flows to react instantly." },
+  { id:"d4", personId:"dmitri", topic:"feedback", label:"Loops compete", def:"Most real systems have multiple feedback loops pulling in different directions at once; behavior depends on which dominates." },
+  { id:"d5", personId:"dmitri", topic:"structure", label:"Systems", def:"Dmitri's shorthand for the whole class of things this chapter is about — thermostats, bathtubs, societies, all the same kind of object." },
+];
+
+const edges = [
+  { fromId:"a1", toId:"a2", sentence:"A system's elements are its most visible, but least informative, part." },
+  { fromId:"a2", toId:"a3", sentence:"What elements are connected to matters more than what they are." },
+  { fromId:"a3", toId:"a4", sentence:"The pattern of interconnections often exists to serve a system's purpose." },
+  { fromId:"a4", toId:"a5", sentence:"Because purpose is hard to see directly, even the system's boundary becomes a judgment call." },
+
+  { fromId:"b1", toId:"b2", sentence:"A stock only changes because flows move through it." },
+  { fromId:"b2", toId:"b3", sentence:"Inflows are one direction a flow can move." },
+  { fromId:"b2", toId:"b4", sentence:"Outflows are the other." },
+
+  { fromId:"c1", toId:"c2", sentence:"A balancing loop is one kind of feedback loop." },
+  { fromId:"c1", toId:"c3", sentence:"A reinforcing loop is the other kind." },
+  { fromId:"c3", toId:"c4", sentence:"Unchecked reinforcing loops can undermine a system's resilience." },
+
+  { fromId:"d3", toId:"d4", sentence:"A stock's buffering capacity is itself shaped by which feedback loop is currently dominant." },
+  { fromId:"d4", toId:"d1", sentence:"Which loop dominates helps decide what behavior emerges." },
+  { fromId:"d1", toId:"d2", sentence:"What a system actually does is the best evidence of what it's for." },
+];
+
+const personById = {}; PEOPLE.forEach(p=>personById[p.id]=p);
+const conceptById = {}; concepts.forEach(c=>conceptById[c.id]=c);
+
+// ---- Auto-combine: exact same name (case-insensitive) becomes one concept automatically.
+// Different names for the same idea (e.g. "System" vs "Systems") are NOT auto-combined —
+// that requires a person to deliberately "fold in" one to the other.
+function normLabel(s){ return s.trim().toLowerCase(); }
+const mergedConcepts = [];
+const toMerged = {};
+{
+  let mergeSeq = 1;
+  const groups = {};
+  concepts.forEach(c=>{ (groups[normLabel(c.label)] ||= []).push(c); });
+  Object.values(groups).forEach(group=>{
+    if(group.length === 1){
+      const c = group[0];
+      mergedConcepts.push({ id:c.id, label:c.label, topic:c.topic, contributors:[{personId:c.personId, sourceConceptId:c.id, def:c.def}] });
+      toMerged[c.id] = c.id;
+    } else {
+      const id = `merge${mergeSeq++}`;
+      mergedConcepts.push({ id, label:group[0].label, topic:group[0].topic, contributors: group.map(c=>({personId:c.personId, sourceConceptId:c.id, def:c.def})) });
+      group.forEach(c=>{ toMerged[c.id] = id; });
+    }
+  });
+}
+function mergedById(id){ return mergedConcepts.find(m=>m.id===id); }
+
+// ---- Layout: force sim seeded by topic clusters (stand-in for embedding similarity) ----
+function computeLayout(){
+  const width = 1100, height = 680;
+  const mappedEdges = edges.map(e=>({ fromId:toMerged[e.fromId], toId:toMerged[e.toId] })).filter(e=>e.fromId && e.toId && e.fromId!==e.toId);
+  const topics = [...new Set(mergedConcepts.map(c=>c.topic))];
+  const anchors = {};
+  topics.forEach((t,i)=>{
+    const a = (i/topics.length)*Math.PI*2;
+    anchors[t] = { x: width/2 + Math.cos(a)*300, y: height/2 + Math.sin(a)*220 };
+  });
+  const pos = {};
+  mergedConcepts.forEach(c=>{
+    const an = anchors[c.topic];
+    pos[c.id] = { x: an.x + (Math.random()-0.5)*90, y: an.y + (Math.random()-0.5)*90 };
+  });
+  const topicGroups = {};
+  mergedConcepts.forEach(c=>{ (topicGroups[c.topic] ||= []).push(c.id); });
+  const topicSprings = [];
+  Object.values(topicGroups).forEach(ids=>{
+    for(let i=0;i<ids.length;i++) for(let j=i+1;j<ids.length;j++) topicSprings.push([ids[i], ids[j]]);
+  });
+  const ITER = 320;
+  for(let it=0; it<ITER; it++){
+    const disp = {}; mergedConcepts.forEach(c=>disp[c.id]={x:0,y:0});
+    for(let i=0;i<mergedConcepts.length;i++){
+      for(let j=i+1;j<mergedConcepts.length;j++){
+        const a=mergedConcepts[i].id, b=mergedConcepts[j].id;
+        let dx=pos[a].x-pos[b].x, dy=pos[a].y-pos[b].y;
+        let d2 = dx*dx+dy*dy || 0.01;
+        const f = 14000/d2;
+        const d = Math.sqrt(d2);
+        disp[a].x += f*dx/d; disp[a].y += f*dy/d;
+        disp[b].x -= f*dx/d; disp[b].y -= f*dy/d;
+      }
+    }
+    topicSprings.forEach(([a,b])=>{
+      let dx=pos[b].x-pos[a].x, dy=pos[b].y-pos[a].y;
+      const d = Math.sqrt(dx*dx+dy*dy) || 0.01;
+      const f = (d-62)*0.05;
+      disp[a].x += f*dx/d; disp[a].y += f*dy/d;
+      disp[b].x -= f*dx/d; disp[b].y -= f*dy/d;
+    });
+    mappedEdges.forEach(e=>{
+      const a=e.fromId, b=e.toId;
+      let dx=pos[b].x-pos[a].x, dy=pos[b].y-pos[a].y;
+      const d = Math.sqrt(dx*dx+dy*dy) || 0.01;
+      const f = (d-150)*0.015;
+      disp[a].x += f*dx/d; disp[a].y += f*dy/d;
+      disp[b].x -= f*dx/d; disp[b].y -= f*dy/d;
+    });
+    mergedConcepts.forEach(c=>{
+      pos[c.id].x += Math.max(-8,Math.min(8,disp[c.id].x));
+      pos[c.id].y += Math.max(-8,Math.min(8,disp[c.id].y));
+      pos[c.id].x = Math.max(70, Math.min(width-70, pos[c.id].x));
+      pos[c.id].y = Math.max(50, Math.min(height-50, pos[c.id].y));
+    });
+  }
+  // final declutter pass: resolve label bounding-box collisions (labels run to the right of each dot).
+  const labelW = c => c.label.length*7.3 + 14;
+  for(let pass=0; pass<60; pass++){
+    let anyOverlap = false;
+    for(let i=0;i<mergedConcepts.length;i++){
+      for(let j=i+1;j<mergedConcepts.length;j++){
+        const ca=mergedConcepts[i], cb=mergedConcepts[j];
+        const a=ca.id, b=cb.id;
+        const boxA = { l:pos[a].x, r:pos[a].x+10+labelW(ca), t:pos[a].y-9, b:pos[a].y+9 };
+        const boxB = { l:pos[b].x, r:pos[b].x+10+labelW(cb), t:pos[b].y-9, b:pos[b].y+9 };
+        const overlapX = Math.min(boxA.r,boxB.r) - Math.max(boxA.l,boxB.l);
+        const overlapY = Math.min(boxA.b,boxB.b) - Math.max(boxA.t,boxB.t);
+        if(overlapX > 0 && overlapY > 0){
+          anyOverlap = true;
+          let dx=pos[b].x-pos[a].x, dy=pos[b].y-pos[a].y;
+          const d = Math.sqrt(dx*dx+dy*dy) || 0.01;
+          const push = Math.max(overlapX, overlapY)/2 + 5;
+          const ux = dx/d, uy = dy/d;
+          pos[a].x -= ux*push; pos[a].y -= uy*push;
+          pos[b].x += ux*push; pos[b].y += uy*push;
+        }
+      }
+    }
+    mergedConcepts.forEach(c=>{
+      pos[c.id].x = Math.max(70, Math.min(width-70, pos[c.id].x));
+      pos[c.id].y = Math.max(50, Math.min(height-50, pos[c.id].y));
+    });
+    if(!anyOverlap) break;
+  }
+  return { width, height, pos };
+}
+const LAYOUT = computeLayout();
+const nodePos = { ...LAYOUT.pos };
+const sharedPos = {};
+function getPos(id){ return nodePos[id] || sharedPos[id]; }
+function sharedNodeById(id){ return sharedNodes.find(n=>n.id===id); }
+function labelOf(id){ const mc=mergedById(id); if(mc) return mc.label; const sn=sharedNodeById(id); if(sn) return sn.label; return id; }
+
+function currentPersonalEdges(){
+  return edges.map(e=>({
+    fromId: toMerged[e.fromId], toId: toMerged[e.toId],
+    color: personById[conceptById[e.fromId].personId].color,
+    sentence: e.sentence,
+  })).filter(e => e.fromId && e.toId && e.fromId !== e.toId && nodePos[e.fromId] && nodePos[e.toId]);
+}
+
+// ---- Geometry: stop lines at a node's boundary, not its center (same technique as ClothMap's concept-map view) ----
+function footprintFor(id, dim){
+  const sn = sharedNodeById(id);
+  if(sn){ return { hw: Math.max(90, sn.label.length*8.6+30)/2, hh: 17 }; }
+  return { hw: dim ? 5 : 7, hh: dim ? 5 : 7 };
+}
+function edgeOfBox(cx, cy, hw, hh, dx, dy){
+  if(!dx && !dy) return { x:cx, y:cy };
+  const scale = 1 / Math.max(Math.abs(dx)/hw, Math.abs(dy)/hh);
+  return { x: cx + dx*scale, y: cy + dy*scale };
+}
+function trimmedLine(aId, bId, dim, posFn){
+  posFn = posFn || getPos;
+  const a = posFn(aId), b = posFn(bId);
+  if(!a || !b) return null;
+  const fa = footprintFor(aId, dim), fb = footprintFor(bId, dim);
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const p1 = edgeOfBox(a.x, a.y, fa.hw, fa.hh, dx, dy);
+  const p2 = edgeOfBox(b.x, b.y, fb.hw, fb.hh, -dx, -dy);
+  return { p1, p2 };
+}
+
+// ---- Shared-graph-only display layout: reflow shared nodes for a cleaner read.
+// Purely cosmetic — construction positions (tied to each node's source) are untouched,
+// so Rise-up/Connect-up still show where things came from. ----
+function computeSharedDisplayLayout(){
+  const pos = {};
+  sharedNodes.forEach(n=>{ const seed = sharedPos[n.id] || { x: LAYOUT.width/2, y: LAYOUT.height/2 }; pos[n.id] = { x: seed.x, y: seed.y }; });
+  const linkPairs = sharedLinks.filter(l => sharedNodeById(l.fromId) && sharedNodeById(l.toId));
+  for(let it=0; it<200; it++){
+    const disp = {}; sharedNodes.forEach(n=>disp[n.id]={x:0,y:0});
+    for(let i=0;i<sharedNodes.length;i++){
+      for(let j=i+1;j<sharedNodes.length;j++){
+        const a=sharedNodes[i].id, b=sharedNodes[j].id;
+        let dx=pos[a].x-pos[b].x, dy=pos[a].y-pos[b].y;
+        let d2 = dx*dx+dy*dy || 0.01;
+        const f = 32000/d2, d = Math.sqrt(d2);
+        disp[a].x += f*dx/d; disp[a].y += f*dy/d;
+        disp[b].x -= f*dx/d; disp[b].y -= f*dy/d;
+      }
+    }
+    linkPairs.forEach(l=>{
+      const a=l.fromId, b=l.toId;
+      let dx=pos[b].x-pos[a].x, dy=pos[b].y-pos[a].y;
+      const d = Math.sqrt(dx*dx+dy*dy) || 0.01;
+      const f = (d-220)*0.04;
+      disp[a].x += f*dx/d; disp[a].y += f*dy/d;
+      disp[b].x -= f*dx/d; disp[b].y -= f*dy/d;
+    });
+    sharedNodes.forEach(n=>{
+      pos[n.id].x += Math.max(-10,Math.min(10,disp[n.id].x));
+      pos[n.id].y += Math.max(-10,Math.min(10,disp[n.id].y));
+      pos[n.id].x = Math.max(90, Math.min(LAYOUT.width-90, pos[n.id].x));
+      pos[n.id].y = Math.max(50, Math.min(LAYOUT.height-50, pos[n.id].y));
+    });
+  }
+  for(let pass=0; pass<60; pass++){
+    let any = false;
+    for(let i=0;i<sharedNodes.length;i++){
+      for(let j=i+1;j<sharedNodes.length;j++){
+        const na=sharedNodes[i], nb=sharedNodes[j];
+        const ba=sharedBoxOf(na), bb=sharedBoxOf(nb);
+        const boxA = { l:pos[na.id].x-ba.hw, r:pos[na.id].x+ba.hw, t:pos[na.id].y-ba.hh, b:pos[na.id].y+ba.hh };
+        const boxB = { l:pos[nb.id].x-bb.hw, r:pos[nb.id].x+bb.hw, t:pos[nb.id].y-bb.hh, b:pos[nb.id].y+bb.hh };
+        const ox = Math.min(boxA.r,boxB.r) - Math.max(boxA.l,boxB.l);
+        const oy = Math.min(boxA.b,boxB.b) - Math.max(boxA.t,boxB.t);
+        if(ox > 0 && oy > 0){
+          any = true;
+          let dx=pos[nb.id].x-pos[na.id].x, dy=pos[nb.id].y-pos[na.id].y;
+          const d = Math.sqrt(dx*dx+dy*dy) || 0.01;
+          const push = Math.max(ox,oy)/2 + 8;
+          const ux=dx/d, uy=dy/d;
+          pos[na.id].x -= ux*push; pos[na.id].y -= uy*push;
+          pos[nb.id].x += ux*push; pos[nb.id].y += uy*push;
+        }
+      }
+    }
+    if(!any) break;
+  }
+  return pos;
+}
+
+// ---- Shared graph state — starts empty; rise up or connect up a concept yourself to test it ----
+const sharedNodes = [];
+
+// keep shared-node boxes from overlapping each other as they're added
+function sharedBoxOf(n){ const bw = Math.max(90, n.label.length*8.6+30), bh = 34; return { hw: bw/2, hh: bh/2 }; }
+function declutterSharedBoxes(){
+  for(let pass=0; pass<60; pass++){
+    let any = false;
+    for(let i=0;i<sharedNodes.length;i++){
+      for(let j=i+1;j<sharedNodes.length;j++){
+        const na=sharedNodes[i], nb=sharedNodes[j];
+        const pa=sharedPos[na.id], pb=sharedPos[nb.id];
+        if(!pa || !pb) continue;
+        const ba=sharedBoxOf(na), bb=sharedBoxOf(nb);
+        const boxA = { l:pa.x-ba.hw, r:pa.x+ba.hw, t:pa.y-ba.hh, b:pa.y+ba.hh };
+        const boxB = { l:pb.x-bb.hw, r:pb.x+bb.hw, t:pb.y-bb.hh, b:pb.y+bb.hh };
+        const ox = Math.min(boxA.r,boxB.r) - Math.max(boxA.l,boxB.l);
+        const oy = Math.min(boxA.b,boxB.b) - Math.max(boxA.t,boxB.t);
+        if(ox > 0 && oy > 0){
+          any = true;
+          let dx=pb.x-pa.x, dy=pb.y-pa.y;
+          const d = Math.sqrt(dx*dx+dy*dy) || 0.01;
+          const push = Math.max(ox,oy)/2 + 8;
+          const ux=dx/d, uy=dy/d;
+          pa.x -= ux*push; pa.y -= uy*push;
+          pb.x += ux*push; pb.y += uy*push;
+        }
+      }
+    }
+    if(!any) break;
+  }
+}
+declutterSharedBoxes();
+
+const sharedLinks = [];
+const deletedItems = [];
+
+let sharedNodeSeq = 1, sharedLinkSeq = 1;
+const buildSelected = new Set();
+let inspected = null; // { type: 'concept'|'link', id }
+
+function escXml(str){
+  return String(str).replace(/[&<>"']/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch]));
+}
+
+// ---- One merged-concept node: a colored dot for a single author, or a neutral node
+// with small contributor dots above it when the name has multiple independent authors. ----
+function nodeMarkup(mc, { r, textSize, showLabel, dim }){
+  const p = nodePos[mc.id];
+  const isSel = buildSelected.has(mc.id);
+  const soleName = mc.contributors.length===1 ? personById[mc.contributors[0].personId].name : "multiple people";
+  let s = `<g class="node" data-cid="${mc.id}" role="button" tabindex="0" aria-label="${escXml(mc.label)} — ${escXml(soleName)}">`;
+  if(isSel){ s += `<circle cx="${p.x}" cy="${p.y}" r="${r+4}" fill="none" stroke="var(--ink)" stroke-width="2"/>`; }
+  const tip = `${escXml(mc.label)}\n${mc.contributors.map(c=>`${personById[c.personId].name}: ${escXml(c.def)}`).join("\n")}`;
+  if(mc.contributors.length > 1){
+    const n = mc.contributors.length;
+    mc.contributors.forEach((ct,i)=>{
+      const off = (i-(n-1)/2) * (r*1.15+2);
+      s += `<circle cx="${p.x+off}" cy="${p.y-r-6}" r="${Math.max(2.6,r*0.42)}" fill="${personById[ct.personId].color}" stroke="var(--paper)" stroke-width="1"/>`;
+    });
+    s += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="var(--ink)" fill-opacity="${dim?0.16:0.22}" stroke="var(--ink)" stroke-width="1.4"><title>${tip}</title></circle>`;
+  } else {
+    const person = personById[mc.contributors[0].personId];
+    s += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${person.color}" fill-opacity="${dim?0.32:0.9}" stroke="var(--ink)" stroke-opacity=".45" stroke-width="1"><title>${tip}</title></circle>`;
+  }
+  if(showLabel){
+    s += `<text x="${p.x+r+3}" y="${p.y+4}" font-family="Newsreader,Georgia,serif" font-size="${textSize}" fill="var(--ink)" fill-opacity=".85">${escXml(mc.label)}</text>`;
+  }
+  s += `</g>`;
+  return s;
+}
+
+// ---- Base layer ----
+function renderBase(){
+  const svg = document.getElementById("svgBase");
+  const { width, height } = LAYOUT;
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  let s = "";
+  currentPersonalEdges().forEach(e=>{
+    const t = trimmedLine(e.fromId, e.toId, false);
+    if(!t) return;
+    s += `<line x1="${t.p1.x}" y1="${t.p1.y}" x2="${t.p2.x}" y2="${t.p2.y}" stroke="${e.color}" stroke-opacity=".28" stroke-width="1.3"><title>${escXml(e.sentence)}</title></line>`;
+  });
+  mergedConcepts.forEach(mc=>{ s += nodeMarkup(mc, { r:7, textSize:11.5, showLabel:true, dim:false }); });
+  svg.innerHTML = s;
+  document.getElementById("legendBase").innerHTML = PEOPLE.map(p=>`<span><span class="sw" style="background:${p.color}"></span>${p.name}</span>`).join("")
+    + `<span><span class="sw" style="background:var(--ink);opacity:.4"></span>same name, multiple people</span>`;
+}
+
+// ---- Shared-graph markup shared by Rise-up / Connect-up / Shared views ----
+function sharedMarkup({ dimPersonal, clickableLinks, sharedPosMap }){
+  const spos = sharedPosMap || sharedPos;
+  const localPos = id => spos[id] || getPos(id);
+  let s = `<defs><marker id="qArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/></marker></defs>`;
+
+  if(dimPersonal){
+    currentPersonalEdges().forEach(e=>{
+      const t = trimmedLine(e.fromId, e.toId, true);
+      if(!t) return;
+      s += `<line x1="${t.p1.x}" y1="${t.p1.y}" x2="${t.p2.x}" y2="${t.p2.y}" stroke="${e.color}" stroke-opacity=".14" stroke-width="1"/>`;
+    });
+    mergedConcepts.forEach(mc=>{ s += nodeMarkup(mc, { r:5, textSize:11, showLabel:true, dim:true }); });
+  }
+
+  // shared links — in the shared-only view, only show links between two shared nodes;
+  // links back to a personal concept only make sense where that concept is visible (Rise-up / Connect-up).
+  const linksToShow = dimPersonal ? sharedLinks : sharedLinks.filter(l => sharedNodeById(l.fromId) && sharedNodeById(l.toId));
+  linksToShow.forEach(l=>{
+    const t = trimmedLine(l.fromId, l.toId, dimPersonal, localPos);
+    if(!t) return;
+    const { p1, p2 } = t;
+    const linkAttrs = clickableLinks ? `data-lid="${l.id}" role="button" tabindex="0" aria-label="Link: ${escXml(labelOf(l.fromId))} to ${escXml(labelOf(l.toId))}"` : "";
+    s += `<g class="node" ${linkAttrs}>`;
+    s += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="var(--ink)" stroke-width="2.2" marker-end="url(#qArrow)"/>`;
+    if(clickableLinks){ s += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="transparent" stroke-width="16"/>`; }
+    s += `</g>`;
+  });
+
+  // shared nodes
+  sharedNodes.forEach(n=>{
+    const p = localPos(n.id);
+    const isSel = buildSelected.has(n.id);
+    const bw = Math.max(90, n.label.length*8.6+30), bh = 34;
+    s += `<g class="node" data-cid="${n.id}" role="button" tabindex="0" aria-label="${escXml(n.label)} — shared concept">`;
+    if(isSel){ s += `<rect x="${p.x-bw/2-4}" y="${p.y-bh/2-4}" width="${bw+8}" height="${bh+8}" rx="10" fill="none" stroke="var(--ink)" stroke-width="2"/>`; }
+    s += `<rect x="${p.x-bw/2}" y="${p.y-bh/2}" width="${bw}" height="${bh}" rx="8" fill="var(--ink)" fill-opacity=".09" stroke="var(--ink)" stroke-width="1.7"><title>${escXml(n.label)}\n${escXml(n.def)}</title></rect>`;
+    s += `<text x="${p.x}" y="${p.y}" dominant-baseline="middle" text-anchor="middle" font-family="Fraunces,Georgia,serif" font-weight="600" font-size="14" fill="var(--ink)">${escXml(n.label)}</text>`;
+    s += `</g>`;
+  });
+
+  return s;
+}
+
+// ---- Rise-up screen ----
+function renderRiseUp(){
+  const svg = document.getElementById("svgRiseUp");
+  svg.setAttribute("viewBox", `0 0 ${LAYOUT.width} ${LAYOUT.height}`);
+  svg.innerHTML = sharedMarkup({ dimPersonal:true, clickableLinks:false });
+  const ids = [...buildSelected];
+  const allMerged = ids.length>0 && ids.every(id=>mergedById(id));
+  document.getElementById("selCountRise").textContent = `${ids.length} selected`;
+  document.getElementById("foldInBtn").disabled = !(allMerged && ids.length>=2);
+  const single = ids.length===1 ? mergedById(ids[0]) : null;
+  document.getElementById("riseUpBtn").disabled = !(single && single.contributors.length>=2);
+  document.getElementById("clearSelBtnRise").disabled = ids.length===0;
+}
+
+// ---- Connect-up screen ----
+function renderConnectUp(){
+  const svg = document.getElementById("svgConnectUp");
+  svg.setAttribute("viewBox", `0 0 ${LAYOUT.width} ${LAYOUT.height}`);
+  svg.innerHTML = sharedMarkup({ dimPersonal:true, clickableLinks:false });
+  const n = buildSelected.size;
+  document.getElementById("selCountConnect").textContent = `${n} selected`;
+  document.getElementById("connectUpBtn").disabled = n < 2;
+  document.getElementById("addLinkBtn").disabled = n !== 2;
+  document.getElementById("clearSelBtnConnect").disabled = n === 0;
+}
+
+function renderShared(){
+  const svg = document.getElementById("svgShared");
+  svg.setAttribute("viewBox", `0 0 ${LAYOUT.width} ${LAYOUT.height}`);
+  const displayPos = computeSharedDisplayLayout();
+  svg.innerHTML = sharedMarkup({ dimPersonal:false, clickableLinks:true, sharedPosMap:displayPos });
+  renderInspector();
+  renderDeletedList();
+}
+
+function renderInspector(){
+  const el = document.getElementById("inspector");
+  if(!inspected){ el.innerHTML = `<p class="empty">Click a concept or a link to see its story.</p>`; return; }
+  if(inspected.type === "concept"){
+    const n = sharedNodeById(inspected.id);
+    if(!n){ inspected = null; return renderInspector(); }
+    const originsHtml = (n.origins && n.origins.length>1)
+      ? `<h5>Independently defined by</h5><ul>${n.origins.map(o=>`<li class="row"><b>${escXml(personById[o.personId].name)}</b>: ${escXml(o.def)}</li>`).join("")}</ul>`
+      : "";
+    el.innerHTML = `
+      <h4>${escXml(n.label)}</h4>
+      <p class="row">${escXml(n.def)}</p>
+      ${originsHtml}
+      <h5>History</h5>
+      <ul>${n.history.map(h=>`<li class="row"><b>${escXml(h.by)}</b> ${escXml(h.action)} — ${escXml(h.at)}</li>`).join("")}</ul>
+      <h5>Discussion</h5>
+      <ul>${n.comments.length ? n.comments.map(c=>`<li class="row"><b>${escXml(c.by)}</b>: ${escXml(c.text)}</li>`).join("") : `<p class="empty">No comments yet.</p>`}</ul>
+      <div class="commentInput"><input id="newCommentInput" type="text" placeholder="Add a comment as You"><button class="ghost" id="addCommentBtn">Post</button></div>
+      <div class="actions">
+        <button class="ghost" id="editBtn">Edit</button>
+        <button class="ghost" id="deleteBtn">Delete</button>
+      </div>
+      <div id="editArea"></div>
+    `;
+    document.getElementById("addCommentBtn").addEventListener("click", ()=>{
+      const v = document.getElementById("newCommentInput").value.trim();
+      if(!v) return;
+      n.comments.push({ by:"You", text:v });
+      renderInspector();
+    });
+    document.getElementById("editBtn").addEventListener("click", ()=>{
+      document.getElementById("editArea").innerHTML = `
+        <div class="editBox">
+          <input id="editLabel" type="text" value="${escXml(n.label)}">
+          <input id="editDef" type="text" value="${escXml(n.def)}">
+          <div class="actions"><button class="primary" id="saveEditBtn">Save edit</button></div>
+        </div>`;
+      document.getElementById("saveEditBtn").addEventListener("click", ()=>{
+        n.label = document.getElementById("editLabel").value.trim() || n.label;
+        n.def = document.getElementById("editDef").value.trim() || n.def;
+        n.history.push({ by:"You", action:"edited this concept", at:"just now" });
+        renderShared();
+      });
+    });
+    document.getElementById("deleteBtn").addEventListener("click", ()=>{
+      deletedItems.push({ id:n.id, kind:"concept", label:n.label, def:n.def, sourceIds:n.sourceIds, origins:n.origins, x:sharedPos[n.id].x, y:sharedPos[n.id].y, history:n.history, comments:n.comments, deletedBy:"You", at:"just now" });
+      const idx = sharedNodes.findIndex(x=>x.id===n.id);
+      if(idx>=0) sharedNodes.splice(idx,1);
+      delete sharedPos[n.id];
+      for(let i=sharedLinks.length-1;i>=0;i--){
+        const l = sharedLinks[i];
+        if(l.fromId===n.id || l.toId===n.id){
+          deletedItems.push({ id:l.id, kind:"link", fromId:l.fromId, toId:l.toId, sentence:l.sentence, history:l.history, comments:l.comments, deletedBy:"You", at:"just now" });
+          sharedLinks.splice(i,1);
+        }
+      }
+      inspected = null;
+      renderShared();
+    });
+  } else {
+    const l = sharedLinks.find(x=>x.id===inspected.id);
+    if(!l){ inspected = null; return renderInspector(); }
+    el.innerHTML = `
+      <h4>${escXml(labelOf(l.fromId))} → ${escXml(labelOf(l.toId))}</h4>
+      <p class="row">${l.sentence ? escXml(l.sentence) : "<i>No description yet.</i>"}</p>
+      <h5>History</h5>
+      <ul>${l.history.map(h=>`<li class="row"><b>${escXml(h.by)}</b> ${escXml(h.action)} — ${escXml(h.at)}</li>`).join("")}</ul>
+      <div class="actions">
+        <button class="ghost" id="editLinkBtn">Edit</button>
+        <button class="ghost" id="deleteLinkBtn">Delete</button>
+      </div>
+      <div id="editArea"></div>
+    `;
+    document.getElementById("editLinkBtn").addEventListener("click", ()=>{
+      document.getElementById("editArea").innerHTML = `
+        <div class="editBox">
+          <input id="editSentence" type="text" value="${escXml(l.sentence)}" placeholder="How they relate">
+          <div class="actions"><button class="primary" id="saveLinkEditBtn">Save edit</button></div>
+        </div>`;
+      document.getElementById("saveLinkEditBtn").addEventListener("click", ()=>{
+        l.sentence = document.getElementById("editSentence").value.trim();
+        l.history.push({ by:"You", action:"edited this link", at:"just now" });
+        renderShared();
+      });
+    });
+    document.getElementById("deleteLinkBtn").addEventListener("click", ()=>{
+      deletedItems.push({ id:l.id, kind:"link", fromId:l.fromId, toId:l.toId, sentence:l.sentence, history:l.history, comments:l.comments, deletedBy:"You", at:"just now" });
+      const idx = sharedLinks.findIndex(x=>x.id===l.id);
+      if(idx>=0) sharedLinks.splice(idx,1);
+      inspected = null;
+      renderShared();
+    });
+  }
+}
+
+function renderDeletedList(){
+  const el = document.getElementById("deletedList");
+  if(!deletedItems.length){ el.innerHTML = `<p class="empty">Nothing deleted yet.</p>`; return; }
+  el.innerHTML = `<ul>${deletedItems.map(d=>`
+    <li>
+      <div class="row"><b>${d.kind==="concept" ? escXml(d.label) : escXml(labelOf(d.fromId))+" → "+escXml(labelOf(d.toId))}</b></div>
+      <div class="row">deleted by ${escXml(d.deletedBy)} — ${escXml(d.at)}</div>
+      <button class="ghost" data-restore="${d.id}">Restore</button>
+    </li>
+  `).join("")}</ul>`;
+  el.querySelectorAll("[data-restore]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.getAttribute("data-restore");
+      const idx = deletedItems.findIndex(d=>d.id===id);
+      if(idx < 0) return;
+      const d = deletedItems[idx];
+      d.history.push({ by:"You", action:"restored", at:"just now" });
+      if(d.kind === "concept"){
+        sharedNodes.push({ id:d.id, label:d.label, def:d.def, sourceIds:d.sourceIds, origins:d.origins, history:d.history, comments:d.comments });
+        sharedPos[d.id] = { x:d.x, y:d.y };
+        declutterSharedBoxes();
+      } else {
+        sharedLinks.push({ id:d.id, fromId:d.fromId, toId:d.toId, sentence:d.sentence, history:d.history, comments:d.comments });
+      }
+      deletedItems.splice(idx,1);
+      renderShared();
+    });
+  });
+}
+
+// ---- Selection helpers shared by Rise-up + Connect-up ----
+function attachBuildClicks(svgId, rerender){
+  document.getElementById(svgId).addEventListener("click", (ev)=>{
+    const g = ev.target.closest("[data-cid]");
+    if(!g) return;
+    const id = g.getAttribute("data-cid");
+    if(buildSelected.has(id)) buildSelected.delete(id); else buildSelected.add(id);
+    rerender();
+  });
+}
+attachBuildClicks("svgRiseUp", renderRiseUp);
+attachBuildClicks("svgConnectUp", renderConnectUp);
+
+document.getElementById("clearSelBtnRise").addEventListener("click", ()=>{ buildSelected.clear(); renderRiseUp(); });
+document.getElementById("clearSelBtnConnect").addEventListener("click", ()=>{ buildSelected.clear(); renderConnectUp(); });
+
+// ---- Fold in (Rise-up screen): merge selected concepts that are the same idea under different names ----
+document.getElementById("foldInBtn").addEventListener("click", ()=>{
+  const ids = [...buildSelected];
+  const primary = mergedById(ids[0]);
+  document.getElementById("riseForm").classList.remove("show");
+  document.getElementById("foldForm").classList.add("show");
+  document.getElementById("foldNameInput").value = primary ? primary.label : "";
+  document.getElementById("foldNameInput").focus();
+});
+document.getElementById("cancelFoldBtn").addEventListener("click", ()=>{
+  document.getElementById("foldForm").classList.remove("show");
+});
+document.getElementById("saveFoldBtn").addEventListener("click", ()=>{
+  const ids = [...buildSelected];
+  if(ids.length < 2) return;
+  const primary = mergedById(ids[0]);
+  if(!primary) return;
+  const label = document.getElementById("foldNameInput").value.trim() || primary.label;
+  for(let i=1;i<ids.length;i++){
+    const other = mergedById(ids[i]);
+    if(!other || other.id===primary.id) continue;
+    primary.contributors.push(...other.contributors);
+    other.contributors.forEach(ct=>{ toMerged[ct.sourceConceptId] = primary.id; });
+    const idx = mergedConcepts.findIndex(m=>m.id===other.id);
+    if(idx>=0) mergedConcepts.splice(idx,1);
+    delete nodePos[other.id];
+  }
+  primary.label = label;
+  buildSelected.clear();
+  document.getElementById("foldForm").classList.remove("show");
+  document.getElementById("foldNameInput").value = "";
+  renderRiseUp();
+});
+
+// ---- Rise up (Rise-up screen): promote an already multi-person concept into the shared graph ----
+document.getElementById("riseUpBtn").addEventListener("click", ()=>{
+  const ids = [...buildSelected];
+  const mc = ids.length===1 ? mergedById(ids[0]) : null;
+  document.getElementById("foldForm").classList.remove("show");
+  document.getElementById("riseForm").classList.add("show");
+  document.getElementById("riseDefInput").value = mc ? mc.contributors[0].def : "";
+  document.getElementById("riseDefInput").focus();
+});
+document.getElementById("cancelRiseBtn").addEventListener("click", ()=>{
+  document.getElementById("riseForm").classList.remove("show");
+});
+document.getElementById("saveRiseBtn").addEventListener("click", ()=>{
+  const ids = [...buildSelected];
+  if(ids.length !== 1) return;
+  const mc = mergedById(ids[0]);
+  if(!mc || mc.contributors.length < 2) return;
+  const def = document.getElementById("riseDefInput").value.trim() || mc.contributors[0].def;
+  const nodeId = `sn${sharedNodeSeq++}`;
+  sharedNodes.push({
+    id:nodeId, label:mc.label, def,
+    sourceIds:[mc.id],
+    origins: mc.contributors.map(c=>({personId:c.personId, def:c.def})),
+    history:[{by:"You",action:"rose this up from the personal layer",at:"just now"}],
+    comments:[],
+  });
+  sharedPos[nodeId] = { x:nodePos[mc.id].x, y:nodePos[mc.id].y };
+  declutterSharedBoxes();
+  sharedLinks.push({ id:`sl${sharedLinkSeq++}`, fromId:mc.id, toId:nodeId, sentence:"", history:[{by:"You",action:"created this link",at:"just now"}], comments:[] });
+  buildSelected.clear();
+  document.getElementById("riseForm").classList.remove("show");
+  document.getElementById("riseDefInput").value = "";
+  renderRiseUp();
+});
+
+// ---- Connect up (Connect-up screen): bridge 2+ different concepts into a brand new one ----
+document.getElementById("connectUpBtn").addEventListener("click", ()=>{
+  document.getElementById("connectLinkForm").classList.remove("show");
+  document.getElementById("connectForm").classList.add("show");
+  document.getElementById("connectLabelInput").focus();
+});
+document.getElementById("addLinkBtn").addEventListener("click", ()=>{
+  document.getElementById("connectForm").classList.remove("show");
+  document.getElementById("connectLinkForm").classList.add("show");
+  document.getElementById("connectLinkSentenceInput").focus();
+});
+document.getElementById("cancelConnectBtn").addEventListener("click", ()=>{
+  document.getElementById("connectForm").classList.remove("show");
+  document.getElementById("connectLabelInput").value = ""; document.getElementById("connectDefInput").value = "";
+});
+document.getElementById("cancelConnectLinkBtn").addEventListener("click", ()=>{
+  document.getElementById("connectLinkForm").classList.remove("show");
+  document.getElementById("connectLinkSentenceInput").value = "";
+});
+document.getElementById("saveConnectBtn").addEventListener("click", ()=>{
+  const label = document.getElementById("connectLabelInput").value.trim();
+  const def = document.getElementById("connectDefInput").value.trim();
+  if(!label || !def || buildSelected.size < 2) return;
+  const ids = [...buildSelected];
+  const xs = ids.map(id=>getPos(id));
+  const cx = xs.reduce((s,p)=>s+p.x,0)/xs.length, cy = xs.reduce((s,p)=>s+p.y,0)/xs.length;
+  const nodeId = `sn${sharedNodeSeq++}`;
+  sharedNodes.push({ id:nodeId, label, def, sourceIds:ids, history:[{by:"You",action:"created this concept",at:"just now"}], comments:[] });
+  sharedPos[nodeId] = { x:cx, y:cy };
+  declutterSharedBoxes();
+  ids.forEach(id=>{
+    sharedLinks.push({ id:`sl${sharedLinkSeq++}`, fromId:id, toId:nodeId, sentence:"", history:[{by:"You",action:"created this link",at:"just now"}], comments:[] });
+  });
+  buildSelected.clear();
+  document.getElementById("connectForm").classList.remove("show");
+  document.getElementById("connectLabelInput").value = ""; document.getElementById("connectDefInput").value = "";
+  renderConnectUp();
+});
+document.getElementById("saveConnectLinkBtn").addEventListener("click", ()=>{
+  const sentence = document.getElementById("connectLinkSentenceInput").value.trim();
+  if(buildSelected.size !== 2) return;
+  const [fromId, toId] = [...buildSelected];
+  sharedLinks.push({ id:`sl${sharedLinkSeq++}`, fromId, toId, sentence, history:[{by:"You",action:"created this link",at:"just now"}], comments:[] });
+  buildSelected.clear();
+  document.getElementById("connectLinkForm").classList.remove("show");
+  document.getElementById("connectLinkSentenceInput").value = "";
+  renderConnectUp();
+});
+
+// ---- Selection/inspection in Shared view ----
+document.getElementById("svgShared").addEventListener("click", (ev)=>{
+  const g = ev.target.closest("[data-cid]");
+  if(g){ inspected = { type:"concept", id:g.getAttribute("data-cid") }; renderShared(); return; }
+  const l = ev.target.closest("[data-lid]");
+  if(l){ inspected = { type:"link", id:l.getAttribute("data-lid") }; renderShared(); return; }
+});
+
+// ---- Mode nav ----
+function setMode(mode){
+  document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active", b.getAttribute("data-mode")===mode));
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(`scr-${mode}`).classList.add("active");
+  if(mode === "base") renderBase();
+  else if(mode === "riseup") renderRiseUp();
+  else if(mode === "connectup") renderConnectUp();
+  else renderShared();
+}
+document.getElementById("nav").addEventListener("click", (ev)=>{
+  const b = ev.target.closest("button[data-mode]");
+  if(!b) return;
+  setMode(b.getAttribute("data-mode"));
+});
+
+renderBase();
+renderRiseUp();
+renderConnectUp();
+renderShared();
+</script>
+</body>
+</html>

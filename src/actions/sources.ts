@@ -2,7 +2,7 @@
 
 import { db } from "@/db"
 import { courses, sources, sourcePages, users } from "@/db/schema"
-import { and, asc, eq, isNull } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, isAdminUser } from "@/lib/auth"
 import { readingStorage } from "@/lib/storage"
@@ -65,6 +65,20 @@ export async function getSources(courseIdRaw: string = DEFAULT_COURSE_ID) {
     .from(sources)
     .where(and(eq(sources.isVisible, true), eq(sources.courseId, courseId)))
     .orderBy(asc(sources.createdAt))
+}
+
+export async function getSourcesByIds(ids: string[]) {
+  if (ids.length === 0) return []
+  const session = await getServerSession(authOptions)
+  const admin = isAdminUser(session?.user)
+
+  return db
+    .select()
+    .from(sources)
+    .where(admin
+      ? inArray(sources.id, ids)
+      : and(inArray(sources.id, ids), eq(sources.isVisible, true))
+    )
 }
 
 export async function getManageableSources(courseIdRaw: string = DEFAULT_COURSE_ID) {

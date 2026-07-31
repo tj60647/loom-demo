@@ -7,6 +7,7 @@ import OpenTab from "@/components/tabs/OpenTab"
 import ThrowTab from "@/components/tabs/ThrowTab"
 import ReadTab from "@/components/tabs/ReadTab"
 import LibraryTab from "@/components/tabs/LibraryTab"
+import FilesTab from "@/components/tabs/FilesTab"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import type { Byte } from "@/lib/types"
 
@@ -20,7 +21,7 @@ type LibraryNavTarget = {
 export default function Home() {
   const { data: session } = useSession()
   const { isLoading } = useLoom()
-  const [activeTab, setActiveTab] = useState<"library" | "open" | "throw" | "read">("open")
+  const [activeTab, setActiveTab] = useState<"library" | "open" | "throw" | "read" | "files">("open")
   const [libraryTarget, setLibraryTarget] = useState<LibraryNavTarget | null>(null)
   const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
 
@@ -87,6 +88,12 @@ export default function Home() {
         >
           <span className="step">03</span> Read
         </button>
+        <button
+          className={activeTab === "files" ? "active" : ""}
+          onClick={() => setActiveTab("files")}
+        >
+          <span className="step">04</span> Files
+        </button>
       </nav>
 
       <main>
@@ -113,6 +120,9 @@ export default function Home() {
         </div>
         <div className={`panel ${activeTab === "read" ? "active" : ""}`}>
           {activeTab === "read" && <ReadTab />}
+        </div>
+        <div className={`panel ${activeTab === "files" ? "active" : ""}`}>
+          {activeTab === "files" && <FilesTab />}
         </div>
         <FirstRunWalkthrough />
       </main>

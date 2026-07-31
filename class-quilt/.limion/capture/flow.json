@@ -1,0 +1,117 @@
+{
+  "schema": "limion.flow/v1",
+  "platform": "web",
+  "runtime": {
+    "kind": "browser"
+  },
+  "canvas": {
+    "size": {
+      "w": 1280,
+      "h": 900
+    },
+    "scale": 2,
+    "unit": "css-px"
+  },
+  "screens": [
+    {
+      "id": "aggregated-personal-view-by-embedding-distances",
+      "path": "prototype-screenshots/wKQxrj1VVbha/01_aggregated-personal-view-by-embedding-distances.png",
+      "title": "Aggregated personal view, by embedding distances"
+    },
+    {
+      "id": "rise-up-a-concept-a-name-multiple-students-already-used-ready-to-promote",
+      "path": "prototype-screenshots/I2JejJUXb00w/02_rise-up-a-concept-a-name-multiple-students-already-used-ready-to-promote.png",
+      "title": "Rise up a concept — a name multiple students already used, ready to promote"
+    },
+    {
+      "id": "connect-up-a-concept-select-two-different-concepts-to-bridge-into-something-new",
+      "path": "prototype-screenshots/n7ZPYM8NJOl-/03_connect-up-a-concept-select-two-different-concepts-to-bridge-into-something-new.png",
+      "title": "Connect up a concept — select two different concepts to bridge into something new"
+    },
+    {
+      "id": "shared-graph-auto-arranged-for-a-cleaner-read",
+      "path": "prototype-screenshots/4gS1qWd0eYrC/04_shared-graph-auto-arranged-for-a-cleaner-read.png",
+      "title": "Shared graph, auto-arranged for a cleaner read"
+    },
+    {
+      "id": "click-a-concept-to-see-its-description-attribution-history-and-discussion",
+      "path": "prototype-screenshots/6gMx1FkGiEIq/05_click-a-concept-to-see-its-description-attribution-history-and-discussion.png",
+      "title": "Click a concept to see its description, attribution history, and discussion"
+    },
+    {
+      "id": "done",
+      "path": "prototype-screenshots/NO5sw4v6h99G/06_done.png",
+      "title": "Done"
+    }
+  ],
+  "transitions": [
+    {
+      "from": "aggregated-personal-view-by-embedding-distances",
+      "to": "rise-up-a-concept-a-name-multiple-students-already-used-ready-to-promote",
+      "action": "click",
+      "label": "Rise up a concept — a name multiple students already used, ready to promote",
+      "point": {
+        "x": 175.0572509765625,
+        "y": 449.8125457763672
+      },
+      "frame": {
+        "x": 151.87210083007812,
+        "y": 438.83477783203125,
+        "w": 46.37030029296875,
+        "h": 21.955535888671875
+      },
+      "source": "dom"
+    },
+    {
+      "from": "rise-up-a-concept-a-name-multiple-students-already-used-ready-to-promote",
+      "to": "connect-up-a-concept-select-two-different-concepts-to-bridge-into-something-new",
+      "action": "click",
+      "label": "Connect up a concept — select two different concepts to bridge into something new",
+      "point": {
+        "x": 606.4326477050781,
+        "y": 801.5405578613281
+      },
+      "frame": {
+        "x": 551.6917724609375,
+        "y": 795.0660400390625,
+        "w": 109.48175048828125,
+        "h": 12.94903564453125
+      },
+      "source": "dom"
+    },
+    {
+      "from": "connect-up-a-concept-select-two-different-concepts-to-bridge-into-something-new",
+      "to": "shared-graph-auto-arranged-for-a-cleaner-read",
+      "action": "click",
+      "label": "Shared graph, auto-arranged for a cleaner read",
+      "point": {
+        "x": 1185.9296875,
+        "y": 24.25
+      },
+      "frame": {
+        "x": 1113.859375,
+        "y": 11.25,
+        "w": 144.140625,
+        "h": 26
+      },
+      "source": "dom"
+    },
+    {
+      "from": "shared-graph-auto-arranged-for-a-cleaner-read",
+      "to": "click-a-concept-to-see-its-description-attribution-history-and-discussion",
+      "action": "click",
+      "label": "Click a concept to see its description, attribution history, and discussion",
+      "point": {
+        "x": 134.52727508544922,
+        "y": 369.0223388671875
+      },
+      "frame": {
+        "x": 98.59754943847656,
+        "y": 355.034423828125,
+        "w": 71.85945129394531,
+        "h": 27.975830078125
+      },
+      "source": "dom"
+    }
+  ]
+}

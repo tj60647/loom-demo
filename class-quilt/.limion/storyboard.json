@@ -1,0 +1,23 @@
+{
+  "schema": "limion.capture.storyboard/v1",
+  "target": { "url": "http://localhost:8931/index.html" },
+  "viewport": { "w": 1280, "h": 900 },
+  "steps": [
+    { "action": "goto", "url": "http://localhost:8931/index.html", "label": "Aggregated personal view, by embedding distances", "kind": "load" },
+    { "action": "wait", "ms": 400 },
+    { "action": "click", "selector": { "role": "button", "name": "2 · Rise up" }, "kind": "nav", "settle_ms": 200 },
+    { "action": "click", "selector": { "role": "button", "name": "Stock — multiple people" }, "label": "Rise up a concept — a name multiple students already used, ready to promote", "kind": "action", "settle_ms": 300 },
+    { "action": "click", "selector": { "role": "button", "name": "Rise up", "exact": true }, "kind": "action", "settle_ms": 150 },
+    { "action": "click", "selector": { "role": "button", "name": "Publish" }, "kind": "action", "settle_ms": 300 },
+    { "action": "click", "selector": { "role": "button", "name": "3 · Connect up" }, "kind": "nav", "settle_ms": 200 },
+    { "action": "click", "selector": { "role": "button", "name": "Feedback loop — Cleo", "exact": true }, "kind": "action" },
+    { "action": "click", "selector": { "role": "button", "name": "System boundary — Ana", "exact": true }, "label": "Connect up a concept — select two different concepts to bridge into something new", "kind": "action", "settle_ms": 300 },
+    { "action": "click", "selector": { "role": "button", "name": "Connect up", "exact": true }, "kind": "action", "settle_ms": 150 },
+    { "action": "fill", "selector": { "role": "textbox", "name": "Name" }, "value": "Boundaries decide how fast a loop reads as done", "kind": "input" },
+    { "action": "fill", "selector": { "role": "textbox", "name": "Definition" }, "value": "Where you draw the system boundary changes whether a feedback loop looks finished or still running.", "kind": "input" },
+    { "action": "click", "selector": { "role": "button", "name": "Create", "exact": true }, "kind": "action", "settle_ms": 300 },
+    { "action": "click", "selector": { "role": "button", "name": "4 · Shared graph" }, "label": "Shared graph, auto-arranged for a cleaner read", "kind": "nav", "settle_ms": 400 },
+    { "action": "click", "selector": { "role": "button", "name": "Stock — shared concept" }, "label": "Click a concept to see its description, attribution history, and discussion", "kind": "action", "settle_ms": 300 },
+    { "action": "end", "label": "Done", "kind": "end" }
+  ]
+}
