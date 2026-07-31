@@ -9,7 +9,7 @@ import { emptyViews, parseImport } from "@/lib/graphExport"
 import {
   getUserLoomData,
   createConcept, updateConcept, deleteConcept,
-  createByte, deleteByte, refileByte as refileByteAction,
+  createByte, deleteByte, refileByte as refileByteAction, attributeBytes as attributeBytesAction,
   createEdge, updateEdge, deleteEdge,
   saveRead, saveView,
   importGraph, resetGraph, loadWorkedExample,
@@ -38,6 +38,8 @@ interface LoomContextType {
   removeConcept: (id: string) => Promise<void>
   addByte: (conceptId: string, source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => Promise<Byte>
   removeByte: (id: string) => Promise<void>
+  /** Say which reading passages came from — the student's answer, never a guess. */
+  attributeBytes: (byteIds: string[], sourceId: string) => Promise<number>
   refileByte: (byteId: string, conceptId: string) => Promise<Byte>
   addEdge: (fromId: string, toId: string, sentence: string) => Promise<Edge>
   editEdge: (id: string, data: Partial<{handle: string, sentence: string}>) => Promise<void>
@@ -222,6 +224,22 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const attributeBytes = async (byteIds: string[], sourceId: string) => {
+    const ids = new Set(byteIds)
+    setState(s => ({
+      ...s,
+      bytes: s.bytes.map(b => (ids.has(b.id) && !b.sourceId ? { ...b, sourceId } : b)),
+    }))
+    try {
+      const n = await attributeBytesAction(byteIds, sourceId)
+      flash(n === 1 ? "passage placed in its reading" : `${n} passages placed in their reading`)
+      return n
+    } catch (e) {
+      await resync(e)
+      throw e
+    }
+  }
+
   const refileByte = async (byteId: string, conceptId: string) => {
     try {
       const saved = await refileByteAction(byteId, conceptId)
@@ -382,7 +400,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       state, scope, scoped, scopedState, isLoading,
       studentName: session?.user?.name || "",
       addConcept, editConcept, removeConcept,
-      addByte, removeByte, refileByte,
+      addByte, removeByte, refileByte, attributeBytes,
       addEdge, editEdge, removeEdge,
       setRead, flushRead, setCardTable,
       importFromText, resetAll, loadExample,

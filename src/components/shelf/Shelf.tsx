@@ -13,6 +13,7 @@ import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings, type ReadingMeta } from "@/components/providers/ReadingsProvider"
+import { createOwnReading } from "@/actions/sources"
 import { tallyByReading } from "@/lib/scope"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
@@ -20,16 +21,19 @@ import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 export default function Shelf() {
   const { data: session } = useSession()
   const { state, isLoading, loadExample, flash } = useLoom()
-  const { readings: sources, isLoading: loadingShelf, error } = useReadings()
+  const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
   const [exampleBusy, setExampleBusy] = useState(false)
 
   const tallies = useMemo(() => tallyByReading(state), [state])
 
   // Syllabus order, with unscheduled readings after the weeks rather than
   // sorted into week 0.
+  const courseReadings = useMemo(() => sources.filter((s) => !s.isOwn), [sources])
+  const ownReadings = useMemo(() => sources.filter((s) => s.isOwn), [sources])
+
   const byWeek = useMemo(() => {
     const groups = new Map<number | null, ReadingMeta[]>()
-    sources.forEach((s) => {
+    courseReadings.forEach((s) => {
       const list = groups.get(s.week) ?? []
       list.push(s)
       groups.set(s.week, list)
@@ -40,7 +44,7 @@ export default function Shelf() {
       if (b === null) return -1
       return a - b
     })
-  }, [sources])
+  }, [courseReadings])
 
   const untethered = state.bytes.filter((b) => !b.sourceId).length
 
@@ -53,6 +57,42 @@ export default function Shelf() {
         </div>
         <FirstRunWalkthrough autoOpen={false} />
       </main>
+    )
+  }
+
+  const readingCard = (s: ReadingMeta) => {
+    const tally = tallies.get(s.id)
+    return (
+      <Link key={s.id} href={`/reading/${s.id}`} className="shelfcard">
+        {s.storageKey ? (
+          <SourceThumbnail sourceId={s.id} title={s.title} />
+        ) : (
+          // No PDF behind this card — say so rather than showing a broken frame.
+          <span className="shelfnofile" aria-hidden="true">
+            <span className="cap">no pdf</span>
+          </span>
+        )}
+        <div className="shelfbody">
+          <div>
+            <h3>{s.title}</h3>
+            {s.author ? <p className="shelfauthor">{s.author}</p> : null}
+            {s.isDescriptionVisible && s.description ? (
+              <p className="shelfdesc">{s.description}</p>
+            ) : null}
+          </div>
+          <p className="shelftally">
+            {tally ? (
+              <>
+                {tally.bytes} byte{tally.bytes !== 1 ? "s" : ""} ·{" "}
+                {tally.concepts} concept{tally.concepts !== 1 ? "s" : ""} ·{" "}
+                {tally.threads} thread{tally.threads !== 1 ? "s" : ""}
+              </>
+            ) : (
+              <span className="shelfquiet">nothing captured here yet</span>
+            )}
+          </p>
+        </div>
+      </Link>
     )
   }
 
@@ -88,13 +128,7 @@ export default function Shelf() {
           </span>
         </div>
 
-        {untethered > 0 && (
-          <p className="ghostnote" style={{ marginBottom: 14 }}>
-            {untethered} passage{untethered !== 1 ? "s" : ""} not tied to a reading —{" "}
-            they live in <Link href="/weave">your whole weave</Link>, and you can say which
-            reading each came from from there.
-          </p>
-        )}
+        {untethered > 0 && <Untethered readings={sources} />}
 
         {loadingShelf && <p className="hint">Reading the shelf…</p>}
         {error && <p className="hint" style={{ color: "var(--red)" }}>{error}</p>}
@@ -111,38 +145,24 @@ export default function Shelf() {
               <span className="cap">{week === null ? "unscheduled" : `week ${week}`}</span>
               <span className="weekrule" />
             </div>
-            <div className="shelfgrid">
-              {readings.map((s) => {
-                const tally = tallies.get(s.id)
-                return (
-                  <Link key={s.id} href={`/reading/${s.id}`} className="shelfcard">
-                    <SourceThumbnail sourceId={s.id} title={s.title} />
-                    <div className="shelfbody">
-                      <div>
-                        <h3>{s.title}</h3>
-                        {s.author ? <p className="shelfauthor">{s.author}</p> : null}
-                        {s.isDescriptionVisible && s.description ? (
-                          <p className="shelfdesc">{s.description}</p>
-                        ) : null}
-                      </div>
-                      <p className="shelftally">
-                        {tally ? (
-                          <>
-                            {tally.bytes} byte{tally.bytes !== 1 ? "s" : ""} ·{" "}
-                            {tally.concepts} concept{tally.concepts !== 1 ? "s" : ""} ·{" "}
-                            {tally.threads} thread{tally.threads !== 1 ? "s" : ""}
-                          </>
-                        ) : (
-                          <span className="shelfquiet">nothing captured here yet</span>
-                        )}
-                      </p>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
+            <div className="shelfgrid">{readings.map(readingCard)}</div>
           </section>
         ))}
+
+        {/* A reading of the student's own: something they are coding that the
+            library does not hold. Reading-first needs every byte to have a
+            door, so a self-found paper gets a card rather than becoming an
+            untethered passage. */}
+        <section style={{ marginBottom: 26 }}>
+          <div className="weekhead">
+            <span className="cap">your own readings</span>
+            <span className="weekrule" />
+          </div>
+          {ownReadings.length > 0 && (
+            <div className="shelfgrid" style={{ marginBottom: 12 }}>{ownReadings.map(readingCard)}</div>
+          )}
+          <AddOwnReading onAdded={refresh} />
+        </section>
 
         {!isLoading && state.concepts.length === 0 && (
           <div className="card" style={{ marginTop: 8 }}>
@@ -165,5 +185,156 @@ export default function Shelf() {
         <span className="fr">PICK A READING</span>
       </footer>
     </>
+  )
+}
+
+/**
+ * Passages with no reading behind them — captured before reading-first, or
+ * imported. They are grouped by the citation the student typed and offered a
+ * card to belong to.
+ *
+ * It ASKS. Matching "Suchman, Plans and Situated Actions" against library
+ * titles would be the tool deciding what the student meant, and getting it
+ * wrong would file someone's evidence under the wrong text (red line #2).
+ */
+function Untethered({ readings }: { readings: ReadingMeta[] }) {
+  const { state, attributeBytes } = useLoom()
+  const [picked, setPicked] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const groups = useMemo(() => {
+    const byCitation = new Map<string, string[]>()
+    state.bytes.forEach((b) => {
+      if (b.sourceId) return
+      const key = (b.source ?? "").trim() || " no citation"
+      byCitation.set(key, [...(byCitation.get(key) ?? []), b.id])
+    })
+    return [...byCitation.entries()].sort((a, b) => b[1].length - a[1].length)
+  }, [state.bytes])
+
+  if (!groups.length) return null
+
+  const place = async (key: string, ids: string[]) => {
+    const sourceId = picked[key]
+    if (!sourceId) return
+    setBusy(key)
+    try {
+      await attributeBytes(ids, sourceId)
+    } catch {
+      // attributeBytes resyncs and flashes; nothing more to say here.
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <h2>Passages with no reading <span className="n">counted, not corrected</span></h2>
+      <p className="hint">
+        These were captured before a reading was open, so they sit outside every card on
+        your shelf. Say which reading each set came from and they find their place. Loom
+        will not guess for you — a wrong guess would file your evidence under the wrong text.
+      </p>
+      {groups.map(([key, ids]) => (
+        <div key={key} className="untethered">
+          <div className="untetheredsrc">
+            {key === " no citation" ? <i>no citation given</i> : key}
+            <span className="n"> · {ids.length} passage{ids.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="quietrow">
+            <select
+              className="tinput inline"
+              value={picked[key] ?? ""}
+              onChange={(e) => setPicked((p) => ({ ...p, [key]: e.target.value }))}
+            >
+              <option value="">which reading?</option>
+              {readings.map((r) => (
+                <option key={r.id} value={r.id}>{r.title}</option>
+              ))}
+            </select>
+            <button
+              className="btn ghost mini nowrapbtn"
+              disabled={!picked[key] || busy === key}
+              onClick={() => place(key, ids)}
+            >
+              {busy === key ? "Placing…" : "Place"}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Title and author only. This records WHERE a passage came from — nothing
+ * about the student's reading of it, which is the work the card is a door to.
+ */
+function AddOwnReading({ onAdded }: { onAdded: () => void }) {
+  const { flash } = useLoom()
+  const [open, setOpen] = useState(false)
+  const [title, setTitle] = useState("")
+  const [author, setAuthor] = useState("")
+  const [reference, setReference] = useState("")
+  const [busy, setBusy] = useState(false)
+
+  const submit = async () => {
+    if (!title.trim() || busy) return
+    setBusy(true)
+    try {
+      await createOwnReading({ title, author, sourceReference: reference })
+      setTitle("")
+      setAuthor("")
+      setReference("")
+      setOpen(false)
+      onAdded()
+      flash("added to your shelf")
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "could not add that reading")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div>
+        <button className="btn ghost mini" onClick={() => setOpen(true)}>
+          + a reading of your own
+        </button>
+        <p className="hint" style={{ marginTop: 6 }}>
+          Coding something the library doesn&apos;t hold — a paper you found, a book, a
+          lecture? Give it a card and its passages have somewhere to live.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card">
+      <h2>A reading of your own</h2>
+      <p className="hint">
+        Title and author is enough. It sits on your shelf and nobody else&apos;s; there is
+        no PDF behind it, so you capture its passages by hand on 01 · Open.
+      </p>
+      <div className="form-row">
+        <span className="label">Title</span>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Plans and Situated Actions" autoFocus />
+      </div>
+      <div className="form-row">
+        <span className="label">Author <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span></span>
+        <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Suchman" />
+      </div>
+      <div className="form-row">
+        <span className="label">Where it&apos;s from <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span></span>
+        <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Cambridge University Press, 1987" />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button className="btn mini" onClick={submit} disabled={!title.trim() || busy}>
+          {busy ? "Adding…" : "Add to my shelf"}
+        </button>
+        <button className="btn ghost mini" onClick={() => setOpen(false)} disabled={busy}>Cancel</button>
+      </div>
+    </div>
   )
 }

@@ -39,6 +39,17 @@ export type WorkedExample = {
 
 const SRC = "Star & Griesemer, Institutional Ecology, 'Translations' and Boundary Objects"
 
+/**
+ * The reading the worked example is captured from. Reading-first gives it a
+ * card on the shelf when the example loads — without one its passages would
+ * have no door and the example would land in an app with an empty shelf.
+ */
+export const WORKED_EXAMPLE_SOURCE = {
+  title: "Institutional Ecology, 'Translations' and Boundary Objects",
+  author: "Star & Griesemer",
+  sourceReference: "Social Studies of Science 19(3), 1989",
+}
+
 export const WORKED_EXAMPLE: WorkedExample = {
   title: "worked example · Star & Griesemer",
   read:

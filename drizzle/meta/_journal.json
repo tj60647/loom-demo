@@ -78,6 +78,13 @@
       "when": 1785386660340,
       "tag": "0010_unique_reads_views_nulls_not_distinct",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785474559392,
+      "tag": "0011_own_readings_and_reference_only_sources",
+      "breakpoints": true
     }
   ]
 }

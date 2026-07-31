@@ -186,8 +186,13 @@ export async function getCourseSources(courseIdRaw?: string | null) {
 }
 
 /**
- * The learner-facing reading list: readings published to the course this user
- * is working in.
+ * The learner-facing shelf: readings published to the course this user is
+ * working in, plus any reference-only readings they added for themselves.
+ *
+ * Their own readings carry no `course_source` row, so they appear here and on
+ * nobody else's shelf. They exist because reading-first needs every byte to
+ * belong to a reading — a passage from something the library does not hold
+ * still needs a door (docs/reading-scope-and-map-passes.md §A.6).
  */
 export async function getSources(courseIdRaw?: string | null) {
   const session = await getServerSession(authOptions)
@@ -196,28 +201,88 @@ export async function getSources(courseIdRaw?: string | null) {
     ? await resolveCourseIdForUser(session.user.id, courseIdRaw)
     : await resolveCourseId(courseIdRaw)
 
-  if (!courseId) return []
-
   const admin = isAdminUser(session?.user)
 
-  const rows = await db
-    .select({ source: sources, link: courseSources })
-    .from(courseSources)
-    .innerJoin(sources, eq(sources.id, courseSources.sourceId))
-    .where(
-      admin
-        ? eq(courseSources.courseId, courseId)
-        : and(eq(courseSources.courseId, courseId), eq(courseSources.isVisible, true))
-    )
+  const rows = courseId
+    ? await db
+        .select({ source: sources, link: courseSources })
+        .from(courseSources)
+        .innerJoin(sources, eq(sources.id, courseSources.sourceId))
+        .where(
+          admin
+            ? eq(courseSources.courseId, courseId)
+            : and(eq(courseSources.courseId, courseId), eq(courseSources.isVisible, true))
+        )
+    : []
 
-  return rows
-    .map((row) => ({ ...row.source, isVisible: row.link.isVisible, week: row.link.week }))
-    .sort((a, b) => {
-      const aWeek = a.week ?? Number.MAX_SAFE_INTEGER
-      const bWeek = b.week ?? Number.MAX_SAFE_INTEGER
-      if (aWeek !== bWeek) return aWeek - bWeek
-      return a.title.localeCompare(b.title)
+  const mine = session?.user?.id
+    ? await db
+        .select()
+        .from(sources)
+        .where(
+          and(
+            eq(sources.isOwn, true),
+            eq(sources.createdByUserId, session.user.id),
+            eq(sources.isArchived, false)
+          )
+        )
+    : []
+
+  const courseIds = new Set(rows.map((row) => row.source.id))
+
+  return [
+    ...rows.map((row) => ({ ...row.source, isVisible: row.link.isVisible, week: row.link.week })),
+    // A reading of the student's own that an instructor has since added to the
+    // course is the course's copy — don't list it twice.
+    ...mine
+      .filter((source) => !courseIds.has(source.id))
+      .map((source) => ({ ...source, isVisible: true, week: null as number | null })),
+  ].sort((a, b) => {
+    const aWeek = a.week ?? Number.MAX_SAFE_INTEGER
+    const bWeek = b.week ?? Number.MAX_SAFE_INTEGER
+    if (aWeek !== bWeek) return aWeek - bWeek
+    return a.title.localeCompare(b.title)
+  })
+}
+
+/**
+ * A student mints a card for something they are coding that the library does
+ * not hold — a self-found paper, a book, a lecture. Title and author only:
+ * this records WHERE a passage came from, and nothing about the student's
+ * reading of it.
+ *
+ * Deliberately not admin-gated, and deliberately not added to the course: the
+ * deployment notes (§9) ratified students adding papers, and this is the
+ * bounded version of that — visible to its author, invisible to everyone else.
+ */
+export async function createOwnReading(data: {
+  title: string
+  author?: string
+  sourceReference?: string
+}) {
+  const session = await getServerSession(authOptions)
+  const userId = session?.user?.id
+  if (!userId) throw new Error("Unauthorized")
+
+  const title = data.title.trim()
+  if (!title) throw new Error("A reading needs a title.")
+
+  const [source] = await db
+    .insert(sources)
+    .values({
+      title,
+      author: data.author?.trim() || "",
+      sourceReference: data.sourceReference?.trim() || "",
+      description: "",
+      isDescriptionVisible: false,
+      isOwn: true,
+      storageKey: null,
+      createdByUserId: userId,
     })
+    .returning()
+
+  revalidatePath("/")
+  return { id: source.id, title: source.title }
 }
 
 /**
@@ -410,7 +475,7 @@ export async function rescoreSourceAction(formData: FormData) {
   // a route back to a correct cover.
   const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
   const source = rows[0]
-  if (source) {
+  if (source?.storageKey) {
     try {
       const pdf = await readingStorage.get(source.storageKey)
       const cover = await renderPdfCoverImage(pdf)
@@ -587,7 +652,8 @@ export async function deleteSource(formData: FormData) {
   if (!source) return
 
   await db.delete(sources).where(eq(sources.id, sourceId))
-  await readingStorage.delete(source.storageKey)
+  // A reference-only reading has no file and no cover to remove.
+  if (source.storageKey) await readingStorage.delete(source.storageKey)
   await readingStorage.delete(getSourceCoverKey(source.id))
 
   revalidateLibrary()
@@ -610,6 +676,14 @@ export async function getSourceFile(sourceId: string) {
   const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
   const source = rows[0]
   if (!source) throw new Error("Not found")
+  // A reference-only reading is a citation, not a file. Nothing to serve.
+  if (!source.storageKey) throw new Error("Not found")
+
+  // A student's own reading is theirs to read; it was never published to a
+  // course, so the membership check below cannot admit it.
+  if (source.isOwn && source.createdByUserId === session?.user?.id) {
+    return { source, buffer: await readingStorage.get(source.storageKey) }
+  }
 
   if (!admin && session?.user?.id) {
     const memberships = await db

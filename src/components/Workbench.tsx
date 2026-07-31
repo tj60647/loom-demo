@@ -28,6 +28,12 @@ export type WorkbenchSource = {
   title: string
   author: string
   week: number | null
+  /**
+   * False for a reference-only card — a reading the student added that has no
+   * PDF here. Its passages are captured by hand, so tab 00 and the download
+   * would both be dead controls.
+   */
+  hasFile: boolean
 }
 
 type Tab = "reading" | "open" | "throw" | "read" | "map"
@@ -60,9 +66,13 @@ const KEEP_ALIVE: ReadonlySet<Tab> = new Set<Tab>(["open", "throw", "read", "map
 export default function Workbench({ source }: { source: WorkbenchSource | null }) {
   const { data: session } = useSession()
   const { isLoading, scoped } = useLoom()
-  const tabs: Tab[] = source ? ["reading", "open", "throw", "read"] : ["throw", "read", "map"]
-  const [activeTab, setActiveTab] = useState<Tab>(source ? "open" : "throw")
-  const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([source ? "open" : "throw"]))
+  const tabs: Tab[] = source
+    ? (source.hasFile ? ["reading", "open", "throw", "read"] : ["open", "throw", "read"])
+    : ["throw", "read", "map"]
+  const [activeTab, setActiveTab] = useState<Tab>(tabs.includes("open") ? "open" : "throw")
+  const [visited, setVisited] = useState<ReadonlySet<Tab>>(
+    () => new Set<Tab>([tabs.includes("open") ? "open" : "throw"])
+  )
   const [pdfPage, setPdfPage] = useState(1)
   const [pdfFocusByteId, setPdfFocusByteId] = useState<string | null>(null)
   const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
@@ -77,7 +87,7 @@ export default function Workbench({ source }: { source: WorkbenchSource | null }
   // Inside a reading, "goto" is a tab away rather than a page away: the text is
   // already open in this workbench.
   const handleGotoByte = (byte: Byte) => {
-    if (!source) return
+    if (!source?.hasFile) return
     setPdfPage(byte.pageNumber && byte.pageNumber > 0 ? byte.pageNumber : 1)
     setPdfFocusByteId(byte.id)
     goTo("reading")
@@ -127,9 +137,13 @@ export default function Workbench({ source }: { source: WorkbenchSource | null }
             </span>
             {/* The library card used to carry this; the reading is the library
                 card now, so the affordance moves here rather than disappearing. */}
-            <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>
-              Download PDF
-            </a>
+            {source.hasFile ? (
+              <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>
+                Download PDF
+              </a>
+            ) : (
+              <span className="scopemeta scopedl">your own card — no pdf here</span>
+            )}
           </>
         ) : (
           <>
@@ -153,7 +167,7 @@ export default function Workbench({ source }: { source: WorkbenchSource | null }
       </nav>
 
       <main>
-        {source && (
+        {source?.hasFile && (
           <div className={`panel ${activeTab === "reading" ? "active" : ""}`}>
             {activeTab === "reading" && (
               <PdfViewer

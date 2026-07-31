@@ -92,12 +92,15 @@ async function run() {
       console.log(`[seed-sources] Registered source row for "${reading.title}".`)
     } else {
       // Existing row may reference a stale storage key from a previous local
-      // run/deploy. If the file is missing, re-store it and update the key.
-      let hasStoredFile = true
-      try {
-        await readingStorage.get(source.storageKey)
-      } catch {
-        hasStoredFile = false
+      // run/deploy, or none at all (a reference-only card). Either way, if the
+      // file is missing, re-store it and update the key.
+      let hasStoredFile = !!source.storageKey
+      if (source.storageKey) {
+        try {
+          await readingStorage.get(source.storageKey)
+        } catch {
+          hasStoredFile = false
+        }
       }
 
       if (!hasStoredFile) {

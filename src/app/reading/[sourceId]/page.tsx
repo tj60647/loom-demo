@@ -42,6 +42,7 @@ export default async function ReadingPage({
         title: source.title,
         author: source.author ?? "",
         week: source.week,
+        hasFile: !!source.storageKey,
       }}
     />
   )

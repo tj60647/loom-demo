@@ -40,7 +40,9 @@ export type Source = {
   isDescriptionVisible: boolean
   metadataProvenance: string | null
   isArchived: boolean
-  storageKey: string
+  /** Null for a reference-only reading — a card with no PDF behind it. */
+  storageKey: string | null
+  isOwn: boolean
   createdByUserId: string | null
   createdAt: Date
 }

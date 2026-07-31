@@ -327,3 +327,9 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .bandtoggle.open .tw{transform:rotate(90deg)}
 .bandtoggle .n{color:var(--grey);letter-spacing:.04em}
 .scopebar .scopedl{margin-left:auto}
+.shelfnofile{display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+  width:70px;min-height:92px;border:1px dashed var(--rule);border-radius:3px;background:rgba(0,0,0,.02)}
+.untethered{padding:10px 0;border-bottom:1px dotted var(--rule)}
+.untethered:last-child{border-bottom:none}
+.untetheredsrc{font-family:var(--mono);font-size:12px;margin-bottom:6px}
+.untetheredsrc .n{color:var(--grey)}

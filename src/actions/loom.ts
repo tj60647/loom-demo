@@ -9,7 +9,7 @@ import { authOptions } from "@/lib/auth"
 import { resolveCourseIdForUser } from "@/lib/courses"
 import type { CardTableView, GraphEvent, Tier } from "@/lib/types"
 import type { ParsedImport } from "@/lib/graphExport"
-import { WORKED_EXAMPLE } from "@/lib/example"
+import { WORKED_EXAMPLE, WORKED_EXAMPLE_SOURCE } from "@/lib/example"
 
 async function getUserId() {
   const session = await getServerSession(authOptions)
@@ -369,6 +369,42 @@ export async function refileByte(byteId: string, conceptId: string) {
   return newByte[0]
 }
 
+/**
+ * Say which reading a passage came from.
+ *
+ * Bytes captured before reading-first, and any captured outside a reading,
+ * carry free-text `source` and no `sourceId`, so they have no door and fall out
+ * of every lens. This is the way back in — and it is the STUDENT saying it.
+ * Matching `byte.source` text against library titles would be the tool deciding
+ * what they meant, which is exactly the judgment red line #2 keeps out of the
+ * machine's hands.
+ */
+export async function attributeBytes(byteIds: string[], sourceId: string) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+  if (!byteIds.length) return 0
+
+  const known = await db.select({ id: sources.id }).from(sources).where(eq(sources.id, sourceId)).limit(1)
+  if (!known.length) throw new Error("That reading is not on your shelf.")
+
+  const updated = await db.update(bytes).set({ sourceId })
+    .where(and(
+      inArray(bytes.id, byteIds),
+      eq(bytes.userId, userId),
+      inCourse(bytes.courseId, courseId),
+      isNull(bytes.sourceId)
+    ))
+    .returning({ id: bytes.id })
+
+  if (updated.length) {
+    await recordEvent(userId, courseId, "byte.attribute", "byte", null, {
+      sourceId,
+      count: updated.length,
+    })
+  }
+  return updated.length
+}
+
 export async function deleteByte(id: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
@@ -680,6 +716,28 @@ export async function loadWorkedExample() {
     throw new Error("The worked example only loads into an empty loom — reset first if you mean to.")
   }
 
+  // The example needs a door: reading-first places a byte by its sourceId, so
+  // without a card of its own the whole example would sit outside every reading
+  // and the shelf would look empty next to a full loom. Reused rather than
+  // re-minted, since reset clears the cloth but not this card.
+  const existingCard = await db.select({ id: sources.id }).from(sources)
+    .where(and(
+      eq(sources.isOwn, true),
+      eq(sources.createdByUserId, userId),
+      eq(sources.title, WORKED_EXAMPLE_SOURCE.title)
+    ))
+    .limit(1)
+  const exampleSourceId = existingCard[0]?.id ?? (
+    await db.insert(sources).values({
+      ...WORKED_EXAMPLE_SOURCE,
+      description: "",
+      isDescriptionVisible: false,
+      isOwn: true,
+      storageKey: null,
+      createdByUserId: userId,
+    }).returning({ id: sources.id })
+  )[0].id
+
   const conceptIdByKey = new Map(WORKED_EXAMPLE.concepts.map((c) => [c.key, crypto.randomUUID()]))
   const conceptRows = WORKED_EXAMPLE.concepts.map((c) => ({
     id: conceptIdByKey.get(c.key)!,
@@ -691,7 +749,7 @@ export async function loadWorkedExample() {
       id: crypto.randomUUID(),
       courseId, userId,
       conceptId: conceptIdByKey.get(b.conceptKey)!,
-      source: b.source, location: b.location, content: b.text,
+      source: b.source, sourceId: exampleSourceId, location: b.location, content: b.text,
     }))
   const edgeRows = WORKED_EXAMPLE.edges
     .filter((e) => conceptIdByKey.has(e.fromKey) && conceptIdByKey.has(e.toKey))

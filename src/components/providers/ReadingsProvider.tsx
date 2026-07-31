@@ -19,6 +19,10 @@ export type ReadingMeta = {
   description: string | null
   isDescriptionVisible: boolean
   week: number | null
+  /** A card the student minted for themselves; on nobody else's shelf. */
+  isOwn: boolean
+  /** Null when the card is reference-only — a citation with no PDF behind it. */
+  storageKey: string | null
 }
 
 type ReadingsContextValue = {
@@ -28,6 +32,8 @@ type ReadingsContextValue = {
   error: string | null
   /** A reading's title, or a plain fallback — never a bare id. */
   titleOf: (sourceId: string | null | undefined) => string
+  /** Re-read the shelf, e.g. after the student adds a reading of their own. */
+  refresh: () => void
 }
 
 const ReadingsContext = createContext<ReadingsContextValue | null>(null)
@@ -37,6 +43,7 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
   const [readings, setReadings] = useState<ReadingMeta[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [nonce, setNonce] = useState(0)
 
   useEffect(() => {
     // Deferred rather than set synchronously, the way LoomProvider does it: a
@@ -67,7 +74,7 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
       live = false
       window.clearTimeout(start)
     }
-  }, [session])
+  }, [session, nonce])
 
   const value = useMemo<ReadingsContextValue>(() => {
     const byId = new Map(readings.map((r) => [r.id, r]))
@@ -77,6 +84,7 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
       isLoading,
       error,
       titleOf: (sourceId) => (sourceId && byId.get(sourceId)?.title) || "another reading",
+      refresh: () => setNonce((n) => n + 1),
     }
   }, [readings, isLoading, error])
 
