@@ -9,7 +9,13 @@ import { Byte, Concept } from '@/lib/types';
 import { hashText } from '@/lib/hash';
 import Mark from 'mark.js';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Served from our own origin, copied out of react-pdf's pdfjs-dist by
+// scripts/copy-pdf-worker.mjs at prebuild/predev. This was `//unpkg.com/...`,
+// which put a third party on the critical path of every reading: with unpkg
+// unreachable — an ad blocker, a campus proxy, a room with no internet, a CDN
+// outage — tab 00 showed "Failed to load PDF. Check file path." for every text
+// in the course, blaming a file that was served fine from our own server.
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 interface PdfViewerProps {
   url: string;
