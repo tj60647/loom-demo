@@ -22,8 +22,19 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 
 const TEMP_NAME = 'PW temp map';
 
+/**
+ * The journey bar now stays put while the loom loads, so its presence no
+ * longer implies the graph has arrived — wait for the data itself. Clicking
+ * Map mid-load lands on a map stack that is still empty, and every assertion
+ * after it races the fetch.
+ */
+async function waitForLoom(page: Page) {
+  await expect(page.getByText('Loading your loom...')).toHaveCount(0, { timeout: 20000 });
+}
+
 async function openWeaveMap(page: Page) {
   await page.goto('/weave');
+  await waitForLoom(page);
   await page.locator('nav button', { hasText: 'Map' }).click();
   await expect(page.locator('#mapSwitcher')).toBeVisible({ timeout: 15000 });
 }
@@ -59,18 +70,28 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
   await page.locator('#mapEssence').fill('One line written by the Playwright suite.');
   await page.locator('#mapEssence').blur();
 
-  // Persistence is debounced (700ms) plus a server round trip — and a reload
-  // ABORTS in-flight action POSTs, so the page must go network-quiet before
-  // the first reload or the writes it is checking for are the very thing the
-  // reload cancels.
+  // Persistence is debounced (700ms) plus a server round trip, and a reload
+  // ABORTS an in-flight action POST — a lost rename never retries, so one
+  // early reload fails the test permanently. `networkidle` is not enough:
+  // the save waits on the create promise first, so the POST may not have
+  // been ISSUED yet while the page already looks quiet. Wait for the app's
+  // own save signal (#saveDot flashes "saved" when the write resolves).
   test.setTimeout(90_000);
-  await page.waitForTimeout(900);
+  await expect(page.locator('#saveDot')).toHaveText(/saved/, { timeout: 20_000 });
   await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-  // Most-recently-updated wins selection, which is the temp map.
+  // The claim under test is that THIS map kept its own name, tiers and
+  // essence across a reload — so select it by name rather than leaning on
+  // which map the switcher happens to open on. That default (most recently
+  // updated) is a client-side cursor, not an artifact, and asserting it here
+  // made the test fail for a reason it was never about.
   await expect(async () => {
     await page.reload();
+    await waitForLoom(page);
     await page.locator('nav button', { hasText: 'Map' }).click();
-    await expect(page.locator('#mapSwitcher .chip.on', { hasText: TEMP_NAME })).toBeVisible({ timeout: 5000 });
+    const tempChip = page.locator('#mapSwitcher .chip', { hasText: TEMP_NAME });
+    await expect(tempChip).toHaveCount(1, { timeout: 5000 });
+    await tempChip.click();
+    await expect(tempChip).toHaveClass(/on/, { timeout: 5000 });
     await expect(page.locator('#mapEssence')).toHaveValue('One line written by the Playwright suite.', { timeout: 2000 });
     if (hasConcepts) {
       await expect(page.locator('#triageList .trow').first().locator('.tierchips .tchip').first()).toHaveClass(/on/, { timeout: 2000 });
@@ -118,6 +139,7 @@ test('04 Map lives inside a reading workbench, scoped to it', async ({ page }) =
   await card.click();
   await expect(page).toHaveURL(/\/reading\//);
 
+  await waitForLoom(page);
   await page.locator('nav button', { hasText: 'Map' }).click();
   await expect(page.locator('#mapSwitcher')).toContainText('Your maps of this reading');
   // The whole weave's maps do not leak into a reading's stack.
