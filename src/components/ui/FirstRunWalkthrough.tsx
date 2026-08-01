@@ -8,7 +8,7 @@ const LEGACY_SEEN_KEY = "loom_has_seen_walkthrough"
 const GUIDE = [
  {k:'how loom works', h:'Loom turns reading into weaving',
   p:'You read anywhere — paper, PDF, screen — marking what strikes you. Then you bring the best passages here. Over three moves, the pieces become a graph of your own understanding. The tool holds the structure; you do all the thinking.',
-  loom:'Three moves, in order: 01 Open · 02 Throw · 03 Read. Then 04 Map to lay it out. 00 Library holds the readings; 05 Keep is where your work comes out.'},
+  loom:'Three moves, in order: 01 Open · 02 Throw · 03 Read. Then 04 Map to lay it out. 00 Readings is where you start and 05 Weave is every reading at once; 06 Keep is where your work comes out.'},
  {k:'01 — open', h:'① Capture and name',
   p:'Paste a passage worth keeping (a "byte"), with its citation. Name the concept it evidences — a short noun phrase, often the author\'s own term ("boundary objects"). Then gloss it in your own words in the working definition; crude is welcome there.',
   loom:'Warp = your concepts: the threads held under tension first. Choosing the passage is the judgment.'},

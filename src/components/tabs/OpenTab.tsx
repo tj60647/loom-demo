@@ -259,7 +259,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                 <b>Manual capture</b> starts here. Paste or type the passage, add source and location if you have them, then name what the passage is about.
               </p>
               <p>
-                <b>Assisted capture</b> starts in the Library. Open a PDF, select text, and capture it. Loom fills in the passage, source, page, and highlight anchor for you.
+                <b>Assisted capture</b> starts in the reading — <b>00 · Reading</b>, the text itself. Select the passage there and capture it. Loom fills in the passage, source, page, and highlight anchor for you.
               </p>
               <p>
                 In both paths, the thinking stays yours. The word chips are only a scaffold: tap useful words from the passage, reuse an existing concept, or type a new phrase in your own language.
@@ -271,7 +271,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
             </section>
           </div>
         )}
-        <p className="do">Do this — paste a passage here, or select text in a Library PDF. Then name the concept it evidences, and gloss it in your own words.</p>
+        <p className="do">Do this — paste a passage here, or select text in the reading itself. Then name the concept it evidences, and gloss it in your own words.</p>
         <p className="hint">A &ldquo;byte&rdquo; = one passage + its citation. Choosing the passage is <i>your</i> judgment — that&apos;s the point. Loom can carry over source details and offer passage words to tap; it does not summarize or choose the concept for you.</p>
         
         <div className="form-row">
@@ -507,7 +507,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                               style={{ marginRight: "8px", background: "none", border: "none", padding: 0 }}
                               onClick={() => onGotoByte?.(b)}
                               disabled={!b.sourceId && !b.source}
-                              title={b.sourceId || b.source ? "Open this byte in the library PDF" : "No library source linked for this byte"}
+                              title={b.sourceId || b.source ? "Open this byte in the reading" : "No reading linked to this byte"}
                             >
                               goto
                             </button>

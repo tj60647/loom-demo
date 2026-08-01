@@ -47,7 +47,7 @@ export default async function AdminCoursesPage({
     <main>
       <h1>Courses</h1>
       <p className="tasksub" style={{ marginBottom: "20px" }}>
-        Create courses and their sections. Readings live in one shared library and are
+        Create courses and their sections. Readings live in one shared set and are
         included per course, so the same PDF is never uploaded twice.
       </p>
 
@@ -152,8 +152,8 @@ export default async function AdminCoursesPage({
                       <input type="hidden" name="courseId" value={course.id} />
                       <p className="hint" style={{ margin: 0, maxWidth: "46ch" }}>
                         Removes the course, its sections, memberships, allowlist, and reading
-                        assignments. Readings stay in the shared library and student work is
-                        kept (its course link is cleared). Type <b>delete</b> to confirm.
+                        assignments. The readings themselves stay on the Readings tab and student
+                        work is kept (its course link is cleared). Type <b>delete</b> to confirm.
                       </p>
                       <input name="confirm" placeholder="delete" className="mono-in" required />
                       <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>Delete Course</button>

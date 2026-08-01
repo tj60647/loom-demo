@@ -602,7 +602,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         boxShadow: "0 2px 10px rgba(0,0,0,0.05)", zIndex: 10
       }}>
         <div>
-          <button className="btn ghost mini" onClick={onClose}>← Back to Library</button>
+          {/* This closes the text and lands on 01 Open — where the passage you
+              just captured is waiting — not on the readings list. */}
+          <button className="btn ghost mini" onClick={onClose}>← Back to 01 · Open</button>
         </div>
         
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>

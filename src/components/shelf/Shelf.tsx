@@ -315,8 +315,8 @@ function AddOwnReading({ onAdded }: { onAdded: () => void }) {
           + a reading of your own
         </button>
         <p className="hint" style={{ marginTop: 6 }}>
-          Coding something the library doesn&apos;t hold — a paper you found, a book, a
-          lecture? Give it a card and its passages have somewhere to live.
+          Coding something your course readings don&apos;t include — a paper you found, a
+          book, a lecture? Give it a card and its passages have somewhere to live.
         </p>
       </div>
     )
