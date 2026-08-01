@@ -1,0 +1,6 @@
+# The pdf.js worker is a build artifact copied verbatim out of node_modules
+# (scripts/copy-pdf-worker.mjs). core.autocrlf is on for this checkout, and
+# .mjs is treated as text, so without this git would rewrite the line endings
+# of a 1MB minified file on every checkout — a needless diff on an asset that
+# should be byte-identical to what npm installed.
+public/pdf.worker.min.mjs -text -diff
