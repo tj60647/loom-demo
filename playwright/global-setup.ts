@@ -2,42 +2,50 @@ import { request, FullConfig } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 
+// Two storage states, two identities (see /api/auth/test-login):
+// - user.json   → the admin, for /admin surfaces (library-verify).
+// - testa.json  → "Test User A", the account that owns every concept, byte and
+//   map the suite creates, so test data never pollutes a real person's loom.
+const STATES = [
+  { file: 'playwright/.auth/user.json', query: '' },
+  { file: 'playwright/.auth/testa.json', query: '?as=testa' },
+];
+
 async function globalSetup(config: FullConfig) {
   const baseURL = config.projects[0].use.baseURL || 'http://localhost:3000';
-  
+
   // Ensure the auth directory exists
   const authDir = path.join(__dirname, '.auth');
   if (!fs.existsSync(authDir)) {
     fs.mkdirSync(authDir, { recursive: true });
   }
-  
-  // Create a raw request context
-  const requestContext = await request.newContext();
-  
-  // Hit our backdoor authentication route
-  const response = await requestContext.get(`${baseURL}/api/auth/test-login`);
-  
-  if (!response.ok()) {
-    throw new Error(`Failed to authenticate via test-login: ${response.status()} ${response.statusText()}`);
-  }
-  
-  // Save the state (which includes the session cookie) to the storage path
-  const statePath = 'playwright/.auth/user.json';
-  await requestContext.storageState({ path: statePath });
-  await requestContext.dispose();
 
-  // Mark the first-run walkthrough as seen. Every test context starts with
-  // empty localStorage, so without this the walkthrough's scrim opens over
-  // every page and swallows the first click — tests fail on navigation that
-  // never happened. The legacy (pre-per-user) key is enough: the component
-  // adopts it into the per-user key on first render and stays closed.
-  const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-  const seen = [{ name: 'loom_has_seen_walkthrough', value: 'true' }];
-  state.origins = [
-    { origin: 'http://localhost:3000', localStorage: seen },
-    { origin: 'http://localhost:3100', localStorage: seen },
-  ];
-  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+  for (const state of STATES) {
+    // Create a raw request context and hit the backdoor authentication route
+    const requestContext = await request.newContext();
+    const response = await requestContext.get(`${baseURL}/api/auth/test-login${state.query}`);
+
+    if (!response.ok()) {
+      throw new Error(`Failed to authenticate via test-login${state.query}: ${response.status()} ${response.statusText()}`);
+    }
+
+    // Save the state (which includes the session cookie) to the storage path
+    await requestContext.storageState({ path: state.file });
+    await requestContext.dispose();
+
+    // Mark the first-run walkthrough as seen. Every test context starts with
+    // empty localStorage, so without this the walkthrough's scrim opens over
+    // every page and swallows the first click — tests fail on navigation that
+    // never happened. The legacy (pre-per-user) key is enough: the component
+    // adopts it into the per-user key on first render and stays closed.
+    const parsed = JSON.parse(fs.readFileSync(state.file, 'utf8'));
+    const seen = [{ name: 'loom_has_seen_walkthrough', value: 'true' }];
+    parsed.origins = [
+      { origin: 'http://localhost:3000', localStorage: seen },
+      { origin: 'http://localhost:3100', localStorage: seen },
+    ];
+    fs.writeFileSync(state.file, JSON.stringify(parsed, null, 2));
+  }
 }
 
 export default globalSetup;

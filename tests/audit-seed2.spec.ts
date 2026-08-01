@@ -1,20 +1,12 @@
 import { test } from '@playwright/test';
 import { openReading } from './helpers';
 
+// Runs as Test User A (see playwright/global-setup.ts); the session cookie is
+// real, so no mocked /api/auth/session.
+test.use({ storageState: 'playwright/.auth/testa.json' });
+
 test.describe('Audit Seed Bytes', () => {
   test('verify mark.js fuzzy match', async ({ page }) => {
-    // 0. Mock auth
-    await page.route('**/api/auth/session', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          user: { name: 'Test Admin', email: 'tjm@tjmcleish.com', id: 'test-admin-id' },
-          expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
-        }),
-      });
-    });
-
     await page.addInitScript(() => {
       localStorage.setItem("loom_has_seen_walkthrough", "true");
     });

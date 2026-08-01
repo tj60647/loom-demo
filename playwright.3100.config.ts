@@ -16,7 +16,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // One worker everywhere: every spec signs in as the same Test User A, and
+  // the capture specs now delete their own data — parallel workers race each
+  // other's rows (a deleted concept vanishes under another spec's assertion).
+  workers: 1,
   reporter: [['list']],
   globalSetup: require.resolve('./playwright/global-setup'),
   use: {

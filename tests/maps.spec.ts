@@ -16,6 +16,10 @@ import fs from 'fs';
  */
 test.describe.configure({ mode: 'serial' });
 
+// Runs as Test User A (see playwright/global-setup.ts): the temp map — and a
+// mid-run failure's stranded copy — lives on the test account, not a real one.
+test.use({ storageState: 'playwright/.auth/testa.json' });
+
 const TEMP_NAME = 'PW temp map';
 
 async function openWeaveMap(page: Page) {
@@ -122,10 +126,16 @@ test('04 Map lives inside a reading workbench, scoped to it', async ({ page }) =
 
 test('cleanup: delete the temp map', async ({ page }) => {
   await openWeaveMap(page);
-  const tempChip = page.locator('#mapSwitcher .chip', { hasText: TEMP_NAME });
-  await expect(tempChip).toBeVisible();
-  await tempChip.click();
-  await page.getByRole('button', { name: 'delete', exact: true }).click();
-  await page.getByRole('button', { name: 'Delete this map' }).click();
-  await expect(page.locator('#mapSwitcher .chip', { hasText: TEMP_NAME })).toHaveCount(0, { timeout: 15000 });
+  const tempChips = page.locator('#mapSwitcher .chip', { hasText: TEMP_NAME });
+  // A mid-run failure in an earlier suite run strands its temp map, and two
+  // chips with one name break a single-chip locator — sweep every copy.
+  await expect(tempChips.first()).toBeVisible();
+  let remaining = await tempChips.count();
+  while (remaining > 0) {
+    await tempChips.first().click();
+    await page.getByRole('button', { name: 'delete', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete this map', exact: true }).click();
+    await expect(tempChips).toHaveCount(remaining - 1, { timeout: 15000 });
+    remaining--;
+  }
 });
