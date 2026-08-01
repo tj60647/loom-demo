@@ -10,6 +10,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { getSources } from "@/actions/sources"
+import { getActiveCourse } from "@/actions/courses"
 
 export type ReadingMeta = {
   id: string
@@ -25,9 +26,14 @@ export type ReadingMeta = {
   storageKey: string | null
 }
 
+/** The course these readings belong to — null before it loads, or if none. */
+export type ActiveCourse = { id: string; name: string; term: string }
+
 type ReadingsContextValue = {
   readings: ReadingMeta[]
   byId: Map<string, ReadingMeta>
+  /** The course whose syllabus this is; the header names it. */
+  course: ActiveCourse | null
   isLoading: boolean
   error: string | null
   /** A reading's title, or a plain fallback — never a bare id. */
@@ -41,6 +47,7 @@ const ReadingsContext = createContext<ReadingsContextValue | null>(null)
 export function ReadingsProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession()
   const [readings, setReadings] = useState<ReadingMeta[]>([])
+  const [course, setCourse] = useState<ActiveCourse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
@@ -51,6 +58,7 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
     if (!session) {
       const clear = window.setTimeout(() => {
         setReadings([])
+        setCourse(null)
         setIsLoading(false)
       }, 0)
       return () => window.clearTimeout(clear)
@@ -70,6 +78,11 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         if (live) setIsLoading(false)
       })
+    // The course label is decoration on a header that must not fail because of
+    // it — a failed lookup just leaves the header unlabelled.
+    getActiveCourse()
+      .then((c) => { if (live) setCourse(c) })
+      .catch(() => { if (live) setCourse(null) })
     return () => {
       live = false
       window.clearTimeout(start)
@@ -81,12 +94,13 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
     return {
       readings,
       byId,
+      course,
       isLoading,
       error,
       titleOf: (sourceId) => (sourceId && byId.get(sourceId)?.title) || "another reading",
       refresh: () => setNonce((n) => n + 1),
     }
-  }, [readings, isLoading, error])
+  }, [readings, course, isLoading, error])
 
   return <ReadingsContext.Provider value={value}>{children}</ReadingsContext.Provider>
 }

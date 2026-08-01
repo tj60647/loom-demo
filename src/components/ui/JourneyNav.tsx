@@ -39,7 +39,7 @@ const DEFAULT_HREF: Record<Station, string> = {
 }
 
 const TIP: Partial<Record<Station, string>> = {
-  open: "capture happens inside a reading — pick one on 00 · Readings",
+  open: "capture happens inside a reading — pick one first",
   weave: "the big picture — every reading at once",
 }
 

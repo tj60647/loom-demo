@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth/next"
 import { authOptions, isAdminUser } from "@/lib/auth"
-import { slugify } from "@/lib/courses"
+import { getCourse, resolveCourseIdForUser, slugify } from "@/lib/courses"
 
 // Server Functions are reachable by direct POST, not only through the UI, so
 // every mutation here re-checks admin rather than trusting the calling page.
@@ -21,6 +21,25 @@ async function requireAdmin() {
 function readText(formData: FormData, key: string) {
   const value = formData.get(key)
   return typeof value === "string" ? value.trim() : ""
+}
+
+/**
+ * The course the signed-in person is working in — the header says whose
+ * syllabus this is, since one account can carry several courses and every
+ * count on screen belongs to exactly one of them.
+ *
+ * Learner-safe by construction: it reports the course resolveCourseIdForUser
+ * already scopes their work to (their own enrolment), never an arbitrary one.
+ */
+export async function getActiveCourse() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return null
+
+  const courseId = await resolveCourseIdForUser(session.user.id)
+  if (!courseId) return null
+
+  const course = await getCourse(courseId)
+  return course ? { id: course.id, name: course.name, term: course.term } : null
 }
 
 /** Appends -2, -3, … until the slug is free. */
