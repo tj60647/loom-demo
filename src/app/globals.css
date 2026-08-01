@@ -345,3 +345,10 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .cardmenuwhere{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin:3px 0 0;line-height:1.5}
 .cardmenu .bytequote{margin:6px 0 8px}
 .cardmenu .ghostnote{margin:3px 0 0}
+
+/* Roster: an invitation not yet taken up is quieter than an enrolled learner,
+   but still legible — it is the row that needs chasing. */
+.card.pendingcard{border-style:dashed;background:rgba(255,255,255,.28)}
+.invitereport{border-left:2px solid var(--rule);padding-left:11px;margin-top:4px}
+.invitereport p{font-size:14px;line-height:1.45;margin:0 0 6px}
+.invitereport p:last-child{margin-bottom:0}

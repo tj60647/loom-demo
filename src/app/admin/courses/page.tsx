@@ -260,7 +260,16 @@ export default async function AdminCoursesPage({
                 </div>
 
                 <div style={{ marginTop: "18px", borderTop: "1px dotted var(--rule)", paddingTop: "14px" }}>
-                  <span className="label">Sections</span>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "12px", flexWrap: "wrap" }}>
+                    <span className="label">Sections</span>
+                    <a
+                      className="act"
+                      style={{ marginLeft: "auto" }}
+                      href={`/admin?course=${encodeURIComponent(course.id)}`}
+                    >
+                      {memberships.length} enrolled · invite →
+                    </a>
+                  </div>
                   {courseSectionRows.length === 0 ? (
                     <p className="hint" style={{ marginTop: "8px" }}>No sections yet.</p>
                   ) : (
@@ -272,9 +281,18 @@ export default async function AdminCoursesPage({
                             <div style={{ display: "flex", gap: "10px", alignItems: "baseline", flexWrap: "wrap" }}>
                               <span style={{ fontSize: "15px", flex: 1 }}>{section.name}</span>
                               {section.lead ? <span className="hint" style={{ fontSize: "13px" }}>{section.lead}</span> : null}
-                              <span className="pill beaten">{count} learner(s)</span>
+                              <span className="pill beaten">{count} learner{count !== 1 ? "s" : ""}</span>
                             </div>
                             <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+                              {/* Sections are built here; people are invited on
+                                  the Roster page. Without this link that is two
+                                  pages with nothing joining them. */}
+                              <a
+                                className="act"
+                                href={`/admin?course=${encodeURIComponent(course.id)}&section=${encodeURIComponent(section.id)}`}
+                              >
+                                roster →
+                              </a>
                               <details>
                                 <summary className="act" style={{ listStyle: "none", cursor: "pointer" }}>edit</summary>
                                 <form action={updateSection} style={{ display: "grid", gap: "8px", marginTop: "8px" }}>

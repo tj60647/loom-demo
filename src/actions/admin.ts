@@ -2,7 +2,7 @@
 
 import { db } from "@/db"
 import { users, concepts, bytes, edges, courseMemberships, courseAllowedEmails, sections } from "@/db/schema"
-import { and, eq, inArray } from "drizzle-orm"
+import { and, eq, inArray, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, isAdminUser } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
@@ -91,6 +91,91 @@ export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: s
   })
 }
 
+/** One person on the course roster, invited or enrolled. */
+export type RosterRow = {
+  email: string
+  /** Their display name once they have signed in; null while pending. */
+  name: string | null
+  userId: string | null
+  /** `pending` = invited, has not signed in yet, so has no loom. */
+  status: "enrolled" | "pending"
+  sectionId: string | null
+  sectionName: string | null
+  conceptsCount: number
+  edgesCount: number
+  /** False for someone enrolled via the site-wide allowlist rather than this course's. */
+  invited: boolean
+}
+
+/**
+ * The course roster as one list: everyone invited, plus everyone enrolled,
+ * matched on email.
+ *
+ * These were two separate cards, so "who hasn't signed in yet" — the question
+ * asked in week 2 — had to be eyeballed across them. A pending row is an
+ * invitation that has not been taken up; enrolment happens on first sign-in
+ * (see the signIn callback in lib/auth.ts).
+ */
+export async function getRoster(
+  courseIdRaw?: string | null,
+  sectionIdRaw?: string | null
+): Promise<RosterRow[]> {
+  await checkAdmin()
+
+  const courseId = await resolveCourseId(courseIdRaw)
+  if (!courseId) return []
+  const sectionId = await resolveSectionId(courseId, sectionIdRaw)
+
+  const [enrolled, invited, courseSections] = await Promise.all([
+    getClassData(courseId, sectionId),
+    db
+      .select({ email: courseAllowedEmails.email, sectionId: courseAllowedEmails.sectionId })
+      .from(courseAllowedEmails)
+      .where(eq(courseAllowedEmails.courseId, courseId)),
+    db.select().from(sections).where(eq(sections.courseId, courseId)),
+  ])
+
+  const sectionById = new Map(courseSections.map((s) => [s.id, s.name]))
+  const invitedByEmail = new Map(invited.map((row) => [row.email.toLowerCase(), row]))
+
+  const rows: RosterRow[] = enrolled.map((u) => ({
+    email: u.email,
+    name: u.name,
+    userId: u.id,
+    status: "enrolled",
+    sectionId: u.sectionId,
+    sectionName: u.sectionName,
+    conceptsCount: u.conceptsCount,
+    edgesCount: u.edgesCount,
+    invited: invitedByEmail.has(u.email.toLowerCase()),
+  }))
+
+  const enrolledEmails = new Set(enrolled.map((u) => u.email.toLowerCase()))
+  invited.forEach((row) => {
+    if (enrolledEmails.has(row.email.toLowerCase())) return
+    // A pending invitation is filtered by the section it was addressed to,
+    // since that is the only section it has yet.
+    if (sectionId && row.sectionId !== sectionId) return
+    rows.push({
+      email: row.email,
+      name: null,
+      userId: null,
+      status: "pending",
+      sectionId: row.sectionId,
+      sectionName: row.sectionId ? sectionById.get(row.sectionId) ?? null : null,
+      conceptsCount: 0,
+      edgesCount: 0,
+      invited: true,
+    })
+  })
+
+  // Pending first — they are the ones needing action — then alphabetically.
+  return rows.sort((a, b) => {
+    if (a.status !== b.status) return a.status === "pending" ? -1 : 1
+    return (a.name ?? a.email).localeCompare(b.name ?? b.email, undefined, { sensitivity: "base" })
+  })
+}
+
 export async function getAllowedEmails(courseIdRaw?: string | null) {
   await checkAdmin()
 
@@ -136,6 +221,114 @@ export async function addAllowedEmail(formData: FormData) {
     })
 
   revalidatePath("/admin")
+}
+
+export type InviteResult = {
+  added: string[]
+  already: string[]
+  invalid: string[]
+  /** Section names named in the paste that this course does not have. */
+  unknownSections: string[]
+} | null
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/**
+ * Invite a whole roster at once.
+ *
+ * A course is ~65 people across 5 sections, which one email at a time is 65
+ * round trips. Accepts one per line, optionally `email, section` so a paste
+ * can carry the section split with it:
+ *
+ *   ada@example.edu
+ *   grace@example.edu, Section 2
+ *
+ * Reports what happened per address rather than silently succeeding: a typo in
+ * a roster paste is invisible otherwise, and the person simply never gets in.
+ */
+export async function inviteLearners(
+  _prev: InviteResult,
+  formData: FormData
+): Promise<InviteResult> {
+  await checkAdmin()
+
+  const courseIdRaw = formData.get("courseId")
+  const courseId = await resolveCourseId(typeof courseIdRaw === "string" ? courseIdRaw : null)
+  if (!courseId) return { added: [], already: [], invalid: [], unknownSections: [] }
+
+  const raw = formData.get("emails")
+  if (typeof raw !== "string") return { added: [], already: [], invalid: [], unknownSections: [] }
+
+  const defaultSectionRaw = formData.get("sectionId")
+  const defaultSectionId = await resolveSectionId(
+    courseId,
+    typeof defaultSectionRaw === "string" ? defaultSectionRaw : null
+  )
+
+  const courseSections = await db.select().from(sections).where(eq(sections.courseId, courseId))
+  const sectionByName = new Map<string, string>()
+  courseSections.forEach((s) => {
+    sectionByName.set(s.name.toLowerCase().trim(), s.id)
+    sectionByName.set(s.slug.toLowerCase().trim(), s.id)
+  })
+
+  const existing = new Set(
+    (
+      await db
+        .select({ email: courseAllowedEmails.email })
+        .from(courseAllowedEmails)
+        .where(eq(courseAllowedEmails.courseId, courseId))
+    ).map((row) => row.email.toLowerCase())
+  )
+
+  const added: string[] = []
+  const already: string[] = []
+  const invalid: string[] = []
+  const unknownSections = new Set<string>()
+  const seen = new Set<string>()
+  const toInsert: { courseId: string; email: string; sectionId: string | null }[] = []
+
+  // Commas, tabs and semicolons all appear in pasted rosters; treat any of them
+  // as the field separator.
+  raw.split(/\r?\n/).forEach((line) => {
+    const trimmed = line.trim()
+    if (!trimmed) return
+    const [emailRaw, sectionRaw] = trimmed.split(/[,;\t]/, 2).map((part) => part?.trim() ?? "")
+    const email = emailRaw.toLowerCase()
+
+    if (!EMAIL.test(email)) {
+      invalid.push(trimmed)
+      return
+    }
+    // A duplicate inside one paste is not an error, but it must not become two
+    // rows racing the same conflict target.
+    if (seen.has(email)) return
+    seen.add(email)
+
+    let sectionId = defaultSectionId
+    if (sectionRaw) {
+      const matched = sectionByName.get(sectionRaw.toLowerCase())
+      if (matched) sectionId = matched
+      else unknownSections.add(sectionRaw)
+    }
+
+    if (existing.has(email)) already.push(email)
+    else added.push(email)
+    toInsert.push({ courseId, email, sectionId })
+  })
+
+  if (toInsert.length) {
+    await db
+      .insert(courseAllowedEmails)
+      .values(toInsert)
+      .onConflictDoUpdate({
+        target: [courseAllowedEmails.courseId, courseAllowedEmails.email],
+        set: { sectionId: sql`excluded."sectionId"` },
+      })
+  }
+
+  revalidatePath("/admin")
+  return { added, already, invalid, unknownSections: [...unknownSections] }
 }
 
 export async function removeAllowedEmail(formData: FormData) {
