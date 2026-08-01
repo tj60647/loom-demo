@@ -647,6 +647,7 @@ export default function MapTab() {
         )}
       </div>
       <div className="mapbar">
+        <span className="label">The map</span>
         <span style={{ color: "var(--ink-soft)", fontSize: 13 }}>Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋯</b> — its definition, the passages behind it, and where else you met it.</span>
       </div>
 

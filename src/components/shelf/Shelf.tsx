@@ -193,7 +193,7 @@ export default function Shelf() {
       </main>
 
       <footer>
-        <span className="fl">THE SHELF</span>
+        <span className="fl">00 — READINGS</span>
         <span className="fr">PICK A READING</span>
       </footer>
     </>
