@@ -1,4 +1,4 @@
-import { getRoster, removeAllowedEmail } from "@/actions/admin"
+import { addAllowedEmail, getRoster, removeAllowedEmail } from "@/actions/admin"
 import { assignMemberSection } from "@/actions/courses"
 import { firstParam, getCourse, listSections, resolveCourseId, resolveSectionId } from "@/lib/courses"
 import InviteLearners from "@/components/admin/InviteLearners"
@@ -86,19 +86,31 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 )}
               </div>
 
-              {/* Section is reassigned on the membership once they exist; before
-                  that, it lives on the invitation and is changed by re-inviting. */}
-              {courseSections.length > 0 && person.userId ? (
-                <form action={assignMemberSection} className="quietrow" style={{ marginTop: "12px" }}>
+              {/* Two different writes behind one control. Once someone exists,
+                  their section lives on the membership; before that it lives on
+                  the invitation, so placing a pending learner is an upsert of
+                  the invitation and they land there on first sign-in. */}
+              {courseSections.length > 0 ? (
+                <form
+                  action={person.userId ? assignMemberSection : addAllowedEmail}
+                  className="quietrow"
+                  style={{ marginTop: "12px" }}
+                >
                   <input type="hidden" name="courseId" value={courseId} />
-                  <input type="hidden" name="userId" value={person.userId} />
+                  {person.userId ? (
+                    <input type="hidden" name="userId" value={person.userId} />
+                  ) : (
+                    <input type="hidden" name="email" value={person.email} />
+                  )}
                   <select name="sectionId" className="tinput" defaultValue={person.sectionId ?? ""} aria-label={`Section for ${person.name ?? person.email}`}>
                     <option value="">No section</option>
                     {courseSections.map((section) => (
                       <option key={section.id} value={section.id}>{section.name}</option>
                     ))}
                   </select>
-                  <button className="btn ghost mini" type="submit">Assign</button>
+                  <button className="btn ghost mini" type="submit">
+                    {person.userId ? "Assign" : "Place"}
+                  </button>
                 </form>
               ) : null}
 

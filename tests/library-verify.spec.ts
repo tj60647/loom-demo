@@ -64,12 +64,18 @@ test.describe('Library verification', () => {
     const firstCard = cards.first();
     await expect(firstCard.locator('img')).toBeVisible();
 
-    // Controls: Edit (disclosure summary), Hide/Reveal, Download, Remove.
+    // Controls the library itself owns: Edit (disclosure), Download, archive,
+    // and delete (also a disclosure, since it destroys the file).
+    //
+    // Per-course visibility is NOT here and this spec used to assert it was.
+    // Hide/Reveal moved to the Courses tab when the library became
+    // course-agnostic: a reading can be published in one course and staged in
+    // another, so that decision belongs to the join, not to the reading.
     const editSummary = firstCard.locator('summary', { hasText: 'Edit' });
     await expect(editSummary).toBeVisible();
-    await expect(firstCard.getByRole('button', { name: /Hide|Reveal/i })).toBeVisible();
     await expect(firstCard.getByRole('link', { name: /Download PDF/i })).toBeVisible();
-    await expect(firstCard.getByRole('button', { name: /^Remove$/i })).toBeVisible();
+    await expect(firstCard.getByRole('button', { name: /^archive$/i })).toBeVisible();
+    await expect(firstCard.locator('summary', { hasText: 'delete' })).toBeVisible();
 
     // Edit must be a disclosure, not an always-open form: title field hidden until opened.
     const titleInput = firstCard.locator('input[name="title"]');
