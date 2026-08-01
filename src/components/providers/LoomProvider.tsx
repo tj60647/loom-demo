@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react"
 import { useParams } from "next/navigation"
 import type { Byte, CardTableView, Concept, Edge, LoomMap, LoomState, LoomViews, Tier } from "@/lib/types"
 import { asLoomState, scopeOf, scopedGraph, soleSourceId, WHOLE_WEAVE, type Scope, type ScopedGraph } from "@/lib/scope"
-import { emptyViews, parseImport } from "@/lib/graphExport"
+import { emptyViews, parseImport, type ParsedMapImport } from "@/lib/graphExport"
 import {
   getUserLoomData,
   createConcept, updateConcept, deleteConcept,
@@ -13,7 +13,7 @@ import {
   createEdge, updateEdge, deleteEdge,
   saveView,
   createMap as createMapAction, updateMap as updateMapAction, deleteMap as deleteMapAction,
-  importGraph, resetGraph, loadWorkedExample,
+  importGraph, importMapArrangement, resetGraph, loadWorkedExample,
 } from "@/actions/loom"
 
 interface LoomContextType {
@@ -74,6 +74,12 @@ interface LoomContextType {
    */
   ensureActiveMap: () => Promise<LoomMap>
   importFromText: (raw: string) => Promise<void>
+  /**
+   * Add one map file as a new parallel sibling — nothing replaced. Tiers and
+   * geometry land on the cards still on the table; the count that did not
+   * resolve comes back for the caller to report.
+   */
+  importMapFile: (parsed: ParsedMapImport) => Promise<{ skipped: number }>
   resetAll: () => Promise<void>
   loadExample: () => Promise<void>
   /** Transient status line (v14's saveDot): '· saved ·', '· copied ·', errors. */
@@ -597,6 +603,15 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const importMapFile = async (parsed: ParsedMapImport) => {
+    const { data, mapId, scopeKey, skipped } = await importMapArrangement(parsed)
+    setState(data)
+    // Make the arrival visible: the new map is the selected one in its scope.
+    setSelectedByScope((prev) => ({ ...prev, [scopeKey]: mapId }))
+    flash(skipped > 0 ? `map added — ${skipped} card${skipped !== 1 ? "s" : ""} not on this table` : "map added")
+    return { skipped }
+  }
+
   const resetAll = async () => {
     cancelPendingSaves()
     setSelectedByScope({})
@@ -624,7 +639,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       selectMap, addMap, renameMap, removeMap,
       setMapTiers, setMapRead, setMapEssence, flushMapText,
       setView, ensureActiveMap,
-      importFromText, resetAll, loadExample,
+      importFromText, importMapFile, resetAll, loadExample,
       flashMsg, flash,
       undoStack, setUndoStack, redoStack, setRedoStack
     }}>

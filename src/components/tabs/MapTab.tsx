@@ -21,6 +21,8 @@ import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import { buildMapKit } from "@/lib/mapKit"
 import { copyText } from "@/lib/clipboard"
+import { buildMapExport, buildMapMarkdown, mapExportFilename } from "@/lib/graphExport"
+import { downloadText } from "@/lib/download"
 import CardMenu from "@/components/map/CardMenu"
 
 const TIERS: [Tier, string][] = [["p", "PRIMARY"], ["s", "SECONDARY"], ["t", "TERTIARY"]]
@@ -472,6 +474,29 @@ export default function MapTab() {
     })
   }
 
+  // Keeping a map is the primary path out of Loom (ratified TJ 2026-07-31):
+  // the file is this map — tiers, essence, paragraph, arrangement — carried
+  // with the cards and passages behind it, so it stands on its own.
+  const handleKeepMapJson = () => {
+    if (!activeMap) return
+    downloadText(
+      JSON.stringify(buildMapExport(state, activeMap, studentName, titleOf), null, 2),
+      mapExportFilename(studentName, activeMap.name, "json"),
+      "application/json"
+    )
+    flash(`kept "${activeMap.name}" as .json`)
+  }
+
+  const handleKeepMapMd = () => {
+    if (!activeMap) return
+    downloadText(
+      buildMapMarkdown(state, activeMap, studentName, titleOf),
+      mapExportFilename(studentName, activeMap.name, "md"),
+      "text/markdown"
+    )
+    flash(`kept "${activeMap.name}" as .md`)
+  }
+
   const handleDeleteMap = async () => {
     if (!activeMap) return
     const ok = await confirm({
@@ -605,6 +630,18 @@ export default function MapTab() {
               onBlur={flushMapText}
               style={{ width: 140, fontSize: 12, padding: "4px 7px" }}
             />
+            <button
+              className="btn ghost mini"
+              aria-label={`Keep the map ${activeMap.name} as .json`}
+              data-tip="keep this map as its own file — the artifact to submit"
+              onClick={handleKeepMapJson}
+            >keep .json</button>
+            <button
+              className="btn ghost mini"
+              aria-label={`Keep the map ${activeMap.name} as .md`}
+              data-tip="this map as a readable outline — notes, Obsidian, an agent"
+              onClick={handleKeepMapMd}
+            >keep .md</button>
             <button className="btn ghost mini" data-tip="delete this map — concepts and threads stay" onClick={handleDeleteMap}>delete</button>
           </span>
         )}

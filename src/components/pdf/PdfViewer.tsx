@@ -5,7 +5,7 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import CaptureModal from './CaptureModal';
 import { useLoom } from '@/components/providers/LoomProvider';
-import { Byte } from '@/lib/types';
+import { Byte, Concept } from '@/lib/types';
 import { hashText } from '@/lib/hash';
 import Mark from 'mark.js';
 
@@ -21,18 +21,26 @@ interface PdfViewerProps {
   onClose: () => void;
 }
 
+/** One byte on the clicked span, as the highlight tooltip presents it. */
+type HighlightEntry = {
+  byteId: string;
+  conceptLabel: string;
+  source: string;
+  location: string;
+  startOffset: number | null;
+  endOffset: number | null;
+};
+
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusByteId, onGotoOpenByte, onClose }: PdfViewerProps) {
   const { state } = useLoom();
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [isNarrow, setIsNarrow] = useState(false);
+  // One passage can carry several bytes — the same span re-filed under a
+  // second concept, or overlapping captures. The tooltip lists every byte on
+  // the clicked span, so no coding is hidden behind another.
   const [highlightTooltip, setHighlightTooltip] = useState<{
-    conceptLabel: string;
-    source: string;
-    location: string;
-    byteId: string;
-    startOffset: number | null;
-    endOffset: number | null;
+    entries: HighlightEntry[];
     x: number;
     y: number;
     sticky: boolean;
@@ -50,43 +58,61 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [captureData, setCaptureData] = useState<{text: string, pageNum?: number, startOffset?: number, endOffset?: number, pageContentHash?: string} | null>(null);
 
-  const showHighlightTooltip = useCallback((
-    data: {
-      conceptLabel: string;
-      source: string;
-      location: string;
-      byteId: string;
-      startOffset: number | null;
-      endOffset: number | null;
-    },
-    x: number,
-    y: number,
-    sticky = false
-  ) => {
-    setHighlightTooltip({ ...data, x, y, sticky });
-  }, []);
-
   const hideHighlightTooltip = useCallback(() => {
     setHighlightTooltip(null);
   }, []);
 
-  const bindHighlightTooltip = useCallback((
-    node: HTMLElement,
-    data: {
-      conceptLabel: string;
-      source: string;
-      location: string;
-      byteId: string;
-      startOffset: number | null;
-      endOffset: number | null;
+  // Latest bytes/concepts for click-time lookups. Overlapping captures nest
+  // their <mark> elements, so the byte list for a span is read off the DOM at
+  // click time rather than frozen per node at mark time.
+  const bytesRef = useRef<Byte[]>([]);
+  const conceptsRef = useRef<Concept[]>([]);
+  useEffect(() => {
+    conceptsRef.current = state.concepts;
+  }, [state.concepts]);
+
+  /**
+   * Every byte covering this node's span: the node's own byte plus the bytes
+   * of the ancestor marks it is nested inside. Ordered as the bytes appear in
+   * the capture list, so the tooltip is stable no matter which layer was
+   * clicked.
+   */
+  const entriesForNode = useCallback((node: HTMLElement): HighlightEntry[] => {
+    const ids: string[] = [];
+    let el: HTMLElement | null = node.closest(".loom-byte-highlight");
+    while (el) {
+      const id = el.getAttribute("data-loom-byte-id");
+      if (id && !ids.includes(id)) ids.push(id);
+      el = el.parentElement ? el.parentElement.closest(".loom-byte-highlight") : null;
     }
-  ) => {
+    const orderOf = new Map(bytesRef.current.map((b, i) => [b.id, i]));
+    ids.sort((a, b) => (orderOf.get(a) ?? 0) - (orderOf.get(b) ?? 0));
+    return ids.flatMap((id) => {
+      const byte = bytesRef.current.find((b) => b.id === id);
+      if (!byte) return [];
+      const concept = conceptsRef.current.find((c) => c.id === byte.conceptId);
+      return [{
+        byteId: byte.id,
+        conceptLabel: concept?.label || "Unlabeled byte",
+        source: byte.source || sourceName,
+        location: byte.location || "",
+        startOffset: byte.startOffset ?? null,
+        endOffset: byte.endOffset ?? null,
+      }];
+    });
+  }, [sourceName]);
+
+  const bindHighlightNode = useCallback((node: HTMLElement, byteId: string) => {
+    node.setAttribute("data-loom-byte-id", byteId);
+
     const showFromEvent = (event: MouseEvent | PointerEvent | FocusEvent, sticky = false) => {
-      const target = event.target as HTMLElement | null;
-      const rect = target?.getBoundingClientRect();
+      const target = (event.target as HTMLElement | null) ?? node;
+      const entries = entriesForNode(target);
+      if (!entries.length) return;
+      const rect = target.getBoundingClientRect();
       const x = rect ? rect.left + rect.width / 2 : ("clientX" in event && event.clientX ? event.clientX : 0);
       const y = rect ? rect.top : ("clientY" in event && event.clientY ? event.clientY : 0);
-      showHighlightTooltip(data, x, y, sticky);
+      setHighlightTooltip({ entries, x, y, sticky });
     };
 
     const onClick = (event: MouseEvent) => {
@@ -104,7 +130,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       node.removeEventListener("click", onClick);
       node.removeEventListener("focus", onFocus);
     };
-  }, [showHighlightTooltip]);
+  }, [entriesForNode]);
 
   // Responsive sizing and layout detection
   useEffect(() => {
@@ -246,10 +272,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     setNumPages(numPages);
   }
 
-  // Use a ref to store the latest bytes so we don't need to depend on state.bytes in the observer
-  const bytesRef = useRef<Byte[]>([]);
-
-  // Update bytesRef whenever state.bytes changes
+  // Keep bytesRef current (declared above, next to conceptsRef) so the
+  // MutationObserver's applier never needs state.bytes as a dependency.
   useEffect(() => {
     bytesRef.current = state.bytes.filter(b => (sourceId && b.sourceId === sourceId) || b.source === sourceName);
   }, [state.bytes, sourceName, sourceId]);
@@ -299,18 +323,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   className: "loom-byte-highlight",
                   each: (node) => {
                     const concept = state.concepts.find((c) => c.id === byte.conceptId);
-                    const tipData = {
-                      conceptLabel: concept?.label || "Unlabeled byte",
-                      source: byte.source || sourceName,
-                      location: byte.location || "",
-                      byteId: byte.id,
-                      startOffset: byte.startOffset,
-                      endOffset: byte.endOffset,
-                    };
-                    const a11y = `${tipData.conceptLabel}. ${tipData.source}${tipData.location ? `, ${tipData.location}` : ""}. Characters ${tipData.startOffset ?? "?"}-${tipData.endOffset ?? "?"}.`;
+                    const a11y = `${concept?.label || "Unlabeled byte"}. ${byte.source || sourceName}${byte.location ? `, ${byte.location}` : ""}. Characters ${byte.startOffset ?? "?"}-${byte.endOffset ?? "?"}.`;
                     (node as HTMLElement).setAttribute("aria-label", a11y);
                     (node as HTMLElement).setAttribute("tabindex", "0");
-                    bindHighlightTooltip(node as HTMLElement, tipData);
+                    bindHighlightNode(node as HTMLElement, byte.id);
                   },
                   done: (count) => matches += count
                 });
@@ -329,18 +345,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
                   each: (node) => {
                     const concept = state.concepts.find((c) => c.id === byte.conceptId);
-                    const tipData = {
-                      conceptLabel: concept?.label || "Unlabeled byte",
-                      source: byte.source || sourceName,
-                      location: byte.location || "",
-                      byteId: byte.id,
-                      startOffset: byte.startOffset,
-                      endOffset: byte.endOffset,
-                    };
-                    const a11y = `${tipData.conceptLabel}. ${tipData.source}${tipData.location ? `, ${tipData.location}` : ""}. Characters ${tipData.startOffset ?? "?"}-${tipData.endOffset ?? "?"}.`;
+                    const a11y = `${concept?.label || "Unlabeled byte"}. ${byte.source || sourceName}${byte.location ? `, ${byte.location}` : ""}. Characters ${byte.startOffset ?? "?"}-${byte.endOffset ?? "?"}.`;
                     (node as HTMLElement).setAttribute("aria-label", a11y);
                     (node as HTMLElement).setAttribute("tabindex", "0");
-                    bindHighlightTooltip(node as HTMLElement, tipData);
+                    bindHighlightNode(node as HTMLElement, byte.id);
                   },
                   done: (count) => matches += count
                 });
@@ -376,7 +384,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       observer.disconnect();
       clearTimeout(debounceTimer);
     };
-  }, [state.bytes, state.concepts, pageNumber, bindHighlightTooltip, sourceName]); // Re-run effect when bytes or page changes
+  }, [state.bytes, state.concepts, pageNumber, bindHighlightNode, sourceName]); // Re-run effect when bytes or page changes
 
   const handleCaptureClick = () => {
     if (highlightRect) {
@@ -479,6 +487,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
           backdrop-filter: blur(2px);
           pointer-events: auto;
+        }
+        .loom-highlight-tooltip .entry + .entry {
+          margin-top: 8px;
+          padding-top: 8px;
+          border-top: 1px solid rgba(0, 0, 0, 0.12);
         }
         .loom-highlight-tooltip .head {
           display: flex;
@@ -759,7 +772,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           }}
         >
           <div className="head">
-            <div className="meta">byte</div>
+            <div className="meta">
+              {highlightTooltip.entries.length > 1
+                ? `${highlightTooltip.entries.length} bytes on this passage`
+                : "byte"}
+            </div>
             <button
               type="button"
               className="close"
@@ -772,24 +789,28 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               ×
             </button>
           </div>
-          <div className="coding">{highlightTooltip.conceptLabel}</div>
-          <div className="foot">
-            {highlightTooltip.source}
-            {highlightTooltip.location ? ` | ${highlightTooltip.location}` : ""}
-            {` | chars ${highlightTooltip.startOffset ?? "?"}-${highlightTooltip.endOffset ?? "?"}`}
-          </div>
-          {onGotoOpenByte && highlightTooltip.byteId ? (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onGotoOpenByte(highlightTooltip.byteId);
-                hideHighlightTooltip();
-              }}
-            >
-              Goto Coding Log
-            </button>
-          ) : null}
+          {highlightTooltip.entries.map((entry) => (
+            <div className="entry" key={entry.byteId}>
+              <div className="coding">{entry.conceptLabel}</div>
+              <div className="foot">
+                {entry.source}
+                {entry.location ? ` | ${entry.location}` : ""}
+                {` | chars ${entry.startOffset ?? "?"}-${entry.endOffset ?? "?"}`}
+              </div>
+              {onGotoOpenByte ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onGotoOpenByte(entry.byteId);
+                    hideHighlightTooltip();
+                  }}
+                >
+                  Goto Coding Log
+                </button>
+              ) : null}
+            </div>
+          ))}
         </div>
       )}
     </div>

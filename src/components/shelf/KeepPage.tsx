@@ -25,7 +25,7 @@ export default function KeepPage() {
       <div className="scopebar">
         <Link href="/" className="scopeback">‹ the shelf</Link>
         <span className="scopetitle">Keep</span>
-        <span className="scopemeta">your whole artifact — every reading, in one file</span>
+        <span className="scopemeta">your maps as files, and the whole cloth behind them</span>
       </div>
       <main>
         <KeepTab />

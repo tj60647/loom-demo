@@ -1,42 +1,56 @@
 "use client"
 
-// 05 · Keep — export, import, reset. Moved off the header so the student's
-// artifact (red line #5) has a place that explains itself: what each file IS,
-// when you would reach for it, and what reset does and does not touch.
+// 05 · Keep — the maps first, then the whole cloth. A map is the primary
+// keepable artifact (ratified TJ 2026-07-31): each one exports as its own
+// file, the thing a student submits or hands on. The whole-cloth export stays
+// as the complete backup, so keeping a map is never the only copy of anything
+// (red line #5). Import and reset live here too, each explaining itself.
 
 import { useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
-import { buildExport, buildMarkdown, exportFilename, parseImport } from "@/lib/graphExport"
+import {
+  buildExport, buildMarkdown, exportFilename,
+  buildMapExport, buildMapMarkdown, mapExportFilename, scopeLabelOf,
+  parseAnyImport,
+} from "@/lib/graphExport"
+import { downloadText } from "@/lib/download"
+import type { LoomMap } from "@/lib/types"
 
 export default function KeepTab() {
-  const { state, studentName, importFromText, resetAll, flash } = useLoom()
+  const { state, studentName, importFromText, importMapFile, resetAll, flash } = useLoom()
   const { confirm, notify } = useDialog()
   const { titleOf } = useReadings()
   const importInputRef = useRef<HTMLInputElement>(null)
 
-  const download = (text: string, filename: string, type: string) => {
-    const blob = new Blob([text], { type })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }
-
   const handleExportJson = () => {
-    download(JSON.stringify(buildExport(state, studentName), null, 2), exportFilename(studentName, "json"), "application/json")
+    downloadText(JSON.stringify(buildExport(state, studentName), null, 2), exportFilename(studentName, "json"), "application/json")
     flash("exported .json")
   }
 
   const handleExportMd = () => {
-    download(buildMarkdown(state, studentName, titleOf), exportFilename(studentName, "md"), "text/markdown")
+    downloadText(buildMarkdown(state, studentName, titleOf), exportFilename(studentName, "md"), "text/markdown")
     flash("exported .md")
   }
+
+  const handleKeepMapJson = (m: LoomMap) => {
+    downloadText(JSON.stringify(buildMapExport(state, m, studentName, titleOf), null, 2), mapExportFilename(studentName, m.name, "json"), "application/json")
+    flash(`kept "${m.name}" as .json`)
+  }
+
+  const handleKeepMapMd = (m: LoomMap) => {
+    downloadText(buildMapMarkdown(state, m, studentName, titleOf), mapExportFilename(studentName, m.name, "md"), "text/markdown")
+    flash(`kept "${m.name}" as .md`)
+  }
+
+  // Whole weave first, then reading scopes in shelf order of their labels.
+  const sortedMaps = [...state.maps].sort((a, b) => {
+    if ((a.scopeKey === "") !== (b.scopeKey === "")) return a.scopeKey === "" ? -1 : 1
+    const byScope = scopeLabelOf(a.scopeKey, titleOf).localeCompare(scopeLabelOf(b.scopeKey, titleOf))
+    if (byScope !== 0) return byScope
+    return a.name.localeCompare(b.name)
+  })
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target
@@ -49,7 +63,7 @@ export default function KeepTab() {
       const text = await file.text()
       let parsed
       try {
-        parsed = parseImport(text)
+        parsed = parseAnyImport(text)
       } catch (err) {
         await notify({
           title: "That file is not a Loom export.",
@@ -57,9 +71,33 @@ export default function KeepTab() {
         })
         return
       }
+
+      if (parsed.kind === "map") {
+        const m = parsed.map
+        const known = new Set(state.concepts.map((c) => c.id))
+        const total = Object.keys(m.map.tiers).length
+        const matched = Object.keys(m.map.tiers).filter((id) => known.has(id)).length
+        const ok = await confirm({
+          title: `Add the map "${m.map.name}" to your cloth?`,
+          body: `A single-map file: its tiers, essence and paragraph arrive as one more map alongside yours — nothing is replaced. ${matched} of ${total} sorted card${total !== 1 ? "s" : ""} ${matched === 1 ? "is" : "are"} on your table now${matched < total ? "; the rest are skipped, because a map arranges cards rather than re-weaving them (the whole-cloth .json restores cards)" : ""}.`,
+          confirmLabel: "Add this map",
+        })
+        if (!ok) return
+        try {
+          await importMapFile(m)
+        } catch (err) {
+          await notify({
+            title: "The import did not go through.",
+            body: err instanceof Error ? err.message : String(err),
+          })
+        }
+        return
+      }
+
+      const cloth = parsed.cloth
       const ok = await confirm({
         title: "Replace your cloth with this file?",
-        body: `It holds ${parsed.concepts.length} concept${parsed.concepts.length !== 1 ? "s" : ""}, ${parsed.bytes.length} passage${parsed.bytes.length !== 1 ? "s" : ""}, ${parsed.edges.length} thread${parsed.edges.length !== 1 ? "s" : ""} and ${parsed.maps.length} map${parsed.maps.length !== 1 ? "s" : ""}. What is on the table now is replaced, not merged. Your weaving history is kept either way.`,
+        body: `It holds ${cloth.concepts.length} concept${cloth.concepts.length !== 1 ? "s" : ""}, ${cloth.bytes.length} passage${cloth.bytes.length !== 1 ? "s" : ""}, ${cloth.edges.length} thread${cloth.edges.length !== 1 ? "s" : ""} and ${cloth.maps.length} map${cloth.maps.length !== 1 ? "s" : ""}. What is on the table now is replaced, not merged. Your weaving history is kept either way.`,
         confirmLabel: "Replace my cloth",
         danger: true,
       })
@@ -90,27 +128,63 @@ export default function KeepTab() {
   return (
     <>
       <p className="tasktitle">Keep your work.</p>
-      <p className="tasksub">The weave is yours — your concepts, your passages, your threads, your read, your arrangement. This page is where you take it out of Loom, bring it back in, or clear the table and start again. Nothing here happens without asking you first.</p>
+      <p className="tasksub">The weave is yours — your concepts, your passages, your threads, your maps. This page is where you take it out of Loom, bring it back in, or clear the table and start again. Nothing here happens without asking you first.</p>
 
       <div className="card" style={{ marginBottom: 14 }}>
-        <h2>Take it out <span className="n">{`${state.concepts.length} concepts · ${state.bytes.length} passages · ${state.edges.length} threads`}</span></h2>
-        <p className="do">Do this — download a copy now, and again whenever you&apos;ve done real work. Two formats, two jobs.</p>
-        <p className="hint"><b>.json</b> is the complete, exact record: every concept, passage, thread, and each of your maps — its tiers, its essence sentence, its read, its arrangement on the card table. It is the file to keep, the file to submit, and the only one that round-trips — import it back here later and your cloth returns exactly as you left it. If you keep one file, keep this one.</p>
-        <p className="hint"><b>.md</b> is a readable outline of the same work — plain Markdown for Obsidian, your notes app, a draft, or an agent you want to hand context to. Good for reading, quoting, and pasting. It is <b>not</b> re-importable: Loom cannot rebuild a cloth from it.</p>
+        <h2>Keep a map <span className="n">{state.maps.length ? `${state.maps.length} map${state.maps.length !== 1 ? "s" : ""}` : ""}</span></h2>
+        <p className="do">Do this — when a map reads right, take it out as its own file. A map is the artifact: its tiers, its essence sentence, its paragraph, and the cards, passages and threads behind them, arranged as you left it.</p>
+        <p className="hint"><b>.json</b> is the map&apos;s complete record and the file to submit — it stands alone, and importing it back later restores the map onto your cards. <b>.md</b> is the same map as a readable outline for notes, Obsidian, or an agent.</p>
+        {sortedMaps.length === 0 ? (
+          <div className="empty" style={{ padding: "14px 0" }}>
+            <span className="cap">no maps yet — sort your concepts on 04 · Map and your first map appears here</span>
+          </div>
+        ) : (
+          <div>
+            {sortedMaps.map((m) => (
+              <div key={m.id} className="quietrow" style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", flexWrap: "wrap" }}>
+                <span style={{ flex: "1 1 auto", minWidth: 180 }}>
+                  <b>{m.name}</b>
+                  <span className="hint" style={{ marginLeft: 8 }}>{scopeLabelOf(m.scopeKey, titleOf)}</span>
+                </span>
+                <span style={{ display: "inline-flex", gap: 6 }}>
+                  <button
+                    className="btn mini"
+                    aria-label={`Keep the map ${m.name} as .json`}
+                    data-tip="this map as its own file — the artifact to keep or submit"
+                    onClick={() => handleKeepMapJson(m)}
+                  >Keep .json</button>
+                  <button
+                    className="btn ghost mini"
+                    aria-label={`Keep the map ${m.name} as .md`}
+                    data-tip="this map as a readable outline — not re-importable"
+                    onClick={() => handleKeepMapMd(m)}
+                  >Keep .md</button>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h2>Take it all out <span className="n">{`${state.concepts.length} concepts · ${state.bytes.length} passages · ${state.edges.length} threads`}</span></h2>
+        <p className="do">The whole cloth in one file — every concept, passage, thread and every map at once. Download one now and again whenever you&apos;ve done real work.</p>
+        <p className="hint"><b>.json</b> is the complete, exact record and the only file that restores everything — import it back here later and your cloth returns exactly as you left it, maps and all. It is the backup behind every map you keep; if you keep one file, keep this one.</p>
+        <p className="hint"><b>.md</b> is a readable outline of the whole weave — plain Markdown for reading, quoting, and pasting. It is <b>not</b> re-importable.</p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="btn" data-tip="download your weave as a .json file — your submittable, portable artifact" onClick={handleExportJson}>Export .json</button>
-          <button className="btn ghost" data-tip="download a readable outline for notes, Obsidian, or an agent — not re-importable" onClick={handleExportMd}>Export .md</button>
+          <button className="btn" data-tip="download your whole weave as a .json file — the complete backup" onClick={handleExportJson}>Export .json</button>
+          <button className="btn ghost" data-tip="download a readable outline of the whole weave — not re-importable" onClick={handleExportMd}>Export .md</button>
         </div>
-        <p className="ghostnote" style={{ marginTop: 9 }}>Submitting or archiving? Send the .json. Reading or sharing? Send the .md.</p>
+        <p className="ghostnote" style={{ marginTop: 9 }}>Submitting one map? Keep it above. Archiving or moving machines? This is the file.</p>
       </div>
 
       <div className="card" style={{ marginBottom: 14 }}>
         <h2>Bring one back</h2>
         <p className="do">Do this — export first, then choose a Loom <b>.json</b> file to load.</p>
-        <p className="hint">Importing <b>replaces</b> the cloth for this course. It does not merge: what is on the table now is set aside, and the file becomes your cloth. That is what makes it useful for moving between machines, restoring an earlier state, or picking up a copy you were handed.</p>
-        <p className="hint">The file must be a Loom .json export — a .md export or any other JSON will be refused with a reason. Loom reads the file first, tells you what it found (how many concepts, passages, and threads), and asks before replacing anything.</p>
+        <p className="hint">A <b>whole-cloth</b> file <b>replaces</b> the cloth for this course — what is on the table now is set aside, and the file becomes your cloth. A <b>single-map</b> file <b>adds</b>: the map arrives alongside your maps, its tiers and arrangement landing on the cards still on your table, and nothing is replaced.</p>
+        <p className="hint">The file must be a Loom .json export — a .md export or any other JSON will be refused with a reason. Loom reads the file first, tells you what it found, and asks before touching anything.</p>
         <p className="hint">Either way, your weaving history is kept: importing rewrites the cloth, not the record of how you got here.</p>
-        <button className="btn ghost" data-tip="load a previously exported .json weave" onClick={() => importInputRef.current?.click()}>Import .json</button>
+        <button className="btn ghost" data-tip="load a previously exported .json — a whole cloth or a single map" onClick={() => importInputRef.current?.click()}>Import .json</button>
         <input
           ref={importInputRef}
           type="file"

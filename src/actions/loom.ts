@@ -9,7 +9,7 @@ import { authOptions } from "@/lib/auth"
 import { resolveCourseIdForUser } from "@/lib/courses"
 import { scopeFromKey, scopeOf } from "@/lib/scope"
 import type { CardTableView, GraphEvent, LoomMap, LoomViews, Tier } from "@/lib/types"
-import type { ParsedImport } from "@/lib/graphExport"
+import type { ParsedImport, ParsedMapImport } from "@/lib/graphExport"
 import { WORKED_EXAMPLE, WORKED_EXAMPLE_SOURCE } from "@/lib/example"
 
 async function getUserId() {
@@ -1006,6 +1006,87 @@ export async function importGraph(parsed: ParsedImport) {
   await db.batch(statements as unknown as Parameters<typeof db.batch>[0])
 
   return getUserLoomData()
+}
+
+/**
+ * Bring one map file back in (ratified TJ 2026-07-31: maps are the primary
+ * keepable artifact, so a map file must round-trip). Deliberately narrower
+ * than importGraph: the map RESTORES AN ARRANGEMENT onto the cards still on
+ * this table, matched by concept id — tiers and geometry survive where the id
+ * resolves, and are counted where it does not. It never re-weaves missing
+ * cards (the whole-cloth .json does that) and never replaces anything: the
+ * map arrives as one more parallel sibling.
+ */
+export async function importMapArrangement(parsed: ParsedMapImport) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+
+  if (Object.keys(parsed.map.tiers).length > IMPORT_LIMITS.concepts) {
+    throw new Error("That map file is larger than an import will accept.")
+  }
+
+  const [conceptRows, edgeRows] = await Promise.all([
+    db.select({ id: concepts.id }).from(concepts)
+      .where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId))),
+    db.select({ id: edges.id }).from(edges)
+      .where(and(eq(edges.userId, userId), inCourse(edges.courseId, courseId))),
+  ])
+  const knownConcepts = new Set(conceptRows.map((r) => r.id))
+  const knownEdges = new Set(edgeRows.map((r) => r.id))
+
+  const tiers: Record<string, "p" | "s" | "t" | "x"> = {}
+  Object.entries(parsed.map.tiers).forEach(([id, tier]) => {
+    if (knownConcepts.has(id) && tier) tiers[id] = tier
+  })
+  const skipped = Object.keys(parsed.map.tiers).length - Object.keys(tiers).length
+
+  // Resolve the scope against the readings this deployment holds, falling back
+  // to the whole weave — same rule as importGraph, for the same reason: the
+  // student's tiers, essence and read stay reachable (red line #5).
+  const scopeIds = parsed.map.scopeKey ? parsed.map.scopeKey.split(",") : []
+  const knownScope = scopeIds.length
+    ? new Set((await db.select({ id: sources.id }).from(sources).where(inArray(sources.id, scopeIds))).map((r) => r.id))
+    : new Set<string>()
+  const scopeKey = scopeOf(scopeIds.filter((id) => knownScope.has(id))).key
+
+  const [mapRow] = await db.insert(maps).values({
+    courseId,
+    userId,
+    scopeKey,
+    name: parsed.map.name,
+    essence: parsed.map.essence,
+    read: parsed.map.read,
+    tiers,
+  }).returning()
+
+  const positions: CardTableView["positions"] = {}
+  Object.entries(parsed.view.positions).forEach(([id, p]) => {
+    if (knownConcepts.has(id)) positions[id] = p
+  })
+  const bends: CardTableView["bends"] = {}
+  Object.entries(parsed.view.bends).forEach(([id, b]) => {
+    if (knownEdges.has(id)) bends[id] = b
+  })
+  const order = (parsed.view.order ?? []).filter((id) => knownConcepts.has(id))
+  const pins = (parsed.view.pins ?? []).filter((id) => knownConcepts.has(id))
+  if (Object.keys(positions).length || Object.keys(bends).length || order.length || pins.length) {
+    await db.insert(views).values({
+      userId,
+      courseId,
+      key: `map:${mapRow.id}`,
+      data: { positions, bends, order, pins } as Record<string, unknown>,
+    })
+  }
+
+  await recordEvent(userId, courseId, "map.import", "map", mapRow.id, {
+    name: mapRow.name,
+    scopeKey,
+    tiers: Object.keys(tiers).length,
+    skipped,
+  })
+
+  const data = await getUserLoomData()
+  return { data, mapId: mapRow.id, scopeKey, skipped }
 }
 
 /**

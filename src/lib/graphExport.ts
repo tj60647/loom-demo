@@ -3,13 +3,22 @@
 // that round-trips so no arrangement is lost, but that no consumer must read.
 // Red line #5: the export is the student's artifact, always available.
 
-import type { CardTableView, Concept, LoomExport, LoomState, LoomViews, Tier } from "./types"
+import type { CardTableView, Concept, LoomExport, LoomMap, LoomState, LoomViews, Tier } from "./types"
+import { scopeFromKey, scopedGraph } from "./scope"
 
 const TIERS = new Set(["", "p", "s", "t", "x"])
 
 function asTier(value: unknown): Tier {
   return typeof value === "string" && TIERS.has(value) ? (value as Tier) : ""
 }
+
+const TIER_GROUPS: [Tier, string][] = [
+  ["p", "Primary"],
+  ["s", "Secondary"],
+  ["t", "Tertiary"],
+  ["", "Unsorted"],
+  ["x", "Left off the map"],
+]
 
 export function buildExport(state: LoomState, student: string): LoomExport {
   return {
@@ -217,6 +226,13 @@ export function parseImport(raw: string): ParsedImport {
   }
   if (!data || typeof data !== "object") throw new Error("That file did not parse as a loom export.")
 
+  // A single-map file must never reach the replace path: treating it as a
+  // whole export would swap the entire cloth for one map's slice (red line
+  // #5). parseAnyImport routes it to the additive map import instead.
+  if (data.format === LOOM_MAP_FORMAT) {
+    throw new Error("That file is a single-map export — it adds a map to your cloth rather than replacing it.")
+  }
+
   // Reject JSON that is not a loom export at all — {}, [], a stray
   // package.json. Import REPLACES the graph, so silently treating arbitrary
   // JSON as a valid empty export would erase a student's work (red line #5).
@@ -415,4 +431,259 @@ export function emptyViews(): LoomViews {
 export function exportFilename(student: string, ext: string): string {
   const name = (student || "loom").replace(/\s+/g, "_").toLowerCase()
   return `${name}-loom.${ext}`
+}
+
+// --- PER-MAP EXPORT (ratified TJ 2026-07-31) ---
+// A map is the primary keepable artifact: the file a student submits or hands
+// on is one map — its tiers, essence and paragraph — carried with the cards,
+// passages and threads it arranges, so it reads on its own. The whole-cloth
+// export above stays as the complete backup; keeping a map is never the only
+// copy of anything (red line #5).
+
+export const LOOM_MAP_FORMAT = "loom-map"
+
+export type LoomMapExport = {
+  format: typeof LOOM_MAP_FORMAT
+  student: string
+  map: {
+    id: string
+    scopeKey: string
+    /** Readable form of the scope, so the file makes sense away from Loom. */
+    scopeLabel: string
+    name: string
+    essence: string
+    read: string
+    tiers: Record<string, Tier>
+  }
+  graph: {
+    /** `tier` here is THIS map's tier — the file is a sorted graph on its own. */
+    concepts: { id: string; label: string; def: string; note: string; tier: Tier }[]
+    bytes: LoomExport["graph"]["bytes"]
+    edges: LoomExport["graph"]["edges"]
+  }
+  view?: CardTableView
+}
+
+/** Readable scope label: the whole weave, or the readings' titles. */
+export function scopeLabelOf(scopeKey: string, titleOfSource?: (id: string) => string): string {
+  return scopeKey === ""
+    ? "the whole weave"
+    : scopeKey.split(",").map((id) => (titleOfSource ? titleOfSource(id) : id)).join(" + ")
+}
+
+export function buildMapExport(
+  state: LoomState,
+  map: LoomMap,
+  student: string,
+  titleOfSource?: (id: string) => string
+): LoomMapExport {
+  const scoped = scopedGraph(state, scopeFromKey(map.scopeKey))
+  const memberIds = new Set(scoped.concepts.map((c) => c.id))
+  const view = state.views[`map:${map.id}`]
+  const hasGeometry =
+    view &&
+    (Object.keys(view.positions).length > 0 ||
+      Object.keys(view.bends).length > 0 ||
+      (view.order?.length ?? 0) > 0 ||
+      (view.pins?.length ?? 0) > 0)
+
+  return {
+    format: LOOM_MAP_FORMAT,
+    student,
+    map: {
+      id: map.id,
+      scopeKey: map.scopeKey,
+      scopeLabel: scopeLabelOf(map.scopeKey, titleOfSource),
+      name: map.name,
+      essence: map.essence,
+      read: map.read,
+      tiers: map.tiers,
+    },
+    graph: {
+      concepts: scoped.concepts.map((c) => ({
+        id: c.id,
+        label: c.label,
+        def: c.def || "",
+        note: c.note || "",
+        tier: map.tiers[c.id] ?? "",
+      })),
+      // A concept's evidence travels whole — every byte of every member
+      // concept, not only the scope's own passages — so the file stands alone.
+      bytes: state.bytes
+        .filter((b) => memberIds.has(b.conceptId))
+        .map((b) => ({
+          id: b.id,
+          conceptId: b.conceptId,
+          source: b.source || "",
+          location: b.location || "",
+          text: b.content,
+          ...(b.sourceId
+            ? {
+                anchor: {
+                  sourceId: b.sourceId,
+                  pageNumber: b.pageNumber,
+                  startOffset: b.startOffset,
+                  endOffset: b.endOffset,
+                  pageContentHash: b.pageContentHash,
+                },
+              }
+            : {}),
+        })),
+      edges: scoped.edges.map((e) => ({
+        id: e.id,
+        fromId: e.fromId,
+        toId: e.toId,
+        sentence: e.sentence,
+        handle: e.handle || "",
+      })),
+    },
+    ...(hasGeometry
+      ? {
+          view: {
+            positions: view.positions,
+            bends: view.bends,
+            ...(view.order?.length ? { order: view.order } : {}),
+            ...(view.pins?.length ? { pins: view.pins } : {}),
+          },
+        }
+      : {}),
+  }
+}
+
+/** Readable single-map outline — the map's story with its evidence under it. */
+export function buildMapMarkdown(
+  state: LoomState,
+  map: LoomMap,
+  student: string,
+  titleOfSource?: (id: string) => string
+): string {
+  const scoped = scopedGraph(state, scopeFromKey(map.scopeKey))
+  const label = (id: string) => state.concepts.find((c) => c.id === id)?.label ?? "?"
+  const lines: string[] = []
+
+  lines.push(`# ${map.name} — a map of ${scopeLabelOf(map.scopeKey, titleOfSource)}`, "")
+  if (student) lines.push(`_${student}_`, "")
+  if (map.essence.trim()) lines.push(`**${map.essence.trim()}**`, "")
+  if (map.read.trim()) lines.push(map.read.trim(), "")
+
+  TIER_GROUPS.forEach(([tier, name]) => {
+    const group = scoped.concepts.filter((c) => (map.tiers[c.id] ?? "") === tier)
+    if (!group.length) return
+    lines.push(`## ${name}`, "")
+    group.forEach((c) => {
+      lines.push(`- **${c.label}**${c.def ? ` — ${c.def}` : ""}${c.note ? ` _(${c.note})_` : ""}`)
+      state.bytes
+        .filter((b) => b.conceptId === c.id)
+        .forEach((b) => {
+          const cite = [b.source, b.location].filter(Boolean).join(" · ")
+          lines.push(`  - > ${b.content}${cite ? ` — ${cite}` : ""}`)
+        })
+    })
+    lines.push("")
+  })
+
+  if (scoped.edges.length) {
+    lines.push("## Propositions", "")
+    scoped.edges.forEach((e) => {
+      lines.push(`- ${label(e.fromId)} —[${e.handle || "…"}]→ ${label(e.toId)}`)
+      lines.push(`  - "${e.sentence}"`)
+    })
+    lines.push("")
+  }
+
+  return lines.join("\n")
+}
+
+export function mapExportFilename(student: string, mapName: string, ext: string): string {
+  const name = (student || "loom").replace(/\s+/g, "_").toLowerCase()
+  const mapSlug = (mapName || "map").replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "").toLowerCase() || "map"
+  return `${name}-${mapSlug}.map.${ext}`
+}
+
+// --- MAP IMPORT ---
+// The inverse is deliberately narrower than the whole-cloth import: a map file
+// RESTORES AN ARRANGEMENT onto cards the student still has, matched by concept
+// id. It never re-weaves missing cards (the whole .json does that) and never
+// replaces anything — the map arrives as another parallel sibling.
+
+export type ParsedMapImport = {
+  student: string
+  map: { scopeKey: string; name: string; essence: string; read: string; tiers: Record<string, Tier> }
+  /** Geometry keyed by the file's concept/edge ids; filtered server-side. */
+  view: CardTableView
+  /** Concept ids the file's tiers reference, for match reporting. */
+  referencedConceptIds: string[]
+}
+
+function parseMapImportData(data: Record<string, unknown>): ParsedMapImport {
+  const rawMap = (data.map && typeof data.map === "object" ? data.map : {}) as Record<string, unknown>
+  const name = str(rawMap.name).trim().slice(0, 80)
+  if (!name) throw new Error("That map file has no map name — it did not parse as a loom map export.")
+
+  const tiers: Record<string, Tier> = {}
+  const rawTiers = (rawMap.tiers && typeof rawMap.tiers === "object" ? rawMap.tiers : {}) as Record<string, unknown>
+  Object.entries(rawTiers).forEach(([key, t]) => {
+    const tier = asTier(t)
+    if (tier) tiers[key] = tier
+  })
+
+  const rawView = (data.view && typeof data.view === "object" ? data.view : {}) as Record<string, unknown>
+  const positions: CardTableView["positions"] = {}
+  const bends: CardTableView["bends"] = {}
+  Object.entries((rawView.positions ?? {}) as Record<string, { x?: unknown; y?: unknown }>).forEach(([key, p]) => {
+    if (typeof p?.x === "number" && typeof p?.y === "number") positions[key] = { x: p.x, y: p.y }
+  })
+  Object.entries((rawView.bends ?? {}) as Record<string, { dx?: unknown; dy?: unknown }>).forEach(([key, b]) => {
+    if (typeof b?.dx === "number" && typeof b?.dy === "number") bends[key] = { dx: b.dx, dy: b.dy }
+  })
+  const strings = (value: unknown): string[] => {
+    const out: string[] = []
+    const seen = new Set<string>()
+    ;(Array.isArray(value) ? value : []).forEach((key) => {
+      if (typeof key !== "string" || seen.has(key)) return
+      seen.add(key)
+      out.push(key)
+    })
+    return out
+  }
+  const view: CardTableView = { positions, bends, order: strings(rawView.order), pins: strings(rawView.pins) }
+
+  const referencedConceptIds = [
+    ...new Set([...Object.keys(tiers), ...Object.keys(positions), ...(view.order ?? []), ...(view.pins ?? [])]),
+  ]
+
+  return {
+    student: str(data.student),
+    map: {
+      scopeKey: str(rawMap.scopeKey),
+      name,
+      essence: str(rawMap.essence),
+      read: str(rawMap.read),
+      tiers,
+    },
+    view,
+    referencedConceptIds,
+  }
+}
+
+export type AnyImport =
+  | { kind: "cloth"; cloth: ParsedImport }
+  | { kind: "map"; map: ParsedMapImport }
+
+/**
+ * Routes an import file by what it is: a whole-cloth export (replaces the
+ * cloth) or a single-map export (adds a map). Throws with a friendly message
+ * on anything else.
+ */
+export function parseAnyImport(raw: string): AnyImport {
+  let data: unknown
+  try {
+    data = JSON.parse(raw)
+  } catch {
+    throw new Error("That file did not parse as JSON.")
+  }
+  if (data && typeof data === "object" && (data as Record<string, unknown>).format === LOOM_MAP_FORMAT) {
+    return { kind: "map", map: parseMapImportData(data as Record<string, unknown>) }
+  }
+  return { kind: "cloth", cloth: parseImport(raw) }
 }
