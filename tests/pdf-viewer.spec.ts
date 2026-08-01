@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openReading } from './helpers';
 
 const pdfsToTest = [
   { cardTitle: 'Object Worlds', expectedText: 'Object Worlds' },
@@ -25,24 +26,15 @@ test.describe('PDF Viewer and Highlighting', () => {
       await page.addInitScript(() => {
         localStorage.setItem("loom_has_seen_walkthrough", "true");
       });
-      await page.goto('/');
-      
-      // 1b. Click on the Library tab (default is Open tab)
-      await page.getByRole('button', { name: /Library/i }).click();
-      
-      // 2. Wait for the Library to load. Tabs 01-04 stay mounted once visited
-      // and are hidden with CSS, so scope to the visible panel rather than
-      // matching a concealed one.
-      const panel = page.locator('.panel.active');
-      await expect(panel.locator(`text=${pdf.expectedText}`).first()).toBeVisible();
+      // 1b-4. The shelf is the home screen: pick the reading off it, which opens
+      // that reading's workbench, and read the text from tab 00 inside it.
+      await openReading(page, pdf.cardTitle);
+      // Case-insensitive: shelf titles are the readings' own ("Communities of
+      // practice and social learning systems"), not the test's shorthand.
+      await expect(page.locator('.scopetitle')).toContainText(
+        new RegExp(pdf.expectedText, 'i')
+      );
 
-      // 3. Click "Read in Loom" on the respective card
-      const card = panel.locator('.card', { hasText: pdf.cardTitle });
-      await card.locator('button:has-text("Read in Loom")').click();
-      
-      // 4. Wait for PDF to load
-      await expect(page.locator('text=Loading PDF...')).toBeHidden({ timeout: 15000 });
-      
       // Wait for the text layer to render on the first page
       const textLayer = page.locator('.react-pdf__Page__textContent');
       await expect(textLayer.first()).toBeAttached({ timeout: 10000 });

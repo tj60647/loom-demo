@@ -57,6 +57,7 @@ export function buildExport(state: LoomState, student: string): LoomExport {
         positions: state.views.cardTable.positions,
         bends: state.views.cardTable.bends,
         ...(state.views.cardTable.order?.length ? { order: state.views.cardTable.order } : {}),
+        ...(state.views.cardTable.pins?.length ? { pins: state.views.cardTable.pins } : {}),
       },
     },
   }
@@ -171,6 +172,7 @@ export function parseImport(raw: string): ParsedImport {
       positions: cardTableRaw.positions ?? {},
       bends: cardTableRaw.bends ?? {},
       order: cardTableRaw.order ?? [],
+      pins: cardTableRaw.pins ?? [],
     }
   }
 
@@ -272,13 +274,24 @@ export function parseImport(raw: string): ParsedImport {
     order.push(key)
   })
 
+  // Pinned definitions round-trip like the rest of the card table: a student
+  // gesture, so losing it on export/import would lose arrangement work.
+  const rawPins = Array.isArray(data.pins) ? (data.pins as unknown[]) : []
+  const pins: string[] = []
+  const seenPins = new Set<string>()
+  rawPins.forEach((key) => {
+    if (typeof key !== "string" || !conceptKeys.has(key) || seenPins.has(key)) return
+    seenPins.add(key)
+    pins.push(key)
+  })
+
   return {
     student: str(data.student),
     read: str(data.read),
     concepts,
     bytes,
     edges,
-    cardTable: { positions, bends, order },
+    cardTable: { positions, bends, order, pins },
   }
 }
 

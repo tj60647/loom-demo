@@ -90,9 +90,21 @@ The knowledge graph is kept strictly apart from its projections:
 | `view` | Student-authored geometry per view key (`cardTable`: positions, bends). A new view adds a row, never a column on a concept or edge. Only student gestures write here — derived layout is computed for display and discarded. | `views` — projections |
 | `graph_event` | Append-only history of the student's own acts. Survives reset and import; rendered only as exploratory counts/replay ("the cloth, over time"), never judgment. | development history |
 
+### Reading-first
+
+**The reading is the entry point.** The course's chain of transformations — text → notes → concepts → weave → map → chalk talk — runs per text, twice a week, twenty-six times, so `/` is a shelf of readings grouped by course week and each one opens its own workbench at `/reading/[sourceId]`: the text, the coding log, Throw and Read, scoped to that reading. `/weave` is every reading at once; `/keep` is always the whole artifact.
+
+**A concept does not belong to a reading — a byte does.** A concept emerges from a reading and may then be evidenced in several; spec §2 makes one label one concept, reused across readings and weeks, and that reuse is the island-bridging the course is for. So scope is read off the route, and which readings a concept is *evidenced in* is **derived** from its bytes (`src/lib/scope.ts`), computed per render and discarded. Nothing owns a concept and nothing re-homes it: a reading is a door into one graph, never one of twenty-six graphs, and meeting the same idea in a second text joins its evidence and says so.
+
+Threads that run out of a reading are the payoff, not the leftovers: an edge belongs to every scope containing either endpoint, so a bridge appears in both readings and in the whole weave, with its own counted band. Concepts from other readings stay reachable in Throw behind a disclosure — never removed, because threading this week's text to an earlier one is what weeks 6–13 are for.
+
+`04 Map` stays at the whole weave for now. `concept.tier` holds one value per concept, so a reading's map would show ranks sorted against another reading's concepts — see the passes proposal in [the strategy doc](./docs/reading-scope-and-map-passes.md) and spec §3.
+
 ### The reading library
 
 PDFs are uploaded once into a shared, course-agnostic library, then included in any number of courses. Per-course facts (week, visibility, core vs. supplemental) live on the `course_source` join, not on the reading — so the same PDF is never uploaded twice, and hiding it in one course leaves the others alone.
+
+A reading may also be **reference-only**: a card with a title and author and no PDF, added by a student for something they are coding that the library does not hold (`source.isOwn`, `storageKey` null). It sits on their shelf and nobody else's. This exists because reading-first needs every byte to have a door — otherwise a self-found paper's passages fall out of every lens.
 
 - **Readings tab** (`/admin/library`) — the whole library. Upload one or many PDFs at a time, edit shared metadata, and add a reading to a course. Badges show which courses currently include it.
 - **Courses tab** (`/admin/courses`) — each course's full reading list, with the per-course placement, visibility, and removal controls.

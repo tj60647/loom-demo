@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openReading } from './helpers';
 
 test.describe('PDF Viewer Fit Modes', () => {
   test('fit to width should not cause horizontal scroll', async ({ page }) => {
@@ -18,22 +19,9 @@ test.describe('PDF Viewer Fit Modes', () => {
     await page.addInitScript(() => {
       localStorage.setItem("loom_has_seen_walkthrough", "true");
     });
-    await page.goto('/');
-    
-    // 2. Click on the Library tab. Tabs 01-04 stay mounted once visited and are
-    // hidden with CSS, so page-wide selectors can match a concealed panel —
-    // scope to the visible one.
-    await page.getByRole('button', { name: /Library/i }).click();
-    const panel = page.locator('.panel.active');
-    await expect(panel.locator('text=Object Worlds').first()).toBeVisible();
+    // 2-4. Pick the reading off the shelf and open the text (tab 00).
+    await openReading(page, 'Object Worlds');
 
-    // 3. Click "Read in Loom" on the first card
-    const card = panel.locator('.card', { hasText: 'Object Worlds' });
-    await card.locator('button:has-text("Read in Loom")').click();
-    
-    // 4. Wait for PDF to load
-    await expect(page.locator('text=Loading PDF...')).toBeHidden({ timeout: 15000 });
-    
     // Wait for the text layer to render on the first page
     const textLayer = page.locator('.react-pdf__Page__textContent');
     await expect(textLayer.first()).toBeAttached({ timeout: 10000 });

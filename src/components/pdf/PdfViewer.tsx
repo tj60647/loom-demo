@@ -580,7 +580,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       {/* Toolbar */}
       <div style={{ 
         display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", 
-        padding: "10px 20px", borderBottom: "1px solid var(--rule)", backgroundColor: "var(--paper-alt)",
+        padding: "10px 20px", borderBottom: "1px solid var(--rule)", backgroundColor: "var(--paper-2)",
         boxShadow: "0 2px 10px rgba(0,0,0,0.05)", zIndex: 10
       }}>
         <div>

@@ -47,12 +47,15 @@ export default function CaptureModal({ passage, source, sourceId, location, page
 
   return (
     <div className="info-scrim">
-      <div className="card" style={{ width: "100%", maxWidth: "450px", padding: "24px", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
+      {/* Opaque, not `.card`'s rgba(255,255,255,.5): this sits directly over
+          the page you are reading, and a half-transparent form leaves the PDF's
+          own text running through the passage you are about to keep. */}
+      <div className="card" style={{ width: "100%", maxWidth: "450px", padding: "24px", background: "var(--paper)", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
         <h2 style={{ marginBottom: "16px", fontSize: "18px" }}>Capture Byte</h2>
         
         <div style={{ marginBottom: "20px" }}>
           <span className="label">Passage</span>
-          <div className="passage" style={{ maxHeight: "150px", overflowY: "auto", fontSize: "14px", color: "var(--ink)", padding: "12px", background: "var(--paper-alt)", borderRadius: "6px", border: "1px solid var(--rule)" }}>
+          <div className="passage" style={{ maxHeight: "150px", overflowY: "auto", fontSize: "14px", color: "var(--ink)", padding: "12px", background: "var(--paper-2)", borderRadius: "6px", border: "1px solid var(--rule)" }}>
             "{passage}"
           </div>
         </div>

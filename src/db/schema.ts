@@ -172,7 +172,14 @@ export const sources = pgTable("source", {
   // disturbing courses that already include it.
   isArchived: boolean("isArchived").default(false).notNull(),
   // Key used to locate the file in the storage backend (see src/lib/storage.ts).
-  storageKey: text("storageKey").notNull(),
+  // Null for a REFERENCE-ONLY reading: a card a student minted for something
+  // they are coding that has no PDF here. Reading-first makes every byte belong
+  // to a reading, so a source the library does not hold still needs a row —
+  // otherwise its passages have no door and fall out of every lens.
+  storageKey: text("storageKey"),
+  // A reading a student added for themselves. It sits on their shelf only: it
+  // has no course_source row, so it never reaches anyone else's.
+  isOwn: boolean("isOwn").default(false).notNull(),
   createdByUserId: text("createdByUserId").references(() => users.id, {
     onDelete: "set null",
   }),

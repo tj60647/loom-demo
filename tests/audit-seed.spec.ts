@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
+import { openReading } from './helpers';
 
 test.describe('Audit Seed Bytes', () => {
   test('verify seed bytes are highlighted', async ({ page }) => {
@@ -18,15 +19,8 @@ test.describe('Audit Seed Bytes', () => {
       localStorage.setItem("loom_has_seen_walkthrough", "true");
     });
     
-    await page.goto('/');
-    await page.getByRole('button', { name: /Library/i }).click();
-    
-    // Open Designing Engineers
-    const card = page.locator('.card', { hasText: 'Object Worlds' });
-    await card.locator('button:has-text("Read in Loom")').click();
-    
-    // Wait for PDF to load
-    await expect(page.locator('text=Loading PDF...')).toBeHidden({ timeout: 15000 });
+    // Pick Designing Engineers off the shelf and open its text (tab 00).
+    await openReading(page, 'Object Worlds');
     
     // Go to page 4
     await page.getByRole('button', { name: 'Next Page' }).click();
