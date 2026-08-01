@@ -2,6 +2,13 @@
 
 **Date:** 2026-07-30 · **Method:** four independent read-only audits (01–02, 03–04, global chrome, and a whole-app voice pass) comparing the app against `loom-v14-example.html`, merged and deduped. **123 differences.**
 
+> **Round 2 — 2026-08-01.** The reading-first, maps and journey builds landed
+> after this audit was written and rebuilt surfaces it had already judged.
+> [**Round 2**](#round-2--2026-08-01-the-surfaces-built-since) is at the foot of
+> this file: 13 new items over the changed surfaces, plus a re-check that
+> section A's nine priority fixes survived. Sections A–D below are the 7/30
+> record and are left as written.
+
 > **Status — 2026-07-30: Section A is closed.** All 66 divergences below have
 > been resolved, worked in batches of three. A handful turned out to be the same
 > finding reported by two lenses in different words and were closed with their
@@ -843,3 +850,128 @@ The audit could not confidently sort these.
 - v14: line 548: "The tool draws the lines you already threw and counts what it sees — it never sorts, places, or links for you." and line 556: "Give each concept a tier: <b>P</b>rimary (the map hangs on it) · <b>S</b>econdary · <b>T</b>ertiary (example / detail) · <b>–</b> leave off." — every tier is one …
 - app: src/components/tabs/MapTab.tsx:355 <button ... data-tip="tiers every concept primary in one gesture — you demote from there">make all primary</button>, handler at 166-172 writing tier "p" to every concept
 - Borderline against red line #1 and against v14's own promise that the tool "never sorts" — worth a human call: it is student-initiated and heavily hedged (confirm dialog, hint at MapTab.tsx:358 "a starting point, not a recommendation", flash "all primary — re-sort any that aren't"), but it does write a tier onto concepts the student never judged, and the mirror then counts them as sorted.
+
+---
+
+# Round 2 — 2026-08-01: the surfaces built since
+
+**Method:** a single read-only pass over everything the reading-first (07-30/31),
+maps (07-31) and journey (08-01) builds changed, re-compared against
+`loom-v14-example.html` — plus a re-check of section A's nine priority fixes, to
+see whether the rebuild quietly undid any of them. Scoped to changed surfaces:
+this is not a fresh 123-item sweep, and Throw (02) was not re-read because no
+commit since the audit touched it.
+
+**Result: 13 items — 3 to fix (2 applied, 1 held), 7 deliberate departures to
+confirm, 3 production-only. Section A's nine all still hold, and one section D
+item closes.**
+
+The app has moved further from v14 than the 7/30 audit could see, and mostly on
+purpose: v14 is a four-tab single page, and the app is now a seven-station
+journey across four routes. That is the intended divergence (spec §3 rev 30a/30c
+and the 8/1 ratifications), so most of what follows belongs in B rather than A.
+What matters is that each departure is a decision on the record.
+
+## A2. Divergences to fix
+
+> **Status — 2026-08-01 (TJ).** Items 1 and 2 applied. Item 3 **held** — the
+> placeholder stays as it is for now; it is recorded here so the wording is a
+> pending decision rather than an oversight.
+
+**Readings footer still says "THE SHELF"** · _copy_ · **APPLIED**
+
+- v14: loom-v14-example.html:577 `<footer><span class="fl" id="footLeft">01 — OPEN</span>…`, set from `FOOT` at :1170 — the left slot is always `NN — STATION`, the same name the nav uses
+- app: src/components/shelf/Shelf.tsx:196 `<span className="fl">THE SHELF</span>` — no number, and a name the 8/1 sweep retired everywhere else
+- REGRESSION, twice over. It breaks v14's footer convention (every other surface follows it: `01 — OPEN` … `06 — KEEP` at KeepPage.tsx:37), and it is the **last student-visible "shelf" in the app** — bec97ac and b298c5e renamed the home screen to Readings in the journey bar, the back-links, the not-found page and the walkthrough, and this one string was missed. Should read `00 — READINGS`. The right-hand motto ("PICK A READING") is already right.
+
+**card-table mapbar lost its label** · _copy_ · **APPLIED**
+
+- v14: loom-v14-example.html:559 `<div class="mapbar"><span class="label">The map</span><span …>Drag cards to arrange — …</span>` — one bar, labelled, holding the table's instructions
+- app: src/components/tabs/MapTab.tsx:649-651 — the instruction span with no `<span className="label">` before it, while the *new* mapbar above it (:604-605) does carry one ("Your maps of this reading")
+- REGRESSION, minor. Splitting one mapbar into two (switcher + instructions) left the second one unlabelled, so the page now shows a labelled bar followed by an unlabelled one that reads as its overflow rather than as a section of its own. `The map` restores the parallel.
+
+**Map's read placeholder still promises v14's single shared read** · _copy_ · **HELD**
+
+- v14: loom-v14-example.html:569 `placeholder="Write (or refine) your read here — it's the same text as on 03 · Read."` — literally true there: :1180-1183 sync `yourRead` and `yourRead2` in both directions over one `state.read`
+- app: src/components/tabs/MapTab.tsx:818 `placeholder="Write your read of this map here — same text as on 03 · Read."`, directly under a heading (:806) and hint (:816) that say the read belongs to *this map* and switches with it
+- REGRESSION on precision, introduced by the maps build. The sentence is true only while the same map is active, and it sits one line below copy explaining that it isn't universally true. 03 · Read got this right — ReadTab.tsx:425 names the map: `of "Map 1" — same as 04 · Map`. Match it here.
+
+## B2. Deliberate departures new since the audit (confirm each)
+
+**the journey replaces the tab bar** · _extra_
+
+- v14: loom-v14-example.html:436-441 — a `<nav>` of exactly four buttons, 01 Open · 02 Throw · 03 Read · 04 Map, all four panels on one page (`.panel.active`, :1174-1175)
+- app: src/components/ui/JourneyNav.tsx:21-29 — seven stations, 00 Readings · 01 Open · 02 Throw · 03 Read · 04 Map · 05 Weave · 06 Keep, across four routes; a station you can work at here is a `<button>`, every other is a `<Link className="station">`
+- DELIBERATE (ratified TJ 8/1). v14's visual grammar is preserved exactly — globals.css:30-34 is v14's `nav` rule with `a.station` added to every selector, so a link and a tab are indistinguishable to the eye. The departure is structural, not visual: v14 could keep every panel alive because there was one page, and the app cannot across a route change. Confirm the seven-station bar is the intended reading of v14's four-step nav.
+
+**the footer no longer tracks the nav** · _behavior_
+
+- v14: loom-v14-example.html:1176 — one click sets the panel, the nav underline **and** both footer slots from the same `FOOT` entry; they can never disagree
+- app: src/components/Workbench.tsx:41-47, 178, 231-233 — on `/weave` the underline stays on **05 Weave** while the footer names the open tool (`02 — THROW`, `03 — READ`, `04 — MAP`); `FOOT` has no `weave` entry at all
+- DELIBERATE and reasoned in place (Workbench.tsx:175-177, JourneyNav.tsx:13-15): the bar answers "where am I on the journey", the footer answers "which tool is open". Worth confirming anyway, because it is the one place the two chrome elements contradict each other, and the station the bar says you are standing at never names itself at the foot. If that reads wrong in use, `05 — WEAVE / EVERY READING AT ONCE` as the footer on `/weave` is the alternative.
+
+**station 00 changes its own label** · _copy_
+
+- v14: no equivalent — v14's nav labels are constant strings
+- app: src/components/Workbench.tsx:183 `labels={source?.hasFile ? { readings: "Reading" } : {}}` — station 00 reads "Reading" inside a text that has a PDF (where it is a tab onto that text) and "Readings" everywhere else (where it is a link home)
+- DELIBERATE. It is the honest label in both cases — inside a reading, station 00 *is* this reading — but it means the bar's second word changes as you move, and on a reference-only reading (no PDF) it stays "Readings" and links away rather than opening anything. Confirm that split is wanted.
+
+**"show definitions" became per-card pins** · _behavior_
+
+- v14: loom-v14-example.html:561 `<input type="checkbox" id="defToggle" checked> show definitions` — **on by default**; :1026 `cardH` and :1087-1093 draw every card two-line with its gloss, and :1184 re-renders the table on change
+- app: src/lib/types.ts:152-158 `pins` — "Cards whose working definition the student pinned open on the table … Replaces the global 'show definitions' toggle: that one resized every card at once, on a table whose positions were arranged at the other size." Definitions otherwise live in each card's `⋯` menu (MapTab.tsx:650)
+- DELIBERATE, and the reasoning is sound — but note the **default flipped**. v14 opened the card table with every definition visible; the app opens it with none, until the student pins them one at a time. v14's "check" step leaned on seeing the glosses at a glance. Confirm that opt-in is the intent rather than a side effect of the pins design.
+
+**04 Map's read is now the map's, not the reading's** · _behavior_
+
+- v14: loom-v14-example.html:567 `<h2>Your read <span class="n">same one as 03 — write it while you look</span></h2>`; one `state.read` per cloth, two textareas synced (:1180-1183)
+- app: src/components/tabs/MapTab.tsx:806-825 and ReadTab.tsx:425-440 — a read *and* a one-line essence, both stored on the active map, switching with it
+- DELIBERATE (maps, ratified TJ 7/31). v14's "write it while you look" pairing survives; what changed is that there are now several reads, one per map. Both tabs name the map in their heading, which is the mitigation. See A2 item 3 for the one place the old wording was left behind.
+
+**the header names a course, not a student** · _copy_
+
+- v14: loom-v14-example.html:427 `<div class="field"><span class="label">Student</span><input id="student" placeholder="your name"></div>` — the student types the name that lands in exports
+- app: src/components/ui/AuthButton.tsx:26-40 — course name (ochre, `.label`) · hairline rule · account name, both from the session
+- DELIBERATE, extending the production-necessity item already in section C. New since the audit is the **course** half: v14 had no notion of one account carrying several courses, and every count on screen belongs to exactly one. Confirm the ordering — context before identity, quieter than the name.
+
+**a map is a keepable artifact** · _extra_
+
+- v14: loom-v14-example.html:429-430 — `Export .json` and `Reset` in the header; the export is always the whole cloth, and there is nothing smaller to take out
+- app: src/components/tabs/KeepTab.tsx:134-161 and MapTab.tsx:633-644 — `keep .json` / `keep .md` per map, from 04 Map or 06 Keep, alongside the whole-cloth export (KeepTab.tsx:170-176)
+- DELIBERATE (ratified TJ 7/31). This is the largest single departure in round 2 and it is **not yet in the spec** — §3 still says Keep "is always the whole artifact and never a slice of it (red line #5)". See NEXT_SESSION.md open item 2; it needs the spec PR before it can be called settled.
+
+**export / import / reset moved to their own station** · _extra_
+
+- v14: loom-v14-example.html:428-430 — three buttons in the header chrome, one line of `data-tip` each
+- app: src/components/tabs/KeepTab.tsx:170-203 — three cards on 06 Keep, each with a `do` line and hints stating what the file is, what import replaces or adds, and what reset keeps
+- DELIBERATE (spec §3 rev 30a) — recorded here only because the station renumbered from 05 to 06 on 8/1, and the round-1 entries still name it 05.
+
+## C2. Production-only, nothing to reconcile
+
+**the map switcher** · _extra_ — src/components/tabs/MapTab.tsx:604-647: a chip per map of this scope, `+ New map`, inline rename, keep .json / keep .md, delete. v14 has one implicit map per cloth and no switcher.
+
+**00 · Reading, the text itself** · _extra_ — the PDF station, its capture modal and anchored highlights. v14 assumes the reading happened elsewhere ("You read anywhere — paper, PDF, screen", :1140). The 8/1 build moved the viewer into flow below the journey rather than leaving it a full-screen takeover, and its back-link now names where it actually lands, 01 Open, instead of "← Back to Library" (bec97ac).
+
+**05 · Weave, every reading at once** · _extra_ — src/app/weave/page.tsx: one graph across all readings, `scopeKey: ''`, deep-linkable per tool (`?tab=map`). v14 has exactly one cloth, so the whole-weave/per-reading distinction cannot arise there.
+
+## Re-check: section A's nine priority fixes all survived
+
+The journey build rewrote the chrome those fixes live in, so each was re-read:
+
+| # | Fix | Still holds |
+| --- | --- | --- |
+| 1 | help "?" works signed out | Header.tsx:36-45 renders it unconditionally; FirstRunWalkthrough is mounted on the signed-out branch (Workbench.tsx:120, KeepPage.tsx:19) |
+| 2 | `[data-tip]` tooltips ported | globals.css:280-285 |
+| 3 | About no longer promises to generate a read | Header.tsx:72 — "Nothing is auto-generated. The tool only counts your own throws." |
+| 4 | tab title | layout.tsx:12 `title: "Loom"` |
+| 5 | walkthrough card 1 | FirstRunWalkthrough.tsx:11 now names all seven stations |
+| 6 | validation says why | OpenTab.tsx:397-404 — the reason rides the disabled button's `title` |
+| 7 | panels stay mounted | Workbench.tsx:65 `KEEP_ALIVE` — open/throw/read/map survive a tab switch (a *route* change still unmounts them; see B2) |
+| 8 | the cloth re-measures | ClothMap.tsx:21-28 `ResizeObserver` |
+| 9 | walkthrough "seen" is per account | FirstRunWalkthrough.tsx:44 `${LEGACY_SEEN_KEY}:${userId}`, with a one-time adoption of the device-wide flag |
+
+## Closed from section D
+
+**capture hint** — resolved. OpenTab.tsx:275 now carries both halves of v14:450 verbatim — `A "byte" = one passage + its citation. Choosing the passage is *your* judgment — that's the point.` — with the production disclaimer appended rather than substituted, which was the objection.
+
+**"make all primary"** — still open, still worth a human call (MapTab.tsx:538-544). One thing has changed in its favour: tiers are per map now, so the gesture writes onto one map rather than onto the concepts themselves, and a student can keep an unsorted map beside it. The red line #1 question is unchanged.
