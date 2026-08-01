@@ -28,10 +28,10 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
 .btn:disabled{opacity:.35;cursor:default} .btn:hover:not(:disabled){opacity:.88}
 #saveDot{font-family:var(--mono);font-size:10px;color:var(--ink-soft);align-self:center}
 nav{display:flex;border-bottom:1px solid var(--rule);padding:0 26px;background:var(--paper-2);flex-wrap:wrap}
-nav button{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px}
-nav button.active{color:var(--ink);border-bottom-color:var(--ochre)}
+nav button,nav a.station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
+nav button.active,nav a.station.active{color:var(--ink);border-bottom-color:var(--ochre)}
 nav .step{font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-right:7px;color:var(--grey)}
-nav button.active .step{color:var(--ochre)}
+nav button.active .step,nav a.station.active .step{color:var(--ochre)}
 main{padding:24px 26px 86px;max-width:1100px;margin:0 auto}
 .panel{display:none} .panel.active{display:block}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:28px}

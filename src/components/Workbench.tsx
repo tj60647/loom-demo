@@ -18,6 +18,7 @@ import ThrowTab from "@/components/tabs/ThrowTab"
 import ReadTab from "@/components/tabs/ReadTab"
 import MapTab from "@/components/tabs/MapTab"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
+import JourneyNav, { type Station } from "@/components/ui/JourneyNav"
 import type { Byte } from "@/lib/types"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
@@ -35,7 +36,7 @@ export type WorkbenchSource = {
   hasFile: boolean
 }
 
-type Tab = "reading" | "open" | "throw" | "read" | "map"
+export type Tab = "reading" | "open" | "throw" | "read" | "map"
 
 const FOOT: Record<Tab, [string, string]> = {
   reading: ["00 — READING", "THE TEXT ITSELF"],
@@ -45,12 +46,13 @@ const FOOT: Record<Tab, [string, string]> = {
   map: ["04 — MAP", "THE CARD TABLE"],
 }
 
-const LABEL: Record<Tab, [string, string]> = {
-  reading: ["00 —", "Reading"],
-  open: ["01 —", "Open"],
-  throw: ["02 —", "Throw"],
-  read: ["03 —", "Read"],
-  map: ["04 —", "Map"],
+/** The journey station each workbench tab sits at. */
+const STATION_OF: Record<Tab, Station> = {
+  reading: "readings",
+  open: "open",
+  throw: "throw",
+  read: "read",
+  map: "map",
 }
 
 /**
@@ -62,16 +64,27 @@ const LABEL: Record<Tab, [string, string]> = {
  */
 const KEEP_ALIVE: ReadonlySet<Tab> = new Set<Tab>(["open", "throw", "read", "map"])
 
-export default function Workbench({ source }: { source: WorkbenchSource | null }) {
+export default function Workbench({
+  source,
+  initialTab,
+}: {
+  source: WorkbenchSource | null
+  /** Landing tab for journey deep links (`/weave?tab=map`); validated below. */
+  initialTab?: Tab
+}) {
   const { data: session } = useSession()
   const { isLoading, scoped } = useLoom()
   const tabs: Tab[] = source
     ? (source.hasFile ? ["reading", "open", "throw", "read", "map"] : ["open", "throw", "read", "map"])
     : ["throw", "read", "map"]
-  const [activeTab, setActiveTab] = useState<Tab>(tabs.includes("open") ? "open" : "throw")
-  const [visited, setVisited] = useState<ReadonlySet<Tab>>(
-    () => new Set<Tab>([tabs.includes("open") ? "open" : "throw"])
-  )
+  const firstTab: Tab =
+    initialTab && tabs.includes(initialTab)
+      ? initialTab
+      : tabs.includes("open")
+        ? "open"
+        : "throw"
+  const [activeTab, setActiveTab] = useState<Tab>(firstTab)
+  const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([firstTab]))
   const [pdfPage, setPdfPage] = useState(1)
   const [pdfFocusByteId, setPdfFocusByteId] = useState<string | null>(null)
   const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
@@ -152,18 +165,17 @@ export default function Workbench({ source }: { source: WorkbenchSource | null }
         )}
       </div>
 
-      <nav>
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            className={activeTab === tab ? "active" : ""}
-            onClick={() => goTo(tab)}
-          >
-            <span className="step">{LABEL[tab][0]}</span>
-            {LABEL[tab][1]}
-          </button>
-        ))}
-      </nav>
+      <JourneyNav
+        active={STATION_OF[activeTab]}
+        // In this workbench, the tabs are stations you can work at right here;
+        // Readings and Keep (and Open, at the whole weave) are elsewhere, so
+        // JourneyNav renders them as links. Inside a text, station 00 IS this
+        // reading, so its label goes singular.
+        labels={source?.hasFile ? { readings: "Reading" } : {}}
+        onStation={Object.fromEntries(
+          tabs.map((tab) => [STATION_OF[tab], () => goTo(tab)])
+        )}
+      />
 
       <main>
         {source?.hasFile && (

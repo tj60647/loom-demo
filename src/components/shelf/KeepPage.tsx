@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useSession } from "next-auth/react"
 import KeepTab from "@/components/tabs/KeepTab"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
+import JourneyNav from "@/components/ui/JourneyNav"
 
 export default function KeepPage() {
   const { data: session } = useSession()
@@ -27,6 +28,7 @@ export default function KeepPage() {
         <span className="scopetitle">Keep</span>
         <span className="scopemeta">your maps as files, and the whole cloth behind them</span>
       </div>
+      <JourneyNav active="keep" />
       <main>
         <KeepTab />
         <FirstRunWalkthrough />

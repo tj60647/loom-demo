@@ -17,6 +17,7 @@ import { createOwnReading } from "@/actions/sources"
 import { tallyByReading } from "@/lib/scope"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
+import JourneyNav from "@/components/ui/JourneyNav"
 
 export default function Shelf() {
   const { data: session } = useSession()
@@ -114,6 +115,7 @@ export default function Shelf() {
 
   return (
     <>
+      <JourneyNav active="readings" />
       <main>
         <p className="tasktitle">Pick a reading.</p>
         <p className="tasksub">

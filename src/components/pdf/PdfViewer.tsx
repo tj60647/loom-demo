@@ -135,10 +135,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // Responsive sizing and layout detection
   useEffect(() => {
     const updateLayout = () => {
-      const availableHeight = window.innerHeight - 150; // account for header and toolbar
+      // The viewer sits in flow below the header, scopebar and journey nav
+      // (~250px of chrome) — tab 00 is a station on the journey, not a
+      // takeover, so the bar above must stay visible and clickable.
+      const availableHeight = window.innerHeight - 250;
       setPageHeight(Math.max(400, availableHeight));
       setIsNarrow(window.innerWidth < 900);
-      
+
       if (window.innerWidth < 900) {
         setIsTwoPage(false);
       }
@@ -455,15 +458,17 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   };
 
   return (
-    <div style={{ 
-      position: "fixed", 
-      top: 0, left: 0, right: 0, bottom: 0, 
-      backgroundColor: "var(--paper)", 
-      zIndex: 5000, 
-      display: "flex", 
-      flexDirection: "column"
+    // In flow, not a fixed takeover: the header and the journey nav stay
+    // visible and clickable above the text (ratified TJ 8/1 — the journey is
+    // always in view; tab 00 is one of its stations).
+    <div style={{
+      position: "relative",
+      backgroundColor: "var(--paper)",
+      display: "flex",
+      flexDirection: "column",
+      minHeight: 480
     }} ref={containerRef}>
-      
+
       <style>{`
         .loom-byte-highlight {
           background-color: rgba(255, 204, 0, 0.4);

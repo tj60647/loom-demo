@@ -49,8 +49,10 @@ export default function CaptureModal({ passage, source, sourceId, location, page
     <div className="info-scrim">
       {/* Opaque, not `.card`'s rgba(255,255,255,.5): this sits directly over
           the page you are reading, and a half-transparent form leaves the PDF's
-          own text running through the passage you are about to keep. */}
-      <div className="card" style={{ width: "100%", maxWidth: "450px", padding: "24px", background: "var(--paper)", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
+          own text running through the passage you are about to keep.
+          Scrolls past the viewport: a full-passage capture grows tall (the
+          word chips alone can fill a screen) and Save must stay reachable. */}
+      <div className="card" style={{ width: "100%", maxWidth: "450px", maxHeight: "85vh", overflowY: "auto", padding: "24px", background: "var(--paper)", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
         <h2 style={{ marginBottom: "16px", fontSize: "18px" }}>Capture Byte</h2>
         
         <div style={{ marginBottom: "20px" }}>
