@@ -22,7 +22,7 @@ const GUIDE = [
   p:'Sort your concepts into tiers (primary / secondary / tertiary), then drag the cards to arrange them — general above, specific below. The tool draws the links you already threw and counts what it sees; the sorting and arranging are yours.',
   loom:'Sort · arrange · check. Placement is the decision.'},
  {k:'after loom', h:'⑤ Where this goes next',
-  p:'Your weave is the middle step, not the deliverable. Copy the map kit and draw your real concept map by hand (arranging is thinking), build your chalk talk from it, and export your graph from 05 · Keep (JSON) — yours to keep, submit, or explore further.',
+  p:'Your weave is the middle step, not the deliverable. Copy the map kit and draw your real concept map by hand (arranging is thinking), build your chalk talk from it, and export your graph from 06 · Keep (JSON) — yours to keep, submit, or explore further.',
   loom:'text → notes → concepts → weave → concept map → chalk talk → questions → discussion.'},
 ];
 

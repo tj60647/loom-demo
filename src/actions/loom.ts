@@ -429,7 +429,7 @@ export async function attributeBytes(byteIds: string[], sourceId: string) {
   if (!byteIds.length) return 0
 
   const known = await db.select({ id: sources.id }).from(sources).where(eq(sources.id, sourceId)).limit(1)
-  if (!known.length) throw new Error("That reading is not on your shelf.")
+  if (!known.length) throw new Error("That reading is not among your readings.")
 
   const updated = await db.update(bytes).set({ sourceId })
     .where(and(

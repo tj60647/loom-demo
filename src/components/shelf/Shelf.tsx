@@ -125,9 +125,10 @@ export default function Shelf() {
           the evidence of both.
         </p>
 
+        {/* The whole weave and Keep were quick links here; they are journey
+            stations now (05 · 06), so the bar carries them and this row keeps
+            only the tally. */}
         <div className="shelfbar">
-          <Link className="btn ghost mini" href="/weave">Your whole weave →</Link>
-          <Link className="btn ghost mini" href="/keep">05 · Keep — export, import, reset</Link>
           <span className="cap shelfcount">
             {isLoading ? "reading your loom…" : (
               <>
@@ -180,7 +181,7 @@ export default function Shelf() {
             <h2>New to this?</h2>
             <p className="hint">
               A finished weave to poke at — Star &amp; Griesemer, already captured, threaded
-              and read. Explore it, then clear it from 05 · Keep to start your own.
+              and read. Explore it, then clear it from 06 · Keep to start your own.
             </p>
             <button className="btn ghost mini" onClick={handleLoadExample} disabled={exampleBusy}>
               load the worked example

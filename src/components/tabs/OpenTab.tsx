@@ -148,8 +148,8 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     const ok = await confirm({
       title: `Delete “${label}”?`,
       body: byteCount
-        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s go" : " goes"} with it. Export from 05 · Keep first if you might want this back.`
-        : "Export from 05 · Keep first if you might want this back.",
+        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s go" : " goes"} with it. Export from 06 · Keep first if you might want this back.`
+        : "Export from 06 · Keep first if you might want this back.",
       confirmLabel: "Delete concept",
       danger: true,
     })

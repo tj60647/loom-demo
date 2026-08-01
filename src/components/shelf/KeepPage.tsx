@@ -24,7 +24,7 @@ export default function KeepPage() {
   return (
     <>
       <div className="scopebar">
-        <Link href="/" className="scopeback">‹ the shelf</Link>
+        <Link href="/" className="scopeback">‹ readings</Link>
         <span className="scopetitle">Keep</span>
         <span className="scopemeta">your maps as files, and the whole cloth behind them</span>
       </div>
@@ -34,7 +34,7 @@ export default function KeepPage() {
         <FirstRunWalkthrough />
       </main>
       <footer>
-        <span className="fl">05 — KEEP</span>
+        <span className="fl">06 — KEEP</span>
         <span className="fr">YOURS TO TAKE</span>
       </footer>
     </>

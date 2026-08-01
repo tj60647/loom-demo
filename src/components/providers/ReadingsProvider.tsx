@@ -65,7 +65,7 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch((e) => {
-        if (live) setError(e instanceof Error ? e.message : "Failed to load the shelf")
+        if (live) setError(e instanceof Error ? e.message : "Failed to load your readings")
       })
       .finally(() => {
         if (live) setIsLoading(false)

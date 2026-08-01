@@ -22,10 +22,10 @@ export default async function ReadingPage({
     return (
       <main>
         <div className="empty" style={{ marginTop: "100px" }}>
-          <h2>That reading isn&apos;t on your shelf.</h2>
+          <h2>That reading isn&apos;t among your readings.</h2>
           <span className="cap">it may not be published to your course yet</span>
           <p style={{ marginTop: 18 }}>
-            <Link className="btn ghost mini" href="/">‹ back to the shelf</Link>
+            <Link className="btn ghost mini" href="/">‹ back to your readings</Link>
           </p>
         </div>
       </main>

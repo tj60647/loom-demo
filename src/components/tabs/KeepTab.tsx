@@ -1,6 +1,6 @@
 "use client"
 
-// 05 · Keep — the maps first, then the whole cloth. A map is the primary
+// 06 · Keep — the maps first, then the whole cloth. A map is the primary
 // keepable artifact (ratified TJ 2026-07-31): each one exports as its own
 // file, the thing a student submits or hands on. The whole-cloth export stays
 // as the complete backup, so keeping a map is never the only copy of anything

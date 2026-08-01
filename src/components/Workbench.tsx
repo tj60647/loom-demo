@@ -123,20 +123,26 @@ export default function Workbench({
   }
 
   if (isLoading) {
+    // The journey stays put while the loom loads: it is the one fixed thing
+    // under the header, and blinking it out mid-load makes the app look like
+    // it is rebuilding itself around you.
     return (
-      <main>
-        <div className="empty" style={{ marginTop: "100px" }}>
-          <h2>Loading your loom...</h2>
-        </div>
-        <FirstRunWalkthrough autoOpen={false} />
-      </main>
+      <>
+        <JourneyNav active={source ? STATION_OF[activeTab] : "weave"} />
+        <main>
+          <div className="empty" style={{ marginTop: "100px" }}>
+            <h2>Loading your loom...</h2>
+          </div>
+          <FirstRunWalkthrough autoOpen={false} />
+        </main>
+      </>
     )
   }
 
   return (
     <>
       <div className="scopebar">
-        <Link href="/" className="scopeback">‹ the shelf</Link>
+        <Link href="/" className="scopeback">‹ readings</Link>
         {source ? (
           <>
             <span className="scopetitle">{source.title}</span>
@@ -166,7 +172,10 @@ export default function Workbench({
       </div>
 
       <JourneyNav
-        active={STATION_OF[activeTab]}
+        // Inside a reading the underline follows the tab; at the whole weave
+        // it stays on 05 — Weave, the journey phase this place IS, while
+        // throw/read/map act as its tools (the footer names the open one).
+        active={source ? STATION_OF[activeTab] : "weave"}
         // In this workbench, the tabs are stations you can work at right here;
         // Readings and Keep (and Open, at the whole weave) are elsewhere, so
         // JourneyNav renders them as links. Inside a text, station 00 IS this
