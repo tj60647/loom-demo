@@ -25,6 +25,15 @@ export interface ReadingStorage {
   put(key: string, data: Buffer): Promise<void>
   /** Retrieve a previously stored file's bytes. */
   get(key: string): Promise<Buffer>
+  /**
+   * The same bytes, left as a stream. Use this when the file is being passed
+   * straight through to a response: a Vercel Function may only return 4.5MB in
+   * a buffered body, and three course readings are larger than that, so
+   * buffering them is the difference between a reading opening and a 404. A
+   * streamed body is not subject to that cap. Buffer only when the bytes are
+   * actually needed in memory (cover rendering, text extraction).
+   */
+  getStream(key: string): Promise<ReadableStream<Uint8Array>>
   /** Remove a previously stored file if it exists. */
   delete(key: string): Promise<void>
 }
@@ -46,12 +55,16 @@ class VercelBlobStorage implements ReadingStorage {
   }
 
   async get(key: string): Promise<Buffer> {
+    const arrayBuffer = await new Response(await this.getStream(key)).arrayBuffer()
+    return Buffer.from(arrayBuffer)
+  }
+
+  async getStream(key: string): Promise<ReadableStream<Uint8Array>> {
     const result = await get(key, { access: BLOB_ACCESS })
     if (!result || result.statusCode !== 200) {
       throw new Error(`Blob not found for key: ${key}`)
     }
-    const arrayBuffer = await new Response(result.stream).arrayBuffer()
-    return Buffer.from(arrayBuffer)
+    return result.stream as ReadableStream<Uint8Array>
   }
 
   async delete(key: string): Promise<void> {

@@ -672,7 +672,7 @@ export async function deleteSource(formData: FormData) {
  * lives on the join, so this is a membership question rather than a flag on
  * the source.
  */
-export async function getSourceFile(sourceId: string) {
+async function authorizeSourceFile(sourceId: string) {
   const session = await getServerSession(authOptions)
   const admin = isAdminUser(session?.user)
 
@@ -689,7 +689,7 @@ export async function getSourceFile(sourceId: string) {
   // A student's own reading is theirs to read; it was never published to a
   // course, so the membership check below cannot admit it.
   if (source.isOwn && source.createdByUserId === session?.user?.id) {
-    return { source, buffer: await readingStorage.get(source.storageKey) }
+    return { source, storageKey: source.storageKey }
   }
 
   if (!admin && session?.user?.id) {
@@ -720,6 +720,22 @@ export async function getSourceFile(sourceId: string) {
     if (published.length === 0) throw new Error("Not found")
   }
 
-  const buffer = await readingStorage.get(source.storageKey)
-  return { source, buffer }
+  return { source, storageKey: source.storageKey }
+}
+
+/**
+ * The reading's bytes in memory. For callers that genuinely need the whole
+ * file — cover rendering, text extraction. To send it to a browser, use
+ * `getSourceFileStream`: buffering a reading larger than 4.5MB is fine here
+ * and fatal in a Vercel Function response.
+ */
+export async function getSourceFile(sourceId: string) {
+  const { source, storageKey } = await authorizeSourceFile(sourceId)
+  return { source, buffer: await readingStorage.get(storageKey) }
+}
+
+/** The same reading, streamed — the form the PDF route serves. */
+export async function getSourceFileStream(sourceId: string) {
+  const { source, storageKey } = await authorizeSourceFile(sourceId)
+  return { source, stream: await readingStorage.getStream(storageKey) }
 }
