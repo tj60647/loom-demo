@@ -1,6 +1,7 @@
 import { db } from "@/db"
-import { courseMemberships, courses, sections } from "@/db/schema"
-import { and, asc, eq } from "drizzle-orm"
+import { courseMemberships, courses, sections, users } from "@/db/schema"
+import { and, asc, eq, isNull } from "drizzle-orm"
+import { isAdminUser } from "@/lib/auth"
 
 export type CourseRecord = typeof courses.$inferSelect
 export type SectionRecord = typeof sections.$inferSelect
@@ -50,8 +51,13 @@ export async function resolveCourseId(raw?: string | null): Promise<string | nul
 }
 
 /**
- * The course a learner is looking at: the requested one when they belong to it,
- * otherwise their first enrolment, otherwise the first course on the site.
+ * The course a learner is looking at: the requested one when they actively
+ * belong to it, otherwise their first active enrolment, otherwise nothing —
+ * membership is the authorization boundary, so a learner is never dropped
+ * into a course that has not enrolled them (their work stays unscoped
+ * instead). Admins keep the site-wide fallback: they are global staff here
+ * (every /admin page already works that way), and it lets them walk the
+ * learner surfaces of any course without being on its roster.
  */
 export async function resolveCourseIdForUser(
   userId: string,
@@ -61,7 +67,13 @@ export async function resolveCourseIdForUser(
     .select({ courseId: courseMemberships.courseId })
     .from(courseMemberships)
     .innerJoin(courses, eq(courses.id, courseMemberships.courseId))
-    .where(and(eq(courseMemberships.userId, userId), eq(courses.isArchived, false)))
+    .where(
+      and(
+        eq(courseMemberships.userId, userId),
+        isNull(courseMemberships.removedAt),
+        eq(courses.isArchived, false)
+      )
+    )
     .orderBy(asc(courses.createdAt))
 
   if (raw) {
@@ -71,7 +83,10 @@ export async function resolveCourseIdForUser(
 
   if (memberships.length > 0) return memberships[0].courseId
 
-  return resolveCourseId(raw)
+  const user = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+  if (isAdminUser(user[0])) return resolveCourseId(raw)
+
+  return null
 }
 
 export async function listSections(courseId: string) {

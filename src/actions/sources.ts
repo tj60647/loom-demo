@@ -10,7 +10,7 @@ import {
   sourceScores,
   users,
 } from "@/db/schema"
-import { and, asc, eq, inArray } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { after } from "next/server"
 import { authOptions, isAdminUser } from "@/lib/auth"
@@ -689,7 +689,9 @@ export async function getSourceFile(sourceId: string) {
     const memberships = await db
       .select({ courseId: courseMemberships.courseId })
       .from(courseMemberships)
-      .where(eq(courseMemberships.userId, session.user.id))
+      .where(
+        and(eq(courseMemberships.userId, session.user.id), isNull(courseMemberships.removedAt))
+      )
 
     if (memberships.length === 0) throw new Error("Not found")
 

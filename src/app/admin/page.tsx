@@ -1,4 +1,4 @@
-import { addAllowedEmail, getRoster, removeAllowedEmail } from "@/actions/admin"
+import { addAllowedEmail, getRoster, removeAllowedEmail, removeFromRoster } from "@/actions/admin"
 import { assignMemberSection } from "@/actions/courses"
 import { firstParam, getCourse, listSections, resolveCourseId, resolveSectionId } from "@/lib/courses"
 import InviteLearners from "@/components/admin/InviteLearners"
@@ -49,9 +49,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <section className="card" style={{ marginBottom: "24px" }}>
         <h2>Invite learners</h2>
         <p className="hint" style={{ marginTop: "6px" }}>
-          Sign-in succeeds only for an email on this roster. A learner joins the course the first
-          time they sign in with that GitHub email, landing in whichever section you gave them
-          here — you can move them afterwards.
+          Sign-in succeeds for anyone invited to or enrolled in a course. A learner joins this
+          course the first time they sign in with the GitHub email you invite here, landing in
+          whichever section you gave them — you can move them afterwards.
         </p>
         <InviteLearners courseId={courseId} sections={courseSections} />
       </section>
@@ -123,20 +123,28 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     Open Loom
                   </a>
                 ) : null}
-                {person.invited ? (
+                {person.userId ? (
+                  <form action={removeFromRoster}>
+                    <input type="hidden" name="courseId" value={courseId} />
+                    <input type="hidden" name="userId" value={person.userId} />
+                    <button className="btn ghost mini" type="submit">
+                      Remove from course
+                    </button>
+                  </form>
+                ) : (
                   <form action={removeAllowedEmail}>
                     <input type="hidden" name="courseId" value={courseId} />
                     <input type="hidden" name="email" value={person.email} />
                     <button className="btn ghost mini" type="submit">
-                      {person.status === "pending" ? "Withdraw invitation" : "Remove from roster"}
+                      Withdraw invitation
                     </button>
                   </form>
-                ) : null}
+                )}
               </div>
-              {person.status === "enrolled" && person.invited && (
+              {person.status === "enrolled" && (
                 <p className="hint" style={{ fontSize: "12px", marginTop: "8px", marginBottom: 0 }}>
-                  Removing them from the roster blocks future sign-ins; it does not delete the work
-                  they have already done.
+                  Removing them ends their access to this course only — other courses are untouched,
+                  and their work is kept. Re-inviting them brings it all back.
                 </p>
               )}
             </div>

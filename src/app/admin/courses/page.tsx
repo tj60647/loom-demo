@@ -16,7 +16,7 @@ import {
 import { checkAdmin } from "@/actions/admin"
 import { db } from "@/db"
 import { courseMemberships, sections } from "@/db/schema"
-import { asc } from "drizzle-orm"
+import { asc, isNull } from "drizzle-orm"
 import { listCourses, firstParam } from "@/lib/courses"
 
 type CoursesPageSearchParams = {
@@ -36,7 +36,10 @@ export default async function AdminCoursesPage({
   const [allCourses, allSections, allMemberships, readingsByCourse] = await Promise.all([
     listCourses({ includeArchived: true }),
     db.select().from(sections).orderBy(asc(sections.name)),
-    db.select({ courseId: courseMemberships.courseId, sectionId: courseMemberships.sectionId }).from(courseMemberships),
+    db
+      .select({ courseId: courseMemberships.courseId, sectionId: courseMemberships.sectionId })
+      .from(courseMemberships)
+      .where(isNull(courseMemberships.removedAt)),
     getReadingsByCourse(),
   ])
 

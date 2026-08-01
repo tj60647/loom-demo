@@ -79,8 +79,14 @@ export const courseMemberships = pgTable(
     sectionId: text("sectionId").references(() => sections.id, {
       onDelete: "set null",
     }),
+    // Not yet read anywhere — authorization is users.role. Kept for the
+    // per-course instructor permissions that sections will eventually need.
     role: text("role").default("LEARNER").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
+    // Soft-remove: set when an instructor removes the person from the course.
+    // The row (and all their work) survives so re-inviting reinstates them;
+    // rosters, aggregates and the sign-in gate treat the membership as ended.
+    removedAt: timestamp("removedAt"),
   },
   (membership) => ({
     compoundKey: primaryKey({ columns: [membership.courseId, membership.userId] }),

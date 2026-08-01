@@ -1,10 +1,10 @@
 "use server"
 
 import { db } from "@/db"
-import { users, concepts, bytes, edges, courseMemberships, courseAllowedEmails, sections } from "@/db/schema"
-import { and, eq, inArray, sql } from "drizzle-orm"
+import { users, concepts, bytes, edges, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
+import { and, eq, inArray, isNull, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
-import { authOptions, isAdminUser } from "@/lib/auth"
+import { authOptions, emailHasAppAccess, isAdminUser } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 import { resolveCourseId, resolveSectionId } from "@/lib/courses"
 
@@ -32,12 +32,11 @@ async function getMemberIds(courseId: string, sectionId?: string | null) {
     .select({ userId: courseMemberships.userId })
     .from(courseMemberships)
     .where(
-      sectionId
-        ? and(
-            eq(courseMemberships.courseId, courseId),
-            eq(courseMemberships.sectionId, sectionId)
-          )
-        : eq(courseMemberships.courseId, courseId)
+      and(
+        eq(courseMemberships.courseId, courseId),
+        isNull(courseMemberships.removedAt),
+        sectionId ? eq(courseMemberships.sectionId, sectionId) : undefined
+      )
     )
 
   return rows.map((row) => row.userId)
@@ -55,12 +54,11 @@ export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: s
     .select({ userId: courseMemberships.userId, sectionId: courseMemberships.sectionId })
     .from(courseMemberships)
     .where(
-      sectionId
-        ? and(
-            eq(courseMemberships.courseId, courseId),
-            eq(courseMemberships.sectionId, sectionId)
-          )
-        : eq(courseMemberships.courseId, courseId)
+      and(
+        eq(courseMemberships.courseId, courseId),
+        isNull(courseMemberships.removedAt),
+        sectionId ? eq(courseMemberships.sectionId, sectionId) : undefined
+      )
     )
 
   if (memberships.length === 0) {
@@ -351,6 +349,45 @@ export async function removeAllowedEmail(formData: FormData) {
   await db
     .delete(courseAllowedEmails)
     .where(and(eq(courseAllowedEmails.courseId, courseId), eq(courseAllowedEmails.email, email)))
+  revalidatePath("/admin")
+}
+
+/**
+ * Remove an enrolled person from one course.
+ *
+ * Ends the membership (soft — removedAt, so their work survives and a
+ * re-invitation reinstates them with it) and withdraws the invitation so they
+ * cannot re-enrol themselves. Scoped to this course by design: their access to
+ * other courses is untouched. Only when this was their last source of access
+ * anywhere do we also revoke live sessions, so that losing all authorization
+ * takes effect now rather than at session expiry.
+ */
+export async function removeFromRoster(formData: FormData) {
+  await checkAdmin()
+
+  const courseIdRaw = formData.get("courseId")
+  const courseId = await resolveCourseId(typeof courseIdRaw === "string" ? courseIdRaw : null)
+  if (!courseId) return
+
+  const userIdRaw = formData.get("userId")
+  if (typeof userIdRaw !== "string" || !userIdRaw) return
+
+  const user = await db.select().from(users).where(eq(users.id, userIdRaw)).limit(1)
+  if (user.length === 0) return
+  const email = user[0].email.toLowerCase().trim()
+
+  await db
+    .update(courseMemberships)
+    .set({ removedAt: new Date() })
+    .where(and(eq(courseMemberships.courseId, courseId), eq(courseMemberships.userId, userIdRaw)))
+  await db
+    .delete(courseAllowedEmails)
+    .where(and(eq(courseAllowedEmails.courseId, courseId), eq(courseAllowedEmails.email, email)))
+
+  if (!(await emailHasAppAccess(email))) {
+    await db.delete(sessions).where(eq(sessions.userId, userIdRaw))
+  }
+
   revalidatePath("/admin")
 }
 

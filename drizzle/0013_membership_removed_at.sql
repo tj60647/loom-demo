@@ -1,0 +1,1 @@
+ALTER TABLE "course_membership" ADD COLUMN "removedAt" timestamp;
