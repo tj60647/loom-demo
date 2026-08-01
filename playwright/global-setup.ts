@@ -22,8 +22,22 @@ async function globalSetup(config: FullConfig) {
   }
   
   // Save the state (which includes the session cookie) to the storage path
-  await requestContext.storageState({ path: 'playwright/.auth/user.json' });
+  const statePath = 'playwright/.auth/user.json';
+  await requestContext.storageState({ path: statePath });
   await requestContext.dispose();
+
+  // Mark the first-run walkthrough as seen. Every test context starts with
+  // empty localStorage, so without this the walkthrough's scrim opens over
+  // every page and swallows the first click — tests fail on navigation that
+  // never happened. The legacy (pre-per-user) key is enough: the component
+  // adopts it into the per-user key on first render and stays closed.
+  const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  const seen = [{ name: 'loom_has_seen_walkthrough', value: 'true' }];
+  state.origins = [
+    { origin: 'http://localhost:3000', localStorage: seen },
+    { origin: 'http://localhost:3100', localStorage: seen },
+  ];
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 }
 
 export default globalSetup;

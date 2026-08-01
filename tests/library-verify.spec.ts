@@ -39,11 +39,14 @@ test.describe('Library verification', () => {
     await expect(firstCard.locator('img')).toBeVisible();
     // Counted, never scored — the card reports the student's own acts.
     await expect(firstCard.locator('.shelftally')).toBeVisible();
+    // Wait out the tally re-render (same trap tests/helpers.ts documents):
+    // clicking while the loom data lands detaches the card mid-click.
+    await expect(firstCard.locator('.shelftally')).not.toHaveText('…', { timeout: 15000 });
 
     await page.screenshot({ path: 'test-results/shelf.png', fullPage: true });
 
     await firstCard.click();
-    await expect(page).toHaveURL(/\/reading\//);
+    await expect(page).toHaveURL(/\/reading\//, { timeout: 15000 });
     // Download moved off the library card onto the reading's scope bar.
     await expect(page.getByRole('link', { name: /Download PDF/i })).toBeVisible();
     // Scoped to the workbench nav: "open" also matches the help button and the

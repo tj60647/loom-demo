@@ -211,6 +211,17 @@ is not an option here — the map is the artifact the chalk talk is built from.
 
 ## 2 · Strategy B — passes (map history and versions)
 
+> **Superseded in part (TJ, 31 July 2026).** Built as **parallel sibling maps**, not
+> linear passes: a student keeps several named maps per scope, any of them editable,
+> each holding `{ name, essence, read, tiers }` plus its own `views` row (`map:<id>`).
+> §B.2's append-only/sealed-head model and the `‹ ›` bar were deliberately not built —
+> the workflow's "one or more maps of the same reading, each expressing a different
+> understanding" is a set of siblings, not a timeline; `graph_event` remains the
+> timeline. §B.3's core argument (a tier is per-map, not per-concept) and §B.4's
+> gotchas (import remints tier keys; reset clears maps; scoped events) are ratified
+> and implemented — see spec §3 Map / §6 and migration `0012_maps.sql`. The essence
+> sentence per map is an addition this document predates. §A stands unchanged.
+
 ### B.1 Two histories, deliberately different
 
 The app already has a history — `graph_event` / "the cloth, over time"

@@ -15,7 +15,7 @@ export default function ReadTab() {
   // scoped graph's edges have both ends in scope by construction, so every
   // concept lookup below resolves. Bridges are named but not drawn: they are
   // 02 Throw's material, and drawing half a thread would be a lie.
-  const { scopedState: state, scoped, scope, setRead, flushRead, flash, studentName } = useLoom()
+  const { scopedState: state, scoped, scope, activeMap, setMapRead, setMapEssence, flushMapText, ensureActiveMap, flash, studentName } = useLoom()
   const wholeWeave = isWholeWeave(scope)
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
   const [drafted, setDrafted] = useState("")
@@ -175,15 +175,26 @@ export default function ReadTab() {
   }
 
   const handleCopyRead = () => {
-    const txt = (state.read || "").trim()
-    if (!txt) { flash("your read is empty — write a short paragraph first"); return }
-    const out = (studentName ? studentName + " — " : "") + "my read of the cloth\n\n" + state.read
+    const read = (activeMap?.read || "").trim()
+    const essence = (activeMap?.essence || "").trim()
+    if (!read && !essence) { flash("your read is empty — write a short paragraph first"); return }
+    const out = [
+      (studentName ? studentName + " — " : "") + (activeMap?.name || "my read of the cloth"),
+      essence,
+      read,
+    ].filter(Boolean).join("\n\n")
     copyWithFeedback(out, "read copied to clipboard")
   }
 
   const handleMapKit = () => {
     if (!state.concepts.length) { flash("nothing to map yet — lay some warp first"); return }
-    copyWithFeedback(buildMapKit(state.concepts, state.edges, studentName), "map kit copied — take it to paper or Figma")
+    copyWithFeedback(
+      buildMapKit(
+        state.concepts, state.edges, studentName,
+        activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
+      ),
+      "map kit copied — take it to paper or Figma"
+    )
   }
 
   // v14's tripleHtml + .readitem. Sizes come from globals.css (.threadhead is
@@ -411,21 +422,23 @@ export default function ReadTab() {
         </div>
 
         <div className="card">
-          <h2>Your read</h2>
-          <p className="hint">One short paragraph, in your own words: what is this reading about, and what holds it together? The tool never writes it for you.</p>
-          {!wholeWeave && (
-            <p className="ghostnote" style={{ marginTop: -8, marginBottom: 10 }}>
-              This is still your read <i>across everything</i> — the same text you would see on any reading.
-              A read of its own per reading arrives with map passes.
-            </p>
-          )}
-          <p className="readq">In a sentence — what is this reading <i>about</i>?</p>
+          <h2>Your read {activeMap && <span className="n">of &ldquo;{activeMap.name}&rdquo; — same as 04 · Map</span>}</h2>
+          <p className="hint">One short paragraph, in your own words: what is this {wholeWeave ? "weave" : "reading"} about, and what holds it together? The tool never writes it for you. Essence and paragraph belong to your current map — keep several maps and each keeps its own.</p>
+          <p className="readq">In a sentence — what is this {wholeWeave ? "weave" : "reading"} <i>about</i>?</p>
+          <input
+            id="readEssence"
+            placeholder="One line — the essence."
+            value={activeMap?.essence ?? ""}
+            onChange={(e) => { const v = e.target.value; void ensureActiveMap().then(m => setMapEssence(m.id, v)) }}
+            onBlur={flushMapText}
+            style={{ marginBottom: 8 }}
+          />
           <textarea
             id="yourRead"
             placeholder="Write your read here — a paragraph is enough. Trace the prompts on the left first if you want your threads laid out to work from."
-            value={state.read}
-            onChange={(e) => setRead(e.target.value)}
-            onBlur={flushRead}
+            value={activeMap?.read ?? ""}
+            onChange={(e) => { const v = e.target.value; void ensureActiveMap().then(m => setMapRead(m.id, v)) }}
+            onBlur={flushMapText}
           />
           <div className="drafted" id="readDrafted">{drafted}</div>
           <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>

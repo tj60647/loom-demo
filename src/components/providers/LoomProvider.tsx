@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { useParams } from "next/navigation"
-import type { Byte, CardTableView, Concept, Edge, LoomState, Tier } from "@/lib/types"
+import type { Byte, CardTableView, Concept, Edge, LoomMap, LoomState, LoomViews, Tier } from "@/lib/types"
 import { asLoomState, scopeOf, scopedGraph, soleSourceId, WHOLE_WEAVE, type Scope, type ScopedGraph } from "@/lib/scope"
 import { emptyViews, parseImport } from "@/lib/graphExport"
 import {
@@ -11,7 +11,8 @@ import {
   createConcept, updateConcept, deleteConcept,
   createByte, deleteByte, refileByte as refileByteAction, attributeBytes as attributeBytesAction,
   createEdge, updateEdge, deleteEdge,
-  saveRead, saveView,
+  saveView,
+  createMap as createMapAction, updateMap as updateMapAction, deleteMap as deleteMapAction,
   importGraph, resetGraph, loadWorkedExample,
 } from "@/actions/loom"
 
@@ -44,11 +45,34 @@ interface LoomContextType {
   addEdge: (fromId: string, toId: string, sentence: string) => Promise<Edge>
   editEdge: (id: string, data: Partial<{handle: string, sentence: string}>) => Promise<void>
   removeEdge: (id: string) => Promise<void>
-  setRead: (readState: string) => void
-  /** Push any pending debounced read save immediately (call on blur). */
-  flushRead: () => void
-  /** Persist a student gesture on the card table (drag end / bend end / clear). */
-  setCardTable: (next: CardTableView) => void
+  /** All of the student's maps, capture order. */
+  maps: LoomMap[]
+  /** Maps whose scopeKey is the current scope's, capture order. */
+  scopeMaps: LoomMap[]
+  /**
+   * The map being worked on in this scope: the student's pick, else the most
+   * recently updated, else null when the scope has no map yet.
+   */
+  activeMap: LoomMap | null
+  selectMap: (id: string) => void
+  /** Create a map in the current scope (default name "Map N") and select it. */
+  addMap: (name?: string) => Promise<LoomMap>
+  renameMap: (id: string, name: string) => void
+  removeMap: (id: string) => Promise<void>
+  /** Replace a map's whole tier record (one write — "make all primary" included). */
+  setMapTiers: (id: string, tiers: Record<string, Tier>) => Promise<void>
+  setMapRead: (id: string, read: string) => void
+  setMapEssence: (id: string, essence: string) => void
+  /** Push pending debounced map text (name/read/essence) saves immediately (blur). */
+  flushMapText: () => void
+  /** Persist a student gesture on a view's geometry, keyed 'cardTable' | 'map:<id>'. */
+  setView: (key: string, next: CardTableView) => void
+  /**
+   * The active map, creating "Map N" first when the scope has none — so the
+   * first tier chip / drag / keystroke in a fresh scope just works. The create
+   * is itself a student gesture's consequence, and it is flashed.
+   */
+  ensureActiveMap: () => Promise<LoomMap>
   importFromText: (raw: string) => Promise<void>
   resetAll: () => Promise<void>
   loadExample: () => Promise<void>
@@ -63,7 +87,7 @@ interface LoomContextType {
 
 const LoomContext = createContext<LoomContextType | null>(null)
 
-const blankState = (): LoomState => ({ concepts: [], bytes: [], edges: [], read: "", views: emptyViews() })
+const blankState = (): LoomState => ({ concepts: [], bytes: [], edges: [], maps: [], read: "", views: emptyViews() })
 
 export function LoomProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession()
@@ -85,6 +109,31 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   )
   const scoped = useMemo(() => scopedGraph(state, scope), [state, scope])
   const scopedState = useMemo(() => asLoomState(state, scoped), [state, scoped])
+
+  // Which map the student is working on, per scope. Client state only: it is a
+  // cursor, not an artifact. A dangling id (deleted map) falls through to the
+  // most-recently-updated default.
+  const [selectedByScope, setSelectedByScope] = useState<Record<string, string>>({})
+  const scopeMaps = useMemo(
+    () => state.maps.filter((m) => m.scopeKey === scope.key),
+    [state.maps, scope.key]
+  )
+  const activeMap = useMemo(() => {
+    const chosen = scopeMaps.find((m) => m.id === selectedByScope[scope.key])
+    if (chosen) return chosen
+    if (!scopeMaps.length) return null
+    return [...scopeMaps].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0]
+  }, [scopeMaps, selectedByScope, scope.key])
+
+  // The mirror: the oldest whole-weave map. Its read/tiers echo into the legacy
+  // state.read / concept.tier so the expand-phase columns track without reloads.
+  const mirrorId = useMemo(() => {
+    const weave = state.maps.filter((m) => m.scopeKey === "")
+    if (!weave.length) return null
+    return [...weave].sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)
+    )[0].id
+  }, [state.maps])
 
   const flashTimer = useRef<number | undefined>(undefined)
   const flash = useCallback((msg: string) => {
@@ -165,13 +214,19 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       concepts: s.concepts.filter(c => c.id !== id),
       bytes: s.bytes.filter(b => b.conceptId !== id),
       edges: s.edges.filter(e => e.fromId !== id && e.toId !== id),
-      views: {
-        cardTable: {
-          ...s.views.cardTable,
-          positions: Object.fromEntries(Object.entries(s.views.cardTable.positions).filter(([k]) => k !== id)),
-          order: s.views.cardTable.order?.filter((cid) => cid !== id),
-        },
-      },
+      maps: s.maps.map(m =>
+        id in m.tiers
+          ? { ...m, tiers: Object.fromEntries(Object.entries(m.tiers).filter(([k]) => k !== id)) }
+          : m
+      ),
+      views: Object.fromEntries(
+        Object.entries(s.views).map(([key, v]) => [key, {
+          ...v,
+          positions: Object.fromEntries(Object.entries(v.positions).filter(([k]) => k !== id)),
+          order: v.order?.filter((cid) => cid !== id),
+          pins: v.pins?.filter((cid) => cid !== id),
+        }])
+      ) as LoomViews,
     }))
     try {
       await deleteConcept(id)
@@ -281,12 +336,12 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     setState(s => ({
       ...s,
       edges: s.edges.filter(e => e.id !== id),
-      views: {
-        cardTable: {
-          ...s.views.cardTable,
-          bends: Object.fromEntries(Object.entries(s.views.cardTable.bends).filter(([k]) => k !== id)),
-        },
-      },
+      views: Object.fromEntries(
+        Object.entries(s.views).map(([key, v]) => [key, {
+          ...v,
+          bends: Object.fromEntries(Object.entries(v.bends).filter(([k]) => k !== id)),
+        }])
+      ) as LoomViews,
     }))
     try {
       await deleteEdge(id)
@@ -296,79 +351,240 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // "Your read" persists debounced; flushRead fires the pending save (on blur)
-  // so red line #5 holds against a quick tab close.
-  const readTimer = useRef<number | undefined>(undefined)
-  const pendingRead = useRef<string | null>(null)
-  const persistRead = useCallback(() => {
-    if (pendingRead.current === null) return
-    const text = pendingRead.current
-    pendingRead.current = null
-    saveRead(text).then(() => flash("saved")).catch((e) => {
-      console.error("Failed to save read", e)
-      flash("read not saved — try again")
-    })
-  }, [flash])
+  // --- MAPS ---
 
-  const setRead = (readState: string) => {
-    setState(s => ({ ...s, read: readState }))
-    pendingRead.current = readState
-    window.clearTimeout(readTimer.current)
-    readTimer.current = window.setTimeout(persistRead, 700)
+  const selectMap = (id: string) => {
+    setSelectedByScope((s) => ({ ...s, [scope.key]: id }))
   }
 
-  const flushRead = useCallback(() => {
-    window.clearTimeout(readTimer.current)
-    persistRead()
-  }, [persistRead])
+  // Optimistic create WITH AN ID ALIAS. The rename input, the essence field
+  // and the tier chips bind to the active map the moment it exists, and the
+  // create can take seconds — so the temp row must appear (and be selected)
+  // instantly, or every gesture in that window lands on the PREVIOUSLY active
+  // map (it renamed a student's real map in testing). Writes made against the
+  // temp id wait for the create and are re-addressed to the server's id; local
+  // edits made mid-flight are newer than the just-born server row and are kept
+  // over it on swap.
+  const mapCreates = useRef<Map<string, Promise<string>>>(new Map())
+  const mapAlias = useRef<Map<string, string>>(new Map())
+  const resolveMapId = useCallback(async (id: string) => {
+    const inflight = mapCreates.current.get(id)
+    if (inflight) await inflight
+    return mapAlias.current.get(id) ?? id
+  }, [])
+
+  const addMap = async (name?: string) => {
+    const mapName = (name ?? `Map ${scopeMaps.length + 1}`).trim() || "Map"
+    const tempId = crypto.randomUUID()
+    const now = new Date()
+    const temp: LoomMap = {
+      id: tempId, courseId: null, userId: session!.user!.id,
+      scopeKey: scope.key, name: mapName, read: "", essence: "", tiers: {},
+      createdAt: now, updatedAt: now,
+    }
+    setState(s => ({ ...s, maps: [...s.maps, temp] }))
+    setSelectedByScope(s => ({ ...s, [scope.key]: tempId }))
+    const creating = (async () => {
+      try {
+        const saved = await createMapAction({ scopeKey: scope.key, name: mapName })
+        mapAlias.current.set(tempId, saved.id)
+        setState(s => {
+          const views = { ...s.views }
+          const tempKey = `map:${tempId}`
+          if (views[tempKey]) {
+            views[`map:${saved.id}`] = views[tempKey]
+            delete views[tempKey]
+          }
+          return {
+            ...s,
+            maps: s.maps.map(m =>
+              m.id === tempId
+                ? { ...m, id: saved.id, courseId: saved.courseId, createdAt: saved.createdAt }
+                : m
+            ),
+            views,
+          }
+        })
+        setSelectedByScope(s => (s[scope.key] === tempId ? { ...s, [scope.key]: saved.id } : s))
+        savedOk()
+        return saved.id
+      } catch (e) {
+        setState(s => {
+          const views = { ...s.views }
+          delete views[`map:${tempId}`]
+          return { ...s, maps: s.maps.filter(m => m.id !== tempId), views }
+        })
+        setSelectedByScope(s => {
+          if (s[scope.key] !== tempId) return s
+          const next = { ...s }
+          delete next[scope.key]
+          return next
+        })
+        throw e
+      } finally {
+        mapCreates.current.delete(tempId)
+      }
+    })()
+    mapCreates.current.set(tempId, creating)
+    // Resolve only once the map is real, so ensureActiveMap-mediated gestures
+    // are handed a server-backed id; the UI meanwhile works on the temp row.
+    const realId = await creating
+    return { ...temp, id: realId }
+  }
+
+  // First gesture in a fresh scope mints its map; concurrent gestures share the
+  // one in-flight create rather than minting siblings.
+  const pendingCreate = useRef<Map<string, Promise<LoomMap>>>(new Map())
+  const ensureActiveMap = async (): Promise<LoomMap> => {
+    if (activeMap) return activeMap
+    const key = scope.key
+    const inflight = pendingCreate.current.get(key)
+    if (inflight) return inflight
+    const creating = addMap()
+      .then((m) => {
+        flash(`new map started — "${m.name}"`)
+        return m
+      })
+      .finally(() => pendingCreate.current.delete(key))
+    pendingCreate.current.set(key, creating)
+    return creating
+  }
+
+  const setMapTiers = async (id: string, tiers: Record<string, Tier>) => {
+    const stored: Record<string, Tier> = {}
+    Object.entries(tiers).forEach(([cid, t]) => { if (t) stored[cid] = t })
+    setState(s => ({
+      ...s,
+      maps: s.maps.map(m => m.id === id ? { ...m, tiers: stored, updatedAt: new Date() } : m),
+      ...(id === mirrorId
+        ? { concepts: s.concepts.map(c => ({ ...c, tier: stored[c.id] ?? "" })) }
+        : {}),
+    }))
+    try {
+      await updateMapAction(await resolveMapId(id), { tiers: stored })
+      savedOk()
+    } catch (e) {
+      await resync(e)
+    }
+  }
+
+  // Map text (name / read / essence) persists debounced per map, merged so a
+  // read keystroke and an essence keystroke inside the window land as one save.
+  const mapTextTimer = useRef<number | undefined>(undefined)
+  const pendingMapText = useRef<Map<string, Partial<{ name: string; read: string; essence: string }>>>(new Map())
+  const persistMapText = useCallback(() => {
+    const pending = pendingMapText.current
+    if (!pending.size) return
+    pendingMapText.current = new Map()
+    pending.forEach((data, id) => {
+      resolveMapId(id)
+        .then((realId) => updateMapAction(realId, data))
+        .then(() => flash("saved"))
+        .catch((e) => {
+          console.error("Failed to save map", e)
+          flash("map not saved — try again")
+        })
+    })
+  }, [flash, resolveMapId])
+
+  const queueMapText = (id: string, data: Partial<{ name: string; read: string; essence: string }>) => {
+    setState(s => ({
+      ...s,
+      maps: s.maps.map(m => m.id === id ? { ...m, ...data, updatedAt: new Date() } : m),
+      // Mirror echo: the legacy read column tracks the mirror map's paragraph.
+      ...(id === mirrorId && data.read !== undefined ? { read: data.read } : {}),
+    }))
+    const current = pendingMapText.current.get(id) ?? {}
+    pendingMapText.current.set(id, { ...current, ...data })
+    window.clearTimeout(mapTextTimer.current)
+    mapTextTimer.current = window.setTimeout(persistMapText, 700)
+  }
+
+  const renameMap = (id: string, name: string) => queueMapText(id, { name })
+  const setMapRead = (id: string, read: string) => queueMapText(id, { read })
+  const setMapEssence = (id: string, essence: string) => queueMapText(id, { essence })
+
+  const flushMapText = useCallback(() => {
+    window.clearTimeout(mapTextTimer.current)
+    persistMapText()
+  }, [persistMapText])
+
+  const removeMap = async (id: string) => {
+    setState(s => {
+      const views = { ...s.views }
+      delete views[`map:${id}`]
+      return { ...s, maps: s.maps.filter(m => m.id !== id), views }
+    })
+    try {
+      await deleteMapAction(await resolveMapId(id))
+      // Deleting the mirror re-points the legacy columns server-side; reload
+      // rather than replicate that bookkeeping optimistically.
+      setState(await getUserLoomData())
+      flash("map removed")
+    } catch (e) {
+      await resync(e)
+    }
+  }
 
   // Blur flushes inside the app; a hidden tab is the closest reliable signal
   // before a close. (A server-action fetch during full unload can still be
   // aborted by the browser — the debounce window is the residual risk.)
   useEffect(() => {
     const onHidden = () => {
-      if (document.visibilityState === "hidden") flushRead()
+      if (document.visibilityState === "hidden") flushMapText()
     }
     document.addEventListener("visibilitychange", onHidden)
-    window.addEventListener("pagehide", flushRead)
+    window.addEventListener("pagehide", flushMapText)
     return () => {
       document.removeEventListener("visibilitychange", onHidden)
-      window.removeEventListener("pagehide", flushRead)
+      window.removeEventListener("pagehide", flushMapText)
     }
-  }, [flushRead])
+  }, [flushMapText])
 
-  // Card-table geometry: only called from student gestures (drag end, bend end,
-  // de-tier cleanup) — auto-layout stays ephemeral in the component.
-  const viewTimer = useRef<number | undefined>(undefined)
-  const pendingView = useRef<CardTableView | null>(null)
-  const setCardTable = (next: CardTableView) => {
-    setState(s => ({ ...s, views: { cardTable: next } }))
-    pendingView.current = next
-    window.clearTimeout(viewTimer.current)
-    viewTimer.current = window.setTimeout(() => {
-      const data = pendingView.current
-      pendingView.current = null
+  // View geometry: only called from student gestures (drag end, bend end,
+  // de-tier cleanup) — auto-layout stays ephemeral in the component. Debounced
+  // PER KEY, and merged into the views record rather than replacing it, so one
+  // map's drag can never clobber another's stored arrangement.
+  const viewTimers = useRef<Map<string, number>>(new Map())
+  const pendingViews = useRef<Map<string, CardTableView>>(new Map())
+  const setView = (key: string, next: CardTableView) => {
+    setState(s => ({ ...s, views: { ...s.views, [key]: next } }))
+    pendingViews.current.set(key, next)
+    const existing = viewTimers.current.get(key)
+    if (existing !== undefined) window.clearTimeout(existing)
+    viewTimers.current.set(key, window.setTimeout(async () => {
+      viewTimers.current.delete(key)
+      const data = pendingViews.current.get(key)
+      pendingViews.current.delete(key)
       if (!data) return
-      saveView("cardTable", data).catch((e) => {
-        console.error("Failed to save card table view", e)
+      try {
+        // Geometry drawn on a map that is still being created persists under
+        // the server's id once it exists.
+        const mapKey = /^map:(.+)$/.exec(key)
+        const persistKey = mapKey ? `map:${await resolveMapId(mapKey[1])}` : key
+        await saveView(persistKey, data)
+      } catch (e) {
+        console.error("Failed to save view", e)
         flash("arrangement not saved — try again")
-      })
-    }, 500)
+      }
+    }, 500))
   }
 
   // A replace-the-graph operation must not race a stale debounced save: a
-  // pending view/read write landing after the replacement would resurrect
+  // pending view/map write landing after the replacement would resurrect
   // pre-replacement state on the server.
   const cancelPendingSaves = useCallback(() => {
-    window.clearTimeout(readTimer.current)
-    pendingRead.current = null
-    window.clearTimeout(viewTimer.current)
-    pendingView.current = null
+    viewTimers.current.forEach((timer) => window.clearTimeout(timer))
+    viewTimers.current.clear()
+    pendingViews.current.clear()
+    window.clearTimeout(mapTextTimer.current)
+    pendingMapText.current.clear()
   }, [])
 
   const importFromText = async (raw: string) => {
     const parsed = parseImport(raw) // throws with a friendly message on bad input
     cancelPendingSaves()
+    setSelectedByScope({})
     try {
       const data = await importGraph(parsed)
       setState(data)
@@ -383,6 +599,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const resetAll = async () => {
     cancelPendingSaves()
+    setSelectedByScope({})
     await resetGraph()
     setState(blankState())
     flash("cleared — the history of your weaving is kept")
@@ -390,6 +607,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const loadExample = async () => {
     cancelPendingSaves()
+    setSelectedByScope({})
     const data = await loadWorkedExample()
     setState(data)
     flash("worked example loaded — explore it, then reset")
@@ -402,7 +620,10 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       addConcept, editConcept, removeConcept,
       addByte, removeByte, refileByte, attributeBytes,
       addEdge, editEdge, removeEdge,
-      setRead, flushRead, setCardTable,
+      maps: state.maps, scopeMaps, activeMap,
+      selectMap, addMap, renameMap, removeMap,
+      setMapTiers, setMapRead, setMapEssence, flushMapText,
+      setView, ensureActiveMap,
       importFromText, resetAll, loadExample,
       flashMsg, flash,
       undoStack, setUndoStack, redoStack, setRedoStack

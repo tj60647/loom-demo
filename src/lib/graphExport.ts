@@ -3,7 +3,7 @@
 // that round-trips so no arrangement is lost, but that no consumer must read.
 // Red line #5: the export is the student's artifact, always available.
 
-import type { CardTableView, Concept, LoomExport, LoomState, Tier } from "./types"
+import type { CardTableView, Concept, LoomExport, LoomState, LoomViews, Tier } from "./types"
 
 const TIERS = new Set(["", "p", "s", "t", "x"])
 
@@ -51,6 +51,21 @@ export function buildExport(state: LoomState, student: string): LoomExport {
         handle: e.handle || "",
       })),
       read: state.read || "",
+      // The student's maps — additive; `concepts[].tier` and `read` above stay
+      // the mirror of the oldest whole-weave map, so pre-maps consumers still
+      // see a sorted graph.
+      ...(state.maps.length
+        ? {
+            maps: state.maps.map((m) => ({
+              id: m.id,
+              scopeKey: m.scopeKey,
+              name: m.name,
+              essence: m.essence,
+              read: m.read,
+              tiers: m.tiers,
+            })),
+          }
+        : {}),
     },
     views: {
       cardTable: {
@@ -59,18 +74,63 @@ export function buildExport(state: LoomState, student: string): LoomExport {
         ...(state.views.cardTable.order?.length ? { order: state.views.cardTable.order } : {}),
         ...(state.views.cardTable.pins?.length ? { pins: state.views.cardTable.pins } : {}),
       },
+      ...(() => {
+        const mapViews: NonNullable<LoomExport["views"]["maps"]> = {}
+        state.maps.forEach((m) => {
+          const v = state.views[`map:${m.id}`]
+          if (!v) return
+          if (!Object.keys(v.positions).length && !Object.keys(v.bends).length && !v.order?.length && !v.pins?.length) return
+          mapViews[m.id] = {
+            positions: v.positions,
+            bends: v.bends,
+            ...(v.order?.length ? { order: v.order } : {}),
+            ...(v.pins?.length ? { pins: v.pins } : {}),
+          }
+        })
+        return Object.keys(mapViews).length ? { maps: mapViews } : {}
+      })(),
     },
   }
 }
 
 /** Markdown export (spec §3 Global, production) — for Obsidian / notes / agents. */
-export function buildMarkdown(state: LoomState, student: string): string {
+export function buildMarkdown(
+  state: LoomState,
+  student: string,
+  titleOfSource?: (id: string) => string
+): string {
   const label = (id: string) => state.concepts.find((c) => c.id === id)?.label ?? "?"
   const lines: string[] = []
   lines.push(`# Loom — ${student || "my weave"}`, "")
 
   if (state.read?.trim()) {
     lines.push("## My read", "", state.read.trim(), "")
+  }
+
+  // Each map is its own artifact: a named sorting of concepts within a scope,
+  // with a one-line essence and an interpretive paragraph.
+  if (state.maps.length) {
+    lines.push("## Maps", "")
+    const scopeLabel = (scopeKey: string) =>
+      scopeKey === ""
+        ? "your whole weave"
+        : scopeKey.split(",").map((id) => (titleOfSource ? titleOfSource(id) : id)).join(" + ")
+    const tierGroups: [Tier, string][] = [
+      ["p", "Primary"],
+      ["s", "Secondary"],
+      ["t", "Tertiary"],
+      ["x", "Left off the map"],
+    ]
+    state.maps.forEach((m) => {
+      lines.push(`### ${m.name} — ${scopeLabel(m.scopeKey)}`, "")
+      if (m.essence.trim()) lines.push(`_${m.essence.trim()}_`, "")
+      if (m.read.trim()) lines.push(m.read.trim(), "")
+      tierGroups.forEach(([tier, name]) => {
+        const group = state.concepts.filter((c) => m.tiers[c.id] === tier)
+        if (!group.length) return
+        lines.push(`**${name}:** ${group.map((c) => c.label).join(" · ")}`, "")
+      })
+    })
   }
 
   lines.push("## Concepts", "")
@@ -138,6 +198,10 @@ export type ParsedImport = {
   }[]
   edges: { key: string; fromKey: string; toKey: string; sentence: string; handle: string }[]
   cardTable: CardTableView // keyed by concept/edge *keys*, remapped server-side
+  /** Tiers keyed by concept *keys*; the server remints ids (like cardTable). */
+  maps: { key: string; scopeKey: string; name: string; essence: string; read: string; tiers: Record<string, Tier> }[]
+  /** Per-map geometry keyed by map *key*, inner keys concept/edge keys. */
+  mapViews: Record<string, CardTableView>
 }
 
 function str(v: unknown): string {
@@ -163,8 +227,11 @@ export function parseImport(raw: string): ParsedImport {
   if (!looksLikeExport) throw new Error("That file did not parse as a loom export.")
 
   // §6 shape: { graph, views } — flatten to the v14-ish working shape first.
+  // Per-map geometry is captured before the flatten, since flattening replaces
+  // `data` with the graph's members.
   const views = (data.views ?? {}) as Record<string, unknown>
   const cardTableRaw = (views.cardTable ?? {}) as Record<string, unknown>
+  const mapViewsRaw = (views.maps && typeof views.maps === "object" ? views.maps : {}) as Record<string, unknown>
   if (data.graph && typeof data.graph === "object") {
     const g = data.graph as Record<string, unknown>
     data = {
@@ -251,39 +318,82 @@ export function parseImport(raw: string): ParsedImport {
   }
 
   const edgeKeys = new Set(edges.map((e) => e.key))
-  const positions: CardTableView["positions"] = {}
-  const bends: CardTableView["bends"] = {}
-  const rawPositions = (data.positions ?? {}) as Record<string, { x?: unknown; y?: unknown }>
-  const rawBends = (data.bends ?? {}) as Record<string, { dx?: unknown; dy?: unknown }>
-  Object.entries(rawPositions).forEach(([key, p]) => {
-    if (conceptKeys.has(key) && typeof p?.x === "number" && typeof p?.y === "number") {
-      positions[key] = { x: p.x, y: p.y }
+
+  // Defensive geometry parse, shared by the card table and each map's view:
+  // keep only known concept/edge keys, dedupe order and pins.
+  const parseGeometry = (raw: Record<string, unknown>): CardTableView => {
+    const positions: CardTableView["positions"] = {}
+    const bends: CardTableView["bends"] = {}
+    const rawPositions = (raw.positions ?? {}) as Record<string, { x?: unknown; y?: unknown }>
+    const rawBends = (raw.bends ?? {}) as Record<string, { dx?: unknown; dy?: unknown }>
+    Object.entries(rawPositions).forEach(([key, p]) => {
+      if (conceptKeys.has(key) && typeof p?.x === "number" && typeof p?.y === "number") {
+        positions[key] = { x: p.x, y: p.y }
+      }
+    })
+    Object.entries(rawBends).forEach(([key, b]) => {
+      if (edgeKeys.has(key) && typeof b?.dx === "number" && typeof b?.dy === "number") {
+        bends[key] = { dx: b.dx, dy: b.dy }
+      }
+    })
+    const dedupe = (value: unknown): string[] => {
+      const out: string[] = []
+      const seen = new Set<string>()
+      ;(Array.isArray(value) ? value : []).forEach((key) => {
+        if (typeof key !== "string" || !conceptKeys.has(key) || seen.has(key)) return
+        seen.add(key)
+        out.push(key)
+      })
+      return out
     }
-  })
-  Object.entries(rawBends).forEach(([key, b]) => {
-    if (edgeKeys.has(key) && typeof b?.dx === "number" && typeof b?.dy === "number") {
-      bends[key] = { dx: b.dx, dy: b.dy }
-    }
-  })
-  const rawOrder = Array.isArray(data.order) ? (data.order as unknown[]) : []
-  const order: string[] = []
-  const seenOrder = new Set<string>()
-  rawOrder.forEach((key) => {
-    if (typeof key !== "string" || !conceptKeys.has(key) || seenOrder.has(key)) return
-    seenOrder.add(key)
-    order.push(key)
+    // Pinned definitions round-trip like the rest of the card table: a student
+    // gesture, so losing it on export/import would lose arrangement work.
+    return { positions, bends, order: dedupe(raw.order), pins: dedupe(raw.pins) }
+  }
+
+  const cardTable = parseGeometry({
+    positions: data.positions,
+    bends: data.bends,
+    order: data.order,
+    pins: data.pins,
   })
 
-  // Pinned definitions round-trip like the rest of the card table: a student
-  // gesture, so losing it on export/import would lose arrangement work.
-  const rawPins = Array.isArray(data.pins) ? (data.pins as unknown[]) : []
-  const pins: string[] = []
-  const seenPins = new Set<string>()
-  rawPins.forEach((key) => {
-    if (typeof key !== "string" || !conceptKeys.has(key) || seenPins.has(key)) return
-    seenPins.add(key)
-    pins.push(key)
+  const rawMaps = Array.isArray(data.maps) ? (data.maps as Record<string, unknown>[]) : []
+  const maps: ParsedImport["maps"] = rawMaps.map((m, i) => {
+    const rawTiers = (m.tiers && typeof m.tiers === "object" ? m.tiers : {}) as Record<string, unknown>
+    const tiers: Record<string, Tier> = {}
+    Object.entries(rawTiers).forEach(([key, t]) => {
+      if (!conceptKeys.has(key)) return
+      const tier = asTier(t)
+      if (tier) tiers[key] = tier
+    })
+    return {
+      key: str(m.id) || `m-${i}`,
+      scopeKey: str(m.scopeKey),
+      name: str(m.name).trim().slice(0, 80) || `Map ${i + 1}`,
+      essence: str(m.essence),
+      read: str(m.read),
+      tiers,
+    }
   })
+  const mapKeys = new Set(maps.map((m) => m.key))
+  const mapViews: Record<string, CardTableView> = {}
+  Object.entries(mapViewsRaw).forEach(([mapKey, v]) => {
+    if (!mapKeys.has(mapKey) || !v || typeof v !== "object") return
+    mapViews[mapKey] = parseGeometry(v as Record<string, unknown>)
+  })
+
+  // A pre-maps file still describes one whole-weave map — its tiers, read and
+  // card table. Synthesize it exactly the way migration 0012 backfilled live
+  // rows, so an old export and an old database land in the same place.
+  if (!maps.length && (concepts.length || str(data.read))) {
+    const tiers: Record<string, Tier> = {}
+    concepts.forEach((c) => {
+      if (c.tier) tiers[c.key] = c.tier
+    })
+    maps.push({ key: "legacy-map-1", scopeKey: "", name: "Map 1", essence: "", read: str(data.read), tiers })
+    mapViews["legacy-map-1"] = cardTable
+  }
 
   return {
     student: str(data.student),
@@ -291,11 +401,13 @@ export function parseImport(raw: string): ParsedImport {
     concepts,
     bytes,
     edges,
-    cardTable: { positions, bends, order, pins },
+    cardTable,
+    maps,
+    mapViews,
   }
 }
 
-export function emptyViews(): { cardTable: CardTableView } {
+export function emptyViews(): LoomViews {
   return { cardTable: { positions: {}, bends: {} } }
 }
 

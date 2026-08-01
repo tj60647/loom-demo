@@ -7,11 +7,13 @@
 import { useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
+import { useReadings } from "@/components/providers/ReadingsProvider"
 import { buildExport, buildMarkdown, exportFilename, parseImport } from "@/lib/graphExport"
 
 export default function KeepTab() {
   const { state, studentName, importFromText, resetAll, flash } = useLoom()
   const { confirm, notify } = useDialog()
+  const { titleOf } = useReadings()
   const importInputRef = useRef<HTMLInputElement>(null)
 
   const download = (text: string, filename: string, type: string) => {
@@ -32,7 +34,7 @@ export default function KeepTab() {
   }
 
   const handleExportMd = () => {
-    download(buildMarkdown(state, studentName), exportFilename(studentName, "md"), "text/markdown")
+    download(buildMarkdown(state, studentName, titleOf), exportFilename(studentName, "md"), "text/markdown")
     flash("exported .md")
   }
 
@@ -57,7 +59,7 @@ export default function KeepTab() {
       }
       const ok = await confirm({
         title: "Replace your cloth with this file?",
-        body: `It holds ${parsed.concepts.length} concept${parsed.concepts.length !== 1 ? "s" : ""}, ${parsed.bytes.length} passage${parsed.bytes.length !== 1 ? "s" : ""} and ${parsed.edges.length} thread${parsed.edges.length !== 1 ? "s" : ""}. What is on the table now is replaced, not merged. Your weaving history is kept either way.`,
+        body: `It holds ${parsed.concepts.length} concept${parsed.concepts.length !== 1 ? "s" : ""}, ${parsed.bytes.length} passage${parsed.bytes.length !== 1 ? "s" : ""}, ${parsed.edges.length} thread${parsed.edges.length !== 1 ? "s" : ""} and ${parsed.maps.length} map${parsed.maps.length !== 1 ? "s" : ""}. What is on the table now is replaced, not merged. Your weaving history is kept either way.`,
         confirmLabel: "Replace my cloth",
         danger: true,
       })
@@ -78,7 +80,7 @@ export default function KeepTab() {
   const handleReset = async () => {
     const ok = await confirm({
       title: "Clear this course's cloth?",
-      body: `${state.concepts.length} concept${state.concepts.length !== 1 ? "s" : ""}, ${state.bytes.length} passage${state.bytes.length !== 1 ? "s" : ""}, ${state.edges.length} thread${state.edges.length !== 1 ? "s" : ""}, your read and your arrangement all go. Export first — a .json makes this reversible. Your weaving history on 03 · Read survives either way.`,
+      body: `${state.concepts.length} concept${state.concepts.length !== 1 ? "s" : ""}, ${state.bytes.length} passage${state.bytes.length !== 1 ? "s" : ""}, ${state.edges.length} thread${state.edges.length !== 1 ? "s" : ""} and ${state.maps.length} map${state.maps.length !== 1 ? "s" : ""} — tiers, essences and reads — all go. Export first — a .json makes this reversible. Your weaving history on 03 · Read survives either way.`,
       confirmLabel: "Clear the table",
       danger: true,
     })
@@ -93,7 +95,7 @@ export default function KeepTab() {
       <div className="card" style={{ marginBottom: 14 }}>
         <h2>Take it out <span className="n">{`${state.concepts.length} concepts · ${state.bytes.length} passages · ${state.edges.length} threads`}</span></h2>
         <p className="do">Do this — download a copy now, and again whenever you&apos;ve done real work. Two formats, two jobs.</p>
-        <p className="hint"><b>.json</b> is the complete, exact record: every concept, passage, thread, tier, your read, and your arrangement on the card table. It is the file to keep, the file to submit, and the only one that round-trips — import it back here later and your cloth returns exactly as you left it. If you keep one file, keep this one.</p>
+        <p className="hint"><b>.json</b> is the complete, exact record: every concept, passage, thread, and each of your maps — its tiers, its essence sentence, its read, its arrangement on the card table. It is the file to keep, the file to submit, and the only one that round-trips — import it back here later and your cloth returns exactly as you left it. If you keep one file, keep this one.</p>
         <p className="hint"><b>.md</b> is a readable outline of the same work — plain Markdown for Obsidian, your notes app, a draft, or an agent you want to hand context to. Good for reading, quoting, and pasting. It is <b>not</b> re-importable: Loom cannot rebuild a cloth from it.</p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn" data-tip="download your weave as a .json file — your submittable, portable artifact" onClick={handleExportJson}>Export .json</button>
@@ -121,7 +123,7 @@ export default function KeepTab() {
       <div className="card">
         <h2>Clear the table</h2>
         <p className="do calm">Only if you mean it — reset empties this course&apos;s cloth and starts you blank.</p>
-        <p className="hint">Reset removes the concepts, the passages, the threads, your read, and your arrangement for this course. It cannot be undone from inside Loom. An export taken beforehand is the whole safety net — with a .json in hand, a reset is reversible by importing it back.</p>
+        <p className="hint">Reset removes the concepts, the passages, the threads, and your maps — every tier, essence, read and arrangement — for this course. It cannot be undone from inside Loom. An export taken beforehand is the whole safety net — with a .json in hand, a reset is reversible by importing it back.</p>
         <p className="hint">What survives on purpose: the development history — &ldquo;the cloth, over time&rdquo; on <b>03 Read</b>. Reset clears the cloth, not the record of weaving it. Your growth stays visible even when the table is empty.</p>
         <p className="ghostnote">You will be asked to confirm. Export first if there is any doubt.</p>
         <button className="btn ghost" data-tip="clear this course's cloth and start blank — your weaving history is kept" onClick={handleReset} style={{ marginTop: 4 }}>Reset this cloth</button>

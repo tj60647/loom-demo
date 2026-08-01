@@ -14,21 +14,32 @@ const TIER_GROUPS: [Tier, string][] = [
   ["x", "LEFT OFF"],
 ]
 
-export function buildMapKit(concepts: Concept[], edges: Edge[], student: string): string {
+export function buildMapKit(
+  concepts: Concept[],
+  edges: Edge[],
+  student: string,
+  map?: { name?: string; essence?: string; tiers?: Record<string, Tier> }
+): string {
   const NL = "\n"
   const degs = concepts
     .map((c) => ({ c, d: degreeOf(edges, c.id) }))
     .sort((a, b) => b.d - a.d)
   const label = (id: string) => concepts.find((c) => c.id === id)?.label ?? "?"
+  // The active map's tiers when given (per-map placement); the legacy
+  // concept.tier mirror otherwise. Without this parameter every reading's kit
+  // would print the course-wide hierarchy — the map is what the chalk talk is
+  // drawn from.
+  const tierOf = (c: Concept): Tier => (map?.tiers ? map.tiers[c.id] ?? "" : c.tier || "")
 
-  let out = "MAP KIT — " + (student || "my weave") + NL
+  let out = "MAP KIT — " + (student || "my weave") + (map?.name ? " — " + map.name : "") + NL
+  if (map?.essence?.trim()) out += "ESSENCE: " + map.essence.trim() + NL
   out += "Take this to paper or Figma. You arrange; that is the thinking." + NL + NL
 
-  const tiered = concepts.some((c) => ["p", "s", "t"].includes(c.tier))
+  const tiered = concepts.some((c) => ["p", "s", "t"].includes(tierOf(c)))
   if (tiered) {
     out += "CONCEPTS (grouped by YOUR tiers, from 04 - Map):" + NL
     TIER_GROUPS.forEach(([tier, name]) => {
-      const group = concepts.filter((c) => (c.tier || "") === tier)
+      const group = concepts.filter((c) => tierOf(c) === tier)
       if (!group.length) return
       out += "  " + name + ":" + NL
       group.forEach((c) => {

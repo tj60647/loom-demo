@@ -159,8 +159,33 @@ export type CardTableView = {
   pins?: string[]
 }
 
+/**
+ * A map — one named, per-scope sorting of the student's concepts, with its own
+ * interpretive paragraph and one-line essence. Maps are parallel siblings
+ * (freely created, renamed, deleted), not sealed versions. Meaning lives here
+ * (spec §6 graph side); the card-table geometry for map `id` is the `views`
+ * entry keyed `map:<id>`.
+ */
+export type LoomMap = {
+  id: string
+  courseId: string | null
+  userId: string
+  /** '' = the whole weave; else sorted comma-joined sourceIds (src/lib/scope.ts). */
+  scopeKey: string
+  name: string
+  read: string
+  essence: string
+  /** Per-concept tier on THIS map. '' is never stored — absent = unsorted. */
+  tiers: Record<string, Tier>
+  createdAt: Date
+  updatedAt: Date
+}
+
 export type LoomViews = {
+  /** Legacy single table — the mirror of the oldest whole-weave map's geometry. */
   cardTable: CardTableView
+  /** `map:<id>` keys carry each map's own geometry. */
+  [key: string]: CardTableView
 }
 
 /** One student act on the graph, as recorded in the append-only history. */
@@ -169,7 +194,7 @@ export type GraphEvent = {
   courseId: string | null
   userId: string
   kind: string
-  entityType: "concept" | "byte" | "edge" | "graph"
+  entityType: "concept" | "byte" | "edge" | "graph" | "map"
   entityId: string | null
   payload: Record<string, unknown> | null
   at: Date
@@ -179,6 +204,8 @@ export type LoomState = {
   concepts: Concept[]
   bytes: Byte[]
   edges: Edge[]
+  maps: LoomMap[]
+  /** Mirror of the oldest whole-weave map's paragraph (expand phase — see maps). */
   read: string
   views: LoomViews
 }
@@ -215,6 +242,20 @@ export type LoomExport = {
     }[]
     edges: { id: string; fromId: string; toId: string; sentence: string; handle: string }[]
     read: string
+    /**
+     * The student's maps (additive, like ExportByteAnchor — older consumers
+     * ignore it; older files lack it and import via legacy synthesis).
+     * `concepts[].tier` and `read` above remain the mirror of the oldest
+     * whole-weave map, so pre-maps importers still see a sorted graph.
+     */
+    maps?: {
+      id: string
+      scopeKey: string
+      name: string
+      essence: string
+      read: string
+      tiers: Record<string, Tier>
+    }[]
   }
   views: {
     cardTable: {
@@ -223,5 +264,15 @@ export type LoomExport = {
       order?: string[]
       pins?: string[]
     }
+    /** Per-map geometry, keyed by map id (symbolic on import). */
+    maps?: Record<
+      string,
+      {
+        positions: Record<string, { x: number; y: number }>
+        bends: Record<string, { dx: number; dy: number }>
+        order?: string[]
+        pins?: string[]
+      }
+    >
   }
 }

@@ -4,14 +4,19 @@
 // Red line #7: render and count, never decide. Cards without a stored position
 // get a DEFAULT position computed fresh each render (v14's drift grid) that is
 // NEVER persisted — only a student drag (card drop, line bend) or a de-tier
-// cleanup writes to views.cardTable via setCardTable.
+// cleanup writes geometry, into the ACTIVE MAP's own view row (`map:<id>`).
+//
+// A map is one named sorting of this scope's concepts with its own essence
+// sentence and paragraph — parallel siblings, switched in the mapbar. Tiers
+// live on the map (a tier is a rank relative to the concepts it sits among),
+// so the same concept may be primary here and tertiary on another map.
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
-import type { Concept, Tier } from "@/lib/types"
-import { readingsOf } from "@/lib/scope"
+import type { CardTableView, Concept, Tier } from "@/lib/types"
+import { isWholeWeave, readingsOf } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import { buildMapKit } from "@/lib/mapKit"
@@ -54,9 +59,31 @@ const sortOrder = (concepts: Concept[], order?: string[]): Concept[] => {
 }
 
 export default function MapTab() {
-  const { state, editConcept, setCardTable, setRead, flushRead, flash, studentName } = useLoom()
+  const {
+    state, scopedState, scope,
+    activeMap, scopeMaps, selectMap, addMap, renameMap, removeMap,
+    setMapTiers, setMapRead, setMapEssence, flushMapText,
+    setView, ensureActiveMap,
+    flash, studentName,
+  } = useLoom()
   const { titleOf } = useReadings()
   const { confirm } = useDialog()
+  const wholeWeave = isWholeWeave(scope)
+
+  // This map's tier for a concept — '' (unsorted) when the map has no entry,
+  // or no map exists yet in this scope.
+  const tierOf = useCallback(
+    (id: string): Tier => activeMap?.tiers[id] ?? "",
+    [activeMap]
+  )
+
+  // The active map's own geometry. Reads fall back to an empty view; writes go
+  // through ensureActiveMap so the first gesture in a fresh scope mints Map 1.
+  const viewKey = activeMap ? `map:${activeMap.id}` : null
+  const emptyView: CardTableView = { positions: {}, bends: {} }
+  const view = (viewKey ? state.views[viewKey] : undefined) ?? emptyView
+  const viewFor = (mapId: string): CardTableView =>
+    state.views[`map:${mapId}`] ?? { positions: {}, bends: {} }
   // The card menu: hover, focus or tap a card's corner. Held here rather than
   // per-card so only one is ever open.
   const [menuFor, setMenuFor] = useState<string | null>(null)
@@ -118,12 +145,12 @@ export default function MapTab() {
   // other pointerId are ignored while it is set.
   const activePointer = useRef<number | null>(null)
 
-  const conceptById = (id: string) => state.concepts.find(c => c.id === id)
+  const conceptById = (id: string) => scopedState.concepts.find(c => c.id === id)
 
   // Only a PINNED definition changes a card's size, so an unpinned card is a
-  // fixed size and a stored position keeps meaning what it meant. The old
-  // global toggle resized every card on the table at once.
-  const pins = state.views.cardTable.pins ?? []
+  // fixed size and a stored position keeps meaning what it meant. Pins are
+  // geometry, so they belong to the active map's view.
+  const pins = view.pins ?? []
   const isPinned = (c: Concept) => !!c.def && pins.includes(c.id)
   const cardH = (c: Concept) => isPinned(c) ? 50 : 34
   const cardW = (c: Concept) => {
@@ -132,9 +159,13 @@ export default function MapTab() {
   }
 
   const togglePin = (c: Concept) => {
-    const next = pins.includes(c.id) ? pins.filter(id => id !== c.id) : [...pins, c.id]
-    setCardTable({ ...state.views.cardTable, pins: next })
-    flash(next.includes(c.id) ? "definition pinned to the card" : "definition unpinned")
+    void ensureActiveMap().then((m) => {
+      const v = viewFor(m.id)
+      const cur = v.pins ?? []
+      const next = cur.includes(c.id) ? cur.filter(id => id !== c.id) : [...cur, c.id]
+      setView(`map:${m.id}`, { ...v, pins: next })
+      flash(next.includes(c.id) ? "definition pinned to the card" : "definition unpinned")
+    })
   }
   const bandRange = (t: Tier, h: number): [number, number] => {
     const i = TIERS.findIndex(x => x[0] === t)
@@ -142,9 +173,9 @@ export default function MapTab() {
     return [top + 8, top + BAND_H - (h || 34) - 8]
   }
 
-  const placed = state.concepts.filter(c => isPlaced(c.tier))
-  const stored = state.views.cardTable.positions
-  const bends = state.views.cardTable.bends
+  const placed = scopedState.concepts.filter(c => isPlaced(tierOf(c.id)))
+  const stored = view.positions
+  const bends = view.bends
 
   // Effective positions: stored (student-authored) where present, else v14's
   // 4-column drift grid per band — computed for display, discarded (red line #7).
@@ -154,7 +185,7 @@ export default function MapTab() {
   // bands jump the moment one card was dropped into another tier — dragging one
   // entry re-arranged the rest. Capture order is fixed, so a card only moves
   // when the student moves it.
-  const captureIndex = new Map(state.concepts.map((c, i) => [c.id, i]))
+  const captureIndex = new Map(scopedState.concepts.map((c, i) => [c.id, i]))
   const effPos: Record<string, { x: number; y: number }> = {}
   {
     placed.forEach(c => {
@@ -172,7 +203,7 @@ export default function MapTab() {
         }
       } else {
         const k = captureIndex.get(c.id) ?? 0
-        const [y0, y1] = bandRange(c.tier, cardH(c))
+        const [y0, y1] = bandRange(tierOf(c.id), cardH(c))
         effPos[c.id] = {
           x: Math.max(10, Math.min(W - cardW(c) - 10, 30 + (k % 4) * ((W - 60) / 4) + (Math.floor(k / 4) % 4) * 24)),
           y: y0 + ((k % 3) * (y1 - y0) / 3),
@@ -218,12 +249,12 @@ export default function MapTab() {
   // --- mirror counts (counted, not judged) ---
   const n: Record<string, number> = { p: 0, s: 0, t: 0 }
   const placedIds: string[] = []
-  state.concepts.forEach(c => { if (isPlaced(c.tier)) { n[c.tier]++; placedIds.push(c.id) } })
-  const unsorted = state.concepts.filter(c => !c.tier).length
-  const off = state.concepts.filter(c => c.tier === "x").length
-  const onTable = state.edges.filter(e => placedIds.includes(e.fromId) && placedIds.includes(e.toId))
+  scopedState.concepts.forEach(c => { const t = tierOf(c.id); if (isPlaced(t)) { n[t]++; placedIds.push(c.id) } })
+  const unsorted = scopedState.concepts.filter(c => !tierOf(c.id)).length
+  const off = scopedState.concepts.filter(c => tierOf(c.id) === "x").length
+  const onTable = scopedState.edges.filter(e => placedIds.includes(e.fromId) && placedIds.includes(e.toId))
   const cross = onTable.filter(e => {
-    const a = conceptById(e.fromId)!.tier, b = conceptById(e.toId)!.tier
+    const a = tierOf(e.fromId), b = tierOf(e.toId)
     return a === b || Math.abs("pst".indexOf(a) - "pst".indexOf(b)) > 1
   }).length
   let level = "a list"
@@ -233,18 +264,25 @@ export default function MapTab() {
   const done2 = done1 && Object.keys(stored).some(id => placedIds.includes(id))
   const done3 = done2 && cross > 0
 
-  const onCount = state.concepts.filter(c => c.tier && c.tier !== "x").length
+  const onCount = scopedState.concepts.filter(c => { const t = tierOf(c.id); return t && t !== "x" }).length
 
-  // --- sort: every assignment is a student act ---
+  // --- sort: every assignment is a student act, on the ACTIVE map ---
   const setTier = (c: Concept, t: Tier) => {
-    const next: Tier = c.tier === t ? "" : t
-    editConcept(c.id, { tier: next })
-    if (!isPlaced(next) && stored[c.id]) {
-      // Leaving the table clears the card's stored spot — a student gesture.
-      const positions = { ...stored }
-      delete positions[c.id]
-      setCardTable({ ...state.views.cardTable, positions })
-    }
+    void ensureActiveMap().then((m) => {
+      const current = m.tiers[c.id] ?? ""
+      const next: Tier = current === t ? "" : t
+      const tiers = { ...m.tiers }
+      if (next) tiers[c.id] = next
+      else delete tiers[c.id]
+      void setMapTiers(m.id, tiers)
+      const v = viewFor(m.id)
+      if (!isPlaced(next) && v.positions[c.id]) {
+        // Leaving the table clears the card's stored spot — a student gesture.
+        const positions = { ...v.positions }
+        delete positions[c.id]
+        setView(`map:${m.id}`, { ...v, positions })
+      }
+    })
   }
 
   // "make all primary" — one student gesture that tiers everything at once.
@@ -252,23 +290,26 @@ export default function MapTab() {
   // move what the student would otherwise do chip by chip, and saying plainly
   // that the demoting is still theirs.
   const makeAllPrimary = async () => {
-    const all = state.concepts
+    const all = scopedState.concepts
     if (!all.length) return
-    const alreadySorted = all.filter(c => c.tier && c.tier !== "p").length
+    const alreadySorted = all.filter(c => { const t = tierOf(c.id); return t && t !== "p" }).length
     const ok = await confirm({
       title: `Make all ${all.length} concept${all.length !== 1 ? "s" : ""} primary?`,
       body: alreadySorted
-        ? `This overwrites the ${alreadySorted} tier${alreadySorted !== 1 ? "s" : ""} you have already set. It is a starting point to demote from, not a recommendation.`
+        ? `This overwrites the ${alreadySorted} tier${alreadySorted !== 1 ? "s" : ""} you have already set on this map. It is a starting point to demote from, not a recommendation.`
         : "A starting point to demote from, not a recommendation.",
       confirmLabel: "Make all primary",
     })
     if (!ok) return
-    all.forEach(c => { if (c.tier !== "p") editConcept(c.id, { tier: "p" }) })
+    const m = await ensureActiveMap()
+    const tiers = { ...m.tiers }
+    all.forEach(c => { tiers[c.id] = "p" })
+    await setMapTiers(m.id, tiers)
     flash("all primary — re-sort any that aren't")
   }
 
   // --- sort list order: a view projection, written only by drag or arrow ---
-  const sortList = sortOrder(state.concepts, state.views.cardTable.order)
+  const sortList = sortOrder(scopedState.concepts, view.order)
   const [dragId, setDragId] = useState<string | null>(null)
   // Insertion index under the pointer (0..sortList.length), not a row index.
   const [dropAt, setDropAt] = useState<number | null>(null)
@@ -280,7 +321,7 @@ export default function MapTab() {
     const ids = sortList.map(c => c.id)
     const [moved] = ids.splice(fromIdx, 1)
     ids.splice(toIdx, 0, moved)
-    setCardTable({ ...state.views.cardTable, order: ids })
+    void ensureActiveMap().then((m) => setView(`map:${m.id}`, { ...viewFor(m.id), order: ids }))
     return true
   }
 
@@ -377,18 +418,20 @@ export default function MapTab() {
       const pos = livePosRef.current && livePosRef.current.id === id
         ? { x: livePosRef.current.x, y: livePosRef.current.y }
         : null
-      if (c && pos) {
+      // Cards only exist on the table when a map holds their tiers, so the
+      // active map is present for any real drop.
+      if (c && pos && activeMap) {
         // Dropping decides the band: re-tier from the card's centre-y.
         const cy = pos.y + cardH(c) / 2
         const idx = Math.max(0, Math.min(2, Math.floor((cy - 10) / BAND_H)))
         const newTier = TIERS[idx][0]
-        if (c.tier !== newTier) {
-          editConcept(c.id, { tier: newTier })
+        if (tierOf(c.id) !== newTier) {
+          void setMapTiers(activeMap.id, { ...activeMap.tiers, [c.id]: newTier })
           flash("re-tiered to " + TIERS[idx][1].toLowerCase() + " — placement is the decision")
         }
         // The drag is the student gesture — persist this card's spot, once.
         // x is stored as a fraction of the usable width (spec §5), y in px.
-        setCardTable({ ...state.views.cardTable, positions: { ...stored, [id]: { x: pos.x / usableW, y: pos.y } } })
+        setView(`map:${activeMap.id}`, { ...view, positions: { ...stored, [id]: { x: pos.x / usableW, y: pos.y } } })
       }
       setLive(null)
       return
@@ -398,8 +441,8 @@ export default function MapTab() {
       dragEdge.current = null
       dragEdgeStart.current = null
       const b = liveBendRef.current
-      if (b && b.id === id) {
-        setCardTable({ ...state.views.cardTable, bends: { ...bends, [id]: { dx: b.dx, dy: b.dy } } })
+      if (b && b.id === id && activeMap) {
+        setView(`map:${activeMap.id}`, { ...view, bends: { ...bends, [id]: { dx: b.dx, dy: b.dy } } })
       }
       setBend(null)
     }
@@ -417,11 +460,27 @@ export default function MapTab() {
   }
 
   const handleMapKit = () => {
-    if (!state.concepts.length) { flash("nothing to map yet — lay some warp first"); return }
-    copyText(buildMapKit(state.concepts, state.edges, studentName)).then(ok => {
+    if (!scopedState.concepts.length) { flash("nothing to map yet — lay some warp first"); return }
+    copyText(buildMapKit(
+      scopedState.concepts,
+      scopedState.edges,
+      studentName,
+      activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
+    )).then(ok => {
       if (ok) flash("map kit copied — take it to paper or Figma")
       else flash("select & copy by hand")
     })
+  }
+
+  const handleDeleteMap = async () => {
+    if (!activeMap) return
+    const ok = await confirm({
+      title: `Delete "${activeMap.name}"?`,
+      body: "Its tiers, its essence sentence, its paragraph and its arrangement go with it. Your concepts, passages and threads are untouched.",
+      confirmLabel: "Delete this map",
+      danger: true,
+    })
+    if (ok) await removeMap(activeMap.id)
   }
 
   // Resolved before the return so the menu's handlers are props on a component
@@ -430,15 +489,15 @@ export default function MapTab() {
   const menuPos = menuConcept ? effPos[menuConcept.id] : undefined
   const handleTogglePin = () => { if (menuConcept) togglePin(menuConcept) }
 
-  const drawnEdges = state.edges.filter(e => {
+  const drawnEdges = scopedState.edges.filter(e => {
     const f = conceptById(e.fromId), t2 = conceptById(e.toId)
-    return f && t2 && isPlaced(f.tier) && isPlaced(t2.tier) && effPos[f.id] && effPos[t2.id]
+    return f && t2 && isPlaced(tierOf(f.id)) && isPlaced(tierOf(t2.id)) && effPos[f.id] && effPos[t2.id]
   })
 
   return (
     <>
       <p className="tasktitle">Lay out your map.</p>
-      <p className="tasksub">Your map, laid out like cards on a table (Novak &amp; Gowin&apos;s own method): sort your concepts into tiers, then arrange them by hand. The tool draws the lines you already threw and counts what it sees — it never sorts, places, or links for you. When the map reads right here, draw the real one (paper or Figma) and build your chalk talk from it.</p>
+      <p className="tasksub">Your map, laid out like cards on a table (Novak &amp; Gowin&apos;s own method): sort your concepts into tiers, then arrange them by hand. The tool draws the lines you already threw and counts what it sees — it never sorts, places, or links for you. Keep more than one map: each is its own reading of the material, with its own tiers, its own essence sentence and its own paragraph. When a map reads right here, draw the real one (paper or Figma) and build your chalk talk from it.</p>
 
       <div className="rail" id="mapRail">
         <span className={`rstep${done1 ? " done" : ""}${!done1 ? " now" : ""}`}>sort</span>
@@ -450,11 +509,11 @@ export default function MapTab() {
 
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="heading-with-info">
-          <h2>Sort <span className="n" id="triageCount">{state.concepts.length ? `(${onCount} of ${state.concepts.length} on the table)` : ""}</span></h2>
+          <h2>Sort <span className="n" id="triageCount">{scopedState.concepts.length ? `(${onCount} of ${scopedState.concepts.length} on the table)` : ""}</span></h2>
           <button
             className="btn ghost mini compact"
             id="makeAllPrimary"
-            disabled={!state.concepts.length}
+            disabled={!scopedState.concepts.length}
             data-tip="tiers every concept primary in one gesture — you demote from there"
             onClick={makeAllPrimary}
           >make all primary</button>
@@ -462,7 +521,7 @@ export default function MapTab() {
         <p className="do">Give each concept a tier: <b>P</b>rimary (the map hangs on it) · <b>S</b>econdary · <b>T</b>ertiary (example / detail) · <b>–</b> leave off. Sorted concepts land on the table below.</p>
         <p className="hint">A–Z until you say otherwise: drag a row by its handle — or focus the handle and press ↑ / ↓ — to re-order this list, and your sequence sticks. That re-sequences the list only; the table, the counts and the map kit are untouched. <b>Make all primary</b> is a starting point, not a recommendation: it puts everything on the top tier in one move so you can demote from there.</p>
         <div id="triageList" onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropAt(null) }}>
-          {!state.concepts.length ? (
+          {!scopedState.concepts.length ? (
             <div className="empty">
               <svg width={34} height={18} viewBox="0 0 34 18" fill="none" stroke="#a39f92" strokeWidth={1.3}><path d="M2 13 L7 5 L12 13 L17 5 L22 13 L27 5 L32 13" /></svg>
               <span className="cap">lay some warp on 01 — open first</span>
@@ -508,17 +567,49 @@ export default function MapTab() {
               <span className="tlabel">{c.label}</span>
               <span className="tierchips">
                 {TIERS.map(([k, name]) => (
-                  <span key={k} className={`tchip${c.tier === k ? " on" : ""}`} title={name.toLowerCase()} onClick={() => setTier(c, k)}>{k.toUpperCase()}</span>
+                  <span key={k} className={`tchip${tierOf(c.id) === k ? " on" : ""}`} title={name.toLowerCase()} onClick={() => setTier(c, k)}>{k.toUpperCase()}</span>
                 ))}
-                <span className={`tchip off${c.tier === "x" ? " on" : ""}`} title="leave off the map" onClick={() => setTier(c, "x")}>–</span>
+                <span className={`tchip off${tierOf(c.id) === "x" ? " on" : ""}`} title="leave off the map" onClick={() => setTier(c, "x")}>–</span>
               </span>
             </div>
           ))}
         </div>
       </div>
 
+      <div className="mapbar" id="mapSwitcher">
+        <span className="label">{wholeWeave ? "Your maps of the whole weave" : "Your maps of this reading"}</span>
+        <span className="chips" style={{ margin: 0, alignItems: "center" }}>
+          {scopeMaps.map(m => (
+            <span
+              key={m.id}
+              className={`chip${activeMap?.id === m.id ? " on" : ""}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => selectMap(m.id)}
+              onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectMap(m.id) } }}
+            >{m.name}</span>
+          ))}
+          <button
+            className="btn ghost mini"
+            id="newMap"
+            data-tip="start another map of the same concepts — a different reading of them"
+            onClick={() => void addMap().catch(e => flash(e instanceof Error ? e.message : "could not start a map"))}
+          >+ New map</button>
+        </span>
+        {activeMap && (
+          <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+            <input
+              aria-label="Rename this map"
+              value={activeMap.name}
+              onChange={e => renameMap(activeMap.id, e.target.value)}
+              onBlur={flushMapText}
+              style={{ width: 140, fontSize: 12, padding: "4px 7px" }}
+            />
+            <button className="btn ghost mini" data-tip="delete this map — concepts and threads stay" onClick={handleDeleteMap}>delete</button>
+          </span>
+        )}
+      </div>
       <div className="mapbar">
-        <span className="label">The map</span>
         <span style={{ color: "var(--ink-soft)", fontSize: 13 }}>Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋯</b> — its definition, the passages behind it, and where else you met it.</span>
       </div>
 
@@ -669,20 +760,28 @@ export default function MapTab() {
       </div>
 
       <div className="ghostnote" id="mapMirror" style={{ marginTop: 8 }}>
-        {state.concepts.length > 0 && (
+        {scopedState.concepts.length > 0 && (
           <>On the table: <b>{n.p}</b> primary · <b>{n.s}</b> secondary · <b>{n.t}</b> tertiary{off ? ` · ${off} left off` : ""}{unsorted ? <> · <span style={{ color: "var(--red)" }}>{unsorted} unsorted</span></> : ""} — {onTable.length} proposition{onTable.length !== 1 ? "s" : ""} drawn, <b>{cross}</b> running level-to-level or sideways (possible cross-links — the level-3 move; you decide if they&apos;re real). Right now this reads as: <b>{level}</b>. Counted, not judged.</>
         )}
       </div>
 
       <div className="card" style={{ marginTop: 14 }}>
-        <h2>Your read <span className="n">same one as 03 — write it while you look</span></h2>
-        <p className="hint">Arranging and articulating feed each other: as the map settles, say in one short paragraph what the reading is about and what holds it together.</p>
+        <h2>Your read of this map {activeMap ? <span className="n">&ldquo;{activeMap.name}&rdquo; — its essence and paragraph travel with it</span> : <span className="n">starts with your first sort</span>}</h2>
+        <p className="readq">In a sentence — what is this {wholeWeave ? "weave" : "reading"} <i>about</i>?</p>
+        <input
+          id="mapEssence"
+          placeholder="One line — the essence."
+          value={activeMap?.essence ?? ""}
+          onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapEssence(m.id, v)) }}
+          onBlur={flushMapText}
+        />
+        <p className="hint" style={{ marginTop: 8 }}>Arranging and articulating feed each other: as the map settles, say in one short paragraph what it is about and what holds it together. Essence, paragraph, tiers and arrangement belong to this map — switch maps and each keeps its own.</p>
         <textarea
           id="yourRead2"
-          placeholder="Write (or refine) your read here — it's the same text as on 03 · Read."
-          value={state.read}
-          onChange={e => setRead(e.target.value)}
-          onBlur={flushRead}
+          placeholder="Write your read of this map here — same text as on 03 · Read."
+          value={activeMap?.read ?? ""}
+          onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapRead(m.id, v)) }}
+          onBlur={flushMapText}
         />
       </div>
 

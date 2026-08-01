@@ -18,7 +18,10 @@ export async function openReading(page: Page, title: string) {
   // lands on nothing.
   await expect(card.locator('.shelftally')).not.toHaveText('…', { timeout: 15000 });
   await card.click();
-  await expect(page).toHaveURL(/\/reading\//);
+  // 15s, not the 5s default: in dev the route compiles on demand and the App
+  // Router only commits the URL once the server has rendered, which under
+  // parallel workers can outlast the default expect timeout.
+  await expect(page).toHaveURL(/\/reading\//, { timeout: 15000 });
 
   await page.getByRole('button', { name: /Reading/i }).click();
   await expect(page.locator('text=Loading PDF...')).toBeHidden({ timeout: 15000 });

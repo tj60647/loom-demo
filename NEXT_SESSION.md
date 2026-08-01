@@ -1,19 +1,31 @@
 # Next Session Prompt
 
-You are continuing work on Loom after the reading-first pass of 2026-07-30/31.
+You are continuing work on Loom after the multiple-maps build of 2026-07-31
+(which followed the reading-first pass of 07-30/31).
 
 ## Where things stand
 
 The app implements the v14 tool in full, on top of the production surfaces v14
 has no equivalent for (auth, courses, the shared reading library with
-extraction scoring, PDF capture with anchored offsets) — and the tool is now
-**reading-first**: the reading is the entry point, not a filter over
-course-wide tabs.
+extraction scoring, PDF capture with anchored offsets). The tool is
+**reading-first** (the reading is the entry point), and maps are now
+**per-scope, parallel and plural**: a student keeps several named maps per
+reading and per whole weave, each holding its own tiers, one-line essence
+sentence, interpretive paragraph, and card-table geometry (`map` table +
+`view` rows keyed `map:<id>`, migration `0012_maps.sql`).
 
 - **Routes:** `/` is the shelf (the course's readings by week, with the
   student's own counts); `/reading/[sourceId]` is one reading's workbench
-  (00 Reading · 01 Open · 02 Throw · 03 Read); `/weave` is every reading at
-  once (02 · 03 · 04 Map); `/keep` is the whole artifact.
+  (00 Reading · 01 Open · 02 Throw · 03 Read · 04 Map); `/weave` is every
+  reading at once (02 · 03 · 04 Map); `/keep` is the whole artifact.
+- **Maps (ratified TJ 7/31, spec §3 Map / §6):** tier is per concept PER MAP —
+  `concept.tier` and the `reads` table survive only as expand-phase MIRRORS of
+  the oldest whole-weave map, dual-written by `updateMap`/`saveView`/`deleteMap`
+  in src/actions/loom.ts, so code rollback stays safe. The first sorting
+  gesture in a fresh scope auto-creates "Map 1" (`ensureActiveMap` in
+  LoomProvider). Export adds `graph.maps[]` + `views.maps` additively; import
+  remints tier keys and synthesizes "Map 1" from pre-maps files, and re-scopes
+  a map to the whole weave when its scopeKey doesn't resolve (red line #5).
 - **Scope** is read off the route in `LoomProvider`, and membership is derived
   from `byte.sourceId` in [src/lib/scope.ts](src/lib/scope.ts). **A concept does
   not belong to a reading — a byte does.** A concept emerges from a reading and
@@ -44,21 +56,20 @@ Verified at hand-off: `npm run check` (eslint + tsc) and `next build` clean;
 
 ## Open items, in the order they matter
 
-1. **Passes need a §7 decision before they are built.** Spec §3 Map states the
-   proposal and §6 states the contract change; §5 lists it under "awaiting a
-   decision". It moves `tier` off the concept, because a tier is a rank
-   *relative to the concepts it sits among* — a concept shared by two readings
-   holds a different rank in each and one field cannot carry both.
-
-   Until it lands, `04 Map` stays at the whole weave and "your read" is shared
-   across readings (both say so in the UI). Three traps for whoever builds it:
-   - `buildMapKit` ([src/lib/mapKit.ts](src/lib/mapKit.ts)) reads `concept.tier`
-     directly. Miss it and every reading's kit prints the course-wide
-     hierarchy — and that kit is what the chalk talk is drawn from.
-   - `concept.retier` events carry no scope; without a `scopeKey` in the
-     payload, the record of *which map you were sorting* is lost for good.
-   - It must land expand/contract (add new → backfill → dual-write → stop
-     reading old → drop), like `0011` did, or code rollback stops being safe.
+1. **The maps contract migration (the "contract" half of expand/contract) —
+   deliberately NOT in the 7/31 build.** `concept.tier` and the `reads` table
+   are still dual-written as mirrors of the oldest whole-weave map. Once the
+   build has soaked (post-Monday testers), a follow-up should: stop writing
+   `concept.tier` from `updateMap`/`deleteMap`, stop the `reads` upsert and the
+   `cardTable` geometry echo in `saveView`, retire the deprecated `saveRead`
+   action, then drop the columns/table in a migration. Until then two known
+   quirks are accepted (recorded in the plan): a student who works only in
+   reading-scoped maps leaves the mirror columns reflecting older whole-weave
+   work, and a failed re-mirror after deleting the mirror map leaves them stale
+   until that map is next edited — the `map` table is authoritative either way.
+   Resolved from the old item 1: per-map tiers ARE ratified and built (spec §3
+   Map, §6); `buildMapKit` takes the active map's tiers; `map.retier` events
+   carry `scopeKey` + the diff; `0012` was expand/backfill.
 
 2. **Monday's dev deployment.** Testers were warned. The setup, reasoned
    through in the session log: a **Neon branch** for `DATABASE_URL` (one

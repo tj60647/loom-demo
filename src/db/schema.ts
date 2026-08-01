@@ -8,6 +8,7 @@ import {
   jsonb,
   boolean,
   unique,
+  index,
 } from "drizzle-orm/pg-core"
 import type { AdapterAccount } from "@auth/core/adapters"
 import type { ExtractionMetrics } from "@/lib/types"
@@ -343,6 +344,49 @@ export const reads = pgTable(
   })
 )
 
+// A map — one named, per-scope sorting of the student's concepts, plus its
+// interpretive paragraph and one-line essence. Maps are PARALLEL SIBLINGS
+// (freely created / renamed / deleted), not sealed passes — ratified 2026-07-31,
+// superseding the linear model of docs/reading-scope-and-map-passes.md §B.2.
+// Meaning lives here (spec §6 graph side); the card-table geometry for map <id>
+// lives in the `view` row keyed `map:<id>`. scopeKey '' = the whole weave,
+// otherwise the sorted comma-joined sourceIds of src/lib/scope.ts — a reading
+// today, a set of readings when subsets ship.
+//
+// Expand phase: `concept.tier` and the `read` table survive as MIRRORS of the
+// oldest whole-weave map, dual-written by updateMap so code rollback stays
+// safe. The contract migration that drops them is a later build.
+export const maps = pgTable(
+  "map",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    courseId: text("courseId").references(() => courses.id, {
+      onDelete: "set null",
+    }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    scopeKey: text("scopeKey").default("").notNull(),
+    name: text("name").notNull(),
+    read: text("read").default("").notNull(),
+    essence: text("essence").default("").notNull(),
+    // { [conceptId]: 'p' | 's' | 't' | 'x' } — absent key = unsorted ('').
+    tiers: jsonb("tiers")
+      .$type<Record<string, "p" | "s" | "t" | "x">>()
+      .default({})
+      .notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  },
+  (row) => ({
+    // Non-unique: several maps per scope is the point. No unique constraint at
+    // all, so orphan-adoption can be a blind UPDATE like concepts'.
+    byScope: index("map_user_course_scope_idx").on(row.userId, row.courseId, row.scopeKey),
+  })
+)
+
 // Per-view, student-authored display geometry — a projection of the graph,
 // never part of it. Spec §6: adding a view adds a row here (a key under
 // `views`), never a field on a concept or edge; only student gestures write
@@ -389,7 +433,7 @@ export const graphEvents = pgTable("graph_event", {
   // '<entity>.<act>', e.g. 'concept.create', 'concept.retier', 'edge.coin',
   // 'graph.import', 'graph.reset', 'graph.example'.
   kind: text("kind").notNull(),
-  entityType: text("entityType").$type<"concept" | "byte" | "edge" | "graph">().notNull(),
+  entityType: text("entityType").$type<"concept" | "byte" | "edge" | "graph" | "map">().notNull(),
   entityId: text("entityId"),
   // Enough of the entity to replay the graph at any point in the timeline.
   payload: jsonb("payload").$type<Record<string, unknown>>(),

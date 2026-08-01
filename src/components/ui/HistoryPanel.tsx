@@ -207,6 +207,11 @@ function describeEvent(e: GraphEvent): string {
     case "edge.update": return "reworded a thread"
     case "edge.delete": return "removed a thread"
     case "read.update": return "revised the read"
+    case "map.create": return typeof p.name === "string" && p.name ? `started a new map — "${p.name}"` : "started a new map"
+    case "map.rename": return typeof p.name === "string" && p.name ? `renamed a map to "${p.name}"` : "renamed a map"
+    case "map.retier": return "re-sorted a map"
+    case "map.update": return "revised a map's read"
+    case "map.delete": return typeof p.name === "string" && p.name ? `removed a map ("${p.name}")` : "removed a map"
     case "graph.reset": return "reset the cloth"
     case "graph.import": return "imported a cloth"
     case "graph.example": return "loaded the worked example"
@@ -248,6 +253,7 @@ export default function HistoryPanel() {
         concepts: cloth.concepts,
         bytes: cloth.bytes,
         edges: cloth.edges,
+        maps: [],
         read: "",
         views: { cardTable: { positions: {}, bends: {} } },
       }

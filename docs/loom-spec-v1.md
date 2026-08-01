@@ -97,18 +97,16 @@ Two other places are entries in their own right: **your whole weave**, every rea
 - **Arrange:** draggable cards on a three-band canvas (general above, specific below). Dropping a card into another band re-tiers it — placement is the decision. Edges render between placed cards, labeled with the student's terms; edges are draggable too (bow a line, re-seat its label — display only).
 - **What a card is made of:** each card carries its own menu — the working definition, the passages behind it as quotes, and which other readings the concept was met in. A definition can be *pinned* open on the card for the chalk talk. (Replaces the global "show definitions" toggle, which also drove card geometry: flipping it resized every card on a table whose positions were arranged at the other size.)
 - **Check:** a counted mirror — tiers, propositions drawn, possible cross-links — echoing the chalk-talk rubric (list → tiers → cross-links). Counted, never advised.
-- **Your read** is writable here too (same text as Read, synced).
 
-#### Passes — proposed, not yet ratified
+#### Maps — ratified TJ, 31 July 2026
 
-A **tier is a rank relative to the concepts it sits among**: primary means "this reading hangs on it", among *this reading's* concepts. A concept shared by two readings therefore carries a different rank in each, and both are right. A single `tier` on the concept cannot hold them, and under reading-first this is immediately visible — sorting one reading's concepts would sort every other reading's map.
+A **tier is a rank relative to the concepts it sits among**: primary means "this reading hangs on it", among *this reading's* concepts. A concept shared by two readings therefore carries a different rank in each, and both are right. A single `tier` on the concept cannot hold them, so **tiers live on the map, not the concept**.
 
-The proposal: a **pass** — one arrangement of one map, cut and named by the student, holding the tiers, the read as it stood, and its own geometry. `‹ ›` steps through them beside the map and the read. Passes are linear and append-only: the newest is the working one and the only editable one, and restoring an earlier pass copies it forward rather than overwriting. Cutting one is explicit and its name is the student's own sentence — the tool must never propose a name from the read, which would be inference on a student's own words.
+A **map** is one named sorting of a scope's concepts, and a student keeps several: each map holds its own tiers, its own **one-line essence sentence**, its own **interpretive paragraph** (the read), and its own card-table geometry. Maps are **parallel siblings** — created, renamed, switched, edited and deleted freely — not a linear sealed history. (This deliberately supersedes the earlier "passes" proposal's append-only model: the workflow's "one or more maps of the same reading, each expressing a different understanding" is a set of siblings, not a timeline. The development history in §6 remains the timeline, tool-written and act-level.) A map's name is the student's own; the tool never proposes one from the read (red lines #1/#2).
 
-Distinct from the development history (§6), which is tool-written, act-level and unnamed. This is voluntary, interpretive, and named.
+Every scope has its map stack: each reading's workbench carries `04 Map` (its maps sort only that reading's concepts), and the whole weave carries its own. The first sorting gesture in a fresh scope starts "Map 1" — visible, flashed, and the student's to rename. Arrangement, essence and paragraph travel with the map: switch maps and each keeps its own.
 
-**This needs a §7 decision before it is built:** it moves `tier` off the concept, which §6 currently calls "placement's meaning, extracted into the graph."
-- **Map kit** (also on Read): copies concepts (grouped by the student's tiers when set, else busiest-first), all propositions with term + sentence, largest chain as a possible armature, loose concepts — the hand-off to the hand-drawn map.
+- **Map kit** (also on Read): copies the active map's name and essence, concepts (grouped by that map's tiers when set, else busiest-first), all propositions with term + sentence, largest chain as a possible armature, loose concepts — the hand-off to the hand-drawn map.
 
 ### Global
 
@@ -151,8 +149,8 @@ Byte capture (+ re-file under a second concept); noun-phrase concept coding with
   - The boundary is what was ratified, not the convenience. Extending a model call to anything a student authored, or to any output a student sees, is a new question and needs its own ratification — red lines #1, #2 and #7 continue to forbid inference, suggestion, or naming anywhere near the graph. The judge also stays optional: absent `OPENROUTER_API_KEY` the gate runs deterministic-only and reports `structure` as unscored rather than guessing, so a deployment that declines the exception still gets a working quality gate.
 - In-tool highlights → bytes (capture only; the student still names every concept).
 - Highlight heat maps per reading group + comparisons — subject to red line #8 (timing).
-- **Reading-first (30 July 2026).** The shelf is the home screen and each reading opens its own workbench, with the text, the coding log, Throw and Read inside it. Membership is derived from byte provenance and discarded per render, so a reading is a door into one graph (§2). Cross-reading threads are first-class and counted (§3 Throw). Students may add reference-only readings of their own, and passages with no reading are placed by asking (§2 Byte).
-  - `04 Map` stays at the whole weave until placement is per-map: with one `tier` per concept, a reading's map would show ranks sorted against another reading's concepts, and the map is what the chalk talk is drawn from.
+- **Reading-first (30 July 2026).** The shelf is the home screen and each reading opens its own workbench, with the text, the coding log, Throw, Read and Map inside it. Membership is derived from byte provenance and discarded per render, so a reading is a door into one graph (§2). Cross-reading threads are first-class and counted (§3 Throw). Students may add reference-only readings of their own, and passages with no reading are placed by asking (§2 Byte).
+- **Maps (31 July 2026).** Tiers moved off the concept onto per-scope maps (§3 Map), so `04 Map` is honest inside a reading and lives in every workbench. Multiple maps per scope, each with essence + paragraph. `concept.tier` and the single `read` row survive as expand-phase mirrors of the oldest whole-weave map (rollback insurance) until a contract migration retires them.
 - Hosting (Vercel), GitHub OAuth, per-student persistence in Postgres, section tags (enables December quilting), positions stored proportionally, markdown export (reconcile from Lingxiu's fork), weekly class export.
 
 ### Out (happens, but not in the tool)
@@ -161,7 +159,7 @@ Reading the source deeply; the final hand-drawn concept map; the chalk talk; sel
 
 ### Awaiting a decision
 
-Map **passes** and per-map tiers (§3 Map). Also open: whether several readings can be selected at once (the data model is keyed for it), and whether `01 Open` becomes the PDF and the coding log side by side rather than a tab apart.
+Whether several readings can be selected at once as one map scope (the data model is keyed for it — `scopeKey` accepts a sorted set), and whether `01 Open` becomes the PDF and the coding log side by side rather than a tab apart. *(Resolved 31 July 2026: per-map tiers and multiple maps — see §3 Map.)*
 
 ### Deferred to v2
 
@@ -178,7 +176,8 @@ One JSON document per student (kilobytes). Schema:
     "concepts": [ { "id": "", "label": "", "def": "", "note": "", "tier": "" } ],
     "bytes":    [ { "id": "", "conceptId": "", "source": "", "location": "", "text": "" } ],
     "edges":    [ { "id": "", "fromId": "", "toId": "", "sentence": "", "handle": "" } ],
-    "read":     ""
+    "read":     "",
+    "maps":     [ { "id": "", "scopeKey": "", "name": "", "essence": "", "read": "", "tiers": { "conceptId": "p" } } ]
   },
   "views": {
     "cardTable": {
@@ -186,7 +185,8 @@ One JSON document per student (kilobytes). Schema:
       "bends":     { "edgeId":    { "dx": 0, "dy": 0 } },
       "order":     [ "conceptId" ],
       "pins":      [ "conceptId" ]
-    }
+    },
+    "maps": { "mapId": { "positions": {}, "bends": {}, "order": [], "pins": [] } }
   }
 }
 ```
@@ -199,9 +199,9 @@ Adding a view adds a key under `views`, never a field on a concept or edge.
 
 `pins` is the set of cards whose working definition the student pinned open on the table — display state like the rest of `cardTable`, written only by that gesture.
 
-**Scope (production, 30 July 2026).** Work done *under a selection of readings* — the read, and (proposed) the pass stack — is keyed by a `scopeKey`: the selection's source ids, sorted and comma-joined, with `''` meaning the whole weave. Single and multiple selections behave identically, which is what makes "several readings at once" a change of degree rather than a rewrite; and every row written before scoping existed already carries `''`, so today's read *is* the axial read with nothing to migrate.
+**Scope (production, 30 July 2026).** Work done *under a selection of readings* — a map stack — is keyed by a `scopeKey`: the selection's source ids, sorted and comma-joined, with `''` meaning the whole weave. Single and multiple selections behave identically, which is what makes "several readings at once" a change of degree rather than a rewrite.
 
-**Passes (proposed, see §3).** If ratified, the export gains one additive array — `graph.mapPasses[]`, each `{ name, read, tiers: { conceptId: tier } }` — in the way `anchor` was added to bytes, and `views` gains one key per pass holding that pass's `{ positions, bends, order, pins }`. `concepts[].tier` keeps its place in the contract but its meaning narrows to *the tier on the course-wide map*, one rank among several; consumers wanting a concept's rank in a given reading read `mapPasses`. Import must remint concept ids inside `tiers`, exactly as it already does for `positions` and `order`.
+**Maps (ratified TJ, 31 July 2026 — see §3).** The export carries `graph.maps[]` — each `{ id, scopeKey, name, essence, read, tiers: { conceptId: tier } }`, tiers holding only sorted concepts (absence = unsorted) — added additively, the way `anchor` was added to bytes; `views` gains `views.maps`, one entry per map id holding that map's `{ positions, bends, order, pins }`. **`concepts[].tier` and `graph.read` keep their place in the contract as mirrors of the oldest whole-weave map** (expand phase; a later §7 change retires them), so pre-maps consumers still see a sorted graph and a read; consumers wanting a concept's rank in a given scope read `maps`. Import remints concept ids inside `tiers` and map view geometry, exactly as it already does for `positions` and `order`; a pre-maps file synthesizes its one whole-weave map from `tier`/`read`/`cardTable`, exactly as migration 0012 backfilled live rows; a map whose scopeKey resolves to no known reading lands at the whole weave rather than being dropped (red line #5). Hosted storage: `graph.maps` → the `map` table; per-map geometry → one `view` row per key `map:<id>`. Event kinds `map.create / map.rename / map.retier / map.update / map.delete` join the development history, each payload carrying `scopeKey` (and re-tier diffs), so the record of *which map was being sorted* is kept.
 
 Placement is a decision (§3), but its meaning is already extracted into `tier` — the residual x/y is display geometry and belongs to the renderer, not the artifact. `bends` are display-only by §3's own wording. `order` is the student's chosen sequence for the sort list; it re-sequences that list only and never the graph's own capture order, which the arc map reads as reading order — so it too is display state. (Production: byte→concept becomes many-to-many.)
 

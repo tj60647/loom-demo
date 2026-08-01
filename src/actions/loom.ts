@@ -1,13 +1,14 @@
 "use server"
 
 import { db } from "@/db"
-import { concepts, bytes, edges, users, sourcePages, sources, reads, views, graphEvents } from "@/db/schema"
-import { and, asc, desc, eq, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm"
+import { concepts, bytes, edges, users, sourcePages, sources, reads, views, graphEvents, maps } from "@/db/schema"
+import { and, asc, desc, eq, inArray, isNull, like, ne, or, sql, type SQL } from "drizzle-orm"
 import type { PgColumn } from "drizzle-orm/pg-core"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { resolveCourseIdForUser } from "@/lib/courses"
-import type { CardTableView, GraphEvent, Tier } from "@/lib/types"
+import { scopeFromKey, scopeOf } from "@/lib/scope"
+import type { CardTableView, GraphEvent, LoomMap, LoomViews, Tier } from "@/lib/types"
 import type { ParsedImport } from "@/lib/graphExport"
 import { WORKED_EXAMPLE, WORKED_EXAMPLE_SOURCE } from "@/lib/example"
 
@@ -40,6 +41,7 @@ async function resolveActiveCourseId(userId: string, courseIdRaw?: string | null
   await db.update(bytes).set({ courseId }).where(and(eq(bytes.userId, userId), isNull(bytes.courseId)))
   await db.update(edges).set({ courseId }).where(and(eq(edges.userId, userId), isNull(edges.courseId)))
   await db.update(graphEvents).set({ courseId }).where(and(eq(graphEvents.userId, userId), isNull(graphEvents.courseId)))
+  await db.update(maps).set({ courseId }).where(and(eq(maps.userId, userId), isNull(maps.courseId)))
 
   // read and view carry unique constraints, so a blind UPDATE could collide
   // with a row the target course already has (e.g. after a course delete set
@@ -83,7 +85,7 @@ async function recordEvent(
   userId: string,
   courseId: string | null,
   kind: string,
-  entityType: "concept" | "byte" | "edge" | "graph",
+  entityType: "concept" | "byte" | "edge" | "graph" | "map",
   entityId: string | null,
   payload?: Record<string, unknown>
 ) {
@@ -95,53 +97,70 @@ async function recordEvent(
 }
 
 /**
- * Drop deleted entities' geometry from the card-table view row so the stored
- * view never accumulates keys for rows that no longer exist. Best-effort: the
- * view is a projection, never the source of truth.
+ * Drop deleted entities' geometry from every view row — the legacy cardTable
+ * and each map's own `map:<id>` — and, when `tiers` names deleted concepts,
+ * from every map's tier record, so no stored projection accumulates keys for
+ * rows that no longer exist. Best-effort: views are projections, never the
+ * source of truth, and tier cleanup is the same hygiene (the concept.delete
+ * event is the record of the act).
  */
-async function pruneCardTable(
+async function pruneViews(
   userId: string,
   courseId: string | null,
-  prune: { positions?: string[]; bends?: string[]; order?: string[]; pins?: string[] }
+  prune: { positions?: string[]; bends?: string[]; order?: string[]; pins?: string[]; tiers?: string[] }
 ) {
   try {
     const rows = await db.select().from(views)
-      .where(and(eq(views.userId, userId), inCourse(views.courseId, courseId), eq(views.key, "cardTable")))
-      .orderBy(desc(views.updatedAt))
-      .limit(1)
-    const row = rows[0]
-    if (!row) return
-    const data = row.data as Partial<CardTableView>
-    const positions = { ...(data.positions ?? {}) }
-    const bends = { ...(data.bends ?? {}) }
-    let order = data.order ? [...data.order] : undefined
-    let pins = data.pins ? [...data.pins] : undefined
-    let changed = false
-    prune.positions?.forEach((id) => { if (id in positions) { delete positions[id]; changed = true } })
-    prune.bends?.forEach((id) => { if (id in bends) { delete bends[id]; changed = true } })
-    if (order && prune.order?.length) {
-      const drop = new Set(prune.order)
-      const next = order.filter((id) => !drop.has(id))
-      if (next.length !== order.length) { order = next; changed = true }
+      .where(and(
+        eq(views.userId, userId),
+        inCourse(views.courseId, courseId),
+        or(eq(views.key, "cardTable"), like(views.key, "map:%"))
+      ))
+    for (const row of rows) {
+      const data = row.data as Partial<CardTableView>
+      const positions = { ...(data.positions ?? {}) }
+      const bends = { ...(data.bends ?? {}) }
+      let order = data.order ? [...data.order] : undefined
+      let pins = data.pins ? [...data.pins] : undefined
+      let changed = false
+      prune.positions?.forEach((id) => { if (id in positions) { delete positions[id]; changed = true } })
+      prune.bends?.forEach((id) => { if (id in bends) { delete bends[id]; changed = true } })
+      if (order && prune.order?.length) {
+        const drop = new Set(prune.order)
+        const next = order.filter((id) => !drop.has(id))
+        if (next.length !== order.length) { order = next; changed = true }
+      }
+      if (pins && prune.pins?.length) {
+        const drop = new Set(prune.pins)
+        const next = pins.filter((id) => !drop.has(id))
+        if (next.length !== pins.length) { pins = next; changed = true }
+      }
+      if (changed) {
+        await db.update(views).set({
+          data: {
+            positions,
+            bends,
+            ...(order ? { order } : {}),
+            ...(pins ? { pins } : {}),
+          },
+          updatedAt: new Date(),
+        }).where(eq(views.id, row.id))
+      }
     }
-    if (pins && prune.pins?.length) {
-      const drop = new Set(prune.pins)
-      const next = pins.filter((id) => !drop.has(id))
-      if (next.length !== pins.length) { pins = next; changed = true }
-    }
-    if (changed) {
-      await db.update(views).set({
-        data: {
-          positions,
-          bends,
-          ...(order ? { order } : {}),
-          ...(pins ? { pins } : {}),
-        },
-        updatedAt: new Date(),
-      }).where(eq(views.id, row.id))
+    if (prune.tiers?.length) {
+      const mapRows = await db.select().from(maps)
+        .where(and(eq(maps.userId, userId), inCourse(maps.courseId, courseId)))
+      for (const m of mapRows) {
+        const next = { ...m.tiers }
+        let changed = false
+        prune.tiers.forEach((id) => { if (id in next) { delete next[id]; changed = true } })
+        // updatedAt deliberately untouched: pruning is hygiene, not a student
+        // act, and must not reshuffle "most recently worked on" selection.
+        if (changed) await db.update(maps).set({ tiers: next }).where(eq(maps.id, m.id))
+      }
     }
   } catch (e) {
-    console.warn("[pruneCardTable] failed", e)
+    console.warn("[pruneViews] failed", e)
   }
 }
 
@@ -164,25 +183,38 @@ export async function getUserLoomData() {
     .where(and(eq(reads.userId, userId), inCourse(reads.courseId, courseId)))
     .orderBy(desc(reads.updatedAt))
     .limit(1)
+  const userMaps = await db.select().from(maps)
+    .where(and(eq(maps.userId, userId), inCourse(maps.courseId, courseId)))
+    .orderBy(asc(maps.createdAt), asc(maps.id))
   const viewRows = await db.select().from(views)
-    .where(and(eq(views.userId, userId), inCourse(views.courseId, courseId), eq(views.key, "cardTable")))
-    .orderBy(desc(views.updatedAt))
-    .limit(1)
+    .where(and(
+      eq(views.userId, userId),
+      inCourse(views.courseId, courseId),
+      or(eq(views.key, "cardTable"), like(views.key, "map:%"))
+    ))
 
-  const cardTableData = (viewRows[0]?.data ?? {}) as Partial<CardTableView>
-  const cardTable: CardTableView = {
-    positions: cardTableData.positions ?? {},
-    bends: cardTableData.bends ?? {},
-    ...(cardTableData.order ? { order: cardTableData.order } : {}),
-    ...(cardTableData.pins ? { pins: cardTableData.pins } : {}),
-  }
+  const mapIds = new Set(userMaps.map((m) => m.id))
+  const loomViews: LoomViews = { cardTable: { positions: {}, bends: {} } }
+  viewRows.forEach((row) => {
+    // Self-healing read: geometry for a map that no longer exists stays out of
+    // the state rather than accumulating as an unreachable key.
+    if (row.key !== "cardTable" && !mapIds.has(row.key.slice("map:".length))) return
+    const data = (row.data ?? {}) as Partial<CardTableView>
+    loomViews[row.key] = {
+      positions: data.positions ?? {},
+      bends: data.bends ?? {},
+      ...(data.order ? { order: data.order } : {}),
+      ...(data.pins ? { pins: data.pins } : {}),
+    }
+  })
 
   return {
     concepts: userConcepts,
     bytes: userBytes,
     edges: userEdges,
+    maps: userMaps as LoomMap[],
     read: readRows[0]?.text ?? "",
-    views: { cardTable },
+    views: loomViews,
   }
 }
 
@@ -257,7 +289,7 @@ export async function deleteConcept(id: string) {
     .returning({ label: concepts.label })
   if (removed.length > 0) {
     await recordEvent(userId, courseId, "concept.delete", "concept", id, { label: removed[0].label })
-    await pruneCardTable(userId, courseId, { positions: [id], order: [id], pins: [id] })
+    await pruneViews(userId, courseId, { positions: [id], order: [id], pins: [id], tiers: [id] })
   }
 }
 
@@ -472,15 +504,15 @@ export async function deleteEdge(id: string) {
     .returning({ fromId: edges.fromId, toId: edges.toId })
   if (removed.length > 0) {
     await recordEvent(userId, courseId, "edge.delete", "edge", id, removed[0])
-    await pruneCardTable(userId, courseId, { bends: [id] })
+    await pruneViews(userId, courseId, { bends: [id] })
   }
 }
 
 /**
- * "Your read" — part of the graph artifact (§6), persisted so it is never lost
- * on refresh (red line #5). Debounced client-side; the event records length
- * only, not every draft. Upsert against the (userId, courseId) unique so
- * concurrent saves can never mint duplicate rows.
+ * DEPRECATED (expand phase): the client no longer calls this — a map's read is
+ * saved via updateMap, which dual-writes this row when the map is the mirror.
+ * Kept so rolled-back clients still have their endpoint; the contract
+ * migration retires it with the rest of the mirror.
  */
 export async function saveRead(text: string) {
   const userId = await getUserId()
@@ -493,20 +525,220 @@ export async function saveRead(text: string) {
   await recordEvent(userId, courseId, "read.update", "graph", null, { chars: text.length })
 }
 
+// --- MAPS ---
+// A map is one named sorting of the concepts within a scope, with its own
+// paragraph and essence sentence. Parallel siblings, freely made and unmade.
+// Expand phase: the OLDEST whole-weave map is the "mirror" — its tiers, read
+// and geometry are dual-written into concept.tier, the read row and the
+// cardTable view, so rolled-back code still shows the student's current
+// whole-weave work. The maps table is authoritative; the mirror is insurance.
+
+const STORED_TIERS = ["p", "s", "t", "x"] as const
+type StoredTier = (typeof STORED_TIERS)[number]
+const MAX_MAPS = 60
+
+/** Keep only known concepts with a stored (non-'') tier — absent = unsorted. */
+function sanitizeTiers(
+  raw: Record<string, Tier>,
+  knownConceptIds: Set<string>
+): Record<string, StoredTier> {
+  const out: Record<string, StoredTier> = {}
+  Object.entries(raw).forEach(([conceptId, tier]) => {
+    if (!knownConceptIds.has(conceptId)) return
+    if ((STORED_TIERS as readonly string[]).includes(tier)) out[conceptId] = tier as StoredTier
+  })
+  return out
+}
+
+/** The mirror: the oldest whole-weave map, or null before any exists. */
+async function mirrorMap(userId: string, courseId: string | null) {
+  const rows = await db.select().from(maps)
+    .where(and(eq(maps.userId, userId), inCourse(maps.courseId, courseId), eq(maps.scopeKey, "")))
+    .orderBy(asc(maps.createdAt), asc(maps.id))
+    .limit(1)
+  return rows[0] ?? null
+}
+
+export async function createMap(data: { scopeKey: string; name: string }): Promise<LoomMap> {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+
+  const existing = await db.select({ id: maps.id }).from(maps)
+    .where(and(eq(maps.userId, userId), inCourse(maps.courseId, courseId)))
+  if (existing.length >= MAX_MAPS) {
+    throw new Error("That is a lot of maps — delete one you are done with first.")
+  }
+
+  const scopeKey = scopeFromKey(data.scopeKey).key
+  const name = data.name.trim().slice(0, 80) || "Map"
+
+  const inserted = await db.insert(maps).values({ courseId, userId, scopeKey, name }).returning()
+  await recordEvent(userId, courseId, "map.create", "map", inserted[0].id, { name, scopeKey })
+  return inserted[0] as LoomMap
+}
+
+export async function updateMap(
+  id: string,
+  data: Partial<{ name: string; read: string; essence: string; tiers: Record<string, Tier> }>
+) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+
+  const rows = await db.select().from(maps)
+    .where(and(eq(maps.id, id), eq(maps.userId, userId), inCourse(maps.courseId, courseId)))
+    .limit(1)
+  const row = rows[0]
+  if (!row) throw new Error("Map not found.")
+
+  const set: Partial<typeof maps.$inferInsert> = { updatedAt: new Date() }
+  if (data.name !== undefined) set.name = data.name.trim().slice(0, 80) || row.name
+  if (data.read !== undefined) set.read = data.read
+  if (data.essence !== undefined) set.essence = data.essence
+
+  // Tiers arrive as the whole object (so "make all primary" is one write); the
+  // server diffs against the stored row so the event records what changed —
+  // including scopeKey and mapId, the record NEXT_SESSION's trap (b) demands.
+  let changed: Record<string, Tier> | undefined
+  if (data.tiers !== undefined) {
+    const known = new Set(
+      (await db.select({ id: concepts.id }).from(concepts)
+        .where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))).map((r) => r.id)
+    )
+    const nextTiers = sanitizeTiers(data.tiers, known)
+    changed = {}
+    Object.entries(nextTiers).forEach(([cid, tier]) => {
+      if (row.tiers[cid] !== tier) changed![cid] = tier
+    })
+    Object.keys(row.tiers).forEach((cid) => {
+      if (!(cid in nextTiers)) changed![cid] = ""
+    })
+    set.tiers = nextTiers
+  }
+
+  const mirror = row.scopeKey === "" ? await mirrorMap(userId, courseId) : null
+  const isMirror = mirror?.id === row.id
+
+  const statements = [
+    db.update(maps).set(set)
+      .where(and(eq(maps.id, id), eq(maps.userId, userId), inCourse(maps.courseId, courseId))),
+    ...(isMirror && changed
+      ? Object.entries(changed).map(([cid, tier]) =>
+          db.update(concepts).set({ tier })
+            .where(and(eq(concepts.id, cid), eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))
+        )
+      : []),
+    ...(isMirror && data.read !== undefined
+      ? [db.insert(reads).values({ userId, courseId, text: data.read }).onConflictDoUpdate({
+          target: [reads.userId, reads.courseId],
+          set: { text: data.read, updatedAt: new Date() },
+        })]
+      : []),
+  ]
+  await db.batch(statements as unknown as Parameters<typeof db.batch>[0])
+
+  const kind =
+    data.tiers !== undefined ? "map.retier" :
+    data.name !== undefined ? "map.rename" :
+    "map.update"
+  const payload: Record<string, unknown> = { scopeKey: row.scopeKey }
+  if (kind === "map.retier") payload.changed = changed
+  if (kind === "map.rename") payload.name = set.name
+  if (kind === "map.update") {
+    if (data.read !== undefined) payload.readChars = data.read.length
+    if (data.essence !== undefined) payload.essenceChars = data.essence.length
+  }
+  await recordEvent(userId, courseId, kind, "map", id, payload)
+}
+
+export async function deleteMap(id: string) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+
+  const rows = await db.select().from(maps)
+    .where(and(eq(maps.id, id), eq(maps.userId, userId), inCourse(maps.courseId, courseId)))
+    .limit(1)
+  const row = rows[0]
+  if (!row) return
+
+  const wasMirror = row.scopeKey === "" && (await mirrorMap(userId, courseId))?.id === row.id
+
+  await db.batch([
+    db.delete(maps).where(and(eq(maps.id, id), eq(maps.userId, userId), inCourse(maps.courseId, courseId))),
+    db.delete(views).where(and(eq(views.userId, userId), inCourse(views.courseId, courseId), eq(views.key, `map:${id}`))),
+  ])
+  await recordEvent(userId, courseId, "map.delete", "map", id, { scopeKey: row.scopeKey, name: row.name })
+
+  // The mirror role passes to the newly-oldest whole-weave map; re-point the
+  // legacy columns at it so a rollback would show current work, not the deleted
+  // map's. Best-effort — the maps table stays authoritative either way.
+  if (wasMirror) {
+    try {
+      const next = await mirrorMap(userId, courseId)
+      if (!next) return
+      const nextView = await db.select().from(views)
+        .where(and(eq(views.userId, userId), inCourse(views.courseId, courseId), eq(views.key, `map:${next.id}`)))
+        .limit(1)
+      const statements = [
+        db.update(concepts).set({ tier: "" })
+          .where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId))),
+        ...Object.entries(next.tiers).map(([cid, tier]) =>
+          db.update(concepts).set({ tier })
+            .where(and(eq(concepts.id, cid), eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))
+        ),
+        db.insert(reads).values({ userId, courseId, text: next.read }).onConflictDoUpdate({
+          target: [reads.userId, reads.courseId],
+          set: { text: next.read, updatedAt: new Date() },
+        }),
+        ...(nextView[0]
+          ? [db.insert(views).values({ userId, courseId, key: "cardTable", data: nextView[0].data }).onConflictDoUpdate({
+              target: [views.userId, views.courseId, views.key],
+              set: { data: nextView[0].data, updatedAt: new Date() },
+            })]
+          : []),
+      ]
+      await db.batch(statements as unknown as Parameters<typeof db.batch>[0])
+    } catch (e) {
+      console.warn("[deleteMap] re-mirror failed", e)
+    }
+  }
+}
+
 /**
  * Persist student-authored view geometry (spec §6 `views`). Only student
  * gestures reach this — derived auto-layout must be computed for display and
  * discarded, never saved (red line #7). No history event: views are
  * projections of the graph, not part of its development.
+ *
+ * Accepts the legacy `cardTable` key or `map:<id>` for a map the caller owns —
+ * server functions are directly POSTable, so the ownership check is the
+ * backstop against writing arbitrary view rows. Saving the mirror map's
+ * geometry echoes it into `cardTable` (expand-phase rollback insurance).
  */
-export async function saveView(key: "cardTable", data: CardTableView) {
+export async function saveView(key: string, data: CardTableView) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
-  await db.insert(views).values({ userId, courseId, key, data }).onConflictDoUpdate({
-    target: [views.userId, views.courseId, views.key],
-    set: { data, updatedAt: new Date() },
-  })
+  let mirrorEcho = false
+  if (key !== "cardTable") {
+    const match = /^map:(.+)$/.exec(key)
+    if (!match) throw new Error("Unknown view key.")
+    const owned = await db.select({ id: maps.id, scopeKey: maps.scopeKey }).from(maps)
+      .where(and(eq(maps.id, match[1]), eq(maps.userId, userId), inCourse(maps.courseId, courseId)))
+      .limit(1)
+    if (!owned.length) throw new Error("Unknown view key.")
+    if (owned[0].scopeKey === "") {
+      mirrorEcho = (await mirrorMap(userId, courseId))?.id === owned[0].id
+    }
+  }
+
+  const upsert = (k: string) =>
+    db.insert(views).values({ userId, courseId, key: k, data }).onConflictDoUpdate({
+      target: [views.userId, views.courseId, views.key],
+      set: { data, updatedAt: new Date() },
+    })
+
+  if (mirrorEcho) await db.batch([upsert(key), upsert("cardTable")])
+  else await upsert(key)
 }
 
 /**
@@ -534,10 +766,11 @@ export async function getGraphEvents(): Promise<GraphEvent[]> {
   recorded
     .filter((e) => e.kind === "graph.import" || e.kind === "graph.example")
     .forEach((e) => {
-      const snapshot = (e.payload as { snapshot?: { concepts?: { id: string }[]; bytes?: { id: string }[]; edges?: { id: string }[] } } | null)?.snapshot
+      const snapshot = (e.payload as { snapshot?: { concepts?: { id: string }[]; bytes?: { id: string }[]; edges?: { id: string }[]; maps?: { id: string }[] } } | null)?.snapshot
       snapshot?.concepts?.forEach((c) => covered.add(c.id))
       snapshot?.bytes?.forEach((b) => covered.add(b.id))
       snapshot?.edges?.forEach((ed) => covered.add(ed.id))
+      snapshot?.maps?.forEach((m) => covered.add(m.id))
     })
 
   const [userConcepts, userBytes, userEdges] = [
@@ -566,6 +799,18 @@ export async function getGraphEvents(): Promise<GraphEvent[]> {
     })
   )
 
+  // Maps born before event recording (the 0012 backfill) get a synthesized
+  // start too, so the timeline names them honestly.
+  const userMaps = await db.select().from(maps)
+    .where(and(eq(maps.userId, userId), inCourse(maps.courseId, courseId)))
+    .orderBy(asc(maps.createdAt), asc(maps.id))
+  userMaps.filter((m) => !covered.has(m.id)).forEach((m) =>
+    synthesized.push({
+      id: `synth-m-${m.id}`, userId, courseId, kind: "map.create", entityType: "map",
+      entityId: m.id, payload: { name: m.name, scopeKey: m.scopeKey, synthesized: true }, at: m.createdAt,
+    })
+  )
+
   return [...recorded, ...synthesized].sort((a, b) => a.at.getTime() - b.at.getTime())
 }
 
@@ -581,6 +826,7 @@ export async function resetGraph() {
   const counts = {
     concepts: (await db.select({ id: concepts.id }).from(concepts).where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))).length,
     edges: (await db.select({ id: edges.id }).from(edges).where(and(eq(edges.userId, userId), inCourse(edges.courseId, courseId)))).length,
+    maps: (await db.select({ id: maps.id }).from(maps).where(and(eq(maps.userId, userId), inCourse(maps.courseId, courseId)))).length,
   }
   await recordEvent(userId, courseId, "graph.reset", "graph", null, counts)
 
@@ -588,17 +834,19 @@ export async function resetGraph() {
     db.delete(edges).where(and(eq(edges.userId, userId), inCourse(edges.courseId, courseId))),
     db.delete(bytes).where(and(eq(bytes.userId, userId), inCourse(bytes.courseId, courseId))),
     db.delete(concepts).where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId))),
+    db.delete(maps).where(and(eq(maps.userId, userId), inCourse(maps.courseId, courseId))),
     db.delete(reads).where(and(eq(reads.userId, userId), inCourse(reads.courseId, courseId))),
     db.delete(views).where(and(eq(views.userId, userId), inCourse(views.courseId, courseId))),
   ])
 }
 
-const IMPORT_LIMITS = { concepts: 400, bytes: 2000, edges: 2000 }
+const IMPORT_LIMITS = { concepts: 400, bytes: 2000, edges: 2000, maps: 40 }
 
 type GraphSnapshot = {
   concepts: { id: string; label: string; tier: Tier }[]
   bytes: { id: string; conceptId: string }[]
   edges: { id: string; fromId: string; toId: string; sentence: string; handle: string }[]
+  maps?: { id: string; name: string; scopeKey: string }[]
 }
 
 /**
@@ -617,15 +865,18 @@ export async function importGraph(parsed: ParsedImport) {
 
   if (parsed.concepts.length > IMPORT_LIMITS.concepts ||
       parsed.bytes.length > IMPORT_LIMITS.bytes ||
-      parsed.edges.length > IMPORT_LIMITS.edges) {
+      parsed.edges.length > IMPORT_LIMITS.edges ||
+      parsed.maps.length > IMPORT_LIMITS.maps) {
     throw new Error("That export is larger than an import will accept.")
   }
 
-  // Imported anchors may point at readings this deployment doesn't have; only
-  // keep sourceIds the FK will accept.
+  // Imported anchors and map scopes may point at readings this deployment
+  // doesn't have; only keep sourceIds that actually resolve.
   const anchorIds = [...new Set(parsed.bytes.map((b) => b.anchor?.sourceId).filter((v): v is string => !!v))]
-  const knownSources = anchorIds.length
-    ? new Set((await db.select({ id: sources.id }).from(sources).where(inArray(sources.id, anchorIds))).map((r) => r.id))
+  const scopeSourceIds = [...new Set(parsed.maps.flatMap((m) => (m.scopeKey ? m.scopeKey.split(",") : [])))]
+  const referencedSourceIds = [...new Set([...anchorIds, ...scopeSourceIds])]
+  const knownSources = referencedSourceIds.length
+    ? new Set((await db.select({ id: sources.id }).from(sources).where(inArray(sources.id, referencedSourceIds))).map((r) => r.id))
     : new Set<string>()
 
   // Remint every id up front so the rows, the view remap, and the history
@@ -666,32 +917,72 @@ export async function importGraph(parsed: ParsedImport) {
       }
     })
 
-  const positions: CardTableView["positions"] = {}
-  Object.entries(parsed.cardTable.positions).forEach(([key, p]) => {
-    const id = conceptIdByKey.get(key)
-    if (id) positions[id] = p
+  // Remap a parsed view's keys onto the minted ids — trap (c)'s geometry half.
+  const remapView = (view: CardTableView): CardTableView => {
+    const positions: CardTableView["positions"] = {}
+    Object.entries(view.positions).forEach(([key, p]) => {
+      const id = conceptIdByKey.get(key)
+      if (id) positions[id] = p
+    })
+    const bends: CardTableView["bends"] = {}
+    Object.entries(view.bends).forEach(([key, b]) => {
+      const id = edgeIdByKey.get(key)
+      if (id) bends[id] = b
+    })
+    const order = (view.order ?? [])
+      .map((key) => conceptIdByKey.get(key))
+      .filter((id): id is string => !!id)
+    const pins = (view.pins ?? [])
+      .map((key) => conceptIdByKey.get(key))
+      .filter((id): id is string => !!id)
+    return { positions, bends, order, pins }
+  }
+  const hasGeometry = (v: CardTableView) =>
+    Object.keys(v.positions).length > 0 || Object.keys(v.bends).length > 0 || (v.order?.length ?? 0) > 0 || (v.pins?.length ?? 0) > 0
+
+  const cardTable = remapView(parsed.cardTable)
+
+  // Maps: remint ids, remap tier keys through conceptIdByKey (trap (c)), and
+  // resolve each scopeKey against the readings this deployment holds. A scope
+  // that resolves to nothing falls back to the whole weave rather than the map
+  // being skipped — the student's tiers, essence and read stay reachable (red
+  // line #5), which beats scope fidelity.
+  const mapIdByKey = new Map(parsed.maps.map((m) => [m.key, crypto.randomUUID()]))
+  const mapRows = parsed.maps.map((m) => {
+    const surviving = m.scopeKey ? m.scopeKey.split(",").filter((id) => knownSources.has(id)) : []
+    const tiers: Record<string, "p" | "s" | "t" | "x"> = {}
+    Object.entries(m.tiers).forEach(([key, tier]) => {
+      const cid = conceptIdByKey.get(key)
+      if (cid && tier) tiers[cid] = tier
+    })
+    return {
+      id: mapIdByKey.get(m.key)!,
+      courseId, userId,
+      scopeKey: scopeOf(surviving).key,
+      name: m.name, essence: m.essence, read: m.read,
+      tiers,
+    }
   })
-  const bends: CardTableView["bends"] = {}
-  Object.entries(parsed.cardTable.bends).forEach(([key, b]) => {
-    const id = edgeIdByKey.get(key)
-    if (id) bends[id] = b
+  const mapViewRows = Object.entries(parsed.mapViews).flatMap(([mapKey, view]) => {
+    const mapId = mapIdByKey.get(mapKey)
+    if (!mapId) return []
+    const remapped = remapView(view)
+    return hasGeometry(remapped)
+      ? [{ userId, courseId, key: `map:${mapId}`, data: remapped as Record<string, unknown> }]
+      : []
   })
-  const order = (parsed.cardTable.order ?? [])
-    .map((key) => conceptIdByKey.get(key))
-    .filter((id): id is string => !!id)
-  const pins = (parsed.cardTable.pins ?? [])
-    .map((key) => conceptIdByKey.get(key))
-    .filter((id): id is string => !!id)
 
   const snapshot: GraphSnapshot = {
     concepts: conceptRows.map((c) => ({ id: c.id, label: c.label, tier: c.tier })),
     bytes: byteRows.map((b) => ({ id: b.id, conceptId: b.conceptId })),
     edges: edgeRows.map((e) => ({ id: e.id, fromId: e.fromId, toId: e.toId, sentence: e.sentence, handle: e.handle })),
+    maps: mapRows.map((m) => ({ id: m.id, name: m.name, scopeKey: m.scopeKey })),
   }
   await recordEvent(userId, courseId, "graph.import", "graph", null, {
     concepts: conceptRows.length,
     bytes: byteRows.length,
     edges: edgeRows.length,
+    maps: mapRows.length,
     snapshot,
   })
 
@@ -699,15 +990,18 @@ export async function importGraph(parsed: ParsedImport) {
     db.delete(edges).where(and(eq(edges.userId, userId), inCourse(edges.courseId, courseId))),
     db.delete(bytes).where(and(eq(bytes.userId, userId), inCourse(bytes.courseId, courseId))),
     db.delete(concepts).where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId))),
+    db.delete(maps).where(and(eq(maps.userId, userId), inCourse(maps.courseId, courseId))),
     db.delete(reads).where(and(eq(reads.userId, userId), inCourse(reads.courseId, courseId))),
     db.delete(views).where(and(eq(views.userId, userId), inCourse(views.courseId, courseId))),
     ...(conceptRows.length ? [db.insert(concepts).values(conceptRows)] : []),
     ...(byteRows.length ? [db.insert(bytes).values(byteRows)] : []),
     ...(edgeRows.length ? [db.insert(edges).values(edgeRows)] : []),
+    ...(mapRows.length ? [db.insert(maps).values(mapRows)] : []),
     ...(parsed.read ? [db.insert(reads).values({ userId, courseId, text: parsed.read })] : []),
-    ...(Object.keys(positions).length || Object.keys(bends).length || order.length || pins.length
-      ? [db.insert(views).values({ userId, courseId, key: "cardTable", data: { positions, bends, order, pins } })]
+    ...(hasGeometry(cardTable)
+      ? [db.insert(views).values({ userId, courseId, key: "cardTable", data: cardTable as Record<string, unknown> })]
       : []),
+    ...(mapViewRows.length ? [db.insert(views).values(mapViewRows)] : []),
   ]
   await db.batch(statements as unknown as Parameters<typeof db.batch>[0])
 
@@ -786,10 +1080,18 @@ export async function loadWorkedExample() {
     snapshot,
   })
 
+  // The example's whole-weave map, built from the same tiers the concept rows
+  // carry — mirror-consistent by construction.
+  const exampleTiers: Record<string, StoredTier> = {}
+  conceptRows.forEach((c) => {
+    if (c.tier) exampleTiers[c.id] = c.tier
+  })
+
   await db.batch([
     db.insert(concepts).values(conceptRows),
     db.insert(bytes).values(byteRows),
     db.insert(edges).values(edgeRows),
+    db.insert(maps).values({ courseId, userId, scopeKey: "", name: "Map 1", read: WORKED_EXAMPLE.read, essence: "", tiers: exampleTiers }),
     db.insert(reads).values({ userId, courseId, text: WORKED_EXAMPLE.read }).onConflictDoUpdate({
       target: [reads.userId, reads.courseId],
       set: { text: WORKED_EXAMPLE.read, updatedAt: new Date() },

@@ -4,10 +4,9 @@
 //
 // Reading-first (docs/reading-scope-and-map-passes.md §A.1): the shelf is the
 // home screen and this is what opens when you pick a reading off it, so the
-// 01-03 sequence runs INSIDE a text rather than across the course. `04 Map`
-// stays at the whole weave until placement is per-map (§A.8) — a reading's map
-// showing tiers sorted against another reading's concepts would be a map that
-// lies, and the map is what the chalk talk is drawn from.
+// 01-04 sequence runs INSIDE a text rather than across the course. `04 Map`
+// is honest per reading now that placement is per-map (maps carry their own
+// tiers): a reading's map sorts only against that reading's concepts.
 
 import { useState } from "react"
 import Link from "next/link"
@@ -67,7 +66,7 @@ export default function Workbench({ source }: { source: WorkbenchSource | null }
   const { data: session } = useSession()
   const { isLoading, scoped } = useLoom()
   const tabs: Tab[] = source
-    ? (source.hasFile ? ["reading", "open", "throw", "read"] : ["open", "throw", "read"])
+    ? (source.hasFile ? ["reading", "open", "throw", "read", "map"] : ["open", "throw", "read", "map"])
     : ["throw", "read", "map"]
   const [activeTab, setActiveTab] = useState<Tab>(tabs.includes("open") ? "open" : "throw")
   const [visited, setVisited] = useState<ReadonlySet<Tab>>(
@@ -202,11 +201,9 @@ export default function Workbench({ source }: { source: WorkbenchSource | null }
         <div className={`panel ${activeTab === "read" ? "active" : ""}`}>
           {shouldRender("read") && <ReadTab />}
         </div>
-        {!source && (
-          <div className={`panel ${activeTab === "map" ? "active" : ""}`}>
-            {shouldRender("map") && <MapTab />}
-          </div>
-        )}
+        <div className={`panel ${activeTab === "map" ? "active" : ""}`}>
+          {shouldRender("map") && <MapTab />}
+        </div>
         <FirstRunWalkthrough />
       </main>
 
