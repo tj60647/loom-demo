@@ -56,7 +56,7 @@ function readInt(formData: FormData, key: string) {
 function revalidateLibrary() {
   revalidatePath("/admin/library")
   // Course reading lists render on the Courses tab, so every membership or
-  // placement change has to invalidate it too — otherwise a reading added from
+  // schedule change has to invalidate it too — otherwise a reading added from
   // the Readings tab doesn't appear in its course until something else evicts
   // the cache.
   revalidatePath("/admin/courses")
@@ -603,7 +603,14 @@ export async function setCourseSourceVisibility(formData: FormData) {
   revalidateLibrary()
 }
 
-export async function updateCourseSourcePlacement(formData: FormData) {
+/**
+ * When a reading is due in this course, and in what order that week.
+ *
+ * Named "schedule", not "placement": placement already means putting a
+ * LEARNER in a section (see assignMemberSection), and one word for two
+ * unrelated moves is how a roster edit gets mistaken for a syllabus edit.
+ */
+export async function updateCourseSourceSchedule(formData: FormData) {
   await requireAdmin()
 
   const courseId = await exactCourseId(readText(formData, "courseId"))

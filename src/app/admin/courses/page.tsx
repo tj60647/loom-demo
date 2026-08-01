@@ -11,7 +11,7 @@ import {
   getReadingsByCourse,
   removeSourceFromCourse,
   setCourseSourceVisibility,
-  updateCourseSourcePlacement,
+  updateCourseSourceSchedule,
 } from "@/actions/sources"
 import { checkAdmin } from "@/actions/admin"
 import { db } from "@/db"
@@ -199,10 +199,10 @@ export default async function AdminCoursesPage({
                           <div style={{ display: "flex", gap: "10px", marginTop: "8px", flexWrap: "wrap", alignItems: "flex-start" }}>
                             <details>
                               <summary className="act" style={{ listStyle: "none", cursor: "pointer" }}>
-                                placement
+                                schedule
                               </summary>
                               <form
-                                action={updateCourseSourcePlacement}
+                                action={updateCourseSourceSchedule}
                                 style={{ display: "grid", gap: "8px", marginTop: "8px" }}
                               >
                                 <input type="hidden" name="courseId" value={course.id} />
@@ -232,7 +232,7 @@ export default async function AdminCoursesPage({
                                   Core reading (students graph this one)
                                 </label>
                                 <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>
-                                  Save Placement
+                                  Save schedule
                                 </button>
                               </form>
                             </details>
