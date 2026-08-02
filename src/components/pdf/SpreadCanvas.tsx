@@ -171,7 +171,10 @@ const CARD_FALLBACK_H = 96
 // unit) and the ones in view re-render to match the zoom once a gesture
 // settles. Quantized to half-steps so tiny zoom changes don't re-render.
 const BASE_RES = 1
-const MAX_RES = 6
+// High enough that the raster stays sharp at max zoom (8× spread fit on a
+// retina display); the self-balancing budget means only a page-fraction ever
+// renders at this level. Well under the browser's ~16k canvas dimension cap.
+const MAX_RES = 12
 const SETTLE_MS = 200
 
 
@@ -367,7 +370,7 @@ export default function SpreadCanvas({ url, sourceName, sourceId, onClose }: Spr
     if (!zb || !layout || !viewport || !spreadFitK) return
     const pad = layout.spreadGap * 4
     const minK = Math.min(viewport.w / (layout.canvasW + pad), viewport.h / (layout.canvasH + pad))
-    zb.scaleExtent([Math.min(minK, spreadFitK), spreadFitK * 4])
+    zb.scaleExtent([Math.min(minK, spreadFitK), spreadFitK * 8])
       .translateExtent([[-pad, -pad], [layout.canvasW + pad, layout.canvasH + pad]])
   }, [layout, viewport, spreadFitK])
 
