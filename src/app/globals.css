@@ -11,8 +11,19 @@
   --display:"Fraunces",Georgia,serif;--body:"Newsreader",Georgia,serif;--mono:ui-monospace,Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box} html,body{margin:0}
+/* The chrome is a frame, not part of the page. The wordmark, the reading's own
+   bar and the journey hold still while only the work below them scrolls: the
+   journey is meant to be always in view, and it cannot be that if it scrolls
+   away. tab 00 gets back the steady full-height reading area it had when the
+   viewer was a fixed takeover, without taking the nav away with it. */
+html{height:100%}
 body{background:radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/26px 26px,var(--paper);
-  color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+header,.scopebar,nav{flex:0 0 auto}
+/* min-height:0 or a flex item refuses to shrink below its content and the
+   scroll silently moves back to the document. */
+main,.adminshell{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
 h1,h2,h3{font-family:var(--display);font-weight:500;margin:0}
 .label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
 .cap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--grey)}
@@ -32,8 +43,14 @@ nav button,nav a.station{font-family:var(--display);font-size:18px;background:no
 nav button.active,nav a.station.active{color:var(--ink);border-bottom-color:var(--ochre)}
 nav .step{font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-right:7px;color:var(--grey)}
 nav button.active .step,nav a.station.active .step{color:var(--ochre)}
-main{padding:24px 26px 86px;max-width:1100px;margin:0 auto}
+/* Full-bleed so the scrollbar rides the window edge rather than the edge of a
+   centred column; the 1100px measure is kept by padding instead of max-width. */
+main{padding:24px max(26px,calc((100% - 1100px)/2)) 86px;margin:0}
 .panel{display:none} .panel.active{display:block}
+/* 00 · Reading hands its whole height to the viewer, which scrolls itself.
+   No padding, no page scroll — the text is the thing on this station. */
+main.station-reading{padding:0;overflow:hidden}
+main.station-reading>.panel.active{height:100%}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:28px}
 @media(max-width:860px){.two{grid-template-columns:1fr}}
 .card{border:1px solid var(--rule);border-radius:4px;padding:18px;background:rgba(255,255,255,.5)}

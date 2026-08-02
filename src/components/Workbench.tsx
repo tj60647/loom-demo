@@ -72,7 +72,12 @@ export default function Workbench({
   /** Landing tab for journey deep links (`/weave?tab=map`); validated below. */
   initialTab?: Tab
 }) {
-  const { data: session } = useSession()
+  // `status`, not just `session`: next-auth reports "loading" on every hard
+  // load while it fetches /api/auth/session, and during that window `session`
+  // is null. Reading only the session made a signed-in student's own reading
+  // greet them with "Please sign in to continue" for a few hundred
+  // milliseconds before the workbench appeared.
+  const { data: session, status } = useSession()
   const { isLoading, scoped } = useLoom()
   const tabs: Tab[] = source
     ? (source.hasFile ? ["reading", "open", "throw", "read", "map"] : ["open", "throw", "read", "map"])
@@ -110,19 +115,10 @@ export default function Workbench({
     goTo("open")
   }
 
-  if (!session) {
-    return (
-      <main>
-        <div className="empty" style={{ marginTop: "100px" }}>
-          <h2>Welcome to Loom.</h2>
-          <span className="cap">Please sign in to continue</span>
-        </div>
-        <FirstRunWalkthrough autoOpen={false} />
-      </main>
-    )
-  }
-
-  if (isLoading) {
+  // Loading comes FIRST. Until next-auth has answered we do not yet know
+  // whether anybody is signed in, and guessing "signed out" is the guess that
+  // shows a sign-in screen to someone who is already signed in.
+  if (status === "loading" || (session && isLoading)) {
     // The journey stays put while the loom loads: it is the one fixed thing
     // under the header, and blinking it out mid-load makes the app look like
     // it is rebuilding itself around you.
@@ -136,6 +132,18 @@ export default function Workbench({
           <FirstRunWalkthrough autoOpen={false} />
         </main>
       </>
+    )
+  }
+
+  if (!session) {
+    return (
+      <main>
+        <div className="empty" style={{ marginTop: "100px" }}>
+          <h2>Welcome to Loom.</h2>
+          <span className="cap">Please sign in to continue</span>
+        </div>
+        <FirstRunWalkthrough autoOpen={false} />
+      </main>
     )
   }
 
@@ -186,7 +194,11 @@ export default function Workbench({
         )}
       />
 
-      <main>
+      {/* The text gets the room. On 00 the viewer manages its own scrolling
+          and wants every pixel under the journey, so main stops padding and
+          stops scrolling and simply hands over its height. Every other station
+          is an ordinary scrolling page. */}
+      <main className={activeTab === "reading" ? "station-reading" : undefined}>
         {source?.hasFile && (
           <div className={`panel ${activeTab === "reading" ? "active" : ""}`}>
             {activeTab === "reading" && (

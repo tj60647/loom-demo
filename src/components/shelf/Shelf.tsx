@@ -20,7 +20,9 @@ import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import JourneyNav from "@/components/ui/JourneyNav"
 
 export default function Shelf() {
-  const { data: session } = useSession()
+  // See the note in Workbench: `status` is what distinguishes "nobody is
+  // signed in" from "we have not asked yet".
+  const { data: session, status } = useSession()
   const { state, isLoading, loadExample, flash } = useLoom()
   const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
   const [exampleBusy, setExampleBusy] = useState(false)
@@ -48,6 +50,19 @@ export default function Shelf() {
   }, [courseReadings])
 
   const untethered = state.bytes.filter((b) => !b.sourceId).length
+
+  if (status === "loading") {
+    return (
+      <>
+        <JourneyNav active="readings" />
+        <main>
+          <div className="empty" style={{ marginTop: "100px" }}>
+            <h2>Loading your readings...</h2>
+          </div>
+        </main>
+      </>
+    )
+  }
 
   if (!session) {
     return (

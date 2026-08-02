@@ -7,7 +7,21 @@ import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import JourneyNav from "@/components/ui/JourneyNav"
 
 export default function KeepPage() {
-  const { data: session } = useSession()
+  // See the note in Workbench: "loading" is not "signed out".
+  const { data: session, status } = useSession()
+
+  if (status === "loading") {
+    return (
+      <>
+        <JourneyNav active="keep" />
+        <main>
+          <div className="empty" style={{ marginTop: "100px" }}>
+            <h2>Loading your loom...</h2>
+          </div>
+        </main>
+      </>
+    )
+  }
 
   if (!session) {
     return (

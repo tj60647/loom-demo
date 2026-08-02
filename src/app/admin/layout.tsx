@@ -36,7 +36,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }))
 
   return (
-    <div style={{ padding: "20px" }}>
+    // `adminshell` is what scrolls here: admin pages put their nav and their
+    // <main> inside this wrapper, so the wrapper is the flex child that has to
+    // own the overflow (see globals.css).
+    <div className="adminshell" style={{ padding: "20px" }}>
       <AdminNav courses={navCourses} />
       {children}
     </div>
