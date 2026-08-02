@@ -26,6 +26,10 @@ import { useDialog } from '@/components/providers/DialogProvider'
 import { hashText } from '@/lib/hash'
 import type { Byte, Concept } from '@/lib/types'
 
+// The proxy react-pdf hands to onLoadSuccess — typed via react-pdf itself so
+// it tracks the pdfjs-dist version react-pdf actually bundles.
+type PdfDoc = Parameters<NonNullable<React.ComponentProps<typeof Document>['onLoadSuccess']>>[0]
+
 // Same self-hosted worker as PdfViewer — copied out of pdfjs-dist by
 // scripts/copy-pdf-worker.mjs at prebuild/predev.
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
@@ -163,6 +167,13 @@ type CardModel = {
 const GUTTER = 36 // reading-mode side masks that hold the prev/next buttons
 const CARD_FALLBACK_H = 96
 
+// Zoom-aware rendering: pages rasterize at BASE_RES (canvas pixels per canvas
+// unit) and the ones in view re-render to match the zoom once a gesture
+// settles. Quantized to half-steps so tiny zoom changes don't re-render.
+const BASE_RES = 1
+const MAX_RES = 6
+const SETTLE_MS = 200
+
 
 interface SpreadCanvasProps {
   url: string
@@ -177,6 +188,10 @@ export default function SpreadCanvas({ url, sourceName, sourceId, onClose }: Spr
 
   const [numPages, setNumPages] = useState<number>()
   const [pageSize, setPageSize] = useState<{ w: number; h: number }>()
+  const [pdfDoc, setPdfDoc] = useState<PdfDoc | null>(null)
+  // Per-page raster resolution targets; pages absent from the map sit at
+  // BASE_RES. Recomputed when a zoom/fit gesture settles.
+  const [pageRes, setPageRes] = useState<Record<number, number>>({})
   const [mode, setMode] = useState<'single' | 'spread' | 'freeform'>('spread')
   const [focusPage, setFocusPage] = useState(1)
   const [viewport, setViewport] = useState<{ w: number; h: number }>()
@@ -212,17 +227,57 @@ export default function SpreadCanvas({ url, sourceName, sourceId, onClose }: Spr
   // The transform is applied imperatively so pan/zoom never re-renders ~40 pdf
   // pages per frame. --invk counter-scales concept titles (requirement: titles
   // never shrink below their reading-view size when zoomed out).
+  // After a settle: pages intersecting the view (plus half a page of margin)
+  // get resolution matching the zoom; everything else drops back to BASE_RES.
+  // The budget is self-balancing — high targets only ever apply to the few
+  // pages visible at high zoom, so rendered pixels stay near one screenful.
+  const resDeps = useRef({ layout, pageSize, viewport, numPages })
+  useEffect(() => {
+    resDeps.current = { layout, pageSize, viewport, numPages }
+  })
+  const retargetRes = useCallback(() => {
+    const { layout, pageSize, viewport, numPages } = resDeps.current
+    if (!layout || !pageSize || !viewport || !numPages) return
+    const t = tref.current
+    const dpr = window.devicePixelRatio || 1
+    const target = Math.max(BASE_RES, Math.min(MAX_RES, Math.ceil(t.k * dpr * 2) / 2))
+    const margin = pageSize.w / 2
+    const vx = -t.x / t.k - margin
+    const vy = -t.y / t.k - margin
+    const vw = viewport.w / t.k + margin * 2
+    const vh = viewport.h / t.k + margin * 2
+    const next: Record<number, number> = {}
+    for (const s of layout.spreads) {
+      for (const p of s.rightPage ? [s.leftPage, s.rightPage] : [s.leftPage]) {
+        const px = s.x + layout.railW + layout.gap + (p % 2 === 0 ? pageSize.w + layout.gap : 0)
+        const inView = px < vx + vw && px + pageSize.w > vx && s.y < vy + vh && s.y + layout.unitH > vy
+        if (inView && target > BASE_RES) next[p] = target
+      }
+    }
+    setPageRes(prev => {
+      const nk = Object.keys(next)
+      if (Object.keys(prev).length === nk.length && nk.every(k => prev[+k] === next[+k])) return prev
+      return next
+    })
+  }, [])
+
+  const settleTimer = useRef<number | undefined>(undefined)
   const applyTransform = useCallback((t: ZoomTransform) => {
     tref.current = t
     const el = canvasRef.current
     if (!el) return
     el.style.transform = `translate(${t.x}px, ${t.y}px) scale(${t.k})`
     el.style.setProperty('--invk', String(Math.max(1, fitKRef.current / t.k)))
-  }, [])
+    // When the transform stops moving, re-target raster resolutions. Until
+    // then the previous rasters just CSS-stretch — that's the interim display.
+    window.clearTimeout(settleTimer.current)
+    settleTimer.current = window.setTimeout(retargetRes, SETTLE_MS)
+  }, [retargetRes])
 
   // --- pdf load ---
 
-  const onDocLoad = useCallback((pdf: { numPages: number; getPage: (n: number) => Promise<{ getViewport: (o: { scale: number }) => { width: number; height: number } }> }) => {
+  const onDocLoad = useCallback((pdf: PdfDoc) => {
+    setPdfDoc(pdf)
     setNumPages(pdf.numPages)
     // ponytail: page 1's size stands in for every page; mixed-size documents
     // render each page at unit width and simply differ a little in height.
@@ -649,7 +704,7 @@ export default function SpreadCanvas({ url, sourceName, sourceId, onClose }: Spr
   // --- render ---
 
   const pagesEl = useMemo(() => {
-    if (!layout || !pageSize) return null
+    if (!layout || !pageSize || !pdfDoc) return null
     return layout.spreads.map(s => {
       const pages = [{ n: s.leftPage, right: false }, ...(s.rightPage ? [{ n: s.rightPage, right: true }] : [])]
       return pages.map(p => (
@@ -663,18 +718,23 @@ export default function SpreadCanvas({ url, sourceName, sourceId, onClose }: Spr
             width: pageSize.w,
           }}
         >
+          {/* The raster and the text layer are split on purpose: the raster
+              re-renders as zoom demands, while the text layer (selection +
+              highlight anchoring) renders once and is never touched again. */}
+          <PageRaster pdf={pdfDoc} pageNumber={p.n} cssW={pageSize.w} cssH={pageSize.h} res={pageRes[p.n] ?? BASE_RES} />
           <Page
             pageNumber={p.n}
             width={pageSize.w}
+            renderMode="none"
             renderTextLayer={true}
             renderAnnotationLayer={false}
             onRenderTextLayerSuccess={onTextLayer}
-            loading={<div className="sc-page-loading" style={{ width: pageSize.w, height: pageSize.h }} />}
+            loading={null}
           />
         </div>
       ))
     })
-  }, [layout, pageSize, onTextLayer])
+  }, [layout, pageSize, pdfDoc, pageRes, onTextLayer])
 
   const maskRects = useMemo(() => {
     if (mode === 'freeform' || !fit || !viewport) return null
@@ -845,6 +905,61 @@ export default function SpreadCanvas({ url, sourceName, sourceId, onClose }: Spr
         </button>
       )}
     </div>
+  )
+}
+
+/**
+ * One page's raster, rendered by pdf.js at `res` canvas pixels per canvas
+ * unit. Re-renders happen into an offscreen canvas and land in one synchronous
+ * resize-and-blit, so the previous raster stays on screen (CSS-stretched)
+ * until the sharper one replaces it — no blank flash mid-render.
+ */
+function PageRaster({ pdf, pageNumber, cssW, cssH, res }: {
+  pdf: PdfDoc
+  pageNumber: number
+  cssW: number
+  cssH: number
+  res: number
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let task: { cancel: () => void } | null = null
+    ;(async () => {
+      const page = await pdf.getPage(pageNumber)
+      if (cancelled) return
+      const base = page.getViewport({ scale: 1 })
+      const viewport = page.getViewport({ scale: (cssW / base.width) * res })
+      const off = document.createElement('canvas')
+      off.width = Math.round(viewport.width)
+      off.height = Math.round(viewport.height)
+      const renderTask = page.render({ canvas: off, viewport })
+      task = renderTask
+      await renderTask.promise
+      if (cancelled) return
+      const c = canvasRef.current
+      if (!c) return
+      c.width = off.width
+      c.height = off.height
+      c.getContext('2d')!.drawImage(off, 0, 0)
+    })().catch(() => { /* cancelled render tasks reject; nothing to do */ })
+    return () => {
+      cancelled = true
+      task?.cancel()
+    }
+  }, [pdf, pageNumber, cssW, res])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="sc-raster"
+      // Initial backing size only shapes the white placeholder; renders set
+      // the real backing imperatively and React never writes these again.
+      width={Math.round(cssW)}
+      height={Math.round(cssH)}
+      style={{ width: cssW }}
+    />
   )
 }
 
@@ -1092,7 +1207,13 @@ const scStyles = `
   background: #fff;
   box-shadow: 0 2px 14px rgba(0,0,0,0.10);
 }
-.sc-page-loading { background: #fff; }
+.sc-raster { display: block; height: auto; }
+/* The text layer overlays the raster; the Page div itself paints nothing. */
+.sc-page .react-pdf__Page {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
 .sc-page .react-pdf__Page__textContent span { pointer-events: auto; }
 .sc-overlay {
   position: absolute;

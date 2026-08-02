@@ -75,9 +75,32 @@ test.describe('Spread Canvas', () => {
       .toBe(true);
     await expect(page.locator('.sc-hl').first()).toBeAttached({ timeout: 10000 });
 
-    // Freeform hides the masks; back to spread mode restores them.
+    // Freeform hides the masks; pinch-zooming in (ctrl+wheel) makes the
+    // visible pages re-render sharper once the gesture settles: their canvas
+    // backing grows past its CSS size. Then back to spread mode restores masks.
     await page.locator('.sc-toggle button:has-text("Freeform")').click();
     await expect(page.locator('.sc-mask-left')).toBeHidden();
+    await page.locator('.sc-viewport').evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      for (let i = 0; i < 4; i++) {
+        el.dispatchEvent(new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          ctrlKey: true,
+          deltaY: -300,
+          clientX: r.left + r.width / 2,
+          clientY: r.top + r.height / 2,
+        }));
+      }
+    });
+    await expect
+      .poll(
+        () => page.locator('canvas.sc-raster').evaluateAll(
+          (cs) => cs.some((c) => (c as HTMLCanvasElement).width > (c as HTMLCanvasElement).clientWidth * 1.3)
+        ),
+        { timeout: 5000 }
+      )
+      .toBe(true);
     await page.locator('.sc-toggle button:has-text("Spread")').click();
     await expect(page.locator('.sc-mask-left')).toBeVisible();
 
