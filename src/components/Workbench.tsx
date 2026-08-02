@@ -160,16 +160,11 @@ export default function Workbench({
             {/* The library card used to carry this; the reading is the library
                 card now, so the affordance moves here rather than disappearing. */}
             {source.hasFile ? (
-              <span className="scopedl" style={{ display: "flex", gap: "14px", alignItems: "baseline" }}>
-                <button
-                  type="button"
-                  className="scopeback"
-                  style={{ border: "none", background: "none", padding: 0, cursor: "pointer" }}
-                  onClick={() => setCanvasOpen(true)}
-                >
-                  Read on Canvas
+              <span className="scopedl" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <button type="button" className="btn ghost compact" onClick={() => setCanvasOpen(true)}>
+                  Read
                 </button>
-                <a className="scopeback" href={`/api/readings/${source.id}?download=1`}>
+                <a className="btn ghost compact" href={`/api/readings/${source.id}?download=1`}>
                   Download PDF
                 </a>
               </span>

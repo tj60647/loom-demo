@@ -27,7 +27,7 @@ test.describe('Spread Canvas', () => {
     await expect(card).toBeVisible({ timeout: 15000 });
     await card.click();
     await expect(page).toHaveURL(/\/reading\//, { timeout: 15000 });
-    await page.locator('button:has-text("Read on Canvas")').click();
+    await page.locator('.scopebar button', { hasText: 'Read' }).click();
 
     // Canvas boots into spread mode fitted to spread 1.
     await expect(page.locator('.sc-canvas')).toBeVisible({ timeout: 20000 });
