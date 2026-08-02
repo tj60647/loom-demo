@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getSourceFile } from "@/actions/sources"
+import { getSourceForCover } from "@/actions/sources"
 import { readingStorage } from "@/lib/storage"
 import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
 
@@ -40,7 +40,11 @@ export async function GET(
   const { sourceId } = await params
 
   try {
-    const { source, buffer } = await getSourceFile(sourceId)
+    // Authorization only — the cached cover is a few tens of KB, and fetching
+    // the whole PDF up front made every cover request download the reading
+    // (the library page fires one of these per card). The bytes are fetched
+    // below, only when a re-render is actually needed.
+    const { source } = await getSourceForCover(sourceId)
     const coverKey = getSourceCoverKey(source.id)
 
     try {
@@ -57,6 +61,7 @@ export async function GET(
       })
     } catch {
       try {
+        const buffer = await readingStorage.get(source.storageKey!)
         const coverBuffer = await renderPdfCoverImage(buffer)
 
         try {

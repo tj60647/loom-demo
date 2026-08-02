@@ -57,8 +57,14 @@ test.describe('Library verification', () => {
   });
 
   test('admin Library manager renders source cards with edit disclosure and controls', async ({ page }) => {
+    test.setTimeout(60_000); // 20+ thumbnail requests against a dev server
     await mockSession(page);
-    await page.goto('/admin/library');
+    // domcontentloaded, not the default 'load': goto would otherwise wait for
+    // every cover thumbnail, and a missing cover re-renders from the PDF on
+    // demand (Cache-Control: no-store) — on a cold CI runner the library's
+    // 20+ images can hold the load event past any sane timeout. The cards and
+    // controls under test are in the DOM long before the images finish.
+    await page.goto('/admin/library', { waitUntil: 'domcontentloaded', timeout: 60_000 });
 
     // Scope to source cards (they contain a thumbnail); skip the add-reading form card.
     const cards = page.locator('.card').filter({ has: page.locator('img') });
@@ -86,6 +92,9 @@ test.describe('Library verification', () => {
     await editSummary.click();
     await expect(titleInput).toBeVisible();
 
-    await page.screenshot({ path: 'test-results/library-admin.png', fullPage: true });
+    // Viewport, not fullPage: a full-page capture rasterizes every one of the
+    // library's 20+ cards (and waits on their images) — it timed out the test
+    // while adding nothing the top of the page doesn't show.
+    await page.screenshot({ path: 'test-results/library-admin.png' });
   });
 });

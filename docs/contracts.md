@@ -131,6 +131,7 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | `setCourseSourceVisibility` / `updateCourseSourceSchedule` | FormData | void | admin |
 | `setSourceArchived` / `deleteSource` | FormData | void | admin; delete removes blob + cover + course links |
 | `getSourceFile` / `getSourceFileStream` | `sourceId` | `{source, buffer\|stream}` | `authorizeSourceFile`: admin → anything; **no session outside production → allowed** (dev skip); own reading → allowed; else active membership in a course where the reading `isVisible` |
+| `getSourceForCover` | `sourceId` | `{source}` — authorization + row, **no bytes** | same `authorizeSourceFile`; exists so the cover route's cache hit never downloads the PDF |
 
 Upload constants ([src/lib/readingUpload.ts](../src/lib/readingUpload.ts)):
 `MAX_READING_BYTES` = 20 MB, prefix `readings/`, PDFs only — enforced browser-side,
@@ -171,7 +172,7 @@ section belongs to the course).
 | `GET/POST /api/auth/[...nextauth]` | NextAuth (GitHub OAuth). Sign-in admitted by `emailHasAppAccess`: admin fallback email ∨ any course invitation ∨ any active membership ∨ legacy allowlist. Enrolment happens in `events.signIn` (first-OAuth `user.id` is GitHub's in the callback), idempotent upsert clearing `removedAt` | — |
 | `GET /api/auth/test-login?as=testa` | Mints a 30-day DB session + cookies; default identity is the admin, `?as=testa` = `test-user-a@loom.local` (LEARNER, enrolled into the oldest course). Returns `{success, userId, sessionToken}` | **403 in production** (first statement); no other guard — dev/CI only |
 | `GET /api/readings/[sourceId]?download=1` | Streams the PDF (never buffered — 4.5 MB serverless cap), RFC 6266 filename, `Cache-Control: private`. Errors: 401 / 404 / 500 JSON | Session required **in production only**; then `authorizeSourceFile` |
-| `GET /api/readings/[sourceId]/cover` | PNG cover (cached, re-rendered if missing) or SVG fallback | No check of its own — inherits `authorizeSourceFile` via `getSourceFile` |
+| `GET /api/readings/[sourceId]/cover` | PNG cover (cached at `covers/<id>.png`; re-rendered from the PDF only on a cache miss) or SVG fallback (`no-store`) | No check of its own — inherits `authorizeSourceFile` via `getSourceForCover` (bytes-free) |
 | `POST /api/readings/upload` | Vercel Blob client-upload token exchange. Token scoped: private, PDFs only, ≤ 20 MB, path under `readings/`, random suffix. `onUploadCompleted` deliberately omitted — the client calls `registerUploadedReading` itself | Admin, checked twice |
 
 ---

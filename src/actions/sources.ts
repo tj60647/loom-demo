@@ -724,6 +724,19 @@ async function authorizeSourceFile(sourceId: string) {
 }
 
 /**
+ * Authorization and the source row, WITHOUT the file's bytes. The cover route
+ * serves a small cached PNG on the happy path; fetching the whole PDF just to
+ * prove the caller may see its thumbnail made every library page view
+ * download the entire shelf — up to 20MB × every card (the CI stall of
+ * 2026-08-02). Callers that go on to render fetch the bytes themselves from
+ * `source.storageKey`, which authorization has already vouched for.
+ */
+export async function getSourceForCover(sourceId: string) {
+  const { source } = await authorizeSourceFile(sourceId)
+  return { source }
+}
+
+/**
  * The reading's bytes in memory. For callers that genuinely need the whole
  * file — cover rendering, text extraction. To send it to a browser, use
  * `getSourceFileStream`: buffering a reading larger than 4.5MB is fine here
