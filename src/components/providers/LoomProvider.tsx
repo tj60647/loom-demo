@@ -148,8 +148,13 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     flashTimer.current = window.setTimeout(() => setFlashMsg(null), 1500)
   }, [])
 
+  // Keyed on the stable user id, not the session object: next-auth mints a new
+  // session object on every window-focus refetch, and reloading (isLoading →
+  // true) on each one blanks the whole workbench under the student — losing
+  // in-progress tab state every time they tab away and back.
+  const userId = session?.user?.id
   useEffect(() => {
-    if (session?.user) {
+    if (userId) {
       const startTimer = window.setTimeout(() => setIsLoading(true), 0)
       getUserLoomData().then(data => {
         setState(data)
@@ -166,7 +171,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       }, 0)
       return () => window.clearTimeout(resetTimer)
     }
-  }, [session])
+  }, [userId])
 
   // v14 flashed on every save; here the graph mutations were silent on success,
   // so the save dot only ever confirmed the read. Callers that have something
