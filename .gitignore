@@ -50,4 +50,3 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
-storage/local-blob/

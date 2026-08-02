@@ -1,6 +1,4 @@
 import { put, get, del } from "@vercel/blob"
-import { promises as fs } from "fs"
-import path from "path"
 
 /**
  * Storage backend for shared, immutable reading assets: uploaded PDFs and the
@@ -75,44 +73,4 @@ class VercelBlobStorage implements ReadingStorage {
   }
 }
 
-// ponytail: local dev without Blob credentials falls back to plain files under
-// storage/local-blob (gitignored), so serving PDFs, covers, and seeding work
-// offline. Any environment with credentials (Vercel OIDC or a token) keeps the
-// private Blob store.
-class LocalDirStorage implements ReadingStorage {
-  private root = path.join(process.cwd(), "storage", "local-blob")
-
-  private resolve(key: string) {
-    const p = path.resolve(this.root, key)
-    if (!p.startsWith(this.root + path.sep)) throw new Error(`Invalid storage key: ${key}`)
-    return p
-  }
-
-  async put(key: string, data: Buffer): Promise<void> {
-    const p = this.resolve(key)
-    await fs.mkdir(path.dirname(p), { recursive: true })
-    await fs.writeFile(p, data)
-  }
-
-  async get(key: string): Promise<Buffer> {
-    try {
-      return await fs.readFile(this.resolve(key))
-    } catch {
-      throw new Error(`Blob not found for key: ${key}`)
-    }
-  }
-
-  async getStream(key: string): Promise<ReadableStream<Uint8Array>> {
-    const buffer = await this.get(key)
-    return new Response(new Uint8Array(buffer)).body!
-  }
-
-  async delete(key: string): Promise<void> {
-    await fs.rm(this.resolve(key), { force: true })
-  }
-}
-
-const useLocalStorage =
-  process.env.NODE_ENV !== "production" && !process.env.VERCEL && !process.env.BLOB_READ_WRITE_TOKEN
-
-export const readingStorage: ReadingStorage = useLocalStorage ? new LocalDirStorage() : new VercelBlobStorage()
+export const readingStorage: ReadingStorage = new VercelBlobStorage()
