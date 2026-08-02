@@ -3,6 +3,40 @@
 You are continuing work on Loom after the journey build of 2026-08-01 (which
 followed the multiple-maps build of 07-31 and the reading-first pass of 07-30/31).
 
+## Addendum, 2026-08-02 (alpha-foundation session — PR #4)
+
+Read this first; it supersedes parts of what follows.
+
+- **Open item 3 is closed.** The order-dependent `maps.spec` failure was a
+  test-synchronization bug: `#saveDot` was still showing the *previous* save's
+  1500ms flash on a warm server, so the spec reloaded early and **aborted the
+  essence POST in flight** (the `ECONNRESET` in the server logs). Fixed by
+  waiting on each action POST matched by its body, plus a strand sweep. The
+  suite is now **24 tests in 8 files, all green in ~2.2m** — including new
+  learner (00→06, Throw and Read covered for the first time) and admin journey
+  specs. The underlying *product* bug (navigation aborts debounced saves;
+  rename-during-create invisible in UI) is audit finding U-3.
+- **New authorities:** [docs/audit-2026-08-02.md](docs/audit-2026-08-02.md)
+  (full audit + alpha verdict), [docs/contracts.md](docs/contracts.md) (every
+  contract surface), [docs/deployments.md](docs/deployments.md) (open item 1's
+  plan in durable, checklisted form — the fresh-GitHub-account smoke test
+  still stands and still cannot be automated),
+  [CONTRIBUTING.md](CONTRIBUTING.md) (branch/PR/test rules).
+- **Demo accounts:** `npm run seed:demo` → `test-user-a@loom.local` (3 maps
+  from 2 readings, anchored verbatim passages, mirror-consistent) and
+  `test-user-b` (enrolled, empty). Idempotent; the journey specs assert
+  against it.
+- **The gate exists:** `.github/workflows/ci.yml` (`checks` + `e2e`),
+  CODEOWNERS, PR template; master branch protection requires a PR, the
+  `checks` status and a code-owner review (`e2e` joins once its three CI
+  secrets are configured — deployments.md §CI). A long-lived `dev` branch now
+  exists for the tester deployment.
+- The unpkg/pdf.js item in §5 below is **fixed** (worker vendored, 0f9f01b).
+- Machine note: if the app serves pages but every `/api/*` route 404s, you
+  have a stale `next dev` — kill the PID and `rm -rf .next`. And C: was found
+  at 100% full on 8/2 (npm cache was ~14GB; cleaned to 15GB free) — check
+  `df -h /c` before long runs.
+
 ## Where things stand
 
 The app implements the v14 tool in full, on top of the production surfaces v14
