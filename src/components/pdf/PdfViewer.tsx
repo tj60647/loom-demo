@@ -4,6 +4,7 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import CaptureModal from './CaptureModal';
+import PageSlot from './PageSlot';
 import { useLoom } from '@/components/providers/LoomProvider';
 import { Byte, Concept } from '@/lib/types';
 import { hashText } from '@/lib/hash';
@@ -55,10 +56,43 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // Layout state
   const [isTwoPage, setIsTwoPage] = useState(true); // default to 2-page spread
   const [fitMode, setFitMode] = useState<"width" | "height">("height");
-  const [pageHeight, setPageHeight] = useState(800);
   const [containerWidth, setContainerWidth] = useState(800);
-  
+
+  /**
+   * How the pages are laid out.
+   *  - `page`   one spread at a time, turned with the arrows (what this was)
+   *  - `strip`  every page in one horizontal run, scrolled sideways
+   *  - `matrix` every page on a grid you can zoom into and pan
+   * All three render ordinary react-pdf pages with their text layers, so a
+   * passage can be selected and captured in any of them.
+   */
+  const [viewMode, setViewMode] = useState<"page" | "strip" | "matrix">("page");
+  // Covers the whole window, chrome included — the reading takes the screen.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  // Matrix zoom, as a multiple of the base thumbnail width.
+  const [zoom, setZoom] = useState(1);
+  // The document's height/width, measured off the first page that renders, so
+  // the many-page views can reserve honest space before a page has drawn.
+  const [aspect, setAspect] = useState(11 / 8.5);
+
   const containerRef = useRef<HTMLDivElement>(null);
+  /**
+   * The element that actually scrolls in every mode — the measuring stick for
+   * page size and the root the slots check visibility against.
+   *
+   * Held in state as well as a ref: the slots need it *during* render to build
+   * their observers, and a ref is null on the first pass, which would quietly
+   * fall back to observing the viewport. That is the wrong box for a strip
+   * that scrolls sideways inside it — every slot would look visible at once
+   * and render the whole document.
+   */
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
+  const attachStage = useCallback((node: HTMLDivElement | null) => {
+    stageRef.current = node;
+    setStageEl(node);
+  }, []);
+  const [stage, setStage] = useState({ w: 800, h: 600 });
   
   const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string, pageNum?: number, startOffset?: number, endOffset?: number, pageContentHash?: string} | null>(null);
   const [showCaptureModal, setShowCaptureModal] = useState(false);
@@ -141,36 +175,38 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // Responsive sizing and layout detection
   useEffect(() => {
     const updateLayout = () => {
-      // The viewer sits in flow below the header, scopebar and journey nav
-      // (~250px of chrome) — tab 00 is a station on the journey, not a
-      // takeover, so the bar above must stay visible and clickable.
-      const availableHeight = window.innerHeight - 250;
-      setPageHeight(Math.max(400, availableHeight));
-      setIsNarrow(window.innerWidth < 900);
-
-      if (window.innerWidth < 900) {
-        setIsTwoPage(false);
-      }
+      const narrow = window.innerWidth < 900;
+      setIsNarrow(narrow);
+      // A spread needs two pages' width; on a phone that leaves each one
+      // unreadable, so a narrow screen reads one page at a time.
+      if (narrow) setIsTwoPage(false);
     };
-    
+
     updateLayout();
     window.addEventListener('resize', updateLayout);
     return () => window.removeEventListener('resize', updateLayout);
   }, []);
 
-  // Track container width for 'Fit to Width' mode
+  /**
+   * Measure the stage rather than guessing at it. This used to subtract a
+   * hardcoded 250px of chrome from the window height, which was wrong the
+   * moment the chrome wrapped, the toolbar grew a second row, or the viewer
+   * went fullscreen. Measuring the box the pages actually sit in is what lets
+   * every mode fill the space it really has.
+   */
   useEffect(() => {
-    if (!containerRef.current) return;
-    
+    const el = stageRef.current;
+    if (!el) return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
+        const box = entry.contentRect;
+        setStage({ w: box.width, h: box.height });
+        setContainerWidth(box.width);
       }
     });
-    
-    observer.observe(containerRef.current);
+    observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [viewMode, isFullscreen]);
 
   // Text selection listener
   useEffect(() => {
@@ -210,34 +246,83 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         let pageContentHash: string | undefined;
         
         if (range) {
-          // Find the react-pdf page element
-          let pageNode: HTMLElement | null = null;
-          let node = range.startContainer as Node | null;
-          while (node && node.nodeType === Node.TEXT_NODE) node = node.parentNode;
-          let element = node as HTMLElement | null;
-          
-          while (element) {
-            if (element.classList?.contains('react-pdf__Page')) {
-              pageNode = element;
-              break;
+          // The page a boundary of the selection sits in.
+          const pageOf = (boundary: Node | null): HTMLElement | null => {
+            let node = boundary;
+            while (node && node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+            let element = node as HTMLElement | null;
+            while (element) {
+              if (element.classList?.contains('react-pdf__Page')) return element;
+              element = element.parentElement;
             }
-            element = element.parentElement;
-          }
-          
+            return null;
+          };
+
+          const startPageNode = pageOf(range.startContainer);
+          const endPageNode = pageOf(range.endContainer);
+          /**
+           * The anchor is not always inside a page. In the matrix the page
+           * caption sits between one page and the next, so a drag begun on it
+           * is anchored outside every `.react-pdf__Page`. Name the passage by
+           * the page it ENDS in rather than falling through to `pageNumber` —
+           * nothing updates that while a continuous view is scrolled, so the
+           * byte would be filed as "p. 1" whichever page it really came from,
+           * and then only ever be looked for on page 1.
+           */
+          const pageNode = startPageNode ?? endPageNode;
+          /**
+           * A selection that starts on one page and ends on another. The strip
+           * and the matrix put pages side by side, so this is now an easy drag
+           * rather than a rarity — and the offset arithmetic below is only
+           * meaningful within ONE text layer: it measures the start against
+           * this page and then adds the length of the whole selection, which
+           * for a two-page drag runs off the end of the page it is anchored
+           * to. Worse, the content hash would still match, so the highlighter
+           * would trust that overlong range and mark the wrong text.
+           *
+           * The passage itself is still exactly what the student selected. Only
+           * the anchor is dropped, which puts the byte on the same fuzzy
+           * matching path as every byte captured before anchoring existed.
+           */
+          const spansPages = !!pageNode && !!endPageNode && pageNode !== endPageNode;
+
           if (pageNode) {
             const pageStr = pageNode.getAttribute('data-page-number');
             if (pageStr) selectedPageNum = parseInt(pageStr, 10);
-            
+
             const textLayer = pageNode.querySelector('.react-pdf__Page__textContent');
-            if (textLayer) {
+            // `startPageNode` is load-bearing, not tidiness: the offsets below
+            // are measured from the start of THIS text layer, so an anchor
+            // that lies outside it collapses the measurement to zero while the
+            // page hash still matches — and a confidently-placed wrong
+            // highlight is worse than no highlight.
+            if (textLayer && startPageNode && !spansPages) {
               const preRange = range.cloneRange();
               preRange.selectNodeContents(textLayer);
               preRange.setEnd(range.startContainer, range.startOffset);
               const rawStartOffset = preRange.toString().length;
-              const leadingTrim = rawText.length - rawText.trimStart().length;
-              const trailingTrim = rawText.length - rawText.trimEnd().length;
+              /**
+               * Measure the span with the RANGE, not the selection.
+               *
+               * `Range.prototype.toString()` concatenates text-node data only
+               * — the same offset space mark.js walks (NodeFilter.SHOW_TEXT)
+               * and that pdfText.ts builds server-side by joining item.str.
+               * `selection.toString()` returns *rendered* text, and pdf.js
+               * appends a <br role="presentation"> at every end-of-line item,
+               * so it carries one "\n" per line that exists in neither offset
+               * space.
+               *
+               * Using the selection's length here overshot endOffset by about
+               * a character per line break — and because the page hash still
+               * matched, the highlighter trusted the overlong range and marked
+               * on into the following words. Every multi-line capture was
+               * affected; it simply had nothing asserting on it.
+               */
+              const rangeText = range.toString();
+              const leadingTrim = rangeText.length - rangeText.trimStart().length;
+              const trailingTrim = rangeText.length - rangeText.trimEnd().length;
               startOffset = rawStartOffset + leadingTrim;
-              endOffset = rawStartOffset + rawText.length - trailingTrim;
+              endOffset = rawStartOffset + rangeText.length - trailingTrim;
               pageContentHash = hashText(textLayer.textContent || "");
             }
           }
@@ -259,9 +344,62 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       }
     };
     
+    /**
+     * `mouseup` alone is a desktop-only contract. A phone selects text by
+     * long-press and drag of the native handles, which fires `selectionchange`
+     * and no mouse event at all — so on iOS Safari and Android Chrome the
+     * Capture button simply never appeared, and tab 00 was read-only on the
+     * device most likely to be doing the reading.
+     *
+     * Debounced because `selectionchange` fires on every handle movement:
+     * settling first means the offsets are computed once, against the
+     * selection the reader actually stopped on.
+     */
+    let selectionTimer: number | undefined;
+    const onSelectionChange = () => {
+      window.clearTimeout(selectionTimer);
+      selectionTimer = window.setTimeout(handleSelection, 300);
+    };
+
     document.addEventListener("mouseup", handleSelection);
-    return () => document.removeEventListener("mouseup", handleSelection);
+    document.addEventListener("selectionchange", onSelectionChange);
+    return () => {
+      document.removeEventListener("mouseup", handleSelection);
+      document.removeEventListener("selectionchange", onSelectionChange);
+      window.clearTimeout(selectionTimer);
+    };
   }, [pageNumber]);
+
+  /**
+   * The Capture button is positioned in viewport coordinates taken when the
+   * selection was made, so anything that moves the pages under it leaves it
+   * stranded — pointing at blank paper, or floating over the toolbar. The
+   * continuous views scroll constantly, so it has to keep up: re-read the live
+   * selection's rectangle, and stand down once the selection is gone.
+   */
+  useEffect(() => {
+    if (!highlightRect) return;
+    const stageEl2 = stageRef.current;
+    let frame = 0;
+    const reposition = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const sel = window.getSelection();
+        const text = sel?.toString().trim() ?? "";
+        if (!text) { setHighlightRect(null); return; }
+        const rect = sel?.getRangeAt(0).getBoundingClientRect();
+        if (!rect) return;
+        setHighlightRect((prev) => prev && ({ ...prev, top: rect.top, left: rect.left + rect.width / 2 }));
+      });
+    };
+    stageEl2?.addEventListener("scroll", reposition, { passive: true });
+    window.addEventListener("resize", reposition);
+    return () => {
+      cancelAnimationFrame(frame);
+      stageEl2?.removeEventListener("scroll", reposition);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [highlightRect]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -421,6 +559,25 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     setPageNumber(p => Math.min(numPages || p, p + advance));
   }, [advance, numPages]);
 
+  /**
+   * In the continuous views a page is somewhere to scroll to, not something to
+   * turn to — so "go to this byte's page" (and the initial page) brings the
+   * page into view instead of swapping what is rendered.
+   */
+  useEffect(() => {
+    if (viewMode === "page") return;
+    const stageEl = stageRef.current;
+    if (!stageEl) return;
+    const timer = window.setTimeout(() => {
+      const slot = stageEl.querySelector(`[data-slot-page="${pageNumber}"]`);
+      slot?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    }, 60);
+    return () => window.clearTimeout(timer);
+    // numPages matters: on the first load the slots do not exist yet, so
+    // without it this ran once against an empty stage and "go to this byte's
+    // page" quietly did nothing until you changed page by hand.
+  }, [pageNumber, viewMode, numPages]);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -428,25 +585,51 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       if (showCaptureModal || document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
 
       if (e.key === 'Escape') {
-        hideHighlightTooltip();
+        // One Escape, one thing: dismiss the tooltip if one is open, otherwise
+        // leave fullscreen. Doing both at once would take the reading away
+        // from someone who only meant to close a label.
+        if (highlightTooltip) hideHighlightTooltip();
+        else if (isFullscreen) setIsFullscreen(false);
         return;
       }
-      
+
+      if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        setIsFullscreen((on) => !on);
+        return;
+      }
+
+      // Arrows turn the spread in paged mode; the continuous views scroll,
+      // which the browser already does for a focused scroll container.
+      if (viewMode !== "page") return;
       if (e.key === 'ArrowLeft' && canGoPrev) {
         handlePrev();
       } else if (e.key === 'ArrowRight' && canGoNext) {
         handleNext();
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal]);
+  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal, viewMode, isFullscreen, highlightTooltip]);
+
+  /**
+   * Matrix page width: a contact sheet of four across on a desktop stage (two
+   * on a phone) at zoom 1, scaled from there. The floor keeps a page legible
+   * as a thumbnail; the ceiling stops a hard zoom from producing a page so
+   * wide the grid can no longer be panned sensibly.
+   */
+  const matrixColumns = isNarrow ? 2 : 4;
+  const matrixPageWidth = Math.min(
+    Math.max(((stage.w - 36) / matrixColumns - 18) * zoom, 90),
+    Math.max(stage.w * 2, 300)
+  );
 
   // Calculate page dimensions based on fit mode
   const calcPageProps = () => {
     if (fitMode === "height") {
-      return { height: pageHeight };
+      // The stage is the real estate; the padding around the pages is the only
+      // thing taken off it, so "fit page" genuinely fills the height available.
+      return { height: Math.max(320, stage.h - (isNarrow ? 24 : 48)) };
     } else {
       // fit to width
       // Non-page horizontal space:
@@ -467,13 +650,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     // In flow, not a fixed takeover: the header and the journey nav stay
     // visible and clickable above the text (ratified TJ 8/1 — the journey is
     // always in view; tab 00 is one of its stations).
-    <div style={{
-      position: "relative",
-      backgroundColor: "var(--paper)",
-      display: "flex",
-      flexDirection: "column",
-      minHeight: 480
-    }} ref={containerRef}>
+    <div
+      className={`pdf-shell${isFullscreen ? " fullscreen" : ""}`}
+      ref={containerRef}
+    >
 
       <style>{`
         .loom-byte-highlight {
@@ -575,7 +755,117 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         .react-pdf__Page__textContent span {
           pointer-events: auto;
         }
-        
+
+        /* The shell fills whatever it is given; in fullscreen it takes the
+           window, above the header and journey but below Loom's own overlays
+           (.info-scrim is 10000, so capture still opens on top). */
+        .pdf-shell {
+          position: relative;
+          background-color: var(--paper);
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          /* No min-height: main is overflow:hidden, so a shell taller than it
+             puts its own bottom (the stage, and on a phone the paging bar)
+             somewhere nothing can scroll to. A landscape phone leaves barely
+             300px under the chrome — less than any floor worth setting — so
+             the shell takes what it is given and the stage scrolls inside. */
+          min-height: 0;
+        }
+        .pdf-shell.fullscreen {
+          position: fixed;
+          inset: 0;
+          z-index: 6000;
+          min-height: 0;
+        }
+        /* The stage is the only scrolling part of the viewer, so the toolbar
+           stays put while the pages move under it. */
+        .pdf-stage {
+          flex: 1 1 auto;
+          min-height: 0;
+          background-color: #eef0f2;
+          overscroll-behavior: contain;
+        }
+        /* "safe center" centres only while the content fits. Plain centring
+           overflows equally in both directions, and a scroll container cannot
+           reach content pushed off its start edge — so a spread or a zoomed
+           page wider than the stage had its left side permanently unreachable.
+           With safe, an overflowing item falls back to start-aligned and can
+           be scrolled to. */
+        .pdf-stage.mode-page { overflow: auto; display: flex; justify-content: safe center; }
+        .pdf-stage.mode-strip { overflow-x: auto; overflow-y: hidden; }
+        .pdf-stage.mode-matrix { overflow: auto; }
+
+        .pdf-strip-run {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+          height: 100%;
+          padding: 12px 18px;
+          width: max-content;
+        }
+        .pdf-matrix-grid {
+          display: flex;
+          flex-wrap: wrap;
+          align-content: flex-start;
+          justify-content: safe center;
+          gap: 18px;
+          padding: 18px;
+        }
+        /* Reserved space for a page that has not drawn yet: the same footprint
+           the page will take, so the scrollbar never lies and nothing jumps. */
+        .pdf-slot-holder {
+          background: repeating-linear-gradient(45deg, #e7e9ec, #e7e9ec 10px, #e2e4e8 10px, #e2e4e8 20px);
+          border: 1px solid var(--rule);
+          border-radius: 2px;
+        }
+        .pdf-slot-label {
+          font-family: var(--mono);
+          font-size: 10px;
+          letter-spacing: .1em;
+          color: var(--ink-soft);
+          text-align: center;
+          padding-top: 4px;
+          /* Not selectable: it sits between two pages, so a drag that starts
+             on it anchors outside every page — and its digits would otherwise
+             land inside the captured passage. */
+          user-select: none;
+          -webkit-user-select: none;
+        }
+        .pdf-modes { display: flex; background: var(--paper); border-radius: 4px; padding: 2px; border: 1px solid var(--rule); }
+        .pdf-modes button { border: none; margin: 0; padding: 4px 9px; }
+        .pdf-toolbar {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 20px;
+          border-bottom: 1px solid var(--rule);
+          background-color: var(--paper-2);
+          box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+          z-index: 10;
+          flex: 0 0 auto;
+        }
+
+        @media (max-width: 900px) {
+          .pdf-strip-run { gap: 10px; padding: 8px 10px; }
+          .pdf-matrix-grid { gap: 10px; padding: 10px; }
+          /* One row, no wrapping: the toolbar is a strip of controls the width
+             of the screen, not a block that grows downward into the reading. */
+          .pdf-toolbar {
+            flex-wrap: nowrap;
+            padding: 6px 8px;
+            gap: 6px;
+            overflow-x: auto;
+            scrollbar-width: none;
+          }
+          .pdf-toolbar::-webkit-scrollbar { display: none; }
+          .pdf-toolbar > div { flex: 0 0 auto; }
+          .pdf-toolbar .btn.mini { padding: 6px 8px; min-height: 34px; font-size: 10px; }
+          .pdf-modes button { padding: 6px 8px; min-height: 34px; }
+        }
+
         .pdf-side-nav {
           display: flex;
           align-items: center;
@@ -601,113 +891,218 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         }
       `}</style>
 
-      {/* Toolbar */}
-      <div style={{ 
-        display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", 
-        padding: "10px 20px", borderBottom: "1px solid var(--rule)", backgroundColor: "var(--paper-2)",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.05)", zIndex: 10
-      }}>
+      {/* Toolbar. On a phone this is one compact row: every control that has
+          somewhere else to live goes there, because a toolbar that wraps to
+          four rows was taking a third of the screen away from the reading. The
+          page count already sits in the bottom bar on a narrow screen, and the
+          labels shorten rather than the buttons shrinking below thumb size. */}
+      <div className="pdf-toolbar">
         <div>
           {/* This closes the text and lands on 01 Open — where the passage you
               just captured is waiting — not on the readings list. */}
-          <button className="btn ghost mini" onClick={onClose}>← Back to 01 · Open</button>
+          {/* Labelled only when the label is an arrow on its own; with the
+              words visible they are the name. */}
+          <button className="btn ghost mini" onClick={onClose} aria-label={isNarrow ? "Back to 01 · Open" : undefined}>
+            {isNarrow ? "←" : "← Back to 01 · Open"}
+          </button>
         </div>
-        
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span className="label" style={{ minWidth: "120px", textAlign: "center" }}>
-            {isTwoPage ? `Pages ${pageNumber}-${Math.min(pageNumber + 1, numPages || pageNumber)}` : `Page ${pageNumber}`} of {numPages || '?'}
-          </span>
-        </div>
-        
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div style={{ display: "flex", backgroundColor: "var(--paper)", borderRadius: "4px", padding: "2px", border: "1px solid var(--rule)" }}>
-            <button 
-              className={`btn mini ${fitMode === "height" ? "" : "ghost"}`} 
-              style={{ border: "none", margin: 0, padding: "4px 8px" }}
-              onClick={() => setFitMode("height")}
-            >
-              Fit Page
-            </button>
-            <button 
-              className={`btn mini ${fitMode === "width" ? "" : "ghost"}`} 
-              style={{ border: "none", margin: 0, padding: "4px 8px" }}
-              onClick={() => setFitMode("width")}
-            >
-              Fit Width
-            </button>
+
+        {!isNarrow && (
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="label" style={{ minWidth: "120px", textAlign: "center" }}>
+              {viewMode === "page"
+                ? `${isTwoPage ? `Pages ${pageNumber}-${Math.min(pageNumber + 1, numPages || pageNumber)}` : `Page ${pageNumber}`} of ${numPages || '?'}`
+                : `${numPages || '?'} pages`}
+            </span>
+          </div>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          {/* How the pages are laid out. Three ways of holding the same text:
+              one spread, one long run, or the whole thing at once. */}
+          <div className="pdf-modes" role="group" aria-label="Page layout">
+            <button
+              className={`btn mini ${viewMode === "page" ? "" : "ghost"}`}
+              onClick={() => setViewMode("page")}
+              data-tip="one spread at a time"
+              aria-pressed={viewMode === "page"}
+            >Page</button>
+            <button
+              className={`btn mini ${viewMode === "strip" ? "" : "ghost"}`}
+              onClick={() => setViewMode("strip")}
+              data-tip="every page in one run — scroll sideways"
+              aria-pressed={viewMode === "strip"}
+            >Strip</button>
+            <button
+              className={`btn mini ${viewMode === "matrix" ? "" : "ghost"}`}
+              onClick={() => setViewMode("matrix")}
+              data-tip="the whole reading at once — zoom in on any page"
+              aria-pressed={viewMode === "matrix"}
+            >Matrix</button>
           </div>
 
-          <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }} className="label">
-            <input 
-              type="checkbox" 
-              checked={isTwoPage} 
-              onChange={(e) => setIsTwoPage(e.target.checked)} 
-              disabled={window.innerWidth < 900}
-            />
-            2-Page Spread
-          </label>
+          {viewMode === "page" && (
+            <div className="pdf-modes" role="group" aria-label="Page size">
+              {/* The accessible name stays "Fit Page"/"Fit Width" at every
+                  width, and the narrow label is a substring of it — a name
+                  that does not contain the visible words is one a voice user
+                  cannot ask for, and it silently renamed the control for
+                  anything matching on it. */}
+              <button
+                className={`btn mini ${fitMode === "height" ? "" : "ghost"}`}
+                onClick={() => setFitMode("height")}
+                aria-pressed={fitMode === "height"}
+                aria-label="Fit Page"
+              >{isNarrow ? "Page" : "Fit Page"}</button>
+              <button
+                className={`btn mini ${fitMode === "width" ? "" : "ghost"}`}
+                onClick={() => setFitMode("width")}
+                aria-pressed={fitMode === "width"}
+                aria-label="Fit Width"
+              >{isNarrow ? "Width" : "Fit Width"}</button>
+            </div>
+          )}
+
+          {viewMode === "matrix" && (
+            <label className="label" style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+              Zoom
+              <input
+                type="range"
+                min={0.5}
+                max={4}
+                step={0.1}
+                value={zoom}
+                onChange={(e) => setZoom(parseFloat(e.target.value))}
+                aria-label="Zoom the page matrix"
+                style={{ width: isNarrow ? 90 : 130 }}
+              />
+            </label>
+          )}
+
+          {viewMode === "page" && !isNarrow && (
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }} className="label">
+              <input
+                type="checkbox"
+                checked={isTwoPage}
+                onChange={(e) => setIsTwoPage(e.target.checked)}
+              />
+              2-Page Spread
+            </label>
+          )}
+
+          <button
+            className="btn ghost mini"
+            onClick={() => setIsFullscreen((on) => !on)}
+            data-tip={isFullscreen ? "back to the journey (esc)" : "give the reading the whole screen (f)"}
+            aria-pressed={isFullscreen}
+            aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
+          >
+            {isFullscreen ? (isNarrow ? "↙" : "↙ Exit full screen") : (isNarrow ? "⛶" : "⛶ Full screen")}
+          </button>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div style={{ flex: 1, overflowY: "auto", overflowX: isNarrow ? "hidden" : "auto", display: "flex", justifyContent: "center", backgroundColor: "#eef0f2" }}>
-        
-        <div style={{ display: "flex", alignItems: "center", gap: "20px", padding: isNarrow ? "12px" : "30px", minHeight: "100%" }}>
-          
-          {/* Left Arrow */}
-          {!isNarrow && <button 
-            className="pdf-side-nav"
-            onClick={handlePrev}
-            disabled={!canGoPrev}
-            aria-label="Previous Page"
-          >
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-          </button>}
+      {/* Main Content Area — one <Document> for all three layouts, so
+          switching views never re-fetches or re-parses the PDF. */}
+      <div ref={attachStage} className={`pdf-stage mode-${viewMode}`}>
+        <Document
+          file={url}
+          onLoadSuccess={onDocumentLoadSuccess}
+          loading={<div className="hint" style={{ padding: 24 }}>Loading PDF...</div>}
+          error={<div className="hint" style={{ padding: 24, color: "var(--red)" }}>Failed to load PDF. Check file path.</div>}
+        >
+          {viewMode === "page" && (
+            <div style={{ display: "flex", alignItems: "center", gap: "20px", padding: isNarrow ? "12px" : "24px", minHeight: "100%" }}>
+              {!isNarrow && <button
+                className="pdf-side-nav"
+                onClick={handlePrev}
+                disabled={!canGoPrev}
+                aria-label="Previous Page"
+              >
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>}
 
-          {/* PDF Container */}
-          <Document 
-            file={url} 
-            onLoadSuccess={onDocumentLoadSuccess} 
-            loading={<div className="hint">Loading PDF...</div>}
-            error={<div className="hint" style={{ color: "var(--red)" }}>Failed to load PDF. Check file path.</div>}
-          >
-            <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
-              <Page 
-                pageNumber={pageNumber} 
-                {...calcPageProps()}
-                renderTextLayer={true} 
-                renderAnnotationLayer={true} 
-                className="pdf-page-shadow"
-              />
-              {isTwoPage && pageNumber + 1 <= (numPages || 1) && (
-                <Page 
-                  pageNumber={pageNumber + 1} 
+              <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
+                <Page
+                  pageNumber={pageNumber}
                   {...calcPageProps()}
-                  renderTextLayer={true} 
+                  renderTextLayer={true}
                   renderAnnotationLayer={true}
                   className="pdf-page-shadow"
+                  onLoadSuccess={(page) => { if (page.originalWidth) setAspect(page.originalHeight / page.originalWidth) }}
                 />
-              )}
-            </div>
-          </Document>
+                {isTwoPage && pageNumber + 1 <= (numPages || 1) && (
+                  <Page
+                    pageNumber={pageNumber + 1}
+                    {...calcPageProps()}
+                    renderTextLayer={true}
+                    renderAnnotationLayer={true}
+                    className="pdf-page-shadow"
+                  />
+                )}
+              </div>
 
-          {/* Right Arrow */}
-          {!isNarrow && <button 
-            className="pdf-side-nav"
-            onClick={handleNext}
-            disabled={!canGoNext}
-            aria-label="Next Page"
-          >
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-          </button>}
-        </div>
+              {!isNarrow && <button
+                className="pdf-side-nav"
+                onClick={handleNext}
+                disabled={!canGoNext}
+                aria-label="Next Page"
+              >
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>}
+            </div>
+          )}
+
+          {/* Strip: the reading as one continuous run, read by scrolling
+              sideways. Pages are full stage height, so a passage is as legible
+              here as in the paged view — this is a reading view, not an index. */}
+          {viewMode === "strip" && (
+            <div className="pdf-strip-run">
+              {Array.from({ length: numPages ?? 0 }, (_, i) => (
+                <PageSlot
+                  key={i + 1}
+                  pageNumber={i + 1}
+                  height={Math.max(280, stage.h - (isNarrow ? 16 : 24))}
+                  aspect={aspect}
+                  root={stageEl}
+                  eager={i === 0}
+                  onAspect={setAspect}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Matrix: every page at once, zoomable. At the low end it is a
+              contact sheet for finding your way; wind the zoom up and the same
+              grid becomes readable, and a passage can be taken from it. */}
+          {viewMode === "matrix" && (
+            <div className="pdf-matrix-grid">
+              {Array.from({ length: numPages ?? 0 }, (_, i) => (
+                <PageSlot
+                  key={i + 1}
+                  pageNumber={i + 1}
+                  width={matrixPageWidth}
+                  aspect={aspect}
+                  root={stageEl}
+                  eager={i === 0}
+                  onAspect={setAspect}
+                  label
+                />
+              ))}
+            </div>
+          )}
+        </Document>
       </div>
 
-      {isNarrow && (
+      {/* Paging bar, phone only — and only where there are pages to turn. The
+          strip and the matrix are scrolled, so a Prev/Next pair there would be
+          a control for something the view does not do, sitting on top of the
+          reading. */}
+      {isNarrow && viewMode === "page" && (
         <div
           style={{
             position: "fixed",
