@@ -39,20 +39,57 @@ async function openWeaveMap(page: Page) {
   await expect(page.locator('#mapSwitcher')).toBeVisible({ timeout: 15000 });
 }
 
+/** A POST whose body carries `needle` has completed — the deterministic form
+ *  of "that save landed". The save dot cannot distinguish WHICH save flashed
+ *  (any save's 1500ms flash satisfies it), and under a warm dev server the
+ *  previous save's flash is always still on screen — which let the reload
+ *  below abort the essence write in flight. That abort (the WebServer
+ *  "Error: aborted / ECONNRESET" in the logs) was the whole order-dependence:
+ *  fast full-suite runs reloaded early and killed the write; cold solo runs
+ *  were slow enough to sync by accident. */
+function responseCarrying(page: Page, needle: string) {
+  return page.waitForResponse(
+    (r) => r.request().method() === 'POST' && (r.request().postData() ?? '').includes(needle),
+    { timeout: 20_000 },
+  );
+}
+
 test('a new map holds its own tiers and essence', async ({ page }) => {
+  test.setTimeout(120_000);
   await openWeaveMap(page);
 
+  // Self-heal: a failed earlier run strands its temp map (serial mode skips
+  // the cleanup test), and a strand with this name breaks every locator below.
+  const strands = page.locator('#mapSwitcher .chip', { hasText: TEMP_NAME });
+  let strand = await strands.count();
+  while (strand > 0) {
+    await strands.first().click();
+    await page.getByRole('button', { name: 'delete', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete this map', exact: true }).click();
+    await expect(strands).toHaveCount(strand - 1, { timeout: 15000 });
+    strand--;
+  }
+
   const chipsBefore = await page.locator('#mapSwitcher .chip').count();
+  const createSaved = responseCarrying(page, '"scopeKey"');
   await page.locator('#newMap').click();
   // The new map appears optimistically AND is selected; wait for its chip so
-  // the rename below cannot land on the previously active map.
+  // the rename below cannot land on the previously active map — and for the
+  // CREATE to complete, because a rename typed while the create round-trip is
+  // still in flight persists server-side but never reaches the chip in the UI
+  // (the optimistic update targets the real id while the local row still has
+  // the temp id — audit U-3(a)). On a warm server that race hits every time.
   await expect(page.locator('#mapSwitcher .chip')).toHaveCount(chipsBefore + 1);
   await expect(page.locator('#mapSwitcher .chip.on')).toHaveText(/^Map \d+$/);
-  // Rename it so cleanup can find it whatever else this account holds.
+  await createSaved;
+  // Rename it so cleanup can find it whatever else this account holds — and
+  // hold the test until the rename's own POST completes.
   const rename = page.getByLabel('Rename this map');
   await expect(rename).toBeVisible();
   await rename.fill(TEMP_NAME);
+  const renameSaved = responseCarrying(page, TEMP_NAME);
   await rename.blur();
+  await renameSaved;
   await expect(page.locator('#mapSwitcher .chip.on', { hasText: TEMP_NAME })).toBeVisible();
 
   // Tiers are per map: tier the first concept primary ON THIS MAP (skipped
@@ -61,24 +98,20 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
   const hasConcepts = (await page.locator('#triageList .trow').count()) > 0;
   if (hasConcepts) {
     const pChip = firstRow.locator('.tierchips .tchip').first();
+    const tierSaved = responseCarrying(page, '"tiers"');
     await pChip.click();
     await expect(pChip).toHaveClass(/on/);
     await expect(page.locator('#mapMirror')).toContainText('1 primary');
+    await tierSaved;
   }
 
-  // The essence sentence belongs to the map.
+  // The essence sentence belongs to the map. Blur flushes the 700ms debounce;
+  // the reload waits for the essence's own POST to complete, so it can no
+  // longer abort the write in flight.
   await page.locator('#mapEssence').fill('One line written by the Playwright suite.');
+  const essenceSaved = responseCarrying(page, 'One line written by the Playwright suite.');
   await page.locator('#mapEssence').blur();
-
-  // Persistence is debounced (700ms) plus a server round trip, and a reload
-  // ABORTS an in-flight action POST — a lost rename never retries, so one
-  // early reload fails the test permanently. `networkidle` is not enough:
-  // the save waits on the create promise first, so the POST may not have
-  // been ISSUED yet while the page already looks quiet. Wait for the app's
-  // own save signal (#saveDot flashes "saved" when the write resolves).
-  test.setTimeout(90_000);
-  await expect(page.locator('#saveDot')).toHaveText(/saved/, { timeout: 20_000 });
-  await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+  await essenceSaved;
   // The claim under test is that THIS map kept its own name, tiers and
   // essence across a reload — so select it by name rather than leaning on
   // which map the switcher happens to open on. That default (most recently

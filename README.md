@@ -39,6 +39,14 @@ Loom is built on foundational ideas from design theory, sociology, and ethnograp
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with `create-next-app`.
 
+Start here:
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — branches, the PR gate (green CI + owner review), tests, local setup.
+- [docs/contracts.md](./docs/contracts.md) — every contract surface: schema, server actions, API routes, export/import formats, invariants.
+- [docs/deployments.md](./docs/deployments.md) — local / dev / production environments, CI secrets, smoke tests.
+- [docs/audit-2026-08-02.md](./docs/audit-2026-08-02.md) — the full journey audit and alpha assessment.
+- Tests: `npm run check`, then `npx playwright test` (see CONTRIBUTING for the Windows/3100 variant and the seeded demo accounts the suite relies on).
+
 ### Getting Started
 
 First, run the development server:
