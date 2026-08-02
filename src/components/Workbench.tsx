@@ -22,6 +22,7 @@ import JourneyNav, { type Station } from "@/components/ui/JourneyNav"
 import type { Byte } from "@/lib/types"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
+const SpreadCanvas = dynamic(() => import("@/components/pdf/SpreadCanvas"), { ssr: false })
 
 export type WorkbenchSource = {
   id: string
@@ -88,6 +89,9 @@ export default function Workbench({
   const [pdfPage, setPdfPage] = useState(1)
   const [pdfFocusByteId, setPdfFocusByteId] = useState<string | null>(null)
   const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
+  // The spread canvas is a full-screen overlay on top of this workbench — a
+  // second way to read the same PDF, not another tab in the 00-04 sequence.
+  const [canvasOpen, setCanvasOpen] = useState(false)
 
   const goTo = (tab: Tab) => {
     setActiveTab(tab)
@@ -156,9 +160,19 @@ export default function Workbench({
             {/* The library card used to carry this; the reading is the library
                 card now, so the affordance moves here rather than disappearing. */}
             {source.hasFile ? (
-              <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>
-                Download PDF
-              </a>
+              <span className="scopedl" style={{ display: "flex", gap: "14px", alignItems: "baseline" }}>
+                <button
+                  type="button"
+                  className="scopeback"
+                  style={{ border: "none", background: "none", padding: 0, cursor: "pointer" }}
+                  onClick={() => setCanvasOpen(true)}
+                >
+                  Read on Canvas
+                </button>
+                <a className="scopeback" href={`/api/readings/${source.id}?download=1`}>
+                  Download PDF
+                </a>
+              </span>
             ) : (
               <span className="scopemeta scopedl">your own card — no pdf here</span>
             )}
@@ -232,6 +246,15 @@ export default function Workbench({
         <span className="fl">{FOOT[activeTab][0]}</span>
         <span className="fr">{FOOT[activeTab][1]}</span>
       </footer>
+
+      {source?.hasFile && canvasOpen && (
+        <SpreadCanvas
+          url={`/api/readings/${source.id}`}
+          sourceName={source.title}
+          sourceId={source.id}
+          onClose={() => setCanvasOpen(false)}
+        />
+      )}
     </>
   )
 }
