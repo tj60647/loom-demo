@@ -369,9 +369,28 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .cardmenu .bytequote{margin:6px 0 8px}
 .cardmenu .ghostnote{margin:3px 0 0}
 
-/* Roster: an invitation not yet taken up is quieter than an enrolled learner,
-   but still legible — it is the row that needs chasing. */
-.card.pendingcard{border-style:dashed;background:rgba(255,255,255,.28)}
+/* Roster: one learner per row — a roster is scanned, not read, so each entry
+   is a line in a list, not a card. The pills column has a fixed basis so the
+   section selects line up down the page. */
+.rosterlist{padding:0}
+.rosterrow{display:flex;align-items:center;gap:10px 14px;padding:9px 14px;border-bottom:1px dotted var(--rule);flex-wrap:wrap}
+.rosterrow:last-child{border-bottom:none}
+.rosterwho{flex:1 1 200px;min-width:0}
+.rostername{display:block;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rosteremail{display:block;font-family:var(--mono);font-size:11px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rosterpills{display:flex;gap:8px;align-items:center;flex:0 0 175px;flex-wrap:wrap}
+@media(max-width:860px){.rosterpills{flex:0 1 auto}}
+.rosterrow form{display:flex;gap:6px;align-items:center;margin:0}
+.rosteracts{display:flex;gap:6px;align-items:center;margin-left:auto}
+/* An invitation not yet taken up is quieter than an enrolled learner, but
+   still legible — it is the row that needs chasing. */
+.rosterrow.pendingrow .rostername{color:var(--ink-soft);font-style:italic}
+/* Invite learners starts folded: inviting is occasional, scanning the roster
+   is the daily visit. Same twirl idiom as .bandtoggle/.distilltoggle. */
+.invitefold summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}
+.invitefold summary::-webkit-details-marker{display:none}
+.invitefold summary .tw{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--ochre);transition:transform .15s}
+.invitefold[open] summary .tw{transform:rotate(90deg)}
 .invitereport{border-left:2px solid var(--rule);padding-left:11px;margin-top:4px}
 .invitereport p{font-size:14px;line-height:1.45;margin:0 0 6px}
 .invitereport p:last-child{margin-bottom:0}

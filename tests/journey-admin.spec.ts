@@ -18,32 +18,34 @@ test("roster shows enrolled demo learners with their counts", async ({ page }) =
   await page.goto("/admin")
   await expect(page.getByRole("heading", { name: "Roster" })).toBeVisible({ timeout: 15_000 })
 
-  const cardA = page.locator(".card", { hasText: "Test User A" })
-  await expect(cardA, "seed missing — run `npm run seed:demo` first").toHaveCount(1)
-  await expect(cardA.locator(".pill", { hasText: /\d+ concepts/ })).toBeVisible()
-  await expect(cardA.getByRole("link", { name: "Open Loom" })).toBeVisible()
+  const rowA = page.locator(".rosterrow", { hasText: "Test User A" })
+  await expect(rowA, "seed missing — run `npm run seed:demo` first").toHaveCount(1)
+  await expect(rowA.locator(".pill", { hasText: /\d+ concepts/ })).toBeVisible()
+  await expect(rowA.getByRole("link", { name: "Open Loom" })).toBeVisible()
 
-  await expect(page.locator(".card", { hasText: "Test User B" })).toHaveCount(1)
+  await expect(page.locator(".rosterrow", { hasText: "Test User B" })).toHaveCount(1)
 })
 
 test("an invitation is issued, appears pending, and is withdrawn", async ({ page }) => {
   await page.goto("/admin")
+  // The invite form starts folded; the summary is the only way in.
+  await page.locator(".invitefold summary").click()
   await page.locator("textarea[name=emails]").fill(INVITEE)
-  await page.getByRole("button", { name: "Invite" }).click()
+  await page.getByRole("button", { name: "Invite", exact: true }).click()
 
   await expect(page.locator(".invitereport")).toContainText("1 invited", { timeout: 15_000 })
-  const pending = page.locator(".card.pendingcard", { hasText: INVITEE })
+  const pending = page.locator(".rosterrow.pendingrow", { hasText: INVITEE })
   await expect(pending).toHaveCount(1, { timeout: 15_000 })
   await expect(pending.getByText("not signed in yet")).toBeVisible()
 
-  await pending.getByRole("button", { name: "Withdraw invitation" }).click()
-  await expect(page.locator(".card", { hasText: INVITEE })).toHaveCount(0, { timeout: 15_000 })
+  await pending.getByRole("button", { name: /Withdraw the invitation/ }).click()
+  await expect(page.locator(".rosterrow", { hasText: INVITEE })).toHaveCount(0, { timeout: 15_000 })
 })
 
 test("the per-student view renders Test User A's loom read-only", async ({ page }) => {
   await page.goto("/admin")
-  const cardA = page.locator(".card", { hasText: "Test User A" })
-  await cardA.getByRole("link", { name: "Open Loom" }).click()
+  const rowA = page.locator(".rosterrow", { hasText: "Test User A" })
+  await rowA.getByRole("link", { name: "Open Loom" }).click()
   await expect(page).toHaveURL(/\/admin\/user\//, { timeout: 15_000 })
   // Seeded graph is visible in the concepts list. (Plain getByText traps
   // itself on the hidden SVG <title> tooltips, which carry the sentences.)
