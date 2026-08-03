@@ -46,15 +46,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         {pendingCount > 0 ? <> · <b>{pendingCount}</b> invited, not signed in yet</> : null}.
       </p>
 
-      <section className="card" style={{ marginBottom: "24px" }}>
-        <h2>Invite learners</h2>
-        <p className="hint" style={{ marginTop: "6px" }}>
+      <details className="card invitefold" style={{ marginBottom: "24px" }}>
+        <summary>
+          <span className="tw">▸</span>
+          <h2>Invite learners</h2>
+        </summary>
+        <p className="hint" style={{ marginTop: "10px" }}>
           Sign-in succeeds for anyone invited to or enrolled in a course. A learner joins this
           course the first time they sign in with the GitHub email you invite here, landing in
           whichever section you gave them — you can move them afterwards.
         </p>
         <InviteLearners courseId={courseId} sections={courseSections} />
-      </section>
+      </details>
 
       {roster.length === 0 ? (
         <div className="card empty">
@@ -63,93 +66,95 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           </span>
         </div>
       ) : (
-        <div className="two">
-          {roster.map((person) => (
-            <div key={person.userId ?? person.email} className={`card${person.status === "pending" ? " pendingcard" : ""}`}>
-              <h2>{person.name ?? person.email}</h2>
-              {person.name ? <div className="hint">{person.email}</div> : null}
-              <div style={{ marginTop: "10px" }}>
-                {person.status === "pending" ? (
-                  <span className="pill loose" title="invited — has not signed in, so has no loom yet">
-                    not signed in yet
-                  </span>
-                ) : (
-                  <>
-                    <span className="pill beaten">{person.conceptsCount} concepts</span>
-                    <span className="pill loose" style={{ marginLeft: "10px" }}>{person.edgesCount} edges</span>
-                  </>
-                )}
-                {person.sectionName ? (
-                  <span className="pill beaten" style={{ marginLeft: "10px" }}>{person.sectionName}</span>
-                ) : (
-                  <span className="pill loose" style={{ marginLeft: "10px" }}>Unassigned</span>
-                )}
-              </div>
+        <>
+          <div className="card rosterlist">
+            {roster.map((person) => (
+              <div key={person.userId ?? person.email} className={`rosterrow${person.status === "pending" ? " pendingrow" : ""}`}>
+                <div className="rosterwho">
+                  <span className="rostername">{person.name ?? person.email}</span>
+                  {person.name ? <span className="rosteremail">{person.email}</span> : null}
+                </div>
 
-              {/* Two different writes behind one control. Once someone exists,
-                  their section lives on the membership; before that it lives on
-                  the invitation, so placing a pending learner is an upsert of
-                  the invitation and they land there on first sign-in. */}
-              {courseSections.length > 0 ? (
-                <form
-                  action={person.userId ? assignMemberSection : addAllowedEmail}
-                  className="quietrow"
-                  style={{ marginTop: "12px" }}
-                >
-                  <input type="hidden" name="courseId" value={courseId} />
-                  {person.userId ? (
-                    <input type="hidden" name="userId" value={person.userId} />
+                <div className="rosterpills">
+                  {person.status === "pending" ? (
+                    <span className="pill loose" title="invited — has not signed in, so has no loom yet">
+                      not signed in yet
+                    </span>
                   ) : (
-                    <input type="hidden" name="email" value={person.email} />
+                    <>
+                      <span className="pill beaten">{person.conceptsCount} concepts</span>
+                      <span className="pill loose">{person.edgesCount} edges</span>
+                    </>
                   )}
-                  <select name="sectionId" className="tinput" defaultValue={person.sectionId ?? ""} aria-label={`Section for ${person.name ?? person.email}`}>
-                    <option value="">No section</option>
-                    {courseSections.map((section) => (
-                      <option key={section.id} value={section.id}>{section.name}</option>
-                    ))}
-                  </select>
-                  <button className="btn ghost mini" type="submit">
-                    {person.userId ? "Assign" : "Place"}
-                  </button>
-                </form>
-              ) : null}
+                </div>
 
-              <div style={{ display: "flex", gap: "8px", marginTop: "15px", flexWrap: "wrap" }}>
-                {person.userId ? (
-                  <a
-                    href={`/admin/user/${person.userId}?course=${encodeURIComponent(courseId)}`}
-                    className="btn mini"
-                  >
-                    Open Loom
-                  </a>
+                {/* Two different writes behind one control. Once someone exists,
+                    their section lives on the membership; before that it lives on
+                    the invitation, so placing a pending learner is an upsert of
+                    the invitation and they land there on first sign-in. */}
+                {courseSections.length > 0 ? (
+                  <form action={person.userId ? assignMemberSection : addAllowedEmail}>
+                    <input type="hidden" name="courseId" value={courseId} />
+                    {person.userId ? (
+                      <input type="hidden" name="userId" value={person.userId} />
+                    ) : (
+                      <input type="hidden" name="email" value={person.email} />
+                    )}
+                    <select name="sectionId" className="tinput inline" defaultValue={person.sectionId ?? ""} aria-label={`Section for ${person.name ?? person.email}`}>
+                      <option value="">No section</option>
+                      {courseSections.map((section) => (
+                        <option key={section.id} value={section.id}>{section.name}</option>
+                      ))}
+                    </select>
+                    <button className="btn ghost mini compact" type="submit">
+                      {person.userId ? "Assign" : "Place"}
+                    </button>
+                  </form>
                 ) : null}
-                {person.userId ? (
-                  <form action={removeFromRoster}>
-                    <input type="hidden" name="courseId" value={courseId} />
-                    <input type="hidden" name="userId" value={person.userId} />
-                    <button className="btn ghost mini" type="submit">
-                      Remove from course
-                    </button>
-                  </form>
-                ) : (
-                  <form action={removeAllowedEmail}>
-                    <input type="hidden" name="courseId" value={courseId} />
-                    <input type="hidden" name="email" value={person.email} />
-                    <button className="btn ghost mini" type="submit">
-                      Withdraw invitation
-                    </button>
-                  </form>
-                )}
+
+                <div className="rosteracts">
+                  {person.userId ? (
+                    <>
+                      <a
+                        href={`/admin/user/${person.userId}?course=${encodeURIComponent(courseId)}`}
+                        className="btn mini compact"
+                      >
+                        Open Loom
+                      </a>
+                      <form action={removeFromRoster}>
+                        <input type="hidden" name="courseId" value={courseId} />
+                        <input type="hidden" name="userId" value={person.userId} />
+                        <button
+                          className="btn ghost mini compact"
+                          type="submit"
+                          aria-label={`Remove ${person.name ?? person.email} from course`}
+                        >
+                          Remove
+                        </button>
+                      </form>
+                    </>
+                  ) : (
+                    <form action={removeAllowedEmail}>
+                      <input type="hidden" name="courseId" value={courseId} />
+                      <input type="hidden" name="email" value={person.email} />
+                      <button
+                        className="btn ghost mini compact"
+                        type="submit"
+                        aria-label={`Withdraw the invitation for ${person.email}`}
+                      >
+                        Withdraw
+                      </button>
+                    </form>
+                  )}
+                </div>
               </div>
-              {person.status === "enrolled" && (
-                <p className="hint" style={{ fontSize: "12px", marginTop: "8px", marginBottom: 0 }}>
-                  Removing them ends their access to this course only — other courses are untouched,
-                  and their work is kept. Re-inviting them brings it all back.
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          <p className="hint" style={{ fontSize: "12.5px", marginTop: "10px" }}>
+            Removing an enrolled learner ends their access to this course only — other courses are
+            untouched, and their work is kept. Re-inviting them brings it all back.
+          </p>
+        </>
       )}
     </main>
   )

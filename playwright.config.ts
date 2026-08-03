@@ -6,6 +6,12 @@ import { defineConfig, devices } from '@playwright/test';
  */
 // require('dotenv').config();
 
+// Port 3000 periodically lands inside Windows' Hyper-V port-exclusion ranges
+// and cannot be bound at all (listen EACCES). PORT points a local run at a
+// port that is actually free — or at an already-running dev server, which
+// reuseExistingServer then picks up. CI leaves PORT unset and keeps 3000.
+const port = Number(process.env.PORT || 3000);
+
 export default defineConfig({
   testDir: './tests',
   /* Maximum time one test can run for. */
@@ -35,7 +41,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:3000',
+    baseURL: `http://localhost:${port}`,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -54,8 +60,8 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
+    command: `npm run dev -- -p ${port}`,
+    url: `http://localhost:${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },
