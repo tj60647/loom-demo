@@ -62,7 +62,10 @@ test("00 · the shelf shows the readings with the student's own tallies", async 
     const main = document.querySelector("main")!
     main.scrollTop += input.getBoundingClientRect().top - (footer.getBoundingClientRect().top + 8)
     const rect = input.getBoundingClientRect()
-    return { x: rect.left + 40, y: rect.top + rect.height / 2 }
+    // Clear of the bottom-left corner: the Next dev-tools badge floats there
+    // in dev builds (it appears whenever some resource 404s) and would eat
+    // the click before the input — a different shield than the one under test.
+    return { x: rect.left + Math.min(rect.width - 20, 260), y: rect.top + rect.height / 2 }
   })
   const chooser = page.waitForEvent("filechooser", { timeout: 10_000 })
   await page.mouse.click(point.x, point.y)
