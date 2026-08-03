@@ -49,7 +49,14 @@ async function openWeaveMap(page: Page) {
  *  were slow enough to sync by accident. */
 function responseCarrying(page: Page, needle: string) {
   return page.waitForResponse(
-    (r) => r.request().method() === 'POST' && (r.request().postData() ?? '').includes(needle),
+    // r.ok() so a failed save times out HERE, at the wait that names the save,
+    // instead of surfacing three assertions later. Caveat it can't cover: a
+    // server action that THROWS still ships as HTTP 200 (the error rides in
+    // the flight payload), so the reload-and-assert below stays load-bearing.
+    (r) =>
+      r.ok() &&
+      r.request().method() === 'POST' &&
+      (r.request().postData() ?? '').includes(needle),
     { timeout: 20_000 },
   );
 }
