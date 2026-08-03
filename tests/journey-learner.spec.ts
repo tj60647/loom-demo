@@ -50,6 +50,24 @@ test("00 · the shelf shows the readings with the student's own tallies", async 
   await expect(page.locator('input[type="file"]')).toBeVisible()
   await expect(page.getByPlaceholder("Plans and Situated Actions")).toBeVisible()
   await expect(page.getByRole("button", { name: "Add to my shelf" })).toBeDisabled()
+
+  // The fixed footer must not eat the click: scroll the input into the
+  // footer's own band and click raw coordinates, the way a mouse does —
+  // "Choose file" silently did nothing there until the footer stopped
+  // catching pointer events. (setInputFiles never clicks, so only a real
+  // click catches this class of regression.)
+  const point = await page.evaluate(() => {
+    const input = document.querySelector('input[type="file"]')!
+    const footer = document.querySelector("footer")!
+    const main = document.querySelector("main")!
+    main.scrollTop += input.getBoundingClientRect().top - (footer.getBoundingClientRect().top + 8)
+    const rect = input.getBoundingClientRect()
+    return { x: rect.left + 40, y: rect.top + rect.height / 2 }
+  })
+  const chooser = page.waitForEvent("filechooser", { timeout: 10_000 })
+  await page.mouse.click(point.x, point.y)
+  await chooser
+
   await page.getByRole("button", { name: "Cancel" }).click()
   await expect(page.locator('input[type="file"]')).toHaveCount(0)
 })
