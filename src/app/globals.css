@@ -147,6 +147,9 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .pill.beaten{color:var(--sage);border:1px solid var(--sage)}
 .act{font-family:var(--mono);font-size:10px;color:var(--sage);cursor:pointer;letter-spacing:.04em}
 .act:hover{text-decoration:underline}
+/* .act and .rm sit on <a>, <summary> and <button> alike; strip the native
+   button chrome so the same word reads the same whatever the element. */
+button.act,button.rm{appearance:none;background:none;border:none;padding:0}
 /* weave */
 .mapbar{display:flex;gap:16px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
 .loosebanner{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:10px}
@@ -311,6 +314,11 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
   padding:6px 10px;border-radius:4px;white-space:normal;width:max-content;max-width:240px;text-align:left;line-height:1.4;z-index:30;pointer-events:none}
 [data-tip]:hover::before{content:"";position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);
   border:5px solid transparent;border-top-color:var(--ink);z-index:30;pointer-events:none}
+/* Inside a scrollbox the tip flips below the control and left-aligns to it:
+   a centred bubble above a top row is clipped by the box's overflow on two
+   sides. Below, the worst case is the last row of a full box, which scrolls. */
+.scrollbox [data-tip]:hover::after{bottom:auto;top:calc(100% + 7px);left:0;transform:none}
+.scrollbox [data-tip]:hover::before{bottom:auto;top:calc(100% + 2px);border-top-color:transparent;border-bottom-color:var(--ink)}
 
 /* --- reading-first: the shelf, the scope bar, the seam --- */
 

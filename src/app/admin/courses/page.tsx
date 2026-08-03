@@ -51,9 +51,15 @@ export default async function AdminCoursesPage({
         included per course, so the same PDF is never uploaded twice.
       </p>
 
-      <section className="card" style={{ marginBottom: "28px" }}>
-        <h2>New Course</h2>
-        <p className="hint" style={{ marginTop: "6px" }}>
+      {/* Folded by default, same idiom as the library's Add Readings and the
+          roster's Invite learners: creating a course is occasional, checking
+          on the existing ones is the daily visit. */}
+      <details className="card invitefold" style={{ marginBottom: "28px" }}>
+        <summary>
+          <span className="tw">▸</span>
+          <h2>New Course</h2>
+        </summary>
+        <p className="hint" style={{ marginTop: "10px" }}>
           The slug is derived from the name and used in links; it is made unique automatically.
         </p>
         <form action={createCourse} style={{ display: "grid", gap: "10px", marginTop: "14px" }}>
@@ -69,9 +75,16 @@ export default async function AdminCoursesPage({
             <span className="label">Description (Optional)</span>
             <textarea name="description" placeholder="DES INV 200" />
           </div>
-          <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>Create Course</button>
+          <button
+            className="btn mini"
+            type="submit"
+            style={{ justifySelf: "start" }}
+            data-tip="Create the course — add sections and readings afterwards"
+          >
+            Create Course
+          </button>
         </form>
-      </section>
+      </details>
 
       {allCourses.length === 0 ? (
         <div className="card empty">
@@ -113,10 +126,21 @@ export default async function AdminCoursesPage({
                   <p style={{ fontSize: "14px", marginTop: "8px" }}>{course.description}</p>
                 ) : null}
 
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "14px" }}>
+                {/* One row of equal buttons; disclosures open below the row
+                    in a .foldout so the buttons never move (see .actrow). */}
+                <div className="actrow" style={{ marginTop: "14px" }}>
                   <details>
-                    <summary className="btn ghost mini" style={{ listStyle: "none", cursor: "pointer" }}>Edit</summary>
-                    <form action={updateCourse} style={{ display: "grid", gap: "10px", marginTop: "12px" }}>
+                    <summary
+                      className="btn ghost mini"
+                      data-tip="Edit the name, slug, term, and description"
+                    >
+                      Edit Course
+                    </summary>
+                    <form
+                      className="foldout"
+                      action={updateCourse}
+                      style={{ display: "grid", gap: "10px", maxWidth: "640px" }}
+                    >
                       <input type="hidden" name="courseId" value={course.id} />
                       <div className="form-row">
                         <span className="label">Name</span>
@@ -134,21 +158,45 @@ export default async function AdminCoursesPage({
                         <span className="label">Description</span>
                         <textarea name="description" defaultValue={course.description} />
                       </div>
-                      <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>Save Course</button>
+                      <button
+                        className="btn mini"
+                        type="submit"
+                        style={{ justifySelf: "start" }}
+                        data-tip="Save the course details"
+                      >
+                        Save Course
+                      </button>
                     </form>
                   </details>
 
                   <form action={setCourseArchived}>
                     <input type="hidden" name="courseId" value={course.id} />
                     <input type="hidden" name="isArchived" value={course.isArchived ? "false" : "true"} />
-                    <button className="btn ghost mini" type="submit">
+                    <button
+                      className="btn ghost mini"
+                      type="submit"
+                      data-tip={
+                        course.isArchived
+                          ? "Return this course to the course pickers"
+                          : "Retire this course from the course pickers — nothing is deleted"
+                      }
+                    >
                       {course.isArchived ? "Unarchive" : "Archive"}
                     </button>
                   </form>
 
                   <details>
-                    <summary className="btn ghost mini" style={{ listStyle: "none", cursor: "pointer" }}>Delete</summary>
-                    <form action={deleteCourse} style={{ marginTop: "10px", display: "grid", gap: "8px" }}>
+                    <summary
+                      className="btn ghost mini pillbtn"
+                      data-tip="Delete the course, its sections, and enrolments — readings and student work survive"
+                    >
+                      Delete
+                    </summary>
+                    <form
+                      className="foldout"
+                      action={deleteCourse}
+                      style={{ display: "grid", gap: "8px", maxWidth: "420px" }}
+                    >
                       <input type="hidden" name="courseId" value={course.id} />
                       <p className="hint" style={{ margin: 0, maxWidth: "46ch" }}>
                         Removes the course, its sections, memberships, allowlist, and reading
@@ -156,7 +204,11 @@ export default async function AdminCoursesPage({
                         work is kept (its course link is cleared). Type <b>delete</b> to confirm.
                       </p>
                       <input name="confirm" placeholder="delete" className="mono-in" required />
-                      <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>Delete Course</button>
+                      {/* No data-tip: the bubble would sit exactly over the
+                          warning this button must be read with. */}
+                      <button className="btn mini danger" type="submit" style={{ justifySelf: "start" }}>
+                        Delete Course
+                      </button>
                     </form>
                   </details>
                 </div>
@@ -196,14 +248,18 @@ export default async function AdminCoursesPage({
                             </span>
                           </div>
 
-                          <div style={{ display: "flex", gap: "10px", marginTop: "8px", flexWrap: "wrap", alignItems: "flex-start" }}>
+                          <div className="actrow" style={{ marginTop: "8px" }}>
                             <details>
-                              <summary className="act" style={{ listStyle: "none", cursor: "pointer" }}>
+                              <summary
+                                className="act"
+                                data-tip="Set the week, order within the week, and core status"
+                              >
                                 schedule
                               </summary>
                               <form
+                                className="foldout"
                                 action={updateCourseSourceSchedule}
-                                style={{ display: "grid", gap: "8px", marginTop: "8px" }}
+                                style={{ display: "grid", gap: "8px", maxWidth: "420px" }}
                               >
                                 <input type="hidden" name="courseId" value={course.id} />
                                 <input type="hidden" name="sourceId" value={reading.id} />
@@ -231,7 +287,12 @@ export default async function AdminCoursesPage({
                                   <input type="checkbox" name="isCore" defaultChecked={reading.link.isCore} />
                                   Core reading (students graph this one)
                                 </label>
-                                <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>
+                                <button
+                                  className="btn mini"
+                                  type="submit"
+                                  style={{ justifySelf: "start" }}
+                                  data-tip="Save the schedule for this course only"
+                                >
                                   Save schedule
                                 </button>
                               </form>
@@ -245,7 +306,15 @@ export default async function AdminCoursesPage({
                                 name="isVisible"
                                 value={reading.link.isVisible ? "false" : "true"}
                               />
-                              <button className="act" type="submit">
+                              <button
+                                className="act"
+                                type="submit"
+                                data-tip={
+                                  reading.link.isVisible
+                                    ? "Hide this reading from students in this course"
+                                    : "Reveal this reading to students in this course"
+                                }
+                              >
                                 {reading.link.isVisible ? "hide" : "reveal"}
                               </button>
                             </form>
@@ -253,7 +322,13 @@ export default async function AdminCoursesPage({
                             <form action={removeSourceFromCourse}>
                               <input type="hidden" name="courseId" value={course.id} />
                               <input type="hidden" name="sourceId" value={reading.id} />
-                              <button className="rm" type="submit">remove from course</button>
+                              <button
+                                className="rm"
+                                type="submit"
+                                data-tip="Remove from this course's list — the reading stays in the library"
+                              >
+                                remove from course
+                              </button>
                             </form>
                           </div>
                         </div>
@@ -269,6 +344,7 @@ export default async function AdminCoursesPage({
                       className="act"
                       style={{ marginLeft: "auto" }}
                       href={`/admin?course=${encodeURIComponent(course.id)}`}
+                      data-tip="Invite and enrol learners on the Roster tab"
                     >
                       {memberships.length} enrolled · invite →
                     </a>
@@ -286,19 +362,26 @@ export default async function AdminCoursesPage({
                               {section.lead ? <span className="hint" style={{ fontSize: "13px" }}>{section.lead}</span> : null}
                               <span className="pill beaten">{count} learner{count !== 1 ? "s" : ""}</span>
                             </div>
-                            <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+                            <div className="actrow" style={{ marginTop: "8px" }}>
                               {/* Sections are built here; people are invited on
                                   the Roster page. Without this link that is two
                                   pages with nothing joining them. */}
                               <a
                                 className="act"
                                 href={`/admin?course=${encodeURIComponent(course.id)}&section=${encodeURIComponent(section.id)}`}
+                                data-tip="Open this section's roster"
                               >
                                 roster →
                               </a>
                               <details>
-                                <summary className="act" style={{ listStyle: "none", cursor: "pointer" }}>edit</summary>
-                                <form action={updateSection} style={{ display: "grid", gap: "8px", marginTop: "8px" }}>
+                                <summary className="act" data-tip="Edit the section name and lead">
+                                  edit
+                                </summary>
+                                <form
+                                  className="foldout"
+                                  action={updateSection}
+                                  style={{ display: "grid", gap: "8px", maxWidth: "420px" }}
+                                >
                                   <input type="hidden" name="courseId" value={course.id} />
                                   <input type="hidden" name="sectionId" value={section.id} />
                                   <div className="form-row">
@@ -309,13 +392,26 @@ export default async function AdminCoursesPage({
                                     <span className="label">Lead</span>
                                     <input name="lead" defaultValue={section.lead} placeholder="Instructor of record" />
                                   </div>
-                                  <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>Save Section</button>
+                                  <button
+                                    className="btn mini"
+                                    type="submit"
+                                    style={{ justifySelf: "start" }}
+                                    data-tip="Save the section name and lead"
+                                  >
+                                    Save Section
+                                  </button>
                                 </form>
                               </details>
                               <form action={deleteSection}>
                                 <input type="hidden" name="courseId" value={course.id} />
                                 <input type="hidden" name="sectionId" value={section.id} />
-                                <button className="rm" type="submit">remove</button>
+                                <button
+                                  className="rm"
+                                  type="submit"
+                                  data-tip="Delete this section — its learners stay enrolled, unassigned"
+                                >
+                                  remove
+                                </button>
                               </form>
                             </div>
                           </div>
@@ -328,7 +424,9 @@ export default async function AdminCoursesPage({
                     <input type="hidden" name="courseId" value={course.id} />
                     <input name="name" placeholder="Section name, e.g. Section 1 — Hugh" required />
                     <input name="lead" placeholder="Lead (optional)" />
-                    <button className="btn mini" type="submit">Add Section</button>
+                    <button className="btn mini" type="submit" data-tip="Create this section in the course">
+                      Add Section
+                    </button>
                   </form>
                 </div>
               </section>

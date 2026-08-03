@@ -55,6 +55,21 @@ test("the per-student view renders Test User A's loom read-only", async ({ page 
 
 test("courses: schedule controls render for the course's readings", async ({ page }) => {
   await page.goto("/admin/courses")
+
+  // New Course starts folded — the same idiom as the library's Add Readings
+  // and the roster's Invite learners.
+  const fold = page.locator("details.invitefold")
+  await expect(fold).toBeVisible({ timeout: 15_000 })
+  await expect(fold.locator("input[name=name]")).toBeHidden()
+
+  // Course controls are one uniform row: Edit Course (disclosure), Archive,
+  // and Delete as the red pill disclosure.
+  const firstCourse = page
+    .locator("section.card", { has: page.locator("summary", { hasText: "Edit Course" }) })
+    .first()
+  await expect(firstCourse.locator("summary", { hasText: "Edit Course" })).toBeVisible()
+  await expect(firstCourse.locator("summary.pillbtn", { hasText: "Delete" })).toBeVisible()
+
   // Each reading row shows its Week/Core/Visible pills; the week+position form
   // sits behind the "schedule" disclosure.
   await expect(page.locator(".pill", { hasText: /Week \d+|Unscheduled/ }).first()).toBeVisible({ timeout: 15_000 })
