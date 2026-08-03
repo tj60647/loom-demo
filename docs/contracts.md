@@ -21,7 +21,7 @@ Conventions used below:
 
 ## 1. Database schema — [src/db/schema.ts](../src/db/schema.ts)
 
-Migrations `drizzle/0000`–`0013`, applied via `drizzle-kit migrate`
+Migrations `drizzle/0000`–`0014`, applied via `drizzle-kit migrate`
 (`drizzle.__drizzle_migrations` is the record of truth).
 
 ### 1a. Auth (NextAuth v4, database sessions)
@@ -49,7 +49,7 @@ Migrations `drizzle/0000`–`0013`, applied via `drizzle-kit migrate`
 | --- | --- | --- |
 | `source` | id · title · author `''` · sourceReference `''` · description `''` · isDescriptionVisible true · metadataProvenance `''` · isArchived false · **storageKey nullable** · **isOwn false** · createdByUserId SET NULL · createdAt | `storageKey NULL` = reference-only card (no PDF). `isOwn` = student-minted, visible on that student's shelf only |
 | `course_source` | courseId CASCADE · sourceId CASCADE · isVisible true · week nullable · isCore true · position 0 · createdAt | PK (courseId, sourceId). Week/visibility/core are per-course facts on the join, never on the reading |
-| `source_page` | id · sourceId CASCADE · pageNumber · textContent · contentHash · createdAt | Extracted text per page; anchor reconciliation reads it. No unique on (sourceId, pageNumber) |
+| `source_page` | id · sourceId CASCADE · pageNumber · textContent · contentHash · createdAt | Extracted text per page; anchor reconciliation and search read it. No unique on (sourceId, pageNumber). GIN index `source_page_search_idx` on `to_tsvector('english', textContent)`; `source` carries the weighted `source_search_idx` twin (title A · author B · reference/description C) — the search queries must repeat these expressions verbatim |
 | `source_score` | sourceId PK/CASCADE · status `'heuristic'\|'judged'\|'unscorable'` · coverage/legibility/anchorability/structure int nullable · overall real · pass bool nullable · notes · judgeNotes · judgeModel · metrics jsonb · scoredAt | 1:1 with source. Unscored dimension = NULL (abstention, never a default). `pass` requires every scored dimension ≥ 3 — not compensatory |
 
 ### 1d. The graph (the artifact — spec §6 `graph`)
@@ -136,6 +136,20 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 Upload constants ([src/lib/readingUpload.ts](../src/lib/readingUpload.ts)):
 `MAX_READING_BYTES` = 20 MB, prefix `readings/`, PDFs only — enforced browser-side,
 token-side, and at registration (three places that don't trust each other).
+
+Search — [src/actions/search.ts](../src/actions/search.ts): plain Postgres FTS
+(`websearch_to_tsquery` / `ts_rank` / `ts_headline`, GIN expression indexes from
+migration 0014 — deliberately no model anywhere near it). Both actions scope
+through `getSources()`, so search can never surface a reading its caller could
+not already open from the shelf. Snippets mark matches with `⟦⟧`
+([src/lib/searchText.ts](../src/lib/searchText.ts)) and are rendered by
+splitting, never as HTML. Queries are trimmed to 200 chars; under 2 chars
+nothing runs.
+
+| Action | Params | Returns | Auth |
+| --- | --- | --- | --- |
+| `searchReadings` | `query` | ≤30 `ReadingSearchHit` — card + page matches, ranked (card ≫ best page > breadth), each with ≤2 page excerpts | session required, else `[]` |
+| `searchReading` | `sourceId, query` | `{hits: ≤50 page-ordered snippets, truncated}` | session required **and** `sourceId` on the caller's shelf, else empty |
 
 ### 2c. Roster & cohort — [src/actions/admin.ts](../src/actions/admin.ts)
 

@@ -16,6 +16,7 @@ import { useReadings, type ReadingMeta } from "@/components/providers/ReadingsPr
 import { createOwnReading } from "@/actions/sources"
 import { tallyByReading } from "@/lib/scope"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
+import ShelfSearch from "@/components/shelf/ShelfSearch"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import JourneyNav from "@/components/ui/JourneyNav"
 
@@ -26,6 +27,9 @@ export default function Shelf() {
   const { state, isLoading, loadExample, flash } = useLoom()
   const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
   const [exampleBusy, setExampleBusy] = useState(false)
+  // While a search query is live, the results own the page; clearing the box
+  // puts the week-grouped shelf back exactly as it was.
+  const [searchActive, setSearchActive] = useState(false)
 
   const tallies = useMemo(() => tallyByReading(state), [state])
 
@@ -140,6 +144,12 @@ export default function Shelf() {
           the evidence of both.
         </p>
 
+        {/* Which reading says this? Words, or a "quoted phrase" — matched
+            against every card and every page on this shelf, never anyone
+            else's. While a query is live the results stand in for the shelf. */}
+        <ShelfSearch onActiveChange={setSearchActive} />
+
+        {!searchActive && (<>
         {/* The whole weave and Keep were quick links here; they are journey
             stations now (05 · 06), so the bar carries them and this row keeps
             only the tally. */}
@@ -203,6 +213,7 @@ export default function Shelf() {
             </button>
           </div>
         )}
+        </>)}
 
         <FirstRunWalkthrough />
       </main>

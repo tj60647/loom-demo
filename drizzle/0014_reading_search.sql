@@ -1,0 +1,2 @@
+CREATE INDEX "source_page_search_idx" ON "source_page" USING gin (to_tsvector('english', "textContent"));--> statement-breakpoint
+CREATE INDEX "source_search_idx" ON "source" USING gin ((setweight(to_tsvector('english', coalesce("title", '')), 'A') || setweight(to_tsvector('english', coalesce("author", '')), 'B') || setweight(to_tsvector('english', coalesce("sourceReference", '')), 'C') || setweight(to_tsvector('english', coalesce("description", '')), 'C')));

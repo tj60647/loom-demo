@@ -1,11 +1,14 @@
 "use client"
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import CaptureModal from './CaptureModal';
 import PageSlot from './PageSlot';
 import { useLoom } from '@/components/providers/LoomProvider';
+import { searchReading, type ReadingPageHit } from '@/actions/search';
+import { hitTermsOf } from '@/lib/searchText';
+import Snippet from '@/components/ui/Snippet';
 import { Byte, Concept } from '@/lib/types';
 import { hashText } from '@/lib/hash';
 import Mark from 'mark.js';
@@ -97,6 +100,22 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string, pageNum?: number, startOffset?: number, endOffset?: number, pageContentHash?: string} | null>(null);
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [captureData, setCaptureData] = useState<{text: string, pageNum?: number, startOffset?: number, endOffset?: number, pageContentHash?: string} | null>(null);
+
+  // Find in this reading. The query runs server-side against the canonical
+  // page text (src/actions/search.ts) and comes back as page-ordered snippets;
+  // the words Postgres marked are then re-marked on the rendered text layer,
+  // so a hit looks the same on the page as it does in the list.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchHits, setSearchHits] = useState<ReadingPageHit[] | null>(null);
+  const [searchTruncated, setSearchTruncated] = useState(false);
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  // Monotonic request id: a slow early response never overwrites a later one.
+  const searchRequestRef = useRef(0);
+  // Read by the highlight applier (and its MutationObserver callback), which
+  // must see the current terms without re-registering.
+  const searchTermsRef = useRef<string[]>([]);
 
   const hideHighlightTooltip = useCallback(() => {
     setHighlightTooltip(null);
@@ -425,25 +444,80 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     bytesRef.current = state.bytes.filter(b => (sourceId && b.sourceId === sourceId) || b.source === sourceName);
   }, [state.bytes, sourceName, sourceId]);
 
-  // Robust highlight applier using MutationObserver + React useEffect
+  // Find in this reading: the effect only schedules the debounced fetch —
+  // state resets happen in the handlers (close, clear), never synchronously
+  // in an effect body.
   useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!searchOpen || !sourceId || trimmed.length < 2) return;
+
+    const requestId = ++searchRequestRef.current;
+    const timer = window.setTimeout(() => {
+      setSearchBusy(true);
+      searchReading(sourceId, trimmed)
+        .then(({ hits, truncated }) => {
+          if (searchRequestRef.current !== requestId) return;
+          setSearchHits(hits);
+          setSearchTruncated(truncated);
+          setSearchError(null);
+        })
+        .catch(() => {
+          if (searchRequestRef.current !== requestId) return;
+          setSearchError("could not search this reading just now");
+        })
+        .finally(() => {
+          if (searchRequestRef.current === requestId) setSearchBusy(false);
+        });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [searchOpen, searchQuery, sourceId]);
+
+  /** Drop any in-flight request and empty the results (and their marks). */
+  const resetSearchResults = useCallback(() => {
+    searchRequestRef.current++;
+    setSearchHits(null);
+    setSearchTruncated(false);
+    setSearchBusy(false);
+    setSearchError(null);
+  }, []);
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    resetSearchResults();
+  }, [resetSearchResults]);
+
+  // The word forms Postgres marked in the snippets — the document's own words
+  // (stemming happened server-side), so an exact, case-insensitive mark on the
+  // text layer finds them again.
+  const searchTerms = useMemo(
+    () => (searchHits ? hitTermsOf(searchHits.map((hit) => hit.snippet)) : []),
+    [searchHits]
+  );
+
+  // Robust highlight applier using MutationObserver + React useEffect.
+  // Search-term marks ride the same pass as byte highlights: one unmark, then
+  // bytes, then search terms — two competing effects would race each other's
+  // unmark and strip whichever finished first.
+  useEffect(() => {
+    searchTermsRef.current = searchTerms;
     if (!containerRef.current) return;
     let debounceTimer: NodeJS.Timeout;
 
     const applyHighlights = () => {
       const bytes = bytesRef.current;
-      if (bytes.length === 0) return;
+      if (bytes.length === 0 && searchTermsRef.current.length === 0) return;
 
       const textLayers = containerRef.current!.querySelectorAll('.react-pdf__Page__textContent');
-      
+
       textLayers.forEach(layer => {
         // Skip empty text layers
         if (layer.children.length === 0) return;
-        
+
         const pageStr = layer.parentElement?.getAttribute('data-page-number');
         const parsedPage = pageStr ? parseInt(pageStr, 10) : 0;
         const pageBytes = bytes.filter(b => b.pageNumber === parsedPage || !b.pageNumber);
-        if (pageBytes.length === 0) return;
+        if (pageBytes.length === 0 && searchTermsRef.current.length === 0) return;
 
         const instance = new Mark(layer as HTMLElement);
         instance.unmark({
@@ -502,6 +576,22 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               }
             });
             if (matches > 0) console.log(`[Loom PDF] Applied ${matches} highlights on Page ${parsedPage}.`);
+
+            // Search hits, marked after the bytes so a passage that is both
+            // captured and searched shows the search mark on top. The terms
+            // are whole word forms from the document, so "exactly" marks the
+            // word and not every substring echo of it.
+            const searchWords = searchTermsRef.current;
+            if (searchWords.length > 0) {
+              instance.mark(searchWords, {
+                className: "loom-search-hit",
+                separateWordSearch: false,
+                accuracy: "exactly",
+                caseSensitive: false,
+                diacritics: true,
+                acrossElements: true,
+              });
+            }
           }
         });
       });
@@ -531,7 +621,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       observer.disconnect();
       clearTimeout(debounceTimer);
     };
-  }, [state.bytes, state.concepts, pageNumber, bindHighlightNode, sourceName]); // Re-run effect when bytes or page changes
+  }, [state.bytes, state.concepts, pageNumber, bindHighlightNode, sourceName, searchTerms]); // Re-run when bytes, page, or search terms change
 
   const handleCaptureClick = () => {
     if (highlightRect) {
@@ -585,10 +675,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       if (showCaptureModal || document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
 
       if (e.key === 'Escape') {
-        // One Escape, one thing: dismiss the tooltip if one is open, otherwise
-        // leave fullscreen. Doing both at once would take the reading away
-        // from someone who only meant to close a label.
+        // One Escape, one thing: dismiss the tooltip if one is open, then the
+        // search panel, then fullscreen. Doing several at once would take the
+        // reading away from someone who only meant to close a label.
         if (highlightTooltip) hideHighlightTooltip();
+        else if (searchOpen) closeSearch();
         else if (isFullscreen) setIsFullscreen(false);
         return;
       }
@@ -610,7 +701,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal, viewMode, isFullscreen, highlightTooltip]);
+  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal, viewMode, isFullscreen, highlightTooltip, searchOpen, closeSearch]);
 
   /**
    * Matrix page width: a contact sheet of four across on a desktop stage (two
@@ -662,6 +753,66 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           color: inherit;
           cursor: help;
           pointer-events: auto;
+        }
+        /* A searched word on the page. Sage, not the byte yellow: a search
+           hit is a place the text says something, never a passage anyone
+           captured — the two must not be readable as each other. */
+        .loom-search-hit {
+          background-color: rgba(122, 138, 110, 0.4);
+          outline: 1px solid rgba(122, 138, 110, 0.75);
+          color: inherit;
+        }
+        .pdf-search-panel {
+          position: absolute;
+          top: 64px;
+          right: 12px;
+          z-index: 20;
+          width: min(340px, calc(100vw - 24px));
+          max-height: min(56vh, 480px);
+          display: flex;
+          flex-direction: column;
+          background: var(--paper-2);
+          border: 1px solid var(--rule);
+          border-radius: 4px;
+          box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16);
+          padding: 10px 12px;
+        }
+        .pdf-search-row { display: flex; gap: 8px; align-items: center; }
+        .pdf-search-row .tinput { flex: 1; }
+        .pdf-search-tally { display: block; margin: 10px 0 6px; }
+        .pdf-search-hits {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          overflow-y: auto;
+          min-height: 0;
+        }
+        .pdf-search-hits li + li { border-top: 1px dotted var(--rule); }
+        .pdf-search-hit {
+          display: block;
+          width: 100%;
+          text-align: left;
+          background: transparent;
+          border: none;
+          padding: 8px 4px;
+          cursor: pointer;
+          font-family: var(--body);
+          color: var(--ink);
+        }
+        .pdf-search-hit:hover { background: rgba(122, 138, 110, 0.09); }
+        .pdf-search-hit .n {
+          font-family: var(--mono);
+          font-size: 10px;
+          letter-spacing: 0.06em;
+          color: var(--grey);
+          margin-right: 7px;
+        }
+        .pdf-search-snip { font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
+        .pdf-search-snip .snipmark {
+          background: rgba(122, 138, 110, 0.28);
+          color: inherit;
+          padding: 0 1px;
+          border-radius: 2px;
         }
         .loom-highlight-tooltip {
           position: fixed;
@@ -990,6 +1141,20 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </label>
           )}
 
+          {/* Only where there is canonical page text to search — a viewer
+              without a sourceId has no pages on record to ask. */}
+          {sourceId && (
+            <button
+              className={`btn mini ${searchOpen ? "" : "ghost"}`}
+              onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+              data-tip="find a word or phrase in this reading"
+              aria-pressed={searchOpen}
+              aria-label="Search this reading"
+            >
+              {isNarrow ? "⌕" : "⌕ Search"}
+            </button>
+          )}
+
           <button
             className="btn ghost mini"
             onClick={() => setIsFullscreen((on) => !on)}
@@ -1001,6 +1166,72 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           </button>
         </div>
       </div>
+
+      {/* Find in this reading. A panel over the stage's edge, not a bar above
+          it: the text keeps its room, and the hits are doors — click one and
+          the page turns (or scrolls) to it with the words marked. */}
+      {searchOpen && sourceId && (
+        <div className="pdf-search-panel" role="search" aria-label="Search this reading">
+          <div className="pdf-search-row">
+            <input
+              type="search"
+              className="tinput"
+              value={searchQuery}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchQuery(value);
+                // Below the two-character floor there is nothing to ask, so
+                // the old results (and their page marks) go now, not later.
+                if (value.trim().length < 2) resetSearchResults();
+              }}
+              onKeyDown={(e) => {
+                // The window handler ignores keys while an input is focused,
+                // so the panel closes itself.
+                if (e.key === "Escape") closeSearch();
+              }}
+              placeholder='a word, or a "phrase"'
+              aria-label="Search this reading for a word or phrase"
+              autoFocus
+            />
+            <button
+              className="btn ghost mini"
+              onClick={closeSearch}
+              aria-label="Close search"
+            >✕</button>
+          </div>
+
+          {searchError && <p className="hint" style={{ color: "var(--red)", margin: "8px 0 0" }}>{searchError}</p>}
+          {!searchError && searchBusy && !searchHits && (
+            <p className="hint" style={{ margin: "8px 0 0" }}>searching…</p>
+          )}
+          {!searchError && searchHits && searchHits.length === 0 && !searchBusy && (
+            <p className="hint" style={{ margin: "8px 0 0" }}>no page says that</p>
+          )}
+
+          {!searchError && searchHits && searchHits.length > 0 && (
+            <>
+              <span className="cap pdf-search-tally">
+                {searchHits.length}{searchTruncated ? "+" : ""} page{searchHits.length !== 1 ? "s" : ""}
+                {searchTruncated ? ` — first ${searchHits.length} shown` : ""}
+              </span>
+              <ol className="pdf-search-hits">
+                {searchHits.map((hit) => (
+                  <li key={hit.pageNumber}>
+                    <button
+                      className="pdf-search-hit"
+                      onClick={() => setPageNumber(hit.pageNumber)}
+                      aria-label={`Go to page ${hit.pageNumber}`}
+                    >
+                      <span className="n">p. {hit.pageNumber}</span>
+                      <span className="pdf-search-snip"><Snippet text={hit.snippet} /></span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Main Content Area — one <Document> for all three layouts, so
           switching views never re-fetches or re-parses the PDF. */}

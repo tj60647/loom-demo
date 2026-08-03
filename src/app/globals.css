@@ -335,6 +335,22 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .shelftally{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:0}
 .shelfquiet{color:var(--grey)}
 
+/* Shelf search: which reading says this? A hit is a link into the reading,
+   shaped like a shelf card; the marked words are Postgres's, not ours. */
+.searchwrap{margin:0 0 18px}
+.searchinput{max-width:520px}
+.searchresults{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.searchtally{display:block}
+.searchhit{display:block;padding:12px 14px;text-decoration:none;color:inherit;
+  border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.5)}
+.searchhit:hover{border-color:var(--ochre);background:rgba(168,132,63,.06)}
+.searchhithead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.searchhithead h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0}
+.searchwhere{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:2px 0 0}
+.searchsnip{font-size:13.5px;line-height:1.45;color:var(--ink-soft);margin:6px 0 0}
+.searchsnip .n{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--grey);margin-right:7px}
+.snipmark{background:rgba(255,204,0,.35);color:inherit;padding:0 1px;border-radius:2px}
+
 /* The seam: the same concept met in a second text. Counted, never advised. */
 .seam{margin-top:12px;padding:11px 13px;border-left:2px solid var(--sage);background:rgba(122,138,110,.09);border-radius:0 4px 4px 0}
 .seam p{font-size:14px;line-height:1.45;margin:4px 0 9px}
