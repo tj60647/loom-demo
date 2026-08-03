@@ -100,6 +100,35 @@ my month"; a change branch is a ten-minute read.
 
 Rhythm in one line: `branch → PR → review → dev alias → soak → PR to master`.
 
+## Onboarding a developer
+
+What a new developer needs, in order:
+
+1. **Repo access: collaborator with write.** Not a fork — fork PRs never
+   receive the CI secrets, so the required `e2e` gate can only pass for
+   branches pushed to this repo.
+2. **Local setup:** clone, `npm ci`, copy `.env.example` → `.env.local` and
+   fill it in (the file says where each value comes from). The non-negotiable
+   line: `DATABASE_URL` points at the Neon **`dev`** branch — `seed:demo`
+   wipes the demo course on whatever database it is aimed at, and aimed at
+   `main` that is production data.
+3. **Local sign-in is the backdoor,** `GET /api/auth/test-login` (admin) or
+   `?as=testa` (learner) — real GitHub OAuth only exists on the deployed
+   environments, whose OAuth apps hold those callbacks. Deployed builds
+   answer 403 there; that is invariant 5 working.
+4. **Read "Working together" above.** Both long-lived branches are protected:
+   `dev` requires green `checks` + `e2e` (so work arrives by PR), `master`
+   additionally requires review and is the production trigger. Neither takes
+   force pushes.
+5. **What they do not need:** Vercel or Neon dashboard access. Previews
+   deploy from git on their own; the environment variables are already
+   scoped. Grant dashboards later if someone ends up debugging deploys.
+
+Two data rules worth saying at hello (both are invariants above): the blob
+store is shared by every environment — never delete a reading locally that
+another environment still references — and the demo accounts (Test User A/B)
+belong to the test suite; human testing happens with real accounts.
+
 ## Production
 
 `master` deploys to production on merge — and merging to master is the *only*
