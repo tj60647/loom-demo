@@ -66,31 +66,81 @@ test.describe('Library verification', () => {
     // controls under test are in the DOM long before the images finish.
     await page.goto('/admin/library', { waitUntil: 'domcontentloaded', timeout: 60_000 });
 
-    // Scope to source cards (they contain a thumbnail); skip the add-reading form card.
+    // The header panel (tabs + course picker) sits outside the scroll: only
+    // .adminbody scrolls, so the nav must still be in view at the bottom.
+    const nav = page.locator('.adminshell nav');
+    await expect(nav).toBeVisible({ timeout: 15000 });
+    const adminBody = page.locator('.adminbody');
+    await adminBody.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    await expect(nav).toBeInViewport();
+    await adminBody.evaluate((el) => { el.scrollTop = 0; });
+
+    // Add Readings starts folded — scanning the library is the daily visit,
+    // uploading is occasional. The summary is the only way in.
+    const addFold = page.locator('details.invitefold');
+    const fileInput = addFold.locator('input[type="file"]');
+    await expect(addFold).toBeVisible();
+    await expect(fileInput).toBeHidden();
+    await addFold.locator('summary').click();
+    await expect(fileInput).toBeVisible();
+    await addFold.locator('summary').click(); // back to the default state
+    await expect(fileInput).toBeHidden();
+
+    // Scope to source cards (they contain a thumbnail); skip the add-reading fold card.
     const cards = page.locator('.card').filter({ has: page.locator('img') });
     await expect(cards.first()).toBeVisible({ timeout: 15000 });
 
     const firstCard = cards.first();
     await expect(firstCard.locator('img')).toBeVisible();
 
-    // Controls the library itself owns: Edit (disclosure), Download, archive,
-    // and delete (also a disclosure, since it destroys the file).
+    // Controls the library itself owns, one uniform row: Edit Entry
+    // (disclosure), Download PDF, Rescore, Archive, and Delete — a red pill,
+    // also a disclosure, since it destroys the file.
     //
     // Per-course visibility is NOT here and this spec used to assert it was.
     // Hide/Reveal moved to the Courses tab when the library became
     // course-agnostic: a reading can be published in one course and staged in
     // another, so that decision belongs to the join, not to the reading.
-    const editSummary = firstCard.locator('summary', { hasText: 'Edit' });
+    const editSummary = firstCard.locator('summary', { hasText: 'Edit Entry' });
+    const downloadLink = firstCard.getByRole('link', { name: /Download PDF/i });
+    const rescoreButton = firstCard.getByRole('button', { name: /^rescore$/i });
+    const archiveButton = firstCard.getByRole('button', { name: /^archive$/i });
+    const deleteSummary = firstCard.locator('summary.pillbtn', { hasText: 'Delete' });
     await expect(editSummary).toBeVisible();
-    await expect(firstCard.getByRole('link', { name: /Download PDF/i })).toBeVisible();
-    await expect(firstCard.getByRole('button', { name: /^archive$/i })).toBeVisible();
-    await expect(firstCard.locator('summary', { hasText: 'delete' })).toBeVisible();
+    await expect(downloadLink).toBeVisible();
+    await expect(rescoreButton).toBeVisible();
+    await expect(archiveButton).toBeVisible();
+    await expect(deleteSummary).toBeVisible();
 
-    // Edit must be a disclosure, not an always-open form: title field hidden until opened.
+    // Every control in the row explains itself on hover.
+    for (const control of [editSummary, downloadLink, rescoreButton, archiveButton, deleteSummary]) {
+      await expect(control).toHaveAttribute('data-tip', /.+/);
+    }
+
+    // Edit must be a disclosure, not an always-open form: title field hidden
+    // until opened — and opening it must not move the buttons, because the
+    // disclosed form lands on its own line *below* the row.
     const titleInput = firstCard.locator('input[name="title"]');
     await expect(titleInput).toBeHidden();
+    // Baseline only once the row is fully in view: boundingBox is
+    // viewport-relative, and a click on an off-screen summary auto-scrolls,
+    // which would read as a phantom 100px+ "move".
+    await editSummary.scrollIntoViewIfNeeded();
+    const rowBefore = await editSummary.boundingBox();
     await editSummary.click();
     await expect(titleInput).toBeVisible();
+    const rowAfter = await editSummary.boundingBox();
+    expect(rowAfter!.x).toBeCloseTo(rowBefore!.x, 0);
+    expect(rowAfter!.y).toBeCloseTo(rowBefore!.y, 0);
+    const titleBox = await titleInput.boundingBox();
+    expect(titleBox!.y).toBeGreaterThan(rowBefore!.y + rowBefore!.height - 1);
+
+    // A second open disclosure stacks below as well; the row still holds.
+    await deleteSummary.click();
+    await expect(firstCard.getByRole('button', { name: /Delete Permanently/i })).toBeVisible();
+    const rowAfterDelete = await editSummary.boundingBox();
+    expect(rowAfterDelete!.x).toBeCloseTo(rowBefore!.x, 0);
+    expect(rowAfterDelete!.y).toBeCloseTo(rowBefore!.y, 0);
 
     // Viewport, not fullPage: a full-page capture rasterizes every one of the
     // library's 20+ cards (and waits on their images) — it timed out the test

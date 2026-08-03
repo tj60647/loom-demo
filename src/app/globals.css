@@ -24,11 +24,16 @@ header,.scopebar,nav{flex:0 0 auto}
 /* min-height:0 or a flex item refuses to shrink below its content and the
    scroll silently moves back to the document. */
 main,.adminshell{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
-/* Admin pages nest <main> inside .adminshell, and the shell owns the scroll.
-   The rule above would still make that nested <main> a scroll container with
-   nothing to scroll — and overscroll-behavior:contain swallows the wheel at a
-   scroll boundary rather than chaining it up to the shell, so the page reads
-   as scroll-broken. A <main> inside the shell must be a plain block. */
+/* Admin pages split the shell: AdminNav (tabs + course picker) is pinned, and
+   .adminbody below it owns the scroll, so where you are and which course you
+   are in never scroll away. The shell must not scroll itself or the nav would
+   ride along with the page. */
+.adminshell{display:flex;flex-direction:column;overflow-y:hidden}
+.adminbody{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+/* A <main> nested inside .adminbody must stay a plain block: the generic rule
+   above would make it a second scroll container with nothing to scroll — and
+   overscroll-behavior:contain swallows the wheel at a scroll boundary rather
+   than chaining it up to .adminbody, so the page reads as scroll-broken. */
 .adminshell main{flex:none;min-height:auto;overflow-y:visible;overscroll-behavior:auto}
 h1,h2,h3{font-family:var(--display);font-weight:500;margin:0}
 .label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
@@ -410,3 +415,29 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .invitereport{border-left:2px solid var(--rule);padding-left:11px;margin-top:4px}
 .invitereport p{font-size:14px;line-height:1.45;margin:0 0 6px}
 .invitereport p:last-child{margin-bottom:0}
+/* A reading card's action row. Every control is the same .btn.mini box
+   whatever its element — button, link, or a disclosure's summary — so the row
+   reads as one set. display:contents lifts each disclosure's children into
+   the row itself: summaries sit with the buttons while the .foldout, ordered
+   last at full width, always wraps onto its own line *below* the row — so
+   opening a disclosure never moves a button. */
+.actrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.actrow .btn{display:inline-flex;align-items:center;justify-content:center}
+.actrow details{display:contents}
+.actrow summary{list-style:none;cursor:pointer}
+.actrow summary::-webkit-details-marker{display:none}
+/* What joins the flex row from an open disclosure is the ::details-content
+   pseudo-box, not the .foldout form inside it — order on the form alone is
+   inert, and the content box would land mid-row, stretch the line to its own
+   height and centre the buttons 300px down. Both rules carry the same intent
+   so engines that flatten straight to the form behave identically. */
+.actrow details::details-content{order:1;flex-basis:100%;min-width:0}
+.actrow .foldout{order:1;flex-basis:100%;min-width:0}
+/* A closed disclosure's content box is content-visibility:hidden, not gone —
+   left in the row, each one is a zero-size item that still draws flex gaps
+   (phantom spacing between buttons, stray rows below). Remove the box. */
+.actrow details:not([open])::details-content{display:none}
+/* Delete is a pill: the same height as its row-mates, but red-rimmed and
+   fully rounded so the destructive act is unmistakably not just another
+   button. */
+.btn.pillbtn{border-radius:999px;color:var(--red);border-color:var(--red)}

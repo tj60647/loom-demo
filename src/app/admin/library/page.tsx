@@ -79,13 +79,16 @@ export default async function AdminLibraryPage({
                   <div style={{ display: "flex", gap: "18px", alignItems: "stretch", flexWrap: "wrap" }}>
                     <SourceThumbnail sourceId={reading.id} title={reading.title} fixedHeight={220} />
 
+                    {/* Top-down flow, never space-between: bottom-pinning the
+                        action row only holds while the column is shorter than
+                        the thumbnail, so the row would jump up the moment a
+                        disclosure opens and the column outgrows it. */}
                     <div
                       style={{
                         flex: "1 1 340px",
                         minWidth: "240px",
                         display: "flex",
                         flexDirection: "column",
-                        justifyContent: "space-between",
                         gap: "12px",
                       }}
                     >
@@ -138,15 +141,22 @@ export default async function AdminLibraryPage({
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-start" }}>
+                      {/* One row of equal buttons; whatever a button discloses
+                          opens in a .foldout on its own line below the row, so
+                          the buttons themselves never move (see .actrow). */}
+                      <div className="actrow">
                         {addable.length > 0 ? (
                           <details>
-                            <summary className="btn mini" style={{ listStyle: "none", cursor: "pointer" }}>
+                            <summary
+                              className="btn mini"
+                              data-tip="Include this reading in a course's list — pick the course and week"
+                            >
                               Add to Course
                             </summary>
                             <form
+                              className="foldout"
                               action={addSourceToCourse}
-                              style={{ display: "grid", gap: "10px", marginTop: "12px" }}
+                              style={{ display: "grid", gap: "10px", maxWidth: "420px" }}
                             >
                               <input type="hidden" name="sourceId" value={reading.id} />
                               <div className="form-row">
@@ -177,7 +187,12 @@ export default async function AdminLibraryPage({
                                 <input type="checkbox" name="isCore" defaultChecked value="on" />
                                 Core reading (students graph this one)
                               </label>
-                              <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>
+                              <button
+                                className="btn mini"
+                                type="submit"
+                                style={{ justifySelf: "start" }}
+                                data-tip="Add with the chosen course, week, and core status"
+                              >
                                 Add to Course
                               </button>
                             </form>
@@ -191,12 +206,16 @@ export default async function AdminLibraryPage({
                         )}
 
                         <details>
-                          <summary className="btn ghost mini" style={{ listStyle: "none", cursor: "pointer" }}>
-                            Edit
+                          <summary
+                            className="btn ghost mini"
+                            data-tip="Edit the title, author, and description shared by every course"
+                          >
+                            Edit Entry
                           </summary>
                           <form
+                            className="foldout"
                             action={updateSourceMetadata}
-                            style={{ display: "grid", gap: "10px", marginTop: "10px" }}
+                            style={{ display: "grid", gap: "10px", maxWidth: "640px" }}
                           >
                             <input type="hidden" name="sourceId" value={reading.id} />
                             <DraftMetadataButton sourceId={reading.id} />
@@ -243,38 +262,68 @@ export default async function AdminLibraryPage({
                                 placeholder="Where this metadata came from, e.g. email text, PDF front matter, manual review"
                               />
                             </div>
-                            <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>
+                            <button
+                              className="btn mini"
+                              type="submit"
+                              style={{ justifySelf: "start" }}
+                              data-tip="Save these fields for every course that includes this reading"
+                            >
                               Save Metadata
                             </button>
                           </form>
                         </details>
 
-                        <a className="btn ghost mini" href={`/api/readings/${reading.id}?download=1`}>
+                        <a
+                          className="btn ghost mini"
+                          href={`/api/readings/${reading.id}?download=1`}
+                          data-tip="Download the original PDF file"
+                        >
                           Download PDF
                         </a>
 
                         <form action={rescoreSourceAction}>
                           <input type="hidden" name="sourceId" value={reading.id} />
-                          <button className="act" type="submit">rescore</button>
+                          <button
+                            className="btn ghost mini"
+                            type="submit"
+                            data-tip="Re-run extraction scoring and rebuild the cover thumbnail"
+                          >
+                            Rescore
+                          </button>
                         </form>
 
                         <form action={setSourceArchived}>
                           <input type="hidden" name="sourceId" value={reading.id} />
                           <input type="hidden" name="isArchived" value="true" />
-                          <button className="act" type="submit">archive</button>
+                          <button
+                            className="btn ghost mini"
+                            type="submit"
+                            data-tip="Retire from the library — courses that already include it keep it"
+                          >
+                            Archive
+                          </button>
                         </form>
 
                         <details>
-                          <summary className="rm" style={{ listStyle: "none", cursor: "pointer" }}>
-                            delete
+                          <summary
+                            className="btn ghost mini pillbtn"
+                            data-tip="Permanently delete the PDF and remove it from every course"
+                          >
+                            Delete
                           </summary>
-                          <form action={deleteSource} style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
+                          <form
+                            className="foldout"
+                            action={deleteSource}
+                            style={{ display: "grid", gap: "8px" }}
+                          >
                             <input type="hidden" name="sourceId" value={reading.id} />
                             <p className="hint" style={{ margin: 0, maxWidth: "46ch" }}>
                               Permanently deletes the PDF and removes it from every course. Student
                               bytes captured from it keep their quoted text but lose the source link.
                             </p>
-                            <button className="btn mini" type="submit" style={{ justifySelf: "start" }}>
+                            {/* No data-tip here: the bubble would sit exactly
+                                over the warning this button must be read with. */}
+                            <button className="btn mini danger" type="submit" style={{ justifySelf: "start" }}>
                               Delete Permanently
                             </button>
                           </form>
@@ -316,9 +365,17 @@ export default async function AdminLibraryPage({
                   <form action={setSourceArchived}>
                     <input type="hidden" name="sourceId" value={reading.id} />
                     <input type="hidden" name="isArchived" value="false" />
-                    <button className="act" type="submit">restore</button>
+                    <button className="act" type="submit" data-tip="Return this reading to the live library">
+                      restore
+                    </button>
                   </form>
-                  <a className="act" href={`/api/readings/${reading.id}?download=1`}>download</a>
+                  <a
+                    className="act"
+                    href={`/api/readings/${reading.id}?download=1`}
+                    data-tip="Download the original PDF file"
+                  >
+                    download
+                  </a>
                 </div>
               </div>
             ))}

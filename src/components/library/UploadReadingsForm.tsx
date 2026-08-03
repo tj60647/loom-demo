@@ -111,9 +111,14 @@ export default function UploadReadingsForm({ course }: UploadReadingsFormProps) 
   const unfinished = items.filter((i) => i.phase === "failed" || i.phase === "skipped").length
 
   return (
-    <section className="card" style={{ marginBottom: "24px" }}>
-      <h2>Add Readings to the Library</h2>
-      <p className="hint" style={{ marginTop: "8px" }}>
+    // Folded by default, same idiom as the roster's "Invite learners":
+    // uploading is occasional, scanning the library is the daily visit.
+    <details className="card invitefold" style={{ marginBottom: "24px" }}>
+      <summary>
+        <span className="tw">▸</span>
+        <h2>Add Readings to the Library</h2>
+      </summary>
+      <p className="hint" style={{ marginTop: "10px" }}>
         Select one or more PDFs, up to {MAX_READING_LABEL} each. They upload straight from
         your browser to storage, one at a time — each is stored, OCR&apos;d and scored on
         its own, so one bad file never takes the others down. Review titles and
@@ -171,6 +176,7 @@ export default function UploadReadingsForm({ course }: UploadReadingsFormProps) 
           type="button"
           onClick={startUpload}
           disabled={running || !items.length}
+          data-tip="Send the selected PDFs to the library — each is stored, extracted, and scored on its own"
         >
           {running
             ? `Uploading ${Math.min(added + unfinished + 1, items.length)} of ${items.length}…`
@@ -211,6 +217,6 @@ export default function UploadReadingsForm({ course }: UploadReadingsFormProps) 
           {unfinished ? ` — ${unfinished} still to deal with.` : "."}
         </p>
       )}
-    </section>
+    </details>
   )
 }

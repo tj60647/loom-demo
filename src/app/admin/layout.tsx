@@ -36,12 +36,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }))
 
   return (
-    // `adminshell` is what scrolls here: admin pages put their nav and their
-    // <main> inside this wrapper, so the wrapper is the flex child that has to
-    // own the overflow (see globals.css).
-    <div className="adminshell" style={{ padding: "20px" }}>
+    // The shell itself no longer scrolls: AdminNav is the pinned header panel
+    // and `adminbody` below it owns the overflow, so the tabs and the course
+    // picker stay put while the page scrolls under them (see globals.css).
+    // Bottom padding lives on the pages' <main>, not the shell — padding here
+    // would put a dead strip under the scroll area.
+    <div className="adminshell" style={{ padding: "20px 20px 0" }}>
       <AdminNav courses={navCourses} />
-      {children}
+      <div className="adminbody">{children}</div>
     </div>
   )
 }
