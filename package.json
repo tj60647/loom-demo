@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck",
     "seed:sources": "tsx scripts/seed-sources.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts",
     "migrate:blob": "tsx scripts/migrate-storage-to-blob.ts"
   },
   "dependencies": {

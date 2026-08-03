@@ -1,0 +1,10 @@
+# Every path needs a project-owner review before merge (enforced by branch
+# protection "Require review from Code Owners"). Add teammates here as they
+# earn merge review rights; order matters — the last matching line wins.
+
+* @tj60647
+
+# The spec is the build contract (docs/loom-spec-v1.md §7): changes to it go
+# by PR reviewed against the §4 red lines, by the project owner specifically.
+/docs/loom-spec-v1.md @tj60647
+/docs/course-deployment-notes.md @tj60647
