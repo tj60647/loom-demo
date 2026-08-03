@@ -121,8 +121,9 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | `getReadingsByCourse()` | — | `Map<courseId, (Source & {link})[]>` week→position→title | admin |
 | `getCourseSources` | `courseId?` | `(Source & {link})[]` | admin |
 | `getSources` | `courseId?` | shelf rows: learners see `isVisible` only + their own `isOwn` readings; admins see hidden too | session-optional |
-| `createOwnReading` | `{title, author?, sourceReference?}` | `{id, title}` | **session only — deliberately not admin-gated** (reference-only card; called from the shelf's "a reading of your own" form) |
-| `createSource` | metadata + `File` | `Source` | admin — but **the check runs after the blob write** (see audit F-5). No callers; effectively dead but POSTable |
+| `createOwnReading` | `{title, author?, sourceReference?}` | `{id, title}` | **session only — deliberately not admin-gated** (reference-only card, no PDF; called from the shelf's "a reading of your own" form) |
+| `registerOwnUploadedReading` | `{storageKey, filename, title?, author?, sourceReference?}` | `{id, title}` | **session only** — the PDF-backed own reading: same prefix/size/magic-byte checks and ingest as the admin path, but always `isOwn`, never added to a course; heuristic score only (no judge pass on private uploads) |
+| `createSource` | metadata + `File` | `Source` | admin, **checked before the blob write** (audit S-5 ordering fixed). No callers; effectively dead but POSTable |
 | `registerUploadedReading` | `{storageKey, filename, title?, courseId?}` | `{id, title}` | admin; re-checks prefix + real blob size, deletes oversize orphans |
 | `rescoreSourceAction` | FormData `sourceId` | void | admin; also rebuilds the cover |
 | `draftMetadataForSource` | `sourceId` | `MetadataDraft` | admin; **writes nothing** (red line #6 exception (b) — proposal only) |
@@ -141,7 +142,9 @@ Search — [src/actions/search.ts](../src/actions/search.ts): plain Postgres FTS
 (`websearch_to_tsquery` / `ts_rank` / `ts_headline`, GIN expression indexes from
 migration 0014 — deliberately no model anywhere near it). Both actions scope
 through `getSources()`, so search can never surface a reading its caller could
-not already open from the shelf. Snippets mark matches with `⟦⟧`
+not already open from the shelf — and `searchReadings` narrows further to
+published (`isVisible`) readings: the reading list, not an admin's staged
+copies. Snippets mark matches with `⟦⟧`
 ([src/lib/searchText.ts](../src/lib/searchText.ts)) and are rendered by
 splitting, never as HTML. Queries are trimmed to 200 chars; under 2 chars
 nothing runs.
@@ -187,7 +190,7 @@ section belongs to the course).
 | `GET /api/auth/test-login?as=testa` | Mints a 30-day DB session + cookies; default identity is the admin, `?as=testa` = `test-user-a@loom.local` (LEARNER, enrolled into the oldest course). Returns `{success, userId, sessionToken}` | **403 in production** (first statement); no other guard — dev/CI only |
 | `GET /api/readings/[sourceId]?download=1` | Streams the PDF (never buffered — 4.5 MB serverless cap), RFC 6266 filename, `Cache-Control: private`. Errors: 401 / 404 / 500 JSON | Session required **in production only**; then `authorizeSourceFile` |
 | `GET /api/readings/[sourceId]/cover` | PNG cover (cached at `covers/<id>.png`; re-rendered from the PDF only on a cache miss) or SVG fallback (`no-store`) | No check of its own — inherits `authorizeSourceFile` via `getSourceForCover` (bytes-free) |
-| `POST /api/readings/upload` | Vercel Blob client-upload token exchange. Token scoped: private, PDFs only, ≤ 20 MB, path under `readings/`, random suffix. `onUploadCompleted` deliberately omitted — the client calls `registerUploadedReading` itself | Admin, checked twice |
+| `POST /api/readings/upload` | Vercel Blob client-upload token exchange. Token scoped: private, PDFs only, ≤ 20 MB, path under `readings/`, random suffix. `onUploadCompleted` deliberately omitted — the client calls `registerUploadedReading` / `registerOwnUploadedReading` itself | Any signed-in session (sign-in is allowlist-gated), checked twice; what the blob may be registered *as* is decided by the register actions |
 
 ---
 

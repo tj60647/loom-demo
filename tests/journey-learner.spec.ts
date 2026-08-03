@@ -43,6 +43,15 @@ test("00 · the shelf shows the readings with the student's own tallies", async 
   await expect(tally).not.toHaveText("…", { timeout: 15_000 })
   // The seeded account is not empty: at least one card carries real counts.
   await expect(page.locator(".shelftally", { hasText: /[1-9]/ }).first()).toBeVisible()
+
+  // "A reading of your own" leads with the PDF upload; a book or lecture can
+  // still be carded without one (the title stays required in that case).
+  await page.getByRole("button", { name: "+ a reading of your own" }).click()
+  await expect(page.locator('input[type="file"]')).toBeVisible()
+  await expect(page.getByPlaceholder("Plans and Situated Actions")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Add to my shelf" })).toBeDisabled()
+  await page.getByRole("button", { name: "Cancel" }).click()
+  await expect(page.locator('input[type="file"]')).toHaveCount(0)
 })
 
 test("01 · a byte captured by hand lands in the coding log — and cleans up", async ({ page }) => {
