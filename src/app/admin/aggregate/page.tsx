@@ -1,5 +1,5 @@
 import { getAggregateLoomData } from "@/actions/admin"
-import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
+import CohortClothPanel from "@/components/admin/CohortClothPanel"
 import { firstParam, getCourse, listSections, resolveCourseId, resolveSectionId } from "@/lib/courses"
 import type { LoomState } from "@/lib/types"
 
@@ -32,6 +32,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   let concepts: LoomState["concepts"] = []
   let bytes: LoomState["bytes"] = []
   let edges: LoomState["edges"] = []
+  let members: { id: string; name: string }[] = []
   let bytesUnavailable = false
   let aggregateUnavailable = false
 
@@ -40,6 +41,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     concepts = aggregate.concepts
     bytes = aggregate.bytes
     edges = aggregate.edges
+    members = aggregate.members
     bytesUnavailable = aggregate.bytesUnavailable
   } catch (error) {
     console.error("[AggregateLoomPage] Aggregate query failed", error)
@@ -47,6 +49,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   }
 
   const state: LoomState = { concepts, bytes, edges, maps: [], read: "", views: { cardTable: { positions: {}, bends: {} } } }
+  const names = Object.fromEntries(members.map((member) => [member.id, member.name]))
 
   return (
     <main>
@@ -70,17 +73,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
       )}
       
       <div style={{ marginTop: "20px", marginBottom: "40px" }}>
-        <div className="card">
-          <div className="mapbar">
-            <span className="label">The collective cloth</span>
-            <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
-              {concepts.length} concepts, {edges.length} threads, {bytes.length} bytes.
-            </span>
-          </div>
-          <div id="mapWrap">
-            <ReadOnlyClothMap state={state} />
-          </div>
-        </div>
+        <CohortClothPanel state={state} names={names} />
       </div>
     </main>
   )

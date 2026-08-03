@@ -412,14 +412,14 @@ export async function getAggregateLoomData(
 
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) {
-    return { concepts: [], bytes: [], edges: [], bytesUnavailable: false }
+    return { concepts: [], bytes: [], edges: [], members: [], bytesUnavailable: false }
   }
 
   const sectionId = await resolveSectionId(courseId, sectionIdRaw)
   const userIds = await getMemberIds(courseId, sectionId)
 
   if (userIds.length === 0) {
-    return { concepts: [], bytes: [], edges: [], bytesUnavailable: false }
+    return { concepts: [], bytes: [], edges: [], members: [], bytesUnavailable: false }
   }
 
   const allConcepts = await db
@@ -431,15 +431,23 @@ export async function getAggregateLoomData(
     .from(edges)
     .where(and(eq(edges.courseId, courseId), inArray(edges.userId, userIds)))
 
+  // Who wove what: the aggregate pools every student's rows, so the same
+  // label can appear once per student — attribution is what tells them apart.
+  const memberRows = await db
+    .select({ id: users.id, name: users.name, email: users.email })
+    .from(users)
+    .where(inArray(users.id, userIds))
+  const members = memberRows.map((u) => ({ id: u.id, name: u.name || u.email }))
+
   try {
     const allBytes = await db
       .select()
       .from(bytes)
       .where(and(eq(bytes.courseId, courseId), inArray(bytes.userId, userIds)))
-    return { concepts: allConcepts, bytes: allBytes, edges: allEdges, bytesUnavailable: false }
+    return { concepts: allConcepts, bytes: allBytes, edges: allEdges, members, bytesUnavailable: false }
   } catch (error) {
     // Fail soft so aggregate map still renders if byte schema/data is temporarily inconsistent.
     console.error("[getAggregateLoomData] Failed to load bytes for aggregate view", error)
-    return { concepts: allConcepts, bytes: [], edges: allEdges, bytesUnavailable: true }
+    return { concepts: allConcepts, bytes: [], edges: allEdges, members, bytesUnavailable: true }
   }
 }

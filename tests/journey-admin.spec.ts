@@ -84,6 +84,18 @@ test("the cohort map renders the section's woven concepts", async ({ page }) => 
   // Seeded work from Test User A is part of the cohort cloth — the SVG node
   // label, not the hidden <title> tooltip.
   await expect(page.locator("svg text", { hasText: "object worlds" }).first()).toBeVisible({ timeout: 20_000 })
+
+  // The cloth's material is listed, not only drawn: every concept and every
+  // thread, each attributed to its student.
+  await expect(page.locator(".crow", { hasText: "object worlds" }).first()).toBeVisible()
+  await expect(page.locator(".thread .sent").first()).toBeVisible()
+
+  // A concept opens the bytes behind it — the student's own captures, with
+  // attribution — plus the threads that cross it.
+  await page.locator(".crow", { hasText: "object worlds" }).first().click()
+  await expect(page.locator(".threadhead", { hasText: "object worlds" })).toBeVisible()
+  await expect(page.locator(".bytequote").first()).toBeVisible()
+  await expect(page.locator(".bytequote").first()).toContainText("Test User A")
 })
 
 test.describe("authorization boundary", () => {
