@@ -318,25 +318,61 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Optimistic create WITH AN ID ALIAS, exactly as maps have (below): "coin a
+  // term" and "remove" bind to the thread the moment it renders, and the
+  // create can take seconds — so a term saved against the temp id was silently
+  // lost, and a remove against it silently deleted nothing (the server matches
+  // no row and reports success), leaving a ghost thread that returned on the
+  // next load. Writes wait for the create and are re-addressed to the server's
+  // id; local edits made mid-flight are newer than the just-born server row
+  // and are kept over it on swap.
+  const edgeCreates = useRef<Map<string, Promise<Edge>>>(new Map())
+  const edgeAlias = useRef<Map<string, string>>(new Map())
+  const resolveEdgeId = useCallback(async (id: string) => {
+    const inflight = edgeCreates.current.get(id)
+    // A failed create already rolled its row back; falling through to the
+    // temp id makes the write a harmless no-op rather than a second error.
+    if (inflight) await inflight.catch(() => {})
+    return edgeAlias.current.get(id) ?? id
+  }, [])
+
   const addEdge = async (fromId: string, toId: string, sentence: string) => {
     const tempId = crypto.randomUUID()
     const tempEdge: Edge = { id: tempId, courseId: null, userId: session!.user!.id, fromId, toId, handle: "", sentence, createdAt: new Date() }
     setState(s => ({ ...s, edges: [...s.edges, tempEdge] }))
-    try {
-      const saved = await createEdge({ fromId, toId, sentence })
-      setState(s => ({ ...s, edges: s.edges.map(e => e.id === tempId ? saved : e) }))
-      savedOk()
-      return saved
-    } catch (e) {
-      setState(s => ({ ...s, edges: s.edges.filter(e => e.id !== tempId) }))
-      throw e
-    }
+    const creating = (async () => {
+      try {
+        const saved = await createEdge({ fromId, toId, sentence })
+        edgeAlias.current.set(tempId, saved.id)
+        // Identity from the server, fields from the local row — a handle
+        // coined mid-flight must not be wiped by the just-born server copy.
+        setState(s => ({
+          ...s,
+          edges: s.edges.map(e =>
+            e.id === tempId
+              ? { ...e, id: saved.id, courseId: saved.courseId, createdAt: saved.createdAt }
+              : e
+          ),
+        }))
+        savedOk()
+        return saved
+      } catch (e) {
+        setState(s => ({ ...s, edges: s.edges.filter(e => e.id !== tempId) }))
+        throw e
+      } finally {
+        edgeCreates.current.delete(tempId)
+      }
+    })()
+    edgeCreates.current.set(tempId, creating)
+    return creating
   }
 
   const editEdge = async (id: string, data: Partial<{handle: string, sentence: string}>) => {
-    setState(s => ({ ...s, edges: s.edges.map(e => e.id === id ? { ...e, ...data } : e) }))
+    // The state row may carry either side of the alias by now — match both.
+    const knownIds = new Set([id, edgeAlias.current.get(id) ?? id])
+    setState(s => ({ ...s, edges: s.edges.map(e => knownIds.has(e.id) ? { ...e, ...data } : e) }))
     try {
-      await updateEdge(id, data)
+      await updateEdge(await resolveEdgeId(id), data)
       savedOk()
     } catch (e) {
       await resync(e)
@@ -344,18 +380,19 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }
 
   const removeEdge = async (id: string) => {
+    const knownIds = new Set([id, edgeAlias.current.get(id) ?? id])
     setState(s => ({
       ...s,
-      edges: s.edges.filter(e => e.id !== id),
+      edges: s.edges.filter(e => !knownIds.has(e.id)),
       views: Object.fromEntries(
         Object.entries(s.views).map(([key, v]) => [key, {
           ...v,
-          bends: Object.fromEntries(Object.entries(v.bends).filter(([k]) => k !== id)),
+          bends: Object.fromEntries(Object.entries(v.bends).filter(([k]) => !knownIds.has(k))),
         }])
       ) as LoomViews,
     }))
     try {
-      await deleteEdge(id)
+      await deleteEdge(await resolveEdgeId(id))
       savedOk()
     } catch (e) {
       await resync(e)

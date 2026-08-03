@@ -98,7 +98,23 @@ test("02 · pick two, say the sentence, throw the thread, coin a term — then u
 
   // Remove the thread; both concepts stay (they are seeded).
   await thread.locator(".rm", { hasText: "remove" }).click()
+  // The row disappears optimistically while the server delete is still in
+  // flight — and ending the test there closes the browser mid-action,
+  // stranding the thread for the NEXT run (which then finds two and fails).
+  // Hold for deleteEdge's own round-trip — its payload is a bare ["<uuid>"],
+  // unlike createEdge's [{...}] or updateEdge's [id, {...}] — then prove the
+  // delete stuck with a fresh load.
+  const removeCommitted = page.waitForResponse(
+    (res) =>
+      res.request().method() === "POST" &&
+      /^\["[0-9a-f-]{36}"\]$/.test(res.request().postData() ?? "") &&
+      res.ok()
+  )
   await page.getByRole("button", { name: "Remove thread" }).click()
+  await expect(page.locator(".sent", { hasText: "one sustains the other" })).toHaveCount(0, { timeout: 15_000 })
+  await removeCommitted
+  await page.reload()
+  await loomLoaded(page)
   await expect(page.locator(".sent", { hasText: "one sustains the other" })).toHaveCount(0, { timeout: 15_000 })
 })
 
