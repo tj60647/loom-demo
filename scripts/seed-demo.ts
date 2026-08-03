@@ -77,7 +77,17 @@ async function findSource(titlePrefix: string) {
 
 async function findOrCreateUser(u: { email: string; name: string }) {
   const existing = await db.select().from(users).where(eq(users.email, u.email)).limit(1)
-  if (existing.length) return existing[0]
+  if (existing.length) {
+    // Force the expected identity, don't inherit drift: a demo user left with
+    // role ADMIN by a prior run or a hand edit would silently invalidate the
+    // journey suite's authorization-boundary test.
+    const [updated] = await db
+      .update(users)
+      .set({ name: u.name, role: "USER" })
+      .where(eq(users.id, existing[0].id))
+      .returning()
+    return updated
+  }
   const [row] = await db.insert(users).values({ email: u.email, name: u.name, role: "USER" }).returning()
   return row
 }
