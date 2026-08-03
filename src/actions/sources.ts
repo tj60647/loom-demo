@@ -581,13 +581,85 @@ export async function draftMetadataForSource(sourceId: string): Promise<Metadata
   const source = rows[0]
   if (!source) throw new Error("Reading not found")
 
+  return draftFromStoredPages(source)
+}
+
+/** The draft itself, shared by the admin and owner gates above and below. */
+async function draftFromStoredPages(
+  source: { id: string; title: string },
+  reviewer: "an instructor" | "the reading's owner" = "an instructor"
+): Promise<MetadataDraft> {
   const pages = await db
     .select({ pageNumber: sourcePages.pageNumber, textContent: sourcePages.textContent })
     .from(sourcePages)
-    .where(eq(sourcePages.sourceId, sourceId))
+    .where(eq(sourcePages.sourceId, source.id))
     .orderBy(asc(sourcePages.pageNumber))
 
-  return draftMetadataFromPages(pages, source.title)
+  return draftMetadataFromPages(pages, source.title, reviewer)
+}
+
+/**
+ * The learner twin of draftMetadataForSource, for a reading of their own.
+ * Same boundary as the admin button: this RETURNS a draft and writes nothing —
+ * the student reads and edits every field before updateOwnReadingMetadata
+ * saves it, so no model-written text lands anywhere unread (red line #6,
+ * same exception, same condition). Owner-gated and isOwn-only: a course
+ * reading's card belongs to the instructor.
+ */
+export async function draftMetadataForOwnSource(sourceId: string): Promise<MetadataDraft> {
+  const session = await getServerSession(authOptions)
+  const userId = session?.user?.id
+  if (!userId) throw new Error("Unauthorized")
+  if (!sourceId) throw new Error("Source id is required")
+
+  const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
+  const source = rows[0]
+  if (!source || !source.isOwn || source.createdByUserId !== userId) {
+    throw new Error("Reading not found")
+  }
+
+  return draftFromStoredPages(source, "the reading's owner")
+}
+
+/**
+ * Owner-gated save for an own reading's card — title, author, and reference
+ * only: an own card is a citation, not a library entry, and it shows no
+ * description. Provenance rides along so a reviewed draft records itself as
+ * one; absent, whatever provenance the row carries stands.
+ */
+export async function updateOwnReadingMetadata(data: {
+  sourceId: string
+  title: string
+  author?: string
+  sourceReference?: string
+  metadataProvenance?: string
+}) {
+  const session = await getServerSession(authOptions)
+  const userId = session?.user?.id
+  if (!userId) throw new Error("Unauthorized")
+
+  const title = data.title.trim()
+  if (!title) throw new Error("A reading needs a title.")
+
+  const rows = await db.select().from(sources).where(eq(sources.id, data.sourceId)).limit(1)
+  const source = rows[0]
+  if (!source || !source.isOwn || source.createdByUserId !== userId) {
+    throw new Error("Reading not found")
+  }
+
+  await db
+    .update(sources)
+    .set({
+      title,
+      author: data.author?.trim() || "",
+      sourceReference: data.sourceReference?.trim() || "",
+      ...(data.metadataProvenance ? { metadataProvenance: data.metadataProvenance } : {}),
+    })
+    .where(eq(sources.id, source.id))
+
+  revalidatePath("/")
+  revalidateLibrary()
+  return { id: source.id, title }
 }
 
 export async function updateSourceMetadata(formData: FormData) {

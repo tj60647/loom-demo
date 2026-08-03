@@ -127,7 +127,9 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | `registerUploadedReading` | `{storageKey, filename, title?, courseId?}` | `{id, title}` | admin; re-checks prefix + real blob size, deletes oversize orphans |
 | `rescoreSourceAction` | FormData `sourceId` | void | admin; also rebuilds the cover |
 | `draftMetadataForSource` | `sourceId` | `MetadataDraft` | admin; **writes nothing** (red line #6 exception (b) — proposal only) |
+| `draftMetadataForOwnSource` | `sourceId` | `MetadataDraft` | **session, owner of an `isOwn` reading only**; writes nothing — same #6 exception, the student is the reviewer |
 | `updateSourceMetadata` | FormData | void | admin |
+| `updateOwnReadingMetadata` | `{sourceId, title, author?, sourceReference?, metadataProvenance?}` | `{id, title}` | session, owner + `isOwn` only; title/author/reference — an own card has no visible description |
 | `addSourceToCourse` / `removeSourceFromCourse` | FormData | void | admin |
 | `setCourseSourceVisibility` / `updateCourseSourceSchedule` | FormData | void | admin |
 | `setSourceArchived` / `deleteSource` | FormData | void | admin; delete removes blob + cover + course links |

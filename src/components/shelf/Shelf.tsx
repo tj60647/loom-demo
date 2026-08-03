@@ -13,7 +13,7 @@ import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings, type ReadingMeta } from "@/components/providers/ReadingsProvider"
-import { createOwnReading } from "@/actions/sources"
+import { createOwnReading, draftMetadataForOwnSource, updateOwnReadingMetadata } from "@/actions/sources"
 import { uploadOwnReading } from "@/lib/readingUploadClient"
 import { MAX_READING_BYTES, MAX_READING_LABEL, formatBytes } from "@/lib/readingUpload"
 import { tallyByReading } from "@/lib/scope"
@@ -351,6 +351,13 @@ function AddOwnReading({ onAdded }: { onAdded: () => void }) {
   const [reference, setReference] = useState("")
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<string | null>(null)
+  // After a PDF upload the form stays open as a review step: the reading is
+  // already on the shelf under its filename, and the card's details can be
+  // drafted from the PDF itself — reviewed and saved, never auto-applied.
+  const [reviewingId, setReviewingId] = useState<string | null>(null)
+  const [drafting, setDrafting] = useState(false)
+  const [draftNote, setDraftNote] = useState<{ kind: "ok" | "err"; text: string } | null>(null)
+  const [draftProvenance, setDraftProvenance] = useState<string | null>(null)
 
   const tooBig = file !== null && file.size > MAX_READING_BYTES
 
@@ -360,6 +367,14 @@ function AddOwnReading({ onAdded }: { onAdded: () => void }) {
     setAuthor("")
     setReference("")
     setProgress(null)
+    setReviewingId(null)
+    setDraftNote(null)
+    setDraftProvenance(null)
+  }
+
+  const close = () => {
+    reset()
+    setOpen(false)
   }
 
   const submit = async () => {
@@ -367,23 +382,73 @@ function AddOwnReading({ onAdded }: { onAdded: () => void }) {
     setBusy(true)
     try {
       if (file) {
-        await uploadOwnReading(file, {
+        const created = await uploadOwnReading(file, {
           title,
           author,
           sourceReference: reference,
           onPhase: (phase) => setProgress(phase === "sending" ? "sending…" : "extracting…"),
           onProgress: (percent) => setProgress(`sending ${percent}%`),
         })
+        // On the shelf already — now its card, with the PDF there to draft from.
+        setTitle(created.title)
+        setFile(null)
+        setProgress(null)
+        setReviewingId(created.id)
+        onAdded()
+        flash("on your shelf — now its card")
       } else {
         await createOwnReading({ title, author, sourceReference: reference })
+        close()
+        onAdded()
+        flash("added to your shelf")
       }
-      reset()
-      setOpen(false)
-      onAdded()
-      flash("added to your shelf")
     } catch (e) {
       setProgress(null)
       flash(e instanceof Error ? e.message : "could not add that reading")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const draft = async () => {
+    if (!reviewingId || drafting) return
+    setDrafting(true)
+    setDraftNote(null)
+    try {
+      const proposal = await draftMetadataForOwnSource(reviewingId)
+      // Only overwrite when the model actually found something; an empty
+      // field means "not stated on the page", not "clear what you typed".
+      if (proposal.title) setTitle(proposal.title)
+      if (proposal.author) setAuthor(proposal.author)
+      if (proposal.sourceReference) setReference(proposal.sourceReference)
+      setDraftProvenance(proposal.provenance)
+      setDraftNote({
+        kind: "ok",
+        text: "Drafted into the fields above — nothing is saved yet. Check every line against the PDF, correct what is wrong, then Save details.",
+      })
+    } catch (e) {
+      setDraftNote({ kind: "err", text: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setDrafting(false)
+    }
+  }
+
+  const saveDetails = async () => {
+    if (!reviewingId || !title.trim() || busy) return
+    setBusy(true)
+    try {
+      await updateOwnReadingMetadata({
+        sourceId: reviewingId,
+        title,
+        author,
+        sourceReference: reference,
+        metadataProvenance: draftProvenance ?? undefined,
+      })
+      close()
+      onAdded()
+      flash("details saved")
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "could not save the details")
     } finally {
       setBusy(false)
     }
@@ -403,6 +468,69 @@ function AddOwnReading({ onAdded }: { onAdded: () => void }) {
           Coding something your course readings don&apos;t include? Upload the PDF and it
           reads like any other card — or card a book or lecture and capture by hand.
         </p>
+      </div>
+    )
+  }
+
+  if (reviewingId) {
+    return (
+      <div className="card">
+        <h2>On your shelf — now its card</h2>
+        <p className="hint">
+          The reading is uploaded. Draft its details from the PDF itself, or type them —
+          either way you review every line, and nothing is saved until you do.
+        </p>
+        <div className="form-row">
+          <span className="label">Title</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+        </div>
+        <div className="form-row">
+          <span className="label">Author <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span></span>
+          <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Suchman" />
+        </div>
+        <div className="form-row">
+          <span className="label">Where it&apos;s from <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span></span>
+          <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Cambridge University Press, 1987" />
+        </div>
+        <div style={{ display: "grid", gap: 6, justifyItems: "start" }}>
+          <button
+            type="button"
+            className="btn ghost mini nowrapbtn"
+            onClick={draft}
+            disabled={drafting || busy}
+            data-tip="reads the PDF's opening pages and fills the fields above for you to check — saves nothing"
+          >
+            {drafting ? "Reading the PDF…" : "Draft from PDF"}
+          </button>
+          {draftNote ? (
+            <p className="hint" style={{ margin: 0, color: draftNote.kind === "err" ? "var(--red)" : undefined }}>
+              {draftNote.text}
+            </p>
+          ) : (
+            <p className="ghostnote" style={{ margin: 0 }}>
+              Proposes title, author and reference from the reading itself. You review and
+              save; nothing is kept unread.
+            </p>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <button
+            className="btn mini"
+            onClick={saveDetails}
+            disabled={busy || drafting || !title.trim()}
+            data-tip="save these details to your card"
+          >
+            {busy ? "Saving…" : "Save details"}
+          </button>
+          <button
+            className="btn ghost mini"
+            onClick={close}
+            disabled={busy || drafting}
+            data-tip="keep the card as it stands"
+          >
+            Keep as is
+          </button>
+        </div>
       </div>
     )
   }
