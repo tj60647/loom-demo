@@ -24,6 +24,12 @@ header,.scopebar,nav{flex:0 0 auto}
 /* min-height:0 or a flex item refuses to shrink below its content and the
    scroll silently moves back to the document. */
 main,.adminshell{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+/* Admin pages nest <main> inside .adminshell, and the shell owns the scroll.
+   The rule above would still make that nested <main> a scroll container with
+   nothing to scroll — and overscroll-behavior:contain swallows the wheel at a
+   scroll boundary rather than chaining it up to the shell, so the page reads
+   as scroll-broken. A <main> inside the shell must be a plain block. */
+.adminshell main{flex:none;min-height:auto;overflow-y:visible;overscroll-behavior:auto}
 h1,h2,h3{font-family:var(--display);font-weight:500;margin:0}
 .label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
 .cap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--grey)}
