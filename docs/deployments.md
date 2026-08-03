@@ -64,6 +64,42 @@ in the 8/1 session (NEXT_SESSION item 1); this document is its durable form.
 Tester data on the dev branch survives every deploy; refresh the demo accounts
 whenever you want with `npm run seed:demo` pointed at the dev `DATABASE_URL`.
 
+## Working together: the loop from idea to production
+
+Two developers, one `dev` branch. Branches map to changes, never to people —
+a personal long-lived branch drifts for weeks and turns review into "approve
+my month"; a change branch is a ten-minute read.
+
+1. **Cut a branch from `dev`, one per change, days not weeks.** Push it —
+   Vercel builds a throwaway preview. That preview is for *looking at UI*:
+   GitHub sign-in cannot work there (an OAuth app holds exactly one callback
+   URL, and preview URLs are ephemeral), and that is by design, not a bug to
+   fix. Anything needing a session is exercised locally (`next dev` +
+   the test-login backdoor) or on the dev alias after merge.
+2. **PR into `dev`; the other developer reviews.** CI's `checks` job gates
+   every PR; `e2e` joins it once its secrets are configured. Keep the PR
+   small enough that the review is genuinely a read, and agree on a
+   CI-green self-merge lane for typo-grade changes so process never
+   outweighs the work.
+3. **A schema change and its migration are one commit.** `drizzle-kit
+   generate` runs in the same PR that edits `schema.ts` — never later. (The
+   `category` column shipped without its migration once; a dev server's
+   stale compiled schema masked it all day, and the first clean rebuild took
+   every `source` query down. The failure surfaces far from the cause.)
+   Whoever lands the PR applies the migration to the Neon `dev` branch —
+   and `ci`, so the e2e gate stays truthful.
+4. **Merge to `dev` deploys the alias automatically.** Both developers and
+   the alpha testers now exercise the *combination* on real (dev-branch)
+   data with real sign-in. Experiments soak here; disagreements get settled
+   by what testers actually do with it.
+5. **Aligned? Promote by PR from `dev` to `master`.** This PR is the
+   production gate — branch protection wants green CI plus review — and it
+   reviews a different question than code review did: *is this what
+   students should meet?* Merging deploys production; the migration goes to
+   the production `DATABASE_URL` at merge time (next section).
+
+Rhythm in one line: `branch → PR → review → dev alias → soak → PR to master`.
+
 ## Production
 
 `master` deploys to production on merge — and merging to master is the *only*
