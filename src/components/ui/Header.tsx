@@ -27,12 +27,13 @@ export default function Header() {
           <span id="saveDot">{flashMsg ? `· ${flashMsg} ·` : "—"}</span>
         )}
         <AuthButton />
-        <span
+        <button
+          className="btn ghost mini"
           onClick={() => setShowAbout(true)}
-          style={{ fontFamily: "var(--mono)", fontSize: "11px", color: "var(--ink-soft)", cursor: "pointer", letterSpacing: ".04em", alignSelf: "center" }}
+          data-tip="what Loom is, and the thinking behind it"
         >
           about
-        </span>
+        </button>
         <button
           onClick={() => window.dispatchEvent(new Event("loom:walkthrough"))}
           className="helpbtn"

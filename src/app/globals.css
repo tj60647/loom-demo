@@ -272,9 +272,14 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .guide .dot{width:7px;height:7px;border-radius:50%;background:var(--rule)}
 .guide .dot.on{background:var(--ochre)}
 .guide .skip{font-family:var(--mono);font-size:11px;color:var(--ink-soft);cursor:pointer;letter-spacing:.04em}
+/* 36px to match .btn.mini's min-height: the header is one row of equal
+   controls, and a smaller circle beside them read as a different species. */
 .helpbtn{font-family:var(--display);font-size:17px;background:none;border:1px solid var(--rule);border-radius:50%;
-  width:28px;height:28px;cursor:pointer;color:var(--ink-soft);line-height:1;align-self:center}
+  width:36px;height:36px;cursor:pointer;color:var(--ink-soft);line-height:1;align-self:center}
 .helpbtn:hover{border-color:var(--ochre);color:var(--ochre)}
+/* One box model for header controls whatever the element (a, button):
+   a bare <a class="btn"> otherwise top-aligns its text next to a <button>. */
+header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* MAP — sort-list re-ordering. The handle is the only grab point; the ochre
    rule marks where the row would land. List sequence only — never the table. */
 .thandle{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
@@ -316,9 +321,12 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
   border:5px solid transparent;border-top-color:var(--ink);z-index:30;pointer-events:none}
 /* Inside a scrollbox the tip flips below the control and left-aligns to it:
    a centred bubble above a top row is clipped by the box's overflow on two
-   sides. Below, the worst case is the last row of a full box, which scrolls. */
+   sides. Below, the worst case is the last row of a full box, which scrolls.
+   .tip-below is the same flip for a control that sits at the top of the main
+   scroll area, where an upward bubble slides under the nav. */
 .scrollbox [data-tip]:hover::after{bottom:auto;top:calc(100% + 7px);left:0;transform:none}
-.scrollbox [data-tip]:hover::before{bottom:auto;top:calc(100% + 2px);border-top-color:transparent;border-bottom-color:var(--ink)}
+.scrollbox [data-tip]:hover::before,[data-tip].tip-below:hover::before{bottom:auto;top:calc(100% + 2px);border-top-color:transparent;border-bottom-color:var(--ink)}
+[data-tip].tip-below:hover::after{bottom:auto;top:calc(100% + 7px)}
 
 /* --- reading-first: the shelf, the scope bar, the seam --- */
 
@@ -351,6 +359,7 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 /* Shelf search: which reading says this? A hit is a link into the reading,
    shaped like a shelf card; the marked words are Postgres's, not ours. */
 .searchwrap{margin:0 0 18px}
+.searchbar{display:flex;align-items:center;gap:10px}
 .searchinput{max-width:520px}
 .searchresults{margin-top:12px;display:flex;flex-direction:column;gap:10px}
 .searchtally{display:block}

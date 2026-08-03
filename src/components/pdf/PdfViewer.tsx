@@ -27,6 +27,9 @@ interface PdfViewerProps {
   sourceId?: string;
   initialPageNumber?: number;
   focusByteId?: string | null;
+  /** Opens the search panel pre-filled — how a shelf-search hit carries its
+      query into the text it matched. */
+  initialSearch?: string;
   onGotoOpenByte?: (byteId: string) => void;
   onClose: () => void;
 }
@@ -41,7 +44,7 @@ type HighlightEntry = {
   endOffset: number | null;
 };
 
-export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusByteId, onGotoOpenByte, onClose }: PdfViewerProps) {
+export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusByteId, initialSearch, onGotoOpenByte, onClose }: PdfViewerProps) {
   const { state } = useLoom();
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -105,8 +108,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // page text (src/actions/search.ts) and comes back as page-ordered snippets;
   // the words Postgres marked are then re-marked on the rendered text layer,
   // so a hit looks the same on the page as it does in the list.
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(!!initialSearch);
+  const [searchQuery, setSearchQuery] = useState(initialSearch ?? "");
   const [searchHits, setSearchHits] = useState<ReadingPageHit[] | null>(null);
   const [searchTruncated, setSearchTruncated] = useState(false);
   const [searchBusy, setSearchBusy] = useState(false);

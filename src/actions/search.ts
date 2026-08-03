@@ -10,8 +10,9 @@
 // query returns the same pages for every student, and a match is a fact about
 // the text, not a judgment about the student.
 //
-// Both actions scope through getSources(), the exact set the shelf renders,
-// so search can never surface a reading its caller could not already open.
+// Both actions scope through getSources(), so search can never surface a
+// reading its caller could not already open — and the shelf-wide search
+// narrows further to published readings: the reading list, not the library.
 // The tsvector expressions below repeat src/db/schema.ts's index expressions
 // verbatim — an expression index only serves queries that match it exactly.
 
@@ -88,7 +89,13 @@ export async function searchReadings(rawQuery: string): Promise<ReadingSearchHit
   const query = normalizeQuery(rawQuery)
   if (query.length < 2) return []
 
-  const shelf = await getSources()
+  // The reading list, not the library: getSources() hands an admin the
+  // staged (hidden) course readings too, but this search speaks for the
+  // shelf, and a reading not yet published is on nobody's list. A learner's
+  // rows are visible-only already, so this narrows only the admin's view;
+  // in-document search (below) keeps the wider gate, since an admin can
+  // legitimately open a staged reading and find within it.
+  const shelf = (await getSources()).filter((source) => source.isVisible)
   if (shelf.length === 0) return []
   const shelfOrder = new Map(shelf.map((source, index) => [source.id, index]))
   const ids = shelf.map((source) => source.id)

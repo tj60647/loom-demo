@@ -14,9 +14,12 @@ import Snippet from "@/components/ui/Snippet"
 
 export default function ShelfSearch({
   onActiveChange,
+  onClose,
 }: {
   /** True while a query is live and the results own the page. */
   onActiveChange: (active: boolean) => void
+  /** Fold the search away — wired to Escape, mirroring the reading's panel. */
+  onClose: () => void
 }) {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<ReadingSearchHit[] | null>(null)
@@ -69,14 +72,22 @@ export default function ShelfSearch({
 
   return (
     <div className="searchwrap">
-      <input
-        type="search"
-        className="tinput searchinput"
-        value={query}
-        onChange={(e) => handleChange(e.target.value)}
-        placeholder='search your readings — a word, or a "phrase"'
-        aria-label="Search your readings"
-      />
+      <div className="searchbar">
+        <label className="label" htmlFor="shelfSearchInput">Search</label>
+        <input
+          id="shelfSearchInput"
+          type="search"
+          className="tinput searchinput"
+          value={query}
+          autoFocus
+          onChange={(e) => handleChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") onClose()
+          }}
+          placeholder='a word, or a "phrase"'
+          aria-label="Search your readings for a word or phrase"
+        />
+      </div>
 
       {active && (
         <div className="searchresults" aria-live="polite">
@@ -97,7 +108,16 @@ export default function ShelfSearch({
                 {results.length === 1 ? "es" : ""}
               </span>
               {results.map((hit) => (
-                <Link key={hit.sourceId} href={`/reading/${hit.sourceId}`} className="searchhit">
+                // A hit is a door to the text itself, so it lands on
+                // 00 · Reading with the query riding along — the reading's own
+                // search opens pre-filled, marks and all. Workbench
+                // re-validates the tab, so a card with no PDF simply falls
+                // back to its first station.
+                <Link
+                  key={hit.sourceId}
+                  href={`/reading/${hit.sourceId}?tab=reading&q=${encodeURIComponent(query.trim())}`}
+                  className="searchhit"
+                >
                   <div className="searchhithead">
                     <h3>{hit.title}</h3>
                     {hit.week != null && <span className="cap">week {hit.week}</span>}

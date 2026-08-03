@@ -67,10 +67,13 @@ const KEEP_ALIVE: ReadonlySet<Tab> = new Set<Tab>(["open", "throw", "read", "map
 export default function Workbench({
   source,
   initialTab,
+  initialSearch,
 }: {
   source: WorkbenchSource | null
   /** Landing tab for journey deep links (`/weave?tab=map`); validated below. */
   initialTab?: Tab
+  /** A shelf-search hit's query, carried into the reading's own search. */
+  initialSearch?: string
 }) {
   // `status`, not just `session`: next-auth reports "loading" on every hard
   // load while it fetches /api/auth/session, and during that window `session`
@@ -207,6 +210,7 @@ export default function Workbench({
                 sourceName={source.title}
                 sourceId={source.id}
                 initialPageNumber={pdfPage}
+                initialSearch={initialSearch}
                 focusByteId={pdfFocusByteId}
                 onGotoOpenByte={handleGotoOpenByte}
                 onClose={() => {

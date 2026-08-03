@@ -16,8 +16,12 @@ test("the shelf search finds a reading and stands in for the shelf while live", 
   await page.goto("/")
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
 
-  const box = page.getByRole("searchbox", { name: "Search your readings" })
+  // The search sits behind the same ⌕ toggle the reading uses, up by the
+  // title; opening it reveals a labelled bar.
+  await page.getByRole("button", { name: "Search your readings" }).click()
+  const box = page.getByRole("searchbox", { name: "Search your readings for a word or phrase" })
   await expect(box).toBeVisible()
+  await expect(page.locator(".searchbar label", { hasText: "Search" })).toBeVisible()
   await box.fill("object worlds")
 
   // A hit card names the reading and says where it matched.
@@ -33,12 +37,19 @@ test("the shelf search finds a reading and stands in for the shelf while live", 
   await expect(page.locator(".searchhit")).toHaveCount(0)
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
 
-  // A hit is a door into the reading's workbench.
+  // A hit is a door to the text itself — 00 · Reading, not 01 · Open — and
+  // the query rides along: the reading's own search opens pre-filled, so the
+  // trail of marks continues into the text.
   await box.fill("object worlds")
   const doorway = page.locator(".searchhit", { hasText: "Object Worlds" }).first()
   await expect(doorway).toBeVisible({ timeout: 15_000 })
   await doorway.click()
-  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
+  await expect(page).toHaveURL(/\/reading\/[^?]+\?tab=reading&q=object(%20|\+)worlds/, { timeout: 15_000 })
+  await expect(page.locator("nav button.active", { hasText: "Reading" })).toBeVisible({ timeout: 15_000 })
+  const inReading = page.getByRole("searchbox", { name: "Search this reading for a word or phrase" })
+  await expect(inReading).toBeVisible({ timeout: 15_000 })
+  await expect(inReading).toHaveValue("object worlds")
+  await expect(page.locator(".pdf-search-hit").first()).toBeVisible({ timeout: 15_000 })
 })
 
 test("search inside a reading lists matching pages and marks the words on the text", async ({ page }) => {

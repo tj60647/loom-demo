@@ -4,15 +4,30 @@
 
 import Link from "next/link"
 import { getSources } from "@/actions/sources"
-import Workbench from "@/components/Workbench"
+import Workbench, { type Tab } from "@/components/Workbench"
+import { firstParam } from "@/lib/courses"
+
+type ReadingPageSearchParams = { tab?: string | string[]; q?: string | string[] }
+
+// Deep links land on a station (`?tab=reading` from a shelf-search hit);
+// anything else lands on the default first tab, as /weave does. `q` rides
+// along from a shelf-search hit and opens the reading's own search panel
+// pre-filled, so the trail of marks continues into the text itself.
+const READING_TABS = new Set<Tab>(["reading", "open", "throw", "read", "map"])
 
 // Next 16: params is a Promise (async request APIs are no longer sync).
 export default async function ReadingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sourceId: string }>
+  searchParams: Promise<ReadingPageSearchParams>
 }) {
   const { sourceId } = await params
+  const resolved = await searchParams
+  const rawTab = firstParam(resolved.tab)
+  const initialTab = rawTab && READING_TABS.has(rawTab as Tab) ? (rawTab as Tab) : undefined
+  const initialSearch = firstParam(resolved.q)?.trim() || undefined
   const sources = await getSources()
   const source = sources.find((s) => s.id === sourceId)
 
@@ -37,6 +52,8 @@ export default async function ReadingPage({
       // Keyed by the reading so a half-typed throw sentence, a traced prompt,
       // or an open PDF page can never follow the student into another text.
       key={source.id}
+      initialTab={initialTab}
+      initialSearch={initialSearch}
       source={{
         id: source.id,
         title: source.title,

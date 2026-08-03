@@ -27,8 +27,10 @@ export default function Shelf() {
   const { state, isLoading, loadExample, flash } = useLoom()
   const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
   const [exampleBusy, setExampleBusy] = useState(false)
-  // While a search query is live, the results own the page; clearing the box
-  // puts the week-grouped shelf back exactly as it was.
+  // The search bar sits behind a toggle, the reading's own ⌕ Search idiom.
+  // While a query is live the results own the page; clearing the box — or
+  // closing the panel — puts the week-grouped shelf back exactly as it was.
+  const [searchOpen, setSearchOpen] = useState(false)
   const [searchActive, setSearchActive] = useState(false)
 
   const tallies = useMemo(() => tallyByReading(state), [state])
@@ -136,7 +138,25 @@ export default function Shelf() {
     <>
       <JourneyNav active="readings" />
       <main>
-        <p className="tasktitle">Pick a reading.</p>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", margin: "0 0 3px" }}>
+          <p className="tasktitle" style={{ margin: 0 }}>Pick a reading.</p>
+          <button
+            className={`btn mini tip-below ${searchOpen ? "" : "ghost"}`}
+            onClick={() => {
+              if (searchOpen) {
+                setSearchOpen(false)
+                setSearchActive(false)
+              } else {
+                setSearchOpen(true)
+              }
+            }}
+            data-tip="find a word or phrase across the readings on your list"
+            aria-pressed={searchOpen}
+            aria-label="Search your readings"
+          >
+            ⌕ Search
+          </button>
+        </div>
         <p className="tasksub">
           Each reading is its own piece of work: capture its passages, name what they
           evidence, thread those concepts together, and read the whole. Your concepts
@@ -145,9 +165,18 @@ export default function Shelf() {
         </p>
 
         {/* Which reading says this? Words, or a "quoted phrase" — matched
-            against every card and every page on this shelf, never anyone
-            else's. While a query is live the results stand in for the shelf. */}
-        <ShelfSearch onActiveChange={setSearchActive} />
+            against every card and every page on your reading list, never
+            anyone else's. While a query is live the results stand in for the
+            shelf; unmounting on close is what resets the box. */}
+        {searchOpen && (
+          <ShelfSearch
+            onActiveChange={setSearchActive}
+            onClose={() => {
+              setSearchOpen(false)
+              setSearchActive(false)
+            }}
+          />
+        )}
 
         {!searchActive && (<>
         {/* The whole weave and Keep were quick links here; they are journey
