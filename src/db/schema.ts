@@ -10,6 +10,7 @@ import {
   unique,
   index,
 } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
 import type { AdapterAccount } from "@auth/core/adapters"
 import type { ExtractionMetrics } from "@/lib/types"
 
@@ -165,33 +166,46 @@ export const verificationTokens = pgTable(
 // is uploaded, OCR'd, and stored once, then included in any number of courses
 // via courseSources. Per-course facts (published? which week? core or
 // supplemental?) live on the join, not here.
-export const sources = pgTable("source", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  title: text("title").notNull(),
-  author: text("author").default(""),
-  sourceReference: text("sourceReference").default(""),
-  description: text("description").default(""),
-  isDescriptionVisible: boolean("isDescriptionVisible").default(true).notNull(),
-  metadataProvenance: text("metadataProvenance").default(""),
-  // Retires a reading from the shared library without deleting the file or
-  // disturbing courses that already include it.
-  isArchived: boolean("isArchived").default(false).notNull(),
-  // Key used to locate the file in the storage backend (see src/lib/storage.ts).
-  // Null for a REFERENCE-ONLY reading: a card a student minted for something
-  // they are coding that has no PDF here. Reading-first makes every byte belong
-  // to a reading, so a source the library does not hold still needs a row —
-  // otherwise its passages have no door and fall out of every lens.
-  storageKey: text("storageKey"),
-  // A reading a student added for themselves. It sits on their shelf only: it
-  // has no course_source row, so it never reaches anyone else's.
-  isOwn: boolean("isOwn").default(false).notNull(),
-  createdByUserId: text("createdByUserId").references(() => users.id, {
-    onDelete: "set null",
-  }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-})
+export const sources = pgTable(
+  "source",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    title: text("title").notNull(),
+    author: text("author").default(""),
+    sourceReference: text("sourceReference").default(""),
+    description: text("description").default(""),
+    isDescriptionVisible: boolean("isDescriptionVisible").default(true).notNull(),
+    metadataProvenance: text("metadataProvenance").default(""),
+    // Retires a reading from the shared library without deleting the file or
+    // disturbing courses that already include it.
+    isArchived: boolean("isArchived").default(false).notNull(),
+    // Key used to locate the file in the storage backend (see src/lib/storage.ts).
+    // Null for a REFERENCE-ONLY reading: a card a student minted for something
+    // they are coding that has no PDF here. Reading-first makes every byte belong
+    // to a reading, so a source the library does not hold still needs a row —
+    // otherwise its passages have no door and fall out of every lens.
+    storageKey: text("storageKey"),
+    // A reading a student added for themselves. It sits on their shelf only: it
+    // has no course_source row, so it never reaches anyone else's.
+    isOwn: boolean("isOwn").default(false).notNull(),
+    createdByUserId: text("createdByUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (source) => ({
+    // Weighted full-text search over the reading's card: the title outranks
+    // the author, which outranks the citation and blurb. The query side
+    // (src/actions/search.ts) must repeat this expression verbatim — an
+    // expression index only serves queries that match it exactly.
+    searchIdx: index("source_search_idx").using(
+      "gin",
+      sql`(setweight(to_tsvector('english', coalesce(${source.title}, '')), 'A') || setweight(to_tsvector('english', coalesce(${source.author}, '')), 'B') || setweight(to_tsvector('english', coalesce(${source.sourceReference}, '')), 'C') || setweight(to_tsvector('english', coalesce(${source.description}, '')), 'C'))`
+    ),
+  })
+)
 
 // Inclusion of a library reading in one course, plus the facts that are true
 // only in that course's context.
@@ -224,20 +238,31 @@ export const courseSources = pgTable(
 // the stable anchor used to compute and validate highlight offsets, since the
 // client-side pdf.js text layer is not guaranteed to be byte-stable across
 // renders/versions.
-export const sourcePages = pgTable("source_page", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  sourceId: text("sourceId")
-    .notNull()
-    .references(() => sources.id, { onDelete: "cascade" }),
-  pageNumber: integer("pageNumber").notNull(),
-  textContent: text("textContent").notNull(),
-  // Hash of textContent, duplicated onto bytes.pageContentHash at capture
-  // time so we can cheaply detect drift without re-fetching this row.
-  contentHash: text("contentHash").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-})
+export const sourcePages = pgTable(
+  "source_page",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    sourceId: text("sourceId")
+      .notNull()
+      .references(() => sources.id, { onDelete: "cascade" }),
+    pageNumber: integer("pageNumber").notNull(),
+    textContent: text("textContent").notNull(),
+    // Hash of textContent, duplicated onto bytes.pageContentHash at capture
+    // time so we can cheaply detect drift without re-fetching this row.
+    contentHash: text("contentHash").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (page) => ({
+    // Full-text search across the canonical page text. Same contract as the
+    // source index above: search queries must use this exact expression.
+    searchIdx: index("source_page_search_idx").using(
+      "gin",
+      sql`to_tsvector('english', ${page.textContent})`
+    ),
+  })
+)
 
 // How well a reading survived PDF text extraction: one row per source, holding
 // 1–5 scores on the dimensions that decide whether the PDF is actually usable

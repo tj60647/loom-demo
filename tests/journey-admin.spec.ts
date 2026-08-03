@@ -55,6 +55,21 @@ test("the per-student view renders Test User A's loom read-only", async ({ page 
 
 test("courses: schedule controls render for the course's readings", async ({ page }) => {
   await page.goto("/admin/courses")
+
+  // New Course starts folded — the same idiom as the library's Add Readings
+  // and the roster's Invite learners.
+  const fold = page.locator("details.invitefold")
+  await expect(fold).toBeVisible({ timeout: 15_000 })
+  await expect(fold.locator("input[name=name]")).toBeHidden()
+
+  // Course controls are one uniform row: Edit Course (disclosure), Archive,
+  // and Delete as the red pill disclosure.
+  const firstCourse = page
+    .locator("section.card", { has: page.locator("summary", { hasText: "Edit Course" }) })
+    .first()
+  await expect(firstCourse.locator("summary", { hasText: "Edit Course" })).toBeVisible()
+  await expect(firstCourse.locator("summary.pillbtn", { hasText: "Delete" })).toBeVisible()
+
   // Each reading row shows its Week/Core/Visible pills; the week+position form
   // sits behind the "schedule" disclosure.
   await expect(page.locator(".pill", { hasText: /Week \d+|Unscheduled/ }).first()).toBeVisible({ timeout: 15_000 })
@@ -69,6 +84,18 @@ test("the cohort map renders the section's woven concepts", async ({ page }) => 
   // Seeded work from Test User A is part of the cohort cloth — the SVG node
   // label, not the hidden <title> tooltip.
   await expect(page.locator("svg text", { hasText: "object worlds" }).first()).toBeVisible({ timeout: 20_000 })
+
+  // The cloth's material is listed, not only drawn: every concept and every
+  // thread, each attributed to its student.
+  await expect(page.locator(".crow", { hasText: "object worlds" }).first()).toBeVisible()
+  await expect(page.locator(".thread .sent").first()).toBeVisible()
+
+  // A concept opens the bytes behind it — the student's own captures, with
+  // attribution — plus the threads that cross it.
+  await page.locator(".crow", { hasText: "object worlds" }).first().click()
+  await expect(page.locator(".threadhead", { hasText: "object worlds" })).toBeVisible()
+  await expect(page.locator(".bytequote").first()).toBeVisible()
+  await expect(page.locator(".bytequote").first()).toContainText("Test User A")
 })
 
 test.describe("authorization boundary", () => {

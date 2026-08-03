@@ -21,7 +21,7 @@ Conventions used below:
 
 ## 1. Database schema — [src/db/schema.ts](../src/db/schema.ts)
 
-Migrations `drizzle/0000`–`0013`, applied via `drizzle-kit migrate`
+Migrations `drizzle/0000`–`0014`, applied via `drizzle-kit migrate`
 (`drizzle.__drizzle_migrations` is the record of truth).
 
 ### 1a. Auth (NextAuth v4, database sessions)
@@ -49,7 +49,7 @@ Migrations `drizzle/0000`–`0013`, applied via `drizzle-kit migrate`
 | --- | --- | --- |
 | `source` | id · title · author `''` · sourceReference `''` · description `''` · isDescriptionVisible true · metadataProvenance `''` · isArchived false · **storageKey nullable** · **isOwn false** · createdByUserId SET NULL · createdAt | `storageKey NULL` = reference-only card (no PDF). `isOwn` = student-minted, visible on that student's shelf only |
 | `course_source` | courseId CASCADE · sourceId CASCADE · isVisible true · week nullable · isCore true · position 0 · createdAt | PK (courseId, sourceId). Week/visibility/core are per-course facts on the join, never on the reading |
-| `source_page` | id · sourceId CASCADE · pageNumber · textContent · contentHash · createdAt | Extracted text per page; anchor reconciliation reads it. No unique on (sourceId, pageNumber) |
+| `source_page` | id · sourceId CASCADE · pageNumber · textContent · contentHash · createdAt | Extracted text per page; anchor reconciliation and search read it. No unique on (sourceId, pageNumber). GIN index `source_page_search_idx` on `to_tsvector('english', textContent)`; `source` carries the weighted `source_search_idx` twin (title A · author B · reference/description C) — the search queries must repeat these expressions verbatim |
 | `source_score` | sourceId PK/CASCADE · status `'heuristic'\|'judged'\|'unscorable'` · coverage/legibility/anchorability/structure int nullable · overall real · pass bool nullable · notes · judgeNotes · judgeModel · metrics jsonb · scoredAt | 1:1 with source. Unscored dimension = NULL (abstention, never a default). `pass` requires every scored dimension ≥ 3 — not compensatory |
 
 ### 1d. The graph (the artifact — spec §6 `graph`)
@@ -121,12 +121,15 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | `getReadingsByCourse()` | — | `Map<courseId, (Source & {link})[]>` week→position→title | admin |
 | `getCourseSources` | `courseId?` | `(Source & {link})[]` | admin |
 | `getSources` | `courseId?` | shelf rows: learners see `isVisible` only + their own `isOwn` readings; admins see hidden too | session-optional |
-| `createOwnReading` | `{title, author?, sourceReference?}` | `{id, title}` | **session only — deliberately not admin-gated** (reference-only card; called from the shelf's "a reading of your own" form) |
-| `createSource` | metadata + `File` | `Source` | admin — but **the check runs after the blob write** (see audit F-5). No callers; effectively dead but POSTable |
+| `createOwnReading` | `{title, author?, sourceReference?}` | `{id, title}` | **session only — deliberately not admin-gated** (reference-only card, no PDF; called from the shelf's "a reading of your own" form) |
+| `registerOwnUploadedReading` | `{storageKey, filename, title?, author?, sourceReference?}` | `{id, title}` | **session only** — the PDF-backed own reading: same prefix/size/magic-byte checks and ingest as the admin path, but always `isOwn`, never added to a course; heuristic score only (no judge pass on private uploads) |
+| `createSource` | metadata + `File` | `Source` | admin, **checked before the blob write** (audit S-5 ordering fixed). No callers; effectively dead but POSTable |
 | `registerUploadedReading` | `{storageKey, filename, title?, courseId?}` | `{id, title}` | admin; re-checks prefix + real blob size, deletes oversize orphans |
 | `rescoreSourceAction` | FormData `sourceId` | void | admin; also rebuilds the cover |
 | `draftMetadataForSource` | `sourceId` | `MetadataDraft` | admin; **writes nothing** (red line #6 exception (b) — proposal only) |
+| `draftMetadataForOwnSource` | `sourceId` | `MetadataDraft` | **session, owner of an `isOwn` reading only**; writes nothing — same #6 exception, the student is the reviewer |
 | `updateSourceMetadata` | FormData | void | admin |
+| `updateOwnReadingMetadata` | `{sourceId, title, author?, sourceReference?, metadataProvenance?}` | `{id, title}` | session, owner + `isOwn` only; title/author/reference — an own card has no visible description |
 | `addSourceToCourse` / `removeSourceFromCourse` | FormData | void | admin |
 | `setCourseSourceVisibility` / `updateCourseSourceSchedule` | FormData | void | admin |
 | `setSourceArchived` / `deleteSource` | FormData | void | admin; delete removes blob + cover + course links |
@@ -136,6 +139,22 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 Upload constants ([src/lib/readingUpload.ts](../src/lib/readingUpload.ts)):
 `MAX_READING_BYTES` = 20 MB, prefix `readings/`, PDFs only — enforced browser-side,
 token-side, and at registration (three places that don't trust each other).
+
+Search — [src/actions/search.ts](../src/actions/search.ts): plain Postgres FTS
+(`websearch_to_tsquery` / `ts_rank` / `ts_headline`, GIN expression indexes from
+migration 0014 — deliberately no model anywhere near it). Both actions scope
+through `getSources()`, so search can never surface a reading its caller could
+not already open from the shelf — and `searchReadings` narrows further to
+published (`isVisible`) readings: the reading list, not an admin's staged
+copies. Snippets mark matches with `⟦⟧`
+([src/lib/searchText.ts](../src/lib/searchText.ts)) and are rendered by
+splitting, never as HTML. Queries are trimmed to 200 chars; under 2 chars
+nothing runs.
+
+| Action | Params | Returns | Auth |
+| --- | --- | --- | --- |
+| `searchReadings` | `query` | ≤30 `ReadingSearchHit` — card + page matches, ranked (card ≫ best page > breadth), each with ≤2 page excerpts | session required, else `[]` |
+| `searchReading` | `sourceId, query` | `{hits: ≤50 page-ordered snippets, truncated}` | session required **and** `sourceId` on the caller's shelf, else empty |
 
 ### 2c. Roster & cohort — [src/actions/admin.ts](../src/actions/admin.ts)
 
@@ -173,7 +192,7 @@ section belongs to the course).
 | `GET /api/auth/test-login?as=testa` | Mints a 30-day DB session + cookies; default identity is the admin, `?as=testa` = `test-user-a@loom.local` (LEARNER, enrolled into the oldest course). Returns `{success, userId, sessionToken}` | **403 in production** (first statement); no other guard — dev/CI only |
 | `GET /api/readings/[sourceId]?download=1` | Streams the PDF (never buffered — 4.5 MB serverless cap), RFC 6266 filename, `Cache-Control: private`. Errors: 401 / 404 / 500 JSON | Session required **in production only**; then `authorizeSourceFile` |
 | `GET /api/readings/[sourceId]/cover` | PNG cover (cached at `covers/<id>.png`; re-rendered from the PDF only on a cache miss) or SVG fallback (`no-store`) | No check of its own — inherits `authorizeSourceFile` via `getSourceForCover` (bytes-free) |
-| `POST /api/readings/upload` | Vercel Blob client-upload token exchange. Token scoped: private, PDFs only, ≤ 20 MB, path under `readings/`, random suffix. `onUploadCompleted` deliberately omitted — the client calls `registerUploadedReading` itself | Admin, checked twice |
+| `POST /api/readings/upload` | Vercel Blob client-upload token exchange. Token scoped: private, PDFs only, ≤ 20 MB, path under `readings/`, random suffix. `onUploadCompleted` deliberately omitted — the client calls `registerUploadedReading` / `registerOwnUploadedReading` itself | Any signed-in session (sign-in is allowlist-gated), checked twice; what the blob may be registered *as* is decided by the register actions |
 
 ---
 

@@ -97,7 +97,10 @@ function parseDraft(raw: string): Omit<MetadataDraft, "provenance"> {
  */
 export async function draftMetadataFromPages(
   pages: { pageNumber: number; textContent: string }[],
-  filenameHint: string
+  filenameHint: string,
+  /** Who reads and saves the draft — the provenance line must not claim an
+      instructor reviewed what a student saved to their own card. */
+  reviewer: "an instructor" | "the reading's owner" = "an instructor"
 ): Promise<MetadataDraft> {
   if (!isJudgeConfigured()) {
     throw new Error("No OPENROUTER_API_KEY is configured, so drafting is unavailable. Type the metadata by hand.")
@@ -133,6 +136,6 @@ export async function draftMetadataFromPages(
   const today = new Date().toISOString().slice(0, 10)
   return {
     ...draft,
-    provenance: `Drafted from the PDF's opening pages by ${model} on ${today}; reviewed and saved by an instructor.`,
+    provenance: `Drafted from the PDF's opening pages by ${model} on ${today}; reviewed and saved by ${reviewer}.`,
   }
 }

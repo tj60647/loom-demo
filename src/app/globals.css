@@ -24,11 +24,16 @@ header,.scopebar,nav{flex:0 0 auto}
 /* min-height:0 or a flex item refuses to shrink below its content and the
    scroll silently moves back to the document. */
 main,.adminshell{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
-/* Admin pages nest <main> inside .adminshell, and the shell owns the scroll.
-   The rule above would still make that nested <main> a scroll container with
-   nothing to scroll — and overscroll-behavior:contain swallows the wheel at a
-   scroll boundary rather than chaining it up to the shell, so the page reads
-   as scroll-broken. A <main> inside the shell must be a plain block. */
+/* Admin pages split the shell: AdminNav (tabs + course picker) is pinned, and
+   .adminbody below it owns the scroll, so where you are and which course you
+   are in never scroll away. The shell must not scroll itself or the nav would
+   ride along with the page. */
+.adminshell{display:flex;flex-direction:column;overflow-y:hidden}
+.adminbody{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+/* A <main> nested inside .adminbody must stay a plain block: the generic rule
+   above would make it a second scroll container with nothing to scroll — and
+   overscroll-behavior:contain swallows the wheel at a scroll boundary rather
+   than chaining it up to .adminbody, so the page reads as scroll-broken. */
 .adminshell main{flex:none;min-height:auto;overflow-y:visible;overscroll-behavior:auto}
 h1,h2,h3{font-family:var(--display);font-weight:500;margin:0}
 .label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
@@ -142,6 +147,9 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .pill.beaten{color:var(--sage);border:1px solid var(--sage)}
 .act{font-family:var(--mono);font-size:10px;color:var(--sage);cursor:pointer;letter-spacing:.04em}
 .act:hover{text-decoration:underline}
+/* .act and .rm sit on <a>, <summary> and <button> alike; strip the native
+   button chrome so the same word reads the same whatever the element. */
+button.act,button.rm{appearance:none;background:none;border:none;padding:0}
 /* weave */
 .mapbar{display:flex;gap:16px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
 .loosebanner{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:10px}
@@ -162,9 +170,12 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .bytequote .src{font-family:var(--mono);font-size:10px}
 .legend{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-top:8px;display:flex;gap:22px;flex-wrap:wrap}
 .legend .sw{display:inline-block;width:22px;height:0;border-top-width:2px;vertical-align:middle;margin-right:5px}
-/* footer rule, poster-style */
+/* footer rule, poster-style. pointer-events:none because a fixed full-width
+   strip is a click shield over whatever scrolls beneath it — the shelf's
+   file input sat under this band and "Choose file" silently did nothing.
+   The footer is print, not controls, so clicks belong to the page below. */
 footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;gap:12px;
-  padding:9px 26px;border-top:1px solid var(--ink);background:var(--paper);z-index:5}
+  padding:9px 26px;border-top:1px solid var(--ink);background:var(--paper);z-index:5;pointer-events:none}
 footer span{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
 footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 
@@ -180,7 +191,9 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
   }
   nav button{flex:0 0 auto}
   main{padding:18px 14px 20px}
-  footer{position:static;padding:10px 14px;z-index:1}
+  /* Static here, in flow under the content — it overlaps nothing, so it can
+     take its clicks (and text selection) back. */
+  footer{position:static;padding:10px 14px;z-index:1;pointer-events:auto}
 }
 
 /* ===== v7 legibility pass ===== */
@@ -264,9 +277,14 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .guide .dot{width:7px;height:7px;border-radius:50%;background:var(--rule)}
 .guide .dot.on{background:var(--ochre)}
 .guide .skip{font-family:var(--mono);font-size:11px;color:var(--ink-soft);cursor:pointer;letter-spacing:.04em}
+/* 36px to match .btn.mini's min-height: the header is one row of equal
+   controls, and a smaller circle beside them read as a different species. */
 .helpbtn{font-family:var(--display);font-size:17px;background:none;border:1px solid var(--rule);border-radius:50%;
-  width:28px;height:28px;cursor:pointer;color:var(--ink-soft);line-height:1;align-self:center}
+  width:36px;height:36px;cursor:pointer;color:var(--ink-soft);line-height:1;align-self:center}
 .helpbtn:hover{border-color:var(--ochre);color:var(--ochre)}
+/* One box model for header controls whatever the element (a, button):
+   a bare <a class="btn"> otherwise top-aligns its text next to a <button>. */
+header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* MAP — sort-list re-ordering. The handle is the only grab point; the ochre
    rule marks where the row would land. List sequence only — never the table. */
 .thandle{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
@@ -306,6 +324,14 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
   padding:6px 10px;border-radius:4px;white-space:normal;width:max-content;max-width:240px;text-align:left;line-height:1.4;z-index:30;pointer-events:none}
 [data-tip]:hover::before{content:"";position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);
   border:5px solid transparent;border-top-color:var(--ink);z-index:30;pointer-events:none}
+/* Inside a scrollbox the tip flips below the control and left-aligns to it:
+   a centred bubble above a top row is clipped by the box's overflow on two
+   sides. Below, the worst case is the last row of a full box, which scrolls.
+   .tip-below is the same flip for a control that sits at the top of the main
+   scroll area, where an upward bubble slides under the nav. */
+.scrollbox [data-tip]:hover::after{bottom:auto;top:calc(100% + 7px);left:0;transform:none}
+.scrollbox [data-tip]:hover::before,[data-tip].tip-below:hover::before{bottom:auto;top:calc(100% + 2px);border-top-color:transparent;border-bottom-color:var(--ink)}
+[data-tip].tip-below:hover::after{bottom:auto;top:calc(100% + 7px)}
 
 /* --- reading-first: the shelf, the scope bar, the seam --- */
 
@@ -334,6 +360,23 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .shelfdesc{font-size:13.5px;line-height:1.4;color:var(--ink-soft);margin:0}
 .shelftally{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:0}
 .shelfquiet{color:var(--grey)}
+
+/* Shelf search: which reading says this? A hit is a link into the reading,
+   shaped like a shelf card; the marked words are Postgres's, not ours. */
+.searchwrap{margin:0 0 18px}
+.searchbar{display:flex;align-items:center;gap:10px}
+.searchinput{max-width:520px}
+.searchresults{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.searchtally{display:block}
+.searchhit{display:block;padding:12px 14px;text-decoration:none;color:inherit;
+  border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.5)}
+.searchhit:hover{border-color:var(--ochre);background:rgba(168,132,63,.06)}
+.searchhithead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.searchhithead h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0}
+.searchwhere{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:2px 0 0}
+.searchsnip{font-size:13.5px;line-height:1.45;color:var(--ink-soft);margin:6px 0 0}
+.searchsnip .n{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--grey);margin-right:7px}
+.snipmark{background:rgba(255,204,0,.35);color:inherit;padding:0 1px;border-radius:2px}
 
 /* The seam: the same concept met in a second text. Counted, never advised. */
 .seam{margin-top:12px;padding:11px 13px;border-left:2px solid var(--sage);background:rgba(122,138,110,.09);border-radius:0 4px 4px 0}
@@ -394,3 +437,29 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .invitereport{border-left:2px solid var(--rule);padding-left:11px;margin-top:4px}
 .invitereport p{font-size:14px;line-height:1.45;margin:0 0 6px}
 .invitereport p:last-child{margin-bottom:0}
+/* A reading card's action row. Every control is the same .btn.mini box
+   whatever its element — button, link, or a disclosure's summary — so the row
+   reads as one set. display:contents lifts each disclosure's children into
+   the row itself: summaries sit with the buttons while the .foldout, ordered
+   last at full width, always wraps onto its own line *below* the row — so
+   opening a disclosure never moves a button. */
+.actrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.actrow .btn{display:inline-flex;align-items:center;justify-content:center}
+.actrow details{display:contents}
+.actrow summary{list-style:none;cursor:pointer}
+.actrow summary::-webkit-details-marker{display:none}
+/* What joins the flex row from an open disclosure is the ::details-content
+   pseudo-box, not the .foldout form inside it — order on the form alone is
+   inert, and the content box would land mid-row, stretch the line to its own
+   height and centre the buttons 300px down. Both rules carry the same intent
+   so engines that flatten straight to the form behave identically. */
+.actrow details::details-content{order:1;flex-basis:100%;min-width:0}
+.actrow .foldout{order:1;flex-basis:100%;min-width:0}
+/* A closed disclosure's content box is content-visibility:hidden, not gone —
+   left in the row, each one is a zero-size item that still draws flex gaps
+   (phantom spacing between buttons, stray rows below). Remove the box. */
+.actrow details:not([open])::details-content{display:none}
+/* Delete is a pill: the same height as its row-mates, but red-rimmed and
+   fully rounded so the destructive act is unmistakably not just another
+   button. */
+.btn.pillbtn{border-radius:999px;color:var(--red);border-color:var(--red)}

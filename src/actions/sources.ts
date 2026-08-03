@@ -247,9 +247,11 @@ export async function getSources(courseIdRaw?: string | null) {
 
 /**
  * A student mints a card for something they are coding that the library does
- * not hold — a self-found paper, a book, a lecture. Title and author only:
- * this records WHERE a passage came from, and nothing about the student's
- * reading of it.
+ * not hold — a book, a lecture, anything with no PDF to upload. Title and
+ * author only: this records WHERE a passage came from, and nothing about the
+ * student's reading of it. When they DO hold the PDF,
+ * `registerOwnUploadedReading` below is the door — same card, with the text
+ * behind it.
  *
  * Deliberately not admin-gated, and deliberately not added to the course: the
  * deployment notes (§9) ratified students adding papers, and this is the
@@ -286,6 +288,65 @@ export async function createOwnReading(data: {
 }
 
 /**
+ * The learner half of the browser → Blob upload: a reading of the student's
+ * own with the PDF behind it, so tab 00 and capture-from-the-text work the
+ * same as for course readings. Storage checks match the admin path exactly —
+ * prefix, size cap, PDF magic bytes — and the same ingest runs, but the
+ * result keeps `createOwnReading`'s bounds: isOwn, never added to any course,
+ * on this student's shelf and nobody else's (admins see it listed on the
+ * Readings tab, as they do every own reading).
+ *
+ * The deterministic heuristic score runs inside ingest as always; the LLM
+ * judge pass is deliberately NOT queued for private uploads — its tokens are
+ * a curation cost the shared library justifies. An admin can Rescore from
+ * the library if a private reading ever needs the reading-order check.
+ */
+export async function registerOwnUploadedReading(data: {
+  storageKey: string
+  filename: string
+  title?: string
+  author?: string
+  sourceReference?: string
+}) {
+  const session = await getServerSession(authOptions)
+  const userId = session?.user?.id
+  if (!userId) throw new Error("Unauthorized")
+
+  if (!data.storageKey.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
+    throw new Error("That upload is not in the readings area.")
+  }
+
+  const buffer = await readingStorage.get(data.storageKey)
+  if (buffer.byteLength > MAX_READING_BYTES) {
+    await readingStorage.delete(data.storageKey).catch(() => {})
+    throw new Error(`That file is ${formatBytes(buffer.byteLength)} — the limit is ${MAX_READING_LABEL}.`)
+  }
+
+  try {
+    const source = await ingestReading({
+      userId,
+      isOwn: true,
+      buffer,
+      storageKey: data.storageKey,
+      filename: data.filename,
+      title: data.title,
+      author: data.author,
+      sourceReference: data.sourceReference,
+      isDescriptionVisible: false,
+      metadataProvenance: "Student's own upload",
+    })
+    revalidatePath("/")
+    revalidateLibrary()
+    return { id: source.id, title: source.title }
+  } catch (error) {
+    // Nothing references the blob yet; a failed ingest must not leave it
+    // sitting in storage.
+    await readingStorage.delete(data.storageKey).catch(() => {})
+    throw error
+  }
+}
+
+/**
  * Registers a new reading in the shared library: stores the uploaded PDF bytes
  * in backend-managed storage (not /public, so it's only reachable via the
  * authenticated /api/readings/[sourceId] route) and extracts + persists the
@@ -304,12 +365,16 @@ export async function createSource(data: {
   metadataProvenance?: string
   file: File
 }) {
+  // Before the blob write, not after (audit S-5): an unauthorized caller must
+  // not get bytes into storage even transiently.
+  const session = await requireAdmin()
+
   const arrayBuffer = await data.file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
   const storageKey = `${crypto.randomUUID()}.pdf`
   await readingStorage.put(storageKey, buffer)
 
-  return ingestReading({ ...data, buffer, storageKey, filename: data.file.name })
+  return ingestReading({ ...data, userId: session.user.id, buffer, storageKey, filename: data.file.name })
 }
 
 /**
@@ -317,11 +382,16 @@ export async function createSource(data: {
  * came from: validate, record the row, extract the canonical page text, render
  * a cover.
  *
- * Shared by the two upload paths — the server-side `createSource` (used by
- * seed scripts) and `registerUploadedReading` (the browser → Blob path) — so
- * neither can drift into ingesting a reading differently from the other.
+ * Shared by every upload path — `createSource`, `registerUploadedReading` and
+ * `registerOwnUploadedReading` — so none can drift into ingesting a reading
+ * differently from the others. It does NOT authenticate: each caller decides
+ * who may reach it (admin for the library, any signed-in student for a
+ * reading of their own) and hands the acting user in.
  */
 async function ingestReading(data: {
+  userId: string
+  /** A student's own reading — their shelf only, never a course's list. */
+  isOwn?: boolean
   courseId?: string | null
   title?: string
   author?: string
@@ -333,8 +403,7 @@ async function ingestReading(data: {
   storageKey: string
   filename: string
 }) {
-  const session = await requireAdmin()
-  const userId = session.user.id
+  const userId = data.userId
   const buffer = data.buffer
 
   // Verify this is actually a PDF (magic bytes: "%PDF-") before storing it
@@ -358,6 +427,7 @@ async function ingestReading(data: {
       isDescriptionVisible: data.isDescriptionVisible ?? true,
       metadataProvenance: data.metadataProvenance || "",
       storageKey,
+      isOwn: data.isOwn ?? false,
       createdByUserId: userId,
     })
     .returning()
@@ -419,7 +489,7 @@ export async function registerUploadedReading(data: {
   title?: string
   courseId?: string | null
 }) {
-  await requireAdmin()
+  const session = await requireAdmin()
 
   if (!data.storageKey.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
     throw new Error("That upload is not in the readings area.")
@@ -436,6 +506,7 @@ export async function registerUploadedReading(data: {
 
   try {
     const source = await ingestReading({
+      userId: session.user.id,
       buffer,
       storageKey: data.storageKey,
       filename: data.filename,
@@ -510,13 +581,85 @@ export async function draftMetadataForSource(sourceId: string): Promise<Metadata
   const source = rows[0]
   if (!source) throw new Error("Reading not found")
 
+  return draftFromStoredPages(source)
+}
+
+/** The draft itself, shared by the admin and owner gates above and below. */
+async function draftFromStoredPages(
+  source: { id: string; title: string },
+  reviewer: "an instructor" | "the reading's owner" = "an instructor"
+): Promise<MetadataDraft> {
   const pages = await db
     .select({ pageNumber: sourcePages.pageNumber, textContent: sourcePages.textContent })
     .from(sourcePages)
-    .where(eq(sourcePages.sourceId, sourceId))
+    .where(eq(sourcePages.sourceId, source.id))
     .orderBy(asc(sourcePages.pageNumber))
 
-  return draftMetadataFromPages(pages, source.title)
+  return draftMetadataFromPages(pages, source.title, reviewer)
+}
+
+/**
+ * The learner twin of draftMetadataForSource, for a reading of their own.
+ * Same boundary as the admin button: this RETURNS a draft and writes nothing —
+ * the student reads and edits every field before updateOwnReadingMetadata
+ * saves it, so no model-written text lands anywhere unread (red line #6,
+ * same exception, same condition). Owner-gated and isOwn-only: a course
+ * reading's card belongs to the instructor.
+ */
+export async function draftMetadataForOwnSource(sourceId: string): Promise<MetadataDraft> {
+  const session = await getServerSession(authOptions)
+  const userId = session?.user?.id
+  if (!userId) throw new Error("Unauthorized")
+  if (!sourceId) throw new Error("Source id is required")
+
+  const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
+  const source = rows[0]
+  if (!source || !source.isOwn || source.createdByUserId !== userId) {
+    throw new Error("Reading not found")
+  }
+
+  return draftFromStoredPages(source, "the reading's owner")
+}
+
+/**
+ * Owner-gated save for an own reading's card — title, author, and reference
+ * only: an own card is a citation, not a library entry, and it shows no
+ * description. Provenance rides along so a reviewed draft records itself as
+ * one; absent, whatever provenance the row carries stands.
+ */
+export async function updateOwnReadingMetadata(data: {
+  sourceId: string
+  title: string
+  author?: string
+  sourceReference?: string
+  metadataProvenance?: string
+}) {
+  const session = await getServerSession(authOptions)
+  const userId = session?.user?.id
+  if (!userId) throw new Error("Unauthorized")
+
+  const title = data.title.trim()
+  if (!title) throw new Error("A reading needs a title.")
+
+  const rows = await db.select().from(sources).where(eq(sources.id, data.sourceId)).limit(1)
+  const source = rows[0]
+  if (!source || !source.isOwn || source.createdByUserId !== userId) {
+    throw new Error("Reading not found")
+  }
+
+  await db
+    .update(sources)
+    .set({
+      title,
+      author: data.author?.trim() || "",
+      sourceReference: data.sourceReference?.trim() || "",
+      ...(data.metadataProvenance ? { metadataProvenance: data.metadataProvenance } : {}),
+    })
+    .where(eq(sources.id, source.id))
+
+  revalidatePath("/")
+  revalidateLibrary()
+  return { id: source.id, title }
 }
 
 export async function updateSourceMetadata(formData: FormData) {

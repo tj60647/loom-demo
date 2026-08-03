@@ -5,34 +5,45 @@ import { usePathname } from "next/navigation"
 import { useLoom } from "@/components/providers/LoomProvider"
 import AuthButton from "./AuthButton"
 
-export default function Header() {
+export default function Header({ deployEnv }: { deployEnv?: string }) {
   const { data: session } = useSession()
   const { flashMsg } = useLoom()
   const [showAbout, setShowAbout] = useState(false)
   // Nothing on an admin page writes to a loom, so the save dot sat there as a
   // bare em dash for the whole visit and read as a stray character.
   const inAdmin = usePathname()?.startsWith("/admin") ?? false
+  // Anywhere that isn't the real site wears the red weft through the mark —
+  // the same clue as the favicon and the dev OAuth app's logo.
+  const isDev = deployEnv !== "production"
 
   return (
     <>
       <header>
         <div className="wordmark">
-          <svg width="17" height="12" viewBox="0 0 26 18" fill="none" stroke="#a8843f" strokeWidth="1.8">
-            <path d="M2 15 L7 4 L12 15 L17 4 L22 15"/>
+          <svg width="17" height="12" viewBox="0 0 26 18" fill="none" strokeWidth="1.8">
+            <path d="M2 15 L7 4 L12 15 L17 4 L22 15" stroke="#a8843f"/>
+            {isDev && <path d="M1 9.5 L23 9.5" stroke="#b23a2b" strokeWidth="1.6"/>}
           </svg>
-          <div>Loom<small>lay the warp · throw the weft</small></div>
+          <div>
+            Loom
+            <small>
+              lay the warp · throw the weft
+              {isDev && <span style={{ color: "var(--red)" }}> · dev</span>}
+            </small>
+          </div>
         </div>
         <div className="spacer"></div>
         {session && !inAdmin && (
           <span id="saveDot">{flashMsg ? `· ${flashMsg} ·` : "—"}</span>
         )}
         <AuthButton />
-        <span
+        <button
+          className="btn ghost mini"
           onClick={() => setShowAbout(true)}
-          style={{ fontFamily: "var(--mono)", fontSize: "11px", color: "var(--ink-soft)", cursor: "pointer", letterSpacing: ".04em", alignSelf: "center" }}
+          data-tip="what Loom is, and the thinking behind it"
         >
           about
-        </span>
+        </button>
         <button
           onClick={() => window.dispatchEvent(new Event("loom:walkthrough"))}
           className="helpbtn"

@@ -13,9 +13,12 @@ import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings, type ReadingMeta } from "@/components/providers/ReadingsProvider"
-import { createOwnReading } from "@/actions/sources"
+import { createOwnReading, draftMetadataForOwnSource, updateOwnReadingMetadata } from "@/actions/sources"
+import { uploadOwnReading } from "@/lib/readingUploadClient"
+import { MAX_READING_BYTES, MAX_READING_LABEL, formatBytes } from "@/lib/readingUpload"
 import { tallyByReading } from "@/lib/scope"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
+import ShelfSearch from "@/components/shelf/ShelfSearch"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import JourneyNav from "@/components/ui/JourneyNav"
 
@@ -26,6 +29,11 @@ export default function Shelf() {
   const { state, isLoading, loadExample, flash } = useLoom()
   const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
   const [exampleBusy, setExampleBusy] = useState(false)
+  // The search bar sits behind a toggle, the reading's own ⌕ Search idiom.
+  // While a query is live the results own the page; clearing the box — or
+  // closing the panel — puts the week-grouped shelf back exactly as it was.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchActive, setSearchActive] = useState(false)
 
   const tallies = useMemo(() => tallyByReading(state), [state])
 
@@ -132,7 +140,25 @@ export default function Shelf() {
     <>
       <JourneyNav active="readings" />
       <main>
-        <p className="tasktitle">Pick a reading.</p>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", margin: "0 0 3px" }}>
+          <p className="tasktitle" style={{ margin: 0 }}>Pick a reading.</p>
+          <button
+            className={`btn mini tip-below ${searchOpen ? "" : "ghost"}`}
+            onClick={() => {
+              if (searchOpen) {
+                setSearchOpen(false)
+                setSearchActive(false)
+              } else {
+                setSearchOpen(true)
+              }
+            }}
+            data-tip="find a word or phrase across the readings on your list"
+            aria-pressed={searchOpen}
+            aria-label="Search your readings"
+          >
+            ⌕ Search
+          </button>
+        </div>
         <p className="tasksub">
           Each reading is its own piece of work: capture its passages, name what they
           evidence, thread those concepts together, and read the whole. Your concepts
@@ -140,6 +166,21 @@ export default function Shelf() {
           the evidence of both.
         </p>
 
+        {/* Which reading says this? Words, or a "quoted phrase" — matched
+            against every card and every page on your reading list, never
+            anyone else's. While a query is live the results stand in for the
+            shelf; unmounting on close is what resets the box. */}
+        {searchOpen && (
+          <ShelfSearch
+            onActiveChange={setSearchActive}
+            onClose={() => {
+              setSearchOpen(false)
+              setSearchActive(false)
+            }}
+          />
+        )}
+
+        {!searchActive && (<>
         {/* The whole weave and Keep were quick links here; they are journey
             stations now (05 · 06), so the bar carries them and this row keeps
             only the tally. */}
@@ -203,6 +244,7 @@ export default function Shelf() {
             </button>
           </div>
         )}
+        </>)}
 
         <FirstRunWalkthrough />
       </main>
@@ -294,30 +336,119 @@ function Untethered({ readings }: { readings: ReadingMeta[] }) {
 }
 
 /**
- * Title and author only. This records WHERE a passage came from — nothing
- * about the student's reading of it, which is the work the card is a door to.
+ * A reading of the student's own, PDF first: uploaded like any course reading
+ * (browser → Blob → register), it gets tab 00 and capture from the text
+ * itself. Without a PDF — a book, a lecture — the card still stands, and its
+ * passages are captured by hand on 01 · Open. Either way it sits on this
+ * student's shelf and nobody else's.
  */
 function AddOwnReading({ onAdded }: { onAdded: () => void }) {
   const { flash } = useLoom()
   const [open, setOpen] = useState(false)
+  const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState("")
   const [author, setAuthor] = useState("")
   const [reference, setReference] = useState("")
   const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState<string | null>(null)
+  // After a PDF upload the form stays open as a review step: the reading is
+  // already on the shelf under its filename, and the card's details can be
+  // drafted from the PDF itself — reviewed and saved, never auto-applied.
+  const [reviewingId, setReviewingId] = useState<string | null>(null)
+  const [drafting, setDrafting] = useState(false)
+  const [draftNote, setDraftNote] = useState<{ kind: "ok" | "err"; text: string } | null>(null)
+  const [draftProvenance, setDraftProvenance] = useState<string | null>(null)
+
+  const tooBig = file !== null && file.size > MAX_READING_BYTES
+
+  const reset = () => {
+    setFile(null)
+    setTitle("")
+    setAuthor("")
+    setReference("")
+    setProgress(null)
+    setReviewingId(null)
+    setDraftNote(null)
+    setDraftProvenance(null)
+  }
+
+  const close = () => {
+    reset()
+    setOpen(false)
+  }
 
   const submit = async () => {
-    if (!title.trim() || busy) return
+    if (busy || tooBig || (!file && !title.trim())) return
     setBusy(true)
     try {
-      await createOwnReading({ title, author, sourceReference: reference })
-      setTitle("")
-      setAuthor("")
-      setReference("")
-      setOpen(false)
-      onAdded()
-      flash("added to your shelf")
+      if (file) {
+        const created = await uploadOwnReading(file, {
+          title,
+          author,
+          sourceReference: reference,
+          onPhase: (phase) => setProgress(phase === "sending" ? "sending…" : "extracting…"),
+          onProgress: (percent) => setProgress(`sending ${percent}%`),
+        })
+        // On the shelf already — now its card, with the PDF there to draft from.
+        setTitle(created.title)
+        setFile(null)
+        setProgress(null)
+        setReviewingId(created.id)
+        onAdded()
+        flash("on your shelf — now its card")
+      } else {
+        await createOwnReading({ title, author, sourceReference: reference })
+        close()
+        onAdded()
+        flash("added to your shelf")
+      }
     } catch (e) {
+      setProgress(null)
       flash(e instanceof Error ? e.message : "could not add that reading")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const draft = async () => {
+    if (!reviewingId || drafting) return
+    setDrafting(true)
+    setDraftNote(null)
+    try {
+      const proposal = await draftMetadataForOwnSource(reviewingId)
+      // Only overwrite when the model actually found something; an empty
+      // field means "not stated on the page", not "clear what you typed".
+      if (proposal.title) setTitle(proposal.title)
+      if (proposal.author) setAuthor(proposal.author)
+      if (proposal.sourceReference) setReference(proposal.sourceReference)
+      setDraftProvenance(proposal.provenance)
+      setDraftNote({
+        kind: "ok",
+        text: "Drafted into the fields above — nothing is saved yet. Check every line against the PDF, correct what is wrong, then Save details.",
+      })
+    } catch (e) {
+      setDraftNote({ kind: "err", text: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setDrafting(false)
+    }
+  }
+
+  const saveDetails = async () => {
+    if (!reviewingId || !title.trim() || busy) return
+    setBusy(true)
+    try {
+      await updateOwnReadingMetadata({
+        sourceId: reviewingId,
+        title,
+        author,
+        sourceReference: reference,
+        metadataProvenance: draftProvenance ?? undefined,
+      })
+      close()
+      onAdded()
+      flash("details saved")
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "could not save the details")
     } finally {
       setBusy(false)
     }
@@ -326,13 +457,80 @@ function AddOwnReading({ onAdded }: { onAdded: () => void }) {
   if (!open) {
     return (
       <div>
-        <button className="btn ghost mini" onClick={() => setOpen(true)}>
+        <button
+          className="btn ghost mini"
+          onClick={() => setOpen(true)}
+          data-tip="upload a PDF you're coding, or card a book or lecture"
+        >
           + a reading of your own
         </button>
         <p className="hint" style={{ marginTop: 6 }}>
-          Coding something your course readings don&apos;t include — a paper you found, a
-          book, a lecture? Give it a card and its passages have somewhere to live.
+          Coding something your course readings don&apos;t include? Upload the PDF and it
+          reads like any other card — or card a book or lecture and capture by hand.
         </p>
+      </div>
+    )
+  }
+
+  if (reviewingId) {
+    return (
+      <div className="card">
+        <h2>On your shelf — now its card</h2>
+        <p className="hint">
+          The reading is uploaded. Draft its details from the PDF itself, or type them —
+          either way you review every line, and nothing is saved until you do.
+        </p>
+        <div className="form-row">
+          <span className="label">Title</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+        </div>
+        <div className="form-row">
+          <span className="label">Author <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span></span>
+          <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Suchman" />
+        </div>
+        <div className="form-row">
+          <span className="label">Where it&apos;s from <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span></span>
+          <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Cambridge University Press, 1987" />
+        </div>
+        <div style={{ display: "grid", gap: 6, justifyItems: "start" }}>
+          <button
+            type="button"
+            className="btn ghost mini nowrapbtn"
+            onClick={draft}
+            disabled={drafting || busy}
+            data-tip="reads the PDF's opening pages and fills the fields above for you to check — saves nothing"
+          >
+            {drafting ? "Reading the PDF…" : "Draft from PDF"}
+          </button>
+          {draftNote ? (
+            <p className="hint" style={{ margin: 0, color: draftNote.kind === "err" ? "var(--red)" : undefined }}>
+              {draftNote.text}
+            </p>
+          ) : (
+            <p className="ghostnote" style={{ margin: 0 }}>
+              Proposes title, author and reference from the reading itself. You review and
+              save; nothing is kept unread.
+            </p>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <button
+            className="btn mini"
+            onClick={saveDetails}
+            disabled={busy || drafting || !title.trim()}
+            data-tip="save these details to your card"
+          >
+            {busy ? "Saving…" : "Save details"}
+          </button>
+          <button
+            className="btn ghost mini"
+            onClick={close}
+            disabled={busy || drafting}
+            data-tip="keep the card as it stands"
+          >
+            Keep as is
+          </button>
+        </div>
       </div>
     )
   }
@@ -341,11 +539,30 @@ function AddOwnReading({ onAdded }: { onAdded: () => void }) {
     <div className="card">
       <h2>A reading of your own</h2>
       <p className="hint">
-        Title and author is enough. It sits on your shelf and nobody else&apos;s; there is
-        no PDF behind it, so you capture its passages by hand on 01 · Open.
+        With the PDF, the reading opens on 00 and you capture from the text itself.
+        Without one — a book, a lecture — the card still stands, and you capture its
+        passages by hand on 01 · Open. It sits on your shelf and nobody else&apos;s.
       </p>
       <div className="form-row">
-        <span className="label">Title</span>
+        <span className="label">PDF File <span style={{ textTransform: "none", letterSpacing: 0 }}>(up to {MAX_READING_LABEL} — optional for a book or lecture)</span></span>
+        <input
+          type="file"
+          accept="application/pdf"
+          disabled={busy}
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
+      </div>
+      {tooBig && (
+        <p className="hint" style={{ margin: "0 0 8px", color: "var(--red)" }}>
+          {formatBytes(file.size)} — over the {MAX_READING_LABEL} limit. Split the
+          chapter, or reduce the scan resolution.
+        </p>
+      )}
+      <div className="form-row">
+        <span className="label">
+          Title{" "}
+          {file ? <span style={{ textTransform: "none", letterSpacing: 0 }}>(defaults to the PDF filename)</span> : null}
+        </span>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Plans and Situated Actions" autoFocus />
       </div>
       <div className="form-row">
@@ -356,11 +573,22 @@ function AddOwnReading({ onAdded }: { onAdded: () => void }) {
         <span className="label">Where it&apos;s from <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span></span>
         <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Cambridge University Press, 1987" />
       </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button className="btn mini" onClick={submit} disabled={!title.trim() || busy}>
-          {busy ? "Adding…" : "Add to my shelf"}
+      <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+        <button
+          className="btn mini"
+          onClick={submit}
+          disabled={busy || tooBig || (!file && !title.trim())}
+          data-tip={
+            file
+              ? "upload the PDF — it's stored, extracted, and lands on your shelf"
+              : "add the card to your shelf — capture its passages by hand"
+          }
+        >
+          {busy ? (progress ?? "Adding…") : "Add to my shelf"}
         </button>
-        <button className="btn ghost mini" onClick={() => setOpen(false)} disabled={busy}>Cancel</button>
+        <button className="btn ghost mini" onClick={() => { reset(); setOpen(false) }} disabled={busy}>
+          Cancel
+        </button>
       </div>
     </div>
   )

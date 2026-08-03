@@ -39,16 +39,28 @@ export default function AuthButton() {
         )}
         <span className="label">{session.user?.name || session.user?.email}</span>
         {isAdmin && <span className="pill beaten">Admin</span>}
-        {isAdmin && !inAdmin && <a href="/admin/aggregate" className="btn ghost mini">Cohort Map</a>}
-        {isAdmin && !inAdmin && <a href="/admin" className="btn ghost mini">Administration</a>}
-        <button className="btn mini" onClick={() => signOut()}>Sign out</button>
+        {isAdmin && !inAdmin && (
+          <a href="/admin/aggregate" className="btn ghost mini" data-tip="the cohort's collective cloth">
+            Cohort Map
+          </a>
+        )}
+        {isAdmin && !inAdmin && (
+          <a href="/admin" className="btn ghost mini" data-tip="roster, readings, and courses">
+            Administration
+          </a>
+        )}
+        {/* Ghost like its row-mates: in this app a solid button marks where
+            you are or the one primary act, and signing out is neither. */}
+        <button className="btn ghost mini" onClick={() => signOut()} data-tip="sign out of Loom">
+          Sign out
+        </button>
       </div>
     )
   }
 
   return (
     <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-      <button className="btn" onClick={() => signIn("github")}>Sign in with GitHub</button>
+      <button className="btn mini" onClick={() => signIn("github")}>Sign in with GitHub</button>
     </div>
   )
 }

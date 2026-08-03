@@ -43,6 +43,36 @@ test("00 · the shelf shows the readings with the student's own tallies", async 
   await expect(tally).not.toHaveText("…", { timeout: 15_000 })
   // The seeded account is not empty: at least one card carries real counts.
   await expect(page.locator(".shelftally", { hasText: /[1-9]/ }).first()).toBeVisible()
+
+  // "A reading of your own" leads with the PDF upload; a book or lecture can
+  // still be carded without one (the title stays required in that case).
+  await page.getByRole("button", { name: "+ a reading of your own" }).click()
+  await expect(page.locator('input[type="file"]')).toBeVisible()
+  await expect(page.getByPlaceholder("Plans and Situated Actions")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Add to my shelf" })).toBeDisabled()
+
+  // The fixed footer must not eat the click: scroll the input into the
+  // footer's own band and click raw coordinates, the way a mouse does —
+  // "Choose file" silently did nothing there until the footer stopped
+  // catching pointer events. (setInputFiles never clicks, so only a real
+  // click catches this class of regression.)
+  const point = await page.evaluate(() => {
+    const input = document.querySelector('input[type="file"]')!
+    const footer = document.querySelector("footer")!
+    const main = document.querySelector("main")!
+    main.scrollTop += input.getBoundingClientRect().top - (footer.getBoundingClientRect().top + 8)
+    const rect = input.getBoundingClientRect()
+    // Clear of the bottom-left corner: the Next dev-tools badge floats there
+    // in dev builds (it appears whenever some resource 404s) and would eat
+    // the click before the input — a different shield than the one under test.
+    return { x: rect.left + Math.min(rect.width - 20, 260), y: rect.top + rect.height / 2 }
+  })
+  const chooser = page.waitForEvent("filechooser", { timeout: 10_000 })
+  await page.mouse.click(point.x, point.y)
+  await chooser
+
+  await page.getByRole("button", { name: "Cancel" }).click()
+  await expect(page.locator('input[type="file"]')).toHaveCount(0)
 })
 
 test("01 · a byte captured by hand lands in the coding log — and cleans up", async ({ page }) => {
@@ -98,7 +128,23 @@ test("02 · pick two, say the sentence, throw the thread, coin a term — then u
 
   // Remove the thread; both concepts stay (they are seeded).
   await thread.locator(".rm", { hasText: "remove" }).click()
+  // The row disappears optimistically while the server delete is still in
+  // flight — and ending the test there closes the browser mid-action,
+  // stranding the thread for the NEXT run (which then finds two and fails).
+  // Hold for deleteEdge's own round-trip — its payload is a bare ["<uuid>"],
+  // unlike createEdge's [{...}] or updateEdge's [id, {...}] — then prove the
+  // delete stuck with a fresh load.
+  const removeCommitted = page.waitForResponse(
+    (res) =>
+      res.request().method() === "POST" &&
+      /^\["[0-9a-f-]{36}"\]$/.test(res.request().postData() ?? "") &&
+      res.ok()
+  )
   await page.getByRole("button", { name: "Remove thread" }).click()
+  await expect(page.locator(".sent", { hasText: "one sustains the other" })).toHaveCount(0, { timeout: 15_000 })
+  await removeCommitted
+  await page.reload()
+  await loomLoaded(page)
   await expect(page.locator(".sent", { hasText: "one sustains the other" })).toHaveCount(0, { timeout: 15_000 })
 })
 

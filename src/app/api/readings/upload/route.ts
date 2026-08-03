@@ -1,7 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client"
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
-import { authOptions, isAdminUser } from "@/lib/auth"
+import { authOptions } from "@/lib/auth"
 import { MAX_READING_BYTES, READING_UPLOAD_PREFIX } from "@/lib/readingUpload"
 
 /**
@@ -16,8 +16,13 @@ import { MAX_READING_BYTES, READING_UPLOAD_PREFIX } from "@/lib/readingUpload"
  * This route hands out write credentials, so it is the security surface of the
  * upload path. Three things hold it closed:
  *
- *   1. Admin session required before any token is generated. An unauthenticated
- *      caller gets a 401 and no token — never a token with a narrower scope.
+ *   1. A signed-in session required before any token is generated — and
+ *      sign-in itself is allowlist-gated, so "signed in" means enrolled or
+ *      admin. An unauthenticated caller gets a 401 and no token — never a
+ *      token with a narrower scope. Admins upload for the shared library;
+ *      learners for readings of their own (registerOwnUploadedReading binds
+ *      those to isOwn and never to a course — what a token holder may RECORD
+ *      is decided there, not here).
  *   2. The token is scoped by the SDK to one pathname, PDFs only, and
  *      MAX_READING_BYTES. The browser cannot widen any of these; the caps are
  *      applied here, server-side, not taken from the client's request.
@@ -30,7 +35,7 @@ import { MAX_READING_BYTES, READING_UPLOAD_PREFIX } from "@/lib/readingUpload"
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const session = await getServerSession(authOptions)
-  if (!session?.user || !isAdminUser(session.user)) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -44,7 +49,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         // Re-check inside the callback rather than trusting the check above to
         // still hold: this is the only place the token is actually issued.
         const current = await getServerSession(authOptions)
-        if (!current?.user || !isAdminUser(current.user)) {
+        if (!current?.user?.id) {
           throw new Error("Unauthorized")
         }
         if (!pathname.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
