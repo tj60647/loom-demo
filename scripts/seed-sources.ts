@@ -66,6 +66,14 @@ const READINGS: {
  * and this repo is public (see storage/readings/.gitkeep). So a fresh clone will
  * not have them, and the failure needs to name the file rather than surface as a
  * bare ENOENT from deep inside the loop.
+ *
+ * Read LAZILY, and that is the whole point: the bytes are needed only to store a
+ * file that is not stored yet. A database that already holds these readings —
+ * CI's, which persists between runs, and any deployment — needs nothing from
+ * disk, so seeding it is a metadata update that should not require copyrighted
+ * files nobody has. Calling this eagerly is what turned the removal of those
+ * PDFs from HEAD into a red `e2e` job the first time that commit reached a
+ * branch CI watches.
  */
 async function readSeedPdf(file: string) {
   const filePath = path.join(process.cwd(), "storage", "readings", file)
@@ -82,7 +90,6 @@ async function readSeedPdf(file: string) {
 
 async function run() {
   for (const reading of READINGS) {
-    const buffer = await readSeedPdf(reading.file)
     const existing = await db
       .select()
       .from(sources)
@@ -93,7 +100,7 @@ async function run() {
 
     if (!source) {
       const storageKey = `${crypto.randomUUID()}.pdf`
-      await readingStorage.put(storageKey, buffer)
+      await readingStorage.put(storageKey, await readSeedPdf(reading.file))
 
       const [inserted] = await db
         .insert(sources)
@@ -124,7 +131,7 @@ async function run() {
 
       if (!hasStoredFile) {
         const storageKey = `${crypto.randomUUID()}.pdf`
-        await readingStorage.put(storageKey, buffer)
+        await readingStorage.put(storageKey, await readSeedPdf(reading.file))
         const [updated] = await db
           .update(sources)
           .set({
@@ -162,8 +169,11 @@ async function run() {
       .where(eq(sourcePages.sourceId, source.id))
       .limit(1)
 
-    if (existingPages.length === 0) {
-      const pages = await extractPdfPageText(buffer)
+    // From the STORED file rather than the local copy: by here the blob is
+    // guaranteed present (just uploaded, or verified above), and it is the file
+    // the app will actually serve — which is what page text has to describe.
+    if (existingPages.length === 0 && source.storageKey) {
+      const pages = await extractPdfPageText(await readingStorage.get(source.storageKey))
       if (pages.length > 0) {
         await db.insert(sourcePages).values(
           pages.map((p) => ({
