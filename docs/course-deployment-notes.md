@@ -89,6 +89,8 @@ Light-touch, from artifacts already collected — used to teach, not to publish:
 
 - **Single source of truth:** TJ's GitHub repo holds the code, this document, and the spec, with a changelog; versions travel by check-in, not email. (JC's v10 committed 7/28; v14 to follow.)
 - **Ratified into production v1:** the reading library (preloaded, standardized "gold" texts approved by HD/JC; students may add papers, with dedupe-and-redirect), in-tool highlights → bytes, and highlight heat maps (subject to the spec's timing red line). OCR quality must be checked before release — several course PDFs are scans.
+
+  *(That check now has a tool: `npm run diagnose:readings` reports every reading's extraction score, names the defect behind a bad one, and says which repair it needs. It is read-only. See [reading-quality.md](reading-quality.md).)*
 - Daily 3 pm PT calls this week to close the spec.
 - **Homework (LX):** take the E-Lab field guide's CAVEAT method and make a loom from a reading; read Novak & Gowin and compare/contrast. JC to gather the field guide and a "paper of record" for axial coding (Glaser ch. 1).
 - **Examples to produce (TJ):** worked examples that show the journey, not just the product — readings → highlights → bytes → threads — including good and bad practice (Goofus & Gallant).

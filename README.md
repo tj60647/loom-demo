@@ -27,11 +27,11 @@ Nothing is auto-generated. The tool only counts your own throws. The structure e
 
 ## The Theory Behind the Tool
 
-Loom is built on foundational ideas from design theory, sociology, and ethnographic coding (see the [concept deck](./docs/presentations/coupled_spaces_deck_v12.pdf) for a deeper dive):
+Loom is built on foundational ideas from design theory, sociology, and ethnographic coding (see the [concept deck](./docs/presentations/coupled_spaces_deck_v12.pdf) for a deeper dive). These three are also the seeded library — the PDFs themselves are not in the repo, since they are published and copyrighted and this repo is public (see [storage/readings/.gitkeep](./storage/readings/.gitkeep)):
 
-- **[Object Worlds (Bucciarelli)](./docs/readings/Bucciarelli-Designing%20Engineers.pdf):** Each discipline inhabits its own world with its own instruments and language. A mechanical engineer might name a connection "is the bottleneck for," while a humanist might say it "betrays" the text. Loom makes these differing worldviews visible and actionable.
-- **[Communities of Practice (Wenger)](./docs/readings/Wenger_communities-of-practice.pdf):** Shared vocabularies are learned by participating in a community, not just by being told. Loom enables a class or team to grow its own shared edge-vocabulary over time by doing the work together.
-- **[Boundary Objects (Star)](./docs/readings/Star,%202010%20'This%20Is%20Not%20A%20Boundary%20Object'.pdf):** How do people from distinct fields coordinate around one shared object without agreeing on exactly what it means? Loom serves as a cross-tongue boundary object—flexible enough to be locally useful, but robust enough to hold a common identity across groups.
+- **Object Worlds (Bucciarelli):** Each discipline inhabits its own world with its own instruments and language. A mechanical engineer might name a connection "is the bottleneck for," while a humanist might say it "betrays" the text. Loom makes these differing worldviews visible and actionable.
+- **Communities of Practice (Wenger):** Shared vocabularies are learned by participating in a community, not just by being told. Loom enables a class or team to grow its own shared edge-vocabulary over time by doing the work together.
+- **Boundary Objects (Star):** How do people from distinct fields coordinate around one shared object without agreeing on exactly what it means? Loom serves as a cross-tongue boundary object—flexible enough to be locally useful, but robust enough to hold a common identity across groups.
 
 ---
 
@@ -44,6 +44,7 @@ Start here:
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — branches, the PR gate (green CI + owner review), tests, local setup.
 - [docs/contracts.md](./docs/contracts.md) — every contract surface: schema, server actions, API routes, export/import formats, invariants.
 - [docs/deployments.md](./docs/deployments.md) — local / dev / production environments, CI secrets, smoke tests.
+- [docs/reading-quality.md](./docs/reading-quality.md) — extraction scoring, defect diagnosis, and which repairs are safe to run.
 - [docs/audit-2026-08-02.md](./docs/audit-2026-08-02.md) — the full journey audit and alpha assessment.
 - Tests: `npm run check`, then `npx playwright test` (see CONTRIBUTING for the Windows/3100 variant and the seeded demo accounts the suite relies on).
 
@@ -66,6 +67,16 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ### Environment
 
 `.env.local` (not committed). Run `vercel env pull` to populate the hosted values.
+
+Two things that will bite. `vercel env pull` writes **`.env.production.local`** unless
+told otherwise, and nothing loads that file by default — scripts read `.env.local`, so
+a run you believe is inspecting production will quietly report on development instead,
+with output similar enough to be believed. Set `LOOM_ENV_FILE=.env.production.local` to
+point them elsewhere; every script that touches library data prints the database it
+actually reached before it says anything about the contents. And Vercel will **not**
+export values for variables marked sensitive — it writes the literal string
+`[SENSITIVE]`, which for `DATABASE_URL` means the file is not usable as-is and the
+connection string has to come from the Neon console.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
@@ -131,7 +142,7 @@ Cover images are rendered from the first page that isn't blank, looking up to fo
 
 Covers render to a fixed **width** (320px), not a fixed scale. Page sizes across one course's readings run from 396×612pt digests to 612×792pt Letter, so a fixed scale produced thumbnails between 144px and 234px wide — all of them narrower than the 140px frame at 2× pixel density, so all of them upscaled and soft. Their aspect ratios still differ (0.65–0.81), so the frame fits the whole page inside itself rather than cropping to fill: a document's cover page loses its margins, and sometimes its title, to a crop.
 
-Because the renderer's output has changed, **rescore also rebuilds the cover** — that is the way to refresh readings uploaded before these changes.
+Because the renderer's output has changed, **rescore re-processes the whole reading** — page text, cover and score together, from the PDF as it stands. Replaying the rubric over stored text could never show the effect of a repaired file, and the old rescore carried the previous cover verdict forward, so a rebuilt cover never moved the score. It refuses on a reading that has highlights: replacing page text moves the substrate their offsets were measured against. See [docs/reading-quality.md](./docs/reading-quality.md).
 
 #### Extraction scoring
 
@@ -140,23 +151,27 @@ Many course PDFs are scans with no usable text layer, which looks identical to a
 | Dimension | Measures | Source |
 | --- | --- | --- |
 | `coverage` | Share of pages with extractable text. | deterministic |
-| `legibility` | Whether the characters read as language at all. | deterministic, refined by judge |
+| `legibility` | Whether the characters read as language, and whether the words are still separated. | deterministic, capped; judge may lower it |
 | `anchorability` | Enough text per page for highlight offsets to hold. | deterministic |
 | `structure` | Whether extraction preserved reading order. | judge only |
 
 The deterministic pass runs at upload from the pages already in memory — no extra queries, no network. The judge runs afterwards via `after()`, so a twenty-file upload doesn't wait on twenty round trips.
 
-**How `legibility` is checked.** Counting junk bytes (U+FFFD, control codes, private-use glyphs) only catches a font map that resolved to *no* character. The more common break resolves to the *wrong* character — ordinary ASCII, zero junk bytes, and unreadable. So the text is also tested for whether it reads as language, on two signals: cosine similarity of its a–z profile against English, and the density of common English words matched as substrings (word boundaries are unreliable, since `extractPdfPageText` joins runs without spaces).
+**How `legibility` is checked.** Counting junk bytes (U+FFFD, control codes, private-use glyphs) only catches a font map that resolved to *no* character. The more common break resolves to the *wrong* character — ordinary ASCII, zero junk bytes, and unreadable. So the text is also tested for whether it reads as language, on two signals: cosine similarity of its a–z profile against English, and the density of common English words matched as substrings. That budget is now spread evenly across the document; it used to be taken from the front, which on a 235-page book meant the first ten pages and nothing else.
 
 The two are weighted differently because they fail differently. A broken letter distribution is strong evidence of mis-mapped characters in any Latin-script language, so it caps hard. Missing English function words alone is weak evidence — French prose, a maths paper, and a bibliography all look like that — so it only caps to "borderline, look at it". A largely non-Latin document caps at 3 with a note saying the check couldn't apply, rather than passing silently. Real readings in this library score ~0.99 similarity and ~50 words/1k, well clear of the 0.85 / 8 thresholds.
 
+Two more things cap `legibility`, and neither is visible to a byte count. A median under 200 characters per page caps at 3 — a page carrying a running header's worth of text extracts cleanly and is useless. And **run-together words** cap it hard: text can be real English in real proportions with the spaces gone, at which point a quoted sentence reads `designismore thanastyle`. That threshold is calibrated against this library — sixteen readings sit at or below 0.4%, the damaged ones run 3% to 30%, and nothing lands in between. The judge cannot overrule it: it sees a few sampled pages, this is a whole-document count, so the same ceiling is re-applied over the judge's answer.
+
 Three invariants worth preserving if you touch this:
 
-- **An unscored dimension abstains.** No key, a judge error, or unparseable output leaves the dimension `null` and the row at `status: "heuristic"` — never a substituted default, which would make "we didn't check" indistinguishable from "we checked and it failed."
-- **The dimensions are not compensatory.** `pass` requires *every* scored dimension to clear 3, not the mean. A PDF whose fonts carry no ToUnicode map scores 5 on coverage and anchorability while being pure mojibake; averaging would call it usable.
+- **An unscored dimension abstains.** No key, a judge error, unparseable output, or too little text all leave the dimension `null` — never a substituted default, which would make "we didn't check" indistinguishable from "we checked and it failed." `legibility` used to be granted a 5 when the language check couldn't run, which is how 693 characters of OCR noise off a diagram scored 5/5/5 and passed.
+- **The dimensions are not compensatory.** `pass` requires *every* scored dimension to clear 3, not the mean, **and** requires `coverage` and `legibility` to have values at all — so `pass` is three-valued, and the card renders the third as "Unverified" rather than as a quiet pass. A PDF whose fonts carry no ToUnicode map scores 5 on coverage and anchorability while being pure mojibake; averaging would call it usable.
 - **A clean byte count is not legibility.** Any future tightening should be tested against text that is *valid characters in the wrong order or the wrong mapping*, not just against mojibake — that's the case a byte-level check cannot see.
 
 The score is advisory. A reading below the bar is flagged "Needs review", never auto-hidden — see red line #7 in the [spec](./docs/loom-spec-v1.md).
+
+What happens *next* — what the defect actually is, which repair it needs, and which repairs are safe to run against a reading students have worked in — is [docs/reading-quality.md](./docs/reading-quality.md).
 
 #### Drafting a reading's metadata
 

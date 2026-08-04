@@ -34,6 +34,7 @@ import {
   concepts, bytes, edges, reads, maps, views, graphEvents,
 } from "../src/db/schema"
 import { eq, asc, ilike, isNotNull, and } from "drizzle-orm"
+import { textLayerProjection } from "../src/lib/pdfText"
 
 const DEMO_DOMAIN = "@loom.local"
 const USER_A = { email: "test-user-a@loom.local", name: "Test User A" }
@@ -52,7 +53,11 @@ function pickPassage(pages: PageRow[], fromPage: number, skip = 0):
   { content: string; pageNumber: number; startOffset: number; endOffset: number; pageContentHash: string } {
   const re = /[A-Z][^.?!]{120,420}[.?!]/g
   for (const page of pages.filter((p) => p.pageNumber >= fromPage)) {
-    const found = [...page.textContent.matchAll(re)]
+    // Offsets on a byte index the browser's text layer, not the stored page
+    // text — the two differ by the line boundaries extractPdfPageText records.
+    // Matching against the stored text would mint offsets that are correct for
+    // no string anyone ever reads.
+    const found = [...textLayerProjection(page.textContent).matchAll(re)]
     if (found.length > skip) {
       const m = found[skip]
       return {

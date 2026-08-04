@@ -113,6 +113,34 @@
       "when": 1785790823463,
       "tag": "0015_source_category",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1785877223463,
+      "tag": "0016_source_foreign_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785963623463,
+      "tag": "0017_source_repairs",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786050023463,
+      "tag": "0018_repair_costs",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786136423463,
+      "tag": "0019_repair_votes",
+      "breakpoints": true
     }
   ]
 }

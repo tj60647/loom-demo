@@ -11,6 +11,8 @@ import { scopeFromKey, scopeOf } from "@/lib/scope"
 import type { CardTableView, GraphEvent, LoomMap, LoomViews, Tier } from "@/lib/types"
 import type { ParsedImport, ParsedMapImport } from "@/lib/graphExport"
 import { WORKED_EXAMPLE, WORKED_EXAMPLE_SOURCE } from "@/lib/example"
+import { textLayerProjection } from "@/lib/pdfText"
+import { authorizeSourceAccess } from "@/actions/sources"
 
 async function getUserId() {
   const session = await getServerSession(authOptions)
@@ -331,7 +333,22 @@ export async function createByte(data: { conceptId: string, source: string, sour
     const page = rows[0]
 
     if (page) {
-      const canonicalIndex = findClosestTextIndex(page.textContent, data.content, data.startOffset)
+      // Search the browser's string, not the stored one. `data.content` is a
+      // selection taken off the rendered text layer, so it can only ever be
+      // found in the text as the browser assembled it — stored page text now
+      // also carries the line boundaries pdf.js marks, which appear nowhere in
+      // a client capture.
+      //
+      // This was already the shape of a live bug: `content` comes from
+      // `selection.toString()`, which carries a newline per rendered line,
+      // while the offsets beside it come from `range.toString()`, which does
+      // not. Every multi-line capture therefore failed this lookup and fell
+      // through to the client-offset branch below.
+      const canonicalIndex = findClosestTextIndex(
+        textLayerProjection(page.textContent),
+        data.content,
+        data.startOffset
+      )
       const clientTextMatchesCanonical = !data.pageContentHash || data.pageContentHash === page.contentHash
 
       if (canonicalIndex !== -1 && clientTextMatchesCanonical) {
@@ -428,8 +445,12 @@ export async function attributeBytes(byteIds: string[], sourceId: string) {
   const courseId = await resolveActiveCourseId(userId)
   if (!byteIds.length) return 0
 
-  const known = await db.select({ id: sources.id }).from(sources).where(eq(sources.id, sourceId)).limit(1)
-  if (!known.length) throw new Error("That reading is not among your readings.")
+  // Not merely "does this id exist" — that admitted any reading in the
+  // library, including another student's private upload, letting one learner
+  // file their passages against a reading they were never entitled to see and
+  // pulling that reading's title into their own graph and exports. The check is
+  // the same one that guards the file itself.
+  await authorizeSourceAccess(sourceId)
 
   const updated = await db.update(bytes).set({ sourceId })
     .where(and(

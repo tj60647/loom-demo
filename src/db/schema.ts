@@ -177,6 +177,10 @@ export const sources = pgTable(
     sourceReference: text("sourceReference").default(""),
     description: text("description").default(""),
     isDescriptionVisible: boolean("isDescriptionVisible").default(true).notNull(),
+    // Which kind of text this is — a history or a theory reading. Part of the
+    // shared card, like author and description: the same reading is not history
+    // in one course and theory in another. '' = not yet categorised.
+    category: text("category").$type<"" | "history" | "theory">().default("").notNull(),
     metadataProvenance: text("metadataProvenance").default(""),
     // Retires a reading from the shared library without deleting the file or
     // disturbing courses that already include it.
@@ -293,6 +297,112 @@ export const sourceScores = pgTable("source_score", {
   judgeModel: text("judgeModel"),
   metrics: jsonb("metrics").$type<ExtractionMetrics>(),
   scoredAt: timestamp("scoredAt").defaultNow().notNull(),
+})
+
+/**
+ * A damaged region of a reading, and the proposals for repairing it.
+ *
+ * Scan damage is local — a mis-read column, a sideways caption — so the unit is
+ * a region on a page, not the reading. Each row is a PROPOSAL until an admin
+ * accepts it: the pipeline that produces them writes nothing to the reading
+ * itself, and `appliedAt` is the only thing that says a repair reached a student.
+ *
+ * Transcription is the one step here that cannot be reproduced. The same crop
+ * read again gives a different reading, so the record is what makes the process
+ * accountable rather than the ability to re-derive it — which is why the
+ * accepted text, who accepted it, and the readings it came from are all stored
+ * rather than recomputed.
+ */
+export const sourceRepairs = pgTable("source_repair", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  sourceId: text("sourceId")
+    .notNull()
+    .references(() => sources.id, { onDelete: "cascade" }),
+  pageNumber: integer("pageNumber").notNull(),
+  /**
+   * The storageKey this damage was measured against. A decision is only valid
+   * for the file it was made about — if the reading's PDF is replaced, older
+   * proposals no longer describe it.
+   */
+  measuredAgainstKey: text("measuredAgainstKey").notNull(),
+  /** Region box in rendered pixels, with the scale it was measured at. */
+  region: jsonb("region").$type<{ x: number; y: number; width: number; height: number; scale: number }>().notNull(),
+  /** Blob key of the cropped image an admin reviews. */
+  cropKey: text("cropKey").notNull(),
+  /** What the PDF extracts here now, and the words that are not words. */
+  currentText: text("currentText").default("").notNull(),
+  garbledWords: jsonb("garbledWords").$type<string[]>().default([]).notNull(),
+  garbleRate: real("garbleRate"),
+  /**
+   * proposed  — readings gathered, awaiting an admin
+   * accepted  — an admin approved text; not yet written into a PDF
+   * rejected  — an admin declined; kept so it is not re-proposed forever
+   * applied   — written into a new revision of the reading
+   */
+  status: text("status").$type<"proposed" | "accepted" | "rejected" | "applied">().default("proposed").notNull(),
+  /** Text every reader agreed on, before any human edit. */
+  agreedText: text("agreedText").default("").notNull(),
+  /** Passages the readers differed on — where a reviewer's attention belongs. */
+  disagreements: jsonb("disagreements").$type<{ passage: string; readings: string[] }[]>().default([]).notNull(),
+  /**
+   * How the vote went: how many readers, what carried a sentence, how the
+   * backing was distributed, and how often each reader was with the majority.
+   *
+   * Kept because it is the only way to tell a panel that is working from one
+   * that is expensive. A reader consistently outvoted is a reader to replace,
+   * and that is invisible in the accepted text.
+   */
+  votes: jsonb("votes").$type<{
+    readers: number
+    majority: number
+    distinctSentences: number
+    distribution: number[]
+    perReader: { reader: number; withMajority: number; outvoted: number; solo: number; agreementRate: number }[]
+  }>(),
+  /** What the admin actually approved, which may be their own correction. */
+  acceptedText: text("acceptedText"),
+  acceptedByUserId: text("acceptedByUserId").references(() => users.id, { onDelete: "set null" }),
+  acceptedAt: timestamp("acceptedAt"),
+  /** Why, when an admin rejects or overrides — the record is the point. */
+  reviewNote: text("reviewNote").default("").notNull(),
+  appliedAt: timestamp("appliedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+})
+
+/**
+ * One model's independent reading of a damaged region.
+ *
+ * Kept per reader rather than merged, because agreement is the signal and
+ * agreement cannot be recovered from an average. Measured on a real page: three
+ * readers transcribed a truncated caption as "from Sadda" and refused to guess
+ * while a fourth completed it to "from Saddam" — a merged result would have
+ * hidden exactly the disagreement worth seeing.
+ */
+export const sourceRepairReadings = pgTable("source_repair_reading", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  repairId: text("repairId")
+    .notNull()
+    .references(() => sourceRepairs.id, { onDelete: "cascade" }),
+  model: text("model").notNull(),
+  /** Which of the independent readers this was, 1-based. */
+  reader: integer("reader").notNull(),
+  text: text("text").default("").notNull(),
+  /** Passages the reader itself flagged as unsure — honesty, recorded. */
+  uncertain: jsonb("uncertain").$type<string[]>().default([]).notNull(),
+  illegibleShare: text("illegibleShare").$type<"none" | "some" | "much" | "most">(),
+  /**
+   * What this reading actually cost, as OpenRouter reported it — not derived
+   * from a price table, which would go stale silently. Null when the API did
+   * not report a figure, which is not the same as free.
+   */
+  promptTokens: integer("promptTokens"),
+  completionTokens: integer("completionTokens"),
+  costUsd: real("costUsd"),
+  /** How long the model took. Slow readers are worth seeing next to their cost. */
+  durationMs: integer("durationMs"),
+  /** The model ran out of room; kept as a record, excluded from the vote. */
+  truncated: boolean("truncated").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
 })
 
 // --- LOOM TABLES ---

@@ -463,3 +463,54 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    fully rounded so the destructive act is unmistakably not just another
    button. */
 .btn.pillbtn{border-radius:999px;color:var(--red);border-color:var(--red)}
+/* A two-named choice — core or supplemental — wears both names as pills, so
+   the road not taken is legible without ticking anything. The pill shape is
+   borrowed from the row's status pills on purpose: this control sets exactly
+   the pill it looks like. */
+.radiorow{display:flex;flex-wrap:wrap;gap:8px}
+.radiopick{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);background:#fff;
+  border:1px solid var(--rule);border-radius:999px;padding:6px 12px;cursor:pointer}
+.radiopick:hover{border-color:var(--sage)}
+.radiopick input{margin:0;accent-color:var(--sage);cursor:pointer}
+/* :has keeps the checked skin on the label without a client component; the
+   :focus-within ring is the keyboard's only sign the pill is live. */
+.radiopick:has(input:checked){color:var(--sage);border-color:var(--sage);background:rgba(111,125,92,.08)}
+.radiopick:has(input:focus-visible){outline:2px solid var(--sage);outline-offset:2px}
+
+/* --- Repair review (admin) ---------------------------------------------- */
+/* The crop stays beside the text while a reviewer reads: the one question they
+   can answer that no measurement can is whether the transcription matches the
+   page, and that needs both in view at once. */
+.repair-panel { display: grid; gap: 14px; margin-top: 10px; }
+.repair-region { border-top: 1px solid var(--rule, #ddd8cc); padding-top: 12px; }
+.repair-region h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14px; }
+.repair-split { display: grid; grid-template-columns: minmax(200px, 34%) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .repair-split { grid-template-columns: 1fr; } }
+.repair-split figure { margin: 0; position: sticky; top: 12px; }
+.repair-split img { max-width: 100%; border: 1px solid var(--rule, #ccc6b8); background: #fff; }
+.repair-panel pre {
+  white-space: pre-wrap; word-break: break-word; font: 12px/1.5 var(--mono, monospace);
+  background: #fff; border: 1px solid var(--rule, #e3ddd0); padding: 8px; margin: 4px 0;
+  max-height: 240px; overflow: auto;
+}
+.repair-damaged { border-color: #e0c3c3 !important; background: #fdf6f6 !important; }
+.repair-panel textarea { width: 100%; font: 12px/1.5 var(--mono, monospace); }
+.repair-disagreements { margin: 4px 0 10px; padding-left: 16px; font-size: 13px; }
+.repair-disagreements > li { margin-bottom: 8px; }
+.repair-passage { font-weight: 600; }
+.repair-disagreements ul { padding-left: 14px; font: 12px/1.45 var(--mono, monospace); color: #4a4a4a; }
+.repair-error { color: var(--red); font-size: 13px; }
+/* A refusal and a result read the same way — both are the panel telling you
+   what it did — so they sit in the same place and differ only in colour. */
+.repair-notice { color: var(--sage); font-size: 13px; }
+/* Costs per reader, not just a total: a total hides the reader that spends most
+   of the money for none of the quality. */
+.repair-costs { width: 100%; border-collapse: collapse; font: 11.5px/1.4 var(--mono, monospace); margin: 8px 0; }
+.repair-costs th, .repair-costs td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--rule, #eee7d9); }
+.repair-costs th:first-child, .repair-costs td:first-child { text-align: left; }
+.repair-costs thead th { color: #7a7a7a; font-weight: normal; text-transform: uppercase; letter-spacing: .05em; }
+.repair-costs-total td { font-weight: 600; border-bottom: none; }
+.pill.repair-accepted { color: var(--sage); border-color: var(--sage); }
+.pill.repair-applied { color: var(--sage); border-color: var(--sage); }
+.pill.repair-rejected { color: var(--red); border-color: var(--red); }

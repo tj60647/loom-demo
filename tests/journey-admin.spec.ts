@@ -71,11 +71,25 @@ test("courses: schedule controls render for the course's readings", async ({ pag
   await expect(firstCourse.locator("summary.pillbtn", { hasText: "Delete" })).toBeVisible()
 
   // Each reading row shows its Week/Core/Visible pills; the week+position form
-  // sits behind the "schedule" disclosure.
+  // sits behind the "Schedule" disclosure.
   await expect(page.locator(".pill", { hasText: /Week \d+|Unscheduled/ }).first()).toBeVisible({ timeout: 15_000 })
-  await page.locator("summary", { hasText: "schedule" }).first().click()
-  await expect(page.locator("input[name=week]").first()).toBeVisible()
-  await expect(page.locator("input[name=position]").first()).toBeVisible()
+
+  // The reading's three tools are one uniform set — Schedule and Hide as plain
+  // buttons, Remove as the red pill — not a mix of link-sized words.
+  const readingRow = page
+    .locator(".lrow", { has: page.locator("summary", { hasText: "Schedule" }) })
+    .first()
+  await expect(readingRow.locator("summary.btn.mini", { hasText: "Schedule" })).toBeVisible()
+  await expect(readingRow.locator("button.btn.mini", { hasText: /Hide|Reveal/ })).toBeVisible()
+  await expect(readingRow.locator("button.btn.pillbtn", { hasText: "Remove from Course" })).toBeVisible()
+
+  await readingRow.locator("summary", { hasText: "Schedule" }).click()
+  await expect(readingRow.locator("input[name=week]")).toBeVisible()
+  await expect(readingRow.locator("input[name=position]")).toBeVisible()
+  // Core/supplemental is a radio pair, so the unchosen name is on screen too,
+  // and exactly one of them is always chosen.
+  await expect(readingRow.locator(".radiopick input[name=isCore]")).toHaveCount(2)
+  await expect(readingRow.locator("input[name=isCore]:checked")).toHaveCount(1)
 })
 
 test("the cohort map renders the section's woven concepts", async ({ page }) => {

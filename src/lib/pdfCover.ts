@@ -1,6 +1,5 @@
-import path from "path"
-import { pathToFileURL } from "url"
 import { createCanvas } from "@napi-rs/canvas"
+import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
 
 /**
  * Covers render to a fixed WIDTH rather than a fixed scale.
@@ -46,30 +45,14 @@ export function getSourceCoverKey(sourceId: string) {
 }
 
 export async function renderPdfCoverImage(data: Buffer): Promise<Buffer> {
-  const pdfjsPath = path.join(
-    process.cwd(),
-    "node_modules/pdfjs-dist/legacy/build/pdf.mjs"
-  )
-  const pdfjsWasmPath = path.join(
-    process.cwd(),
-    "node_modules/pdfjs-dist/wasm/"
-  )
-  const pdfjsUrl = pathToFileURL(pdfjsPath).href
-  const pdfjsWasmUrl = pathToFileURL(pdfjsWasmPath).href
-  const pdfjsLib = await import(/* webpackIgnore: true */ pdfjsUrl)
-
-  // See the note in pdfText.ts: pdf.js loads its worker module even in Node,
-  // and the path it derives on its own is what fails once bundled.
-  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(
-    path.join(process.cwd(), "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs")
-  ).href
+  const pdfjsLib = await loadPdfjs()
 
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(data),
     useWorkerFetch: false,
     isEvalSupported: false,
     useSystemFonts: true,
-    wasmUrl: pdfjsWasmUrl,
+    wasmUrl: pdfjsWasmUrl(),
     useWasm: false,
   })
   const doc = await loadingTask.promise
@@ -103,12 +86,6 @@ export async function renderPdfCoverImage(data: Buffer): Promise<Buffer> {
       `First ${lastPage} page${lastPage === 1 ? "" : "s"} rendered blank — no cover image`
     )
   } finally {
-    if (typeof (doc as { destroy?: () => Promise<void> }).destroy === "function") {
-      await (doc as { destroy: () => Promise<void> }).destroy()
-    } else if (
-      typeof (loadingTask as { destroy?: () => Promise<void> }).destroy === "function"
-    ) {
-      await (loadingTask as { destroy: () => Promise<void> }).destroy()
-    }
+    await destroyPdf(doc, loadingTask)
   }
 }

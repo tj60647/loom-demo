@@ -1,5 +1,269 @@
 # Next Session Prompt
 
+## Start here
+
+`RepairPanel` is mounted and the loop **has been run end to end through the UI**
+— detect → read → review → accept → apply, on *Design as Critique* page 9, with
+the repaired revision written to blob and re-ingested. What that turned up is in
+the evening addendum immediately below; it was none of the three things this
+file predicted.
+
+**The next open item is the one that has been at the top of the list for two
+sessions: the spec is behind the build** (open item 2 under "Open items"). It
+blocks the freeze, and nothing in the repair subsystem stands in its way.
+
+## Addendum, 2026-08-04 evening (the repair loop, run for the first time)
+
+**Read this before the morning addendum below; it corrects part of it.**
+
+`npm run check` green. Uncommitted on `chore/alpha-foundation`.
+
+### The panel is mounted
+
+`/admin/library` — a **Repair Text** disclosure in each reading's action row,
+next to Rescore, because rescore re-measures and this fixes. The summary says
+where the reading is in the loop (`· 2 to review`, `· 1 to write`) so an admin
+does not open eleven panels to find the one with a decision waiting. The page
+fetches full proposal rows only for readings that have any, from one grouped
+count (`getRepairSummary`), and passes each reading's `byte` count as
+`hasHighlights`. `maxDuration = 300` is set on the page, which is what lets a
+synchronous single-region read survive a serverless round trip.
+
+**The panel had no Apply button** — `applyRepairs` existed and nothing called
+it. Added, along with the result lines each act now reports.
+
+### What the run cost and produced
+
+Page 9, one region, **68s and $0.20**, 4 of 5 readers answering. Opus 5 took
+66s and **$0.15 of the $0.20 — 77% of the spend** — and returned 2,097
+characters against Grok's 7,561, because on the small type it wrote *commentary*
+(`[two columns of body text, type too small to read reliably…]`) instead of
+transcribing. That is the same shape as the reader the panel was built to
+expose, now visible in the cost table rather than argued about.
+
+`qwen/qwen3.8-max` did not answer. Measured directly afterwards: it returns
+**HTTP 200 with an empty body after 184s**. Open item 2 is still TJ's call; the
+timeout below stops it hanging a request either way.
+
+### Four bugs, each found by running the thing
+
+1. **The improvement guard passed a page deletion.** `applyRepairs` refuses a
+   repair that "does not measure better" by comparing `garbledPageRate` — but a
+   page with almost no text left is not *measurable*, so emptying a damaged page
+   drops it out of both numerator and denominator and the rate falls. Measured:
+   replacing page 2's 2,290 characters with the single word accepted for it
+   moved the rate 0.750 → 0.727 and the guard **kept it**. Deleting a page read
+   as repairing it. Now guarded per page, before the rate is consulted.
+
+2. **The unit of repair was wrong.** `textLayerRepair` cannot edit a PDF's text
+   operators in place, so it rasterises the page and lays a fresh text layer over
+   it from the accepted transcription *and nothing else*. Sub-region crops
+   therefore repair one paragraph by deleting the rest of the page — page 9 was
+   proposed as **five** boxes, and applying them would have replaced 1,485
+   characters with whatever those five held. The unit is now the page.
+   `locateGarbleRegions` is deleted; `locatePageRepairRegion` replaces it.
+
+3. **Detection measured the database; apply measured the file.** Detection read
+   `source_page`, whose rows are a cache. On *Design as Critique* those rows were
+   **stale**: nine pages of fused words (`oneofthe`,
+   `mostinterestinguses`) where the same pages extracted from the blob read
+   `For us, one of` at a 1–2% rate. Detection reported nine damaged pages on a
+   reading that has one. Both halves now extract the file. *(This corrects the
+   "lost spaces" reading of those pages — the file never had that defect; the
+   rows did. The lost-space case is real and still reported as `unlocatable`,
+   it just was not what was happening here.)*
+
+4. **`REQUEST_TIMEOUT_MS` was `30`, not `30_000`** — 30 milliseconds, changed in
+   83eab85. Every judge call aborted before a TLS handshake could finish, so
+   **the judge had silently stopped running**: `structure` abstaining and
+   `legibility` unrefined on every Rescore since. Verified by a live call failing
+   at 35ms with `TimeoutError`, and verified fixed (3.5s, "OK").
+   `VISION_TIMEOUT_MS` was `120_000_000` — 33 hours — where the comment says 120
+   seconds; now 240s, above the slowest observed reading and under the page's
+   `maxDuration`.
+
+Also: expected refusals are now **return values, not throws** (Next redacts
+thrown Server Function messages in production, and every refusal here is a
+sentence someone has to read); crops are capped at 2,560px on the long edge,
+because the readers downscale past ~2,576 and a 300dpi page was 3.7MB of base64
+sent five times for pixels nobody saw; and region boxes are whole pixels, since
+they become a canvas.
+
+### Verified, not assumed
+
+- *Design as Critique*: 1 damaged page before, **0 after**; page 9 replaced,
+  every other page byte-identical in extraction (same chars, words, item
+  counts) — the pdf-lib round trip changed nothing it was not asked to.
+- *Learning How to Learn*: detection finds **p56** (75%, the sideways concept
+  map — `peuosiad`, `paionnsuoo`), plus p57 and p58; its one highlight
+  correctly renders the refusal notice.
+- The crop route's auth was **fine** — no 4xx across any run.
+
+### Worth knowing before touching this again
+
+- **26% of page 9's sentences carried a majority.** 92 disagreements, 105 of 124
+  distinct sentences backed by one reader alone. That is a photographed
+  newspaper in dense columns and it may be the honest ceiling for such a page —
+  but it means the *agreed* text alone (325 characters) can never pass the
+  page-coverage guard, and a reviewer must compose from the readers. That is
+  what the panel is for, but nobody had seen how much composing it takes.
+- **`acceptedTextMatchesReadings` cannot catch a reader's own commentary** — it
+  checks the text came off the page, and Opus's bracketed notes *are* a reader's
+  words. Documented as a limit; now observed. The accepted text was checked and
+  carries none.
+
+## Addendum, 2026-08-04 morning (extraction, anchoring and repair session)
+
+**Read this first; it supersedes parts of what follows.**
+
+Branch `chore/alpha-foundation`, uncommitted. `npm run check` is green and now
+runs lint, tsc, and two assertion scripts (`check:remap`, `check:scoring`).
+`npm run check:textlayer` needs real PDFs and is run by hand.
+
+### Landed in production (both databases migrated)
+
+- **Migration 0016** — the `source_page` and `byte` foreign keys that
+  `schema.ts` had declared since 0000 and that existed in **no** database.
+  `deleteSource` had been relying on a cascade that was not there; 15 orphaned
+  page rows were cleared from each environment. Plus indexes on `byte.sourceId`
+  and `source_page(sourceId, pageNumber)`.
+- **Migrations 0017 / 0018 / 0019** — `source_repair` and
+  `source_repair_reading`, with per-reading token, cost and duration accounting,
+  and the vote record for each region.
+- **All 23 readings re-extracted.** The canonical text join changed (below), so
+  every `source_page` row was rewritten. **23/23 highlight anchors survived** —
+  verified, not assumed.
+
+### The join fix, and why it mattered
+
+`extractPdfPageText` joined pdf.js text items with `""`, discarding every line
+boundary pdf.js had already computed. Consequence, measured against real
+Postgres: `CraftBuilding` tokenises to `craftbuild`, matching neither `craft`
+nor `building`, and **58–77% of line ends in this library fused two words**.
+Reading search was silently missing them.
+
+Stored text now records the boundaries; `textLayerProjection()` strips them back
+out to recover **the browser's** text-layer string, which is where every
+`startOffset`/`endOffset` actually lives — not the stored column. Anything
+reconciling a client capture against stored page text must go through it.
+`scripts/check-text-layer-projection.ts` asserts the round trip (42/42 pages
+exact). Result: **+321 page-hits across ten common terms**, and the search index
+shed ~26,600 junk tokens (42,940 → 16,333).
+
+The warning that used to head `pdfText.ts` — "changing any of it silently moves
+every existing anchor" — was **wrong**, and is corrected in place.
+
+### Scoring, substantially reworked
+
+Every change came from a measurement that contradicted the previous rule:
+
+- `coverage` counted **all** pages, so a thesis of diagrams was penalised for
+  being illustrated. It now counts pages that were supposed to carry text —
+  `pdfStructure.ts` classifies each as `text` / `scanned` / `picture` / `blank`
+  from a row-band profile (text bands at 5.0–8.9 per 100 rows, pictures at
+  0.0–0.8; a six-fold gap with nothing between).
+- `anchorability` was "at least 300 characters per page" — a proxy for whether a
+  highlight holds that **never tested whether a highlight holds**. It now
+  simulates captures (`highlightProbe.ts`) at 30/80/200 characters, sizes drawn
+  from the real capture distribution where the shortest byte is 27 characters.
+  Both readings that were failing on it anchor **100%** of simulated highlights.
+- All character floors are gone. `PAGE_TEXT_FLOOR` stood in for "is this content
+  or a running header", answered with length; repetition answers it properly,
+  and catches the SAGE-watermark case the 120-character floor *admitted* (the
+  stamp runs to ~159 characters).
+- `legibility` used to be granted a **5** when there was too little text to run
+  the language check — 693 characters of OCR noise scored 5/5/5 and passed. It
+  now abstains, `pass` is three-valued, and the card shows "Unverified".
+- The judge prompt was **telling the model to forgive** run-together words, the
+  defect that matters most for quoting. Fixed. The judge can also no longer
+  raise legibility past the measured ceiling, and a bug where the raw verdict
+  was stored while the capped value drove `pass` is fixed.
+
+### Gibberish detection and repair (new subsystem)
+
+`garble.ts` finds scan-induced nonsense every aggregate misses — the characters
+are valid, the letter distribution is perfect, and the page reads
+`ihe feacier refigian haa`. Two restrictions make it honest: only **lowercase**
+tokens count (proper nouns are capitalised, so bibliographies stop
+false-alarming), and a page needs enough body words for the rate to mean
+anything. Clean pages measure 1–2%; broken ones 30–81%.
+
+`garbleRegion.ts` locates damage to a pixel box from the text layer, so crops
+are exact rather than guessed. `repairPipeline.ts` sends the crop to five
+independent frontier models. `repairConsensus.ts` computes agreement
+**mechanically** — an adjudicator agent once returned a paragraph *describing*
+the agreement, which was written into a PDF and improved every automatic measure
+while being unrelated to the page. Agreement is by **majority**, not unanimity,
+and the vote is recorded per reader: with-majority, outvoted, and *solo* counts.
+Solo is the invention detector — `"from Saddam"` where three readers wrote
+`"from Sadda"` shows as solo=1. Deciding a vote is exact (so `religions` and
+`televisions` never merge); grouping the losers for display is fuzzy (so a
+reviewer sees both variants of a disputed passage together).
+
+`textLayerRepair.ts` writes an accepted transcription back as a replaced page. `src/actions/repairs.ts` and
+`components/library/RepairPanel.tsx` are the admin surface.
+
+### Open decisions — TJ's, not the next session's
+
+1. ~~**Mount `RepairPanel`**~~ — done, and the loop has been run. See the
+   evening addendum.
+2. **`qwen/qwen3.8-max`** took 210 seconds when this was written, and on the
+   run of 8/4 evening returned **HTTP 200 with an empty body after 184s** — so
+   it is currently costing a reader slot and contributing nothing. Either it
+   goes, or transcription moves fully behind `after()`. A 240s per-reader
+   timeout now stops it hanging a request, which makes this a question about
+   panel quality rather than about uptime.
+3. **The panel is five readers** — Opus 5, Qwen3.8 Max, Gemini 3.6 Flash,
+   Grok 4.5, Inkling Small. Odd on purpose: a majority cannot tie.
+4. **Majority voting is in, with per-reader stats** (item 2 is what to spend
+   them on). Nothing to decide unless the stats show a reader worth replacing —
+   watch the `solo` column, which is where invention shows up. **First real
+   numbers, page 9:** agreement 29% / 33% / 12% / 9% (Opus 5, Gemini, Grok,
+   Inkling), solo counts 10 / 11 / 41 / 43. Read them as a property of the page
+   before a property of the readers — a dense newspaper photograph is the
+   hardest thing in this library — but Opus 5 spent 77% of the region's money
+   for the shortest transcription of the four, which is the pattern this column
+   exists to make visible.
+5. **Upload gate** — spec line 139 says scoring is "advisory, not blocking".
+   TJ's stated goal makes a gate unnecessary: a bad score means *source a better
+   copy*, not *block*. Treat as decided against unless TJ reopens it.
+6. **Git history** still holds the copyrighted seed PDFs. They are out of HEAD
+   and gitignored. A purge needs `git filter-repo`, a force-push across six
+   branches, and a GitHub Support request — the rewrite alone does **not**
+   remove them. TJ chose to skip; not urgent, not closed.
+7. **`tesseract.js` is installed and unused.** Measured as unnecessary here:
+   every "scanned" page in this library is a cover, a blank leaf or a figure.
+   Drop it unless a future upload needs it.
+
+### Facts worth not re-deriving
+
+- **`.env.local` is what every script reads.** `vercel env pull` writes
+  `.env.production.local`, which nothing loads by default, and Vercel returns
+  the literal string `[SENSITIVE]` for `DATABASE_URL` and five other variables —
+  a pulled production file is **not usable as-is**. Use `LOOM_ENV_FILE`, and
+  read the `database:` line every script now prints. PowerShell has no inline
+  env prefix: `$env:LOOM_ENV_FILE = '.env.production.local'`.
+- **Red line #6 is about students not outsourcing their thinking**, not about
+  faculty preparing source material (TJ, 2026-08-04). Faculty-facing repair is
+  not gated by it.
+- **What text matters in a reading is not the tool's call.** A figure's labels
+  and a reproduced newspaper are content a student may code.
+- **The registry MCP is the authority on models.** Three things are not
+  inferable from a model name, and all three would have shipped broken: image
+  *generators* (`->text+image`) masquerading as vision models; `temperature`
+  rejected by reasoning models; and `max_tokens` vs `max_completion_tokens`.
+  Sorting by price is not sorting by recency.
+- **Costs come from OpenRouter's `usage` reporting**, never a price table in
+  this repo. Measured panel cost is **$0.18 per region**; the first estimate was
+  50× low.
+- **The two known-damaged pages** for testing: *Design as Critique* p9 (a
+  photographed spoof newspaper) and *Learning How to Learn* p56 (a hand-drawn
+  concept map printed sideways). Non-LLM rungs — rotation-aware re-OCR at
+  400dpi — were measured and **fail on both**.
+
+---
+
+
 You are continuing work on Loom after the journey build of 2026-08-01 (which
 followed the multiple-maps build of 07-31 and the reading-first pass of 07-30/31).
 

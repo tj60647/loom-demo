@@ -11,10 +11,14 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck",
+    "check": "npm run lint && npm run typecheck && npm run check:remap && npm run check:scoring",
     "seed:sources": "tsx scripts/seed-sources.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
-    "migrate:blob": "tsx scripts/migrate-storage-to-blob.ts"
+    "check:remap": "tsx scripts/check-offset-remap.ts",
+    "check:textlayer": "tsx scripts/check-text-layer-projection.ts",
+    "diagnose:readings": "tsx scripts/diagnose-readings.ts",
+    "reingest:readings": "tsx scripts/reingest-readings.ts",
+    "check:scoring": "tsx scripts/check-scoring.ts"
   },
   "dependencies": {
     "@auth/core": "^0.34.3",
@@ -23,15 +27,18 @@
     "@neondatabase/serverless": "^1.1.0",
     "@types/mark.js": "^8.11.12",
     "@vercel/blob": "^2.5.0",
+    "an-array-of-english-words": "^2.0.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "mark.js": "^8.11.1",
     "next": "16.2.9",
     "next-auth": "^4.24.14",
-    "pdfjs-dist": "^6.1.200",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "6.1.200",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "react-pdf": "^10.4.1"
+    "react-pdf": "10.4.1",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

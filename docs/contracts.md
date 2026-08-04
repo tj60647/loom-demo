@@ -4,8 +4,9 @@ The complete inventory of every surface a caller can rely on: database schema, s
 actions, API routes, export/import file formats, and the invariants the code enforces.
 Companion to [loom-spec-v1.md](loom-spec-v1.md) (the *why*); this is the *what, exactly*.
 
-**As of:** master `9abbdd7`, 2026-08-02. Line numbers cite that commit and will drift;
-names and shapes are the contract, line numbers are a courtesy.
+**As of:** `chore/alpha-foundation`, 2026-08-03 — the extraction and anchoring pass.
+Re-stamp when it reaches master. Line numbers cite that branch and will drift; names
+and shapes are the contract, line numbers are a courtesy.
 
 Conventions used below:
 
@@ -21,8 +22,12 @@ Conventions used below:
 
 ## 1. Database schema — [src/db/schema.ts](../src/db/schema.ts)
 
-Migrations `drizzle/0000`–`0014`, applied via `drizzle-kit migrate`
-(`drizzle.__drizzle_migrations` is the record of truth).
+Migrations `drizzle/0000`–`0016`, applied via `drizzle-kit migrate`.
+`drizzle.__drizzle_migrations` records which migrations *ran*, which is not the same
+as what the database is *shaped* like: `scripts/apply-db-compat.ts` bootstraps tables
+directly, and the `source_page` it creates has never carried the foreign key
+`schema.ts` declared from 0000. That is what 0016 is for — it adds that key and
+`byte`'s, after deleting the orphans the missing constraint had been accumulating.
 
 ### 1a. Auth (NextAuth v4, database sessions)
 
@@ -49,8 +54,9 @@ Migrations `drizzle/0000`–`0014`, applied via `drizzle-kit migrate`
 | --- | --- | --- |
 | `source` | id · title · author `''` · sourceReference `''` · description `''` · isDescriptionVisible true · metadataProvenance `''` · isArchived false · **storageKey nullable** · **isOwn false** · createdByUserId SET NULL · createdAt | `storageKey NULL` = reference-only card (no PDF). `isOwn` = student-minted, visible on that student's shelf only |
 | `course_source` | courseId CASCADE · sourceId CASCADE · isVisible true · week nullable · isCore true · position 0 · createdAt | PK (courseId, sourceId). Week/visibility/core are per-course facts on the join, never on the reading |
-| `source_page` | id · sourceId CASCADE · pageNumber · textContent · contentHash · createdAt | Extracted text per page; anchor reconciliation and search read it. No unique on (sourceId, pageNumber). GIN index `source_page_search_idx` on `to_tsvector('english', textContent)`; `source` carries the weighted `source_search_idx` twin (title A · author B · reference/description C) — the search queries must repeat these expressions verbatim |
-| `source_score` | sourceId PK/CASCADE · status `'heuristic'\|'judged'\|'unscorable'` · coverage/legibility/anchorability/structure int nullable · overall real · pass bool nullable · notes · judgeNotes · judgeModel · metrics jsonb · scoredAt | 1:1 with source. Unscored dimension = NULL (abstention, never a default). `pass` requires every scored dimension ≥ 3 — not compensatory |
+| `source_page` | id · sourceId CASCADE · pageNumber · textContent · contentHash · createdAt | Extracted text per page; anchor reconciliation and search read it. `textContent` carries pdf.js's line boundaries — a `
+` after each `hasEOL` item — except on a page whose own items already contain a newline, which keeps the old separator-free join because the newline could not then be taken back out. `contentHash` is therefore **not** a hash of this column: every writer stores `hashText(textLayerProjection(textContent))`, the browser's text-layer string, which is what `byte.pageContentHash` is compared against. 0016 gives the CASCADE its actual constraint and indexes (sourceId, pageNumber). No unique on (sourceId, pageNumber). GIN index `source_page_search_idx` on `to_tsvector('english', textContent)`; `source` carries the weighted `source_search_idx` twin (title A · author B · reference/description C) — the search queries must repeat these expressions verbatim |
+| `source_score` | sourceId PK/CASCADE · status `'heuristic'\|'judged'\|'unscorable'` · coverage/legibility/anchorability/structure int nullable · overall real · pass bool nullable · notes · judgeNotes · judgeModel · metrics jsonb · scoredAt | 1:1 with source. Unscored dimension = NULL (abstention, never a default). `pass` requires every scored dimension ≥ 3 — not compensatory — **and** non-null `coverage` and `legibility`, since "can a student quote this?" has no answer without them. `legibility` abstains when there is too little text to confirm the characters read as language; it used to be granted a 5, which is how 693 characters of OCR noise scored 5/5/5 and passed. `pass NULL` is a third verdict, rendered **Unverified**. `metrics` carries the structural probe only when the scorer held the PDF bytes |
 
 ### 1d. The graph (the artifact — spec §6 `graph`)
 
@@ -93,7 +99,7 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | `deleteConcept` | `id` | void | refuses while an edge endpoint; cascades bytes; prunes views + map tiers; `concept.delete` |
 | `createByte` | `{conceptId, source, sourceId?, location, content, anchor fields?}` | inserted `Byte` | reconciles offsets against `source_page` when hashes agree; `byte.create` |
 | `refileByte` | `byteId, conceptId` | new `Byte` (row copy — v1 semantics) | dedupes by (userId, conceptId, content); `byte.refile` |
-| `attributeBytes` | `byteIds[], sourceId` | count updated | fills `sourceId` **only where NULL**, only by student act; `byte.attribute` |
+| `attributeBytes` | `byteIds[], sourceId` | count updated | fills `sourceId` **only where NULL**, only by student act, and only to a reading the student may see — `authorizeSourceAccess`. Until 0016-era it checked merely that the id existed, which admitted another student's private upload; `byte.attribute` |
 | `deleteByte` | `id` | void | `byte.delete` |
 | `createEdge` | `{fromId, toId, sentence}` | inserted `Edge` | `edge.throw` |
 | `updateEdge` | `id, Partial<{handle, sentence}>` | void | `edge.coin` when handle present, else `edge.update` |
@@ -125,7 +131,7 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | `registerOwnUploadedReading` | `{storageKey, filename, title?, author?, sourceReference?}` | `{id, title}` | **session only** — the PDF-backed own reading: same prefix/size/magic-byte checks and ingest as the admin path, but always `isOwn`, never added to a course; heuristic score only (no judge pass on private uploads) |
 | `createSource` | metadata + `File` | `Source` | admin, **checked before the blob write** (audit S-5 ordering fixed). No callers; effectively dead but POSTable |
 | `registerUploadedReading` | `{storageKey, filename, title?, courseId?}` | `{id, title}` | admin; re-checks prefix + real blob size, deletes oversize orphans |
-| `rescoreSourceAction` | FormData `sourceId` | void | admin; also rebuilds the cover |
+| `rescoreSourceAction` | FormData `sourceId` | void | admin. Full **re-ingest** — re-extracts page text, rebuilds the cover and rescores from the current PDF, then queues the judge. A rubric replay over stored text could never show the effect of a repaired file. **Throws** when the reading has highlights, naming `scripts/reingest-readings.ts --force` as the deliberate route; a reference-only card (no `storageKey`) falls back to the replay |
 | `draftMetadataForSource` | `sourceId` | `MetadataDraft` | admin; **writes nothing** (red line #6 exception (b) — proposal only) |
 | `draftMetadataForOwnSource` | `sourceId` | `MetadataDraft` | **session, owner of an `isOwn` reading only**; writes nothing — same #6 exception, the student is the reviewer |
 | `updateSourceMetadata` | FormData | void | admin |
@@ -135,6 +141,7 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | `setSourceArchived` / `deleteSource` | FormData | void | admin; delete removes blob + cover + course links |
 | `getSourceFile` / `getSourceFileStream` | `sourceId` | `{source, buffer\|stream}` | `authorizeSourceFile`: admin → anything; **no session outside production → allowed** (dev skip); own reading → allowed; else active membership in a course where the reading `isVisible` |
 | `getSourceForCover` | `sourceId` | `{source}` — authorization + row, **no bytes** | same `authorizeSourceFile`; exists so the cover route's cache hit never downloads the PDF |
+| `authorizeSourceAccess` | `sourceId` | `Source` | **exported, therefore POSTable.** The membership/ownership rule on its own, with no file requirement — admin sees anything; a student sees their own reading, or one published visibly into a course they are currently in. Throws `Not found` rather than `Forbidden` throughout: whether a reading exists is not itself public. `authorizeSourceFile` is this plus a `storageKey` check |
 
 Upload constants ([src/lib/readingUpload.ts](../src/lib/readingUpload.ts)):
 `MAX_READING_BYTES` = 20 MB, prefix `readings/`, PDFs only — enforced browser-side,
