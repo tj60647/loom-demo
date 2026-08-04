@@ -13,10 +13,11 @@
 import { and, eq } from "drizzle-orm"
 import { createCanvas } from "@napi-rs/canvas"
 import { db } from "@/db"
-import { sourcePages, sourceRepairs, sourceRepairReadings } from "@/db/schema"
+import { sourceRepairs, sourceRepairReadings } from "@/db/schema"
 import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
-import { locateGarbleRegions } from "@/lib/garbleRegion"
-import { reportGarble } from "@/lib/garble"
+import { extractPdfPageText } from "@/lib/pdfText"
+import { locatePageRepairRegion } from "@/lib/garbleRegion"
+import { isGarbled, measurePageGarble } from "@/lib/garble"
 import { computeConsensus } from "@/lib/repairConsensus"
 import { readingStorage } from "@/lib/storage"
 import { VISION_READERS, requestVisionCompletion } from "@/lib/openrouter"
@@ -30,7 +31,20 @@ import { VISION_READERS, requestVisionCompletion } from "@/lib/openrouter"
 const CROP_DPI = 300
 const PDF_POINTS_PER_INCH = 72
 
-/** Regions per source per run. A reading with more damage than this needs a
+/**
+ * Ceiling on a crop's long edge, in pixels.
+ *
+ * The readers resize anything larger before they look at it — the current
+ * frontier vision limit is 2,576px on the long edge — so pixels above this are
+ * uploaded, paid for, and then thrown away. A letter page at 300dpi is 3,300px
+ * tall and weighs 2.8MB, which is 3.7MB of base64 sent five times for a picture
+ * no reader sees at that size. Capping the edge keeps the crop inside what they
+ * actually read, and a letter page still lands at ~230dpi — well above what the
+ * small type in a photographed newspaper needs.
+ */
+const MAX_CROP_EDGE = 2560
+
+/** Pages per source per run. A reading with more damage than this needs a
  * different remedy than transcription, and should be re-sourced instead. */
 const MAX_REGIONS_PER_SOURCE = 12
 
@@ -39,7 +53,12 @@ export function repairCropKey(sourceId: string, pageNumber: number, index: numbe
 }
 
 /**
- * Find the damaged regions of a reading and record them as proposals.
+ * Find the damaged pages of a reading and record them as proposals.
+ *
+ * One proposal per page, covering all of that page's text, because applying one
+ * replaces the page's whole text layer — see `locatePageRepairRegion`, which
+ * also explains why a page whose only fault is lost spaces gets no proposal at
+ * all and is reported as `unlocatable` instead.
  *
  * Replaces any proposals that have not yet been accepted: detection is
  * repeatable, so re-running should refresh what has not been decided while
@@ -50,16 +69,49 @@ export async function detectRepairsForSource(
   buffer: Buffer,
   storageKey: string
 ) {
-  const pages = await db
-    .select({ pageNumber: sourcePages.pageNumber, textContent: sourcePages.textContent })
-    .from(sourcePages)
-    .where(eq(sourcePages.sourceId, sourceId))
+  /**
+   * The file, not the `source_page` rows.
+   *
+   * Those rows are a cache of an extraction, and a stale one is not a
+   * hypothetical: measured on *Design as Critique*, the stored text had nine
+   * pages of fused words — `oneofthe`, `mostinterestinguses` — while the same
+   * pages extracted from the blob read `For us, one of`, cleanly, at a 1-2%
+   * garble rate. Detection believed the rows and reported nine damaged pages on
+   * a reading that has one. `applyRepairs` has always measured the file, so the
+   * two halves of this pipeline were answering different questions; now they
+   * read the same bytes.
+   */
+  const pages = await extractPdfPageText(buffer)
 
-  const garble = reportGarble(pages)
-  const damagedPages = new Set(
-    garble.worst.filter((page) => page.rate > 0).map((page) => page.pageNumber)
+  if (pages.length === 0) {
+    return { regions: 0, pagesExamined: 0, unlocatable: [] as number[] }
+  }
+
+  /**
+   * What the extracted TEXT says about each page — the same measure the score
+   * uses, and not what decides a page gets a proposal.
+   *
+   * It cannot be, because the two measures disagree in both directions. A page
+   * whose text items are each a real word but whose joins were lost reads as
+   * garbage here and as clean prose to the glyph view, and no re-reading can fix
+   * it — the picture is already correct. In the other direction, page 9 of
+   * *Design as Critique* — a photographed newspaper reading `ihe feacier
+   * refigian`, and the one page in that reading a re-reading CAN fix — this
+   * measure calls clean on a technicality: 90 body words at a 0.34 rate clears
+   * the threshold, but the same page's stored row had only 37 words, under the
+   * 40 the ordinary threshold needs, and 0.43, under the 0.50 that applies at
+   * any size.
+   *
+   * So this is kept for exactly one thing: naming pages that are damaged but not
+   * repairable here, so "no proposals" cannot be mistaken for "nothing wrong".
+   */
+  const textDamaged = new Set(
+    pages
+      .map((page) => measurePageGarble(page.pageNumber, page.textContent))
+      .filter((page): page is NonNullable<typeof page> => page !== null)
+      .filter(isGarbled)
+      .map((page) => page.pageNumber)
   )
-  if (damagedPages.size === 0) return { regions: 0, pagesExamined: garble.pagesMeasured }
 
   await db
     .delete(sourceRepairs)
@@ -75,15 +127,36 @@ export async function detectRepairsForSource(
     useWasm: false,
   })
   const doc = await loadingTask.promise
-  const scale = CROP_DPI / PDF_POINTS_PER_INCH
   let created = 0
+  /**
+   * Pages that read as damaged but that no crop can repair: their glyphs are
+   * correct and only the spaces between them were lost. Reported rather than
+   * swallowed — the reading really is broken, and the operator needs to know
+   * that this tool is not the remedy for it.
+   */
+  const unlocatable: number[] = []
 
   try {
-    for (const pageNumber of [...damagedPages].sort((a, b) => a - b)) {
+    // Every page, judged by its own glyphs. Reading the text layer is cheap —
+    // nothing is rendered until a page has earned a crop — and it is the only
+    // way to reach a page the stored measure passed over.
+    for (const pageNumber of pages.map((page) => page.pageNumber).sort((a, b) => a - b)) {
       if (created >= MAX_REGIONS_PER_SOURCE) break
       const page = await doc.getPage(pageNumber)
-      const regions = await locateGarbleRegions(page, scale)
-      if (regions.length === 0) continue
+
+      // Per page, because page sizes differ within one PDF and the cap is on
+      // the rendered edge rather than on the paper.
+      const unscaled = page.getViewport({ scale: 1 })
+      const scale = Math.min(
+        CROP_DPI / PDF_POINTS_PER_INCH,
+        MAX_CROP_EDGE / Math.max(unscaled.width, unscaled.height)
+      )
+
+      const region = await locatePageRepairRegion(page, pageNumber, scale)
+      if (!region) {
+        if (textDamaged.has(pageNumber)) unlocatable.push(pageNumber)
+        continue
+      }
 
       const viewport = page.getViewport({ scale })
       const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
@@ -94,34 +167,34 @@ export async function detectRepairsForSource(
 
       const pageText = pages.find((p) => p.pageNumber === pageNumber)?.textContent ?? ""
 
-      for (const [index, region] of regions.entries()) {
-        if (created >= MAX_REGIONS_PER_SOURCE) break
-        const crop = createCanvas(region.width, region.height)
-        crop
-          .getContext("2d")
-          .drawImage(canvas, region.x, region.y, region.width, region.height, 0, 0, region.width, region.height)
+      const crop = createCanvas(region.width, region.height)
+      crop
+        .getContext("2d")
+        .drawImage(canvas, region.x, region.y, region.width, region.height, 0, 0, region.width, region.height)
 
-        const cropKey = repairCropKey(sourceId, pageNumber, index)
-        await readingStorage.put(cropKey, crop.toBuffer("image/png"))
+      const cropKey = repairCropKey(sourceId, pageNumber, 0)
+      await readingStorage.put(cropKey, crop.toBuffer("image/png"))
 
-        await db.insert(sourceRepairs).values({
-          sourceId,
-          pageNumber,
-          measuredAgainstKey: storageKey,
-          region: { ...region, scale },
-          cropKey,
-          currentText: pageText.slice(0, 4000),
-          garbledWords: region.words,
-          garbleRate: garble.worst.find((p) => p.pageNumber === pageNumber)?.rate ?? null,
-        })
-        created += 1
-      }
+      await db.insert(sourceRepairs).values({
+        sourceId,
+        pageNumber,
+        measuredAgainstKey: storageKey,
+        region: { x: region.x, y: region.y, width: region.width, height: region.height, scale },
+        cropKey,
+        currentText: pageText.slice(0, 4000),
+        garbledWords: region.words,
+        // The glyph rate, because that is the damage the crop shows and the
+        // transcription is answerable for. The stored rate measures a defect
+        // this repair does not address.
+        garbleRate: region.glyphRate,
+      })
+      created += 1
     }
   } finally {
     await destroyPdf(doc, loadingTask)
   }
 
-  return { regions: created, pagesExamined: garble.pagesMeasured }
+  return { regions: created, pagesExamined: pages.length, unlocatable }
 }
 
 const TRANSCRIBE_SYSTEM =

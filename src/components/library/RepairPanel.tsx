@@ -3,10 +3,12 @@
 import { useState, useTransition } from "react"
 import {
   acceptRepair,
+  applyRepairs,
   detectRepairs,
   rejectRepair,
   transcribeAllRepairs,
   transcribeRepair,
+  type Refused,
 } from "@/actions/repairs"
 
 /**
@@ -67,6 +69,22 @@ export type RepairRow = {
 function money(value: number | null) {
   if (value == null) return "—"
   return value < 0.01 ? `$${value.toFixed(4)}` : `$${value.toFixed(2)}`
+}
+
+/**
+ * What a transcription run actually produced.
+ *
+ * The panel below re-renders with the readings anyway, so this exists for the
+ * one thing the rows do not say: how many of the five readers answered. A panel
+ * that quietly ran with two is a weaker vote, and it looks exactly like a panel
+ * that ran with five.
+ */
+function describeReading(result: { readers: number; complete: number; costUsd: number | null }) {
+  const short = result.readers < 5 ? ` — ${5 - result.readers} reader(s) did not answer` : ""
+  return (
+    `${result.readers} of 5 readers answered, ${result.complete} of them completely` +
+    `${short}. This region cost ${money(result.costUsd)}.`
+  )
 }
 
 /** Null costs are unknown, not free — a total that swallows them lies. */
@@ -179,14 +197,32 @@ export default function RepairPanel({
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState("")
   const [drafts, setDrafts] = useState<Record<string, string>>({})
 
-  const run = (action: () => Promise<unknown>) => {
+  /**
+   * Every act here answers with a result rather than throwing, because a
+   * refusal is a sentence the reviewer has to read and Next redacts thrown
+   * messages in a production build. `describe` turns the ones worth confirming
+   * into a line — a detection that found nothing and a detection that never ran
+   * look identical otherwise.
+   */
+  const run = <T extends { ok: true }>(
+    action: () => Promise<T | Refused>,
+    describe?: (result: T) => string
+  ) => {
     setError("")
+    setNotice("")
     startTransition(async () => {
       try {
-        await action()
+        const result = await action()
+        if (!result.ok) {
+          setError(result.error)
+          return
+        }
+        if (describe) setNotice(describe(result))
       } catch (caught) {
+        // The action itself no longer throws; this is the network, or a bug.
         setError(caught instanceof Error ? caught.message : String(caught))
       }
     })
@@ -195,21 +231,78 @@ export default function RepairPanel({
   const everyCost = repairs.flatMap((repair) => repair.readings)
   const { total: grandTotal, partial } = sumCost(everyCost)
   const proposed = repairs.filter((repair) => repair.status === "proposed")
+  const accepted = repairs.filter((repair) => repair.status === "accepted")
 
   return (
     <div className="repair-panel">
       <div className="actrow">
-        <button className="btn ghost mini" disabled={pending} onClick={() => run(() => detectRepairs(sourceId))}>
+        <button
+          className="btn ghost mini"
+          disabled={pending}
+          onClick={() =>
+            run(
+              () => detectRepairs(sourceId),
+              (result) => {
+                // Naming these is the point. A page whose glyphs are correct
+                // and whose spaces are gone is genuinely damaged and genuinely
+                // not repairable by re-reading it — silence here would read as
+                // "nothing wrong", which is the opposite of true.
+                const skipped = result.unlocatable.length
+                  ? ` Page${result.unlocatable.length === 1 ? "" : "s"} ` +
+                    `${result.unlocatable.join(", ")} read as damaged but cannot be repaired this way: ` +
+                    `the characters are right and the spaces between them are missing, so there is nothing ` +
+                    `in the picture for a reader to correct.`
+                  : ""
+                return result.regions === 0
+                  ? `No repairable page found across ${result.pagesExamined} examined.${skipped}`
+                  : `${result.regions} page(s) to repair, of ${result.pagesExamined} examined.${skipped}`
+              }
+            )
+          }
+        >
           Find damaged regions
         </button>
         {proposed.length > 0 ? (
           <button
             className="btn ghost mini"
             disabled={pending}
-            onClick={() => run(() => transcribeAllRepairs(sourceId))}
+            onClick={() =>
+              run(
+                () => transcribeAllRepairs(sourceId),
+                (result) =>
+                  `Reading ${result.queued} region(s) in the background. Reload in a minute or two — ` +
+                  `each one lands as it finishes, and pressing this again skips the ones already read.`
+              )
+            }
             data-tip="Reads every region that has not been read yet. Safe to re-run — finished regions are skipped."
           >
             Read all {proposed.length} unread
+          </button>
+        ) : null}
+        {/* Apply is the only act on this panel a student can see, so it names
+            what it will do rather than saying "apply". It stays pressable when
+            highlights exist: the refusal is the server's to give, and its
+            message counts them. */}
+        {accepted.length > 0 ? (
+          <button
+            className="btn mini"
+            disabled={pending}
+            onClick={() =>
+              run(
+                () => applyRepairs(sourceId),
+                (result) =>
+                  // pagesReplaced is the page NUMBERS, not a count — naming them
+                  // is also what a reviewer wants to read back.
+                  `Written into a new revision. Replaced the text layer of page` +
+                  `${result.pagesReplaced.length === 1 ? "" : "s"} ` +
+                  `${result.pagesReplaced.join(", ")}; the reading now measures ` +
+                  `${result.damagedPagesAfter} damaged page(s), from ${result.damagedPagesBefore}. ` +
+                  `The original file is still stored under its old key.`
+              )
+            }
+            data-tip="Writes every accepted transcription into a new revision of the PDF, then re-extracts and rescores it"
+          >
+            Write {accepted.length} accepted repair{accepted.length === 1 ? "" : "s"} into the reading
           </button>
         ) : null}
         {everyCost.length > 0 ? (
@@ -221,6 +314,12 @@ export default function RepairPanel({
       </div>
 
       {error ? <p className="repair-error">{error}</p> : null}
+      {notice ? <p className="repair-notice">{notice}</p> : null}
+      {pending ? (
+        <p className="hint">
+          Working — a region takes a minute or two, because five readers are transcribing it independently.
+        </p>
+      ) : null}
 
       {hasHighlights > 0 ? (
         <p className="hint">
@@ -264,7 +363,7 @@ export default function RepairPanel({
                   <button
                     className="btn ghost mini"
                     disabled={pending}
-                    onClick={() => run(() => transcribeRepair(repair.id))}
+                    onClick={() => run(() => transcribeRepair(repair.id), describeReading)}
                   >
                     Read this region
                   </button>
@@ -346,7 +445,14 @@ export default function RepairPanel({
                         <button
                           className="btn mini"
                           disabled={pending || !draft.trim()}
-                          onClick={() => run(() => acceptRepair(repair.id, draft))}
+                          onClick={() =>
+                            run(
+                              () => acceptRepair(repair.id, draft),
+                              (result) =>
+                                `Page ${result.pageNumber} accepted. Nothing has changed in the reading yet — ` +
+                                `use the write button at the top when every region is decided.`
+                            )
+                          }
                         >
                           Accept this text
                         </button>
@@ -363,7 +469,7 @@ export default function RepairPanel({
                         <button
                           className="btn ghost mini"
                           disabled={pending}
-                          onClick={() => run(() => transcribeRepair(repair.id))}
+                          onClick={() => run(() => transcribeRepair(repair.id), describeReading)}
                           data-tip="Ask the readers again. Costs the same as the first time."
                         >
                           Re-read

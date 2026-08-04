@@ -1,3 +1,4 @@
+import { getRepairSummary, getRepairsForSource } from "@/actions/repairs"
 import {
   addSourceToCourse,
   deleteSource,
@@ -8,6 +9,7 @@ import {
 } from "@/actions/sources"
 import DraftMetadataButton from "@/components/library/DraftMetadataButton"
 import ExtractionScore from "@/components/library/ExtractionScore"
+import RepairPanel from "@/components/library/RepairPanel"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 import UploadReadingsForm from "@/components/library/UploadReadingsForm"
 import { firstParam, getCourse, resolveCourseId } from "@/lib/courses"
@@ -15,6 +17,19 @@ import { firstParam, getCourse, resolveCourseId } from "@/lib/courses"
 type AdminLibrarySearchParams = {
   course?: string | string[]
 }
+
+/**
+ * Five frontier models read a crop one after another, and the slowest of them
+ * has been measured at 210 seconds on a single region. The platform default
+ * would cut that off mid-panel and leave the region unread with the money
+ * already spent, so this page — and therefore every Server Function reached
+ * from it — is given the room the work actually takes.
+ *
+ * `transcribeAllRepairs` sidesteps this entirely by handing the loop to
+ * `after()`; this ceiling is what makes reading ONE region synchronously, which
+ * is how a reviewer checks a single page, survive the round trip.
+ */
+export const maxDuration = 300
 
 /**
  * The Readings tab: every reading in the library, on its own terms.
@@ -34,10 +49,22 @@ export default async function AdminLibraryPage({
   const activeCourse = activeCourseId ? await getCourse(activeCourseId) : null
 
   const { readings, courses } = await getLibraryOverview()
+  const repairSummary = await getRepairSummary()
 
   const live = readings.filter((reading) => !reading.isArchived)
   const archived = readings.filter((reading) => reading.isArchived)
   const unscheduled = live.filter((reading) => reading.courses.length === 0).length
+
+  // Full proposal rows only where there are any. A reading nobody has run
+  // detection on renders an empty panel, which is the correct thing to see —
+  // detection is free and the panel says so.
+  const repairsBySource = new Map(
+    await Promise.all(
+      live
+        .filter((reading) => repairSummary.repairs[reading.id])
+        .map(async (reading) => [reading.id, await getRepairsForSource(reading.id)] as const)
+    )
+  )
 
   return (
     <main>
@@ -73,6 +100,18 @@ export default async function AdminLibraryPage({
             {live.map((reading) => {
               const memberOf = new Set(reading.courses.map((course) => course.id))
               const addable = courses.filter((course) => !memberOf.has(course.id))
+
+              // The disclosure says where this reading is in the loop, so an
+              // admin does not have to open eleven panels to find the one with
+              // a decision waiting in it.
+              const repairCounts = repairSummary.repairs[reading.id]
+              const repairNote = repairCounts?.accepted
+                ? `${repairCounts.accepted} to write`
+                : repairCounts?.proposed
+                  ? `${repairCounts.proposed} to review`
+                  : repairCounts?.applied
+                    ? `${repairCounts.applied} applied`
+                    : ""
 
               return (
                 <div className="card" key={reading.id} style={{ padding: "20px" }}>
@@ -302,6 +341,25 @@ export default async function AdminLibraryPage({
                             Rescore
                           </button>
                         </form>
+
+                        {/* Repair sits next to Rescore because it is what you
+                            reach for when the score comes back bad: rescore
+                            re-measures, this fixes. */}
+                        <details>
+                          <summary
+                            className="btn ghost mini"
+                            data-tip="Find scan damage no score can see, have five models read it, and decide what the page actually says"
+                          >
+                            Repair Text{repairNote ? ` · ${repairNote}` : ""}
+                          </summary>
+                          <div className="foldout">
+                            <RepairPanel
+                              sourceId={reading.id}
+                              repairs={repairsBySource.get(reading.id) ?? []}
+                              hasHighlights={repairSummary.highlights[reading.id] ?? 0}
+                            />
+                          </div>
+                        </details>
 
                         <form action={setSourceArchived}>
                           <input type="hidden" name="sourceId" value={reading.id} />

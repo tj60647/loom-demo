@@ -93,7 +93,20 @@ export type GarbleReport = {
   worst: PageGarble[]
 }
 
-function measurePage(pageNumber: number, text: string): PageGarble | null {
+/**
+ * Judge one run of text as a page.
+ *
+ * Exported because a repair pass has to ask this of two different strings and
+ * compare the answers. The stored page text carries the line boundaries, so a
+ * page whose damage is LOST SPACES reads as garbage there; the same page's
+ * pdf.js items, joined with a space, read as clean prose, because every item is
+ * still a real word and only the joins between them were lost. Measured on
+ * page 2 of *Design as Critique*: 47 unknown words in the stored text, 1 in the
+ * items. Nothing can be cropped for a model to re-read on such a page — the
+ * glyphs are all correct — and a repair pass that does not distinguish the two
+ * proposes a box around the one dictionary miss it found.
+ */
+export function measurePageGarble(pageNumber: number, text: string): PageGarble | null {
   const tokens = text.split(/[^A-Za-z'’]+/).filter((token) => token.length >= MIN_TOKEN_CHARS)
   // Lowercase in the source, so not a name, an acronym or a heading. Deduped:
   // one word repeated forty times is one piece of evidence, not forty.
@@ -109,7 +122,8 @@ function measurePage(pageNumber: number, text: string): PageGarble | null {
   }
 }
 
-function isGarbled(page: PageGarble) {
+/** Does this measurement read as scan damage? Exported alongside the measure. */
+export function isGarbled(page: PageGarble) {
   if (page.rate >= GARBLED_PAGE_RATE_SEVERE) return true
   return page.bodyWords >= MIN_BODY_WORDS && page.rate >= GARBLED_PAGE_RATE
 }
@@ -123,7 +137,7 @@ function isGarbled(page: PageGarble) {
  */
 export function reportGarble(pages: { pageNumber: number; textContent: string }[]): GarbleReport {
   const measured = pages
-    .map((page) => measurePage(page.pageNumber, page.textContent))
+    .map((page) => measurePageGarble(page.pageNumber, page.textContent))
     .filter((page): page is PageGarble => page !== null)
 
   const garbled = measured.filter(isGarbled)

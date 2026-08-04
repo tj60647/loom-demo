@@ -23,14 +23,28 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 // Ruled 2026-07-29: do not downgrade this to Haiku.
 const DEFAULT_JUDGE_MODEL = "anthropic/claude-opus-5"
 
-const REQUEST_TIMEOUT_MS = 30
+// Milliseconds. Both of these are passed straight to AbortSignal.timeout(), and
+// both were off by a factor of a thousand — this one at `30` aborted every judge
+// call after 30ms, which is before a TLS handshake completes, so the judge had
+// silently stopped running and every score was heuristics-only with `structure`
+// abstaining. Measured, not deduced: a live call failed at 35ms with
+// TimeoutError. Keep the `_000` when editing either of these.
+const REQUEST_TIMEOUT_MS = 30_000
 
 /**
  * Transcribing an image takes materially longer than judging a page of text —
  * the model is reading, not skimming — so this gets its own, longer budget
  * rather than quietly inheriting the judge's.
+ *
+ * Set above the slowest reading actually observed (`qwen/qwen3.8-max` at 184s on
+ * a full page) rather than at a round number, because the point of the cap is to
+ * stop a hung reader from taking the whole request down, not to decide which
+ * readers are worth their latency — that is open item 2, and TJ's call. It sits
+ * under the 300s `maxDuration` on the admin page so that a stuck reader is
+ * dropped by this timeout and the panel still returns, instead of the platform
+ * killing the function and losing the readers that did answer.
  */
-const VISION_TIMEOUT_MS = 120_000_000
+const VISION_TIMEOUT_MS = 240_000
 
 export function isJudgeConfigured() {
   return Boolean(process.env.OPENROUTER_API_KEY)

@@ -501,6 +501,9 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .repair-passage { font-weight: 600; }
 .repair-disagreements ul { padding-left: 14px; font: 12px/1.45 var(--mono, monospace); color: #4a4a4a; }
 .repair-error { color: var(--red); font-size: 13px; }
+/* A refusal and a result read the same way — both are the panel telling you
+   what it did — so they sit in the same place and differ only in colour. */
+.repair-notice { color: var(--sage); font-size: 13px; }
 /* Costs per reader, not just a total: a total hides the reader that spends most
    of the money for none of the quality. */
 .repair-costs { width: 100%; border-collapse: collapse; font: 11.5px/1.4 var(--mono, monospace); margin: 8px 0; }

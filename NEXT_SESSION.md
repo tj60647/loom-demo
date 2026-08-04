@@ -2,27 +2,117 @@
 
 ## Start here
 
-The reading-repair pipeline is built end to end and **has never been run through
-the UI**. Everything below it is measured and green; the last mile is not wired.
+`RepairPanel` is mounted and the loop **has been run end to end through the UI**
+— detect → read → review → accept → apply, on *Design as Critique* page 9, with
+the repaired revision written to blob and re-ingested. What that turned up is in
+the evening addendum immediately below; it was none of the three things this
+file predicted.
 
-> Mount `RepairPanel` on `src/app/admin/library/page.tsx`, then run one real
-> reading through the whole loop — detect → read → review → accept → apply — and
-> fix what that turns up.
->
-> Use **Design as Critique** (page 9, a photographed spoof newspaper) or
-> **Learning How to Learn** (page 56, a hand-drawn concept map printed
-> sideways). Both are known-damaged and both have been transcribed successfully
-> by the panel outside the UI, so anything that fails is the wiring.
->
-> The panel needs `getRepairsForSource(sourceId)` from
-> `src/actions/repairs.ts` and a count of that reading's `byte` rows passed as
-> `hasHighlights`. Read `docs/reading-quality.md` first — it is the map.
+**The next open item is the one that has been at the top of the list for two
+sessions: the spec is behind the build** (open item 2 under "Open items"). It
+blocks the freeze, and nothing in the repair subsystem stands in its way.
 
-Expect the first pass to find something: server-action error surfacing, the
-crop route's auth, and transcription duration are the three most likely. On
-duration, see open item 2.
+## Addendum, 2026-08-04 evening (the repair loop, run for the first time)
 
-## Addendum, 2026-08-04 (extraction, anchoring and repair session)
+**Read this before the morning addendum below; it corrects part of it.**
+
+`npm run check` green. Uncommitted on `chore/alpha-foundation`.
+
+### The panel is mounted
+
+`/admin/library` — a **Repair Text** disclosure in each reading's action row,
+next to Rescore, because rescore re-measures and this fixes. The summary says
+where the reading is in the loop (`· 2 to review`, `· 1 to write`) so an admin
+does not open eleven panels to find the one with a decision waiting. The page
+fetches full proposal rows only for readings that have any, from one grouped
+count (`getRepairSummary`), and passes each reading's `byte` count as
+`hasHighlights`. `maxDuration = 300` is set on the page, which is what lets a
+synchronous single-region read survive a serverless round trip.
+
+**The panel had no Apply button** — `applyRepairs` existed and nothing called
+it. Added, along with the result lines each act now reports.
+
+### What the run cost and produced
+
+Page 9, one region, **68s and $0.20**, 4 of 5 readers answering. Opus 5 took
+66s and **$0.15 of the $0.20 — 77% of the spend** — and returned 2,097
+characters against Grok's 7,561, because on the small type it wrote *commentary*
+(`[two columns of body text, type too small to read reliably…]`) instead of
+transcribing. That is the same shape as the reader the panel was built to
+expose, now visible in the cost table rather than argued about.
+
+`qwen/qwen3.8-max` did not answer. Measured directly afterwards: it returns
+**HTTP 200 with an empty body after 184s**. Open item 2 is still TJ's call; the
+timeout below stops it hanging a request either way.
+
+### Four bugs, each found by running the thing
+
+1. **The improvement guard passed a page deletion.** `applyRepairs` refuses a
+   repair that "does not measure better" by comparing `garbledPageRate` — but a
+   page with almost no text left is not *measurable*, so emptying a damaged page
+   drops it out of both numerator and denominator and the rate falls. Measured:
+   replacing page 2's 2,290 characters with the single word accepted for it
+   moved the rate 0.750 → 0.727 and the guard **kept it**. Deleting a page read
+   as repairing it. Now guarded per page, before the rate is consulted.
+
+2. **The unit of repair was wrong.** `textLayerRepair` cannot edit a PDF's text
+   operators in place, so it rasterises the page and lays a fresh text layer over
+   it from the accepted transcription *and nothing else*. Sub-region crops
+   therefore repair one paragraph by deleting the rest of the page — page 9 was
+   proposed as **five** boxes, and applying them would have replaced 1,485
+   characters with whatever those five held. The unit is now the page.
+   `locateGarbleRegions` is deleted; `locatePageRepairRegion` replaces it.
+
+3. **Detection measured the database; apply measured the file.** Detection read
+   `source_page`, whose rows are a cache. On *Design as Critique* those rows were
+   **stale**: nine pages of fused words (`oneofthe`,
+   `mostinterestinguses`) where the same pages extracted from the blob read
+   `For us, one of` at a 1–2% rate. Detection reported nine damaged pages on a
+   reading that has one. Both halves now extract the file. *(This corrects the
+   "lost spaces" reading of those pages — the file never had that defect; the
+   rows did. The lost-space case is real and still reported as `unlocatable`,
+   it just was not what was happening here.)*
+
+4. **`REQUEST_TIMEOUT_MS` was `30`, not `30_000`** — 30 milliseconds, changed in
+   83eab85. Every judge call aborted before a TLS handshake could finish, so
+   **the judge had silently stopped running**: `structure` abstaining and
+   `legibility` unrefined on every Rescore since. Verified by a live call failing
+   at 35ms with `TimeoutError`, and verified fixed (3.5s, "OK").
+   `VISION_TIMEOUT_MS` was `120_000_000` — 33 hours — where the comment says 120
+   seconds; now 240s, above the slowest observed reading and under the page's
+   `maxDuration`.
+
+Also: expected refusals are now **return values, not throws** (Next redacts
+thrown Server Function messages in production, and every refusal here is a
+sentence someone has to read); crops are capped at 2,560px on the long edge,
+because the readers downscale past ~2,576 and a 300dpi page was 3.7MB of base64
+sent five times for pixels nobody saw; and region boxes are whole pixels, since
+they become a canvas.
+
+### Verified, not assumed
+
+- *Design as Critique*: 1 damaged page before, **0 after**; page 9 replaced,
+  every other page byte-identical in extraction (same chars, words, item
+  counts) — the pdf-lib round trip changed nothing it was not asked to.
+- *Learning How to Learn*: detection finds **p56** (75%, the sideways concept
+  map — `peuosiad`, `paionnsuoo`), plus p57 and p58; its one highlight
+  correctly renders the refusal notice.
+- The crop route's auth was **fine** — no 4xx across any run.
+
+### Worth knowing before touching this again
+
+- **26% of page 9's sentences carried a majority.** 92 disagreements, 105 of 124
+  distinct sentences backed by one reader alone. That is a photographed
+  newspaper in dense columns and it may be the honest ceiling for such a page —
+  but it means the *agreed* text alone (325 characters) can never pass the
+  page-coverage guard, and a reviewer must compose from the readers. That is
+  what the panel is for, but nobody had seen how much composing it takes.
+- **`acceptedTextMatchesReadings` cannot catch a reader's own commentary** — it
+  checks the text came off the page, and Opus's bracketed notes *are* a reader's
+  words. Documented as a limit; now observed. The accepted text was checked and
+  carries none.
+
+## Addendum, 2026-08-04 morning (extraction, anchoring and repair session)
 
 **Read this first; it supersedes parts of what follows.**
 
@@ -115,15 +205,25 @@ reviewer sees both variants of a disputed passage together).
 
 ### Open decisions — TJ's, not the next session's
 
-1. **Mount `RepairPanel`** — see "Start here" at the top of this file.
-2. **`qwen/qwen3.8-max` took 210 seconds** on one region. That alone would
-   exceed a serverless function's duration. Either it goes, or transcription
-   moves fully behind `after()`.
+1. ~~**Mount `RepairPanel`**~~ — done, and the loop has been run. See the
+   evening addendum.
+2. **`qwen/qwen3.8-max`** took 210 seconds when this was written, and on the
+   run of 8/4 evening returned **HTTP 200 with an empty body after 184s** — so
+   it is currently costing a reader slot and contributing nothing. Either it
+   goes, or transcription moves fully behind `after()`. A 240s per-reader
+   timeout now stops it hanging a request, which makes this a question about
+   panel quality rather than about uptime.
 3. **The panel is five readers** — Opus 5, Qwen3.8 Max, Gemini 3.6 Flash,
    Grok 4.5, Inkling Small. Odd on purpose: a majority cannot tie.
 4. **Majority voting is in, with per-reader stats** (item 2 is what to spend
    them on). Nothing to decide unless the stats show a reader worth replacing —
-   watch the `solo` column, which is where invention shows up.
+   watch the `solo` column, which is where invention shows up. **First real
+   numbers, page 9:** agreement 29% / 33% / 12% / 9% (Opus 5, Gemini, Grok,
+   Inkling), solo counts 10 / 11 / 41 / 43. Read them as a property of the page
+   before a property of the readers — a dense newspaper photograph is the
+   hardest thing in this library — but Opus 5 spent 77% of the region's money
+   for the shortest transcription of the four, which is the pattern this column
+   exists to make visible.
 5. **Upload gate** — spec line 139 says scoring is "advisory, not blocking".
    TJ's stated goal makes a gate unnecessary: a bad score means *source a better
    copy*, not *block*. Treat as decided against unless TJ reopens it.
