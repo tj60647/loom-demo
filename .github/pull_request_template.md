@@ -17,6 +17,14 @@
 - [ ] No spec change needed — behavior already matches docs/loom-spec-v1.md
 - [ ] Spec change included in this PR (rev bump + revision-history entry)
 
+## Docs impact
+
+<!-- CONTRIBUTING §Docs has the table of what to update for what. Live docs must
+     match master; a dated record gets a status header, never a rewrite. -->
+
+- [ ] No live doc goes stale from this change
+- [ ] The docs this changes are updated **in this PR**
+
 ## How it was verified
 
 <!-- `npm run check`, which Playwright specs ran, manual steps taken. "Not verified" is an answer, but say it. -->

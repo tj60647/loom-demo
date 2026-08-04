@@ -4,8 +4,9 @@ The complete inventory of every surface a caller can rely on: database schema, s
 actions, API routes, export/import file formats, and the invariants the code enforces.
 Companion to [loom-spec-v1.md](loom-spec-v1.md) (the *why*); this is the *what, exactly*.
 
-**As of:** master `9abbdd7`, 2026-08-02. Line numbers cite that commit and will drift;
-names and shapes are the contract, line numbers are a courtesy.
+**As of:** master `d400378`, 2026-08-03 (schema, actions and routes re-checked at that
+commit; the line numbers still cite `9abbdd7` and have drifted by up to a few dozen
+lines). Names and shapes are the contract, line numbers are a courtesy.
 
 Conventions used below:
 
@@ -21,8 +22,17 @@ Conventions used below:
 
 ## 1. Database schema — [src/db/schema.ts](../src/db/schema.ts)
 
-Migrations `drizzle/0000`–`0014`, applied via `drizzle-kit migrate`
-(`drizzle.__drizzle_migrations` is the record of truth).
+Migrations `drizzle/0000`–`0015`, applied via `drizzle-kit migrate`
+(`drizzle.__drizzle_migrations` is the record of truth). `0014` adds the search
+indexes, `0015` adds `source.category`.
+
+> **Known break, 2026-08-03.** `0015_source_category.sql` and its snapshot carry
+> `source.category`, but the commit that landed them (`ec85ffd`) never staged
+> `src/db/schema.ts`, so the ORM does not declare the column on any branch. The
+> database has it; Drizzle does not. Until schema.ts is committed, the next
+> `drizzle-kit generate` will diff schema-without-column against
+> snapshot-with-column and emit a **`DROP COLUMN`** migration. Do not run
+> `generate` before fixing this.
 
 ### 1a. Auth (NextAuth v4, database sessions)
 
@@ -47,7 +57,7 @@ Migrations `drizzle/0000`–`0014`, applied via `drizzle-kit migrate`
 
 | Table | Columns | Keys / notes |
 | --- | --- | --- |
-| `source` | id · title · author `''` · sourceReference `''` · description `''` · isDescriptionVisible true · metadataProvenance `''` · isArchived false · **storageKey nullable** · **isOwn false** · createdByUserId SET NULL · createdAt | `storageKey NULL` = reference-only card (no PDF). `isOwn` = student-minted, visible on that student's shelf only |
+| `source` | id · title · author `''` · sourceReference `''` · description `''` · isDescriptionVisible true · **category `'' \| 'history' \| 'theory'`** · metadataProvenance `''` · isArchived false · **storageKey nullable** · **isOwn false** · createdByUserId SET NULL · createdAt | `storageKey NULL` = reference-only card (no PDF). `isOwn` = student-minted, visible on that student's shelf only. `category` (0015) is a shared fact like author — the same reading is not history in one course and theory in another; `''` = not yet categorised. **In the database, not yet in `schema.ts`, and read by no code** — see the break note above |
 | `course_source` | courseId CASCADE · sourceId CASCADE · isVisible true · week nullable · isCore true · position 0 · createdAt | PK (courseId, sourceId). Week/visibility/core are per-course facts on the join, never on the reading |
 | `source_page` | id · sourceId CASCADE · pageNumber · textContent · contentHash · createdAt | Extracted text per page; anchor reconciliation and search read it. No unique on (sourceId, pageNumber). GIN index `source_page_search_idx` on `to_tsvector('english', textContent)`; `source` carries the weighted `source_search_idx` twin (title A · author B · reference/description C) — the search queries must repeat these expressions verbatim |
 | `source_score` | sourceId PK/CASCADE · status `'heuristic'\|'judged'\|'unscorable'` · coverage/legibility/anchorability/structure int nullable · overall real · pass bool nullable · notes · judgeNotes · judgeModel · metrics jsonb · scoredAt | 1:1 with source. Unscored dimension = NULL (abstention, never a default). `pass` requires every scored dimension ≥ 3 — not compensatory |
@@ -170,7 +180,7 @@ nothing runs.
 | `removeAllowedEmail` | FormData | void — hard-deletes the invitation |
 | `removeFromRoster` | FormData `{courseId, userId}` | void — sets `removedAt`, deletes invite, revokes sessions **only** when no app access remains |
 | `getUserLoomDataAsAdmin` | `targetUserId, courseId?` | `{concepts, bytes, edges}` (no maps/read/views) |
-| `getAggregateLoomData` | `courseId?, sectionId?` | cohort `{concepts, bytes, edges, bytesUnavailable}` — bytes fail soft |
+| `getAggregateLoomData` | `courseId?, sectionId?` | cohort `{concepts, bytes, edges, members, bytesUnavailable}` — bytes fail soft. `members` (`14d9728`) carries each pooled row's author, because the cohort repeats one label once per student and every quoted passage on the Cohort Map is attributed by name |
 
 ### 2d. Courses & sections — [src/actions/courses.ts](../src/actions/courses.ts)
 

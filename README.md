@@ -21,6 +21,7 @@ Nothing is auto-generated. The tool only counts your own throws. The structure e
 - **Intentional Connections ("Throws"):** The power of Loom lies in the edges. You decide exactly how two concepts relate. 
 - **Disciplinary "Tongues":** The verbs we reach for to name a relation (e.g., *constrains*, *refutes*, *betrays*) aren't neutral; each belongs to a specific way of seeing the world. When you coin a term, Loom offers registers from several fields—"Cause & system", "Stance & value"—as suggestions to tap or ignore. You pick the word, or write your own; the machine never names the relation.
 - **The Woven Graph:** View your interconnected graph ("Read"), then write your own "axial read" across texts. Loom lays your threads out as material and counts what it sees; you write the reading, and copy it out as a draft.
+- **Search as a Door to the Text:** Search the readings from the shelf and get them back by rank, or search inside one reading and get its matching pages with the words marked on the page. It is plain Postgres full-text search—no model anywhere near it—and it can only ever surface a reading you could already open.
 - **The Card Table ("Map"):** Sort your concepts into tiers (primary / secondary / tertiary), then arrange them as cards on a three-band table—general above, specific below. The tool draws the links you already threw and counts what it sees; the sorting and arranging are yours. The "map kit" hands the whole thing off to paper for the real, hand-drawn concept map.
 - **Your Artifact:** Export your graph as JSON (the spec §6 contract: the `graph` is the artifact, `views` are your arrangements riding along) or as markdown for Obsidian and notes. Import and reset round it out—your work is never locked in.
 - **The Cloth, Over Time:** Loom keeps an append-only history of your own acts—capture, throw, coin, re-tier—and replays how your weave grew. It counts; it never grades. Reset clears the cloth, not the history.
@@ -29,9 +30,11 @@ Nothing is auto-generated. The tool only counts your own throws. The structure e
 
 Loom is built on foundational ideas from design theory, sociology, and ethnographic coding (see the [concept deck](./docs/presentations/coupled_spaces_deck_v12.pdf) for a deeper dive):
 
-- **[Object Worlds (Bucciarelli)](./docs/readings/Bucciarelli-Designing%20Engineers.pdf):** Each discipline inhabits its own world with its own instruments and language. A mechanical engineer might name a connection "is the bottleneck for," while a humanist might say it "betrays" the text. Loom makes these differing worldviews visible and actionable.
-- **[Communities of Practice (Wenger)](./docs/readings/Wenger_communities-of-practice.pdf):** Shared vocabularies are learned by participating in a community, not just by being told. Loom enables a class or team to grow its own shared edge-vocabulary over time by doing the work together.
-- **[Boundary Objects (Star)](./docs/readings/Star,%202010%20'This%20Is%20Not%20A%20Boundary%20Object'.pdf):** How do people from distinct fields coordinate around one shared object without agreeing on exactly what it means? Loom serves as a cross-tongue boundary object—flexible enough to be locally useful, but robust enough to hold a common identity across groups.
+- **Object Worlds (Bucciarelli, *Designing Engineers*):** Each discipline inhabits its own world with its own instruments and language. A mechanical engineer might name a connection "is the bottleneck for," while a humanist might say it "betrays" the text. Loom makes these differing worldviews visible and actionable.
+- **Communities of Practice (Wenger):** Shared vocabularies are learned by participating in a community, not just by being told. Loom enables a class or team to grow its own shared edge-vocabulary over time by doing the work together.
+- **Boundary Objects (Star, 2010, "This Is Not A Boundary Object"):** How do people from distinct fields coordinate around one shared object without agreeing on exactly what it means? Loom serves as a cross-tongue boundary object—flexible enough to be locally useful, but robust enough to hold a common identity across groups.
+
+(These three are readings *in* the tool, not files in this repo — they live in the blob store and are served through the authenticated reading route.)
 
 ---
 
@@ -42,39 +45,50 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with `create-next-a
 Start here:
 
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — branches, the PR gate (green CI + owner review), tests, local setup.
+- [docs/deployments.md](./docs/deployments.md) — local / dev / production environments, onboarding a developer, branch protection, CI secrets, smoke tests.
 - [docs/contracts.md](./docs/contracts.md) — every contract surface: schema, server actions, API routes, export/import formats, invariants.
-- [docs/deployments.md](./docs/deployments.md) — local / dev / production environments, CI secrets, smoke tests.
-- [docs/audit-2026-08-02.md](./docs/audit-2026-08-02.md) — the full journey audit and alpha assessment.
-- Tests: `npm run check`, then `npx playwright test` (see CONTRIBUTING for the Windows/3100 variant and the seeded demo accounts the suite relies on).
+- [docs/loom-spec-v1.md](./docs/loom-spec-v1.md) — the build contract and the §4 red lines every PR is reviewed against. **Currently rev 30c and behind the build** — see [NEXT_SESSION.md](./NEXT_SESSION.md).
+- [docs/audit-2026-08-02.md](./docs/audit-2026-08-02.md) — the full journey audit and alpha assessment (dated; read its status header first).
+- Tests: `npm run check`, then `npx playwright test` — 26 tests in 9 files (see CONTRIBUTING for the Windows port note and the seeded demo accounts the suite relies on).
 
 ### Getting Started
 
-First, run the development server:
-
 ```bash
+cp .env.example .env.local   # then fill it in
+npm ci
+npx drizzle-kit migrate
+npm run seed:sources && npm run seed:demo
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result. You can start editing the page by modifying `app/page.tsx` (or `src/app/page.tsx`). The page auto-updates as you edit the file.
+Then open [http://localhost:3000](http://localhost:3000) and sign in through
+`/api/auth/test-login` (admin) or `/api/auth/test-login?as=testa` (learner) —
+real GitHub OAuth exists only on the deployed environments. Routes live under
+`src/app/`; the learner surfaces are `/` (Readings), `/reading/[sourceId]`,
+`/weave` and `/keep`, and the admin ones under `/admin`.
+[CONTRIBUTING.md](./CONTRIBUTING.md) has the full setup, the Windows port note,
+and how to run the suite.
 
 ### Environment
 
-`.env.local` (not committed). Run `vercel env pull` to populate the hosted values.
+`.env.local` (not committed). Start from the committed
+[.env.example](./.env.example), which says where each value comes from.
+**Do not `vercel env pull` for `DATABASE_URL`** — local work rides the Neon
+`dev` branch, never `main`, because `npm run seed:demo` wipes the demo course on
+whatever database it is pointed at.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | yes | Neon Postgres connection string. |
-| `NEXTAUTH_SECRET`, `NEXTAUTH_URL` | yes | NextAuth session signing and callback base. |
-| `GITHUB_ID`, `GITHUB_SECRET` | yes | GitHub OAuth app credentials. |
-| `BLOB_READ_WRITE_TOKEN` | local dev | Vercel Blob access. On Vercel this is resolved from the OIDC token + `BLOB_STORE_ID` instead. |
-| `OPENROUTER_API_KEY` | no | Enables the reading-quality judge. Absent, readings are still scored deterministically. |
+| `DATABASE_URL` | yes | Neon Postgres connection string — the **`dev`** branch locally. |
+| `NEXTAUTH_SECRET`, `NEXTAUTH_URL` | yes | NextAuth session signing and callback base. `NEXTAUTH_URL` always carries the protocol. |
+| `GITHUB_ID`, `GITHUB_SECRET` | yes | GitHub OAuth app credentials. Dummies are fine locally — OAuth never runs there. |
+| `BLOB_READ_WRITE_TOKEN`, `BLOB_STORE_ID` | local dev | Vercel Blob access — required to open reading PDFs. On Vercel these resolve from the OIDC token instead. |
+| `OPENROUTER_API_KEY` | no | Enables the reading-quality judge and *Draft from PDF*. Absent, readings are still scored deterministically and metadata is typed by hand. |
 | `LOOM_JUDGE_MODEL` | no | Judge model override. Defaults to `anthropic/claude-opus-5` — see the note below before changing it. |
+
+One blob store serves every environment, so a reading deleted locally is
+deleted for production too. [docs/deployments.md](./docs/deployments.md) has the
+environment table and the five invariants behind it.
 
 ### Database migrations
 
@@ -157,6 +171,31 @@ Three invariants worth preserving if you touch this:
 - **A clean byte count is not legibility.** Any future tightening should be tested against text that is *valid characters in the wrong order or the wrong mapping*, not just against mojibake — that's the case a byte-level check cannot see.
 
 The score is advisory. A reading below the bar is flagged "Needs review", never auto-hidden — see red line #7 in the [spec](./docs/loom-spec-v1.md).
+
+#### Searching the readings
+
+Two searches, both plain Postgres full-text search — `websearch_to_tsquery` /
+`ts_rank` / `ts_headline` over GIN expression indexes (migration `0014`),
+**deliberately with no model anywhere near it** ([src/actions/search.ts](./src/actions/search.ts)).
+
+- **From the shelf**, `searchReadings` ranks whole readings: the card fields are
+  weighted (title A · author B · reference and description C) and page text is
+  the second signal, so a title match outranks a passing mention, and each hit
+  carries up to two page excerpts.
+- **Inside a reading**, `searchReading` returns matching pages in page order and
+  marks the words on the text itself — the search is a door to the passage, not
+  a list beside it.
+
+Both scope through `getSources()`, so a search can never surface a reading its
+caller could not already open from the shelf; `searchReadings` narrows further
+to published readings, so an admin's staged uploads stay off a student's
+results. Snippets mark matches with `⟦⟧` ([src/lib/searchText.ts](./src/lib/searchText.ts))
+and are rendered by splitting on those, never as HTML. Queries are trimmed to
+200 characters; under two characters nothing runs.
+
+The indexes are expression indexes, so **the queries must repeat the indexed
+expressions verbatim** — a `to_tsvector` call that drifts from the one in `0014`
+still returns correct rows, silently, via a sequential scan.
 
 #### Drafting a reading's metadata
 

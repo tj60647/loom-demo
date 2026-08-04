@@ -1,11 +1,50 @@
 # Next Session Prompt
 
-You are continuing work on Loom after the journey build of 2026-08-01 (which
-followed the multiple-maps build of 07-31 and the reading-first pass of 07-30/31).
+You are continuing work on Loom after the deployment day of 2026-08-03 (which
+followed the alpha-foundation session of 08-02, the journey build of 08-01, the
+multiple-maps build of 07-31 and the reading-first pass of 07-30/31).
+
+## Addendum, 2026-08-03 (deployment day — PRs #5, #6, #7)
+
+Newest first: read this, then the 8/2 addendum; both supersede the body below.
+
+- **The dev deployment is live and production has been promoted.** `dev` merged
+  to `master` (PR #6), so the whole alpha cut is in production. Both branches
+  are protected and both require `checks` **and** `e2e` — the three CI secrets
+  are configured and the gate is real. `dev` needs no approving review;
+  `master` needs one code-owner. [docs/deployments.md](docs/deployments.md) is
+  current, including a new §"Onboarding a developer" and a committed
+  `.env.example`.
+- **The one thing deployment day did not close: the fresh-GitHub-account smoke
+  test.** Open item 1 below is otherwise done. Nobody has recorded a result for
+  invite → real OAuth → enrolment → Readings, and Playwright structurally
+  cannot. Until someone runs it and dates it in deployments.md §"Standing up
+  the dev deployment", treat first sign-in as unverified.
+- **Open item 3 (`maps.spec` order dependence) is closed** — see the 8/2
+  addendum. The suite is now **26 tests in 9 files** (reading-search added two,
+  the shelf spec one). Item 3's text below is kept as the record of the bug.
+- **The pdf.js/unpkg bullet in open item 5 is fixed** (worker vendored,
+  `0f9f01b`). The rest of item 5 stands.
+- **Built on 8/3, none of it audited:** reading search — shelf-wide by rank and
+  in-reading by page, plain Postgres FTS, migration `0014`
+  ([src/actions/search.ts](src/actions/search.ts)); PDF-backed *readings of your
+  own* with *Draft from PDF* reviewed by their owner; the Cohort Map laid out as
+  the student 03 pane it mirrors, with attributed passages
+  ([src/components/admin/CohortClothPanel.tsx](src/components/admin/CohortClothPanel.tsx));
+  the roster as rows; folded panels on Readings and Courses; and the deployment
+  colours (`VERCEL_ENV` → red-weft favicon and wordmark off production).
+- **A live break to fix before anything else touches the schema.** `source.category`
+  exists in `drizzle/0015_source_category.sql` and in the `0015` snapshot, and is
+  applied to Neon `main`, `dev` and `ci` — but `ec85ffd` never staged
+  `src/db/schema.ts`, so **no branch declares the column**. The next
+  `drizzle-kit generate` will read schema.ts (no column) against the snapshot
+  (column) and emit a `DROP COLUMN`. The working tree holds the uncommitted fix.
+  Nothing reads `category` yet either. This is the same one-commit rule from
+  `ec85ffd`'s own message, dropped on the other side.
 
 ## Addendum, 2026-08-02 (alpha-foundation session — PR #4)
 
-Read this first; it supersedes parts of what follows.
+Superseded in part by the 8/3 addendum above.
 
 - **Open item 3 is closed.** The order-dependent `maps.spec` failure was a
   test-synchronization bug: `#saveDot` was still showing the *previous* save's
@@ -111,15 +150,25 @@ surface.
   A closed, B a review list, C production-only) were both last touched 7/31 and
   predate the whole journey build.
 
-Verified at hand-off (8/1): `npm run check` (eslint + tsc) clean, `next build`
+~~Verified at hand-off (8/1): `npm run check` (eslint + tsc) clean, `next build`
 clean, migrations applied through `0013` in Neon (14 rows), `master` level with
 `origin/master`. The suite is **12 Playwright tests in 6 files** (one worker,
 signed in as Test User A via `test-login?as=testa`) and it is **not green end to
-end** — see open item 3.
+end** — see open item 3.~~
+
+**Superseded 8/3:** migrations run through `0015` on Neon `main`, `dev` and `ci`
+(but see the schema.ts break in the 8/3 addendum). The suite is **26 Playwright
+tests in 9 files**, one worker, green, and required on both protected branches.
 
 ## Open items, in the order they matter
 
-1. **Monday's dev deployment (8/3).** Testers were warned. The setup, reasoned
+1. **Monday's dev deployment (8/3) — DONE except the smoke test.** Stood up on
+   8/3 exactly as reasoned below, and durably documented in
+   [docs/deployments.md](docs/deployments.md); production was promoted the same
+   day. **What remains is the bolded paragraph: the fresh-GitHub-account sign-in
+   has never been run.** The rest of this item is kept as the reasoning.
+
+   Testers were warned. The setup, reasoned
    through in the session log: a **Neon branch** for `DATABASE_URL` (one
    long-lived branch, not Vercel's auto-branch-per-deployment, which would
    reset tester data on every push); a **second GitHub OAuth app** whose
@@ -157,7 +206,9 @@ end** — see open item 3.
    ratification is real rather than inherited from an agent's summary. The spec
    and TJ are the authority; a commit message is not.
 
-3. **`maps.spec.ts` fails in a full-suite run and passes alone.** Measured 8/1,
+3. **`maps.spec.ts` fails in a full-suite run and passes alone. — CLOSED 8/2**
+   (root cause and fix in the 8/2 addendum; the learner bug underneath is U-3(b),
+   still open). Kept below as the record. Measured 8/1,
    both ways, against a dev server on 3100:
    - Whole suite: **8 passed, 1 failed, 3 did not run.** The failure is
      `maps.spec.ts:42 "a new map holds its own tiers and essence"` — after the
@@ -195,10 +246,12 @@ end** — see open item 3.
      `getSourceFile` skip auth whenever `NODE_ENV !== 'production'`;
      [src/lib/auth.ts:9](src/lib/auth.ts#L9) carries hardcoded admin fallback
      emails.
-   - pdf.js loads its worker from unpkg at runtime
-     ([src/components/pdf/PdfViewer.tsx:12](src/components/pdf/PdfViewer.tsx#L12)).
+   - ~~pdf.js loads its worker from unpkg at runtime.~~ **Fixed** — vendored
+     into `public/` at build (`0f9f01b`, `scripts/copy-pdf-worker.mjs`).
    - `scripts/apply-db-compat.ts` is an ad-hoc schema patcher behind the real
-     schema — decide whether it retires.
+     schema — decide whether it retires. Same call for
+     `scripts/run-migrations.ts` (duplicates `drizzle-kit migrate`) and
+     `playwright.3100.config.ts` (the main config now reads `PORT`).
 
 6. **Section B review, now with a round 2.** The UI/language diff has a fresh
    **[round 2](docs/v14-ui-language-diff.md#round-2--2026-08-01-the-surfaces-built-since)**
@@ -226,14 +279,17 @@ Meanwhile **run on 3100 and it all works**, including admin pages: cookies are
 not port-scoped, so `NEXTAUTH_URL=http://localhost:3000` still yields the right
 session-cookie name. It was the missing protocol that broke it, never the port.
 
-The suite has its own committed config for this — it starts the dev server
-itself, and keeps `globalSetup` + `storageState` (drop them and the
-authenticated specs run signed-out, which reads as a product failure and is
-not one):
+The suite handles this itself: `playwright.config.ts` reads `PORT` (`b5e35a0`),
+starts the dev server on it, and keeps `globalSetup` + `storageState` (drop them
+and the authenticated specs run signed-out, which reads as a product failure and
+is not one):
 
 ```bash
-npx playwright test --config=playwright.3100.config.ts
+$env:PORT='3100'; npx playwright test
 ```
+
+`playwright.3100.config.ts` predates that and is now a redundant copy — it still
+works, but `PORT` is the one to reach for.
 
 Two things that will waste your time if you don't know them:
 
@@ -246,7 +302,7 @@ Two things that will waste your time if you don't know them:
 ## Kickoff commands
 
 ```bash
-git status -sb
+git status -sb                             # start from dev: git fetch && git checkout -b <name> origin/dev
 npm run check                              # eslint + tsc
 npx tsx scripts/check-migrations.ts        # what Neon actually has
 npm run dev -- -p 3100
