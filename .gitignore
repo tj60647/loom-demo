@@ -44,6 +44,14 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Reading PDFs. Production readings live in the private Vercel Blob store, never
+# on disk (see src/lib/storage.ts). The only thing this directory is still for is
+# scripts/seed-sources.ts, which needs the three seed PDFs locally to populate a
+# fresh database. Those are published, copyrighted course readings and this repo
+# is public, so they are deliberately untracked — supply your own copies.
+/storage/readings/*
+!/storage/readings/.gitkeep
+
 # vercel
 .vercel
 
@@ -52,3 +60,8 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# Tesseract downloads its language data next to the process on first use.
+# Regenerated on demand (5MB for English), and nothing in the repo depends on it.
+eng.traineddata
+*.traineddata

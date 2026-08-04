@@ -33,16 +33,52 @@ in the 8/1 session (NEXT_SESSION item 1); this document is its durable form.
    reading in one environment that another environment's rows still reference**
    — `deleteSource` removes the blob itself. Archive on dev; delete only in
    production, or only for readings that exist nowhere else.)
+
+   A second consequence, live since re-ingest exists: the blob is shared but the
+   *page text* is per-environment, in three separate Neon databases. Re-ingesting
+   reads production bytes wherever it is run and writes rows only to the database
+   it was pointed at, so the environments can silently disagree about what a
+   reading says. Run it once per environment, and check the `database:` line the
+   script prints before believing its output.
 5. **`NODE_ENV` must be `production` on every deployed build.** Three dev
    conveniences key off it (see [audit](audit-2026-08-02.md) S-1..S-3): the
    loom actions' fallback identity, the reading routes' auth skip, and the
    test-login backdoor. Vercel sets it for production *and* preview builds;
    anything self-hosted must too. Checking this is part of the smoke test.
 
+### Reaching another environment from your machine
+
+Scripts load `.env.local`. `vercel env pull` writes `.env.production.local`, which
+nothing reads by default — so a run intended to inspect production reports on
+development instead, and the output is similar enough to be believed.
+`LOOM_ENV_FILE` redirects them. This repo is developed on Windows, so the
+PowerShell form is the one you will actually type — there is no inline
+`VAR=value cmd` prefix:
+
+```powershell
+$env:LOOM_ENV_FILE = '.env.production.local'
+npm run diagnose:readings
+$env:LOOM_ENV_FILE = $null      # it persists for the session otherwise
+```
+
+Every script prints the database it reached before it reports anything. Read that
+line; it is the whole point of it existing.
+
+Vercel also refuses to export values for variables marked **sensitive**: it writes
+the literal string `[SENSITIVE]`. In this project that includes `DATABASE_URL`,
+`NEXTAUTH_SECRET`, `GITHUB_ID`, `GITHUB_SECRET`, `NEXTAUTH_URL` and
+`OPENROUTER_API_KEY` — so a pulled production file is not usable as-is, and the
+connection string has to come from the Neon console. `src/db/index.ts` fails with
+that instruction rather than letting it surface as an opaque driver error.
+
 ## Standing up the dev deployment
 
 1. Neon → create branch `dev` from `main` (schema + data snapshot; migrations
-   already applied through `0013`).
+   applied through `0016` as of 2026-08-03 — check `drizzle/meta/_journal.json`
+   rather than trusting this line, and note that
+   `npx tsx scripts/check-migrations.ts` reports which migrations *ran*, not what
+   the database is shaped like: 0016 exists precisely because a constraint
+   `schema.ts` had declared since 0000 was never in any database).
 2. GitHub → Settings → Developer settings → New OAuth App:
    homepage = dev alias, callback = `https://<dev-alias>/api/auth/callback/github`.
 3. Vercel → project → Settings → Domains: give the `dev` branch a stable domain

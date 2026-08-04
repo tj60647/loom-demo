@@ -88,6 +88,22 @@ export default function ExtractionScore({ score }: { score: ScoreRow | null }) {
             Needs review
           </span>
         ) : null}
+        {/*
+          A null verdict is not a quiet pass. It means a dimension the gate needs
+          could not be measured — most often too little text to confirm the
+          characters read as language, which is exactly the state a page of OCR
+          noise lands in. Showing nothing here would let it sit on the shelf
+          looking scored.
+        */}
+        {score.pass == null ? (
+          <span
+            className="pill"
+            style={{ color: "var(--ochre)", border: "1px dashed var(--ochre)" }}
+            title="Not enough was measurable to say whether this reading is usable — see the notes"
+          >
+            Unverified
+          </span>
+        ) : null}
       </div>
 
       <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>

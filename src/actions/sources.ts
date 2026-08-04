@@ -2,6 +2,7 @@
 
 import { db } from "@/db"
 import {
+  bytes,
   courseMemberships,
   courseSources,
   courses,
@@ -10,15 +11,16 @@ import {
   sourceScores,
   users,
 } from "@/db/schema"
-import { and, asc, eq, inArray, isNull } from "drizzle-orm"
+import { and, asc, count, eq, inArray, isNull } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { after } from "next/server"
 import { authOptions, isAdminUser } from "@/lib/auth"
 import { readingStorage } from "@/lib/storage"
 import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
-import { extractPdfPageText } from "@/lib/pdfText"
+import { extractPdfPageText, textLayerProjection } from "@/lib/pdfText"
 import { hashText } from "@/lib/hash"
 import { judgeSourceScore, recordHeuristicScore, rescoreSource } from "@/lib/readingScore"
+import { reingestSource } from "@/lib/reingest"
 import { isJudgeConfigured } from "@/lib/openrouter"
 import { draftMetadataFromPages, type MetadataDraft } from "@/lib/metadataDraft"
 import { MAX_READING_BYTES, MAX_READING_LABEL, READING_UPLOAD_PREFIX, formatBytes } from "@/lib/readingUpload"
@@ -51,6 +53,16 @@ function readInt(formData: FormData, key: string) {
   if (!raw) return null
   const parsed = Number.parseInt(raw, 10)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+/**
+ * Core or supplemental, read the same way wherever it is set — the Courses
+ * tab's Schedule foldout and the library's Add to Course both post the
+ * "true"/"false" radio pair. Core unless told otherwise, matching the column's
+ * own default: a form that forgets the field must not quietly demote a reading.
+ */
+function readIsCore(formData: FormData) {
+  return formData.get("isCore") !== "false"
 }
 
 function revalidateLibrary() {
@@ -449,7 +461,7 @@ async function ingestReading(data: {
         sourceId: source.id,
         pageNumber: p.pageNumber,
         textContent: p.textContent,
-        contentHash: hashText(p.textContent),
+        contentHash: hashText(textLayerProjection(p.textContent)),
       }))
     )
   }
@@ -538,27 +550,53 @@ export async function rescoreSourceAction(formData: FormData) {
   const sourceId = readText(formData, "sourceId")
   if (!sourceId) return
 
-  // Rebuild the cover too, not just the scores. Cover rendering used to be
-  // treated as decided once at upload, but the renderer itself changes — it
-  // now targets a fixed width and skips blank opening pages — so readings
-  // uploaded before those changes keep a stale, undersized or empty thumbnail
-  // with no way to refresh it. Re-rendering here gives every existing reading
-  // a route back to a correct cover.
   const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
   const source = rows[0]
-  if (source?.storageKey) {
-    try {
-      const pdf = await readingStorage.get(source.storageKey)
-      const cover = await renderPdfCoverImage(pdf)
-      await readingStorage.put(getSourceCoverKey(sourceId), cover)
-    } catch (error) {
-      // A reading whose opening pages are genuinely blank has no cover to
-      // rebuild; that is recorded by the score, not a reason to fail a rescore.
-      console.warn("[Loom] Cover rebuild failed during rescore", error)
-    }
+
+  // Nothing stored to re-read: a reference-only card has no PDF, so replaying
+  // the rubric over its (absent) pages is all that can be done.
+  if (!source?.storageKey) {
+    await rescoreSource(sourceId)
+    revalidateLibrary()
+    return
   }
 
-  await rescoreSource(sourceId)
+  // Refuse to touch a reading students have worked on. Re-ingesting replaces
+  // the page text every stored offset was measured against; the batch script
+  // carries a --force for the deliberate case, and this button should not be
+  // the way that happens by accident.
+  const [{ value: byteCount }] = await db
+    .select({ value: count() })
+    .from(bytes)
+    .where(eq(bytes.sourceId, sourceId))
+
+  if (byteCount > 0) {
+    await rescoreSource(sourceId)
+    revalidateLibrary()
+    throw new Error(
+      `Rescored, but the reading was not re-processed: ${byteCount} highlight${byteCount === 1 ? " is" : "s are"} anchored to its current text. ` +
+        `Use "npx tsx scripts/reingest-readings.ts ${sourceId} --force" if you mean to replace it anyway.`
+    )
+  }
+
+  // Full re-processing, not a rubric replay. `rescoreSource` re-reads the
+  // STORED page rows, so on its own it can never show the effect of a repaired
+  // PDF or of a change to extraction itself — and it carried the old
+  // cover-rendered verdict forward, so a rebuilt cover never moved the score.
+  // Re-ingesting settles all three together from the bytes as they stand.
+  try {
+    await reingestSource(sourceId, await readingStorage.get(source.storageKey))
+  } catch (error) {
+    console.warn("[Loom] Re-ingest failed during rescore; falling back to a rubric replay", error)
+    await rescoreSource(sourceId)
+  }
+
+  if (isJudgeConfigured()) {
+    after(async () => {
+      await judgeSourceScore(sourceId)
+      revalidateLibrary()
+    })
+  }
   revalidateLibrary()
 }
 
@@ -709,7 +747,7 @@ export async function addSourceToCourse(formData: FormData) {
       courseId,
       sourceId,
       week: readInt(formData, "week"),
-      isCore: formData.get("isCore") !== "false",
+      isCore: readIsCore(formData),
     })
     .onConflictDoNothing()
 
@@ -765,7 +803,7 @@ export async function updateCourseSourceSchedule(formData: FormData) {
     .set({
       week: readInt(formData, "week"),
       position: readInt(formData, "position") ?? 0,
-      isCore: formData.get("isCore") === "on",
+      isCore: readIsCore(formData),
     })
     .where(and(eq(courseSources.courseId, courseId), eq(courseSources.sourceId, sourceId)))
 
@@ -815,7 +853,22 @@ export async function deleteSource(formData: FormData) {
  * lives on the join, so this is a membership question rather than a flag on
  * the source.
  */
-async function authorizeSourceFile(sourceId: string) {
+/**
+ * May the current viewer see this reading at all?
+ *
+ * The rule, in one place because more than one caller needs it: an admin sees
+ * everything; a student sees a reading of their own, or one published visibly
+ * into a course they are currently a member of. Nothing else.
+ *
+ * Deliberately says nothing about FILES — a reference-only reading is a
+ * citation with no PDF, and a student is entitled to name it as the source of a
+ * passage even though there is nothing to serve. `authorizeSourceFile` adds
+ * that requirement on top.
+ *
+ * Throws "Not found" rather than "Forbidden" throughout: whether a particular
+ * reading exists is itself not public.
+ */
+export async function authorizeSourceAccess(sourceId: string) {
   const session = await getServerSession(authOptions)
   const admin = isAdminUser(session?.user)
 
@@ -826,14 +879,17 @@ async function authorizeSourceFile(sourceId: string) {
   const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
   const source = rows[0]
   if (!source) throw new Error("Not found")
-  // A reference-only reading is a citation, not a file. Nothing to serve.
-  if (!source.storageKey) throw new Error("Not found")
 
-  // A student's own reading is theirs to read; it was never published to a
-  // course, so the membership check below cannot admit it.
+  // A student's own reading is theirs; it was never published to a course, so
+  // the membership check below cannot admit it.
   if (source.isOwn && source.createdByUserId === session?.user?.id) {
-    return { source, storageKey: source.storageKey }
+    return source
   }
+
+  // An own reading belonging to SOMEONE ELSE is never admissible, and would
+  // otherwise fall through the membership check below unexamined — it is in no
+  // course, so `published` would be empty and throw, but only by accident.
+  if (source.isOwn && !admin) throw new Error("Not found")
 
   if (!admin && session?.user?.id) {
     const memberships = await db
@@ -863,6 +919,13 @@ async function authorizeSourceFile(sourceId: string) {
     if (published.length === 0) throw new Error("Not found")
   }
 
+  return source
+}
+
+async function authorizeSourceFile(sourceId: string) {
+  const source = await authorizeSourceAccess(sourceId)
+  // A reference-only reading is a citation, not a file. Nothing to serve.
+  if (!source.storageKey) throw new Error("Not found")
   return { source, storageKey: source.storageKey }
 }
 

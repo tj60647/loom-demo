@@ -81,6 +81,54 @@ export type ExtractionMetrics = {
    * absent for a largely non-Latin document, where they cannot apply.
    */
   latinShare?: number
+  /**
+   * Occurrences of PDF glyph names left in the text (`/f_i`, `/ffi`,
+   * `/hyphen.cap`). A font whose /ToUnicode map is absent falls back to naming
+   * its glyphs, and the names survive extraction as ordinary ASCII — invisible
+   * to junkCharRatio, which is why this is counted separately.
+   */
+  glyphNameLeaks?: number
+  /**
+   * Punctuation marks sitting between two letters (`INTERAC$IVE`). The
+   * signature of ligature codes resolving to the ASCII punctuation that happens
+   * to share their byte value.
+   */
+  punctuationInWord?: number
+  /**
+   * Share of whitespace-delimited tokens long enough to mean lost word
+   * boundaries. Biased upward — see LONG_TOKEN_CHARS.
+   */
+  longTokenRatio?: number
+  /**
+   * Structural facts read from the file rather than the text, by
+   * src/lib/pdfStructure.ts. Absent on rows scored before the probe existed.
+   *
+   * `spreadPages` is the one no text measure can substitute for: a book opening
+   * scanned as a single landscape sheet extracts as clean prose and passes
+   * every other check while reading across the gutter.
+   */
+  spreadPages?: number
+  pagesWithGlyphs?: number
+  /**
+   * Share of simulated captures that would anchor cleanly, and how many were
+   * tried. This is what `anchorability` is scored from — a direct test of the
+   * mechanism rather than a character count standing in for it.
+   */
+  anchorRate?: number
+  anchorSpansTested?: number
+  /**
+   * Pages that are photographs, plates or diagrams. They have no text because
+   * they are not text, so they are excluded from `coverage` rather than counted
+   * against it.
+   */
+  picturePages?: number
+  /** Pages showing an image with no text over it — the only pages OCR helps. */
+  scannedPages?: number
+  /** Pages with neither text nor image. Blank leaves, not a defect. */
+  blankPages?: number
+  glyphCount?: number
+  /** Share of glyphs that resolved to no usable character at all. */
+  unmappedGlyphRatio?: number
   /** Whether the first page rendered to a cover image. */
   coverRendered: boolean
 }

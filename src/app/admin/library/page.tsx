@@ -180,13 +180,24 @@ export default async function AdminLibraryPage({
                                 <span className="label">Week (Optional)</span>
                                 <input name="week" type="number" min="1" max="20" placeholder="Unscheduled" />
                               </div>
-                              <label
-                                className="hint"
-                                style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                              >
-                                <input type="checkbox" name="isCore" defaultChecked value="on" />
-                                Core reading (students graph this one)
-                              </label>
+                              {/* Same pair, same words, as the Courses tab's
+                                  Schedule foldout — one choice with two names. */}
+                              <div className="form-row">
+                                <span className="label">Weight</span>
+                                <div className="radiorow">
+                                  <label className="radiopick">
+                                    <input type="radio" name="isCore" value="true" defaultChecked />
+                                    Core
+                                  </label>
+                                  <label className="radiopick">
+                                    <input type="radio" name="isCore" value="false" />
+                                    Supplemental
+                                  </label>
+                                </div>
+                                <p className="hint" style={{ margin: "4px 0 0", fontSize: "13px" }}>
+                                  Students graph the core readings; supplemental ones sit alongside.
+                                </p>
+                              </div>
                               <button
                                 className="btn mini"
                                 type="submit"

@@ -1,20 +1,21 @@
 /**
- * One-time migration: registers the three PDFs that used to live in
- * public/readings (now storage/readings, served only via the authenticated
- * /api/readings/[sourceId] route) as `sources` rows, extracts their
- * canonical per-page text into `sourcePages`, and backfills `sourceId` on
- * any existing `bytes` rows that reference them by their old free-text
- * `source` label.
+ * Seeds a fresh database with the three course readings: uploads each PDF to
+ * Blob storage, registers it as a `sources` row, extracts its canonical per-page
+ * text into `sourcePages`, and backfills `sourceId` on any existing `bytes` rows
+ * that reference it by an old free-text `source` label.
+ *
+ * The PDFs are read from storage/readings/ but are NOT committed — see
+ * storage/readings/.gitkeep. Supply your own copies before running.
  *
  * Usage: npx tsx scripts/seed-sources.ts
- * Requires DATABASE_URL to be set (via .env.local).
+ * Requires DATABASE_URL and Blob credentials to be set (via .env.local).
  */
 import { readFile } from "fs/promises"
 import path from "path"
 import { db } from "../src/db"
 import { sources, sourcePages, bytes } from "../src/db/schema"
 import { eq } from "drizzle-orm"
-import { extractPdfPageText } from "../src/lib/pdfText"
+import { extractPdfPageText, textLayerProjection } from "../src/lib/pdfText"
 import { hashText } from "../src/lib/hash"
 import { readingStorage } from "../src/lib/storage"
 
@@ -60,10 +61,28 @@ const READINGS: {
   },
 ]
 
+/**
+ * The seed PDFs are gitignored — they are published, copyrighted course readings
+ * and this repo is public (see storage/readings/.gitkeep). So a fresh clone will
+ * not have them, and the failure needs to name the file rather than surface as a
+ * bare ENOENT from deep inside the loop.
+ */
+async function readSeedPdf(file: string) {
+  const filePath = path.join(process.cwd(), "storage", "readings", file)
+  try {
+    return await readFile(filePath)
+  } catch {
+    throw new Error(
+      `Missing seed PDF: storage/readings/${file}\n` +
+        `These are not committed to the repo. Place your own copies of the three ` +
+        `seed readings in storage/readings/ before running this script.`
+    )
+  }
+}
+
 async function run() {
   for (const reading of READINGS) {
-    const filePath = path.join(process.cwd(), "storage", "readings", reading.file)
-    const buffer = await readFile(filePath)
+    const buffer = await readSeedPdf(reading.file)
     const existing = await db
       .select()
       .from(sources)
@@ -151,7 +170,7 @@ async function run() {
             sourceId: source.id,
             pageNumber: p.pageNumber,
             textContent: p.textContent,
-            contentHash: hashText(p.textContent),
+            contentHash: hashText(textLayerProjection(p.textContent)),
           }))
         )
       }

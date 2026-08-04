@@ -25,14 +25,32 @@ import { db } from "@/db"
 import { sourcePages, sourceScores } from "@/db/schema"
 import { asc, eq } from "drizzle-orm"
 import type { ExtractionMetrics } from "@/lib/types"
+import type { PdfStructure } from "@/lib/pdfStructure"
+import { probeHighlights } from "@/lib/highlightProbe"
 import { isJudgeConfigured, judgeModelName, requestChatCompletion } from "@/lib/openrouter"
 
 /**
- * Characters on a page below which there is nothing worth quoting. Chosen to
- * clear a running header and folio (~40 chars) by a wide margin while still
- * counting a sparse page — a section title page, a figure with a caption.
+ * Share of pages a line must appear on before it is page furniture rather than
+ * content — a running header, a journal's download stamp, a copyright footer.
+ *
+ * This replaces a character floor that asked the wrong question. "Fewer than 120
+ * characters" was standing in for "nothing here but a header and a folio", and
+ * it was wrong in both directions: it excluded a page whose only text is a
+ * photograph's caption or a three-word heading, which a student can and does
+ * quote (the shortest capture in this library is 27 characters, a heading); and
+ * it admitted the case it was written for, since the SAGE download stamp that
+ * motivated it runs to ~159 characters a page.
+ *
+ * Repetition separates them cleanly and needs no threshold on length. A line
+ * that appears on two thirds of the pages is not what anyone came to read.
  */
-const PAGE_TEXT_FLOOR = 120
+const FURNITURE_PAGE_SHARE = 0.66
+
+/**
+ * Pages below which repetition means nothing — three pages sharing a line is a
+ * coincidence, not a running header.
+ */
+const FURNITURE_MIN_PAGES = 4
 
 /**
  * Characters a page needs before highlight offsets are meaningful. Higher than
@@ -79,6 +97,58 @@ const FUNCTION_WORDS = [
   "into", "such", "only", "other", "some", "these", "also", "may", "its",
   "use", "between", "about", "through", "however", "where", "were", "each",
 ]
+
+/**
+ * Glyph names that leaked into the text instead of the characters they stand
+ * for. A font with no usable /ToUnicode map falls back to naming its glyphs, and
+ * because those names are ordinary ASCII they pass junkCharRatio untouched and
+ * are stripped before the letter-frequency profile is built — so without this
+ * they register nowhere at all.
+ *
+ * Restricted to the AGL names that actually occur, with composite forms limited
+ * to single-letter components (`f_i`, `f_f_l`). The tempting general shape
+ * `/[a-z]+_[a-z]+` is too broad: it matches ordinary URL paths, and did — a
+ * footnote citing `lindahall.org/events_exhib/` was the library's only reported
+ * "leak" until this was narrowed.
+ */
+const GLYPH_NAME_LEAK =
+  /\/(?:[a-z](?:_[a-z])+|ffi|ffl|ff|fi|fl|hyphen|endash|emdash|quotesingle|quotedbl|bullet)(?:\.[a-z]+)?\b/g
+
+/**
+ * A punctuation mark between two letters — `INTERAC$IVE`. This is what a
+ * ligature code looks like once it has resolved to the ASCII punctuation that
+ * shares its byte value, which is the most common way a broken font map stays
+ * invisible to every other check.
+ *
+ * Two exclusions, both learned from false positives on this library's own
+ * readings rather than reasoned from the character table:
+ *
+ *   - `&` is dropped entirely. It is ordinary inside an acronym, and `AT&T` in
+ *     a Bucciarelli footnote matched every time.
+ *   - `!` and `?` count only when a LOWERCASE letter follows. extractPdfPageText
+ *     joins text runs with no separator, so a sentence ending in `?` fuses with
+ *     the capital that opens the next one; `works?A` and `WORKINGS?Seeking` are
+ *     artefacts of the join, not of the font. Mid-word, before a lowercase
+ *     letter, they are still the ligature signature.
+ *
+ * Note what it does *not* catch: a systematic letter-for-letter OCR confusion
+ * such as `ct` read as `cf` produces `INTERACfIVE`, which is letters throughout.
+ * That one is only visible to the language-likeness measures below.
+ */
+const PUNCT_IN_WORD = /[A-Za-z](?:[!?](?=[a-z])|["#$%*+<=>@^_`|~])[A-Za-z]/g
+
+/**
+ * Length at which a whitespace-delimited token means word boundaries were lost
+ * rather than a genuinely long word.
+ *
+ * Known upward bias, measured on this library's own readings: extractPdfPageText
+ * joins pdf.js items with no separator, and an end-of-line item carries an empty
+ * string, so the last word of every line fuses with the first of the next. That
+ * adds roughly +0.1 percentage points on ordinary prose and considerably more on
+ * layout-heavy pages. The metric still separates the two clearly; read it as a
+ * comparative signal, not an absolute error rate.
+ */
+const LONG_TOKEN_CHARS = 28
 
 /** Below this there is too little signal to judge, and the check abstains. */
 const LIKENESS_MIN_CHARS = 600
@@ -177,8 +247,25 @@ export function computeLanguageLikeness(text: string): LanguageLikeness | null {
  * paper, or a table of figures all look like that — so it only caps to
  * "borderline, look at it", and the judge can raise it back.
  */
-function legibilityCeiling(likeness: LanguageLikeness | null): { ceiling: number; reason: string | null } {
-  if (!likeness) return { ceiling: 5, reason: null }
+function legibilityCeiling(likeness: LanguageLikeness | null): {
+  /** Null means the check could not run — abstain rather than cap. */
+  ceiling: number | null
+  reason: string | null
+} {
+  // Too little text to say anything about whether it reads as language.
+  //
+  // This used to return a ceiling of 5, which quietly asserted the opposite of
+  // what it knew: junkCharRatio can only see characters that failed to resolve,
+  // so a short page of confident-looking nonsense — the exact output OCR
+  // produces from a diagram — scored 5 on legibility because nothing had
+  // contradicted it. Measured: 693 characters of OCR noise off a chart scored
+  // 5/5/5 and passed. "Not checked" must not read as "checked and fine".
+  if (!likeness) {
+    return {
+      ceiling: null,
+      reason: "too little text to verify that it reads as language",
+    }
+  }
 
   // Plenty of text, but not in the Latin alphabet. That is either a genuinely
   // non-Latin reading or a mis-mapped codepage, and these measures cannot tell
@@ -208,6 +295,103 @@ function legibilityCeiling(likeness: LanguageLikeness | null): { ceiling: number
   return { ceiling: 5, reason: null }
 }
 
+/**
+ * Pages carrying something a student could actually quote.
+ *
+ * A page counts if it has any text left once page furniture is removed —
+ * ANY text, with no minimum. The line that decides it is repetition: a header,
+ * a folio, a download stamp recur across the document, and what a reader came
+ * for does not.
+ *
+ * Short documents skip the repetition test entirely, because with three pages
+ * there is nothing to repeat against and the measure would fire on prose.
+ */
+export function countPagesWithContent(pages: ScorablePage[]) {
+  const withText = pages.filter((page) => page.textContent.trim().length > 0)
+  if (pages.length < FURNITURE_MIN_PAGES) return withText.length
+
+  const lineCounts = new Map<string, number>()
+  for (const page of pages) {
+    // Same line twice on one page still only implicates that page once.
+    for (const line of new Set(page.textContent.split("\n").map((l) => l.trim()).filter(Boolean))) {
+      lineCounts.set(line, (lineCounts.get(line) ?? 0) + 1)
+    }
+  }
+  const furnitureFloor = pages.length * FURNITURE_PAGE_SHARE
+
+  return pages.filter((page) => {
+    const content = page.textContent
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && (lineCounts.get(line) ?? 0) < furnitureFloor)
+      // A folio escapes the repetition test because every page's is different —
+      // "47" appears once in the document, so it reads as unique content. It is
+      // not; it is furniture of a kind rather than of a string. Requiring two
+      // consecutive letters drops page numbers, rules and stray punctuation
+      // while keeping anything with a word in it, which is the actual line: a
+      // three-word heading stays, "47" does not, and no length is involved.
+      .filter((line) => /\p{L}{2}/u.test(line))
+    return content.join("").length > 0
+  }).length
+}
+
+function countMatches(text: string, pattern: RegExp) {
+  return text.match(pattern)?.length ?? 0
+}
+
+/**
+ * An even slice of the document for the language check, rather than its opening.
+ *
+ * computeLanguageLikeness caps its input at LIKENESS_SAMPLE_CHARS, and it used
+ * to be handed every page joined together — so it read the first 40,000
+ * characters and nothing else. On a 235-page book that is roughly the first ten
+ * pages: front matter, a preface, and then silence. Damage anywhere later —
+ * a font that breaks at chapter three, an OCR pass that writes noise into a
+ * scanned plate on page 180 — was never looked at.
+ *
+ * Taking the same budget spread evenly across pages costs nothing and means
+ * every part of the document is represented. Pages are joined with a space so
+ * the trailing word of one is not fused to the leading word of the next.
+ */
+function sampleAcrossPages(pages: ScorablePage[]) {
+  if (pages.length === 0) return ""
+
+  const perPage = Math.max(1, Math.floor(LIKENESS_SAMPLE_CHARS / pages.length))
+  // A short document does not need thinning — take it whole, up to the budget.
+  if (perPage >= LIKENESS_SAMPLE_CHARS) {
+    return pages.map((page) => page.textContent).join(" ")
+  }
+
+  return pages.map((page) => page.textContent.slice(0, perPage)).join(" ")
+}
+
+/**
+ * Share of tokens long enough to mean the extractor lost word boundaries.
+ * Returns 0 for text with no tokens at all rather than dividing by zero.
+ */
+export function computeLongTokenRatio(text: string) {
+  const tokens = text.split(/\s+/).filter((token) => token.length > 0)
+  if (tokens.length === 0) return 0
+  const long = tokens.filter((token) => token.length > LONG_TOKEN_CHARS).length
+  return Math.round((long / tokens.length) * 10000) / 10000
+}
+
+/**
+ * The most legibility a document may claim given how many of its words have run
+ * together. Shared by the heuristic pass and the judge pass so the two cannot
+ * disagree about a number neither of them is entitled to argue with.
+ *
+ * Returns 5 — no cap — when the measure is absent, which is the case for score
+ * rows written before it existed.
+ */
+function legibilityCeilingFromBoundaries(metrics: { longTokenRatio?: number } | null) {
+  const ratio = metrics?.longTokenRatio
+  if (ratio == null) return 5
+  if (ratio >= 0.05) return 2
+  if (ratio >= 0.02) return 3
+  return 5
+}
+
 function median(values: number[]) {
   if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
@@ -226,20 +410,29 @@ function bandFromRatio(ratio: number) {
 
 export function computeExtractionMetrics(
   pages: ScorablePage[],
-  { coverRendered }: { coverRendered: boolean }
+  {
+    coverRendered,
+    structure,
+  }: {
+    coverRendered: boolean
+    /**
+     * Optional: the file's structure, from probePdfStructure. Optional because
+     * it needs the PDF bytes, which a rescore over stored page rows does not
+     * have. Absent means "not measured", never "measured as fine".
+     */
+    structure?: PdfStructure
+  }
 ): ExtractionMetrics {
   const lengths = pages.map((page) => page.textContent.length)
   const totalChars = lengths.reduce((sum, length) => sum + length, 0)
-  const junkChars = pages.reduce(
-    (sum, page) => sum + (page.textContent.match(JUNK_CHAR)?.length ?? 0),
-    0
-  )
+  const junkChars = pages.reduce((sum, page) => sum + countMatches(page.textContent, JUNK_CHAR), 0)
 
-  const likeness = computeLanguageLikeness(pages.map((page) => page.textContent).join(" "))
+  const allText = pages.map((page) => page.textContent).join(" ")
+  const likeness = computeLanguageLikeness(sampleAcrossPages(pages))
 
   return {
     pageCount: pages.length,
-    pagesWithText: pages.filter((page) => page.textContent.length >= PAGE_TEXT_FLOOR).length,
+    pagesWithText: countPagesWithContent(pages),
     totalChars,
     medianCharsPerPage: median(lengths),
     junkCharRatio: totalChars > 0 ? junkChars / totalChars : 0,
@@ -247,6 +440,27 @@ export function computeExtractionMetrics(
     letterFreqSimilarity: likeness?.letterFreqSimilarity ?? undefined,
     functionWordsPerKChar: likeness?.functionWordsPerKChar ?? undefined,
     latinShare: likeness?.latinShare,
+    glyphNameLeaks: countMatches(allText, GLYPH_NAME_LEAK),
+    punctuationInWord: countMatches(allText, PUNCT_IN_WORD),
+    longTokenRatio: computeLongTokenRatio(allText),
+    ...(() => {
+      const probe = probeHighlights(pages)
+      return {
+        anchorRate: probe.anchorRate ?? undefined,
+        anchorSpansTested: probe.spansTested,
+      }
+    })(),
+    ...(structure
+      ? {
+          picturePages: structure.pages.filter((page) => page.kind === "picture").length,
+          spreadPages: structure.spreadPages,
+          pagesWithGlyphs: structure.pagesWithGlyphs,
+          scannedPages: structure.scannedPages,
+          blankPages: structure.blankPages,
+          glyphCount: structure.glyphCount,
+          unmappedGlyphRatio: Math.round(structure.unmappedGlyphRatio * 10000) / 10000,
+        }
+      : {}),
   }
 }
 
@@ -269,9 +483,19 @@ export function scoreFromMetrics(metrics: ExtractionMetrics, pages: ScorablePage
     }
   }
 
-  const coverage = bandFromRatio(metrics.pagesWithText / metrics.pageCount)
+  // Coverage is over pages that were SUPPOSED to carry text. A photograph, a
+  // plate or a diagram has no text because it is not text, and counting it as
+  // missing text punishes a document for being illustrated — which on this
+  // library dragged two perfectly usable readings below the bar. A page that IS
+  // laid out as prose and yields nothing still counts against it; that is the
+  // scanned case, and the distinction is drawn in pdfStructure.
+  const textBearingPages =
+    metrics.picturePages != null && metrics.blankPages != null
+      ? Math.max(1, metrics.pageCount - metrics.picturePages - metrics.blankPages)
+      : metrics.pageCount
+  const coverage = bandFromRatio(metrics.pagesWithText / textBearingPages)
 
-  let legibility: number
+  let legibility: number | null
   if (metrics.totalChars === 0) legibility = 1
   else if (metrics.junkCharRatio <= 0.001) legibility = 5
   else if (metrics.junkCharRatio <= 0.005) legibility = 4
@@ -282,6 +506,16 @@ export function scoreFromMetrics(metrics: ExtractionMetrics, pages: ScorablePage
   // A document whose pages carry only a header's worth of text extracts
   // "cleanly" by the junk measure while being useless to read. Cap it.
   if (metrics.medianCharsPerPage < 200) legibility = Math.min(legibility, 3)
+
+  // Words run together. Every other measure here is blind to this — the
+  // characters are correct, the letter distribution is perfect, the common words
+  // are all present — and yet a student quoting a sentence gets
+  // `designismore thanastyle`. For a tool whose whole purpose is capturing
+  // passages, that is a legibility failure however clean the bytes are.
+  //
+  // The floor of 0.5% is our own line-end join, measured across this library;
+  // the thresholds sit well clear of it. See LONG_TOKEN_CHARS.
+  legibility = Math.min(legibility, legibilityCeilingFromBoundaries(metrics))
 
   // The junk-character count only sees characters that failed to resolve. A
   // font map that resolves to the *wrong* character produces clean ASCII and
@@ -298,20 +532,42 @@ export function scoreFromMetrics(metrics: ExtractionMetrics, pages: ScorablePage
         }
       : null
   const { ceiling, reason } = legibilityCeiling(likeness)
-  legibility = Math.min(legibility, ceiling)
+  // A null ceiling means the language check could not run. Abstain outright
+  // rather than reporting the junk-byte number alone as if it settled the
+  // question — the judge can still fill this in, since it reads the words.
+  legibility = ceiling == null ? null : Math.min(legibility, ceiling)
 
+  // Anchorability is measured, not inferred. It used to be "pages carrying 300
+  // characters", which is a proxy for whether a highlight will hold and not the
+  // thing itself — and the proxy was wrong here twice: two readings failed on it
+  // while every simulated capture in them anchored perfectly. probeHighlights
+  // runs the real mechanism instead, so this dimension now answers the question
+  // it is named after.
+  //
+  // Falls back to the old page count only when nothing could be simulated, which
+  // means the document had no page with a capture's worth of text on it.
   const anchorablePages = pages.filter(
     (page) => page.textContent.length >= ANCHOR_TEXT_FLOOR
   ).length
   const anchorability =
-    metrics.totalChars === 0 ? 1 : bandFromRatio(anchorablePages / metrics.pageCount)
+    metrics.totalChars === 0
+      ? 1
+      : metrics.anchorRate != null
+        ? bandFromRatio(metrics.anchorRate)
+        : bandFromRatio(anchorablePages / textBearingPages)
 
   const parts = [
-    `${metrics.pagesWithText}/${metrics.pageCount} pages have extractable text`,
+    `${metrics.pagesWithText}/${textBearingPages} text pages have extractable text` +
+      (metrics.picturePages ? ` (${metrics.picturePages} pictures not counted)` : ""),
     `median ${metrics.medianCharsPerPage.toLocaleString()} chars/page`,
   ]
   if (metrics.junkCharRatio > 0.005) {
     parts.push(`${(metrics.junkCharRatio * 100).toFixed(1)}% unreadable characters`)
+  }
+  if (metrics.anchorRate != null && metrics.anchorSpansTested) {
+    parts.push(
+      `${(metrics.anchorRate * 100).toFixed(0)}% of ${metrics.anchorSpansTested} simulated highlights anchor cleanly`
+    )
   }
   if (reason) parts.push(reason)
   if (!metrics.coverRendered) parts.push("cover preview failed to render")
@@ -358,7 +614,14 @@ export function overallFromDimensions(dimensions: Dimensions) {
  */
 export function passFromDimensions(dimensions: Dimensions) {
   const overall = overallFromDimensions(dimensions)
-  if (overall == null || dimensions.coverage == null) return null
+  // Legibility joins coverage as a dimension that must actually have a value.
+  // Without it "can a student quote this?" has no answer: coverage and
+  // anchorability both measure how MUCH text there is, and a page can be full
+  // of characters that are not words. Returning null here reports the reading
+  // as unverified rather than accusing it of a defect nothing measured.
+  if (overall == null || dimensions.coverage == null || dimensions.legibility == null) {
+    return null
+  }
 
   const scored = [
     dimensions.coverage,
@@ -374,7 +637,7 @@ export function passFromDimensions(dimensions: Dimensions) {
 
 /** Pages spread evenly through the document, skipping ones with nothing to read. */
 function sampleForJudge(pages: ScorablePage[]) {
-  const usable = pages.filter((page) => page.textContent.length >= PAGE_TEXT_FLOOR)
+  const usable = pages.filter((page) => page.textContent.trim().length > 0)
   if (usable.length === 0) return []
 
   const step = Math.max(1, Math.floor(usable.length / JUDGE_SAMPLE_PAGES))
@@ -400,8 +663,14 @@ export function buildJudgePrompt(sample: ScorablePage[]) {
     `numbers are non-contiguous and jump. No pages are missing from the PDF.\n` +
     `- Each page is truncated at a fixed character budget, so every excerpt ends ` +
     `mid-sentence. That is the budget, not a truncated extraction.\n` +
-    `- The extractor joins text runs without inserting spaces, so missing spaces ` +
-    `between words are expected.\n` +
+    `- Line breaks appear as newlines, one per line of the page. A line ending ` +
+    `mid-sentence is the page's own line wrapping, not a broken extraction.\n` +
+    `DO judge whether words run together WITHIN a line — ` +
+    `"designismore thanastyle option,corporatePropaganda" is a defect in the ` +
+    `document, and it makes the text unquotable. Older readings may still be ` +
+    `stored without line breaks; on those, fusion exactly AT a line end is an ` +
+    `artefact of how they were extracted and should not be penalised, while ` +
+    `fusion running through the middle of a line still should.\n` +
     `Judge only what is visible WITHIN each excerpt.\n\n` +
     `legibility: are these real, readable words in a real script? 5 = clean text. ` +
     `1 = mojibake, glyph soup, or character substitution making it unreadable.\n\n` +
@@ -485,9 +754,21 @@ async function upsertScore(row: ScoreRow) {
 export async function recordHeuristicScore(
   sourceId: string,
   pages: ScorablePage[],
-  { coverRendered }: { coverRendered: boolean }
+  {
+    coverRendered,
+    structure,
+  }: {
+    coverRendered: boolean
+    /**
+     * The file's own structure, when the caller has the bytes. Carries the two
+     * defects no amount of page text reveals — a spread scanned as one sheet,
+     * and glyphs resolving to nothing — into the stored metrics, where
+     * diagnoseExtraction can route them to a repair.
+     */
+    structure?: PdfStructure
+  }
 ) {
-  const metrics = computeExtractionMetrics(pages, { coverRendered })
+  const metrics = computeExtractionMetrics(pages, { coverRendered, structure })
   const heuristic = scoreFromMetrics(metrics, pages)
   const dimensions: Dimensions = {
     coverage: heuristic.coverage,
@@ -546,9 +827,16 @@ export async function judgeSourceScore(sourceId: string) {
     // The judge overrides legibility — it read the words, the heuristic only
     // counted bytes. Coverage and anchorability stay as computed: those are
     // measurements, and a model's opinion of them is worth less.
+    //
+    // Run-together words are a measurement too, and one the judge is poorly
+    // placed to weigh: it sees a few sampled pages, and it is explicitly told to
+    // forgive line-end fusions, which sit right beside the real thing. So the
+    // deterministic ceiling is re-applied over the judge's answer — the judge may
+    // lower legibility here, never raise it past what was counted.
+    const judged = Math.min(verdict.legibility, legibilityCeilingFromBoundaries(existing.metrics))
     const dimensions = {
       coverage: existing.coverage,
-      legibility: verdict.legibility,
+      legibility: judged,
       anchorability: existing.anchorability,
       structure: verdict.structure,
     }
@@ -557,7 +845,10 @@ export async function judgeSourceScore(sourceId: string) {
       .update(sourceScores)
       .set({
         status: "judged",
-        legibility: verdict.legibility,
+        // The capped value, not the raw verdict — writing the judge's answer
+        // here while deriving `overall` and `pass` from the capped one would
+        // put a number on the card that contradicts the verdict beside it.
+        legibility: judged,
         structure: verdict.structure,
         overall: overallFromDimensions(dimensions),
         pass: passFromDimensions(dimensions),

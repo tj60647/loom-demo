@@ -1,5 +1,169 @@
 # Next Session Prompt
 
+## Start here
+
+The reading-repair pipeline is built end to end and **has never been run through
+the UI**. Everything below it is measured and green; the last mile is not wired.
+
+> Mount `RepairPanel` on `src/app/admin/library/page.tsx`, then run one real
+> reading through the whole loop — detect → read → review → accept → apply — and
+> fix what that turns up.
+>
+> Use **Design as Critique** (page 9, a photographed spoof newspaper) or
+> **Learning How to Learn** (page 56, a hand-drawn concept map printed
+> sideways). Both are known-damaged and both have been transcribed successfully
+> by the panel outside the UI, so anything that fails is the wiring.
+>
+> The panel needs `getRepairsForSource(sourceId)` from
+> `src/actions/repairs.ts` and a count of that reading's `byte` rows passed as
+> `hasHighlights`. Read `docs/reading-quality.md` first — it is the map.
+
+Expect the first pass to find something: server-action error surfacing, the
+crop route's auth, and transcription duration are the three most likely. On
+duration, see open item 2.
+
+## Addendum, 2026-08-04 (extraction, anchoring and repair session)
+
+**Read this first; it supersedes parts of what follows.**
+
+Branch `chore/alpha-foundation`, uncommitted. `npm run check` is green and now
+runs lint, tsc, and two assertion scripts (`check:remap`, `check:scoring`).
+`npm run check:textlayer` needs real PDFs and is run by hand.
+
+### Landed in production (both databases migrated)
+
+- **Migration 0016** — the `source_page` and `byte` foreign keys that
+  `schema.ts` had declared since 0000 and that existed in **no** database.
+  `deleteSource` had been relying on a cascade that was not there; 15 orphaned
+  page rows were cleared from each environment. Plus indexes on `byte.sourceId`
+  and `source_page(sourceId, pageNumber)`.
+- **Migrations 0017 / 0018 / 0019** — `source_repair` and
+  `source_repair_reading`, with per-reading token, cost and duration accounting,
+  and the vote record for each region.
+- **All 23 readings re-extracted.** The canonical text join changed (below), so
+  every `source_page` row was rewritten. **23/23 highlight anchors survived** —
+  verified, not assumed.
+
+### The join fix, and why it mattered
+
+`extractPdfPageText` joined pdf.js text items with `""`, discarding every line
+boundary pdf.js had already computed. Consequence, measured against real
+Postgres: `CraftBuilding` tokenises to `craftbuild`, matching neither `craft`
+nor `building`, and **58–77% of line ends in this library fused two words**.
+Reading search was silently missing them.
+
+Stored text now records the boundaries; `textLayerProjection()` strips them back
+out to recover **the browser's** text-layer string, which is where every
+`startOffset`/`endOffset` actually lives — not the stored column. Anything
+reconciling a client capture against stored page text must go through it.
+`scripts/check-text-layer-projection.ts` asserts the round trip (42/42 pages
+exact). Result: **+321 page-hits across ten common terms**, and the search index
+shed ~26,600 junk tokens (42,940 → 16,333).
+
+The warning that used to head `pdfText.ts` — "changing any of it silently moves
+every existing anchor" — was **wrong**, and is corrected in place.
+
+### Scoring, substantially reworked
+
+Every change came from a measurement that contradicted the previous rule:
+
+- `coverage` counted **all** pages, so a thesis of diagrams was penalised for
+  being illustrated. It now counts pages that were supposed to carry text —
+  `pdfStructure.ts` classifies each as `text` / `scanned` / `picture` / `blank`
+  from a row-band profile (text bands at 5.0–8.9 per 100 rows, pictures at
+  0.0–0.8; a six-fold gap with nothing between).
+- `anchorability` was "at least 300 characters per page" — a proxy for whether a
+  highlight holds that **never tested whether a highlight holds**. It now
+  simulates captures (`highlightProbe.ts`) at 30/80/200 characters, sizes drawn
+  from the real capture distribution where the shortest byte is 27 characters.
+  Both readings that were failing on it anchor **100%** of simulated highlights.
+- All character floors are gone. `PAGE_TEXT_FLOOR` stood in for "is this content
+  or a running header", answered with length; repetition answers it properly,
+  and catches the SAGE-watermark case the 120-character floor *admitted* (the
+  stamp runs to ~159 characters).
+- `legibility` used to be granted a **5** when there was too little text to run
+  the language check — 693 characters of OCR noise scored 5/5/5 and passed. It
+  now abstains, `pass` is three-valued, and the card shows "Unverified".
+- The judge prompt was **telling the model to forgive** run-together words, the
+  defect that matters most for quoting. Fixed. The judge can also no longer
+  raise legibility past the measured ceiling, and a bug where the raw verdict
+  was stored while the capped value drove `pass` is fixed.
+
+### Gibberish detection and repair (new subsystem)
+
+`garble.ts` finds scan-induced nonsense every aggregate misses — the characters
+are valid, the letter distribution is perfect, and the page reads
+`ihe feacier refigian haa`. Two restrictions make it honest: only **lowercase**
+tokens count (proper nouns are capitalised, so bibliographies stop
+false-alarming), and a page needs enough body words for the rate to mean
+anything. Clean pages measure 1–2%; broken ones 30–81%.
+
+`garbleRegion.ts` locates damage to a pixel box from the text layer, so crops
+are exact rather than guessed. `repairPipeline.ts` sends the crop to five
+independent frontier models. `repairConsensus.ts` computes agreement
+**mechanically** — an adjudicator agent once returned a paragraph *describing*
+the agreement, which was written into a PDF and improved every automatic measure
+while being unrelated to the page. Agreement is by **majority**, not unanimity,
+and the vote is recorded per reader: with-majority, outvoted, and *solo* counts.
+Solo is the invention detector — `"from Saddam"` where three readers wrote
+`"from Sadda"` shows as solo=1. Deciding a vote is exact (so `religions` and
+`televisions` never merge); grouping the losers for display is fuzzy (so a
+reviewer sees both variants of a disputed passage together).
+
+`textLayerRepair.ts` writes an accepted transcription back as a replaced page. `src/actions/repairs.ts` and
+`components/library/RepairPanel.tsx` are the admin surface.
+
+### Open decisions — TJ's, not the next session's
+
+1. **Mount `RepairPanel`** — see "Start here" at the top of this file.
+2. **`qwen/qwen3.8-max` took 210 seconds** on one region. That alone would
+   exceed a serverless function's duration. Either it goes, or transcription
+   moves fully behind `after()`.
+3. **The panel is five readers** — Opus 5, Qwen3.8 Max, Gemini 3.6 Flash,
+   Grok 4.5, Inkling Small. Odd on purpose: a majority cannot tie.
+4. **Majority voting is in, with per-reader stats** (item 2 is what to spend
+   them on). Nothing to decide unless the stats show a reader worth replacing —
+   watch the `solo` column, which is where invention shows up.
+5. **Upload gate** — spec line 139 says scoring is "advisory, not blocking".
+   TJ's stated goal makes a gate unnecessary: a bad score means *source a better
+   copy*, not *block*. Treat as decided against unless TJ reopens it.
+6. **Git history** still holds the copyrighted seed PDFs. They are out of HEAD
+   and gitignored. A purge needs `git filter-repo`, a force-push across six
+   branches, and a GitHub Support request — the rewrite alone does **not**
+   remove them. TJ chose to skip; not urgent, not closed.
+7. **`tesseract.js` is installed and unused.** Measured as unnecessary here:
+   every "scanned" page in this library is a cover, a blank leaf or a figure.
+   Drop it unless a future upload needs it.
+
+### Facts worth not re-deriving
+
+- **`.env.local` is what every script reads.** `vercel env pull` writes
+  `.env.production.local`, which nothing loads by default, and Vercel returns
+  the literal string `[SENSITIVE]` for `DATABASE_URL` and five other variables —
+  a pulled production file is **not usable as-is**. Use `LOOM_ENV_FILE`, and
+  read the `database:` line every script now prints. PowerShell has no inline
+  env prefix: `$env:LOOM_ENV_FILE = '.env.production.local'`.
+- **Red line #6 is about students not outsourcing their thinking**, not about
+  faculty preparing source material (TJ, 2026-08-04). Faculty-facing repair is
+  not gated by it.
+- **What text matters in a reading is not the tool's call.** A figure's labels
+  and a reproduced newspaper are content a student may code.
+- **The registry MCP is the authority on models.** Three things are not
+  inferable from a model name, and all three would have shipped broken: image
+  *generators* (`->text+image`) masquerading as vision models; `temperature`
+  rejected by reasoning models; and `max_tokens` vs `max_completion_tokens`.
+  Sorting by price is not sorting by recency.
+- **Costs come from OpenRouter's `usage` reporting**, never a price table in
+  this repo. Measured panel cost is **$0.18 per region**; the first estimate was
+  50× low.
+- **The two known-damaged pages** for testing: *Design as Critique* p9 (a
+  photographed spoof newspaper) and *Learning How to Learn* p56 (a hand-drawn
+  concept map printed sideways). Non-LLM rungs — rotation-aware re-OCR at
+  400dpi — were measured and **fail on both**.
+
+---
+
+
 You are continuing work on Loom after the journey build of 2026-08-01 (which
 followed the multiple-maps build of 07-31 and the reading-first pass of 07-30/31).
 
