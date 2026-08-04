@@ -1,18 +1,37 @@
 # Loom — Environments and deployments
 
 Three environments, one Vercel project (`loom-demo`), one blob store, one Neon
-project with three branches. The reasoning for the dev setup was worked through
-in the 8/1 session (NEXT_SESSION item 1); this document is its durable form.
+project with three branches — `main`, `dev`, and `ci`, of which only the first
+two back a deployment. The reasoning for the dev setup was worked through in the
+8/1 session (NEXT_SESSION item 1); this document is its durable form. Stood up
+8/3.
 
 | | local | dev (alpha testers) | production (students) |
 | --- | --- | --- | --- |
-| Git | working tree | `dev` branch | `master` |
+| Git | working tree | `dev` branch (protected) | `master` (protected) |
 | URL | `http://localhost:3000` (or 3100) | the **stable** dev branch alias | the production domain |
 | Neon branch | `dev` (via `.env.local`) | `dev` | `main` |
-| GitHub OAuth app | dev app | **dev app** (callback = dev alias) | production app |
+| GitHub OAuth app | none — backdoor only | **dev app** (callback = dev alias) | production app |
 | `NEXTAUTH_URL` | `http://localhost:3000` | `https://<dev-alias>` | `https://<prod-domain>` |
 | Blob store | the one store | the one store | the one store |
 | test-login backdoor | works (`next dev`) | **403s** (production build) | **403s** |
+| Mark | red weft | red weft + "dev" caption | bare mark |
+
+The `ci` branch backs the e2e gate and belongs to no deployed environment
+(see §CI). Local setup starts from
+[.env.example](../.env.example), which says where each value comes from —
+**not** `vercel env pull`, which would aim local work at production.
+
+**The deployment wears its colours** (947e0e8). `VERCEL_ENV` decides: production
+serves `public/icon.svg` and a bare wordmark; every other build — the dev alias
+and local — serves `public/icon-dev.svg`, the same mark with one red thread
+through it, plus a quiet red `dev` in the wordmark caption
+([src/app/layout.tsx](../src/app/layout.tsx),
+[src/components/ui/Header.tsx](../src/components/ui/Header.tsx)). The two GitHub
+OAuth apps carry the matching pair (`public/oauth-logo.png`,
+`public/oauth-logo-dev.png`), so the consent screen says which environment you
+are signing in to before you sign in. A tab that looks like production and isn't
+is how tester data gets written to `main`.
 
 ## The five invariants
 
@@ -41,8 +60,15 @@ in the 8/1 session (NEXT_SESSION item 1); this document is its durable form.
 
 ## Standing up the dev deployment
 
+Done 8/3 — steps 1–5 below are the record of how, and the recipe if it ever has
+to be rebuilt. **Step 6 is the part that is still owed:** the fresh-GitHub-account
+sign-in has no recorded result, and until someone runs it and writes the date
+here, treat it as unverified. It is the one path the suite structurally cannot
+reach (CONTRIBUTING §Tests, audit condition 1).
+
 1. Neon → create branch `dev` from `main` (schema + data snapshot; migrations
-   already applied through `0013`).
+   applied through `0015` on `main`, `dev` and `ci` as of 8/3 — check with
+   `npx tsx scripts/check-migrations.ts`, never the journal alone).
 2. GitHub → Settings → Developer settings → New OAuth App:
    homepage = dev alias, callback = `https://<dev-alias>/api/auth/callback/github`.
 3. Vercel → project → Settings → Domains: give the `dev` branch a stable domain
@@ -76,11 +102,12 @@ my month"; a change branch is a ten-minute read.
    URL, and preview URLs are ephemeral), and that is by design, not a bug to
    fix. Anything needing a session is exercised locally (`next dev` +
    the test-login backdoor) or on the dev alias after merge.
-2. **PR into `dev`; the other developer reviews.** CI's `checks` job gates
-   every PR; `e2e` joins it once its secrets are configured. Keep the PR
-   small enough that the review is genuinely a read, and agree on a
-   CI-green self-merge lane for typo-grade changes so process never
-   outweighs the work.
+2. **PR into `dev`; the other developer reviews.** `dev` is protected: both
+   CI jobs — `checks` **and** `e2e` — are required, and neither branch takes
+   force pushes. `dev` requires no approving review, so a CI-green self-merge
+   is the lane for typo-grade changes; `master` requires one code-owner
+   approval on top. Keep the PR small enough that the review is genuinely a
+   read.
 3. **A schema change and its migration are one commit.** `drizzle-kit
    generate` runs in the same PR that edits `schema.ts` — never later. (The
    `category` column shipped without its migration once; a dev server's
@@ -148,13 +175,15 @@ merge time via `npx drizzle-kit migrate` against the production
 
 - `checks` (lint + types + build) needs no secrets and runs on every PR,
   including forks.
-- `e2e` runs the Playwright journey suite against a **third Neon branch,
-  `ci`**, created once from `dev`. It migrates, seeds readings and demo
-  accounts, then runs the suite via `next dev` (the backdoor needs a
-  non-production build). Runs queue on a shared concurrency group because the
-  suite owns its demo account exclusively.
+- `e2e` runs the Playwright journey suite — **26 tests in 9 files**, one worker
+  — against a **third Neon branch, `ci`**, created once from `dev`. It migrates,
+  seeds readings and demo accounts, then runs the suite via `next dev` (the
+  backdoor needs a non-production build). Runs queue on a shared concurrency
+  group because the suite owns its demo account exclusively.
 
-Repository secrets to configure (Settings → Secrets → Actions):
+Both jobs run on pull requests to **and** pushes of `master` and `dev`.
+
+Repository secrets, all three configured 8/3 (Settings → Secrets → Actions):
 
 | Secret | Value |
 | --- | --- |
@@ -162,18 +191,23 @@ Repository secrets to configure (Settings → Secrets → Actions):
 | `CI_BLOB_READ_WRITE_TOKEN` | a blob read-write token (same store) |
 | `CI_NEXTAUTH_SECRET` | any fresh random string (optional; has a default) |
 
-Until `CI_DATABASE_URL` is set, the `e2e` job **fails with a pointed message**
-rather than skipping — a gate that silently skips is not a gate. Fork PRs
-don't receive secrets; collaborators should push branches to this repo.
+If `CI_DATABASE_URL` or `CI_BLOB_READ_WRITE_TOKEN` goes missing, the `e2e` job
+**fails with a pointed message** rather than skipping — a gate that silently
+skips is not a gate. Fork PRs don't receive secrets, so the required `e2e`
+context can never go green on one; collaborators push branches to this repo.
 
-Branch protection on `master` initially requires only the `checks` context (so
-an unconfigured e2e gate can't block everything); **once the secrets are in
-and the job is green, add `e2e` to the required status checks** — Settings →
-Branches → master, or:
+### Branch protection, as configured
+
+| Branch | Required contexts | Reviews | Force push |
+| --- | --- | --- | --- |
+| `master` | `checks`, `e2e` | 1, code-owner ([CODEOWNERS](../.github/CODEOWNERS)) | no |
+| `dev` | `checks`, `e2e` | none | no |
+
+Read it back rather than trusting this table, which will drift:
 
 ```bash
-gh api -X PATCH repos/tj60647/loom-demo/branches/master/protection/required_status_checks \
-  -f "contexts[]=checks" -f "contexts[]=e2e"
+gh api repos/tj60647/loom-demo/branches/master/protection \
+  --jq '{checks: .required_status_checks.contexts, reviews: .required_pull_request_reviews}'
 ```
 
 ## Rollback
