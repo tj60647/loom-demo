@@ -14,7 +14,7 @@
  * Keeping them apart is what lets the expensive step be retried, the decision be
  * audited, and the change be refused if it does not measure better.
  */
-import { and, asc, count, eq, inArray } from "drizzle-orm"
+import { and, asc, count, eq, inArray, isNotNull } from "drizzle-orm"
 import { after } from "next/server"
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth/next"
@@ -26,9 +26,11 @@ import { detectRepairsForSource, repairSettings, transcribeRepairRegion } from "
 import { ACCEPTED_OVERLAP_FLOOR, acceptedTextMatchesReadings } from "@/lib/repairReview"
 import { repairPageTextLayers } from "@/lib/textLayerRepair"
 import { reingestSource } from "@/lib/reingest"
-import { extractPdfPageText } from "@/lib/pdfText"
+import { extractPdfPageText, textLayerProjection } from "@/lib/pdfText"
 import { reportGarble } from "@/lib/garble"
 import { consensusSettings } from "@/lib/repairConsensus"
+import { planReanchor } from "@/lib/reanchor"
+import { hashText } from "@/lib/hash"
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -152,9 +154,16 @@ export async function getRepairSummary() {
       .select({ sourceId: sourceRepairs.sourceId, status: sourceRepairs.status, value: count() })
       .from(sourceRepairs)
       .groupBy(sourceRepairs.sourceId, sourceRepairs.status),
+    // Only highlights with offsets. A byte typed or pasted rather than selected
+    // was never measured against a text layer, so replacing one cannot disturb
+    // it — 20 of this library's 43 bytes are that kind, carrying a written
+    // location like "p. 387 (abstract)" and nothing to move. Counting them made
+    // the panel say "7 highlights anchored to this reading" about a reading with
+    // none, and refused a repair that would have broken nothing.
     db
       .select({ sourceId: bytes.sourceId, value: count() })
       .from(bytes)
+      .where(isNotNull(bytes.startOffset))
       .groupBy(bytes.sourceId),
   ])
 
@@ -321,17 +330,6 @@ export async function applyRepairs(sourceId: string) {
     const source = rows[0]
     if (!source?.storageKey) throw new Error("That reading has no stored file.")
 
-    const [{ value: byteCount }] = await db
-      .select({ value: count() })
-      .from(bytes)
-      .where(eq(bytes.sourceId, sourceId))
-    if (byteCount > 0) {
-      throw new Error(
-        `${byteCount} highlight${byteCount === 1 ? " is" : "s are"} anchored to this reading's current text. ` +
-          `Repairing it now would move them. Repair before a cohort works in a reading, not after.`
-      )
-    }
-
     const accepted = await db
       .select()
       .from(sourceRepairs)
@@ -410,12 +408,63 @@ export async function applyRepairs(sourceId: string) {
       )
     }
 
+    /**
+     * Can every existing highlight be carried across?
+     *
+     * This used to be a flat refusal whenever any byte referenced the reading,
+     * which was wrong three times over: bytes with no offsets were never
+     * measured against a text layer and cannot be disturbed by one; highlights
+     * on pages this repair does not touch are not affected; and a quote that
+     * occurs exactly once on its page can simply be found again. All of that is
+     * decided HERE — against the repaired reading built in memory, before a
+     * single byte of it is stored — so a repair that would strand a highlight is
+     * refused having changed nothing.
+     */
+    const anchored = await db
+      .select({
+        id: bytes.id,
+        content: bytes.content,
+        pageNumber: bytes.pageNumber,
+        startOffset: bytes.startOffset,
+        endOffset: bytes.endOffset,
+      })
+      .from(bytes)
+      .where(and(eq(bytes.sourceId, sourceId), isNotNull(bytes.startOffset)))
+
+    const projectionsAfter = new Map(
+      pagesAfter.map((page) => [page.pageNumber, textLayerProjection(page.textContent)])
+    )
+    const plan = planReanchor(anchored, projectionsAfter, repaired.pagesReplaced)
+    if (plan.lost.length > 0) {
+      const worst = plan.lost[0]
+      throw new Error(
+        `Discarded: ${plan.lost.length} highlight${plan.lost.length === 1 ? "" : "s"} could not be carried ` +
+          `across this repair, so nothing was changed. On page ${worst.pageNumber}, ${worst.why} — ` +
+          `“${worst.quote}…”. A student's quotation is not something to break in passing; if this repair ` +
+          `matters more than that highlight, the highlight has to be dealt with first.`
+      )
+    }
+
     // A new key, never an overwrite: the original stays retrievable, and one blob
     // store is shared by every environment.
     const revisedKey = `readings/${sourceId}-repaired-${Date.now()}.pdf`
     await readingStorage.put(revisedKey, repaired.bytes)
     await db.update(sources).set({ storageKey: revisedKey }).where(eq(sources.id, sourceId))
     await reingestSource(sourceId, repaired.bytes)
+
+    // After re-ingest, so the hash a highlight carries names the page rows that
+    // now exist rather than the ones that did a moment ago.
+    for (const move of plan.moves) {
+      const projection = projectionsAfter.get(move.pageNumber) ?? ""
+      await db
+        .update(bytes)
+        .set({
+          startOffset: move.startOffset,
+          endOffset: move.endOffset,
+          pageContentHash: hashText(projection),
+        })
+        .where(eq(bytes.id, move.id))
+    }
 
     await db
       .update(sourceRepairs)
@@ -428,6 +477,8 @@ export async function applyRepairs(sourceId: string) {
       damagedPagesBefore: before.pagesGarbled,
       damagedPagesAfter: after_.pagesGarbled,
       revisedKey,
+      highlightsMoved: plan.moves.length,
+      highlightsUnchanged: plan.unchanged,
     }
   })
 }

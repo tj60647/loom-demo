@@ -492,6 +492,12 @@ export default function RepairPanel({
                   `${result.pagesReplaced.length === 1 ? "" : "s"} ` +
                   `${result.pagesReplaced.join(", ")}; the reading now measures ` +
                   `${result.damagedPagesAfter} damaged page(s), from ${result.damagedPagesBefore}. ` +
+                  (result.highlightsMoved > 0
+                    ? `${result.highlightsMoved} highlight(s) were re-located in the corrected text; `
+                    : "") +
+                  (result.highlightsUnchanged > 0
+                    ? `${result.highlightsUnchanged} were unaffected. `
+                    : "") +
                   `The original file is still stored under its old key.`
               )
             }
@@ -519,9 +525,11 @@ export default function RepairPanel({
 
       {hasHighlights > 0 ? (
         <p className="hint">
-          {hasHighlights} highlight{hasHighlights === 1 ? "" : "s"} anchored to this reading. Repairs can be
-          reviewed, but applying one would move the text those highlights were measured against — so it is
-          refused. Repair before a cohort works in a reading, not after.
+          {hasHighlights} highlight{hasHighlights === 1 ? " is" : "s are"} anchored to this reading&rsquo;s text.
+          Writing a repair re-locates {hasHighlights === 1 ? "it" : "them"} in the corrected page and moves{" "}
+          {hasHighlights === 1 ? "its offsets" : "their offsets"} to match. If even one cannot be placed —
+          because the passage is gone, or appears twice and could not be told apart — the whole write is
+          refused and nothing changes. A student&rsquo;s quotation is not broken in passing.
         </p>
       ) : null}
 

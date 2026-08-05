@@ -13,6 +13,7 @@ import { countPagesWithContent } from "../src/lib/readingScore"
 import { probeHighlights } from "../src/lib/highlightProbe"
 import { acceptedTextMatchesReadings } from "../src/lib/repairReview"
 import { computeConsensus } from "../src/lib/repairConsensus"
+import { locateQuote, planReanchor } from "../src/lib/reanchor"
 
 let failures = 0
 function check(name: string, got: unknown, want: unknown) {
@@ -182,6 +183,60 @@ check("the dissenting reader shows 0% agreement", STATS.perReader[4].agreementRa
 check("  and its reading is marked solo", STATS.perReader[4].solo, 1)
 check("a majority reader shows 100%", STATS.perReader[0].agreementRate, 1)
 check("the vote distribution counts sentences by backing", STATS.distribution[4], 1)
+
+console.log("\nre-anchoring — carrying a highlight across a repaired page")
+
+// The case that makes whitespace-insensitivity necessary rather than merely
+// convenient: `Selection.toString()` renders pdf.js's end-of-line <br> as a
+// newline, while the offsets index `textContent`, where it contributes nothing.
+// Compared literally these match 12 of this library's 23 highlights; ignoring
+// whitespace, all 23.
+const PAGE = "Historicallyandtraditionally,it has been the task of the science disciplines."
+const QUOTED = "Historically\nand\ntraditionally,\nit has been"
+const FOUND = locateQuote(PAGE, QUOTED)
+check("a quote whose newlines the page does not have is still found", FOUND.found, true)
+check(
+  "  and the span it returns is the real one",
+  FOUND.found ? PAGE.slice(FOUND.startOffset, FOUND.endOffset) : null,
+  "Historicallyandtraditionally,it has been"
+)
+
+check(
+  "a passage that is simply absent is not placed",
+  locateQuote(PAGE, "nothing of the sort appears here"),
+  { found: false, why: "missing" }
+)
+
+// Ambiguity refuses rather than guesses: marking the wrong one of two identical
+// sentences is worse than a highlight that visibly needs attention.
+check(
+  "a passage appearing twice is refused, not guessed at",
+  locateQuote("the same words. and then the same words.", "the same words"),
+  { found: false, why: "ambiguous" }
+)
+
+check("an empty quote anchors to nothing", locateQuote(PAGE, "   ").found, false)
+
+const PLAN = planReanchor(
+  [
+    // Untouched page, still exactly where it was.
+    { id: "a", content: "has been the task", pageNumber: 1, startOffset: 32, endOffset: 49 },
+    // Repaired page: the passage moved, but is findable.
+    { id: "b", content: "the task of the science", pageNumber: 2, startOffset: 0, endOffset: 5 },
+    // Repaired page: the transcription does not contain it.
+    { id: "c", content: "a sentence nobody transcribed", pageNumber: 2, startOffset: 0, endOffset: 5 },
+  ],
+  new Map([
+    [1, PAGE],
+    [2, PAGE],
+  ]),
+  [2]
+)
+check("a highlight that did not move is left alone", PLAN.unchanged, 1)
+check("a highlight that moved is given its new span", PLAN.moves.length, 1)
+check("  pointing at the passage it quoted", PAGE.slice(PLAN.moves[0]?.startOffset ?? 0, PLAN.moves[0]?.endOffset ?? 0), "the task of the science")
+check("a highlight that cannot be placed is reported, not dropped", PLAN.lost.length, 1)
+check("  and names the page it was on", PLAN.lost[0]?.pageNumber, 2)
 
 console.log(
   failures === 0 ? "\n[check-scoring] all assertions passed\n" : `\n[check-scoring] ${failures} FAILED\n`
