@@ -21,7 +21,14 @@ test.beforeEach(() => test.setTimeout(120_000))
 
 /** Open the Repair Text disclosure on the first reading that has one. */
 async function openPanel(page: Page) {
-  await page.goto("/admin/library")
+  // `domcontentloaded`, not the default `load`: this page renders a cover
+  // thumbnail per reading, and waiting for every one of them to decode makes
+  // navigation hostage to cover generation — which on CI's Node is currently
+  // failing inside pdf.js ("buffer.transferToFixedLength is not a function"),
+  // so `load` never fires and the whole test times out at two minutes. The one
+  // image this file actually cares about is the crop, and it is waited for
+  // explicitly below.
+  await page.goto("/admin/library", { waitUntil: "domcontentloaded" })
   await expect(page.getByRole("heading", { name: "Readings", exact: true })).toBeVisible({
     timeout: 20_000,
   })
