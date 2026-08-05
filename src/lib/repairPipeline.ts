@@ -48,8 +48,71 @@ const MAX_CROP_EDGE = 2560
  * different remedy than transcription, and should be re-sourced instead. */
 const MAX_REGIONS_PER_SOURCE = 12
 
-export function repairCropKey(sourceId: string, pageNumber: number, index: number) {
-  return `repairs/${sourceId}/p${pageNumber}-${index}.png`
+/**
+ * Where a crop is stored. The random segment is load-bearing.
+ *
+ * This key used to be `p{page}-{index}.png` — the same string on every run — and
+ * it was written with `allowOverwrite`, while the route serving it declares
+ * `immutable, max-age=31536000` on the reasoning that "a crop never changes once
+ * written". Those two facts contradict each other, and re-detection is exactly
+ * when they do: a second run writes different bytes to the same key, and both
+ * the blob CDN and the browser can keep serving the first ones. Observed: the
+ * same key read 7KB and then 225KB moments apart, and a reviewer was shown a
+ * blank image for a page that renders perfectly — after which five models were
+ * sent that blank image and unsurprisingly returned nothing usable.
+ *
+ * A crop that is never overwritten really is immutable, so the cache header
+ * becomes true rather than aspirational.
+ */
+export function repairCropKey(sourceId: string, pageNumber: number) {
+  return `repairs/${sourceId}/p${pageNumber}-${crypto.randomUUID()}.png`
+}
+
+/**
+ * Share of a crop's pixels that must differ from the page background before it
+ * is worth a reader's time.
+ *
+ * A text page measures 4-13% here; a blank one measures ~0. The floor sits well
+ * below the former and well above the latter, because the only judgement it has
+ * to make is "is there anything here at all".
+ */
+const MIN_CROP_INK = 0.002
+
+/** Share of non-background pixels in a rendered region. */
+function inkShare(
+  context: ReturnType<ReturnType<typeof createCanvas>["getContext"]>,
+  width: number,
+  height: number
+) {
+  const { data } = context.getImageData(0, 0, width, height)
+  let marked = 0
+  for (let i = 0; i < data.length; i += 4) {
+    // Opaque and darker than near-white. The canvas is filled white before the
+    // page renders, so anything else is ink the reader could actually read.
+    if (data[i + 3] > 10 && (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245)) marked += 1
+  }
+  return marked / (width * height)
+}
+
+/**
+ * Everything the review screen needs to explain itself.
+ *
+ * Read off the same constants the pipeline runs on rather than retyped into the
+ * UI, because a settings panel that drifts from the settings is worse than none:
+ * it tells a reviewer something confident and false about what just happened to
+ * their reading. If a threshold moves, this moves with it.
+ */
+export function repairSettings() {
+  return {
+    readers: VISION_READERS.map((reader) => reader.model),
+    /** What the readers are told, verbatim — the reviewer should see the brief. */
+    systemPrompt: TRANSCRIBE_SYSTEM,
+    instructions: transcribePrompt(["<the words this page currently reads as>"]),
+    cropDpi: CROP_DPI,
+    maxCropEdge: MAX_CROP_EDGE,
+    maxPagesPerRun: MAX_REGIONS_PER_SOURCE,
+    minCropInk: MIN_CROP_INK,
+  }
 }
 
 /**
@@ -84,7 +147,7 @@ export async function detectRepairsForSource(
   const pages = await extractPdfPageText(buffer)
 
   if (pages.length === 0) {
-    return { regions: 0, pagesExamined: 0, unlocatable: [] as number[] }
+    return { regions: 0, pagesExamined: 0, unlocatable: [] as number[], blank: [] as number[] }
   }
 
   /**
@@ -113,9 +176,20 @@ export async function detectRepairsForSource(
       .map((page) => page.pageNumber)
   )
 
+  // Take the outgoing proposals' crops with them. Keys are unique per run now,
+  // so nothing is overwritten and an un-deleted crop would simply accumulate
+  // forever — one orphaned image per page per re-detection.
+  const replaced = await db
+    .select({ cropKey: sourceRepairs.cropKey })
+    .from(sourceRepairs)
+    .where(and(eq(sourceRepairs.sourceId, sourceId), eq(sourceRepairs.status, "proposed")))
   await db
     .delete(sourceRepairs)
     .where(and(eq(sourceRepairs.sourceId, sourceId), eq(sourceRepairs.status, "proposed")))
+  for (const row of replaced) {
+    // A crop nobody can reach is litter, not data — never worth failing over.
+    await readingStorage.delete(row.cropKey).catch(() => {})
+  }
 
   const pdfjsLib = await loadPdfjs()
   const loadingTask = pdfjsLib.getDocument({
@@ -135,6 +209,12 @@ export async function detectRepairsForSource(
    * that this tool is not the remedy for it.
    */
   const unlocatable: number[] = []
+  /**
+   * Pages whose crop came out empty. Named rather than skipped silently: an
+   * empty crop of a page that visibly has text means the region or the renderer
+   * is wrong, and that is a bug report, not a property of the reading.
+   */
+  const blank: number[] = []
 
   try {
     // Every page, judged by its own glyphs. Reading the text layer is cheap —
@@ -168,11 +248,27 @@ export async function detectRepairsForSource(
       const pageText = pages.find((p) => p.pageNumber === pageNumber)?.textContent ?? ""
 
       const crop = createCanvas(region.width, region.height)
-      crop
-        .getContext("2d")
-        .drawImage(canvas, region.x, region.y, region.width, region.height, 0, 0, region.width, region.height)
+      const cropContext = crop.getContext("2d")
+      cropContext.drawImage(
+        canvas, region.x, region.y, region.width, region.height, 0, 0, region.width, region.height
+      )
 
-      const cropKey = repairCropKey(sourceId, pageNumber, 0)
+      /**
+       * A crop with nothing in it cannot be transcribed, and finding that out
+       * costs five model calls and about $0.20. The check is here rather than in
+       * a test because it is the moment the image is made: whatever the cause —
+       * a region off the page, a rotation the box did not account for, a page
+       * that renders empty in this environment and not another — the answer is
+       * the same, and it is cheaper to notice now than to send the blank picture
+       * to five readers and receive five shrugs.
+       */
+      const ink = inkShare(cropContext, region.width, region.height)
+      if (ink < MIN_CROP_INK) {
+        blank.push(pageNumber)
+        continue
+      }
+
+      const cropKey = repairCropKey(sourceId, pageNumber)
       await readingStorage.put(cropKey, crop.toBuffer("image/png"))
 
       await db.insert(sourceRepairs).values({
@@ -194,7 +290,7 @@ export async function detectRepairsForSource(
     await destroyPdf(doc, loadingTask)
   }
 
-  return { regions: created, pagesExamined: pages.length, unlocatable }
+  return { regions: created, pagesExamined: pages.length, unlocatable, blank }
 }
 
 const TRANSCRIBE_SYSTEM =
@@ -294,6 +390,13 @@ export function parseReading(raw: string): ParsedReading | null {
  * Readers run concurrently — they are independent by design, so there is
  * nothing to serialise — and a reader that errors or returns unparseable output
  * is simply absent. Consensus is computed from whoever answered.
+ *
+ * Why each absent reader was absent is kept and returned. "No reader returned a
+ * usable transcription" on its own is the least actionable sentence this
+ * subsystem can produce: it arrives after the money is spent and does not
+ * distinguish a blank crop from an expired key from five models that all timed
+ * out. Naming what each one did costs nothing and is the difference between a
+ * bug report and a shrug.
  */
 export async function transcribeRepairRegion(repairId: string) {
   const rows = await db.select().from(sourceRepairs).where(eq(sourceRepairs.id, repairId)).limit(1)
@@ -303,6 +406,7 @@ export async function transcribeRepairRegion(repairId: string) {
   const crop = await readingStorage.get(repair.cropKey)
   const imageBase64 = crop.toString("base64")
   const message = transcribePrompt(repair.garbledWords)
+  const failures: { model: string; reason: string }[] = []
 
   const results = await Promise.all(
     VISION_READERS.map(async (reader, index) => {
@@ -316,6 +420,14 @@ export async function transcribeRepairRegion(repairId: string) {
           tokenParam: reader.tokenParam,
         })
         const parsed = parseReading(text)
+        if (!parsed) {
+          failures.push({
+            model: reader.model,
+            reason: text.trim()
+              ? `answered, but no transcription could be read out of it (${text.trim().length} chars)`
+              : "returned an empty response",
+          })
+        }
         return parsed
           ? {
               ...parsed,
@@ -327,13 +439,24 @@ export async function transcribeRepairRegion(repairId: string) {
           : null
       } catch (error) {
         console.warn(`[repair] ${reader.model} failed on ${repairId}`, error)
+        failures.push({
+          model: reader.model,
+          reason: error instanceof Error ? error.message.slice(0, 160) : String(error).slice(0, 160),
+        })
         return null
       }
     })
   )
 
   const readings = results.filter((result): result is NonNullable<typeof result> => result !== null)
-  if (readings.length === 0) throw new Error("No reader returned a usable transcription")
+  if (readings.length === 0) {
+    throw new Error(
+      `None of the ${VISION_READERS.length} readers returned a usable transcription:\n` +
+        failures.map((failure) => `  · ${failure.model} — ${failure.reason}`).join("\n") +
+        `\nIf they all came back empty, suspect the crop rather than the readers — ` +
+        `open the image beside this region and check there is something in it to read.`
+    )
+  }
 
   await db.delete(sourceRepairReadings).where(eq(sourceRepairReadings.repairId, repairId))
   await db.insert(sourceRepairReadings).values(
@@ -374,5 +497,14 @@ export async function transcribeRepairRegion(repairId: string) {
     ? null
     : costs.reduce((total: number, cost) => total + (cost ?? 0), 0)
 
-  return { readers: readings.length, complete: complete.length, costUsd, ...consensus }
+  return {
+    readers: readings.length,
+    complete: complete.length,
+    costUsd,
+    // Which readers sat this one out, and why. A four-reader panel and a
+    // five-reader panel look identical in the result otherwise.
+    failures,
+    panel: VISION_READERS.length,
+    ...consensus,
+  }
 }

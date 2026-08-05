@@ -71,4 +71,4 @@ export function acceptedTextMatchesReadings(accepted: string, readings: RegionRe
  * words, join hyphenated fragments and fix punctuation, and all of that should
  * pass. The commentary that prompted this check scored far below it.
  */
-const ACCEPTED_OVERLAP_FLOOR = 0.6
+export const ACCEPTED_OVERLAP_FLOOR = 0.6

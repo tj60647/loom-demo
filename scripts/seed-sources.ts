@@ -20,7 +20,25 @@ import { hashText } from "../src/lib/hash"
 import { readingStorage } from "../src/lib/storage"
 
 const READINGS: {
+  /**
+   * Stable identity, written to `source.seedKey`. Matching used to be by
+   * `title`, which an admin edits: two of these three titles had already drifted
+   * to full bibliographic form on one database, and since nothing constrains
+   * `title` to be unique the next run would have inserted duplicates rather than
+   * failing. A key nobody displays cannot drift.
+   */
+  seedKey: string
   title: string
+  /**
+   * Titles this reading is already filed under somewhere, so a row that drifted
+   * before `seedKey` existed is adopted rather than duplicated.
+   *
+   * These are not guesses — they are what the dev and production databases
+   * actually hold, after an admin expanded the short seed titles into full
+   * bibliographic ones. Adoption writes the key, so each of these matters
+   * exactly once per database and never again.
+   */
+  alsoKnownAs: string[]
   author: string
   sourceReference: string
   description: string
@@ -30,7 +48,9 @@ const READINGS: {
   legacySourceLabels: string[]
 }[] = [
   {
+    seedKey: "object-worlds",
     title: "Object Worlds",
+    alsoKnownAs: [],
     author: "Bucciarelli — Designing Engineers",
     sourceReference: "Bucciarelli, Louis L. Designing Engineers.",
     description: "Explores how different disciplines inhabit their own \"worlds\" with distinct instruments and languages.",
@@ -40,7 +60,9 @@ const READINGS: {
     legacySourceLabels: ["Bucciarelli, Designing Engineers"],
   },
   {
+    seedKey: "communities-of-practice",
     title: "Communities of Practice",
+    alsoKnownAs: ["Communities of practice and social learning systems: the career of a concept"],
     author: "Wenger",
     sourceReference: "Wenger, Etienne. Communities of Practice.",
     description: "Details how shared vocabularies are learned by participating in a community.",
@@ -50,7 +72,9 @@ const READINGS: {
     legacySourceLabels: ["Wenger, Communities of Practice"],
   },
   {
+    seedKey: "boundary-objects",
     title: "Boundary Objects",
+    alsoKnownAs: ["This is Not a Boundary Object: Reflections on the Origin of a Concept"],
     author: "Star, 2010 — 'This Is Not A Boundary Object'",
     sourceReference: "Star, Susan Leigh. 2010. 'This Is Not a Boundary Object'.",
     description: "How distinct fields coordinate around one shared object without agreeing on its exact meaning.",
@@ -90,13 +114,38 @@ async function readSeedPdf(file: string) {
 
 async function run() {
   for (const reading of READINGS) {
-    const existing = await db
-      .select()
-      .from(sources)
-      .where(eq(sources.title, reading.title))
-      .limit(1)
+    /**
+     * By key, then — once — by title.
+     *
+     * The title fallback is how rows seeded before this column existed get
+     * adopted rather than duplicated. It runs at most once per reading: the
+     * adoption writes the key, and every later run matches on that instead, so a
+     * subsequent retitle is invisible to seeding. A row that matches none of the
+     * known titles is a genuinely new reading and is treated as one.
+     */
+    let source = (
+      await db.select().from(sources).where(eq(sources.seedKey, reading.seedKey)).limit(1)
+    )[0]
 
-    let source = existing[0]
+    if (!source) {
+      for (const title of [reading.title, ...reading.alsoKnownAs]) {
+        const byTitle = (
+          await db.select().from(sources).where(eq(sources.title, title)).limit(1)
+        )[0]
+        if (!byTitle) continue
+        // Already claimed by a different seed reading — adopting it would move
+        // the key off a row that legitimately holds it.
+        if (byTitle.seedKey) continue
+        const [adopted] = await db
+          .update(sources)
+          .set({ seedKey: reading.seedKey })
+          .where(eq(sources.id, byTitle.id))
+          .returning()
+        source = adopted
+        console.log(`[seed-sources] Adopted "${title}" as ${reading.seedKey}.`)
+        break
+      }
+    }
 
     if (!source) {
       const storageKey = `${crypto.randomUUID()}.pdf`
@@ -105,6 +154,7 @@ async function run() {
       const [inserted] = await db
         .insert(sources)
         .values({
+          seedKey: reading.seedKey,
           title: reading.title,
           author: reading.author,
           sourceReference: reading.sourceReference,

@@ -22,12 +22,13 @@ import { db } from "@/db"
 import { authOptions, isAdminUser } from "@/lib/auth"
 import { bytes, sourceRepairs, sourceRepairReadings, sources, users } from "@/db/schema"
 import { readingStorage } from "@/lib/storage"
-import { detectRepairsForSource, transcribeRepairRegion } from "@/lib/repairPipeline"
-import { acceptedTextMatchesReadings } from "@/lib/repairReview"
+import { detectRepairsForSource, repairSettings, transcribeRepairRegion } from "@/lib/repairPipeline"
+import { ACCEPTED_OVERLAP_FLOOR, acceptedTextMatchesReadings } from "@/lib/repairReview"
 import { repairPageTextLayers } from "@/lib/textLayerRepair"
 import { reingestSource } from "@/lib/reingest"
 import { extractPdfPageText } from "@/lib/pdfText"
 import { reportGarble } from "@/lib/garble"
+import { consensusSettings } from "@/lib/repairConsensus"
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -109,6 +110,27 @@ export async function getRepairsForSource(sourceId: string) {
     ...repair,
     readings: readings.filter((reading) => reading.repairId === repair.id),
   }))
+}
+
+/**
+ * What the panel is, in its own words, for the settings dialog.
+ *
+ * Every number here is read from the module that uses it — never retyped — so
+ * the dialog cannot quietly describe a system that no longer exists. The
+ * thresholds this file owns are stated here too, because a reviewer deciding
+ * whether to press "write into the reading" is entitled to know what would make
+ * that refuse.
+ */
+export async function getRepairSettings() {
+  await requireAdmin()
+  return {
+    ...repairSettings(),
+    consensus: consensusSettings(),
+    guards: {
+      acceptedOverlapFloor: ACCEPTED_OVERLAP_FLOOR,
+      minKeptTextShare: MIN_KEPT_TEXT_SHARE,
+    },
+  }
 }
 
 /**

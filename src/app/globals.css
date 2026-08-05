@@ -48,6 +48,13 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
 .btn.mini{font-size:11px;padding:7px 10px;letter-spacing:.05em;min-height:36px}
 .btn:disabled{opacity:.35;cursor:default} .btn:hover:not(:disabled){opacity:.88}
+/* A control's label is not prose. Without this, every button, tab and
+   disclosure in the app drag-selects and double-click-highlights like body
+   text, which reads as "this is content" exactly where it should read as
+   "this is a thing you press" — and a mis-drag on a card leaves half the
+   action row highlighted. Selection stays on for anything a reader might
+   legitimately want to copy: page text, transcriptions, tooltips, hints. */
+.btn,.act,summary,nav button,nav a.station{-webkit-user-select:none;user-select:none}
 #saveDot{font-family:var(--mono);font-size:10px;color:var(--ink-soft);align-self:center}
 nav{display:flex;border-bottom:1px solid var(--rule);padding:0 26px;background:var(--paper-2);flex-wrap:wrap}
 nav button,nav a.station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
@@ -504,6 +511,47 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* A refusal and a result read the same way — both are the panel telling you
    what it did — so they sit in the same place and differ only in colour. */
 .repair-notice { color: var(--sage); font-size: 13px; }
+/* The four acts, named in order, with the gear pushed to the far end so it
+   reads as reference rather than as a fifth step. */
+.repair-steps {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; border-bottom: 1px solid var(--rule, #e3ddd0); padding-bottom: 10px;
+}
+.repair-steps ol {
+  display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; padding: 0; list-style: none;
+  font: 12px/1.5 var(--mono, monospace);
+}
+.repair-steps li { display: flex; align-items: baseline; gap: 6px; }
+.repair-steps b { color: var(--ochre); font-weight: 600; }
+.repair-steps .hint { font-size: 11px; }
+.repair-gear { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+
+/* The crop is a whole page. Give it real room — the review is a comparison, and
+   a page rendered at thumbnail size cannot be compared with anything. */
+.repair-split { grid-template-columns: minmax(280px, 44%) 1fr; }
+.repair-split figure a { display: block; cursor: zoom-in; }
+.repair-split figure a:hover img { border-color: var(--ochre); }
+
+.repair-settings {
+  border: 1px solid var(--rule, #ccc6b8); background: var(--paper, #fbf9f4);
+  max-width: 760px; width: calc(100% - 48px); padding: 0; color: var(--ink);
+}
+.repair-settings::backdrop { background: rgba(20, 18, 14, 0.45); }
+.repair-settings-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 16px 20px; border-bottom: 1px solid var(--rule, #e3ddd0); position: sticky; top: 0;
+  background: var(--paper, #fbf9f4);
+}
+.repair-settings-head h3 { margin: 0; font-size: 16px; }
+.repair-settings-body { padding: 4px 20px 20px; max-height: 70vh; overflow: auto; display: grid; gap: 18px; }
+.repair-settings-body section { display: grid; gap: 4px; }
+.repair-settings-body pre {
+  white-space: pre-wrap; word-break: break-word; font: 11.5px/1.5 var(--mono, monospace);
+  background: #fff; border: 1px solid var(--rule, #e3ddd0); padding: 9px; margin: 4px 0; max-height: 220px; overflow: auto;
+}
+.repair-readers { margin: 4px 0; padding-left: 20px; font: 12px/1.7 var(--mono, monospace); }
+.repair-settings-list { margin: 4px 0; padding-left: 17px; font-size: 13px; line-height: 1.5; }
+.repair-settings-list li { margin-bottom: 5px; }
 /* Costs per reader, not just a total: a total hides the reader that spends most
    of the money for none of the quality. */
 .repair-costs { width: 100%; border-collapse: collapse; font: 11.5px/1.4 var(--mono, monospace); margin: 8px 0; }

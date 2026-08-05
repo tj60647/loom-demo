@@ -55,6 +55,34 @@ export type ConsensusVotes = {
   perReader: ReaderVoteStat[]
 }
 
+/**
+ * Backing a sentence needs to carry, given how many readers answered.
+ *
+ * A single reading is not agreement — one model's confident transcription is
+ * precisely what the vote exists to avoid trusting — so it is asked for a
+ * majority it cannot reach, and reported as wholly disputed rather than carried.
+ */
+export function requiredMajority(readerCount: number) {
+  return readerCount === 1 ? 2 : Math.floor(readerCount / 2) + 1
+}
+
+/** How the vote is decided, for the panel's settings dialog. */
+export function consensusSettings() {
+  return {
+    /** What a majority means at each panel size a run can actually end up with. */
+    majorityBySize: [2, 3, 4, 5].map((readers) => ({
+      readers,
+      needed: requiredMajority(readers),
+    })),
+    decidedBy:
+      "Exact match on the sentence's words, so `religions` and `televisions` never merge into one vote.",
+    groupedBy:
+      "Fuzzy similarity, so a reviewer sees both variants of a disputed passage together.",
+    truncatedReadersExcluded:
+      "A reader that ran out of room mid-transcription is recorded but kept out of the vote: it stopped early rather than disagreeing, and counting its silence as dissent would send a reviewer to passages nobody read differently.",
+  }
+}
+
 export type Consensus = {
   /** Sentences a majority backed, in reading order. */
   agreedText: string
@@ -157,7 +185,7 @@ export function computeConsensus(readings: ReaderText[]): Consensus {
   // A single reading is not agreement. One model's confident transcription is
   // precisely what the vote exists to avoid trusting, so it is reported as
   // wholly disputed rather than carried.
-  const majority = readerCount === 1 ? 2 : Math.floor(readerCount / 2) + 1
+  const majority = requiredMajority(readerCount)
 
   const perReaderSentences = present.map((reading) => ({
     reader: reading.reader,

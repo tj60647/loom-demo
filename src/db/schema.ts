@@ -172,6 +172,24 @@ export const sources = pgTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
+    /**
+     * Stable identity for a reading that `seed-sources.ts` owns. Null for
+     * everything else, which is almost every row.
+     *
+     * The seed script used to find its readings by matching `title`, and title
+     * is metadata an admin edits — Edit Entry offers it, and metadata drafting
+     * rewrites it. Two of the three seed titles on the dev database had already
+     * drifted to full bibliographic form ("Communities of practice and social
+     * learning systems: the career of a concept" against the script's
+     * "Communities of Practice"), and since nothing constrains `title` to be
+     * unique, the next seeding run would not have failed — it would have
+     * silently inserted a second row for a reading already present.
+     *
+     * A hash of the file would not fix this: the bytes legitimately change when
+     * a repair is applied, so a repaired reading would stop matching itself.
+     * Identity here has to be provenance, not content.
+     */
+    seedKey: text("seedKey").unique(),
     title: text("title").notNull(),
     author: text("author").default(""),
     sourceReference: text("sourceReference").default(""),
