@@ -61,12 +61,20 @@ test("the panel names its four acts, and marks the one that spends money", async
 test("the settings dialog names the readers and what they are told", async ({ page }) => {
   const panel = await openPanel(page)
 
-  await panel.getByRole("button", { name: /how this reading gets read/i }).click()
-
   // Scoped to this panel: every reading on the page renders its own dialog, so
   // a page-level selector matches one per card.
   const dialog = panel.locator("dialog.repair-settings")
-  await expect(dialog).toBeVisible()
+  const gear = panel.getByRole("button", { name: /how this reading gets read/i })
+
+  // Retry the open rather than clicking once. Navigation waits only for the
+  // DOM (see openPanel), so the first click can land before React has hydrated
+  // — on inert HTML, which swallows it silently. The disclosure above survives
+  // that because <details> toggling is the browser's, not ours; this button is
+  // ours. `toPass` re-clicks until the handler exists.
+  await expect(async () => {
+    await gear.click()
+    await expect(dialog).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
   await expect(dialog.getByRole("heading", { name: "How this reading gets read" })).toBeVisible()
 
   // The reader list is read off the pipeline's own constant, so an empty list
