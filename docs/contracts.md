@@ -1,8 +1,19 @@
 # Loom — Contracts
 
+> DESCRIBES THE CODE AS BUILT, not the target. Where this file conflicts with
+> docs/loom-model-build.md, the model wins — several contracts below are ruled for
+> replacement by docs/loom-refactor-spec.md: `byte.conceptId` and `createByte`'s required
+> concept (P0.1 — Unlabeled Passages are legal), `deleteConcept`'s byte cascade (P0.1),
+> the label clash-check and invariant 7 "one label = one concept" (ruling 36 — warn, don't
+> forbid), `edge.sentence NOT NULL` and `createEdge`'s required sentence (P0.3), the
+> mirror dual-write and invariant 1 (P0.5), and the student-visible "Map N" strings (P2).
+> Update the invariant, then this file, as each phase lands.
+
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
-Companion to [loom-spec-v1.md](loom-spec-v1.md) (the *why*); this is the *what, exactly*.
+Companion to the *why* — now [loom-model-build.md](loom-model-build.md) (authority) with
+[loom-refactor-spec.md](loom-refactor-spec.md) (work order); historically
+[archive/loom-spec-v1.md](archive/loom-spec-v1.md). This is the *what, exactly*.
 
 **As of:** `chore/alpha-foundation`, 2026-08-03 — the extraction and anchoring pass.
 Re-stamp when it reaches master. Line numbers cite that branch and will drift; names
@@ -13,7 +24,7 @@ Conventions used below:
 - All ids are `text` primary keys defaulting to `crypto.randomUUID()` unless noted.
 - `Tier` = `'' | 'p' | 's' | 't' | 'x'` (unsorted · primary · secondary · tertiary · left off).
 - "Mirror" = the expand-phase dual-write of `concept.tier` + the `read` row from the
-  **oldest whole-weave map** (spec §6; retirement is a planned contract migration —
+  **oldest whole-weave map** (archived spec §6; retirement is a planned contract migration —
   see NEXT_SESSION open item 4).
 - Server actions are HTTP-POSTable endpoints. "Auth" below is what the action itself
   enforces; nothing else stands in front of it (there is **no middleware.ts**).
@@ -58,7 +69,7 @@ directly, and the `source_page` it creates has never carried the foreign key
 ` after each `hasEOL` item — except on a page whose own items already contain a newline, which keeps the old separator-free join because the newline could not then be taken back out. `contentHash` is therefore **not** a hash of this column: every writer stores `hashText(textLayerProjection(textContent))`, the browser's text-layer string, which is what `byte.pageContentHash` is compared against. 0016 gives the CASCADE its actual constraint and indexes (sourceId, pageNumber). No unique on (sourceId, pageNumber). GIN index `source_page_search_idx` on `to_tsvector('english', textContent)`; `source` carries the weighted `source_search_idx` twin (title A · author B · reference/description C) — the search queries must repeat these expressions verbatim |
 | `source_score` | sourceId PK/CASCADE · status `'heuristic'\|'judged'\|'unscorable'` · coverage/legibility/anchorability/structure int nullable · overall real · pass bool nullable · notes · judgeNotes · judgeModel · metrics jsonb · scoredAt | 1:1 with source. Unscored dimension = NULL (abstention, never a default). `pass` requires every scored dimension ≥ 3 — not compensatory — **and** non-null `coverage` and `legibility`, since "can a student quote this?" has no answer without them. `legibility` abstains when there is too little text to confirm the characters read as language; it used to be granted a 5, which is how 693 characters of OCR noise scored 5/5/5 and passed. `pass NULL` is a third verdict, rendered **Unverified**. `metrics` carries the structural probe only when the scorer held the PDF bytes |
 
-### 1d. The graph (the artifact — spec §6 `graph`)
+### 1d. The graph (the artifact — archived spec §6 `graph`)
 
 | Table | Columns | Keys / notes |
 | --- | --- | --- |
@@ -68,7 +79,7 @@ directly, and the `source_page` it creates has never carried the foreign key
 | `read` | id · courseId SET NULL · userId CASCADE · text `''` · updatedAt | UNIQUE NULLS NOT DISTINCT (userId, courseId). MIRROR table |
 | `map` | id · courseId SET NULL · userId CASCADE · **scopeKey `''`** · name · read `''` · essence `''` · **tiers jsonb `Record<conceptId, 'p'\|'s'\|'t'\|'x'>`** default `{}` · createdAt · updatedAt | scopeKey `''` = whole weave, else sorted comma-joined sourceIds. Absent tier key = unsorted. Non-unique index (userId, courseId, scopeKey) — plural siblings are the point |
 
-### 1e. Projections & history (spec §6 `views` + development history)
+### 1e. Projections & history (archived spec §6 `views` + development history)
 
 | Table | Columns | Keys / notes |
 | --- | --- | --- |
@@ -195,7 +206,7 @@ section belongs to the course).
 
 | Route | Behavior | Auth |
 | --- | --- | --- |
-| `GET/POST /api/auth/[...nextauth]` | NextAuth (GitHub OAuth). Sign-in admitted by `emailHasAppAccess`: admin fallback email ∨ any course invitation ∨ any active membership ∨ legacy allowlist. Enrolment happens in `events.signIn` (first-OAuth `user.id` is GitHub's in the callback), idempotent upsert clearing `removedAt` | — |
+| `GET/POST /api/auth/[...nextauth]` | NextAuth (GitHub OAuth, scope **`user:email`** only). Identity: the provider's `userinfo` override reads `GET /user/emails` on **every** sign-in and keeps only `verified === true` addresses, minus `@users.noreply.github.com`; of those it signs the student in as the first one `emailHasAppAccess` accepts, else the primary. Sign-in still admitted by `emailHasAppAccess` alone: admin fallback email ∨ any course invitation ∨ any active membership ∨ legacy allowlist. Refusals return a path, not `false` — `/auth/error?error=NoVerifiedEmail` or `?error=NotOnRoster&email=…`. Enrolment happens in `events.signIn` → `enrolInvitedCourses()` (first-OAuth `user.id` is GitHub's in the callback), idempotent upsert clearing `removedAt`. **Second provider, `email`** (guest door): registered *only* where `RESEND_API_KEY` **and** `EMAIL_FROM` are both set — absent in dev and CI, so GitHub is the sole provider there. Mailed single-use link, 24 h, token minted and hashed into `verificationToken` by NextAuth; delivery is a `fetch` to Resend (nodemailer is never required — the provider object is built inline). Both providers run the same `decideSignIn` gate, and for `email` it runs **twice**: once at the send step (`email.verificationRequest`), so an address no course invited is never mailed, and again when the link is clicked | — |
 | `GET /api/auth/test-login?as=testa` | Mints a 30-day DB session + cookies; default identity is the admin, `?as=testa` = `test-user-a@loom.local` (LEARNER, enrolled into the oldest course). Returns `{success, userId, sessionToken}` | **403 in production** (first statement); no other guard — dev/CI only |
 | `GET /api/readings/[sourceId]?download=1` | Streams the PDF (never buffered — 4.5 MB serverless cap), RFC 6266 filename, `Cache-Control: private`. Errors: 401 / 404 / 500 JSON | Session required **in production only**; then `authorizeSourceFile` |
 | `GET /api/readings/[sourceId]/cover` | PNG cover (cached at `covers/<id>.png`; re-rendered from the PDF only on a cache miss) or SVG fallback (`no-store`) | No check of its own — inherits `authorizeSourceFile` via `getSourceForCover` (bytes-free) |
@@ -207,7 +218,7 @@ section belongs to the course).
 
 ### 4a. Whole-cloth export (`<student>-loom.json`)
 
-The spec §6 contract, exactly:
+The archived spec's §6 contract, exactly:
 
 ```jsonc
 {

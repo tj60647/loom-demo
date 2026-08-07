@@ -506,7 +506,7 @@ export const reads = pgTable(
 // A map — one named, per-scope sorting of the student's concepts, plus its
 // interpretive paragraph and one-line essence. Maps are PARALLEL SIBLINGS
 // (freely created / renamed / deleted), not sealed passes — ratified 2026-07-31,
-// superseding the linear model of docs/reading-scope-and-map-passes.md §B.2.
+// superseding the linear model of docs/archive/reading-scope-and-map-passes.md §B.2.
 // Meaning lives here (spec §6 graph side); the card-table geometry for map <id>
 // lives in the `view` row keyed `map:<id>`. scopeKey '' = the whole weave,
 // otherwise the sorted comma-joined sourceIds of src/lib/scope.ts — a reading

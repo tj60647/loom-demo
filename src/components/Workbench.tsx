@@ -2,7 +2,7 @@
 
 // The workbench for one scope — a reading, or the whole weave.
 //
-// Reading-first (docs/reading-scope-and-map-passes.md §A.1): the shelf is the
+// Reading-first (docs/archive/reading-scope-and-map-passes.md §A.1): the shelf is the
 // home screen and this is what opens when you pick a reading off it, so the
 // 01-04 sequence runs INSIDE a text rather than across the course. `04 Map`
 // is honest per reading now that placement is per-map (maps carry their own

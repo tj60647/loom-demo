@@ -1,4 +1,4 @@
-// The reading lens (docs/reading-scope-and-map-passes.md §A.3).
+// The reading lens (docs/archive/reading-scope-and-map-passes.md §A.3).
 //
 // A CONCEPT DOES NOT BELONG TO A READING — A BYTE DOES. A concept emerges from
 // a reading and may then be evidenced in several; spec §2 makes one label one

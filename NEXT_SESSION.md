@@ -346,7 +346,7 @@ surface.
   from `byte.sourceId` in [src/lib/scope.ts](src/lib/scope.ts). **A concept does
   not belong to a reading — a byte does.** A concept emerges from a reading and
   may then be evidenced in several; nothing owns or re-homes one. See
-  [docs/reading-scope-and-map-passes.md](docs/reading-scope-and-map-passes.md).
+  [docs/archive/reading-scope-and-map-passes.md](docs/archive/reading-scope-and-map-passes.md).
 - **Every byte belongs to a reading.** Capture inside one stamps it; a student
   can mint a reference-only reading (title/author, no PDF) for anything the
   collection does not hold; passages with no reading are placed by *asking*,

@@ -1,3 +1,8 @@
+> SUPERSEDED 2026-08-07 by docs/loom-model-build.md (with docs/loom-refactor-spec.md as the work order). Historical only.
+> §A's substance — reading-first entry, derived scope membership, reference-only readings — and §B.3's per-map tiers are ratified into the model; §B.2's linear map passes were superseded by parallel sibling maps, now Projections (see the `maps` comment in src/db/schema.ts).
+> §A.3/§6.2's "no uncoded byte" is explicitly reversed — Unlabeled Passages are first-class — and label-dedupe identity (§A.4) is overruled by identity-by-object. Do not implement from this file.
+> One §B.4 clause is stated nowhere else (proposed here, never ratified): never offer to seed a fresh scope's tiers from another scope's map — those ranks were judged against a different set of concepts. Ratify it into the model or let it lapse; do not treat it as binding on this file's authority.
+
 # Reading-first: scope and map passes — strategy
 
 Design strategy for two asks, drafted 2026-07-30, revised the same day when the IA

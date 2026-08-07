@@ -204,7 +204,7 @@ export async function getCourseSources(courseIdRaw?: string | null) {
  * Their own readings carry no `course_source` row, so they appear here and on
  * nobody else's shelf. They exist because reading-first needs every byte to
  * belong to a reading — a passage from something the library does not hold
- * still needs a door (docs/reading-scope-and-map-passes.md §A.6).
+ * still needs a door (docs/archive/reading-scope-and-map-passes.md §A.6).
  */
 export async function getSources(courseIdRaw?: string | null) {
   const session = await getServerSession(authOptions)

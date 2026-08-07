@@ -1,6 +1,10 @@
+> SUPERSEDED 2026-08-07 by docs/loom-model-build.md. Historical only.
+> Several positions here (byte-requires-concept, label-dedupe identity,
+> tongues, "no unnamed marks") are explicitly reversed — do not implement from this file.
+
 # Loom — Spec v1
 
-Build contract. Functionality only — pedagogy, staging, and governance live in the [Course Deployment notes](course-deployment-notes.md). This is the target the build freezes to and the release gate checks against.
+Build contract. Functionality only — pedagogy, staging, and governance live in the [Course Deployment notes](../course-deployment-notes.md). This is the target the build freezes to and the release gate checks against.
 
 **Status:** DRAFT (freeze target) · **Version** v1 · rev July 30c · **Freeze date:** TBD
 

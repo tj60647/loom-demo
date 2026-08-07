@@ -212,6 +212,78 @@ gh api -X PATCH repos/tj60647/loom-demo/branches/master/protection/required_stat
   -f "contexts[]=checks" -f "contexts[]=e2e"
 ```
 
+## The one gate CI cannot close: the OAuth round trip
+
+The e2e suite signs in through `/api/auth/test-login`, so it never touches
+GitHub. `npm run check:auth` covers everything on Loom's side of the callback
+— which verified address stands for a student, who the roster admits, what
+each refusal says — but *that GitHub returns the payload we parse* is only
+ever established by a person. Run this after any change to `src/lib/auth.ts`,
+`src/lib/signIn.ts`, the OAuth app's settings, or the callback URLs.
+
+Five minutes, on the deployment you changed:
+
+1. **A real student, first time.** Invite a spare GitHub account's verified
+   address (Admin → Roster), then sign in as it in a private window. Expect:
+   GitHub's consent screen asking for **"Email addresses (read-only)" and
+   nothing else** — if it also asks to read profile data, the scope narrowing
+   has been reverted. You land on the shelf with the course's readings.
+2. **Idempotent second time.** Sign out, sign in again. Same landing, and
+   Admin → Roster still shows exactly one row for them.
+3. **The address that is not primary.** On that account, add the course
+   address as a *secondary* verified address and make something else primary.
+   Sign in: Loom should still find the course. This is the case most students
+   are actually in.
+4. **Not on the roster.** Remove them from the roster, sign in again. Expect
+   "That email is not on a course roster", naming the address GitHub gave —
+   not a NextAuth error page, and not a generic "access denied".
+5. **No confirmed address.** Hard to stage on a real account; if you have a
+   throwaway with an unverified email only, expect "GitHub sent no confirmed
+   email address". Otherwise read `/auth/error?error=NoVerifiedEmail` directly
+   and confirm the copy still makes sense.
+
+If step 1 fails on a fresh deployment, check the OAuth app's callback URL
+against `NEXTAUTH_URL` before anything else — dev and production have separate
+GitHub OAuth apps, and a mismatch surfaces as a generic callback failure.
+
+### The guest door
+
+Some people invited to a course have no GitHub account and will not get one.
+For them the sign-in page carries a folded-away "no GitHub account?" form that
+mails a single-use link, good for 24 hours.
+
+It exists **only where `RESEND_API_KEY` and `EMAIL_FROM` are both set** — leave
+them empty in dev and CI and GitHub is the only provider, which is what those
+environments want. `EMAIL_FROM` must sit at a domain verified in Resend, or
+every send is refused. Neither variable is a secret you can recover from
+Vercel once set: `vercel env pull` writes `[SENSITIVE]` for both.
+
+The roster still decides, and decides first. NextAuth runs the sign-in gate
+*before* it mails anything, so an address no course invited receives no email
+at all — it gets the same "not on a course roster" page the GitHub door gives.
+That is the property to re-check if the gate is ever touched:
+
+```bash
+# uninvited → refused, and nothing sent (no "[auth] Resend refused" in the log)
+curl -s -c /tmp/j http://localhost:3000/api/auth/csrf   # take csrfToken
+curl -s -b /tmp/j -o /dev/null -w '%{redirect_url}\n' -X POST \
+  -d "csrfToken=$CSRF&email=stranger@example.com" \
+  http://localhost:3000/api/auth/signin/email
+# expect: /auth/error?error=NotOnRoster&email=stranger%40example.com
+```
+
+Two smoke steps to add for a guest, after inviting their address:
+
+6. **Guest, first time.** Open the disclosure, enter the invited address,
+   expect "Check your inbox" and a link that lands them on the shelf enrolled.
+7. **Guest, uninvited address.** Enter something not on any roster: expect the
+   roster refusal page and, in the logs, **no send attempt**.
+
+One consequence worth knowing: a person who signs in by link first and later
+tries GitHub with the same address hits `OAuthAccountNotLinked` — NextAuth will
+not join a GitHub account to an existing user row on its own. Keep the door
+guest-only rather than advertised, and it stays a non-issue.
+
 ## Rollback
 
 Vercel → Deployments → promote the previous production deployment. Database

@@ -117,7 +117,7 @@ The knowledge graph is kept strictly apart from its projections:
 
 Threads that run out of a reading are the payoff, not the leftovers: an edge belongs to every scope containing either endpoint, so a bridge appears in both readings and in the whole weave, with its own counted band. Concepts from other readings stay reachable in Throw behind a disclosure — never removed, because threading this week's text to an earlier one is what weeks 6–13 are for.
 
-`04 Map` stays at the whole weave for now. `concept.tier` holds one value per concept, so a reading's map would show ranks sorted against another reading's concepts — see the passes proposal in [the strategy doc](./docs/reading-scope-and-map-passes.md) and spec §3.
+`04 Map` is honest per reading now that placement is per-map: each map carries its own tiers (`maps.tiers`), so a reading's map sorts only against that reading's concepts. The linear passes proposal that preceded parallel sibling maps is superseded — historical argument in [the archived strategy doc](./docs/archive/reading-scope-and-map-passes.md).
 
 ### The reading library
 
