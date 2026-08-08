@@ -357,10 +357,15 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .weekrule{flex:1;height:0;border-top:1px solid var(--rule)}
 .shelfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
 
-/* A shelf card is a link, so the whole card is the target. */
-.shelfcard{display:flex;gap:14px;padding:14px;text-decoration:none;color:inherit;
+/* A shelf card: the reading itself is the link (.shelfmain — browsing is not
+   capture); the cloth row beneath carries the work's own doors. */
+.shelfcard{display:flex;flex-direction:column;gap:10px;padding:14px;
   border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.5)}
 .shelfcard:hover{border-color:var(--ochre);background:rgba(168,132,63,.06)}
+.shelfmain{display:flex;gap:14px;flex:1;min-width:0;text-decoration:none;color:inherit}
+.clothrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  border-top:1px solid var(--rule);padding-top:10px}
+.clothbadge{color:var(--grey);cursor:default}
 .shelfbody{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
 .shelfbody h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0 0 3px}
 .shelfauthor{font-size:13px;color:var(--ink-soft);margin:0 0 6px}

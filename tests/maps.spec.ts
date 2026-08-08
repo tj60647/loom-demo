@@ -180,7 +180,7 @@ test('04 Map lives inside a reading workbench, scoped to it', async ({ page }) =
   const card = page.locator('.shelfcard').first();
   await expect(card).toBeVisible({ timeout: 15000 });
   await expect(card.locator('.shelftally')).not.toHaveText('…', { timeout: 15000 });
-  await card.click();
+  await card.locator('.shelfmain').click();
   await expect(page).toHaveURL(/\/reading\//);
 
   await waitForLoom(page);

@@ -50,8 +50,12 @@ interface LoomContextType {
   unfileByte: (byteId: string, conceptId: string) => Promise<void>
   /** The current scope's cloth (title + description), or null before one is written. */
   activeCloth: Cloth | null
-  /** Title or describe the current scope's cloth. */
-  updateCloth: (data: Partial<{ title: string; description: string }>) => Promise<void>
+  /**
+   * Title or describe a cloth — the current scope's by default, or an explicit
+   * scope's (the shelf creates a reading's cloth from the whole-weave scope).
+   * Resolves true on save, false when the write failed and state was resynced.
+   */
+  updateCloth: (data: Partial<{ title: string; description: string }>, scopeKey?: string) => Promise<boolean>
   addEdge: (fromId: string, toId: string, sentence: string) => Promise<Edge>
   editEdge: (id: string, data: Partial<{handle: string, sentence: string}>) => Promise<void>
   removeEdge: (id: string) => Promise<void>
@@ -363,18 +367,20 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Cloth title/description: optimistic upsert against the current scope.
-  const updateCloth = async (data: Partial<{ title: string; description: string }>) => {
+  // Cloth title/description: optimistic upsert against the given scope (the
+  // current one unless a caller — the shelf's Create Cloth — names another).
+  const updateCloth = async (data: Partial<{ title: string; description: string }>, scopeKeyArg?: string) => {
+    const key = scopeKeyArg ?? scope.key
     const now = new Date()
     setState(s => {
-      const existing = s.cloths.find(c => c.scopeKey === scope.key)
+      const existing = s.cloths.find(c => c.scopeKey === key)
       const cloths = existing
-        ? s.cloths.map(c => (c.scopeKey === scope.key ? { ...c, ...data, updatedAt: now } : c))
+        ? s.cloths.map(c => (c.scopeKey === key ? { ...c, ...data, updatedAt: now } : c))
         : [...s.cloths, {
             id: crypto.randomUUID(),
             courseId: null,
             userId: session!.user!.id,
-            scopeKey: scope.key,
+            scopeKey: key,
             title: data.title ?? "",
             description: data.description ?? "",
             createdAt: now,
@@ -383,16 +389,18 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       return { ...s, cloths }
     })
     try {
-      const saved = await saveClothAction({ scopeKey: scope.key, ...data })
+      const saved = await saveClothAction({ scopeKey: key, ...data })
       setState(s => ({
         ...s,
-        cloths: s.cloths.some(c => c.scopeKey === scope.key)
-          ? s.cloths.map(c => (c.scopeKey === scope.key ? saved : c))
+        cloths: s.cloths.some(c => c.scopeKey === key)
+          ? s.cloths.map(c => (c.scopeKey === key ? saved : c))
           : [...s.cloths, saved],
       }))
       savedOk()
+      return true
     } catch (e) {
       await resync(e)
+      return false
     }
   }
 

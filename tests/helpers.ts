@@ -17,7 +17,10 @@ export async function openReading(page: Page, title: string) {
   // arrive — clicking into that re-render detaches the node and the click
   // lands on nothing.
   await expect(card.locator('.shelftally')).not.toHaveText('…', { timeout: 15000 });
-  await card.click();
+  // The reading link is .shelfmain — the card also carries the cloth row
+  // (Create/Open Cloth), so a click on the card's center is no longer a click
+  // on the reading.
+  await card.locator('.shelfmain').click();
   // 15s, not the 5s default: in dev the route compiles on demand and the App
   // Router only commits the URL once the server has rendered, which under
   // parallel workers can outlast the default expect timeout.

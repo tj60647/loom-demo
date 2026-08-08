@@ -84,7 +84,7 @@ test("01 · a byte captured by hand lands in the coding log — and cleans up", 
   await page.goto("/")
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
   await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
-  await card.click()
+  await card.locator(".shelfmain").click()
   await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
   // Station buttons are named "01 —Open" etc. — match by substring, never exact.
   await page.locator("nav button", { hasText: "Open" }).click()
@@ -200,7 +200,7 @@ test("04 · three maps, and each scope keeps its own tiers and essence", async (
   await page.goto("/")
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
   await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
-  await card.click()
+  await card.locator(".shelfmain").click()
   await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
   await page.locator("nav button", { hasText: "Knowledge Graph" }).click()
   await expect(page.locator("#mapSwitcher")).toContainText("Your projections of this reading", { timeout: 15_000 })

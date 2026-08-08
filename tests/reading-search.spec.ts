@@ -59,7 +59,7 @@ test("search inside a reading lists matching pages and marks the words on the te
   // Same trap tests/helpers.ts documents: clicking during the tally
   // re-render detaches the card mid-click.
   await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
-  await card.click()
+  await card.locator(".shelfmain").click()
   await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
 
   // Tab 00 — the text itself.

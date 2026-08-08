@@ -10,6 +10,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings, type ReadingMeta } from "@/components/providers/ReadingsProvider"
@@ -17,6 +18,7 @@ import { createOwnReading, draftMetadataForOwnSource, updateOwnReadingMetadata }
 import { uploadOwnReading } from "@/lib/readingUploadClient"
 import { MAX_READING_BYTES, MAX_READING_LABEL, formatBytes } from "@/lib/readingUpload"
 import { tallyByReading } from "@/lib/scope"
+import { short } from "@/lib/clothMath"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 import ShelfSearch from "@/components/shelf/ShelfSearch"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
@@ -28,9 +30,13 @@ export default function Shelf() {
   // See the note in Workbench: `status` is what distinguishes "nobody is
   // signed in" from "we have not asked yet".
   const { data: session, status } = useSession()
-  const { state, isLoading, loadExample, flash } = useLoom()
+  const { state, isLoading, loadExample, flash, updateCloth } = useLoom()
   const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
+  const router = useRouter()
   const [exampleBusy, setExampleBusy] = useState(false)
+  // The reading whose Create Cloth is in flight, so double-clicks and a second
+  // card's button both wait for the first create to land.
+  const [creatingClothFor, setCreatingClothFor] = useState<string | null>(null)
   // The search bar sits behind a toggle, the reading's own ⌕ Search idiom.
   // While a query is live the results own the page; clearing the box — or
   // closing the panel — puts the week-grouped shelf back exactly as it was.
@@ -102,44 +108,98 @@ export default function Shelf() {
     )
   }
 
+  // Create is an explicit act, never a side effect of opening (the model's
+  // reading-card ruling) — so it writes the cloth row first, then walks in.
+  // On failure updateCloth has already flashed and resynced; staying on the
+  // shelf keeps the card honest about what exists.
+  const createCloth = async (sourceId: string) => {
+    setCreatingClothFor(sourceId)
+    try {
+      const ok = await updateCloth({}, sourceId)
+      if (ok) {
+        flash("your cloth — title it on 02 · Linking")
+        router.push(`/reading/${sourceId}`)
+      }
+    } finally {
+      setCreatingClothFor(null)
+    }
+  }
+
   const readingCard = (s: ReadingMeta) => {
     const tally = tallies.get(s.id)
+    // 0 or 1 today — the schema keeps one cloth per scope for now — but the
+    // card renders a list, so several cloths per reading lands here for free.
+    const clothsHere = state.cloths.filter((c) => c.scopeKey === s.id)
+    const clothTitles = clothsHere
+      .map((c) => c.title.trim() || "untitled cloth")
+      .join(" · ")
     return (
-      <Link key={s.id} href={`/reading/${s.id}`} className="shelfcard">
-        {s.storageKey ? (
-          <SourceThumbnail sourceId={s.id} title={s.title} />
-        ) : (
-          // No PDF behind this card — say so rather than showing a broken frame.
-          <span className="shelfnofile" aria-hidden="true">
-            <span className="cap">no pdf</span>
-          </span>
-        )}
-        <div className="shelfbody">
-          <div>
-            <h3>{s.title}</h3>
-            {s.author ? <p className="shelfauthor">{s.author}</p> : null}
-            {s.isDescriptionVisible && s.description ? (
-              <p className="shelfdesc">{s.description}</p>
-            ) : null}
+      <div key={s.id} className="shelfcard">
+        <Link href={`/reading/${s.id}`} className="shelfmain">
+          {s.storageKey ? (
+            <SourceThumbnail sourceId={s.id} title={s.title} />
+          ) : (
+            // No PDF behind this card — say so rather than showing a broken frame.
+            <span className="shelfnofile" aria-hidden="true">
+              <span className="cap">no pdf</span>
+            </span>
+          )}
+          <div className="shelfbody">
+            <div>
+              <h3>{s.title}</h3>
+              {s.author ? <p className="shelfauthor">{s.author}</p> : null}
+              {s.isDescriptionVisible && s.description ? (
+                <p className="shelfdesc">{s.description}</p>
+              ) : null}
+            </div>
+            <p className="shelftally">
+              {/* Say nothing until the loom has actually loaded: "nothing
+                  captured here yet" on a full loom is a lie, and it is the
+                  first thing a student would read on every card. */}
+              {isLoading ? (
+                <span className="shelfquiet">…</span>
+              ) : tally ? (
+                <>
+                  {tally.bytes} passage{tally.bytes !== 1 ? "s" : ""} ·{" "}
+                  {tally.concepts} concept{tally.concepts !== 1 ? "s" : ""} ·{" "}
+                  {tally.threads} thread{tally.threads !== 1 ? "s" : ""}
+                </>
+              ) : (
+                <span className="shelfquiet">nothing captured here yet</span>
+              )}
+            </p>
           </div>
-          <p className="shelftally">
-            {/* Say nothing until the loom has actually loaded: "nothing
-                captured here yet" on a full loom is a lie, and it is the
-                first thing a student would read on every card. */}
-            {isLoading ? (
-              <span className="shelfquiet">…</span>
-            ) : tally ? (
+        </Link>
+        {/* The cloth row (rulings 20–22, 33): badge with the titles on hover,
+            one Open button per cloth labeled by its title, and Create Cloth
+            when none exists. The card above stays a plain door — a reading may
+            be opened to read without a cloth; browsing is not capture. */}
+        {!isLoading && (
+          <div className="clothrow">
+            {clothsHere.length > 0 ? (
               <>
-                {tally.bytes} byte{tally.bytes !== 1 ? "s" : ""} ·{" "}
-                {tally.concepts} concept{tally.concepts !== 1 ? "s" : ""} ·{" "}
-                {tally.threads} thread{tally.threads !== 1 ? "s" : ""}
+                <span className="cap clothbadge tip-below" data-tip={clothTitles}>
+                  {clothsHere.length} cloth{clothsHere.length !== 1 ? "s" : ""}
+                </span>
+                {clothsHere.map((c) => (
+                  <Link key={c.id} href={`/reading/${s.id}`} className="btn ghost mini nowrapbtn">
+                    {c.title.trim() ? `Open “${short(c.title, 40)}”` : "Open Cloth"}
+                  </Link>
+                ))}
               </>
             ) : (
-              <span className="shelfquiet">nothing captured here yet</span>
+              <button
+                className="btn ghost mini nowrapbtn"
+                onClick={() => createCloth(s.id)}
+                disabled={creatingClothFor !== null}
+                data-tip="your work on this reading, under your own title — made only when you ask"
+              >
+                {creatingClothFor === s.id ? "Creating…" : "Create Cloth"}
+              </button>
             )}
-          </p>
-        </div>
-      </Link>
+          </div>
+        )}
+      </div>
     )
   }
 
@@ -268,7 +328,7 @@ export default function Shelf() {
       </main>
 
       <footer>
-        <span className="fl">00 — READINGS</span>
+        <span className="fl">00 — LIBRARY</span>
         <span className="fr">PICK A READING</span>
       </footer>
     </>

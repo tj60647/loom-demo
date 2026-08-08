@@ -29,6 +29,87 @@ function EmptyState({ caption }: { caption: string }) {
   )
 }
 
+/**
+ * The cloth's own card — Cloth Title and Cloth Description, edited where the
+ * model homes them (Linking). Folded: the bench is this tab's work; the cloth
+ * is its name. Saving here is also how a cloth begun from the shelf's Create
+ * Cloth button gets its title — the shelf card shows both.
+ */
+function ClothFold() {
+  const { activeCloth, updateCloth, isLoading, scope, flash } = useLoom()
+  const wholeWeave = isWholeWeave(scope)
+  const [title, setTitle] = useState(activeCloth?.title ?? "")
+  const [description, setDescription] = useState(activeCloth?.description ?? "")
+  const [busy, setBusy] = useState(false)
+
+  // Reseed the drafts when the underlying row changes identity — on load, and
+  // when a first save swaps the optimistic row for the server's. Keying on the
+  // id keeps a keystroke from being clobbered by the save it caused.
+  const seededId = useRef<string | null>(activeCloth?.id ?? null)
+  useEffect(() => {
+    const id = activeCloth?.id ?? null
+    if (id !== seededId.current) {
+      seededId.current = id
+      setTitle(activeCloth?.title ?? "")
+      setDescription(activeCloth?.description ?? "")
+    }
+  }, [activeCloth])
+
+  const dirty =
+    title !== (activeCloth?.title ?? "") || description !== (activeCloth?.description ?? "")
+
+  const save = async () => {
+    if (busy || !dirty) return
+    setBusy(true)
+    try {
+      const ok = await updateCloth({ title, description })
+      if (ok) flash("cloth saved")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const shownTitle = (activeCloth?.title ?? "").trim()
+  return (
+    <details className="card invitefold" style={{ marginBottom: 14 }}>
+      <summary>
+        <span className="tw">▸</span>
+        <h2>
+          {wholeWeave ? "The whole weave's cloth" : "This cloth"}{" "}
+          {!isLoading && (
+            <span className="n">{shownTitle ? `— “${short(shownTitle, 60)}”` : "— untitled"}</span>
+          )}
+        </h2>
+      </summary>
+      <p className="hint" style={{ marginTop: 10 }}>
+        {wholeWeave
+          ? "A title and a short interpretation for everything at once — every reading, one cloth."
+          : "Your work on this reading, under your own name for it. The title is a sentence or headline — yours, not the reading's — and both show on the reading's card in the Library."}
+      </p>
+      <div className="form-row">
+        <span className="label">Cloth Title</span>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="a sentence or headline — what your reading of it says"
+          maxLength={200}
+        />
+      </div>
+      <div className="form-row">
+        <span className="label">Cloth Description</span>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={wholeWeave ? "your short interpretation, across the readings" : "your short interpretation of the reading"}
+        />
+      </div>
+      <button className="btn mini" onClick={save} disabled={busy || !dirty}>
+        {busy ? "Saving…" : "Save cloth"}
+      </button>
+    </details>
+  )
+}
+
 export default function ThrowTab() {
   // Scoped for what this reading is about; whole for anything that has to be
   // TRUE. A thread that runs out of this reading has one end outside it, so
@@ -331,6 +412,7 @@ export default function ThrowTab() {
           </span>
         ))}
       </div>
+      <ClothFold />
       <div className="two">
         <div className="card">
           <h2>The warp <span className="n">{scoped.concepts.length ? `(${scoped.concepts.length})` : ''}</span></h2>

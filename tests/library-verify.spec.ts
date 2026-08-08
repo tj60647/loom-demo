@@ -45,7 +45,7 @@ test.describe('Library verification', () => {
 
     await page.screenshot({ path: 'test-results/shelf.png', fullPage: true });
 
-    await firstCard.click();
+    await firstCard.locator('.shelfmain').click();
     await expect(page).toHaveURL(/\/reading\//, { timeout: 15000 });
     // Download moved off the library card onto the reading's scope bar.
     await expect(page.getByRole('link', { name: /Download PDF/i })).toBeVisible();
