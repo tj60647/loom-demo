@@ -7,10 +7,14 @@ import * as schema from './schema';
 // every config() call, which corrupts the output of any script that pipes it.
 //
 // The path was hardcoded to .env.local, which made `vercel env pull` a trap: it
-// writes .env.production.local, nothing reads it, and a script run to inspect
+// writes .env.production.local, no script reads it, and a script run to inspect
 // production silently reports on development instead — with output identical
 // enough to be believed. Hence LOOM_ENV_FILE, and databaseLabel() below so a
 // script can say out loud which database it actually reached.
+//
+// Any path works. Keep a pulled file as .env.production.pulled rather than the
+// name Vercel gives it: `next build` DOES auto-load .env.production.local, and
+// its [SENSITIVE] NEXTAUTH_URL breaks the build (see README, deployments.md).
 const ENV_FILE = process.env.LOOM_ENV_FILE || ".env.local"
 dotenv.config({ path: ENV_FILE, quiet: true })
 

@@ -68,15 +68,22 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 `.env.local` (not committed). Run `vercel env pull` to populate the hosted values.
 
-Two things that will bite. `vercel env pull` writes **`.env.production.local`** unless
-told otherwise, and nothing loads that file by default — scripts read `.env.local`, so
+Three things that will bite. `vercel env pull` writes **`.env.production.local`** unless
+told otherwise, and no *script* loads that file — scripts read `.env.local`, so
 a run you believe is inspecting production will quietly report on development instead,
-with output similar enough to be believed. Set `LOOM_ENV_FILE=.env.production.local` to
+with output similar enough to be believed. Set `LOOM_ENV_FILE=<path>` to
 point them elsewhere; every script that touches library data prints the database it
 actually reached before it says anything about the contents. And Vercel will **not**
 export values for variables marked sensitive — it writes the literal string
 `[SENSITIVE]`, which for `DATABASE_URL` means the file is not usable as-is and the
 connection string has to come from the Neon console.
+
+Third: **`next build` does load `.env.production.local`**, which is the one thing that
+reads it and the reason it cannot simply be left lying there — the `[SENSITIVE]`
+placeholder for `NEXTAUTH_URL` fails the prerender of `/_not-found` with
+`ERR_INVALID_URL`, breaking every local production build. Keep the pulled file under a
+name Next ignores; this repo uses **`.env.production.pulled`**, which `LOOM_ENV_FILE`
+reaches just as well.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |

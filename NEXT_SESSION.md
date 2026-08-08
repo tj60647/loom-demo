@@ -63,9 +63,25 @@ shell, not the authorization.
   fresh-GitHub-account smoke test, not a new gap.
 - **D4 and the Open/Reading merge** are still TJ's calls. Station 03 is
   labelled Vocabulary but still holds the read-the-cloth prompts.
-- The [SENSITIVE] `.env.production.local` still breaks `next build`; this
-  session moved it aside and restored it. **Delete it or re-pull real values** —
-  it has now cost a mv/mv on four consecutive sessions.
+- ~~The [SENSITIVE] `.env.production.local` breaks `next build`~~ — **closed,
+  and it was never the file that needed deleting, only its name.** TJ's call:
+  renamed to **`.env.production.pulled`**. Next auto-loads
+  `.env.production.local` during a production build and nothing else does; its
+  `[SENSITIVE]` `NEXTAUTH_URL` fails the prerender of `/_not-found` with
+  `ERR_INVALID_URL`. `LOOM_ENV_FILE` takes any path, so the rename ends the
+  mv/mv *and* keeps the production escape hatch — verified both ways: `next
+  build` is clean with the file in place, and
+  `LOOM_ENV_FILE=.env.production.pulled` reaches a different Neon endpoint than
+  `.env.local` (checked by hostname, not by trust). Docs updated in README,
+  deployments.md, reading-quality.md and `src/db/index.ts`.
+
+  Correct the record while you are here: the old note claimed `vercel env pull`
+  redacts `DATABASE_URL` to `[SENSITIVE]` in this file. It does not — that file
+  holds a **real** production connection string and real blob tokens
+  (`BLOB_READ_WRITE_TOKEN`, `BLOB_STORE_ID`, `BLOB_WEBHOOK_PUBLIC_KEY`), added
+  by hand after the pull. Only `GITHUB_ID`, `GITHUB_SECRET`, `NEXTAUTH_SECRET`
+  and `NEXTAUTH_URL` are placeholders. It is live credentials in the working
+  tree, gitignored — treat it as such.
 
 ## Addendum, 2026-08-07 latest (the shelf bounce, fixed at the mechanism)
 

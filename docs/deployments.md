@@ -56,10 +56,17 @@ PowerShell form is the one you will actually type — there is no inline
 `VAR=value cmd` prefix:
 
 ```powershell
-$env:LOOM_ENV_FILE = '.env.production.local'
+$env:LOOM_ENV_FILE = '.env.production.pulled'
 npm run diagnose:readings
 $env:LOOM_ENV_FILE = $null      # it persists for the session otherwise
 ```
+
+**Rename the pulled file, don't leave it where Vercel put it.** Next auto-loads
+`.env.production.local` during `next build`, and the `[SENSITIVE]` placeholder it
+carries for `NEXTAUTH_URL` fails the prerender of `/_not-found` with
+`ERR_INVALID_URL` — every local production build breaks until the file is moved
+aside. `LOOM_ENV_FILE` takes any path, so keeping it as `.env.production.pulled`
+costs nothing and ends that (2026-08-08; `.env*` is gitignored either way).
 
 Every script prints the database it reached before it reports anything. Read that
 line; it is the whole point of it existing.

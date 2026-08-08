@@ -175,10 +175,14 @@ Point it elsewhere with `LOOM_ENV_FILE`. In PowerShell, which is what this repo
 is developed in, that is a statement rather than a prefix:
 
 ```powershell
-$env:LOOM_ENV_FILE = '.env.production.local'
+$env:LOOM_ENV_FILE = '.env.production.pulled'
 npm run diagnose:readings
 $env:LOOM_ENV_FILE = $null
 ```
+
+(The pulled file is kept as `.env.production.pulled`, not the name `vercel env
+pull` gives it: Next auto-loads `.env.production.local` and its `[SENSITIVE]`
+`NEXTAUTH_URL` breaks every local `next build`. See deployments.md.)
 
 Note that `vercel env pull` writes the literal string `[SENSITIVE]` for variables
 marked sensitive, `DATABASE_URL` among them, so a pulled production file is not
