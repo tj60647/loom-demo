@@ -30,22 +30,27 @@ test("a cloth is created explicitly on the card, titled in Linking, and opens by
   // the card link itself must never mint a cloth — so the row offers exactly
   // one of the two doors.
   const create = card.getByRole("button", { name: "Create Cloth" })
-  const open = card.locator(".clothrow a")
+  const open = card.locator(".clothopen")
   await expect(create.or(open.first())).toBeVisible({ timeout: 15_000 })
 
+  // Either door lands on 02 · Linking, where the cloth's title lives — that is
+  // the point of the 2026-08-08 rework: opening the cloth goes somewhere the
+  // card itself does not.
   if (await create.isVisible()) {
     await create.click()
   } else {
     await open.first().click()
   }
-  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
+  await expect(page).toHaveURL(/\/reading\/[^?]+\?tab=throw/, { timeout: 15_000 })
 
-  // 02 · Linking is where the cloth's title and description live.
-  await page.locator("nav button", { hasText: "Linking" }).click()
   await loomLoaded(page)
   const fold = page.locator("details.invitefold", { hasText: "This cloth" })
   await expect(fold).toBeVisible({ timeout: 15_000 })
-  await fold.locator("summary").click()
+  // Create Cloth arrives with `?cloth=new`, which opens the fold already —
+  // toggling blindly would close it.
+  if (!(await fold.locator("input").first().isVisible())) {
+    await fold.locator("summary").click()
+  }
 
   const titleInput = fold.getByPlaceholder(/a sentence or headline/)
   await expect(titleInput).toBeVisible()
@@ -59,12 +64,13 @@ test("a cloth is created explicitly on the card, titled in Linking, and opens by
     await expect(save).toBeDisabled({ timeout: 15_000 })
   }
 
-  // Back on the shelf: the badge counts it, carries the title on hover, and
-  // the Open button speaks the title.
+  // Back on the shelf: the card speaks the cloth's name outright — no hover,
+  // no count — and says when it was last worked on.
   await page.goto("/")
   const cardAgain = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
   await expect(cardAgain.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
-  await expect(cardAgain.locator(".clothbadge")).toHaveText(/1 cloth/, { timeout: 15_000 })
-  await expect(cardAgain.locator(".clothbadge")).toHaveAttribute("data-tip", new RegExp(CLOTH_TITLE))
-  await expect(cardAgain.locator(".clothrow a", { hasText: CLOTH_TITLE })).toBeVisible()
+  await expect(cardAgain.locator(".clothname")).toHaveText(CLOTH_TITLE, { timeout: 15_000 })
+  await expect(cardAgain.locator(".clothmeta")).toContainText(/edited/)
+  // And it opens the cloth, not the text.
+  await expect(cardAgain.locator(".clothopen")).toHaveAttribute("href", /\?tab=throw$/)
 })

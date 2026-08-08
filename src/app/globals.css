@@ -646,3 +646,23 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* Naming a concept before its evidence — a first-class move, so it reads as a
    block with its own label rather than a stray input (TJ, 2026-08-08). */
 .aheadofit { margin-top: 14px; padding-top: 12px; border-top: 1px dotted var(--rule); }
+
+/* The reading card's cloth row, reworked 2026-08-08 (TJ): the cloth's NAME is
+   the affordance, not a count with the name hidden on hover, and "edited …"
+   says the work is alive. The whole row is the door — it opens at 02 · Linking,
+   which is what distinguishes it from the card above (that opens the text). */
+.clothopen {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  flex: 1 1 auto; min-width: 0;
+  text-decoration: none; color: inherit;
+  padding: 4px 8px; margin: -4px -8px; border-radius: 5px;
+}
+.clothopen:hover { background: rgba(168,132,63,.12); }
+.clothname {
+  font-family: var(--display); font-size: 14px; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.clothopen:hover .clothname { text-decoration: underline; text-underline-offset: 2px; }
+.clothmeta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft); white-space: nowrap; }
+.clothnone { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--grey); flex: 1 1 auto; }

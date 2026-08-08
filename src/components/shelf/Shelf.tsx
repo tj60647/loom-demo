@@ -20,6 +20,7 @@ import { uploadOwnReading } from "@/lib/readingUploadClient"
 import { MAX_READING_BYTES, MAX_READING_LABEL, formatBytes } from "@/lib/readingUpload"
 import { tallyByReading } from "@/lib/scope"
 import { short } from "@/lib/clothMath"
+import { timeAgo } from "@/lib/utils"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 import ShelfSearch from "@/components/shelf/ShelfSearch"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
@@ -118,8 +119,11 @@ export default function Shelf() {
     try {
       const ok = await updateCloth({}, sourceId)
       if (ok) {
-        flash("your cloth — title it on 02 · Linking")
-        router.push(`/reading/${sourceId}`)
+        // Land ON the tab that holds the cloth's title rather than telling the
+        // student to go and find it. `?cloth=new` opens the fold there, so the
+        // field they were just asked for is the thing in front of them.
+        flash("cloth created — give it a title")
+        router.push(`/reading/${sourceId}?tab=throw&cloth=new`)
       }
     } finally {
       setCreatingClothFor(null)
@@ -131,9 +135,6 @@ export default function Shelf() {
     // 0 or 1 today — the schema keeps one cloth per scope for now — but the
     // card renders a list, so several cloths per reading lands here for free.
     const clothsHere = state.cloths.filter((c) => c.scopeKey === s.id)
-    const clothTitles = clothsHere
-      .map((c) => c.title.trim() || "untitled cloth")
-      .join(" · ")
     return (
       <div key={s.id} className="shelfcard">
         <Link href={`/reading/${s.id}`} className="shelfmain">
@@ -171,32 +172,48 @@ export default function Shelf() {
             </p>
           </div>
         </Link>
-        {/* The cloth row (rulings 20–22, 33): badge with the titles on hover,
-            one Open button per cloth labeled by its title, and Create Cloth
-            when none exists. The card above stays a plain door — a reading may
-            be opened to read without a cloth; browsing is not capture. */}
+        {/* The cloth row (rulings 20–22, 33). Reworked 2026-08-08 (TJ): it was
+            not intuitive and gave no feedback.
+
+            The core problem was that "Open Cloth" and the card above pointed at
+            the SAME url, so two controls did one thing and the difference the
+            model draws — browse the text vs. open your work on it — was
+            invisible. The card is still the text; the cloth now opens at 02 ·
+            Linking, where its title and description live.
+
+            And the name was hidden behind a hover tooltip on a badge that
+            counted to one. The title is the information, so it is the row; the
+            count is gone, and "edited …" says the work is alive. */}
         {!isLoading && (
           <div className="clothrow">
             {clothsHere.length > 0 ? (
-              <>
-                <span className="cap clothbadge tip-below" data-tip={clothTitles}>
-                  {clothsHere.length} cloth{clothsHere.length !== 1 ? "s" : ""}
-                </span>
-                {clothsHere.map((c) => (
-                  <Link key={c.id} href={`/reading/${s.id}`} className="btn ghost mini nowrapbtn">
-                    {c.title.trim() ? `Open “${short(c.title, 40)}”` : "Open Cloth"}
-                  </Link>
-                ))}
-              </>
+              clothsHere.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/reading/${s.id}?tab=throw`}
+                  className="clothopen"
+                  data-tip="your work on this reading — opens at 02 · Linking, where its title and description live"
+                >
+                  <span className="clothname">
+                    {c.title.trim() ? short(c.title, 52) : "Untitled cloth"}
+                  </span>
+                  <span className="clothmeta">
+                    {c.title.trim() ? "" : "name it · "}edited {timeAgo(c.updatedAt)}
+                  </span>
+                </Link>
+              ))
             ) : (
-              <button
-                className="btn ghost mini nowrapbtn"
-                onClick={() => createCloth(s.id)}
-                disabled={creatingClothFor !== null}
-                data-tip="your work on this reading, under your own title — made only when you ask"
-              >
-                {creatingClothFor === s.id ? "Creating…" : "Create Cloth"}
-              </button>
+              <>
+                <span className="clothnone">No cloth yet</span>
+                <button
+                  className="btn ghost mini nowrapbtn"
+                  onClick={() => createCloth(s.id)}
+                  disabled={creatingClothFor !== null}
+                  data-tip="your work on this reading, under your own title — made only when you ask"
+                >
+                  {creatingClothFor === s.id ? "Creating…" : "Create Cloth"}
+                </button>
+              </>
             )}
           </div>
         )}

@@ -7,7 +7,6 @@
 // (red line #5). Import and reset live here too, each explaining itself.
 
 import { useRef } from "react"
-import Link from "next/link"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
@@ -131,13 +130,6 @@ export default function KeepTab() {
       <p className="tasktitle">Keep your work.</p>
       <p className="tasksub">The weave is yours — your concepts, your passages, your threads, your projections. This page is where you take it out of Loom, bring it back in, or clear the table and start again. Nothing here happens without asking you first.</p>
 
-      {/* The Weave station is hidden from the journey pending a decision on
-          what it becomes, so this is the way in — without it the whole-weave
-          projections would be reachable only by typing the URL. */}
-      <p className="hint" style={{ marginTop: -8, marginBottom: 16 }}>
-        Working across every reading at once? <Link href="/weave?tab=map">Open your whole weave</Link> —
-        the same Linking, Vocabulary and Knowledge Graph, scoped to everything you have read.
-      </p>
 
       <div className="card" style={{ marginBottom: 14 }}>
         <h2>Keep a projection <span className="n">{state.maps.length ? `${state.maps.length} projection${state.maps.length !== 1 ? "s" : ""}` : ""}</span></h2>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
@@ -38,6 +39,15 @@ function EmptyState({ caption }: { caption: string }) {
 function ClothFold() {
   const { activeCloth, updateCloth, isLoading, scope, flash } = useLoom()
   const wholeWeave = isWholeWeave(scope)
+  // Arriving from the shelf's Create Cloth (`?cloth=new`), the fold opens on
+  // its own: the student was just told to give it a title, so the field should
+  // be the thing in front of them rather than something to go and find.
+  // Uncontrolled after that first render — `defaultOpen` is not a React prop,
+  // so the initial `open` is set once and the browser owns it from there.
+  const justCreated = useSearchParams().get("cloth") === "new"
+  // Controlled, not a bare `open` attribute: with the param still in the URL a
+  // re-render could re-assert `open` and the fold would refuse to close.
+  const [foldOpen, setFoldOpen] = useState(justCreated)
   const [title, setTitle] = useState(activeCloth?.title ?? "")
   const [description, setDescription] = useState(activeCloth?.description ?? "")
   const [busy, setBusy] = useState(false)
@@ -71,7 +81,12 @@ function ClothFold() {
 
   const shownTitle = (activeCloth?.title ?? "").trim()
   return (
-    <details className="card invitefold" style={{ marginBottom: 14 }}>
+    <details
+      className="card invitefold"
+      style={{ marginBottom: 14 }}
+      open={foldOpen}
+      onToggle={(e) => setFoldOpen((e.currentTarget as HTMLDetailsElement).open)}
+    >
       <summary>
         <span className="tw">▸</span>
         <h2>
