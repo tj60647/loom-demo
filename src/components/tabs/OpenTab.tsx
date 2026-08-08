@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
-import type { Byte, Concept } from "@/lib/types"
+import type { Byte } from "@/lib/types"
 import { readingsOf, soleSourceId } from "@/lib/scope"
 import { contentWords, sortedByLabel } from "@/lib/utils"
 import { tidy } from "@/lib/clothMath"
@@ -22,7 +22,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
   // naming, dedup and the delete guards must see every concept the student has
   // — otherwise capturing a concept met in an earlier text would mint a
   // duplicate instead of joining its evidence (spec §2 identity).
-  const { state, scope, scoped, addConcept, addByte, editConcept, removeConcept, mergeConcepts, removeByte, refileByte, unfileByte, flash } = useLoom()
+  const { state, scope, scoped, addConcept, addByte, editConcept, removeConcept, removeByte, refileByte, unfileByte, flash } = useLoom()
   const { byId, titleOf } = useReadings()
   const { confirm, notify } = useDialog()
   const activeSourceId = soleSourceId(scope)
@@ -43,8 +43,6 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
   const [reuseNote, setReuseNote] = useState<{ label: string; where: string[] } | null>(null)
   const [refileInputs, setRefileInputs] = useState<Record<string, string>>({})
   const [refileBusy, setRefileBusy] = useState<Record<string, boolean>>({})
-  const [mergeInputs, setMergeInputs] = useState<Record<string, string>>({})
-  const [mergeBusy, setMergeBusy] = useState<Record<string, boolean>>({})
   const closeCaptureInfoButtonRef = useRef<HTMLButtonElement>(null)
 
   const [openLogRows, setOpenLogRows] = useState<Record<string, boolean>>({})
@@ -130,44 +128,6 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
       // swallow here to avoid an unhandled rejection.
     } finally {
       setRefileBusy(prev => ({ ...prev, [b.id]: false }))
-    }
-  }
-
-  const handleMerge = async (source: Concept) => {
-    if (mergeBusy[source.id]) return
-    const nm = (mergeInputs[source.id] ?? "").trim()
-    if (!nm) {
-      await notify({
-        title: "Name the concept to keep first.",
-        body: "Type the concept this one merges into, then Merge.",
-      })
-      return
-    }
-    const target = findConcept(nm)
-    if (!target || target.id === source.id) {
-      await notify({
-        title: target ? "That is this concept." : "No concept by that name.",
-        body: "Merging repairs a duplicate you already have — name the existing concept to keep.",
-      })
-      return
-    }
-    // Always confirm: the source concept goes away, and there is no unmerge.
-    const ok = await confirm({
-      title: `Merge “${source.label}” into “${target.label}”?`,
-      body: "Every passage and thread of the first will point at the second, and the first goes away. There is no unmerge.",
-      confirmLabel: "Merge",
-      danger: true,
-    })
-    if (!ok) return
-    setMergeBusy(prev => ({ ...prev, [source.id]: true }))
-    try {
-      await mergeConcepts(source.id, target.id)
-      setMergeInputs(prev => ({ ...prev, [source.id]: "" }))
-      setOpenLogRows(prev => ({ ...prev, [target.id]: true }))
-    } catch {
-      // mergeConcepts resyncs and flashes before rethrowing; swallow here.
-    } finally {
-      setMergeBusy(prev => ({ ...prev, [source.id]: false }))
     }
   }
 
@@ -613,16 +573,9 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                         {elsewhere} more passage{elsewhere !== 1 ? "s" : ""} evidence{elsewhere === 1 ? "s" : ""} this concept in your other readings — one concept, evidence from several texts.
                       </p>
                     )}
-                    <div className="quietrow" style={{ marginTop: "12px" }}>
-                      <input
-                        list="conceptOptions"
-                        placeholder="merge into another concept…"
-                        title="the same idea captured twice? name the concept to keep — this one's passages and threads move onto it"
-                        value={mergeInputs[concept.id] ?? ""}
-                        onChange={(e) => setMergeInputs(prev => ({ ...prev, [concept.id]: e.target.value }))}
-                      />
-                      <button className="btn ghost mini" onClick={() => handleMerge(concept)} disabled={!!mergeBusy[concept.id]}>Merge</button>
-                    </div>
+                    {/* Merge lives on 03 · Vocabulary (model §3 tab 4), where
+                        you can see every concept you own at once — which is
+                        what you need to judge whether two are really one. */}
                     <button
                       type="button"
                       className="rm"

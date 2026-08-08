@@ -8,8 +8,12 @@
  * asserted, never changed.
  *
  * Station coverage this file adds over the older specs: 01 Open's by-hand
- * capture form, 02 Throw (previously untested entirely), 03 Read (same),
- * multi-map assertions on 04, and the whole-cloth export on 06 Keep.
+ * capture form, 02 Linking (previously untested entirely), 03 Vocabulary
+ * (same), multi-map assertions on 04, and the whole-cloth export on 06 Keep.
+ *
+ * Since 2026-08-08, 03 is the holdings tab and the cloth reflection it used to
+ * hold lives on 04 — the 03 test asserts the words, the 04 test asserts the
+ * prompts and the read.
  */
 import { test, expect } from "@playwright/test"
 
@@ -168,32 +172,57 @@ test("02 · pick two, say the sentence, throw the thread, coin a term — then u
   await expect(page.locator(".sent", { hasText: "one sustains the other" })).toHaveCount(0, { timeout: 15_000 })
 })
 
-test("03 · the cloth counts what it sees, and the read belongs to the active map", async ({ page }) => {
-  await selectWholeCloth(page)
+test("03 · vocabulary is every word you own, across all your readings", async ({ page }) => {
+  // Unscoped on purpose (model §3 tab 4): a concept does not belong to a
+  // reading, so the holdings are the same list inside a reading as at the
+  // whole weave. Entering through a reading is the stronger check.
+  await page.goto("/")
+  const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
+  await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
+  await card.locator(".shelfmain").click()
+  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
   await page.locator("nav button", { hasText: "Vocabulary" }).click()
 
-  // Counted prompts render; the two visible failure states are counted, not hidden:
-  // the seeded no-evidence concept and the seeded sentence-only thread.
-  await expect(page.locator(".prompt").first()).toBeVisible({ timeout: 15_000 })
-  await expect(page.getByText(/no evidence/).first()).toBeVisible()
-  await expect(page.getByText(/no label yet/).first()).toBeVisible()
+  // All 8 seeded concepts, not this reading's slice — including the seeded
+  // evidence-less one, which is counted rather than hidden.
+  const conceptRows = page.locator(".lrow[data-concept-id]")
+  await expect(conceptRows, "seed missing — run `npm run seed:demo` first").toHaveCount(8, { timeout: 15_000 })
+  await expect(page.locator(".lrow[data-link-label]").first()).toBeVisible()
 
-  // Essence and paragraph are the seeded whole-cloth map's own.
-  await expect(page.locator("#readEssence")).toHaveValue(/Disciplinary worlds hold together/, { timeout: 15_000 })
-  await expect(page.locator("#yourRead")).toHaveValue(/Bucciarelli watches designers/)
+  // Filtering narrows the list and finding nothing says so.
+  await page.locator("#conceptFilter").fill("object")
+  await expect(conceptRows).toHaveCount(2)
+  await page.locator("#conceptFilter").fill("zzzznothing")
+  await expect(conceptRows).toHaveCount(0)
+  await expect(page.getByText(/No concept matches/)).toBeVisible()
+  await page.locator("#conceptFilter").fill("")
+  await expect(conceptRows).toHaveCount(8)
 
-  // Persistence: a fresh load re-derives the same map, same text.
-  await page.reload()
-  await loomLoaded(page)
-  await selectWholeCloth(page)
-  await page.locator("nav button", { hasText: "Vocabulary" }).click()
-  await expect(page.locator("#readEssence")).toHaveValue(/Disciplinary worlds hold together/, { timeout: 15_000 })
+  // A concept opens to its description and its merge control — the two
+  // affordances the model puts here (merge lives ONLY here now).
+  await page.locator(".lrow[data-concept-id]", { hasText: "object worlds" }).first().locator(".lhead").click()
+  await expect(page.locator(".conceptDescription").first()).toBeVisible()
+  await expect(page.getByRole("button", { name: "Merge" }).first()).toBeVisible()
+
+  // The read editor and the cloth prompts moved to 04 — they must not be here.
+  await expect(page.locator("#yourRead, #readEssence")).toHaveCount(0)
+  await expect(page.locator("#clothPrompts")).toHaveCount(0)
 })
 
 test("04 · three maps, and each scope keeps its own tiers and essence", async ({ page }) => {
   // Whole weave: the seeded whole-cloth map with its own essence.
   await selectWholeCloth(page)
   await expect(page.locator("#mapEssence")).toHaveValue(/Disciplinary worlds hold together/, { timeout: 15_000 })
+  await expect(page.locator("#yourRead2")).toHaveValue(/Bucciarelli watches designers/)
+
+  // The cloth reflection moved here from 03: counted prompts, and the two
+  // visible failure states counted rather than hidden — the seeded
+  // no-evidence concept and the seeded sentence-only thread.
+  await expect(page.locator("#clothPrompts .prompt").first()).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText(/no evidence/).first()).toBeVisible()
+  await expect(page.getByText(/no label yet/).first()).toBeVisible()
+  // The whole weave carries the development record; a single reading does not.
+  await expect(page.locator(".cap", { hasText: "Capture Log" })).toHaveCount(1)
 
   // Inside Object Worlds: its own map, its own essence, its own mirror counts —
   // and the whole-weave map does not leak in.

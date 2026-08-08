@@ -15,7 +15,7 @@ import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import OpenTab from "@/components/tabs/OpenTab"
 import ThrowTab from "@/components/tabs/ThrowTab"
-import ReadTab from "@/components/tabs/ReadTab"
+import VocabularyTab from "@/components/tabs/VocabularyTab"
 import MapTab from "@/components/tabs/MapTab"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import JourneyNav, { type Station } from "@/components/ui/JourneyNav"
@@ -43,7 +43,7 @@ const FOOT: Record<Tab, [string, string]> = {
   reading: ["00 — READING", "THE TEXT ITSELF"],
   open: ["01 — OPEN", "LAY THE WARP"],
   throw: ["02 — LINKING", "ONE THREAD AT A TIME"],
-  read: ["03 — VOCABULARY", "PULL A THREAD"],
+  read: ["03 — VOCABULARY", "THE WORDS YOU OWN"],
   map: ["04 — KNOWLEDGE GRAPH", "THE CARD TABLE"],
 }
 
@@ -255,7 +255,10 @@ export default function Workbench({
           {shouldRender("throw") && <ThrowTab />}
         </div>
         <div className={`panel ${activeTab === "read" ? "active" : ""}`}>
-          {shouldRender("read") && <ReadTab />}
+          {/* The station key stays "read" (and so does ?tab=read) — the URL
+              params are deliberately legacy per refactor spec §F. What it
+              renders is now the model's Vocabulary tab. */}
+          {shouldRender("read") && <VocabularyTab />}
         </div>
         <div className={`panel ${activeTab === "map" ? "active" : ""}`}>
           {shouldRender("map") && <MapTab />}

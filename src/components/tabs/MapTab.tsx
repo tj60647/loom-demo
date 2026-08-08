@@ -24,6 +24,8 @@ import { copyText } from "@/lib/clipboard"
 import { buildMapExport, buildMapMarkdown, mapExportFilename } from "@/lib/graphExport"
 import { downloadText } from "@/lib/download"
 import CardMenu from "@/components/map/CardMenu"
+import ClothReflection from "@/components/tabs/ClothReflection"
+import HistoryPanel from "@/components/ui/HistoryPanel"
 
 const TIERS: [Tier, string][] = [["p", "PRIMARY"], ["s", "SECONDARY"], ["t", "TERTIARY"]]
 const TABLE_H = 560
@@ -487,6 +489,24 @@ export default function MapTab() {
     setBend(null)
   }
 
+  // Came with the read editor when 03's duplicate was retired — the paragraph
+  // and its one-line copy out together, which is how a student hands the take
+  // to something outside Loom.
+  const handleCopyRead = () => {
+    const read = (activeMap?.read || "").trim()
+    const essence = (activeMap?.essence || "").trim()
+    if (!read && !essence) { flash("your read is empty — write a short paragraph first"); return }
+    const out = [
+      (studentName ? studentName + " — " : "") + (activeMap?.name || "my read of the cloth"),
+      essence,
+      read,
+    ].filter(Boolean).join("\n\n")
+    copyText(out).then(ok => {
+      if (ok) flash("read copied to clipboard")
+      else flash("select & copy by hand")
+    })
+  }
+
   const handleMapKit = () => {
     if (!scopedState.concepts.length) { flash("nothing to lay out yet — lay some warp first"); return }
     copyText(buildMapKit(
@@ -863,6 +883,12 @@ export default function MapTab() {
         )}
       </div>
 
+      {/* Look · trace · question, then write. The cloth and its prompts moved
+          here from 03 when 03 became Vocabulary (TJ, 2026-08-08): the panel
+          reads the structure of the graph, and the read it feeds is the one
+          directly below it rather than a second copy on another tab. */}
+      <ClothReflection />
+
       <div className="card" style={{ marginTop: 14 }}>
         <h2>Your read of this projection {activeMap ? <span className="n">&ldquo;{activeMap.name}&rdquo; — its one-line and paragraph travel with it</span> : <span className="n">starts with your first sort</span>}</h2>
         <p className="readq">In a sentence — what is this {wholeWeave ? "weave" : "reading"} <i>about</i>?</p>
@@ -876,16 +902,26 @@ export default function MapTab() {
         <p className="hint" style={{ marginTop: 8 }}>Arranging and articulating feed each other: as the projection settles, say in one short paragraph what it is about and what holds it together. One-line, paragraph, tiers and arrangement belong to this projection — switch projections and each keeps its own.</p>
         <textarea
           id="yourRead2"
-          placeholder="Write your read of this projection here — same text as on 03 · Vocabulary."
+          placeholder="Write your read of this projection here — a paragraph is enough. Trace a prompt above if you want your threads laid out to work from."
           value={activeMap?.read ?? ""}
           onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapRead(m.id, v)) }}
           onBlur={flushMapText}
         />
       </div>
 
-      <div style={{ marginTop: 10 }}>
+      <div style={{ marginTop: 10, display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <button className="btn ghost mini" data-tip="copies your paragraph to the clipboard" onClick={handleCopyRead}>Copy your read</button>
         <button className="btn ghost mini" data-tip="same concept-map kit — now grouped by your tiers" onClick={handleMapKit}>Copy the concept-map kit → draw the real concept map</button>
       </div>
+
+      {/* The record is of the whole weaving, not one reading's share of it, so
+          it belongs where the whole weave does rather than repeating itself
+          identically inside all twenty-six readings. */}
+      {wholeWeave && (
+        <div style={{ marginTop: "22px" }}>
+          <HistoryPanel />
+        </div>
+      )}
     </>
   )
 }

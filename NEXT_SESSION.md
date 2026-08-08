@@ -1,5 +1,61 @@
 # Next Session Prompt
 
+## Addendum, 2026-08-08 late (station 03 becomes Vocabulary)
+
+**Read this first. 03 · Vocabulary now holds what the model says it holds; the
+cloth reflection moved to 04.** TJ's call this session.
+
+One commit on `dev`. `npm run check`, `next build` and the full Playwright suite
+(39 passed / 1 skipped) are green; **no migration** — nothing about the data
+changed, only which tab renders it.
+
+### What moved, and why it was safe to move
+
+Model §3 tab 4 says Vocabulary is *the User's holdings*: browse/filter Concepts
+and Link Labels, recurrence, edit Descriptions, merge. Station 03 was holding
+the cloth-reflection prompts and a **second read editor** whose `#readEssence` /
+`#yourRead` wrote the same map fields as 04's `#mapEssence` / `#yourRead2`. So
+nothing had to be invented and nothing was lost:
+
+- **New `VocabularyTab`** (03) — every concept and link label you own, filter on
+  each, descriptions editable in place, recurrence counted, **merge**. It is
+  **UNSCOPED**, and that is the point: a concept does not belong to a reading, a
+  passage does, so the holdings read the same inside a reading as at the whole
+  weave. 01 Open keeps the *reading-scoped* Capture Log.
+- **New `ClothReflection`** (rendered by `MapTab`, 04) — the cloth, the counted
+  prompts, the traced-threads pane, and the whole-weave Capture Log history. It
+  sits directly above the read it feeds, which is what it was always for.
+- **Merge now has exactly one home.** It was on 01 Open; the model puts it on
+  Vocabulary, and judging whether two concepts are one needs the whole list in
+  front of you. `handleMerge` and its state are gone from `OpenTab`.
+- `#readEssence` / `#yourRead` **no longer exist** — grep for them before
+  believing any older spec or note.
+
+### Verified in a browser, not only type-checked
+
+Drove it as Test User A: 03 shows all 8 seeded concepts and 5 link labels *both*
+at `/weave?tab=read` and inside a reading (the unscoped behaviour, confirmed);
+the filter narrows 8 → 2 on "object" and says so when it matches nothing; a row
+opens to its description and Merge. 04 carries the prompts, the cloth SVG and
+the read editor, and the Capture Log renders at the whole weave but **not**
+inside a reading — the pre-existing rule, preserved.
+
+`tests/journey-learner.spec.ts`'s 03 test was rewritten to assert the words
+(and that `#yourRead`/`#clothPrompts` are absent); its 04 test picked up the
+prompt and read assertions. Copy updated in `KeepTab`, `FirstRunWalkthrough`
+and the workbench footer, which all pointed students at the old 03.
+
+### What remains
+
+- **D4** (keep 06 Keep as its own station, or fold it into Linking/Knowledge
+  Graph) and the **Open/Reading merge** are still TJ's calls — untouched. This
+  pass was deliberately compatible with either: 01 Open now holds capture plus
+  its own log, which is the shape the model's merged Reading tab wants.
+- **Next's queue bug** (vercel/next.js#90467) is still routed around, not fixed.
+- The enrolment-time faculty path is still asserted without a browser
+  (`scripts/check-auth.ts --db`), the same untestable seam as the fresh-GitHub
+  smoke test.
+
 ## Addendum, 2026-08-08 (faculty walk through a browser, and a door that erred)
 
 **Read this first. The faculty path — carried as untested for three sessions —

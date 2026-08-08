@@ -1,22 +1,31 @@
 "use client"
 
+// The cloth, its prompts, and the threads a prompt lays out to work from.
+//
+// This was station 03's whole content until 2026-08-08, when 03 became
+// Vocabulary (the model's tab 4 — the User's holdings). It moved here to 04 ·
+// Knowledge Graph on TJ's call: the panel reads the *structure of the graph*,
+// and 04 already owns the projection whose one-line and paragraph it feeds.
+// The read editor came with it only in the sense that it was already here —
+// 03's copy was a duplicate of `#yourRead2` and is gone.
+//
+// Nothing here writes an interpretation: it counts and sorts and poses a
+// generic question (red lines #1/#7). "Counted, not judged."
+
 import { useLoom } from "@/components/providers/LoomProvider"
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import type { Edge } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
-import { isWholeWeave, soleSourceId } from "@/lib/scope"
-import { buildMapKit } from "@/lib/mapKit"
+import { isWholeWeave } from "@/lib/scope"
 import { copyText } from "@/lib/clipboard"
 import ClothMap from "@/components/svg/ClothMap"
-import VocabularyOverlay from "@/components/tabs/VocabularyOverlay"
-import HistoryPanel from "@/components/ui/HistoryPanel"
 
-export default function ReadTab() {
-  // The cloth, the prompts and the counted report are all this reading's — the
-  // scoped graph's edges have both ends in scope by construction, so every
-  // concept lookup below resolves. Bridges are named but not drawn: they are
-  // 02 Throw's material, and drawing half a thread would be a lie.
-  const { scopedState: state, scoped, scope, activeMap, setMapRead, setMapEssence, flushMapText, ensureActiveMap, flash, studentName } = useLoom()
+export default function ClothReflection() {
+  // The cloth and the counted report are this scope's — the scoped graph's
+  // edges have both ends in scope by construction, so every concept lookup
+  // below resolves. Bridges are named but not drawn: they are 02 Linking's
+  // material, and drawing half a thread would be a lie.
+  const { scopedState: state, scoped, scope, flash, studentName } = useLoom()
   const wholeWeave = isWholeWeave(scope)
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
   const [drafted, setDrafted] = useState("")
@@ -111,7 +120,7 @@ export default function ReadTab() {
     if (rec.length) {
       readPrompts.push({
         key: 'your words', gap: false,
-        q: <>You've reached for <b>"{rec[0][0]}"</b> on {rec[0][1].length} threads — it's becoming one of your own labels.</>,
+        q: <>You&apos;ve reached for <b>&ldquo;{rec[0][0]}&rdquo;</b> on {rec[0][1].length} threads — it&apos;s becoming one of your own labels. See it with the rest on <b>03 · Vocabulary</b>.</>,
         move: 'a coinage forming'
       })
     }
@@ -135,15 +144,8 @@ export default function ReadTab() {
       setReadSel(null)
     }
     setDrafted(p.rep
-      ? 'traced on the cloth — your threads are laid out on the left, yours to weave here in your own words.'
+      ? 'traced on the cloth — your threads are laid out below, yours to weave into your read.'
       : 'just a pattern to notice — nothing to lay out.')
-  }
-
-  const copyWithFeedback = (out: string, okMsg: string) => {
-    copyText(out).then(ok => {
-      if (ok) { flash(okMsg); setDrafted("✓ copied") }
-      else flash("select & copy by hand")
-    })
   }
 
   const buildDraft = () => {
@@ -175,32 +177,9 @@ export default function ReadTab() {
     const txt = buildDraft()
     if (!txt) return
     copyText(txt).then(ok => {
-      if (ok) flash("copied to clipboard")
+      if (ok) { flash("copied to clipboard"); setDrafted("✓ copied") }
       else flash("select & copy by hand")
     })
-  }
-
-  const handleCopyRead = () => {
-    const read = (activeMap?.read || "").trim()
-    const essence = (activeMap?.essence || "").trim()
-    if (!read && !essence) { flash("your read is empty — write a short paragraph first"); return }
-    const out = [
-      (studentName ? studentName + " — " : "") + (activeMap?.name || "my read of the cloth"),
-      essence,
-      read,
-    ].filter(Boolean).join("\n\n")
-    copyWithFeedback(out, "read copied to clipboard")
-  }
-
-  const handleMapKit = () => {
-    if (!state.concepts.length) { flash("nothing to lay out yet — lay some warp first"); return }
-    copyWithFeedback(
-      buildMapKit(
-        state.concepts, state.edges, studentName,
-        activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
-      ),
-      "concept-map kit copied — take it to paper or Figma"
-    )
   }
 
   // v14's tripleHtml + .readitem. Sizes come from globals.css (.threadhead is
@@ -286,7 +265,7 @@ export default function ReadTab() {
                 <span className="red">{c.label}</span> <span className="n"> · {comp.edges.length} crossing{comp.edges.length !== 1 ? 's' : ''}</span>
               </div>
               <p className="hint" style={{ margin: "4px 0 9px" }}>
-                Your threads, in walking order — your own sentences, laid out as raw material. <b>You</b> weave them into a read on the right, in your own words. Copy to quote a line.
+                Your threads, in walking order — your own sentences, laid out as raw material. <b>You</b> weave them into a read below, in your own words. Copy to quote a line.
               </p>
               <button className="btn ghost mini" onClick={handleCopyDraft} style={{ marginBottom: "12px" }}>copy these threads</button>
               <div>{comp.edges.map(threadItem)}</div>
@@ -305,16 +284,7 @@ export default function ReadTab() {
 
   return (
     <>
-      <p className="tasktitle">{wholeWeave ? "Read the whole cloth." : "Read this reading's cloth."}</p>
-      <p className="tasksub">What argument runs through it? What does it keep returning to? What&apos;s missing? The cloth shows you where to look — the reading is yours to write. From here, your weave feeds the work <i>outside</i> Loom: the concept map you draw by hand, and the chalk talk you build from it.</p>
-      {!wholeWeave && scoped.bridges.length > 0 && (
-        <p className="ghostnote" style={{ marginTop: -6, marginBottom: 12 }}>
-          {scoped.bridges.length} thread{scoped.bridges.length !== 1 ? "s" : ""} also run{scoped.bridges.length === 1 ? "s" : ""} out of this reading to concepts you met elsewhere.
-          They are not drawn here — half a thread would be a lie — but they are listed on <b>02 · Linking</b>.
-        </p>
-      )}
-
-      <div className="rail" id="readRail">
+      <div className="rail" id="readRail" style={{ marginTop: "22px" }}>
         {["look", "trace", "question", "write"].map((s, i) => (
           <Fragment key={s}>
             {i > 0 && <span className="rsep">·</span>}
@@ -322,6 +292,13 @@ export default function ReadTab() {
           </Fragment>
         ))}
       </div>
+
+      {!wholeWeave && scoped.bridges.length > 0 && (
+        <p className="ghostnote" style={{ marginTop: 6, marginBottom: 12 }}>
+          {scoped.bridges.length} thread{scoped.bridges.length !== 1 ? "s" : ""} also run{scoped.bridges.length === 1 ? "s" : ""} out of this reading to concepts you met elsewhere.
+          They are not drawn here — half a thread would be a lie — but they are listed on <b>02 · Linking</b>.
+        </p>
+      )}
 
       <div className="mapbar">
         <span className="label">The cloth</span>
@@ -338,136 +315,94 @@ export default function ReadTab() {
         <span><span className="sw" style={{borderTop: "2px solid var(--ochre)"}}></span>warp — concept</span>
         <span><span className="sw" style={{borderTop: "2px solid var(--sage)"}}></span>coined label</span>
         <span><span className="sw" style={{borderTop: "2px dashed var(--grey)"}}></span>unnamed — description only</span>
-        <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>what you're tracing</span>
+        <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>what you&apos;re tracing</span>
       </div>
 
-      <div className="two" style={{marginTop: "22px"}}>
-        <div className="card">
-          <h2 className="heading-with-info">
-            What the cloth shows you <span className="n">counted, not judged</span>
-            <button
-              type="button"
-              className="iconbtn cloth-info-btn"
-              aria-label="How cloth prompts are derived"
-              aria-haspopup="dialog"
-              aria-expanded={showClothInfo}
-              aria-controls="clothInfoDialog"
-              onClick={() => setShowClothInfo(true)}
+      <div className="card" style={{ marginTop: "22px" }}>
+        <h2 className="heading-with-info">
+          What the cloth shows you <span className="n">counted, not judged</span>
+          <button
+            type="button"
+            className="iconbtn cloth-info-btn"
+            aria-label="How cloth prompts are derived"
+            aria-haspopup="dialog"
+            aria-expanded={showClothInfo}
+            aria-controls="clothInfoDialog"
+            onClick={() => setShowClothInfo(true)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+          </button>
+        </h2>
+        {showClothInfo && (
+          <div className="info-scrim" onClick={() => setShowClothInfo(false)}>
+            <section
+              id="clothInfoDialog"
+              className="info-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="clothInfoTitle"
+              onClick={(event) => event.stopPropagation()}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4" />
-                <path d="M12 8h.01" />
-              </svg>
-            </button>
-          </h2>
-          {showClothInfo && (
-            <div className="info-scrim" onClick={() => setShowClothInfo(false)}>
-              <section
-                id="clothInfoDialog"
-                className="info-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="clothInfoTitle"
-                onClick={(event) => event.stopPropagation()}
+              <button
+                ref={closeInfoButtonRef}
+                type="button"
+                className="iconbtn info-close"
+                aria-label="Close info"
+                onClick={() => setShowClothInfo(false)}
               >
-                <button
-                  ref={closeInfoButtonRef}
-                  type="button"
-                  className="iconbtn info-close"
-                  aria-label="Close info"
-                  onClick={() => setShowClothInfo(false)}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
-                </button>
-                <div className="info-k">counted, not judged</div>
-                <h2 id="clothInfoTitle">How these prompts are made</h2>
-                <p>
-                  This panel reads the structure of your own loom. It counts concepts and threads, then turns the visible patterns into questions for you to answer.
-                </p>
-                <ul>
-                  <li><b>The spine</b> is the largest connected weave of concepts and threads.</li>
-                  <li><b>The centre</b> is the concept, or tied concepts, with the most threads touching them.</li>
-                  <li><b>The gap</b> is either an island apart from the main weave, or a concept with no threads yet.</li>
-                </ul>
-                <p className="info-note">
-                  No agent writes the reading or decides what it means. The tool points; you interpret.
-                </p>
-                <button type="button" className="btn ghost mini" onClick={() => setShowClothInfo(false)}>Got it</button>
-              </section>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+              <div className="info-k">counted, not judged</div>
+              <h2 id="clothInfoTitle">How these prompts are made</h2>
+              <p>
+                This panel reads the structure of your own loom. It counts concepts and threads, then turns the visible patterns into questions for you to answer.
+              </p>
+              <ul>
+                <li><b>The spine</b> is the largest connected weave of concepts and threads.</li>
+                <li><b>The centre</b> is the concept, or tied concepts, with the most threads touching them.</li>
+                <li><b>The gap</b> is either an island apart from the main weave, or a concept with no threads yet.</li>
+              </ul>
+              <p className="info-note">
+                No agent writes the reading or decides what it means. The tool points; you interpret.
+              </p>
+              <button type="button" className="btn ghost mini" onClick={() => setShowClothInfo(false)}>Got it</button>
+            </section>
+          </div>
+        )}
+        <p className="hint">Click a prompt to light it up on the cloth and lay those threads out below. <b>You don&apos;t write anything here</b> — your one short read goes underneath.</p>
+
+        <div id="clothPrompts">
+          {state.concepts.length === 0 && <p className="empty">Nothing laid yet — prompts appear as you weave.</p>}
+          {readPrompts.map((p, i) => (
+            <div
+              key={i}
+              className={`prompt ${readSel?.promptIdx === i ? "on" : ""}`}
+              onClick={() => handlePromptClick(p, i)}
+            >
+              <span className="youdecide">you decide</span>
+              <span className="pk">{p.key}</span>
+              <div className="pq">{p.q}</div>
+              {p.move && <span className="pm">{p.move}</span>}
             </div>
+          ))}
+          {state.concepts.length > 0 && loose > 0 && (
+            <div className="ghostnote" style={{ marginTop: "6px" }}>{loose} thread{loose !== 1 ? 's' : ''} with no label yet — coin one on 02 so a word can recur.</div>
           )}
-          <p className="hint">Click a prompt to light it up on the cloth and lay those threads out below. <b>You don&apos;t write anything here</b> — your one short read goes on the right.</p>
-
-          <div id="clothPrompts">
-            {state.concepts.length === 0 && <p className="empty">Nothing laid yet — prompts appear as you weave.</p>}
-            {readPrompts.map((p, i) => (
-              <div
-                key={i}
-                className={`prompt ${readSel?.promptIdx === i ? "on" : ""}`}
-                onClick={() => handlePromptClick(p, i)}
-              >
-                <span className="youdecide">you decide</span>
-                <span className="pk">{p.key}</span>
-                <div className="pq">{p.q}</div>
-                {p.move && <span className="pm">{p.move}</span>}
-              </div>
-            ))}
-            {state.concepts.length > 0 && loose > 0 && (
-              <div className="ghostnote" style={{ marginTop: "6px" }}>{loose} thread{loose !== 1 ? 's' : ''} with no label yet — coin one on 02 so a word can recur.</div>
-            )}
-            {state.concepts.length > 0 && noEv.length > 0 && (
-              <div className="ghostnote" style={{ marginTop: "6px", color: "var(--red)" }}>{noEv.length} concept{noEv.length !== 1 ? 's' : ''} with <b>no evidence</b> yet — every concept should trace to a captured passage.</div>
-            )}
-          </div>
-
-          {readingPane}
+          {state.concepts.length > 0 && noEv.length > 0 && (
+            <div className="ghostnote" style={{ marginTop: "6px", color: "var(--red)" }}>{noEv.length} concept{noEv.length !== 1 ? 's' : ''} with <b>no evidence</b> yet — every concept should trace to a captured passage.</div>
+          )}
+          {drafted && <div className="drafted" id="readDrafted">{drafted}</div>}
         </div>
 
-        <div className="card">
-          <h2>Your read {activeMap && <span className="n">of &ldquo;{activeMap.name}&rdquo; — same as 04 · Knowledge Graph</span>}</h2>
-          <p className="hint">One short paragraph, in your own words: what is this {wholeWeave ? "weave" : "reading"} about, and what holds it together? The tool never writes it for you. Your one-line and paragraph belong to your current projection — keep several projections and each keeps its own.</p>
-          <p className="readq">In a sentence — what is this {wholeWeave ? "weave" : "reading"} <i>about</i>?</p>
-          <input
-            id="readEssence"
-            placeholder="Your one-line — the take, in a sentence."
-            value={activeMap?.essence ?? ""}
-            onChange={(e) => { const v = e.target.value; void ensureActiveMap().then(m => setMapEssence(m.id, v)) }}
-            onBlur={flushMapText}
-            style={{ marginBottom: 8 }}
-          />
-          <textarea
-            id="yourRead"
-            placeholder="Write your read here — a paragraph is enough. Trace the prompts on the left first if you want your threads laid out to work from."
-            value={activeMap?.read ?? ""}
-            onChange={(e) => { const v = e.target.value; void ensureActiveMap().then(m => setMapRead(m.id, v)) }}
-            onBlur={flushMapText}
-          />
-          <div className="drafted" id="readDrafted">{drafted}</div>
-          <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
-            <button className="btn ghost mini" data-tip="copies your paragraph to the clipboard" onClick={handleCopyRead}>Copy your read</button>
-            <button className="btn ghost mini" data-tip="copies your concepts, propositions, and spine — everything you need to draw your concept map by hand" onClick={handleMapKit}>Copy the concept-map kit → draw your concept map</button>
-          </div>
-        </div>
+        {readingPane}
       </div>
-
-      {/* The Concepts and Links Overlays (ruling 28). Below your own read, not
-          beside it: the comparison is a second look at the words you already
-          have, and putting it level with them would invite you to write from
-          it. Gated on having coded the reading yourself, server-side. */}
-      <VocabularyOverlay sourceId={soleSourceId(scope)} ownCaptureCount={scoped.bytes.length} />
-
-      {/* The record is of the whole weaving, not one reading's share of it, so
-          it belongs where the whole weave does rather than repeating itself
-          identically inside all twenty-six readings. */}
-      {wholeWeave && (
-        <div style={{ marginTop: "22px" }}>
-          <HistoryPanel />
-        </div>
-      )}
     </>
   )
 }

@@ -27,6 +27,10 @@
 > **Faculty walked through a browser** (2026-08-08): `tests/faculty.spec.ts` signs
 > in as a FACULTY membership for the first time; `/admin/library` gained the
 > `checkAdmin()` redirect it had been missing (§2c).
+> **Station 03 reconciled to the model** (2026-08-08, TJ): 03 · Vocabulary is now
+> the User's holdings (`VocabularyTab` — concepts, link labels, merge); the cloth
+> prompts and the duplicate read editor moved to 04 (`ClothReflection`). See
+> §2b-ii.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
@@ -300,9 +304,32 @@ other). Marks are `aria-hidden`, carry `data-heat` 1–5, and shade in five step
 with a slate rule above the words so the section's mark survives under your own
 yellow. The client re-checks the hash against the live text layer and refuses to
 shade a drifted page — there is no fuzzy fallback, because it never receives the
-other student's text. **ReadTab** mounts `VocabularyOverlay` below the read.
-Both are off until asked for and re-ask when the viewer's own capture count
-changes, so the capture that opens the gate opens the overlay without a reload.
+other student's text. **VocabularyTab** mounts `VocabularyOverlay` below the
+holdings. Both are off until asked for and re-ask when the viewer's own capture
+count changes, so the capture that opens the gate opens the overlay without a
+reload.
+
+### 2b-ii. The workbench tabs (2026-08-08 — station 03 reconciled)
+
+Model §3's five tabs against the seven-station journey. Only 03 changed:
+
+| Station | Component | Holds |
+| --- | --- | --- |
+| 00 Reading | `Workbench` + `PdfViewer` | the text, capture, in-reading search, Passages Overlay |
+| 01 Open | `OpenTab` | capture by hand; the reading-scoped **Capture Log** (passages filed by concept, refile/unfile, rename, describe, delete) |
+| 02 Linking | `ThrowTab` | links, Description-then-Label, Cloth Title/Description |
+| **03 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); **merge Concepts — its only home**; Concepts/Links Overlays |
+| 04 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, card table; the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); the Capture Log history at the whole weave |
+
+Scoping is the load-bearing distinction: **01 Open is this reading's captures;
+03 Vocabulary is everything you own.** A concept does not belong to a reading —
+a passage does — so the holdings render identically inside a reading and at the
+whole weave. The Overlay alone stays reading-gated.
+
+Before this pass 03 held the cloth prompts and a *second* read editor
+(`#readEssence`/`#yourRead`) writing the same map fields as 04's; those ids no
+longer exist. `?tab=read` and the `"read"` station key are unchanged — URL
+params are deliberately legacy (refactor spec §F).
 
 ### 2d. Courses & sections — [src/actions/courses.ts](../src/actions/courses.ts)
 

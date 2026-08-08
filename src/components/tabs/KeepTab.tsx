@@ -118,7 +118,7 @@ export default function KeepTab() {
   const handleReset = async () => {
     const ok = await confirm({
       title: "Clear this course's cloth?",
-      body: `${state.concepts.length} concept${state.concepts.length !== 1 ? "s" : ""}, ${state.bytes.length} passage${state.bytes.length !== 1 ? "s" : ""}, ${state.edges.length} thread${state.edges.length !== 1 ? "s" : ""} and ${state.maps.length} projection${state.maps.length !== 1 ? "s" : ""} — tiers, one-lines and descriptions — all go. Export first — a .json makes this reversible. Your weaving history on 03 · Vocabulary survives either way.`,
+      body: `${state.concepts.length} concept${state.concepts.length !== 1 ? "s" : ""}, ${state.bytes.length} passage${state.bytes.length !== 1 ? "s" : ""}, ${state.edges.length} thread${state.edges.length !== 1 ? "s" : ""} and ${state.maps.length} projection${state.maps.length !== 1 ? "s" : ""} — tiers, one-lines and descriptions — all go. Export first — a .json makes this reversible. Your weaving history on 04 · Knowledge Graph survives either way.`,
       confirmLabel: "Clear the table",
       danger: true,
     })
@@ -198,7 +198,7 @@ export default function KeepTab() {
         <h2>Clear the table</h2>
         <p className="do calm">Only if you mean it — reset empties this course&apos;s cloth and starts you blank.</p>
         <p className="hint">Reset removes the concepts, the passages, the threads, and your projections — every tier, one-line, description and arrangement — for this course. It cannot be undone from inside Loom. An export taken beforehand is the whole safety net — with a .json in hand, a reset is reversible by importing it back.</p>
-        <p className="hint">What survives on purpose: the development history — the Capture Log on <b>03 Vocabulary</b>. Reset clears the cloth, not the record of weaving it. Your growth stays visible even when the table is empty.</p>
+        <p className="hint">What survives on purpose: the development history — the record of weaving, on <b>04 Knowledge Graph</b>. Reset clears the cloth, not the record of weaving it. Your growth stays visible even when the table is empty.</p>
         <p className="ghostnote">You will be asked to confirm. Export first if there is any doubt.</p>
         <button className="btn ghost" data-tip="clear this course's cloth and start blank — your weaving history is kept" onClick={handleReset} style={{ marginTop: 4 }}>Reset this cloth</button>
       </div>
