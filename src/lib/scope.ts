@@ -1,10 +1,12 @@
 // The reading lens (docs/archive/reading-scope-and-map-passes.md §A.3).
 //
 // A CONCEPT DOES NOT BELONG TO A READING — A BYTE DOES. A concept emerges from
-// a reading and may then be evidenced in several; spec §2 makes one label one
-// concept, reused across readings and weeks. So the only stored relation is the
-// byte's `sourceId`, and everything below derives from it per render and throws
-// the result away. Nothing here owns a concept, re-homes one, or writes.
+// a reading and may then be evidenced in several: one User-level object,
+// referenced by passages across readings (identity by object, not label —
+// ruling 36). The stored relations are the byte's `sourceId` and its concept
+// pointers (`byte_concept`), and everything below derives from them per render
+// and throws the result away. Nothing here owns a concept, re-homes one, or
+// writes.
 //
 // A reading is a door into one graph, never one of many graphs.
 
@@ -89,9 +91,9 @@ export function scopedGraph(state: LoomState, scope: Scope): ScopedGraph {
   const bytes: Byte[] = []
 
   state.bytes.forEach((b) => {
-    hasByte.add(b.conceptId)
+    b.conceptIds.forEach((id) => hasByte.add(id))
     if (b.sourceId && inScope.has(b.sourceId)) {
-      evidenced.add(b.conceptId)
+      b.conceptIds.forEach((id) => evidenced.add(id))
       bytes.push(b)
     }
   })
@@ -127,7 +129,7 @@ export function asLoomState(state: LoomState, graph: ScopedGraph): LoomState {
 export function readingsOf(conceptId: string, bytes: Byte[]): string[] {
   const ids = new Set<string>()
   bytes.forEach((b) => {
-    if (b.conceptId === conceptId && b.sourceId) ids.add(b.sourceId)
+    if (b.sourceId && b.conceptIds.includes(conceptId)) ids.add(b.sourceId)
   })
   return [...ids]
 }
@@ -147,19 +149,22 @@ export function tallyByReading(state: LoomState): Map<string, ReadingTally> {
     if (!b.sourceId) return
     byteCount.set(b.sourceId, (byteCount.get(b.sourceId) ?? 0) + 1)
     const set = conceptsBySource.get(b.sourceId) ?? new Set<string>()
-    set.add(b.conceptId)
+    b.conceptIds.forEach((id) => set.add(id))
     conceptsBySource.set(b.sourceId, set)
   })
 
   const tallies = new Map<string, ReadingTally>()
-  conceptsBySource.forEach((conceptIds, sourceId) => {
+  // Keyed by byte count, not by concept map: a reading whose only captures are
+  // unlabeled passages still counts — the passage is the act, not the label.
+  byteCount.forEach((count, sourceId) => {
+    const conceptIds = conceptsBySource.get(sourceId) ?? new Set<string>()
     // A thread counts for a reading when either end is evidenced in it — the
     // same rule the workbench uses, so the card and the tab agree.
     const threads = state.edges.filter(
       (e) => conceptIds.has(e.fromId) || conceptIds.has(e.toId)
     ).length
     tallies.set(sourceId, {
-      bytes: byteCount.get(sourceId) ?? 0,
+      bytes: count,
       concepts: conceptIds.size,
       threads,
     })

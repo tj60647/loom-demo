@@ -106,7 +106,7 @@ export default function ThrowTab() {
 
   // Whole-graph: a concept evidenced in an earlier reading is not evidence-less
   // just because this reading has not quoted it.
-  const bytesOf = (conceptId: string) => state.bytes.filter(b => b.conceptId === conceptId)
+  const bytesOf = (conceptId: string) => state.bytes.filter(b => b.conceptIds.includes(conceptId))
   const conceptById = (id: string) => state.concepts.find(c => c.id === id)
 
   const togglePick = (id: string) => {
@@ -164,7 +164,9 @@ export default function ThrowTab() {
   }
 
   const handleThrow = async () => {
-    if (!pairA || !pairB || !sentence.trim()) return
+    // The sentence is encouraged, never required (P0.3): connecting first and
+    // describing later is the golden path.
+    if (!pairA || !pairB) return
     await addEdge(pairA, pairB, sentence.trim())
     setPairA(null)
     setPairB(null)
@@ -472,14 +474,13 @@ export default function ThrowTab() {
                 onChange={(e) => setSentence(e.target.value)}
               />
             </div>
-            <button className="btn" onClick={handleThrow} disabled={!sent}>Throw it</button>
-            {/* v14 alerted the reason on click and showed the standing note
-                always; with a disabled button the reason has to be visible
-                instead — so the two take turns rather than stacking. */}
+            <button className="btn" onClick={handleThrow} disabled={!both}>Throw it</button>
+            {/* The sentence is encouraged, never required (P0.3) — the note
+                coaches toward it instead of the button withholding the throw. */}
             <p className="ghostnote" style={{marginTop: "7px"}}>
               {sent
                 ? "Thrown threads land below. When a relationship recurs, coin a short term for it (optional) — that's how your vocabulary grows."
-                : "Say how they hang together — however awkwardly. The sentence is the thread."}
+                : "Say how they hang together — however awkwardly. The sentence is the thread, and you can throw now and write it later."}
             </p>
           </div>
 

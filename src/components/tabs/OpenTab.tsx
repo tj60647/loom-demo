@@ -22,7 +22,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
   // naming, dedup and the delete guards must see every concept the student has
   // — otherwise capturing a concept met in an earlier text would mint a
   // duplicate instead of joining its evidence (spec §2 identity).
-  const { state, scope, scoped, addConcept, addByte, editConcept, removeConcept, removeByte, refileByte, flash } = useLoom()
+  const { state, scope, scoped, addConcept, addByte, editConcept, removeConcept, removeByte, refileByte, unfileByte, flash } = useLoom()
   const { byId, titleOf } = useReadings()
   const { confirm, notify } = useDialog()
   const activeSourceId = soleSourceId(scope)
@@ -72,7 +72,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
       await editConcept(concept.id, { def: wdef })
     }
 
-    await addByte(concept.id, source.trim() || citation, location.trim(), text)
+    await addByte([concept.id], source.trim() || citation, location.trim(), text)
 
     // reset form (keep source/location if user wants to enter multiple passages from same place)
     setContent("")
@@ -107,7 +107,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
       return
     }
     let concept = findConcept(nm)
-    if (concept && state.bytes.some(x => x.content === b.content && x.conceptId === concept!.id)) {
+    if (concept && b.conceptIds.includes(concept.id)) {
       await notify({
         title: "Already filed under that concept.",
         body: `This passage is already evidence for “${concept.label}”.`,
@@ -141,14 +141,13 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
       })
       return
     }
-    // Always confirm, and name what goes. v14 only asked when the concept had
-    // bytes, which it could afford: its state was browser-local. Here the
-    // delete is a server-side cascade with no undo.
+    // Always confirm, and name what happens. Since 0021 the passages survive
+    // the concept (P0.1): only the label and its pointers go.
     const label = state.concepts.find(c => c.id === conceptId)?.label ?? "this concept"
     const ok = await confirm({
       title: `Delete “${label}”?`,
       body: byteCount
-        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s go" : " goes"} with it. Export from 06 · Keep first if you might want this back.`
+        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s" : ""} stay${byteCount !== 1 ? "" : "s"} in your log, unfiled. Export from 06 · Keep first if you might want this back.`
         : "Export from 06 · Keep first if you might want this back.",
       confirmLabel: "Delete concept",
       danger: true,
@@ -192,7 +191,8 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     }
 
     const rowTimer = window.setTimeout(() => {
-      setOpenLogRows((prev) => ({ ...prev, [targetByte.conceptId]: true }))
+      const firstConcept = targetByte.conceptIds[0]
+      if (firstConcept) setOpenLogRows((prev) => ({ ...prev, [firstConcept]: true }))
     }, 0)
 
     const timer = window.setTimeout(() => {
@@ -442,9 +442,9 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
             // This reading's evidence for the concept. A concept met in an
             // earlier text keeps that evidence — it is counted below rather
             // than shown here, so the log stays this reading's own work.
-            const conceptBytes = scoped.bytes.filter(b => b.conceptId === concept.id)
+            const conceptBytes = scoped.bytes.filter(b => b.conceptIds.includes(concept.id))
             const elsewhere = state.bytes.filter(
-              b => b.conceptId === concept.id && !conceptBytes.some(x => x.id === b.id)
+              b => b.conceptIds.includes(concept.id) && !conceptBytes.some(x => x.id === b.id)
             ).length
             
             return (
@@ -511,14 +511,29 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                             >
                               goto
                             </button>
-                            <button
-                              type="button"
-                              className="rm"
-                              style={{ background: "none", border: "none", padding: 0 }}
-                              onClick={() => removeByte(b.id)}
-                            >
-                              remove byte
-                            </button>
+                            {b.conceptIds.length > 1 ? (
+                              // A multi-filed passage: this row's control removes
+                              // only THIS filing — deleting the byte here would
+                              // silently take every other concept's evidence too.
+                              <button
+                                type="button"
+                                className="rm"
+                                style={{ background: "none", border: "none", padding: 0 }}
+                                onClick={() => unfileByte(b.id, concept.id)}
+                                title="Filed under several concepts — this removes it from this one only."
+                              >
+                                unfile from this concept
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="rm"
+                                style={{ background: "none", border: "none", padding: 0 }}
+                                onClick={() => removeByte(b.id)}
+                              >
+                                remove byte
+                              </button>
+                            )}
                           </span>
                         </div>
                         <div className="quietrow" style={{ marginTop: "9px" }}>

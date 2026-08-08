@@ -139,12 +139,12 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
   }).toPass({ timeout: 45_000, intervals: [2_000, 3_000, 5_000] });
 });
 
-test('export carries maps[] with id-valid tiers and the tier mirror', async ({ page }) => {
+test('export carries maps[] with id-valid tiers and no mirror residue', async ({ page }) => {
   await page.goto('/keep');
   // The export button snapshots current client state, which right after load
   // is still the blank pre-fetch state — retry until the loaded graph (with
   // the map test 1 made) is what lands in the file.
-  let parsed: { graph: { maps?: { name: string; essence: string; read: string; tiers: Record<string, string> }[]; concepts: { id: string; tier?: string }[]; read?: string } } | undefined;
+  let parsed: { graph: { maps?: { name: string; essence: string; read: string; tiers: Record<string, string> }[]; concepts: { id: string; tier?: string }[]; bytes?: { conceptIds?: string[] }[]; read?: string } } | undefined;
   await expect(async () => {
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export .json' }).click();
@@ -163,12 +163,16 @@ test('export carries maps[] with id-valid tiers and the tier mirror', async ({ p
       expect(conceptIds.has(conceptId)).toBe(true);
     }
   }
-  // The expand-phase mirror stays in the contract: every concept still carries
-  // a tier, and the top-level read survives.
+  // The mirror is gone from the contract (P0.5): no concept-level tier, no
+  // top-level read — tiers live on maps, the paragraph on the cloth.
   for (const c of parsed.graph.concepts) {
-    expect(c).toHaveProperty('tier');
+    expect(c).not.toHaveProperty('tier');
   }
-  expect(parsed.graph).toHaveProperty('read');
+  expect(parsed.graph).not.toHaveProperty('read');
+  // And every byte carries its concept pointers as an array (P0.1).
+  for (const b of parsed.graph.bytes ?? []) {
+    expect(Array.isArray(b.conceptIds)).toBe(true);
+  }
 });
 
 test('04 Map lives inside a reading workbench, scoped to it', async ({ page }) => {

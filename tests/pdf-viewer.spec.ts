@@ -96,16 +96,29 @@ test.describe('PDF Viewer and Highlighting', () => {
       await expect(highlight).toBeVisible({ timeout: 5000 });
 
       // The capture WAS the test — the data must not outlive it, or every run
-      // stacks another identical concept onto the account. Delete the concept
-      // (its byte cascades) through the same UI a student would use.
+      // stacks another identical concept onto the account. Since 0021 a byte
+      // survives its concept (P0.1), so remove the byte first, then the
+      // concept, through the same UI a student would use — and await each
+      // delete's server-action POST: the optimistic UI clears instantly, and
+      // ending the test earlier aborts the queued fetches, leaving residue.
       await page.locator('nav button', { hasText: 'Open' }).click();
       const row = page
         .locator('.lrow', { has: page.locator('.lconcept', { hasText: conceptName }) })
         .first();
       await expect(row).toBeVisible({ timeout: 5000 });
       await row.locator('.lhead').click();
+      const byteId = await row.locator('[data-byte-id]').first().getAttribute('data-byte-id');
+      const byteDeleted = page.waitForResponse((r) =>
+        r.request().method() === 'POST' && (r.request().postData() ?? '').includes(byteId!)
+      );
+      await row.getByRole('button', { name: 'remove byte' }).click();
+      await byteDeleted;
+      const conceptDeleted = page.waitForResponse((r) =>
+        r.request().method() === 'POST' && /^\["[0-9a-f-]{36}"\]$/.test(r.request().postData() ?? '')
+      );
       await row.getByRole('button', { name: 'remove concept' }).click();
       await page.getByRole('button', { name: 'Delete concept' }).click();
+      await conceptDeleted;
       await expect(page.locator('.lconcept', { hasText: conceptName })).toHaveCount(0, { timeout: 5000 });
     });
   }

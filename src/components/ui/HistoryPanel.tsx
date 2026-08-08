@@ -8,9 +8,7 @@
 import { useMemo, useState, type SyntheticEvent } from "react"
 import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
 import { getGraphEvents } from "@/actions/loom"
-import type { Byte, Concept, Edge, GraphEvent, LoomState, Tier } from "@/lib/types"
-
-const TIERS = new Set(["", "p", "s", "t", "x"])
+import type { Byte, Concept, Edge, GraphEvent, LoomState } from "@/lib/types"
 
 // Events arrive through a server-action boundary; be tolerant of a Date that
 // serialized to a string.
@@ -19,16 +17,25 @@ function eventDate(e: GraphEvent): Date {
 }
 
 function makeConcept(id: string, label: string, at: Date): Concept {
-  return { id, courseId: null, userId: "", label, def: "", note: "", tier: "", createdAt: at }
+  return { id, courseId: null, userId: "", label, def: "", note: "", createdAt: at }
 }
 
-function makeByte(id: string, conceptId: string, at: Date): Byte {
+function makeByte(id: string, conceptIds: string[], at: Date): Byte {
   return {
-    id, courseId: null, userId: "", conceptId,
+    id, courseId: null, userId: "", conceptIds,
     source: "", sourceId: null, location: "", content: "",
     pageNumber: null, startOffset: null, endOffset: null, pageContentHash: null,
+    note: "", question: "", isPullQuote: false, tier: "",
     createdAt: at,
   }
+}
+
+/** A snapshot/payload's concept pointers: new shape (array) or legacy (single). */
+function pointerIds(raw: Record<string, unknown>): string[] {
+  if (Array.isArray(raw.conceptIds)) {
+    return raw.conceptIds.filter((v): v is string => typeof v === "string")
+  }
+  return typeof raw.conceptId === "string" ? [raw.conceptId] : []
 }
 
 function makeEdge(id: string, fromId: string, toId: string, sentence: string, at: Date): Edge {
@@ -55,17 +62,15 @@ function seedFromSnapshot(
     for (const raw of s.concepts) {
       const c = raw as Record<string, unknown> | null
       if (c && typeof c.id === "string" && typeof c.label === "string") {
-        const made = makeConcept(c.id, c.label, at)
-        if (typeof c.tier === "string" && TIERS.has(c.tier)) made.tier = c.tier as Tier
-        concepts.set(c.id, made)
+        concepts.set(c.id, makeConcept(c.id, c.label, at))
       }
     }
   }
   if (Array.isArray(s.bytes)) {
     for (const raw of s.bytes) {
       const b = raw as Record<string, unknown> | null
-      if (b && typeof b.id === "string" && typeof b.conceptId === "string") {
-        bytes.set(b.id, makeByte(b.id, b.conceptId, at))
+      if (b && typeof b.id === "string") {
+        bytes.set(b.id, makeByte(b.id, pointerIds(b), at))
       }
     }
   }
@@ -90,6 +95,11 @@ function foldEvents(events: GraphEvent[], upTo: number) {
   const concepts = new Map<string, Concept>()
   const bytes = new Map<string, Byte>()
   const edges = new Map<string, Edge>()
+  // Pre-0021 bytes (recorded as byte.create) died with their concept — the
+  // old cascade — while byte.capture bytes survive as Unlabeled. The record
+  // spans both eras, so the fold must replay each byte under the semantics
+  // it actually lived under.
+  const cascadeEraBytes = new Set<string>()
   let readRevisions = 0
 
   for (let i = 0; i < upTo && i < events.length; i++) {
@@ -109,22 +119,50 @@ function foldEvents(events: GraphEvent[], upTo: number) {
         if (c && typeof p.label === "string") c.label = p.label
         break
       }
-      case "concept.retier": {
-        const c = e.entityId ? concepts.get(e.entityId) : undefined
-        if (c && typeof p.tier === "string" && TIERS.has(p.tier)) c.tier = p.tier as Tier
-        break
-      }
+      // concept.retier is a legacy kind (tiers moved onto maps, 0021) — it no
+      // longer changes what the cloth draws.
       case "concept.delete": {
         if (e.entityId && concepts.delete(e.entityId)) {
-          for (const [id, b] of bytes) if (b.conceptId === e.entityId) bytes.delete(id)
+          for (const [id, b] of bytes) {
+            if (!b.conceptIds.includes(e.entityId)) continue
+            // Cascade-era bytes actually died with their concept; 0021-era
+            // passages survive their label and only the pointer goes.
+            if (cascadeEraBytes.has(id)) bytes.delete(id)
+            else b.conceptIds = b.conceptIds.filter((cid) => cid !== e.entityId)
+          }
           for (const [id, ed] of edges) if (ed.fromId === e.entityId || ed.toId === e.entityId) edges.delete(id)
         }
         break
       }
       case "byte.create":
+      case "byte.capture": {
+        if (e.entityId) {
+          bytes.set(e.entityId, makeByte(e.entityId, pointerIds(p), at))
+          // Recorded byte.create = the pre-0021 cascade era. Synthesized
+          // creates are minted from rows alive TODAY, so they demonstrably
+          // survived — replay them with survive semantics.
+          if (e.kind === "byte.create" && p.synthesized !== true) cascadeEraBytes.add(e.entityId)
+        }
+        break
+      }
       case "byte.refile": {
         if (e.entityId && typeof p.conceptId === "string") {
-          bytes.set(e.entityId, makeByte(e.entityId, p.conceptId, at))
+          const b = bytes.get(e.entityId)
+          if (b && !b.conceptIds.includes(p.conceptId)) {
+            b.conceptIds = [...b.conceptIds, p.conceptId]
+          } else if (!b) {
+            // Pre-0021 refile events minted a NEW byte row under this id —
+            // cascade-era rows like any other byte.create of their day.
+            bytes.set(e.entityId, makeByte(e.entityId, [p.conceptId], at))
+            cascadeEraBytes.add(e.entityId)
+          }
+        }
+        break
+      }
+      case "byte.unfile": {
+        if (e.entityId && typeof p.conceptId === "string") {
+          const b = bytes.get(e.entityId)
+          if (b) b.conceptIds = b.conceptIds.filter((cid) => cid !== p.conceptId)
         }
         break
       }
@@ -154,6 +192,12 @@ function foldEvents(events: GraphEvent[], upTo: number) {
       }
       case "read.update": {
         readRevisions++
+        break
+      }
+      // The cloth description is the read's successor (0021); count a
+      // description revision the same way. Title edits change nothing drawn.
+      case "cloth.update": {
+        if (typeof p.descriptionChars === "number") readRevisions++
         break
       }
       // Reset clears the cloth.
@@ -200,7 +244,13 @@ function describeEvent(e: GraphEvent): string {
     case "concept.update": return "revised a working definition"
     case "concept.delete": return "removed a concept"
     case "byte.create": return "captured a passage"
+    case "byte.capture":
+      return Array.isArray(p.conceptIds) && p.conceptIds.length === 0
+        ? "captured an unlabeled passage"
+        : "captured a passage"
     case "byte.refile": return "filed a passage under a second concept"
+    case "byte.unfile": return "unfiled a passage from a concept"
+    case "byte.attribute": return "placed passages in their reading"
     case "byte.delete": return "removed a passage"
     case "edge.throw": return "threw a thread"
     case "edge.coin": return typeof p.handle === "string" && p.handle ? `coined "${p.handle}"` : "cleared a coined term"
@@ -212,6 +262,9 @@ function describeEvent(e: GraphEvent): string {
     case "map.retier": return "re-sorted a map"
     case "map.update": return "revised a map's read"
     case "map.delete": return typeof p.name === "string" && p.name ? `removed a map ("${p.name}")` : "removed a map"
+    case "map.import": return "brought a map in"
+    case "cloth.update":
+      return typeof p.descriptionChars === "number" ? "revised a cloth's description" : "titled a cloth"
     case "graph.reset": return "reset the cloth"
     case "graph.import": return "imported a cloth"
     case "graph.example": return "loaded the worked example"
@@ -254,7 +307,7 @@ export default function HistoryPanel() {
         bytes: cloth.bytes,
         edges: cloth.edges,
         maps: [],
-        read: "",
+        cloths: [],
         views: { cardTable: { positions: {}, bends: {} } },
       }
     : null

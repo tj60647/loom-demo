@@ -438,13 +438,15 @@ export const concepts = pgTable("concept", {
   label: text("label").notNull(),
   def: text("def").default(""),
   note: text("note").default(""),
-  // Map-tab sort: '' unsorted · p/s/t tiers · x left off the map. Tier lives on
-  // the concept — it is the *meaning* of placement, extracted into the graph
-  // (spec §6); the residual x/y stays in `views`, never here.
-  tier: text("tier").$type<"" | "p" | "s" | "t" | "x">().default("").notNull(),
+  // No tier here: Concept Tiers are per-map (`maps.tiers`). The concept.tier
+  // mirror was dropped in 0021 (docs/loom-refactor-spec.md P0.5).
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 })
 
+// A byte — one captured passage. Concepts attach via `byte_concept` (0..n):
+// a byte with zero rows there is an Unlabeled Passage, a legal first-class
+// state (docs/loom-model-build.md §2 Passage). Deleting a concept never
+// deletes a byte — the passage survives its labels.
 export const bytes = pgTable("byte", {
   id: text("id")
     .primaryKey()
@@ -455,9 +457,6 @@ export const bytes = pgTable("byte", {
   userId: text("userId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  conceptId: text("conceptId")
-    .notNull()
-    .references(() => concepts.id, { onDelete: "cascade" }),
   // Free-text label, kept for manually-captured bytes (e.g. from OpenTab)
   // that aren't tied to a library PDF.
   source: text("source").default(""),
@@ -474,14 +473,45 @@ export const bytes = pgTable("byte", {
   // this is sourcePages.textContent; when the browser pdf.js layer differs, it
   // can be the live client text layer hash so markRanges remains precise.
   pageContentHash: text("pageContentHash"),
+  // The student's own margin, riding the passage itself (P0.2).
+  note: text("note").default("").notNull(),
+  question: text("question").default("").notNull(),
+  isPullQuote: boolean("isPullQuote").default(false).notNull(),
+  // Passage Tier — ordinal on the passage ('' unranked · p/s/t), distinct
+  // from the per-map Concept Tiers in `maps.tiers`.
+  tier: text("tier").$type<"" | "p" | "s" | "t">().default("").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 })
 
-// "Your read" — the student's one-paragraph synthesis. Part of the graph
-// artifact (spec §6 graph.read), not a view, so it gets a real table: losing it
-// on refresh would make the student's work inaccessible (red line #5).
-export const reads = pgTable(
-  "read",
+// Which concepts a byte evidences — the passage↔concept pointers of ruling 37.
+// Zero rows = an Unlabeled Passage; several rows = one passage filed under
+// several concepts (refile adds a pointer, never copies the byte). Cascades
+// both ways: losing either end removes the pointer, never the other end.
+export const byteConcepts = pgTable(
+  "byte_concept",
+  {
+    byteId: text("byteId")
+      .notNull()
+      .references(() => bytes.id, { onDelete: "cascade" }),
+    conceptId: text("conceptId")
+      .notNull()
+      .references(() => concepts.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (row) => ({
+    pk: primaryKey({ columns: [row.byteId, row.conceptId] }),
+    byConcept: index("byte_concept_concept_idx").on(row.conceptId),
+  })
+)
+
+// A cloth — the per-scope workspace identity: the student's own title for
+// their engagement with a reading (or the whole weave, scopeKey ''), plus a
+// short interpretation (docs/loom-model-build.md §2 Cloth). Absorbed the old
+// `read` table in 0021: the whole-weave row's text became the whole-weave
+// cloth's description. One row per scope for now; several cloths per reading
+// (and maps keyed by clothId) are future work.
+export const cloths = pgTable(
+  "cloth",
   {
     id: text("id")
       .primaryKey()
@@ -492,14 +522,17 @@ export const reads = pgTable(
     userId: text("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    text: text("text").default("").notNull(),
+    scopeKey: text("scopeKey").default("").notNull(),
+    title: text("title").default("").notNull(),
+    description: text("description").default("").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   },
   (row) => ({
     // NULLS NOT DISTINCT so the pre-course (courseId null) row is unique too —
-    // without it, concurrent saves could mint duplicates and the student's
-    // read would flap between them.
-    onePerCourse: unique().on(row.userId, row.courseId).nullsNotDistinct(),
+    // the same guard the old `read` table carried against concurrent saves
+    // minting duplicates and the student's text flapping between them.
+    onePerScope: unique().on(row.userId, row.courseId, row.scopeKey).nullsNotDistinct(),
   })
 )
 
@@ -512,9 +545,9 @@ export const reads = pgTable(
 // otherwise the sorted comma-joined sourceIds of src/lib/scope.ts — a reading
 // today, a set of readings when subsets ship.
 //
-// Expand phase: `concept.tier` and the `read` table survive as MIRRORS of the
-// oldest whole-weave map, dual-written by updateMap so code rollback stays
-// safe. The contract migration that drops them is a later build.
+// 0021 dropped the expand-phase mirrors (`concept.tier`, the `read` table):
+// tiers live only here, per map, and the whole-weave paragraph lives on the
+// whole-weave cloth (docs/loom-refactor-spec.md P0.5).
 export const maps = pgTable(
   "map",
   {
@@ -590,9 +623,12 @@ export const graphEvents = pgTable("graph_event", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   // '<entity>.<act>', e.g. 'concept.create', 'concept.retier', 'edge.coin',
-  // 'graph.import', 'graph.reset', 'graph.example'.
+  // 'byte.capture', 'cloth.update', 'graph.import', 'graph.reset',
+  // 'graph.example'.
   kind: text("kind").notNull(),
-  entityType: text("entityType").$type<"concept" | "byte" | "edge" | "graph" | "map">().notNull(),
+  entityType: text("entityType")
+    .$type<"concept" | "byte" | "edge" | "graph" | "map" | "cloth">()
+    .notNull(),
   entityId: text("entityId"),
   // Enough of the entity to replay the graph at any point in the timeline.
   payload: jsonb("payload").$type<Record<string, unknown>>(),
@@ -616,6 +652,9 @@ export const edges = pgTable("edge", {
     .notNull()
     .references(() => concepts.id, { onDelete: "cascade" }),
   handle: text("handle").default(""),
-  sentence: text("sentence").notNull(),
+  // The link description — optional at throw (golden path: connect first,
+  // describe when ready). Default '' rather than nullable so render code
+  // never branches (P0.3).
+  sentence: text("sentence").default("").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 })

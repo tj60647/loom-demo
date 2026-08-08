@@ -20,7 +20,7 @@ export default async function UserLoomPage({
   const courseId = await resolveCourseId(firstParam(resolvedSearchParams.course))
   const { concepts, bytes, edges } = await getUserLoomDataAsAdmin(resolvedParams.id, courseId)
 
-  const state: LoomState = { concepts, bytes, edges, maps: [], read: "", views: { cardTable: { positions: {}, bends: {} } } }
+  const state: LoomState = { concepts, bytes, edges, maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
   
   // Note: We use a simple read-only wrapper around ClothMap here
   return (

@@ -3,15 +3,15 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { useParams } from "next/navigation"
-import type { Byte, CardTableView, Concept, Edge, LoomMap, LoomState, LoomViews, Tier } from "@/lib/types"
+import type { Byte, CardTableView, Cloth, Concept, Edge, LoomMap, LoomState, LoomViews, Tier } from "@/lib/types"
 import { asLoomState, scopeOf, scopedGraph, soleSourceId, WHOLE_WEAVE, type Scope, type ScopedGraph } from "@/lib/scope"
 import { emptyViews, parseImport, type ParsedMapImport } from "@/lib/graphExport"
 import {
   getUserLoomData,
   createConcept, updateConcept, deleteConcept,
-  createByte, deleteByte, refileByte as refileByteAction, attributeBytes as attributeBytesAction,
+  createByte, deleteByte, refileByte as refileByteAction, unfileByte as unfileByteAction, attributeBytes as attributeBytesAction,
   createEdge, updateEdge, deleteEdge,
-  saveView,
+  saveView, saveCloth as saveClothAction,
   createMap as createMapAction, updateMap as updateMapAction, deleteMap as deleteMapAction,
   importGraph, importMapArrangement, resetGraph, loadWorkedExample,
 } from "@/actions/loom"
@@ -35,13 +35,21 @@ interface LoomContextType {
   /** Signed-in student's display name — graph.student in the export contract. */
   studentName: string
   addConcept: (label: string, def?: string, note?: string) => Promise<Concept>
-  editConcept: (id: string, data: Partial<{label: string, def: string, note: string, tier: Tier}>) => Promise<void>
+  editConcept: (id: string, data: Partial<{label: string, def: string, note: string}>) => Promise<void>
   removeConcept: (id: string) => Promise<void>
-  addByte: (conceptId: string, source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => Promise<Byte>
+  /** Capture a passage. Zero concept ids is a legal capture — an Unlabeled Passage. */
+  addByte: (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => Promise<Byte>
   removeByte: (id: string) => Promise<void>
   /** Say which reading passages came from — the student's answer, never a guess. */
   attributeBytes: (byteIds: string[], sourceId: string) => Promise<number>
+  /** File a passage under another concept — adds a pointer, never copies the byte. */
   refileByte: (byteId: string, conceptId: string) => Promise<Byte>
+  /** Remove one concept pointer from a passage — the byte itself survives. */
+  unfileByte: (byteId: string, conceptId: string) => Promise<void>
+  /** The current scope's cloth (title + description), or null before one is written. */
+  activeCloth: Cloth | null
+  /** Title or describe the current scope's cloth. */
+  updateCloth: (data: Partial<{ title: string; description: string }>) => Promise<void>
   addEdge: (fromId: string, toId: string, sentence: string) => Promise<Edge>
   editEdge: (id: string, data: Partial<{handle: string, sentence: string}>) => Promise<void>
   removeEdge: (id: string) => Promise<void>
@@ -93,7 +101,7 @@ interface LoomContextType {
 
 const LoomContext = createContext<LoomContextType | null>(null)
 
-const blankState = (): LoomState => ({ concepts: [], bytes: [], edges: [], maps: [], read: "", views: emptyViews() })
+const blankState = (): LoomState => ({ concepts: [], bytes: [], edges: [], maps: [], cloths: [], views: emptyViews() })
 
 export function LoomProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession()
@@ -131,15 +139,11 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     return [...scopeMaps].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0]
   }, [scopeMaps, selectedByScope, scope.key])
 
-  // The mirror: the oldest whole-weave map. Its read/tiers echo into the legacy
-  // state.read / concept.tier so the expand-phase columns track without reloads.
-  const mirrorId = useMemo(() => {
-    const weave = state.maps.filter((m) => m.scopeKey === "")
-    if (!weave.length) return null
-    return [...weave].sort(
-      (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)
-    )[0].id
-  }, [state.maps])
+  // The current scope's cloth — its title and description, when written.
+  const activeCloth = useMemo(
+    () => state.cloths.find((c) => c.scopeKey === scope.key) ?? null,
+    [state.cloths, scope.key]
+  )
 
   const flashTimer = useRef<number | undefined>(undefined)
   const flash = useCallback((msg: string) => {
@@ -193,7 +197,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const addConcept = async (label: string, def?: string, note?: string) => {
     const tempId = crypto.randomUUID()
-    const tempConcept: Concept = { id: tempId, courseId: null, userId: session!.user!.id, label, def: def || "", note: note || "", tier: "", createdAt: new Date() }
+    const tempConcept: Concept = { id: tempId, courseId: null, userId: session!.user!.id, label, def: def || "", note: note || "", createdAt: new Date() }
     setState(s => ({ ...s, concepts: [...s.concepts, tempConcept] }))
     try {
       const saved = await createConcept({ label, def, note })
@@ -206,7 +210,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const editConcept = async (id: string, data: Partial<{label: string, def: string, note: string, tier: Tier}>) => {
+  const editConcept = async (id: string, data: Partial<{label: string, def: string, note: string}>) => {
     setState(s => ({
       ...s,
       concepts: s.concepts.map(c => c.id === id ? { ...c, ...data } : c)
@@ -223,7 +227,12 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     setState(s => ({
       ...s,
       concepts: s.concepts.filter(c => c.id !== id),
-      bytes: s.bytes.filter(b => b.conceptId !== id),
+      // The passages survive their label (P0.1): only the pointer goes.
+      bytes: s.bytes.map(b =>
+        b.conceptIds.includes(id)
+          ? { ...b, conceptIds: b.conceptIds.filter(cid => cid !== id) }
+          : b
+      ),
       edges: s.edges.filter(e => e.fromId !== id && e.toId !== id),
       maps: s.maps.map(m =>
         id in m.tiers
@@ -247,7 +256,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const addByte = async (conceptId: string, source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => {
+  const addByte = async (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => {
     const tempId = crypto.randomUUID()
     // Capturing inside a reading stamps that reading, so a byte taken by hand
     // has the same provenance as one taken from the PDF and lands in the same
@@ -257,7 +266,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       id: tempId,
       courseId: null,
       userId: session!.user!.id,
-      conceptId,
+      conceptIds,
       source,
       sourceId: stampedSourceId ?? null,
       location,
@@ -266,11 +275,15 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       startOffset: startOffset ?? null,
       endOffset: endOffset ?? null,
       pageContentHash: pageContentHash ?? null,
+      note: "",
+      question: "",
+      isPullQuote: false,
+      tier: "",
       createdAt: new Date()
     }
     setState(s => ({ ...s, bytes: [...s.bytes, tempByte] }))
     try {
-      const saved = await createByte({ conceptId, source, sourceId: stampedSourceId, location, content, pageNumber, startOffset, endOffset, pageContentHash })
+      const saved = await createByte({ conceptIds, source, sourceId: stampedSourceId, location, content, pageNumber, startOffset, endOffset, pageContentHash })
       setState(s => ({ ...s, bytes: s.bytes.map(b => b.id === tempId ? saved : b) }))
       savedOk()
       return saved
@@ -308,13 +321,62 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const refileByte = async (byteId: string, conceptId: string) => {
     try {
+      // The byte gains a pointer (ruling 37) — same row, one more concept.
       const saved = await refileByteAction(byteId, conceptId)
-      setState(s => ({ ...s, bytes: [...s.bytes, saved] }))
+      setState(s => ({ ...s, bytes: s.bytes.map(b => b.id === saved.id ? saved : b) }))
       savedOk()
       return saved
     } catch (e) {
       await resync(e)
       throw e
+    }
+  }
+
+  const unfileByte = async (byteId: string, conceptId: string) => {
+    setState(s => ({
+      ...s,
+      bytes: s.bytes.map(b =>
+        b.id === byteId ? { ...b, conceptIds: b.conceptIds.filter(id => id !== conceptId) } : b
+      ),
+    }))
+    try {
+      await unfileByteAction(byteId, conceptId)
+      flash("unfiled — the passage keeps its other filings")
+    } catch (e) {
+      await resync(e)
+    }
+  }
+
+  // Cloth title/description: optimistic upsert against the current scope.
+  const updateCloth = async (data: Partial<{ title: string; description: string }>) => {
+    const now = new Date()
+    setState(s => {
+      const existing = s.cloths.find(c => c.scopeKey === scope.key)
+      const cloths = existing
+        ? s.cloths.map(c => (c.scopeKey === scope.key ? { ...c, ...data, updatedAt: now } : c))
+        : [...s.cloths, {
+            id: crypto.randomUUID(),
+            courseId: null,
+            userId: session!.user!.id,
+            scopeKey: scope.key,
+            title: data.title ?? "",
+            description: data.description ?? "",
+            createdAt: now,
+            updatedAt: now,
+          }]
+      return { ...s, cloths }
+    })
+    try {
+      const saved = await saveClothAction({ scopeKey: scope.key, ...data })
+      setState(s => ({
+        ...s,
+        cloths: s.cloths.some(c => c.scopeKey === scope.key)
+          ? s.cloths.map(c => (c.scopeKey === scope.key ? saved : c))
+          : [...s.cloths, saved],
+      }))
+      savedOk()
+    } catch (e) {
+      await resync(e)
     }
   }
 
@@ -504,9 +566,6 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     setState(s => ({
       ...s,
       maps: s.maps.map(m => m.id === id ? { ...m, tiers: stored, updatedAt: new Date() } : m),
-      ...(id === mirrorId
-        ? { concepts: s.concepts.map(c => ({ ...c, tier: stored[c.id] ?? "" })) }
-        : {}),
     }))
     try {
       await updateMapAction(await resolveMapId(id), { tiers: stored })
@@ -539,8 +598,6 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     setState(s => ({
       ...s,
       maps: s.maps.map(m => m.id === id ? { ...m, ...data, updatedAt: new Date() } : m),
-      // Mirror echo: the legacy read column tracks the mirror map's paragraph.
-      ...(id === mirrorId && data.read !== undefined ? { read: data.read } : {}),
     }))
     const current = pendingMapText.current.get(id) ?? {}
     pendingMapText.current.set(id, { ...current, ...data })
@@ -565,9 +622,6 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     })
     try {
       await deleteMapAction(await resolveMapId(id))
-      // Deleting the mirror re-points the legacy columns server-side; reload
-      // rather than replicate that bookkeeping optimistically.
-      setState(await getUserLoomData())
       flash("map removed")
     } catch (e) {
       await resync(e)
@@ -675,7 +729,8 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       state, scope, scoped, scopedState, isLoading,
       studentName: session?.user?.name || "",
       addConcept, editConcept, removeConcept,
-      addByte, removeByte, refileByte, attributeBytes,
+      addByte, removeByte, refileByte, unfileByte, attributeBytes,
+      activeCloth, updateCloth,
       addEdge, editEdge, removeEdge,
       maps: state.maps, scopeMaps, activeMap,
       selectMap, addMap, renameMap, removeMap,

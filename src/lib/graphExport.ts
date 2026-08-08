@@ -3,13 +3,19 @@
 // that round-trips so no arrangement is lost, but that no consumer must read.
 // Red line #5: the export is the student's artifact, always available.
 
-import type { CardTableView, Concept, LoomExport, LoomMap, LoomState, LoomViews, Tier } from "./types"
+import type { CardTableView, Concept, LoomExport, LoomMap, LoomState, LoomViews, PassageTier, Tier } from "./types"
 import { scopeFromKey, scopedGraph } from "./scope"
 
 const TIERS = new Set(["", "p", "s", "t", "x"])
 
 function asTier(value: unknown): Tier {
   return typeof value === "string" && TIERS.has(value) ? (value as Tier) : ""
+}
+
+const PASSAGE_TIERS = new Set(["", "p", "s", "t"])
+
+function asPassageTier(value: unknown): PassageTier {
+  return typeof value === "string" && PASSAGE_TIERS.has(value) ? (value as PassageTier) : ""
 }
 
 const TIER_GROUPS: [Tier, string][] = [
@@ -29,15 +35,20 @@ export function buildExport(state: LoomState, student: string): LoomExport {
         label: c.label,
         def: c.def || "",
         note: c.note || "",
-        tier: c.tier || "",
       })),
       bytes: state.bytes.map((b) => ({
         id: b.id,
-        conceptId: b.conceptId,
+        // Empty = an Unlabeled Passage; it travels like any other capture.
+        conceptIds: b.conceptIds,
         source: b.source || "",
         location: b.location || "",
         // The contract's field is `text`; the app's column is `content`.
         text: b.content,
+        // The passage's margin — emitted only when the student wrote one.
+        ...(b.note ? { note: b.note } : {}),
+        ...(b.question ? { question: b.question } : {}),
+        ...(b.isPullQuote ? { isPullQuote: true } : {}),
+        ...(b.tier ? { tier: b.tier } : {}),
         // Capture provenance for PDF-captured bytes — a contract extension
         // (see spec changelog); consumers may ignore it.
         ...(b.sourceId
@@ -59,10 +70,20 @@ export function buildExport(state: LoomState, student: string): LoomExport {
         sentence: e.sentence,
         handle: e.handle || "",
       })),
-      read: state.read || "",
-      // The student's maps — additive; `concepts[].tier` and `read` above stay
-      // the mirror of the oldest whole-weave map, so pre-maps consumers still
-      // see a sorted graph.
+      // Cloth identities per scope. Replaces the legacy top-level `read`
+      // string — import still folds an old file's `read` into the whole-weave
+      // cloth.
+      ...(state.cloths.length
+        ? {
+            cloths: state.cloths.map((c) => ({
+              id: c.id,
+              scopeKey: c.scopeKey,
+              title: c.title,
+              description: c.description,
+            })),
+          }
+        : {}),
+      // The student's maps — the only place tiers live (P0.5).
       ...(state.maps.length
         ? {
             maps: state.maps.map((m) => ({
@@ -112,8 +133,23 @@ export function buildMarkdown(
   const lines: string[] = []
   lines.push(`# Loom — ${student || "my weave"}`, "")
 
-  if (state.read?.trim()) {
-    lines.push("## My read", "", state.read.trim(), "")
+  const wholeWeaveCloth = state.cloths.find((c) => c.scopeKey === "")
+  if (wholeWeaveCloth?.description.trim()) {
+    lines.push("## My read", "", wholeWeaveCloth.description.trim(), "")
+  }
+
+  // Per-reading cloths: the student's own titles for their engagements.
+  const readingCloths = state.cloths.filter(
+    (c) => c.scopeKey !== "" && (c.title.trim() || c.description.trim())
+  )
+  if (readingCloths.length) {
+    lines.push("## My readings", "")
+    const scopeName = (scopeKey: string) =>
+      scopeKey.split(",").map((id) => (titleOfSource ? titleOfSource(id) : id)).join(" + ")
+    readingCloths.forEach((c) => {
+      lines.push(`### ${c.title.trim() || scopeName(c.scopeKey)}${c.title.trim() ? ` — ${scopeName(c.scopeKey)}` : ""}`, "")
+      if (c.description.trim()) lines.push(c.description.trim(), "")
+    })
   }
 
   // Each map is its own artifact: a named sorting of concepts within a scope,
@@ -143,40 +179,34 @@ export function buildMarkdown(
   }
 
   lines.push("## Concepts", "")
-  const groups: [Tier, string][] = [
-    ["p", "Primary"],
-    ["s", "Secondary"],
-    ["t", "Tertiary"],
-    ["", "Unsorted"],
-    ["x", "Left off the map"],
-  ]
-  const tiered = state.concepts.some((c) => ["p", "s", "t"].includes(c.tier))
   const emitConcept = (c: Concept) => {
     lines.push(`- **${c.label}**${c.def ? ` — ${c.def}` : ""}${c.note ? ` _(${c.note})_` : ""}`)
     state.bytes
-      .filter((b) => b.conceptId === c.id)
+      .filter((b) => b.conceptIds.includes(c.id))
       .forEach((b) => {
         const cite = [b.source, b.location].filter(Boolean).join(" · ")
         lines.push(`  - > ${b.content}${cite ? ` — ${cite}` : ""}`)
       })
   }
-  if (tiered) {
-    groups.forEach(([tier, name]) => {
-      const group = state.concepts.filter((c) => (c.tier || "") === tier)
-      if (!group.length) return
-      lines.push(`### ${name}`, "")
-      group.forEach(emitConcept)
-      lines.push("")
+  state.concepts.forEach(emitConcept)
+  lines.push("")
+
+  // Unlabeled passages are part of the record, not leftovers to hide
+  // (red line #4: empty states are visible).
+  const unfiled = state.bytes.filter((b) => b.conceptIds.length === 0)
+  if (unfiled.length) {
+    lines.push("## Unfiled passages", "")
+    unfiled.forEach((b) => {
+      const cite = [b.source, b.location].filter(Boolean).join(" · ")
+      lines.push(`- > ${b.content}${cite ? ` — ${cite}` : ""}`)
     })
-  } else {
-    state.concepts.forEach(emitConcept)
     lines.push("")
   }
 
   lines.push("## Propositions", "")
   state.edges.forEach((e) => {
     lines.push(`- ${label(e.fromId)} —[${e.handle || "…"}]→ ${label(e.toId)}`)
-    lines.push(`  - "${e.sentence}"`)
+    if (e.sentence) lines.push(`  - "${e.sentence}"`)
   })
   lines.push("")
   return lines.join("\n")
@@ -190,13 +220,17 @@ export function buildMarkdown(
 
 export type ParsedImport = {
   student: string
-  read: string
-  concepts: { key: string; label: string; def: string; note: string; tier: Tier }[]
+  concepts: { key: string; label: string; def: string; note: string }[]
   bytes: {
-    conceptKey: string
+    /** Empty = an Unlabeled Passage (kept, never dropped). */
+    conceptKeys: string[]
     source: string
     location: string
     text: string
+    note?: string
+    question?: string
+    isPullQuote?: boolean
+    tier?: PassageTier
     anchor?: {
       sourceId: string
       pageNumber: number | null
@@ -206,6 +240,8 @@ export type ParsedImport = {
     }
   }[]
   edges: { key: string; fromKey: string; toKey: string; sentence: string; handle: string }[]
+  /** Cloth identities per scope; a legacy `read` string arrives as the whole-weave cloth. */
+  cloths: { scopeKey: string; title: string; description: string }[]
   cardTable: CardTableView // keyed by concept/edge *keys*, remapped server-side
   /** Tiers keyed by concept *keys*; the server remints ids (like cardTable). */
   maps: { key: string; scopeKey: string; name: string; essence: string; read: string; tiers: Record<string, Tier> }[]
@@ -263,28 +299,48 @@ export function parseImport(raw: string): ParsedImport {
   const rawBytes = Array.isArray(data.bytes) ? (data.bytes as Record<string, unknown>[]) : []
   const rawEdges = Array.isArray(data.edges) ? (data.edges as Record<string, unknown>[]) : []
 
+  // Legacy files carry a concept-level tier; it feeds the pre-maps map
+  // synthesis below and is otherwise dropped (tiers are per-map, P0.5).
+  const legacyTierByKey = new Map<string, Tier>()
   const concepts = rawConcepts
     .filter((c) => str(c.label).trim())
-    .map((c, i) => ({
-      key: str(c.id) || `c-${i}`,
-      label: str(c.label).trim(),
-      def: str(c.def),
-      note: str(c.note),
-      tier: asTier(c.tier),
-    }))
+    .map((c, i) => {
+      const key = str(c.id) || `c-${i}`
+      const tier = asTier(c.tier)
+      if (tier) legacyTierByKey.set(key, tier)
+      return {
+        key,
+        label: str(c.label).trim(),
+        def: str(c.def),
+        note: str(c.note),
+      }
+    })
   const conceptKeys = new Set(concepts.map((c) => c.key))
 
+  // A byte survives even when its concepts don't resolve — it arrives as an
+  // Unlabeled Passage rather than being dropped (red line #5). Only text-less
+  // rows have nothing to keep.
   const bytes = rawBytes
-    .filter((b) => conceptKeys.has(str(b.conceptId)) && (str(b.text) || str(b.content)))
+    .filter((b) => str(b.text) || str(b.content))
     .map((b) => {
+      // New shape: conceptIds array. Legacy: a single conceptId string. In
+      // the legacy shape, byte.note belonged to the CONCEPT (folded below),
+      // so it must not double as a passage note.
+      const isNewShape = Array.isArray(b.conceptIds)
+      const rawIds = isNewShape ? (b.conceptIds as unknown[]) : [b.conceptId]
+      const conceptKeys_ = [...new Set(rawIds.map(str).filter((k) => k && conceptKeys.has(k)))]
       const anchorSource = str(b.sourceId) || str((b.anchor as Record<string, unknown> | undefined)?.sourceId)
       const a = (b.anchor ?? b) as Record<string, unknown>
       return {
-        conceptKey: str(b.conceptId),
+        conceptKeys: conceptKeys_,
         source: str(b.source),
         location: str(b.location),
         // v14 exports `text`; app-era exports may carry `content`.
         text: str(b.text) || str(b.content),
+        ...(isNewShape && str(b.note) ? { note: str(b.note) } : {}),
+        ...(isNewShape && str(b.question) ? { question: str(b.question) } : {}),
+        ...(isNewShape && b.isPullQuote === true ? { isPullQuote: true } : {}),
+        ...(isNewShape && asPassageTier(b.tier) ? { tier: asPassageTier(b.tier) } : {}),
         ...(anchorSource
           ? {
               anchor: {
@@ -301,6 +357,7 @@ export function parseImport(raw: string): ParsedImport {
 
   // Legacy v2/v3: byte.note folds onto its concept (joined with ' · ').
   rawBytes.forEach((b) => {
+    if (Array.isArray(b.conceptIds)) return
     const note = str(b.note)
     if (!note) return
     const c = concepts.find((x) => x.key === str(b.conceptId))
@@ -405,18 +462,31 @@ export function parseImport(raw: string): ParsedImport {
   if (!maps.length && (concepts.length || str(data.read))) {
     const tiers: Record<string, Tier> = {}
     concepts.forEach((c) => {
-      if (c.tier) tiers[c.key] = c.tier
+      const tier = legacyTierByKey.get(c.key)
+      if (tier) tiers[c.key] = tier
     })
     maps.push({ key: "legacy-map-1", scopeKey: "", name: "Map 1", essence: "", read: str(data.read), tiers })
     mapViews["legacy-map-1"] = cardTable
   }
 
+  // Cloths: the new shape carries them; a legacy `read` string becomes the
+  // whole-weave cloth's description (the 0021 migration rule).
+  const rawCloths = Array.isArray(data.cloths) ? (data.cloths as Record<string, unknown>[]) : []
+  const cloths: ParsedImport["cloths"] = rawCloths.map((c) => ({
+    scopeKey: str(c.scopeKey),
+    title: str(c.title).trim().slice(0, 200),
+    description: str(c.description),
+  }))
+  if (!cloths.some((c) => c.scopeKey === "") && str(data.read)) {
+    cloths.push({ scopeKey: "", title: "", description: str(data.read) })
+  }
+
   return {
     student: str(data.student),
-    read: str(data.read),
     concepts,
     bytes,
     edges,
+    cloths,
     cardTable,
     maps,
     mapViews,
@@ -508,15 +578,25 @@ export function buildMapExport(
         tier: map.tiers[c.id] ?? "",
       })),
       // A concept's evidence travels whole — every byte of every member
-      // concept, not only the scope's own passages — so the file stands alone.
+      // concept, not only the scope's own passages — so the file stands
+      // alone. The scope's own unlabeled passages travel too: a projection
+      // shows them as its unattached group.
       bytes: state.bytes
-        .filter((b) => memberIds.has(b.conceptId))
+        .filter(
+          (b) =>
+            b.conceptIds.some((id) => memberIds.has(id)) ||
+            scoped.bytes.some((sb) => sb.id === b.id)
+        )
         .map((b) => ({
           id: b.id,
-          conceptId: b.conceptId,
+          conceptIds: b.conceptIds,
           source: b.source || "",
           location: b.location || "",
           text: b.content,
+          ...(b.note ? { note: b.note } : {}),
+          ...(b.question ? { question: b.question } : {}),
+          ...(b.isPullQuote ? { isPullQuote: true } : {}),
+          ...(b.tier ? { tier: b.tier } : {}),
           ...(b.sourceId
             ? {
                 anchor: {
@@ -573,7 +653,7 @@ export function buildMapMarkdown(
     group.forEach((c) => {
       lines.push(`- **${c.label}**${c.def ? ` — ${c.def}` : ""}${c.note ? ` _(${c.note})_` : ""}`)
       state.bytes
-        .filter((b) => b.conceptId === c.id)
+        .filter((b) => b.conceptIds.includes(c.id))
         .forEach((b) => {
           const cite = [b.source, b.location].filter(Boolean).join(" · ")
           lines.push(`  - > ${b.content}${cite ? ` — ${cite}` : ""}`)
@@ -582,11 +662,21 @@ export function buildMapMarkdown(
     lines.push("")
   })
 
+  const unfiled = scoped.bytes.filter((b) => b.conceptIds.length === 0)
+  if (unfiled.length) {
+    lines.push("## Unfiled passages", "")
+    unfiled.forEach((b) => {
+      const cite = [b.source, b.location].filter(Boolean).join(" · ")
+      lines.push(`- > ${b.content}${cite ? ` — ${cite}` : ""}`)
+    })
+    lines.push("")
+  }
+
   if (scoped.edges.length) {
     lines.push("## Propositions", "")
     scoped.edges.forEach((e) => {
       lines.push(`- ${label(e.fromId)} —[${e.handle || "…"}]→ ${label(e.toId)}`)
-      lines.push(`  - "${e.sentence}"`)
+      if (e.sentence) lines.push(`  - "${e.sentence}"`)
     })
     lines.push("")
   }

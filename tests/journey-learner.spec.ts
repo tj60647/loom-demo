@@ -56,20 +56,25 @@ test("00 · the shelf shows the readings with the student's own tallies", async 
   // "Choose file" silently did nothing there until the footer stopped
   // catching pointer events. (setInputFiles never clicks, so only a real
   // click catches this class of regression.)
-  const point = await page.evaluate(() => {
-    const input = document.querySelector('input[type="file"]')!
-    const footer = document.querySelector("footer")!
-    const main = document.querySelector("main")!
-    main.scrollTop += input.getBoundingClientRect().top - (footer.getBoundingClientRect().top + 8)
-    const rect = input.getBoundingClientRect()
-    // Clear of the bottom-left corner: the Next dev-tools badge floats there
-    // in dev builds (it appears whenever some resource 404s) and would eat
-    // the click before the input — a different shield than the one under test.
-    return { x: rect.left + Math.min(rect.width - 20, 260), y: rect.top + rect.height / 2 }
-  })
-  const chooser = page.waitForEvent("filechooser", { timeout: 10_000 })
-  await page.mouse.click(point.x, point.y)
-  await chooser
+  // Recompute the point on every attempt: cover images decoding late reflow
+  // the shelf, and a coordinate snapshotted before the shift clicks where the
+  // input used to be (same fix as the settings-dialog retry-past-hydration).
+  await expect(async () => {
+    const point = await page.evaluate(() => {
+      const input = document.querySelector('input[type="file"]')!
+      const footer = document.querySelector("footer")!
+      const main = document.querySelector("main")!
+      main.scrollTop += input.getBoundingClientRect().top - (footer.getBoundingClientRect().top + 8)
+      const rect = input.getBoundingClientRect()
+      // Clear of the bottom-left corner: the Next dev-tools badge floats there
+      // in dev builds (it appears whenever some resource 404s) and would eat
+      // the click before the input — a different shield than the one under test.
+      return { x: rect.left + Math.min(rect.width - 20, 260), y: rect.top + rect.height / 2 }
+    })
+    const chooser = page.waitForEvent("filechooser", { timeout: 3_000 })
+    await page.mouse.click(point.x, point.y)
+    await chooser
+  }).toPass({ timeout: 30_000, intervals: [1_000, 2_000, 3_000] })
 
   await page.getByRole("button", { name: "Cancel" }).click()
   await expect(page.locator('input[type="file"]')).toHaveCount(0)
@@ -93,10 +98,25 @@ test("01 · a byte captured by hand lands in the coding log — and cleans up", 
   const row = page.locator(".lrow", { hasText: "journey test concept" })
   await expect(row).toHaveCount(1, { timeout: 15_000 })
 
-  // Cleanup through the product's own controls.
+  // Cleanup through the product's own controls. Since 0021 a passage survives
+  // its concept (P0.1) — remove the byte first so nothing unlabeled lingers,
+  // then the concept. The optimistic UI clears instantly, so each delete's
+  // server-action POST must be awaited: ending the test any earlier closes
+  // the page and aborts the serially-queued fetches, and the "deleted" rows
+  // resurface on the next load as residue.
   await row.locator(".lhead").click()
+  const byteId = await row.locator("[data-byte-id]").first().getAttribute("data-byte-id")
+  const byteDeleted = page.waitForResponse((r) =>
+    r.request().method() === "POST" && (r.request().postData() ?? "").includes(byteId!)
+  )
+  await row.getByRole("button", { name: "remove byte" }).click()
+  await byteDeleted
+  const conceptDeleted = page.waitForResponse((r) =>
+    r.request().method() === "POST" && /^\["[0-9a-f-]{36}"\]$/.test(r.request().postData() ?? "")
+  )
   await row.getByRole("button", { name: "remove concept" }).click()
   await page.getByRole("button", { name: "Delete concept" }).click()
+  await conceptDeleted
   await expect(page.locator(".lrow", { hasText: "journey test concept" })).toHaveCount(0, { timeout: 15_000 })
 })
 
@@ -215,7 +235,13 @@ test("06 · keep lists every map, and the whole-cloth export carries them all", 
   // Bytes carry their reading (anchor provenance survives the export contract).
   const anchored = data.graph.bytes.filter((b: { anchor?: { sourceId?: string } }) => b.anchor?.sourceId)
   expect(anchored.length).toBeGreaterThanOrEqual(10)
-  // The mirror holds: concept tiers reflect the oldest whole-weave map.
+  // The P0 contract: every byte carries its concept pointers as an array.
+  for (const b of data.graph.bytes) {
+    expect(Array.isArray(b.conceptIds)).toBe(true)
+  }
+  // The whole-weave cloth carries the read paragraph — the 0021 successor to
+  // the dropped mirror (the seed writes it equal to the whole-cloth map's).
   const whole = data.graph.maps.find((m: { name: string }) => m.name === "The whole cloth")
-  expect(data.graph.read).toBe(whole.read)
+  const weaveCloth = data.graph.cloths?.find((c: { scopeKey: string }) => c.scopeKey === "")
+  expect(weaveCloth?.description).toBe(whole.read)
 })

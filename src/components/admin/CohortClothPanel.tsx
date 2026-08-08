@@ -30,9 +30,11 @@ export default function CohortClothPanel({
   const bytesByConcept = useMemo(() => {
     const map = new Map<string, Byte[]>()
     state.bytes.forEach((b) => {
-      const list = map.get(b.conceptId) ?? []
-      list.push(b)
-      map.set(b.conceptId, list)
+      b.conceptIds.forEach((conceptId) => {
+        const list = map.get(conceptId) ?? []
+        list.push(b)
+        map.set(conceptId, list)
+      })
     })
     return map
   }, [state.bytes])

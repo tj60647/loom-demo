@@ -152,10 +152,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     return ids.flatMap((id) => {
       const byte = bytesRef.current.find((b) => b.id === id);
       if (!byte) return [];
-      const concept = conceptsRef.current.find((c) => c.id === byte.conceptId);
+      const concept = conceptsRef.current.find((c) => c.id === byte.conceptIds[0]);
       return [{
         byteId: byte.id,
-        conceptLabel: concept?.label || "Unlabeled byte",
+        conceptLabel: concept?.label || "Unlabeled passage",
         source: byte.source || sourceName,
         location: byte.location || "",
         startOffset: byte.startOffset ?? null,
@@ -546,8 +546,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 }], {
                   className: "loom-byte-highlight",
                   each: (node) => {
-                    const concept = state.concepts.find((c) => c.id === byte.conceptId);
-                    const a11y = `${concept?.label || "Unlabeled byte"}. ${byte.source || sourceName}${byte.location ? `, ${byte.location}` : ""}. Characters ${byte.startOffset ?? "?"}-${byte.endOffset ?? "?"}.`;
+                    const concept = state.concepts.find((c) => c.id === byte.conceptIds[0]);
+                    const a11y = `${concept?.label || "Unlabeled passage"}. ${byte.source || sourceName}${byte.location ? `, ${byte.location}` : ""}. Characters ${byte.startOffset ?? "?"}-${byte.endOffset ?? "?"}.`;
                     (node as HTMLElement).setAttribute("aria-label", a11y);
                     (node as HTMLElement).setAttribute("tabindex", "0");
                     bindHighlightNode(node as HTMLElement, byte.id);
@@ -568,8 +568,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   ignoreJoiners: true,
                   ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
                   each: (node) => {
-                    const concept = state.concepts.find((c) => c.id === byte.conceptId);
-                    const a11y = `${concept?.label || "Unlabeled byte"}. ${byte.source || sourceName}${byte.location ? `, ${byte.location}` : ""}. Characters ${byte.startOffset ?? "?"}-${byte.endOffset ?? "?"}.`;
+                    const concept = state.concepts.find((c) => c.id === byte.conceptIds[0]);
+                    const a11y = `${concept?.label || "Unlabeled passage"}. ${byte.source || sourceName}${byte.location ? `, ${byte.location}` : ""}. Characters ${byte.startOffset ?? "?"}-${byte.endOffset ?? "?"}.`;
                     (node as HTMLElement).setAttribute("aria-label", a11y);
                     (node as HTMLElement).setAttribute("tabindex", "0");
                     bindHighlightNode(node as HTMLElement, byte.id);

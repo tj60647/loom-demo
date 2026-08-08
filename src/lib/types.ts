@@ -1,5 +1,8 @@
-/** Map-tab sort: '' unsorted · p/s/t tiers · x left off the map. */
+/** Per-map concept sort: '' unsorted · p/s/t tiers · x set aside. */
 export type Tier = "" | "p" | "s" | "t" | "x"
+
+/** Passage tier — on the byte itself. '' unranked; no "set aside" for passages. */
+export type PassageTier = "" | "p" | "s" | "t"
 
 export type Concept = {
   id: string
@@ -8,7 +11,6 @@ export type Concept = {
   label: string
   def: string | null
   note: string | null
-  tier: Tier
   createdAt: Date
 }
 
@@ -16,7 +18,11 @@ export type Byte = {
   id: string
   courseId: string | null
   userId: string
-  conceptId: string
+  /**
+   * The concepts this passage evidences (byte_concept join, capture order).
+   * Empty = an Unlabeled Passage — a legal, first-class state.
+   */
+  conceptIds: string[]
   source: string | null
   sourceId: string | null
   location: string | null
@@ -25,6 +31,11 @@ export type Byte = {
   startOffset: number | null
   endOffset: number | null
   pageContentHash: string | null
+  /** The student's own margin, on the passage itself. */
+  note: string
+  question: string
+  isPullQuote: boolean
+  tier: PassageTier
   createdAt: Date
 }
 
@@ -230,10 +241,26 @@ export type LoomMap = {
 }
 
 export type LoomViews = {
-  /** Legacy single table — the mirror of the oldest whole-weave map's geometry. */
+  /** Legacy single table — kept for pre-maps geometry; maps carry their own. */
   cardTable: CardTableView
   /** `map:<id>` keys carry each map's own geometry. */
   [key: string]: CardTableView
+}
+
+/**
+ * A cloth — the per-scope workspace identity: the student's own title for
+ * their engagement with a reading (scopeKey as in maps; '' = whole weave)
+ * plus a short interpretation. Absorbed the old `read` mirror in 0021.
+ */
+export type Cloth = {
+  id: string
+  courseId: string | null
+  userId: string
+  scopeKey: string
+  title: string
+  description: string
+  createdAt: Date
+  updatedAt: Date
 }
 
 /** One student act on the graph, as recorded in the append-only history. */
@@ -242,7 +269,7 @@ export type GraphEvent = {
   courseId: string | null
   userId: string
   kind: string
-  entityType: "concept" | "byte" | "edge" | "graph" | "map"
+  entityType: "concept" | "byte" | "edge" | "graph" | "map" | "cloth"
   entityId: string | null
   payload: Record<string, unknown> | null
   at: Date
@@ -253,8 +280,8 @@ export type LoomState = {
   bytes: Byte[]
   edges: Edge[]
   maps: LoomMap[]
-  /** Mirror of the oldest whole-weave map's paragraph (expand phase — see maps). */
-  read: string
+  /** One per scope the student has titled or described ('' = whole weave). */
+  cloths: Cloth[]
   views: LoomViews
 }
 
@@ -279,22 +306,31 @@ export type ExportByteAnchor = {
 export type LoomExport = {
   graph: {
     student: string
-    concepts: { id: string; label: string; def: string; note: string; tier: Tier }[]
+    concepts: { id: string; label: string; def: string; note: string }[]
     bytes: {
       id: string
-      conceptId: string
+      /** Empty array = an Unlabeled Passage. Legacy files carry `conceptId`. */
+      conceptIds: string[]
       source: string
       location: string
       text: string
+      /** The passage's margin — emitted only when set. */
+      note?: string
+      question?: string
+      isPullQuote?: boolean
+      tier?: PassageTier
       anchor?: ExportByteAnchor
     }[]
     edges: { id: string; fromId: string; toId: string; sentence: string; handle: string }[]
-    read: string
     /**
-     * The student's maps (additive, like ExportByteAnchor — older consumers
-     * ignore it; older files lack it and import via legacy synthesis).
-     * `concepts[].tier` and `read` above remain the mirror of the oldest
-     * whole-weave map, so pre-maps importers still see a sorted graph.
+     * Cloth titles/descriptions per scope ('' = whole weave). Replaces the
+     * legacy top-level `read` string, which import still accepts and folds
+     * into the whole-weave cloth.
+     */
+    cloths?: { id: string; scopeKey: string; title: string; description: string }[]
+    /**
+     * The student's maps. Older files lack it (and carry `concepts[].tier` +
+     * `read` instead); import synthesizes a whole-weave map from those.
      */
     maps?: {
       id: string

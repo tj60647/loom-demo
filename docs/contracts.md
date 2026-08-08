@@ -1,12 +1,13 @@
 # Loom — Contracts
 
 > DESCRIBES THE CODE AS BUILT, not the target. Where this file conflicts with
-> docs/loom-model-build.md, the model wins — several contracts below are ruled for
-> replacement by docs/loom-refactor-spec.md: `byte.conceptId` and `createByte`'s required
-> concept (P0.1 — Unlabeled Passages are legal), `deleteConcept`'s byte cascade (P0.1),
-> the label clash-check and invariant 7 "one label = one concept" (ruling 36 — warn, don't
-> forbid), `edge.sentence NOT NULL` and `createEdge`'s required sentence (P0.3), the
-> mirror dual-write and invariant 1 (P0.5), and the student-visible "Map N" strings (P2).
+> docs/loom-model-build.md, the model wins. **P0 landed (migration 0021)**:
+> `byte_concept` join (Unlabeled Passages legal; concept delete never deletes bytes),
+> passage note/question/isPullQuote/tier, `edge.sentence` optional, the `cloth` table
+> (absorbing `read`), and the mirror drop (`concept.tier` gone; tiers per-map only).
+> Still ruled for replacement: the label clash-check and invariant 7 "one label = one
+> concept" (ruling 36 — warn, don't forbid; lands with P1.7 merge/homonyms), and the
+> student-visible "Map N" strings and station names (P2 naming sweep).
 > Update the invariant, then this file, as each phase lands.
 
 The complete inventory of every surface a caller can rely on: database schema, server
@@ -22,10 +23,11 @@ and shapes are the contract, line numbers are a courtesy.
 Conventions used below:
 
 - All ids are `text` primary keys defaulting to `crypto.randomUUID()` unless noted.
-- `Tier` = `'' | 'p' | 's' | 't' | 'x'` (unsorted · primary · secondary · tertiary · left off).
-- "Mirror" = the expand-phase dual-write of `concept.tier` + the `read` row from the
-  **oldest whole-weave map** (archived spec §6; retirement is a planned contract migration —
-  see NEXT_SESSION open item 4).
+- `Tier` = `'' | 'p' | 's' | 't' | 'x'` (unsorted · primary · secondary · tertiary · set
+  aside), per-map only. `PassageTier` = `'' | 'p' | 's' | 't'`, on the byte itself.
+- The "Mirror" (expand-phase dual-write of `concept.tier` + the `read` row from the
+  oldest whole-weave map) was RETIRED by migration 0021 — `concept.tier` and the `read`
+  table no longer exist; the whole-weave paragraph lives on the whole-weave `cloth` row.
 - Server actions are HTTP-POSTable endpoints. "Auth" below is what the action itself
   enforces; nothing else stands in front of it (there is **no middleware.ts**).
 
@@ -73,10 +75,11 @@ directly, and the `source_page` it creates has never carried the foreign key
 
 | Table | Columns | Keys / notes |
 | --- | --- | --- |
-| `concept` | id · courseId SET NULL · userId CASCADE · label · def `''` · note `''` · **tier `Tier` default `''`** · createdAt | `tier` is the MIRROR column. One-label-one-concept is enforced in code (`updateConcept` clash check), **not** by a DB unique |
-| `byte` | id · courseId SET NULL · userId CASCADE · conceptId CASCADE · source `''` (free-text citation) · **sourceId SET NULL** (the reading it belongs to) · location `''` · content · pageNumber/startOffset/endOffset/pageContentHash nullable (anchor) · createdAt | A byte belongs to a reading; a concept does not. Export field is `text`, column is `content` |
-| `edge` | id · courseId SET NULL · userId CASCADE · fromId CASCADE · toId CASCADE · handle `''` · sentence NOT NULL · createdAt | Directed. Sentence required; handle is the coined term |
-| `read` | id · courseId SET NULL · userId CASCADE · text `''` · updatedAt | UNIQUE NULLS NOT DISTINCT (userId, courseId). MIRROR table |
+| `concept` | id · courseId SET NULL · userId CASCADE · label · def `''` · note `''` · createdAt | No tier (0021 dropped the mirror column — tiers live on `map.tiers`). One-label-one-concept is enforced in code (`updateConcept` clash check), **not** by a DB unique — ruled for replacement by warn-don't-forbid (P1.7) |
+| `byte` | id · courseId SET NULL · userId CASCADE · source `''` (free-text citation) · **sourceId SET NULL** (the reading it belongs to) · location `''` · content · pageNumber/startOffset/endOffset/pageContentHash nullable (anchor) · **note `''` · question `''` · isPullQuote false · tier `PassageTier` `''`** · createdAt | A byte belongs to a reading; a concept does not. Concepts attach via `byte_concept` (0..n) — zero rows = an Unlabeled Passage, a legal state. Export field is `text`, column is `content` |
+| `byte_concept` | byteId CASCADE · conceptId CASCADE · createdAt | PK (byteId, conceptId); index on conceptId. The passage↔concept pointers of ruling 37 — refile adds a row, never copies a byte; deleting either end removes pointers only |
+| `edge` | id · courseId SET NULL · userId CASCADE · fromId CASCADE · toId CASCADE · handle `''` · sentence `''` NOT NULL default `''` · createdAt | Directed. Sentence optional at throw (P0.3 golden path); handle is the coined term |
+| `cloth` | id · courseId SET NULL · userId CASCADE · scopeKey `''` · title `''` · description `''` · createdAt · updatedAt | UNIQUE NULLS NOT DISTINCT (userId, courseId, scopeKey). The per-scope workspace identity (P0.4); absorbed the `read` table in 0021 (whole-weave row's text → whole-weave cloth's description) |
 | `map` | id · courseId SET NULL · userId CASCADE · **scopeKey `''`** · name · read `''` · essence `''` · **tiers jsonb `Record<conceptId, 'p'\|'s'\|'t'\|'x'>`** default `{}` · createdAt · updatedAt | scopeKey `''` = whole weave, else sorted comma-joined sourceIds. Absent tier key = unsorted. Non-unique index (userId, courseId, scopeKey) — plural siblings are the point |
 
 ### 1e. Projections & history (archived spec §6 `views` + development history)
@@ -84,7 +87,7 @@ directly, and the `source_page` it creates has never carried the foreign key
 | Table | Columns | Keys / notes |
 | --- | --- | --- |
 | `view` | id · courseId SET NULL · userId CASCADE · key (`'cardTable'` \| `'map:<mapId>'`) · **data jsonb** `{positions:{conceptId:{x,y}}, bends:{edgeId:{dx,dy}}, order?:string[], pins?:string[]}` · updatedAt | UNIQUE NULLS NOT DISTINCT (userId, courseId, key). Only student gestures write here (red line #7). `x` is proportional 0..1 (>1.5 read as legacy pixels) |
-| `graph_event` | id · courseId SET NULL · userId CASCADE · kind · entityType `'concept'\|'byte'\|'edge'\|'graph'\|'map'` · entityId nullable · payload jsonb · at | Append-only. Survives reset and import. Kinds: `concept.create/retier/rename/update/delete`, `byte.create/refile/attribute/delete`, `edge.throw/coin/update/delete`, `read.update`, `map.create/retier/rename/update/delete/import`, `graph.reset/import/example` |
+| `graph_event` | id · courseId SET NULL · userId CASCADE · kind · entityType `'concept'\|'byte'\|'edge'\|'graph'\|'map'\|'cloth'` · entityId nullable · payload jsonb · at | Append-only. Survives reset and import. Kinds: `concept.create/rename/update/delete`, `byte.capture/refile/unfile/attribute/delete`, `edge.throw/coin/update/delete`, `cloth.update`, `map.create/retier/rename/update/delete/import`, `graph.reset/import/example`. Historical kinds still in the record: `byte.create`, `concept.retier`, `read.update` |
 
 ---
 
@@ -104,25 +107,26 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 
 | Action | Params | Returns | Writes / events |
 | --- | --- | --- | --- |
-| `getUserLoomData()` | — | `{concepts, bytes, edges, maps, read, views}` — rows ordered `createdAt, id` (capture order is meaning) | read-only; drops orphaned `map:<id>` view rows from the response |
+| `getUserLoomData()` | — | `{concepts, bytes, edges, maps, cloths, views}` — rows ordered `createdAt, id` (capture order is meaning); each byte carries `conceptIds` folded from `byte_concept` in filing order | read-only; drops orphaned `map:<id>` view rows from the response |
 | `createConcept` | `{label, def?, note?}` | inserted `Concept` | `concept.create` |
-| `updateConcept` | `id, Partial<{label,def,note,tier}>` | void | case-insensitive label-clash check within (user, course) → throws; `concept.retier/rename/update` |
-| `deleteConcept` | `id` | void | refuses while an edge endpoint; cascades bytes; prunes views + map tiers; `concept.delete` |
-| `createByte` | `{conceptId, source, sourceId?, location, content, anchor fields?}` | inserted `Byte` | reconciles offsets against `source_page` when hashes agree; `byte.create` |
-| `refileByte` | `byteId, conceptId` | new `Byte` (row copy — v1 semantics) | dedupes by (userId, conceptId, content); `byte.refile` |
+| `updateConcept` | `id, Partial<{label,def,note}>` | void | case-insensitive label-clash check within (user, course) → throws (ruled for replacement, P1.7); `concept.rename/update` |
+| `deleteConcept` | `id` | void | refuses while an edge endpoint; **bytes survive** — join rows cascade, passages become Unlabeled; prunes views + map tiers; `concept.delete` |
+| `createByte` | `{conceptIds?, source, sourceId?, location, content, anchor fields?, note?, question?, isPullQuote?, tier?}` | inserted `Byte` (+`conceptIds`) | zero conceptIds = Unlabeled Passage; byte + pointers land in one `db.batch`; verifies concept ownership; reconciles offsets against `source_page` when hashes agree; `byte.capture` (fires for every capture, named or not — `byte.create` is a historical kind) |
+| `refileByte` | `byteId, conceptId` | the same `Byte` with the pointer added | inserts one `byte_concept` row (ruling 37 — never copies); throws if already filed; `byte.refile` |
+| `unfileByte` | `byteId, conceptId` | void | removes one pointer — refileByte's inverse; the byte survives (possibly as an Unlabeled Passage); OpenTab shows this instead of "remove byte" when a passage has >1 filing; `byte.unfile` |
 | `attributeBytes` | `byteIds[], sourceId` | count updated | fills `sourceId` **only where NULL**, only by student act, and only to a reading the student may see — `authorizeSourceAccess`. Until 0016-era it checked merely that the id existed, which admitted another student's private upload; `byte.attribute` |
 | `deleteByte` | `id` | void | `byte.delete` |
-| `createEdge` | `{fromId, toId, sentence}` | inserted `Edge` | `edge.throw` |
+| `createEdge` | `{fromId, toId, sentence?}` | inserted `Edge` | sentence defaults `''` (P0.3 — connect first, describe when ready); `edge.throw` |
 | `updateEdge` | `id, Partial<{handle, sentence}>` | void | `edge.coin` when handle present, else `edge.update` |
 | `deleteEdge` | `id` | void | prunes bends; `edge.delete` |
-| `saveRead` **(deprecated)** | `text` | void | upserts the mirror `read` row **without** touching any map — the one writer that can desync the mirror. Uncalled by the client; still exported and POSTable |
+| `saveCloth` | `{scopeKey, title?, description?}` | upserted `Cloth` | one row per (user, course, scopeKey); title trimmed to 200; replaces the removed `saveRead`; `cloth.update` |
 | `createMap` | `{scopeKey, name}` | `LoomMap` | max 60 maps → throws; name trimmed to 80; `map.create` |
-| `updateMap` | `id, Partial<{name, read, essence, tiers}>` | void | one `db.batch`: map update + mirror dual-write of `concept.tier` diffs + `read` upsert when it's the mirror map; `map.retier/rename/update` |
-| `deleteMap` | `id` | void | batch: map + its `map:<id>` view; if it was the mirror, re-points the mirror to the next-oldest whole-weave map (best-effort); `map.delete` |
-| `saveView` | `key, CardTableView` | void | key must be `cardTable` or an owned `map:<id>` else throws; mirror-map geometry echoes into `cardTable`; **no event** (projections) |
+| `updateMap` | `id, Partial<{name, read, essence, tiers}>` | void | single map update — no mirror (0021); tiers sanitized to known concepts, diffed for the `map.retier` payload; `map.retier/rename/update` |
+| `deleteMap` | `id` | void | batch: map + its `map:<id>` view; `map.delete` |
+| `saveView` | `key, CardTableView` | void | key must be `cardTable` or an owned `map:<id>` else throws; **no event** (projections) |
 | `getGraphEvents()` | — | events oldest-first, with synthesized `synth-*` creates for pre-history rows | read-only |
-| `resetGraph()` | — | void | `graph.reset` event first (with counts), then batch-delete edges/bytes/concepts/maps/reads/views. **History survives** |
-| `importGraph` | `ParsedImport` (client-parsed) | fresh `getUserLoomData()` | limits `{concepts:400, bytes:2000, edges:2000, maps:40}`; whole-graph replace in one batch; see §4e |
+| `resetGraph()` | — | void | `graph.reset` event first (with counts), then batch-delete edges/bytes/concepts/maps/cloths/views (byte_concept cascades). **History survives** |
+| `importGraph` | `ParsedImport` (client-parsed) | fresh `getUserLoomData()` | limits `{concepts:400, bytes:2000, edges:2000, maps:40, cloths:40}`; whole-graph replace in one batch; see §4e |
 | `importMapArrangement` | `ParsedMapImport` | `{data, mapId, scopeKey, skipped}` | additive sibling only; see §4f |
 | `loadWorkedExample()` | — | fresh `getUserLoomData()` | refuses unless the loom is empty; mirror-consistent by construction; `graph.example` |
 
@@ -224,11 +228,13 @@ The archived spec's §6 contract, exactly:
 {
   "graph": {
     "student": "Display Name",
-    "concepts": [{ "id", "label", "def", "note", "tier" }],   // tier = mirror of oldest whole-weave map
-    "bytes":    [{ "id", "conceptId", "source", "location", "text",
+    "concepts": [{ "id", "label", "def", "note" }],            // no tier — tiers are per-map (0021)
+    "bytes":    [{ "id", "conceptIds": [],                     // [] = an Unlabeled Passage
+                   "source", "location", "text",
+                   "note?", "question?", "isPullQuote?", "tier?",  // the margin, emitted when set
                    "anchor?": { "sourceId", "pageNumber", "startOffset", "endOffset", "pageContentHash" } }],
     "edges":    [{ "id", "fromId", "toId", "sentence", "handle" }],
-    "read":     "mirror paragraph",
+    "cloths?":  [{ "id", "scopeKey", "title", "description" }], // replaces top-level "read"
     "maps?":    [{ "id", "scopeKey", "name", "essence", "read",
                    "tiers": { "<conceptId>": "p" } }]          // absent key = unsorted
   },
@@ -250,8 +256,9 @@ whole-artifact form and the complete backup behind every map.
   "student": "...",
   "map":   { "id", "scopeKey", "scopeLabel", "name", "essence", "read", "tiers": {} },
   "graph": {
-    "concepts": [{ ..., "tier": mapTier }],   // THIS map's tier, not the mirror
-    "bytes":    [ /* every byte of every in-scope concept — the file stands alone */ ],
+    "concepts": [{ ..., "tier": mapTier }],   // THIS map's tier — the file is sorted on its own
+    "bytes":    [ /* every byte of every in-scope concept, plus the scope's own
+                     unlabeled passages — the file stands alone */ ],
     "edges":    [ /* scoped edges only */ ]
   },
   "view?": { "positions": {}, "bends": {}, "order?": [], "pins?": [] }
@@ -264,10 +271,13 @@ of its bytes has `sourceId ∈ scope` **or it has no bytes at all**
 
 ### 4c. Markdown outlines (readable, never re-importable)
 
-Whole cloth: `# Loom — <student>` → My read → Maps (per map: name — scope, essence,
-paragraph, tier lines) → Concepts grouped by tier (with bytes as quotes) →
-Propositions (`A —[handle]→ B` + sentence). Per map: same shape scoped to the map.
-Map kit (clipboard): name/essence/tier groups/propositions/armature/loose.
+Whole cloth: `# Loom — <student>` → My read (whole-weave cloth description) → My
+readings (per-reading cloth titles/descriptions) → Maps (per map: name — scope,
+essence, paragraph, tier lines) → Concepts (flat, with bytes as quotes) → Unfiled
+passages (unlabeled bytes — red line #4 keeps them visible) → Propositions
+(`A —[handle]→ B` + sentence when present). Per map: same shape scoped to the map,
+plus its unfiled passages. Map kit (clipboard): name/essence/tier groups/
+propositions/armature/loose; with no map, everything is unsorted (degree order).
 
 ### 4d. Import routing
 
@@ -277,15 +287,22 @@ map can never reach the replace path.**
 
 ### 4e. Whole-cloth import (replace)
 
-Client parse: flattens `{graph, views}`; validates tiers; drops blank labels and
-orphan bytes; accepts `text` or `content`; folds legacy v2/v3 shapes (byte notes,
-`triples` → edges); a pre-maps file **synthesizes "Map 1"** from
+Client parse: flattens `{graph, views}`; validates tiers; drops blank-label concepts
+and text-less bytes — but a byte whose concepts don't resolve now SURVIVES as an
+Unlabeled Passage (red line #5), where it used to be dropped as an orphan; accepts
+`conceptIds` (new) or `conceptId` (legacy), `text` or `content`; folds legacy v2/v3
+shapes (legacy byte notes onto the concept — a new-shape byte's `note` stays on the
+passage; `triples` → edges); a legacy `read` string becomes the whole-weave cloth's
+description; a pre-maps file **synthesizes "Map 1"** from the legacy concept
 `tier`/`read`/`cardTable` (the 0012 backfill rule).
 Server (`importGraph`): size limits → resolve known sources → **remint every id** →
-remap view keys → **re-scope** each map (scopeKey filtered to known sources; resolves
-to nothing → whole weave, never dropped — red line #5) → **remint tier keys** →
-`graph.import` event with snapshot → one atomic batch: delete everything, insert
-everything. Replace, never merge.
+remap view keys → **re-scope** each map and cloth (scopeKey filtered to known
+sources; resolves to nothing → whole weave, never dropped — red line #5; for
+cloths, exact scopes claim their slots FIRST and a scope-degraded cloth is
+dropped on collision, never the genuine one) → **remint tier keys**
+(`byte_concept` createdAt staggered per row — filing order is meaning) →
+`graph.import` event with snapshot → one atomic batch: delete everything (incl.
+cloths), insert everything (incl. `byte_concept` pointers). Replace, never merge.
 
 ### 4f. Per-map import (additive)
 
@@ -298,10 +315,11 @@ delete or replace anything.
 
 ## 5. Invariants the code enforces
 
-1. **Mirror dual-write.** `updateMap`, `saveView`, `deleteMap`, `loadWorkedExample`,
-   `importGraph` keep `concept.tier` + `read` equal to the oldest whole-weave map.
-   `saveRead` (deprecated) is the only writer that can break it. The `map` table is
-   authoritative either way.
+1. **Passages survive their labels** (0021). Deleting a concept removes
+   `byte_concept` pointers, never bytes; a byte with zero pointers is an Unlabeled
+   Passage, legal everywhere. `createByte` writes the byte and its pointers in one
+   `db.batch`. (The old invariant here — the mirror dual-write — was retired by
+   0021; `map.tiers` is the only tier store and the cloth carries the paragraph.)
 2. **`ensureActiveMap`** (client-only, LoomProvider): first sorting gesture in a fresh
    scope mints "Map N", with a pending-create de-dupe and an id-alias so in-flight
    gestures land on the right map.
@@ -311,19 +329,21 @@ delete or replace anything.
 4. **Soft removal.** `removedAt` on membership; every read filters it; sessions
    revoked only when no access remains; re-invitation reinstates.
 5. **Orphan adoption.** Every loom action adopts `courseId IS NULL` rows into the
-   active course; for `read`/`view` (unique-constrained) it deletes the null-course
+   active course; for `cloth`/`view` (unique-constrained) it deletes the null-course
    leftover first so the unique can't wedge the student.
 6. **A byte belongs to a reading; a concept does not.** Membership is derived from
-   `byte.sourceId` per render and discarded. `attributeBytes` fills NULL only, by
-   student act. A byte-less concept appears in every scope (red line #4 visibility).
+   `byte.sourceId` + its `byte_concept` pointers per render and discarded.
+   `attributeBytes` fills NULL only, by student act. A byte-less concept appears in
+   every scope (red line #4 visibility).
 7. **One label = one concept** — code-level clash check in `updateConcept` (not in
-   `createConcept`, and no DB constraint).
+   `createConcept`, and no DB constraint). RULED FOR REPLACEMENT by ruling 36
+   (homonyms warned, never forbidden) — lands with P1.7 merge.
 8. **A concept in use cannot be deleted** while it is an edge endpoint.
 9. **History survives everything** — `graph_event` outlives reset and import;
    event writes are best-effort (neon-http has no cross-call transactions), graph
    tables stay the source of truth.
-10. **Atomicity via `db.batch`** for: whole-graph replace, reset, mirror dual-write,
-    mirror re-point, worked example, map delete.
+10. **Atomicity via `db.batch`** for: whole-graph replace, reset, byte + its
+    concept pointers, worked example, map delete.
 11. **Anchor canonicality.** `createByte` prefers server page offsets when content
     hashes agree; otherwise preserves the client's offsets and hash.
 12. **Replace-race protection.** The client cancels debounced view (500 ms) and
@@ -332,10 +352,11 @@ delete or replace anything.
 
 ### Known contract debts (tracked, deliberate)
 
-- The mirror (`concept.tier`, `reads`, `cardTable` echo) awaits its contract
-  migration; until then two quirks are accepted (see NEXT_SESSION item 4).
 - `importGraph`/`importMapArrangement` trust client-side parsing for shape; the
   server re-validates sizes, source existence, and ownership only.
-- `saveRead` and `createSource` are exported but have no callers — deprecated and
-  dead-but-live respectively (see audit).
-- Byte→concept is one-to-many by v1 decision; re-file copies the byte.
+- `createSource` is exported but has no callers — dead-but-live (see audit).
+  (`saveRead` was removed with the mirror in 0021.)
+- The new `bytes` margin fields (note/question/isPullQuote/tier) are contract-level
+  only — no capture UI writes them yet (arrives with the P2/P3 Reading tab work).
+- Unlabeled Passages are representable and survive import/delete, but no UI creates
+  or displays them yet — the graph-view unattached group is P1.9.

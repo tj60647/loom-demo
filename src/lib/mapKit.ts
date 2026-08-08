@@ -25,11 +25,10 @@ export function buildMapKit(
     .map((c) => ({ c, d: degreeOf(edges, c.id) }))
     .sort((a, b) => b.d - a.d)
   const label = (id: string) => concepts.find((c) => c.id === id)?.label ?? "?"
-  // The active map's tiers when given (per-map placement); the legacy
-  // concept.tier mirror otherwise. Without this parameter every reading's kit
-  // would print the course-wide hierarchy — the map is what the chalk talk is
-  // drawn from.
-  const tierOf = (c: Concept): Tier => (map?.tiers ? map.tiers[c.id] ?? "" : c.tier || "")
+  // The active map's tiers when given (per-map placement — the only placement
+  // there is since the concept.tier mirror was dropped in 0021); with no map,
+  // everything is unsorted and the kit falls back to degree ordering.
+  const tierOf = (c: Concept): Tier => map?.tiers?.[c.id] ?? ""
 
   let out = "MAP KIT — " + (student || "my weave") + (map?.name ? " — " + map.name : "") + NL
   if (map?.essence?.trim()) out += "ESSENCE: " + map.essence.trim() + NL
@@ -56,7 +55,7 @@ export function buildMapKit(
   out += NL + "PROPOSITIONS (each should read as a sentence on your map):" + NL
   edges.forEach((e) => {
     out += "  " + label(e.fromId) + "  —[" + (e.handle || "…") + "]→  " + label(e.toId) + NL
-    out += '      ("' + e.sentence + '")' + NL
+    if (e.sentence) out += '      ("' + e.sentence + '")' + NL
   })
 
   const comps = allComponents(concepts, edges)

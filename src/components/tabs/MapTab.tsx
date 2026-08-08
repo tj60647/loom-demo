@@ -780,7 +780,7 @@ export default function MapTab() {
         {menuConcept && menuPos && (
           <CardMenu
             concept={menuConcept}
-            bytes={state.bytes.filter(b => b.conceptId === menuConcept.id)}
+            bytes={state.bytes.filter(b => b.conceptIds.includes(menuConcept.id))}
             where={readingsOf(menuConcept.id, state.bytes).map(titleOf)}
             pinned={pins.includes(menuConcept.id)}
             // Clamped so a card near the right edge does not push its menu off

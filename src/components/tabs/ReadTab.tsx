@@ -117,7 +117,12 @@ export default function ReadTab() {
   }
 
   // Read rail: look · trace · question · write
-  const wrote = !!(state.read && state.read.trim())
+  // "Wrote" = any interpretive paragraph exists: the active map's read, or
+  // the whole-weave cloth's description (the old read row's successor).
+  const wholeWeaveCloth = state.cloths.find((c) => c.scopeKey === "")
+  const wrote = !!(
+    state.maps.some((m) => m.read.trim()) || wholeWeaveCloth?.description.trim()
+  )
   const railN = wrote ? 3 : readSel?.gap ? 2 : readSel ? 1 : 0
 
   const handlePromptClick = (p: ReadPrompt, idx: number) => {
@@ -238,8 +243,8 @@ export default function ReadTab() {
       if (e) {
         const f = state.concepts.find(c => c.id === e.fromId);
         const t = state.concepts.find(c => c.id === e.toId);
-        const fBytes = state.bytes.filter(b => b.conceptId === f?.id);
-        const tBytes = state.bytes.filter(b => b.conceptId === t?.id);
+        const fBytes = state.bytes.filter(b => f && b.conceptIds.includes(f.id));
+        const tBytes = state.bytes.filter(b => t && b.conceptIds.includes(t.id));
 
         readingPane = (
           <div id="readingPane" style={{ marginTop: "16px" }}>

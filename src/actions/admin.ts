@@ -1,8 +1,8 @@
 "use server"
 
 import { db } from "@/db"
-import { users, concepts, bytes, edges, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
-import { and, eq, inArray, isNull, sql } from "drizzle-orm"
+import { users, concepts, bytes, byteConcepts, edges, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, emailHasAppAccess, isAdminUser } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
@@ -398,10 +398,27 @@ export async function getUserLoomDataAsAdmin(targetUserId: string, courseIdRaw?:
   if (!courseId) return { concepts: [], bytes: [], edges: [] }
 
   const userConcepts = await db.select().from(concepts).where(and(eq(concepts.userId, targetUserId), eq(concepts.courseId, courseId)))
-  const userBytes = await db.select().from(bytes).where(and(eq(bytes.userId, targetUserId), eq(bytes.courseId, courseId)))
+  const byteRows = await db.select().from(bytes).where(and(eq(bytes.userId, targetUserId), eq(bytes.courseId, courseId)))
   const userEdges = await db.select().from(edges).where(and(eq(edges.userId, targetUserId), eq(edges.courseId, courseId)))
 
-  return { concepts: userConcepts, bytes: userBytes, edges: userEdges }
+  return { concepts: userConcepts, bytes: await foldConceptIds(byteRows), edges: userEdges }
+}
+
+/** Fold byte_concept pointers onto byte rows as `conceptIds` (capture order). */
+async function foldConceptIds<T extends { id: string }>(byteRows: T[]): Promise<(T & { conceptIds: string[] })[]> {
+  if (!byteRows.length) return []
+  const junction = await db
+    .select({ byteId: byteConcepts.byteId, conceptId: byteConcepts.conceptId })
+    .from(byteConcepts)
+    .where(inArray(byteConcepts.byteId, byteRows.map((b) => b.id)))
+    .orderBy(asc(byteConcepts.createdAt), asc(byteConcepts.conceptId))
+  const byByte = new Map<string, string[]>()
+  junction.forEach((row) => {
+    const list = byByte.get(row.byteId) ?? []
+    list.push(row.conceptId)
+    byByte.set(row.byteId, list)
+  })
+  return byteRows.map((b) => ({ ...b, conceptIds: byByte.get(b.id) ?? [] }))
 }
 
 export async function getAggregateLoomData(
@@ -444,7 +461,7 @@ export async function getAggregateLoomData(
       .select()
       .from(bytes)
       .where(and(eq(bytes.courseId, courseId), inArray(bytes.userId, userIds)))
-    return { concepts: allConcepts, bytes: allBytes, edges: allEdges, members, bytesUnavailable: false }
+    return { concepts: allConcepts, bytes: await foldConceptIds(allBytes), edges: allEdges, members, bytesUnavailable: false }
   } catch (error) {
     // Fail soft so aggregate map still renders if byte schema/data is temporarily inconsistent.
     console.error("[getAggregateLoomData] Failed to load bytes for aggregate view", error)

@@ -11,9 +11,10 @@
  *
  * Passages are pulled verbatim from the `source_page` rows with their canonical
  * offsets and content hashes, so they highlight precisely in the PDF viewer.
- * The whole-weave map is written mirror-consistently (concept.tier, the `read`
- * row, and the cardTable view echo it), matching what updateMap/saveView would
- * have produced — the seeded account is indistinguishable from a worked one.
+ * Concepts attach through `byte_concept` (P0.1); tiers live per map only; the
+ * whole-weave cloth carries the student's read paragraph — matching what the
+ * actions would have produced, so the seeded account is indistinguishable
+ * from a worked one.
  *
  * Sign-in: these accounts have no GitHub identity. Locally and in CI they are
  * reached through /api/auth/test-login (?as=testa); on any production build
@@ -31,7 +32,7 @@
 import { db } from "../src/db"
 import {
   users, courses, courseMemberships, sources, sourcePages,
-  concepts, bytes, edges, reads, maps, views, graphEvents,
+  concepts, bytes, byteConcepts, edges, cloths, maps, views, graphEvents,
 } from "../src/db/schema"
 import { eq, asc, ilike, isNotNull, and } from "drizzle-orm"
 import { textLayerProjection } from "../src/lib/pdfText"
@@ -128,7 +129,7 @@ async function main() {
     await db.delete(bytes).where(eq(bytes.userId, u.id))
     await db.delete(concepts).where(eq(concepts.userId, u.id))
     await db.delete(maps).where(eq(maps.userId, u.id))
-    await db.delete(reads).where(eq(reads.userId, u.id))
+    await db.delete(cloths).where(eq(cloths.userId, u.id))
     await db.delete(views).where(eq(views.userId, u.id))
     await db.delete(graphEvents).where(eq(graphEvents.userId, u.id))
   }
@@ -142,7 +143,7 @@ async function main() {
   const at = () => new Date(base + ++tick * 37 * 60 * 1000) // every ~37 minutes
 
   const C = (label: string, def: string, note = "") => ({
-    userId: userA.id, courseId: course.id, label, def, note, tier: "" as const, createdAt: at(),
+    userId: userA.id, courseId: course.id, label, def, note, createdAt: at(),
   })
   const conceptRows = await db.insert(concepts).values([
     C("object worlds", "The discipline-specific world of instruments, language and know-how a designer thinks within."),
@@ -158,15 +159,18 @@ async function main() {
   // purpose — the visible no-evidence state — so it is never referenced again.
   const [oworlds, social, compromise, cop, lpp, reif, negmean] = conceptRows
 
+  // Concepts attach through byte_concept rows (P0.1): the byte row carries the
+  // passage, the join row carries the filing.
   const B = (c: { id: string }, src: typeof srcA, srcLabel: string, p: ReturnType<typeof pickPassage>) => ({
-    userId: userA.id, courseId: course.id, conceptId: c.id,
+    id: crypto.randomUUID(), conceptId: c.id,
+    userId: userA.id, courseId: course.id,
     source: srcLabel, sourceId: src.id, location: `p. ${p.pageNumber}`,
     content: p.content, pageNumber: p.pageNumber, startOffset: p.startOffset,
     endOffset: p.endOffset, pageContentHash: p.pageContentHash, createdAt: at(),
   })
   const labelA = "Bucciarelli, Designing Engineers"
   const labelB = "Wenger, Communities of Practice"
-  await db.insert(bytes).values([
+  const byteSeeds = [
     B(oworlds, srcA, labelA, pickPassage(pagesA, 2, 0)),
     B(oworlds, srcA, labelA, pickPassage(pagesA, 4, 1)),
     B(social, srcA, labelA, pickPassage(pagesA, 3, 0)),
@@ -177,7 +181,11 @@ async function main() {
     B(lpp, srcB, labelB, pickPassage(pagesB, 3, 0)),
     B(reif, srcB, labelB, pickPassage(pagesB, 5, 0)),
     B(negmean, srcB, labelB, pickPassage(pagesB, 6, 1)),
-  ])
+  ]
+  await db.insert(bytes).values(byteSeeds.map(({ conceptId: _conceptId, ...row }) => row))
+  await db.insert(byteConcepts).values(
+    byteSeeds.map((b) => ({ byteId: b.id, conceptId: b.conceptId, createdAt: b.createdAt }))
+  )
 
   const E = (from: { id: string }, to: { id: string }, sentence: string, handle = "") => ({
     userId: userA.id, courseId: course.id, fromId: from.id, toId: to.id, sentence, handle, createdAt: at(),
@@ -250,12 +258,11 @@ async function main() {
     { userId: userA.id, courseId: course.id, key: `map:${mapB.id}`, data: viewB, updatedAt: at() },
   ])
 
-  // Mirror dual-write, exactly as updateMap would leave it: concept.tier and
-  // the read row reflect the oldest whole-weave map.
-  for (const [cid, tier] of Object.entries(mapWeave.tiers))
-    await db.update(concepts).set({ tier: tier as "p" | "s" | "t" | "x" }).where(eq(concepts.id, cid))
-  await db.insert(reads).values({
-    userId: userA.id, courseId: course.id, text: mapWeave.read, updatedAt: at(),
+  // The whole-weave cloth: the student's read paragraph lives here (P0.4/0021),
+  // exactly as saveCloth would leave it.
+  await db.insert(cloths).values({
+    userId: userA.id, courseId: course.id, scopeKey: "",
+    title: "", description: mapWeave.read, createdAt: at(), updatedAt: at(),
   })
 
   // No graph_event rows are inserted: getGraphEvents synthesizes create events

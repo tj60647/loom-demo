@@ -36,7 +36,7 @@ export default function CaptureModal({ passage, source, sourceId, location, page
       } else if (wdef && !concept.def) {
         await editConcept(concept.id, { def: wdef })
       }
-      await addByte(concept.id, source, location, passage, pageNumber, startOffset, endOffset, sourceId, pageContentHash)
+      await addByte([concept.id], source, location, passage, pageNumber, startOffset, endOffset, sourceId, pageContentHash)
       onClose()
     } catch(e) {
       console.error(e)

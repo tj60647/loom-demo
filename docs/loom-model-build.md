@@ -76,6 +76,7 @@ The object model, semantics, and UI structure for Loom v1. This is the authority
 - Views: List View · Hierarchical View · Cards View · other. Nothing in the UI is called a "Map" ("Concept Map" refers only to the external artifact made in Figma from an export).
 - One Cloth may have many Projections — each a different take; title the takes.
 - **Concept Tiers live here**, per-Projection: the same Concept may be Tier 1 in one Projection and Tier 3 in another.
+- **A fresh Projection opens unsorted.** The tool never offers to seed its Tiers from another Projection or another scope's map — those ranks were judged against a different set of Concepts. (Ratified 2026-08-07, TJ, from the archived strategy doc's §B.4; no automation stands in for the student's sorting — of a piece with red lines 1 and 3.)
 - A Projection shows the graph **and the Cloth's Unlabeled Passages** (unattached group; a Concept can be coined from within the view; links can be created here — the Linking tab is their home, tabs are homes not walls).
 - Display geometry (positions, bends, pins, order) is view state, never part of the graph artifact; derived layout is computed for display and discarded — only student gestures persist geometry.
 
