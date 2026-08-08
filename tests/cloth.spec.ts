@@ -33,21 +33,21 @@ test("a cloth is created explicitly on the card, titled in Linking, and opens by
   const open = card.locator(".clothopen")
   await expect(create.or(open.first())).toBeVisible({ timeout: 15_000 })
 
-  // Either door lands on 02 · Linking, where the cloth's title lives — that is
-  // the point of the 2026-08-08 rework: opening the cloth goes somewhere the
-  // card itself does not.
+  // Either door opens the READING (TJ, 2026-08-08): a cloth starts where you
+  // read and gather, not where you name it.
   if (await create.isVisible()) {
     await create.click()
   } else {
     await open.first().click()
   }
-  await expect(page).toHaveURL(/\/reading\/[^?]+\?tab=throw/, { timeout: 15_000 })
+  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
 
+  // The title lives on 02 · Linking, and is named whenever the student likes —
+  // an untitled cloth is a fine state.
+  await page.locator("nav button", { hasText: "Linking" }).click()
   await loomLoaded(page)
   const fold = page.locator("details.invitefold", { hasText: "This cloth" })
   await expect(fold).toBeVisible({ timeout: 15_000 })
-  // Create Cloth arrives with `?cloth=new`, which opens the fold already —
-  // toggling blindly would close it.
   if (!(await fold.locator("input").first().isVisible())) {
     await fold.locator("summary").click()
   }
@@ -71,6 +71,6 @@ test("a cloth is created explicitly on the card, titled in Linking, and opens by
   await expect(cardAgain.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
   await expect(cardAgain.locator(".clothname")).toHaveText(CLOTH_TITLE, { timeout: 15_000 })
   await expect(cardAgain.locator(".clothmeta")).toContainText(/edited/)
-  // And it opens the cloth, not the text.
-  await expect(cardAgain.locator(".clothopen")).toHaveAttribute("href", /\?tab=throw$/)
+  // It opens the reading — where reading and gathering happen.
+  await expect(cardAgain.locator(".clothopen")).toHaveAttribute("href", /\/reading\/[^?]+$/)
 })

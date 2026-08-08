@@ -119,11 +119,12 @@ export default function Shelf() {
     try {
       const ok = await updateCloth({}, sourceId)
       if (ok) {
-        // Land ON the tab that holds the cloth's title rather than telling the
-        // student to go and find it. `?cloth=new` opens the fold there, so the
-        // field they were just asked for is the thing in front of them.
-        flash("cloth created — give it a title")
-        router.push(`/reading/${sourceId}?tab=throw&cloth=new`)
+        // A cloth starts in READING (TJ, 2026-08-08): that is where you read
+        // and gather, and the title can wait — an untitled cloth is a fine
+        // state, and the card says so. It briefly landed on Linking, which put
+        // the naming of the work before the work.
+        flash("cloth created — start reading")
+        router.push(`/reading/${sourceId}`)
       }
     } finally {
       setCreatingClothFor(null)
@@ -190,9 +191,9 @@ export default function Shelf() {
               clothsHere.map((c) => (
                 <Link
                   key={c.id}
-                  href={`/reading/${s.id}?tab=throw`}
+                  href={`/reading/${s.id}`}
                   className="clothopen"
-                  data-tip="your work on this reading — opens at 02 · Linking, where its title and description live"
+                  data-tip="your work on this reading — opens at 01 · Reading, where you read and gather"
                 >
                   <span className="clothname">
                     {c.title.trim() ? short(c.title, 52) : "Untitled cloth"}
