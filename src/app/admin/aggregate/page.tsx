@@ -15,7 +15,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   if (!courseId) {
     return (
       <main>
-        <h1>Cohort Map</h1>
+        <h1>Cohort Graph</h1>
         <div className="card empty" style={{ marginTop: "20px" }}>
           <span className="cap">No courses yet — create one on the Courses tab</span>
         </div>
@@ -53,11 +53,11 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
 
   return (
     <main>
-      <h1>Cohort Map</h1>
+      <h1>Cohort Graph</h1>
       <p className="tasksub" style={{ marginBottom: "20px" }}>
-        A macro view of concepts, bytes, and threads across {course?.name ?? "this course"}
+        A macro view of concepts, passages, and threads across {course?.name ?? "this course"}
         {sectionName ? ` · ${sectionName}` : " · all sections"}.
-        {sectionName ? "" : " Quilting happens per section — pick one in the nav to scope this map."}
+        {sectionName ? "" : " Quilting happens per section — pick one in the nav to scope this graph."}
       </p>
 
       {aggregateUnavailable && (
@@ -68,7 +68,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
 
       {bytesUnavailable && (
         <p className="tasksub" style={{ marginBottom: "12px", color: "var(--red)" }}>
-          Byte records could not be loaded. The concept/thread map is still shown.
+          Passage records could not be loaded. The concept/thread graph is still shown.
         </p>
       )}
       

@@ -23,7 +23,7 @@ const TIER_GROUPS: [Tier, string][] = [
   ["s", "Secondary"],
   ["t", "Tertiary"],
   ["", "Unsorted"],
-  ["x", "Left off the map"],
+  ["x", "Set aside"],
 ]
 
 export function buildExport(state: LoomState, student: string): LoomExport {
@@ -155,7 +155,7 @@ export function buildMarkdown(
   // Each map is its own artifact: a named sorting of concepts within a scope,
   // with a one-line essence and an interpretive paragraph.
   if (state.maps.length) {
-    lines.push("## Maps", "")
+    lines.push("## Projections", "")
     const scopeLabel = (scopeKey: string) =>
       scopeKey === ""
         ? "your whole weave"
@@ -164,7 +164,7 @@ export function buildMarkdown(
       ["p", "Primary"],
       ["s", "Secondary"],
       ["t", "Tertiary"],
-      ["x", "Left off the map"],
+      ["x", "Set aside"],
     ]
     state.maps.forEach((m) => {
       lines.push(`### ${m.name} — ${scopeLabel(m.scopeKey)}`, "")
@@ -266,7 +266,7 @@ export function parseImport(raw: string): ParsedImport {
   // whole export would swap the entire cloth for one map's slice (red line
   // #5). parseAnyImport routes it to the additive map import instead.
   if (data.format === LOOM_MAP_FORMAT) {
-    throw new Error("That file is a single-map export — it adds a map to your cloth rather than replacing it.")
+    throw new Error("That file is a single-projection export — it adds a projection to your cloth rather than replacing it.")
   }
 
   // Reject JSON that is not a loom export at all — {}, [], a stray
@@ -443,7 +443,7 @@ export function parseImport(raw: string): ParsedImport {
     return {
       key: str(m.id) || `m-${i}`,
       scopeKey: str(m.scopeKey),
-      name: str(m.name).trim().slice(0, 80) || `Map ${i + 1}`,
+      name: str(m.name).trim().slice(0, 80) || `Projection ${i + 1}`,
       essence: str(m.essence),
       read: str(m.read),
       tiers,
@@ -465,7 +465,7 @@ export function parseImport(raw: string): ParsedImport {
       const tier = legacyTierByKey.get(c.key)
       if (tier) tiers[c.key] = tier
     })
-    maps.push({ key: "legacy-map-1", scopeKey: "", name: "Map 1", essence: "", read: str(data.read), tiers })
+    maps.push({ key: "legacy-map-1", scopeKey: "", name: "Projection 1", essence: "", read: str(data.read), tiers })
     mapViews["legacy-map-1"] = cardTable
   }
 
@@ -641,7 +641,7 @@ export function buildMapMarkdown(
   const label = (id: string) => state.concepts.find((c) => c.id === id)?.label ?? "?"
   const lines: string[] = []
 
-  lines.push(`# ${map.name} — a map of ${scopeLabelOf(map.scopeKey, titleOfSource)}`, "")
+  lines.push(`# ${map.name} — a projection of ${scopeLabelOf(map.scopeKey, titleOfSource)}`, "")
   if (student) lines.push(`_${student}_`, "")
   if (map.essence.trim()) lines.push(`**${map.essence.trim()}**`, "")
   if (map.read.trim()) lines.push(map.read.trim(), "")
@@ -686,8 +686,8 @@ export function buildMapMarkdown(
 
 export function mapExportFilename(student: string, mapName: string, ext: string): string {
   const name = (student || "loom").replace(/\s+/g, "_").toLowerCase()
-  const mapSlug = (mapName || "map").replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "").toLowerCase() || "map"
-  return `${name}-${mapSlug}.map.${ext}`
+  const mapSlug = (mapName || "projection").replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "").toLowerCase() || "projection"
+  return `${name}-${mapSlug}.projection.${ext}`
 }
 
 // --- MAP IMPORT ---
@@ -708,7 +708,7 @@ export type ParsedMapImport = {
 function parseMapImportData(data: Record<string, unknown>): ParsedMapImport {
   const rawMap = (data.map && typeof data.map === "object" ? data.map : {}) as Record<string, unknown>
   const name = str(rawMap.name).trim().slice(0, 80)
-  if (!name) throw new Error("That map file has no map name — it did not parse as a loom map export.")
+  if (!name) throw new Error("That projection file has no name — it did not parse as a loom projection export.")
 
   const tiers: Record<string, Tier> = {}
   const rawTiers = (rawMap.tiers && typeof rawMap.tiers === "object" ? rawMap.tiers : {}) as Record<string, unknown>

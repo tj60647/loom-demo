@@ -31,7 +31,7 @@ export default async function UserLoomPage({
           <div className="mapbar">
             <span className="label">The cloth</span>
             <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
-              {concepts.length} concepts, {edges.length} threads, {bytes.length} bytes.
+              {concepts.length} concepts, {edges.length} threads, {bytes.length} passages.
             </span>
           </div>
           <div id="mapWrap">

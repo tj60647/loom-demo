@@ -500,7 +500,8 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addMap = async (name?: string) => {
-    const mapName = (name ?? `Map ${scopeMaps.length + 1}`).trim() || "Map"
+    // "Projection", never "map", anywhere a student reads (rulings 2/13/32).
+    const mapName = (name ?? `Projection ${scopeMaps.length + 1}`).trim() || "Projection"
     const tempId = crypto.randomUUID()
     const now = new Date()
     const temp: LoomMap = {
@@ -568,7 +569,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     if (inflight) return inflight
     const creating = addMap()
       .then((m) => {
-        flash(`new map started — "${m.name}"`)
+        flash(`new projection started — "${m.name}"`)
         return m
       })
       .finally(() => pendingCreate.current.delete(key))
@@ -605,7 +606,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
         .then(() => flash("saved"))
         .catch((e) => {
           console.error("Failed to save map", e)
-          flash("map not saved — try again")
+          flash("projection not saved — try again")
         })
     })
   }, [flash, resolveMapId])
@@ -638,7 +639,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     })
     try {
       await deleteMapAction(await resolveMapId(id))
-      flash("map removed")
+      flash("projection removed")
     } catch (e) {
       await resync(e)
     }
@@ -720,7 +721,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     setState(data)
     // Make the arrival visible: the new map is the selected one in its scope.
     setSelectedByScope((prev) => ({ ...prev, [scopeKey]: mapId }))
-    flash(skipped > 0 ? `map added — ${skipped} card${skipped !== 1 ? "s" : ""} not on this table` : "map added")
+    flash(skipped > 0 ? `projection added — ${skipped} card${skipped !== 1 ? "s" : ""} not on this table` : "projection added")
     return { skipped }
   }
 

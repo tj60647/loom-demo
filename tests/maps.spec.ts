@@ -35,7 +35,7 @@ async function waitForLoom(page: Page) {
 async function openWeaveMap(page: Page) {
   await page.goto('/weave');
   await waitForLoom(page);
-  await page.locator('nav button', { hasText: 'Map' }).click();
+  await page.locator('nav button', { hasText: 'Knowledge Graph' }).click();
   await expect(page.locator('#mapSwitcher')).toBeVisible({ timeout: 15000 });
 }
 
@@ -72,7 +72,7 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
   while (strand > 0) {
     await strands.first().click();
     await page.getByRole('button', { name: 'delete', exact: true }).click();
-    await page.getByRole('button', { name: 'Delete this map', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete this projection', exact: true }).click();
     await expect(strands).toHaveCount(strand - 1, { timeout: 15000 });
     strand--;
   }
@@ -87,11 +87,11 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
   // (the optimistic update targets the real id while the local row still has
   // the temp id — audit U-3(a)). On a warm server that race hits every time.
   await expect(page.locator('#mapSwitcher .chip')).toHaveCount(chipsBefore + 1);
-  await expect(page.locator('#mapSwitcher .chip.on')).toHaveText(/^Map \d+$/);
+  await expect(page.locator('#mapSwitcher .chip.on')).toHaveText(/^Projection \d+$/);
   await createSaved;
   // Rename it so cleanup can find it whatever else this account holds — and
   // hold the test until the rename's own POST completes.
-  const rename = page.getByLabel('Rename this map');
+  const rename = page.getByLabel('Rename this projection');
   await expect(rename).toBeVisible();
   await rename.fill(TEMP_NAME);
   const renameSaved = responseCarrying(page, TEMP_NAME);
@@ -127,7 +127,7 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
   await expect(async () => {
     await page.reload();
     await waitForLoom(page);
-    await page.locator('nav button', { hasText: 'Map' }).click();
+    await page.locator('nav button', { hasText: 'Knowledge Graph' }).click();
     const tempChip = page.locator('#mapSwitcher .chip', { hasText: TEMP_NAME });
     await expect(tempChip).toHaveCount(1, { timeout: 5000 });
     await tempChip.click();
@@ -184,8 +184,8 @@ test('04 Map lives inside a reading workbench, scoped to it', async ({ page }) =
   await expect(page).toHaveURL(/\/reading\//);
 
   await waitForLoom(page);
-  await page.locator('nav button', { hasText: 'Map' }).click();
-  await expect(page.locator('#mapSwitcher')).toContainText('Your maps of this reading');
+  await page.locator('nav button', { hasText: 'Knowledge Graph' }).click();
+  await expect(page.locator('#mapSwitcher')).toContainText('Your projections of this reading');
   // The whole weave's maps do not leak into a reading's stack.
   await expect(page.locator('#mapSwitcher .chip', { hasText: TEMP_NAME })).toHaveCount(0);
 });
@@ -200,7 +200,7 @@ test('cleanup: delete the temp map', async ({ page }) => {
   while (remaining > 0) {
     await tempChips.first().click();
     await page.getByRole('button', { name: 'delete', exact: true }).click();
-    await page.getByRole('button', { name: 'Delete this map', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete this projection', exact: true }).click();
     await expect(tempChips).toHaveCount(remaining - 1, { timeout: 15000 });
     remaining--;
   }

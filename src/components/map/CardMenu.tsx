@@ -46,14 +46,14 @@ export default function CardMenu({
 
       {concept.def ? (
         <>
-          <span className="cap">your working definition</span>
+          <span className="cap">your description</span>
           <p className="cardmenudef">{concept.def}</p>
           <button type="button" className="btn ghost mini compact" onClick={onTogglePin}>
             {pinned ? "unpin from the card" : "pin to the card"}
           </button>
         </>
       ) : (
-        <p className="ghostnote">No working definition yet — add one on 01 · Open.</p>
+        <p className="ghostnote">No description yet — add one on 01 · Open.</p>
       )}
 
       <span className="cap" style={{ display: "block", marginTop: 12 }}>
@@ -73,7 +73,7 @@ export default function CardMenu({
         ))
       )}
       {bytes.length > SHOWN && (
-        <p className="ghostnote">…and {bytes.length - SHOWN} more, in the coding log.</p>
+        <p className="ghostnote">…and {bytes.length - SHOWN} more, in the capture log.</p>
       )}
 
       {/* The seam, on the table: the same idea met in more than one text.

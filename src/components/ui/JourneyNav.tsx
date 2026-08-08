@@ -19,11 +19,11 @@ import Link from "next/link"
 export type Station = "readings" | "open" | "throw" | "read" | "map" | "weave" | "keep"
 
 const STATIONS: { key: Station; step: string; label: string }[] = [
-  { key: "readings", step: "00 —", label: "Readings" },
+  { key: "readings", step: "00 —", label: "Library" },
   { key: "open", step: "01 —", label: "Open" },
-  { key: "throw", step: "02 —", label: "Throw" },
-  { key: "read", step: "03 —", label: "Read" },
-  { key: "map", step: "04 —", label: "Map" },
+  { key: "throw", step: "02 —", label: "Linking" },
+  { key: "read", step: "03 —", label: "Vocabulary" },
+  { key: "map", step: "04 —", label: "Knowledge Graph" },
   { key: "weave", step: "05 —", label: "Weave" },
   { key: "keep", step: "06 —", label: "Keep" },
 ]

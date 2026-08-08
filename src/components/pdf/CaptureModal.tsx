@@ -53,7 +53,7 @@ export default function CaptureModal({ passage, source, sourceId, location, page
           Scrolls past the viewport: a full-passage capture grows tall (the
           word chips alone can fill a screen) and Save must stay reachable. */}
       <div className="card" style={{ width: "100%", maxWidth: "450px", maxHeight: "85vh", overflowY: "auto", padding: "24px", background: "var(--paper)", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
-        <h2 style={{ marginBottom: "16px", fontSize: "18px" }}>Capture Byte</h2>
+        <h2 style={{ marginBottom: "16px", fontSize: "18px" }}>Capture Passage</h2>
         
         <div style={{ marginBottom: "20px" }}>
           <span className="label">Passage</span>
@@ -125,7 +125,7 @@ export default function CaptureModal({ passage, source, sourceId, location, page
         </div>
 
         <div className="form-row">
-          <span className="label">Working definition — the concept in your own words <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
+          <span className="label">Description — the concept in your own words <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
           <input
             placeholder="e.g. a thing that means different things to different groups but still holds them together"
             title="your own-words gloss — a sentence is fine; this is where crude is welcome"
@@ -137,7 +137,7 @@ export default function CaptureModal({ passage, source, sourceId, location, page
         <div style={{ display: "flex", gap: "10px", marginTop: "24px", justifyContent: "flex-end" }}>
           <button className="btn ghost" onClick={onClose} disabled={isSubmitting}>Cancel</button>
           <button className="btn" onClick={handleCapture} disabled={!conceptLabel.trim() || isSubmitting}>
-            {isSubmitting ? "Saving..." : "Save Byte"}
+            {isSubmitting ? "Saving..." : "Save Passage"}
           </button>
         </div>
       </div>

@@ -11,7 +11,7 @@ const TIER_GROUPS: [Tier, string][] = [
   ["s", "SECONDARY"],
   ["t", "TERTIARY"],
   ["", "UNSORTED"],
-  ["x", "LEFT OFF"],
+  ["x", "SET ASIDE"],
 ]
 
 export function buildMapKit(
@@ -30,13 +30,13 @@ export function buildMapKit(
   // everything is unsorted and the kit falls back to degree ordering.
   const tierOf = (c: Concept): Tier => map?.tiers?.[c.id] ?? ""
 
-  let out = "MAP KIT — " + (student || "my weave") + (map?.name ? " — " + map.name : "") + NL
-  if (map?.essence?.trim()) out += "ESSENCE: " + map.essence.trim() + NL
+  let out = "CONCEPT-MAP KIT — " + (student || "my weave") + (map?.name ? " — " + map.name : "") + NL
+  if (map?.essence?.trim()) out += "ONE-LINE: " + map.essence.trim() + NL
   out += "Take this to paper or Figma. You arrange; that is the thinking." + NL + NL
 
   const tiered = concepts.some((c) => ["p", "s", "t"].includes(tierOf(c)))
   if (tiered) {
-    out += "CONCEPTS (grouped by YOUR tiers, from 04 - Map):" + NL
+    out += "CONCEPTS (grouped by YOUR tiers, from 04 - Knowledge Graph):" + NL
     TIER_GROUPS.forEach(([tier, name]) => {
       const group = concepts.filter((c) => tierOf(c) === tier)
       if (!group.length) return
@@ -52,7 +52,7 @@ export function buildMapKit(
     })
   }
 
-  out += NL + "PROPOSITIONS (each should read as a sentence on your map):" + NL
+  out += NL + "PROPOSITIONS (each should read as a sentence on your concept map):" + NL
   edges.forEach((e) => {
     out += "  " + label(e.fromId) + "  —[" + (e.handle || "…") + "]→  " + label(e.toId) + NL
     if (e.sentence) out += '      ("' + e.sentence + '")' + NL
@@ -70,7 +70,7 @@ export function buildMapKit(
   if (unwoven.length) {
     out +=
       NL +
-      "STILL LOOSE (decide: secondary, tertiary, or leave off the map):" +
+      "STILL LOOSE (decide: secondary, tertiary, or set aside):" +
       NL +
       unwoven.map((c) => "  " + c.label).join(NL) +
       NL

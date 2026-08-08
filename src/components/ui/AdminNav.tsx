@@ -58,7 +58,7 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
       <Link href={withParams("/", activeCourseId, null)} className="btn ghost mini">← My Loom</Link>
       {([
         ["/admin", "Roster", activeSectionId] as const,
-        ["/admin/aggregate", "Cohort Map", activeSectionId] as const,
+        ["/admin/aggregate", "Cohort Graph", activeSectionId] as const,
         ["/admin/library", "Readings", null] as const,
         ["/admin/courses", "Courses", null] as const,
       ]).map(([href, label, section]) => (

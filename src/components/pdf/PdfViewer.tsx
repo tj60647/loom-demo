@@ -1381,7 +1381,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           }}
           onClick={handleCaptureClick}
         >
-          Capture as Byte
+          Capture as Passage
         </button>
       )}
 
@@ -1416,8 +1416,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           <div className="head">
             <div className="meta">
               {highlightTooltip.entries.length > 1
-                ? `${highlightTooltip.entries.length} bytes on this passage`
-                : "byte"}
+                ? `${highlightTooltip.entries.length} captures on this passage`
+                : "passage"}
             </div>
             <button
               type="button"
@@ -1448,7 +1448,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                     hideHighlightTooltip();
                   }}
                 >
-                  Goto Coding Log
+                  Goto Capture Log
                 </button>
               ) : null}
             </div>

@@ -436,7 +436,7 @@ export async function refileByte(byteId: string, conceptId: string) {
     .where(and(eq(bytes.id, byteId), eq(bytes.userId, userId), inCourse(bytes.courseId, courseId)))
     .limit(1)
   const src = rows[0]
-  if (!src) throw new Error("Byte not found.")
+  if (!src) throw new Error("Passage not found.")
 
   const owned = await db.select({ id: concepts.id }).from(concepts)
     .where(and(eq(concepts.id, conceptId), eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))
@@ -522,7 +522,7 @@ export async function unfileByte(byteId: string, conceptId: string) {
   const rows = await db.select({ id: bytes.id }).from(bytes)
     .where(and(eq(bytes.id, byteId), eq(bytes.userId, userId), inCourse(bytes.courseId, courseId)))
     .limit(1)
-  if (!rows.length) throw new Error("Byte not found.")
+  if (!rows.length) throw new Error("Passage not found.")
 
   const removed = await db.delete(byteConcepts)
     .where(and(eq(byteConcepts.byteId, byteId), eq(byteConcepts.conceptId, conceptId)))
@@ -705,11 +705,11 @@ export async function createMap(data: { scopeKey: string; name: string }): Promi
   const existing = await db.select({ id: maps.id }).from(maps)
     .where(and(eq(maps.userId, userId), inCourse(maps.courseId, courseId)))
   if (existing.length >= MAX_MAPS) {
-    throw new Error("That is a lot of maps — delete one you are done with first.")
+    throw new Error("That is a lot of projections — delete one you are done with first.")
   }
 
   const scopeKey = scopeFromKey(data.scopeKey).key
-  const name = data.name.trim().slice(0, 80) || "Map"
+  const name = data.name.trim().slice(0, 80) || "Projection"
 
   const inserted = await db.insert(maps).values({ courseId, userId, scopeKey, name }).returning()
   await recordEvent(userId, courseId, "map.create", "map", inserted[0].id, { name, scopeKey })
@@ -727,7 +727,7 @@ export async function updateMap(
     .where(and(eq(maps.id, id), eq(maps.userId, userId), inCourse(maps.courseId, courseId)))
     .limit(1)
   const row = rows[0]
-  if (!row) throw new Error("Map not found.")
+  if (!row) throw new Error("Projection not found.")
 
   const set: Partial<typeof maps.$inferInsert> = { updatedAt: new Date() }
   if (data.name !== undefined) set.name = data.name.trim().slice(0, 80) || row.name
@@ -1150,7 +1150,7 @@ export async function importMapArrangement(parsed: ParsedMapImport) {
   const courseId = await resolveActiveCourseId(userId)
 
   if (Object.keys(parsed.map.tiers).length > IMPORT_LIMITS.concepts) {
-    throw new Error("That map file is larger than an import will accept.")
+    throw new Error("That projection file is larger than an import will accept.")
   }
 
   const [conceptRows, edgeRows] = await Promise.all([
@@ -1306,7 +1306,7 @@ export async function loadWorkedExample() {
     db.insert(bytes).values(byteRows),
     db.insert(byteConcepts).values(byteConceptRows),
     db.insert(edges).values(edgeRows),
-    db.insert(maps).values({ courseId, userId, scopeKey: "", name: "Map 1", read: WORKED_EXAMPLE.read, essence: "", tiers: exampleTiers }),
+    db.insert(maps).values({ courseId, userId, scopeKey: "", name: "Projection 1", read: WORKED_EXAMPLE.read, essence: "", tiers: exampleTiers }),
   ])
 
   return getUserLoomData()

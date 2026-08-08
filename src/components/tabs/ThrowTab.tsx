@@ -8,14 +8,7 @@ import { isWholeWeave, readingsOf } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 
-const REGISTERS = [
-  {id:'plain',   name:'Plain',          tag:'everyday',          verbs:['leads to','depends on','is part of','goes against','is the same as','sets up']},
-  {id:'argue',   name:'Argument',       tag:'logic & claims',    verbs:['presupposes','contradicts','exemplifies','entails','qualifies','generalizes']},
-  {id:'system',  name:'Cause & system', tag:'forces & feedback', verbs:['drives','constrains','bottlenecks','damps','feeds back into','is upstream of']},
-  {id:'design',  name:'Design & making',tag:'craft & use',       verbs:['affords','scaffolds','reframes','trades off against','operationalizes','prototypes']},
-  {id:'practice',name:'Practice & power',tag:'people & norms',   verbs:['legitimizes','governs','mediates','enacts','situates','negotiates']},
-  {id:'stance',  name:'Stance & value', tag:'orientation',       verbs:['honors','resists','mourns','inherits from','answers','betrays']},
-];
+const PLAIN_VERBS = ['leads to','depends on','is part of','goes against','is the same as','sets up'];
 
 const OPENERS = [
   'this means that',
@@ -49,7 +42,6 @@ export default function ThrowTab() {
   const [sentence, setSentence] = useState("")
   const [namingFor, setNamingFor] = useState<string | null>(null)
   const [nameDraft, setNameDraft] = useState("")
-  const [moreTongues, setMoreTongues] = useState(false)
   const [showOutside, setShowOutside] = useState(false)
   const [outsideFilter, setOutsideFilter] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -172,7 +164,7 @@ export default function ThrowTab() {
     setPairB(null)
     setDrawn(false)
     setSentence("")
-    flash('thread thrown — coin a term for it below, when you like')
+    flash('thread thrown — coin a label for it below, when you like')
   }
 
   const handleOpenerClick = (opener: string) => {
@@ -192,7 +184,6 @@ export default function ThrowTab() {
       setNamingFor(edgeId)
       setNameDraft(currentHandle ?? "")
     }
-    setMoreTongues(false)
   }
 
   const handleSaveName = (edgeId: string, previousValue: string | null) => {
@@ -203,8 +194,7 @@ export default function ThrowTab() {
       editEdge(edgeId, { handle: h });
     }
     setNamingFor(null);
-    setMoreTongues(false);
-    flash(h ? 'term coined' : 'left as a sentence');
+    flash(h ? 'label coined' : 'left as a description');
   }
 
   const c1 = conceptById(pairA ?? "")
@@ -250,7 +240,7 @@ export default function ThrowTab() {
         </div>
         {isPicked
           ? <div className="pickedtag">PICK {pairA === c.id ? 1 : 2}</div>
-          : (noev && <div className="pickedtag" style={{ color: "var(--red)" }} title="no captured passage — every concept should trace to a byte">no evidence</div>)}
+          : (noev && <div className="pickedtag" style={{ color: "var(--red)" }} title="no captured passage — every concept should trace to a passage">no evidence</div>)}
       </div>
     )
   }
@@ -282,18 +272,18 @@ export default function ThrowTab() {
         <div className="sent">“{e.sentence}”</div>
         <div className="tmeta">
           {e.handle
-            ? <span className="pill beaten">term</span>
-            : <span className="pill loose">sentence</span>}
+            ? <span className="pill beaten">label</span>
+            : <span className="pill loose">description</span>}
           {farWhere.length > 0 && <span className="pill">from {farWhere.join(" · ")}</span>}
           <span className="act" onClick={() => toggleNamer(e.id, e.handle)}>
-            {sel ? 'close' : (e.handle ? 'edit term' : 'coin a term')}
+            {sel ? 'close' : (e.handle ? 'edit label' : 'coin a label')}
           </span>
           <span
             className="rm"
             onClick={async () => {
               const ok = await confirm({
                 title: "Remove this thread?",
-                body: <>The sentence goes with it: <i>&ldquo;{short(e.sentence, 120)}&rdquo;</i> Both concepts stay.</>,
+                body: <>The description goes with it: <i>&ldquo;{short(e.sentence, 120)}&rdquo;</i> Both concepts stay.</>,
                 confirmLabel: "Remove thread",
                 danger: true,
               })
@@ -305,7 +295,7 @@ export default function ThrowTab() {
         </div>
         {sel && (
           <div className="distill">
-            <div className="rnote"><b>Coin a term</b> (optional) — you&apos;ve already said how they relate; a short word lets this <i>kind</i> of link recur across your weave.</div>
+            <div className="rnote"><b>Coin a label</b> (optional) — you&apos;ve already said how they relate; a short word lets this <i>kind</i> of link recur across your weave.</div>
             <div className="form-row" style={{ margin: "6px 0 8px" }}>
               <input
                 ref={nameInputRef}
@@ -316,31 +306,14 @@ export default function ThrowTab() {
                 autoFocus
               />
             </div>
-            <div className="rnote">Stuck for a word? Tap an everyday suggestion — or open <b>more tongues</b> for other fields&apos; vocabularies:</div>
+            <div className="rnote">Stuck for a word? Tap an everyday suggestion:</div>
             <div className="chips">
-              {REGISTERS[0].verbs.map(v => (
+              {PLAIN_VERBS.map(v => (
                 <span key={v} className="verbchip" onClick={() => pickWord(v)}>{v}</span>
               ))}
             </div>
-            <span
-              className={`distilltoggle ${moreTongues ? 'open' : ''}`}
-              style={{ marginTop: "8px" }}
-              onClick={() => setMoreTongues(!moreTongues)}
-            >
-              <span className="tw">▸</span> more tongues
-            </span>
-            {moreTongues && REGISTERS.slice(1).map(r => (
-              <div key={r.id} style={{ marginTop: "8px" }}>
-                <span className="cap">{r.name} · {r.tag}</span>
-                <div className="chips" style={{ marginTop: "4px" }}>
-                  {r.verbs.map(v => (
-                    <span key={v} className="verbchip borrowed" onClick={() => pickWord(v)}>{v}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
             <div style={{ marginTop: "10px" }}>
-              <button className="btn mini" onClick={() => handleSaveName(e.id, e.handle)}>Save term</button>
+              <button className="btn mini" onClick={() => handleSaveName(e.id, e.handle)}>Save label</button>
             </div>
           </div>
         )}
@@ -405,7 +378,7 @@ export default function ThrowTab() {
 
         <div className="card">
           <h2>Throw a thread</h2>
-          <p className="hint calm">When two are picked, say how they hang together — long and awkward is fine. The sentence <i>is</i> the thread. A good check: does it read aloud as a claim you&apos;d defend in section?</p>
+          <p className="hint calm">When two are picked, say how they hang together — long and awkward is fine. The description <i>is</i> the thread. A good check: does it read aloud as a claim you&apos;d defend in section?</p>
 
           <div className="benchbar">
             <span className="cap">the pair</span>
@@ -460,7 +433,7 @@ export default function ThrowTab() {
           <div className={`sleeper ${both ? "" : "asleep"}`}>
             <div className="sleepmsg">pick two concepts on the left — the bench wakes when the pair is loaded</div>
             <div className="form-row">
-              <span className="label">The relationship, however awkwardly — your sentence</span>
+              <span className="label">The link description — how they relate, however awkwardly</span>
               <div className="chips" style={{ margin: "2px 0 6px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 {OPENERS.map(o => (
                   <span key={o} className="openchip" onClick={() => handleOpenerClick(o)}>
@@ -479,8 +452,8 @@ export default function ThrowTab() {
                 coaches toward it instead of the button withholding the throw. */}
             <p className="ghostnote" style={{marginTop: "7px"}}>
               {sent
-                ? "Thrown threads land below. When a relationship recurs, coin a short term for it (optional) — that's how your vocabulary grows."
-                : "Say how they hang together — however awkwardly. The sentence is the thread, and you can throw now and write it later."}
+                ? "Thrown threads land below. When a relationship recurs, coin a short label for it (optional) — that's how your vocabulary grows."
+                : "Say how they hang together — however awkwardly. The description is the thread, and you can throw now and write it later."}
             </p>
           </div>
 

@@ -110,7 +110,7 @@ export default function ReadTab() {
     if (rec.length) {
       readPrompts.push({
         key: 'your words', gap: false,
-        q: <>You've reached for <b>"{rec[0][0]}"</b> on {rec[0][1].length} threads — it's becoming one of your own terms.</>,
+        q: <>You've reached for <b>"{rec[0][0]}"</b> on {rec[0][1].length} threads — it's becoming one of your own labels.</>,
         move: 'a coinage forming'
       })
     }
@@ -192,13 +192,13 @@ export default function ReadTab() {
   }
 
   const handleMapKit = () => {
-    if (!state.concepts.length) { flash("nothing to map yet — lay some warp first"); return }
+    if (!state.concepts.length) { flash("nothing to lay out yet — lay some warp first"); return }
     copyWithFeedback(
       buildMapKit(
         state.concepts, state.edges, studentName,
         activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
       ),
-      "map kit copied — take it to paper or Figma"
+      "concept-map kit copied — take it to paper or Figma"
     )
   }
 
@@ -211,7 +211,7 @@ export default function ReadTab() {
     return (
       <div key={e.id} className="readitem">
         <div className="trip">
-          <b>{f?.label || "?"}</b> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">sentence</span>} <b>{t?.label || "?"}</b>
+          <b>{f?.label || "?"}</b> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">description</span>} <b>{t?.label || "?"}</b>
         </div>
         <div className="sent">&ldquo;{e.sentence}&rdquo;</div>
       </div>
@@ -249,7 +249,7 @@ export default function ReadTab() {
         readingPane = (
           <div id="readingPane" style={{ marginTop: "16px" }}>
             <div className="threadhead">
-              <span className="red">{f?.label || "?"}</span> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">sentence</span>} <span className="red">{t?.label || "?"}</span>
+              <span className="red">{f?.label || "?"}</span> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">description</span>} <span className="red">{t?.label || "?"}</span>
             </div>
             <p style={{ fontSize: "15.5px", fontStyle: "italic", margin: "8px 0 14px" }}>&ldquo;{e.sentence}&rdquo;</p>
             {[f, t].filter(Boolean).map(c => (
@@ -275,7 +275,7 @@ export default function ReadTab() {
           readingPane = (
             <div id="readingPane" style={{ marginTop: "16px" }}>
               <div className="threadhead"><span className="red">{c.label}</span></div>
-              <p className="empty" style={{ marginTop: "8px" }}>This thread crosses nothing yet — warp waiting for weft. Take it to 02 — Throw.</p>
+              <p className="empty" style={{ marginTop: "8px" }}>This thread crosses nothing yet — warp waiting for weft. Take it to 02 — Linking.</p>
             </div>
           );
         } else {
@@ -309,7 +309,7 @@ export default function ReadTab() {
       {!wholeWeave && scoped.bridges.length > 0 && (
         <p className="ghostnote" style={{ marginTop: -6, marginBottom: 12 }}>
           {scoped.bridges.length} thread{scoped.bridges.length !== 1 ? "s" : ""} also run{scoped.bridges.length === 1 ? "s" : ""} out of this reading to concepts you met elsewhere.
-          They are not drawn here — half a thread would be a lie — but they are listed on <b>02 · Throw</b>.
+          They are not drawn here — half a thread would be a lie — but they are listed on <b>02 · Linking</b>.
         </p>
       )}
 
@@ -335,8 +335,8 @@ export default function ReadTab() {
 
       <div className="legend">
         <span><span className="sw" style={{borderTop: "2px solid var(--ochre)"}}></span>warp — concept</span>
-        <span><span className="sw" style={{borderTop: "2px solid var(--sage)"}}></span>coined term</span>
-        <span><span className="sw" style={{borderTop: "2px dashed var(--grey)"}}></span>unnamed — sentence only</span>
+        <span><span className="sw" style={{borderTop: "2px solid var(--sage)"}}></span>coined label</span>
+        <span><span className="sw" style={{borderTop: "2px dashed var(--grey)"}}></span>unnamed — description only</span>
         <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>what you're tracing</span>
       </div>
 
@@ -416,7 +416,7 @@ export default function ReadTab() {
               </div>
             ))}
             {state.concepts.length > 0 && loose > 0 && (
-              <div className="ghostnote" style={{ marginTop: "6px" }}>{loose} thread{loose !== 1 ? 's' : ''} with no term yet — coin one on 02 so a word can recur.</div>
+              <div className="ghostnote" style={{ marginTop: "6px" }}>{loose} thread{loose !== 1 ? 's' : ''} with no label yet — coin one on 02 so a word can recur.</div>
             )}
             {state.concepts.length > 0 && noEv.length > 0 && (
               <div className="ghostnote" style={{ marginTop: "6px", color: "var(--red)" }}>{noEv.length} concept{noEv.length !== 1 ? 's' : ''} with <b>no evidence</b> yet — every concept should trace to a captured passage.</div>
@@ -427,12 +427,12 @@ export default function ReadTab() {
         </div>
 
         <div className="card">
-          <h2>Your read {activeMap && <span className="n">of &ldquo;{activeMap.name}&rdquo; — same as 04 · Map</span>}</h2>
-          <p className="hint">One short paragraph, in your own words: what is this {wholeWeave ? "weave" : "reading"} about, and what holds it together? The tool never writes it for you. Essence and paragraph belong to your current map — keep several maps and each keeps its own.</p>
+          <h2>Your read {activeMap && <span className="n">of &ldquo;{activeMap.name}&rdquo; — same as 04 · Knowledge Graph</span>}</h2>
+          <p className="hint">One short paragraph, in your own words: what is this {wholeWeave ? "weave" : "reading"} about, and what holds it together? The tool never writes it for you. Your one-line and paragraph belong to your current projection — keep several projections and each keeps its own.</p>
           <p className="readq">In a sentence — what is this {wholeWeave ? "weave" : "reading"} <i>about</i>?</p>
           <input
             id="readEssence"
-            placeholder="One line — the essence."
+            placeholder="Your one-line — the take, in a sentence."
             value={activeMap?.essence ?? ""}
             onChange={(e) => { const v = e.target.value; void ensureActiveMap().then(m => setMapEssence(m.id, v)) }}
             onBlur={flushMapText}
@@ -448,7 +448,7 @@ export default function ReadTab() {
           <div className="drafted" id="readDrafted">{drafted}</div>
           <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
             <button className="btn ghost mini" data-tip="copies your paragraph to the clipboard" onClick={handleCopyRead}>Copy your read</button>
-            <button className="btn ghost mini" data-tip="copies your concepts, propositions, and spine — everything you need to draw your concept map by hand" onClick={handleMapKit}>Copy map kit → draw your map</button>
+            <button className="btn ghost mini" data-tip="copies your concepts, propositions, and spine — everything you need to draw your concept map by hand" onClick={handleMapKit}>Copy the concept-map kit → draw your concept map</button>
           </div>
         </div>
       </div>

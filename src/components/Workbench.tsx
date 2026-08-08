@@ -42,9 +42,9 @@ export type Tab = "reading" | "open" | "throw" | "read" | "map"
 const FOOT: Record<Tab, [string, string]> = {
   reading: ["00 — READING", "THE TEXT ITSELF"],
   open: ["01 — OPEN", "LAY THE WARP"],
-  throw: ["02 — THROW", "ONE THREAD AT A TIME"],
-  read: ["03 — READ", "PULL A THREAD"],
-  map: ["04 — MAP", "THE CARD TABLE"],
+  throw: ["02 — LINKING", "ONE THREAD AT A TIME"],
+  read: ["03 — VOCABULARY", "PULL A THREAD"],
+  map: ["04 — KNOWLEDGE GRAPH", "THE CARD TABLE"],
 }
 
 /** The journey station each workbench tab sits at. */
@@ -155,7 +155,7 @@ export default function Workbench({
   return (
     <>
       <div className="scopebar">
-        <Link href="/" className="scopeback">‹ readings</Link>
+        <Link href="/" className="scopeback">‹ library</Link>
         {source ? (
           <>
             <span className="scopetitle">{source.title}</span>

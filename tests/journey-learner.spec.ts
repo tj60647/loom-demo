@@ -93,7 +93,7 @@ test("01 · a byte captured by hand lands in the coding log — and cleans up", 
   await page.locator("#bText").fill("A passage typed by the journey suite, verbatim enough for the log.")
   await page.getByPlaceholder("e.g. boundary objects · satisficing · valence").fill("journey test concept")
   await page.getByPlaceholder("ch. 3, p. 49").fill("p. 999")
-  await page.getByRole("button", { name: "Add byte" }).click()
+  await page.getByRole("button", { name: "Add passage" }).click()
 
   const row = page.locator(".lrow", { hasText: "journey test concept" })
   await expect(row).toHaveCount(1, { timeout: 15_000 })
@@ -109,7 +109,7 @@ test("01 · a byte captured by hand lands in the coding log — and cleans up", 
   const byteDeleted = page.waitForResponse((r) =>
     r.request().method() === "POST" && (r.request().postData() ?? "").includes(byteId!)
   )
-  await row.getByRole("button", { name: "remove byte" }).click()
+  await row.getByRole("button", { name: "remove passage" }).click()
   await byteDeleted
   const conceptDeleted = page.waitForResponse((r) =>
     r.request().method() === "POST" && /^\["[0-9a-f-]{36}"\]$/.test(r.request().postData() ?? "")
@@ -138,13 +138,13 @@ test("02 · pick two, say the sentence, throw the thread, coin a term — then u
   const sent = page.locator(".sent", { hasText: "one sustains the other" })
   await expect(sent).toHaveCount(1, { timeout: 15_000 })
   const thread = sent.locator("..")
-  await expect(thread.locator(".pill", { hasText: "sentence" })).toBeVisible()
+  await expect(thread.locator(".pill", { hasText: "description" })).toBeVisible()
 
-  // Coin a term on the new thread.
-  await thread.locator(".act", { hasText: "coin a term" }).click()
+  // Coin a label on the new thread.
+  await thread.locator(".act", { hasText: "coin a label" }).click()
   await page.getByPlaceholder("your word… e.g. leads to · contradicts · is part of").fill("journey-term")
-  await thread.getByRole("button", { name: "Save term" }).click()
-  await expect(thread.locator(".pill", { hasText: "term" }).first()).toBeVisible({ timeout: 15_000 })
+  await thread.getByRole("button", { name: "Save label" }).click()
+  await expect(thread.locator(".pill", { hasText: "label" }).first()).toBeVisible({ timeout: 15_000 })
 
   // Remove the thread; both concepts stay (they are seeded).
   await thread.locator(".rm", { hasText: "remove" }).click()
@@ -170,13 +170,13 @@ test("02 · pick two, say the sentence, throw the thread, coin a term — then u
 
 test("03 · the cloth counts what it sees, and the read belongs to the active map", async ({ page }) => {
   await selectWholeCloth(page)
-  await page.locator("nav button", { hasText: "Read" }).click()
+  await page.locator("nav button", { hasText: "Vocabulary" }).click()
 
   // Counted prompts render; the two visible failure states are counted, not hidden:
   // the seeded no-evidence concept and the seeded sentence-only thread.
   await expect(page.locator(".prompt").first()).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText(/no evidence/).first()).toBeVisible()
-  await expect(page.getByText(/no term yet/).first()).toBeVisible()
+  await expect(page.getByText(/no label yet/).first()).toBeVisible()
 
   // Essence and paragraph are the seeded whole-cloth map's own.
   await expect(page.locator("#readEssence")).toHaveValue(/Disciplinary worlds hold together/, { timeout: 15_000 })
@@ -186,7 +186,7 @@ test("03 · the cloth counts what it sees, and the read belongs to the active ma
   await page.reload()
   await loomLoaded(page)
   await selectWholeCloth(page)
-  await page.locator("nav button", { hasText: "Read" }).click()
+  await page.locator("nav button", { hasText: "Vocabulary" }).click()
   await expect(page.locator("#readEssence")).toHaveValue(/Disciplinary worlds hold together/, { timeout: 15_000 })
 })
 
@@ -202,8 +202,8 @@ test("04 · three maps, and each scope keeps its own tiers and essence", async (
   await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
   await card.click()
   await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
-  await page.locator("nav button", { hasText: "Map" }).click()
-  await expect(page.locator("#mapSwitcher")).toContainText("Your maps of this reading", { timeout: 15_000 })
+  await page.locator("nav button", { hasText: "Knowledge Graph" }).click()
+  await expect(page.locator("#mapSwitcher")).toContainText("Your projections of this reading", { timeout: 15_000 })
   await expect(page.locator("#mapSwitcher .chip", { hasText: "The whole cloth" })).toHaveCount(0)
 
   const readingMap = page.locator("#mapSwitcher .chip", { hasText: "Object worlds, sorted" })

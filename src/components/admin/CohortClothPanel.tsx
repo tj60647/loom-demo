@@ -66,7 +66,7 @@ export default function CohortClothPanel({
     return (
       <>
         <b>{from?.label ?? "?"}</b>{" "}
-        {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">sentence</span>}{" "}
+        {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">description</span>}{" "}
         <b>{to?.label ?? "?"}</b>
       </>
     )
@@ -87,7 +87,7 @@ export default function CohortClothPanel({
             <span className="red">{concept.label}</span>
             <span className="n">
               {" "}· {who(concept.userId)} · {crossings.length} crossing{crossings.length !== 1 ? "s" : ""} ·{" "}
-              {conceptBytes.length} byte{conceptBytes.length !== 1 ? "s" : ""}
+              {conceptBytes.length} passage{conceptBytes.length !== 1 ? "s" : ""}
             </span>
           </div>
           {concept.def ? <p className="cardmenudef">{concept.def}</p> : null}
@@ -129,7 +129,7 @@ export default function CohortClothPanel({
         <div style={{ marginTop: "16px" }}>
           <div className="threadhead">
             <span className="red">{ends[0]?.label ?? "?"}</span>{" "}
-            {edge.handle ? <span className="vpill">{edge.handle}</span> : <span className="vpill loosev">sentence</span>}{" "}
+            {edge.handle ? <span className="vpill">{edge.handle}</span> : <span className="vpill loosev">description</span>}{" "}
             <span className="red">{ends[1]?.label ?? "?"}</span>
             <span className="n"> · {who(edge.userId)}</span>
           </div>
@@ -162,8 +162,8 @@ export default function CohortClothPanel({
         <div className="mapbar">
           <span className="label">The collective cloth</span>
           <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
-            {state.concepts.length} concepts, {state.edges.length} threads, {state.bytes.length} bytes.
-            Click a concept to open its bytes; click an arc to read the thread.
+            {state.concepts.length} concepts, {state.edges.length} threads, {state.bytes.length} passages.
+            Click a concept to open its passages; click an arc to read the thread.
           </span>
         </div>
         <div id="mapWrap">
@@ -178,7 +178,7 @@ export default function CohortClothPanel({
             Concepts <span className="n">{state.concepts.length}</span>
           </h2>
           <p className="hint">
-            Every concept in the cohort&apos;s weave, in map order. Click one to light it on the
+            Every concept in the cohort&apos;s weave, in projection order. Click one to light it on the
             cloth and open the passages behind it.
           </p>
           {state.concepts.length === 0 ? (
@@ -195,7 +195,7 @@ export default function CohortClothPanel({
                   >
                     <span className="clabel">{c.label}</span>
                     <span className="cap" style={{ whiteSpace: "nowrap" }}>
-                      {who(c.userId)} · {count} byte{count !== 1 ? "s" : ""}
+                      {who(c.userId)} · {count} passage{count !== 1 ? "s" : ""}
                     </span>
                   </div>
                 )

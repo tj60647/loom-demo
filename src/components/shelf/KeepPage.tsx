@@ -40,7 +40,7 @@ export default function KeepPage() {
       <div className="scopebar">
         <Link href="/" className="scopeback">‹ readings</Link>
         <span className="scopetitle">Keep</span>
-        <span className="scopemeta">your maps as files, and the whole cloth behind them</span>
+        <span className="scopemeta">your projections as files, and the whole cloth behind them</span>
       </div>
       <JourneyNav active="keep" />
       <main>

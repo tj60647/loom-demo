@@ -256,7 +256,7 @@ function describeEvent(e: GraphEvent): string {
     case "concept.create": return typeof p.label === "string" && p.label ? `named "${p.label}"` : "named a concept"
     case "concept.rename": return "renamed a concept"
     case "concept.retier": return "re-tiered a concept"
-    case "concept.update": return "revised a working definition"
+    case "concept.update": return "revised a concept's description"
     case "concept.merge":
       return typeof p.fromLabel === "string" && typeof p.intoLabel === "string"
         ? `merged "${p.fromLabel}" into "${p.intoLabel}"`
@@ -272,22 +272,22 @@ function describeEvent(e: GraphEvent): string {
     case "byte.attribute": return "placed passages in their reading"
     case "byte.delete": return "removed a passage"
     case "edge.throw": return "threw a thread"
-    case "edge.coin": return typeof p.handle === "string" && p.handle ? `coined "${p.handle}"` : "cleared a coined term"
+    case "edge.coin": return typeof p.handle === "string" && p.handle ? `coined "${p.handle}"` : "cleared a coined label"
     case "edge.update": return "reworded a thread"
     case "edge.delete": return "removed a thread"
     case "read.update": return "revised the read"
-    case "map.create": return typeof p.name === "string" && p.name ? `started a new map — "${p.name}"` : "started a new map"
-    case "map.rename": return typeof p.name === "string" && p.name ? `renamed a map to "${p.name}"` : "renamed a map"
-    case "map.retier": return "re-sorted a map"
-    case "map.update": return "revised a map's read"
-    case "map.delete": return typeof p.name === "string" && p.name ? `removed a map ("${p.name}")` : "removed a map"
-    case "map.import": return "brought a map in"
+    case "map.create": return typeof p.name === "string" && p.name ? `started a new projection — "${p.name}"` : "started a new projection"
+    case "map.rename": return typeof p.name === "string" && p.name ? `renamed a projection to "${p.name}"` : "renamed a projection"
+    case "map.retier": return "re-sorted a projection"
+    case "map.update": return "revised a projection's description"
+    case "map.delete": return typeof p.name === "string" && p.name ? `removed a projection ("${p.name}")` : "removed a projection"
+    case "map.import": return "brought a projection in"
     case "cloth.update":
       return typeof p.descriptionChars === "number" ? "revised a cloth's description" : "titled a cloth"
     case "graph.reset": return "reset the cloth"
     case "graph.import": return "imported a cloth"
     case "graph.example": return "loaded the worked example"
-    default: return e.kind
+    default: return "one more act on the record"
   }
 }
 
@@ -340,7 +340,7 @@ export default function HistoryPanel() {
   return (
     <details className="card" onToggle={handleToggle}>
       <summary style={{ cursor: "pointer" }}>
-        <span className="cap">The cloth, over time</span>
+        <span className="cap">Capture Log</span>
         <span className="hint" style={{ display: "block" }}>
           replay how your weave grew — counted from your own acts, never judged
         </span>

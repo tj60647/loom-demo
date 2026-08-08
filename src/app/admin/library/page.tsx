@@ -388,7 +388,7 @@ export default async function AdminLibraryPage({
                             <input type="hidden" name="sourceId" value={reading.id} />
                             <p className="hint" style={{ margin: 0, maxWidth: "46ch" }}>
                               Permanently deletes the PDF and removes it from every course. Student
-                              bytes captured from it keep their quoted text but lose the source link.
+                              passages captured from it keep their quoted text but lose the source link.
                             </p>
                             {/* No data-tip here: the bubble would sit exactly
                                 over the warning this button must be read with. */}

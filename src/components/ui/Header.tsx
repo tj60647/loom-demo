@@ -76,17 +76,16 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
 
             <p style={{ lineHeight: "1.6", marginBottom: "8px" }}>The core workflow is simple:</p>
             <ul style={{ lineHeight: "1.6", marginBottom: "24px", paddingLeft: "20px" }}>
-              <li style={{ marginBottom: "6px" }}><b>Read & Capture:</b> Keep passages worth keeping as short "bytes" — the author's words, verbatim, with citation. Name the concept each passage evidences, and gloss it in your own words in the working definition.</li>
+              <li style={{ marginBottom: "6px" }}><b>Read & Capture:</b> Keep passages worth keeping — the author's words, verbatim, with citation. Name the concept each passage evidences, and gloss it in your own words in the description.</li>
               <li style={{ marginBottom: "6px" }}><b>Throw:</b> Pick two concepts and connect them.</li>
-              <li style={{ marginBottom: "6px" }}><b>Name the Relation:</b> Define the "edge" between these ideas yourself, using your own phrasing or pulling a verb from one of the "tongues" (disciplinary thought styles).</li>
+              <li style={{ marginBottom: "6px" }}><b>Name the Relation:</b> define the link between these ideas in your own phrasing.</li>
             </ul>
             <p style={{ lineHeight: "1.6", marginBottom: "24px" }}>Nothing is auto-generated. The tool only counts your own throws. The structure emerges organically from your coding: from open codes first, to axial reads across texts.</p>
 
             <h3 style={{ fontSize: "16px", marginBottom: "12px", borderBottom: "1px solid var(--rule)", paddingBottom: "4px" }}>Features</h3>
             <ul style={{ lineHeight: "1.6", marginBottom: "24px", paddingLeft: "20px" }}>
-              <li style={{ marginBottom: "6px" }}><b>Bite-Sized Capture:</b> Keep the passages that matter as discrete "bytes" — the author's words, verbatim, with their citation — each filed under a concept you name.</li>
+              <li style={{ marginBottom: "6px" }}><b>Bite-Sized Capture:</b> Keep the passages that matter as discrete passages — the author's words, verbatim, with their citation — each filed under a concept you name.</li>
               <li style={{ marginBottom: "6px" }}><b>Intentional Connections ("Throws"):</b> The power of Loom lies in the edges. You decide exactly how two concepts relate.</li>
-              <li style={{ marginBottom: "6px" }}><b>Disciplinary "Tongues":</b> The verbs we reach for to name a relation (e.g., constrains, refutes, betrays) aren't neutral; each belongs to a specific way of seeing the world. When you coin a term, Loom offers registers from several fields — "Cause &amp; system", "Stance &amp; value" — as suggestions to tap or ignore. You pick the word, or write your own; the machine never names the relation.</li>
               <li style={{ marginBottom: "6px" }}><b>The Woven Graph:</b> View your interconnected graph ("Read"), then write your own "axial read" across texts. Loom lays your threads out as material and counts what it sees; you write the reading, and copy it out as a draft.</li>
             </ul>
 
@@ -95,7 +94,7 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
             <ul style={{ lineHeight: "1.6", marginBottom: "12px", paddingLeft: "20px" }}>
               <li style={{ marginBottom: "8px" }}><b>Object Worlds (Bucciarelli):</b> Each discipline inhabits its own world with its own instruments and language. A mechanical engineer might name a connection "is the bottleneck for," while a humanist might say it "betrays" the text. Loom makes these differing worldviews visible and actionable.</li>
               <li style={{ marginBottom: "8px" }}><b>Communities of Practice (Wenger):</b> Shared vocabularies are learned by participating in a community, not just by being told. Loom enables a class or team to grow its own shared edge-vocabulary over time by doing the work together.</li>
-              <li style={{ marginBottom: "8px" }}><b>Boundary Objects (Star):</b> How do people from distinct fields coordinate around one shared object without agreeing on exactly what it means? Loom serves as a cross-tongue boundary object—flexible enough to be locally useful, but robust enough to hold a common identity across groups.</li>
+              <li style={{ marginBottom: "8px" }}><b>Boundary Objects (Star):</b> How do people from distinct fields coordinate around one shared object without agreeing on exactly what it means? Loom serves as a cross-disciplinary boundary object—flexible enough to be locally useful, but robust enough to hold a common identity across groups.</li>
             </ul>
           </div>
         </div>

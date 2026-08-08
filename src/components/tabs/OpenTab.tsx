@@ -91,10 +91,10 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
         label: concept.label,
         where: metElsewhere.map(titleOf),
       })
-      flash("byte added — you've named this concept before")
+      flash("passage added — you've named this concept before")
     } else {
       setReuseNote(null)
-      flash("byte added — in its log row you can also file it under a second concept")
+      flash("passage added — in its log row you can also file it under a second concept")
     }
   }
 
@@ -177,7 +177,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     if (state.edges.some(e => e.fromId === conceptId || e.toId === conceptId)) {
       await notify({
         title: "This concept is woven into a thread.",
-        body: "Remove the thread on 02 · Throw first — deleting the concept now would take your thread with it.",
+        body: "Remove the thread on 02 · Linking first — deleting the concept now would take your thread with it.",
       })
       return
     }
@@ -263,11 +263,11 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     <div className="two">
       <div className="card">
         <h2 className="heading-with-info">
-          Capture a byte
+          Capture a passage
           <button
             type="button"
             className="iconbtn"
-            aria-label="Two ways to capture a byte"
+            aria-label="Two ways to capture a passage"
             aria-haspopup="dialog"
             aria-expanded={showCaptureInfo}
             aria-controls="captureInfoDialog"
@@ -302,10 +302,10 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                   <path d="m6 6 12 12" />
                 </svg>
               </button>
-              <div className="info-k">same byte, different doorway</div>
-              <h2 id="captureInfoTitle">Two ways to capture a byte</h2>
+              <div className="info-k">same passage, different doorway</div>
+              <h2 id="captureInfoTitle">Two ways to capture a passage</h2>
               <p>
-                A byte is always the same thing: a passage you want to keep, attached to a concept you name.
+                A passage is always the same thing: the author&apos;s words you want to keep, attached to a concept you name.
               </p>
               <p>
                 <b>Manual capture</b> starts here. Paste or type the passage, add source and location if you have them, then name what the passage is about.
@@ -324,7 +324,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
           </div>
         )}
         <p className="do">Do this — paste a passage here, or select text in the reading itself. Then name the concept it evidences, and gloss it in your own words.</p>
-        <p className="hint">A &ldquo;byte&rdquo; = one passage + its citation. Choosing the passage is <i>your</i> judgment — that&apos;s the point. Loom can carry over source details and offer passage words to tap; it does not summarize or choose the concept for you.</p>
+        <p className="hint">A passage = the author&apos;s words, verbatim, with its citation. Choosing the passage is <i>your</i> judgment — that&apos;s the point. Loom can carry over source details and offer passage words to tap; it does not summarize or choose the concept for you.</p>
         
         <div className="form-row">
           <span className="label">
@@ -366,7 +366,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
           />
           <div className="scaffold" style={{marginTop: "12px"}}>
             <div className="snote">
-              A <b>concept</b> is the idea this passage evidences — a <b>short noun phrase</b>, often the author's own words. If she names it ("boundary objects"), use her name for it. Your own-words gloss goes in the <b>working definition</b> — a sentence is fine there, crude is welcome. Rename anything later.
+              A <b>concept</b> is the idea this passage evidences — a <b>short noun phrase</b>, often the author's own words. If she names it ("boundary objects"), use her name for it. Your own-words gloss goes in the <b>description</b> — a sentence is fine there, crude is welcome. Rename anything later.
             </div>
             <div className="snote" style={{marginTop: "5px", color: "var(--ink-soft)"}}>
               One passage can hold several concepts — capture it once, then "also file under another concept" from the log.
@@ -412,7 +412,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
         </div>
         
         <div className="form-row">
-          <span className="label">Concept — a short noun phrase naming the idea <span style={{textTransform: "none", letterSpacing: 0, color: "var(--grey)"}}>(one per byte — you can file the same passage under a second concept from the log)</span></span>
+          <span className="label">Concept — a short noun phrase naming the idea <span style={{textTransform: "none", letterSpacing: 0, color: "var(--grey)"}}>(one per passage — you can file the same passage under a second concept from the log)</span></span>
           <input
             list="conceptOptions"
             placeholder="e.g. boundary objects · satisficing · valence"
@@ -429,7 +429,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
         </div>
 
         <div className="form-row">
-          <span className="label">Working definition — the concept in your own words <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
+          <span className="label">Description — the concept in your own words <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
           <input
             placeholder="e.g. a thing that means different things to different groups but still holds them together"
             title="your own-words gloss — a sentence is fine; this is where crude is welcome"
@@ -442,9 +442,9 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
           className="btn"
           onClick={handleAddByte}
           disabled={!content.trim() || !conceptLabel.trim()}
-          title="files the passage under its concept in your coding log"
+          title="files the passage under its concept in your capture log"
         >
-          Add byte
+          Add passage
         </button>
         {/* v14 alerted the reason on click; the button here is disabled instead,
             so the same coaching has to be visible without one. */}
@@ -454,7 +454,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
               ? "Paste or type a passage, then name the concept it evidences."
               : !content.trim()
                 ? "Paste or type a passage."
-                : "Name the concept this byte evidences — a short noun phrase (the author's own term is often best)."}
+                : "Name the concept this passage evidences — a short noun phrase (the author's own term is often best)."}
           </p>
         )}
         {reuseNote && (
@@ -478,9 +478,9 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
       </div>
 
       <div className="card">
-        <h2>Coding log <span className="n">{scoped.bytes.length ? `(${scoped.bytes.length} bytes · ${scoped.concepts.length} concepts)` : ""}</span></h2>
+        <h2>Capture log <span className="n">{scoped.bytes.length ? `(${scoped.bytes.length} passages · ${scoped.concepts.length} concepts)` : ""}</span></h2>
         <p className="do calm">Everything you capture from this reading lands here, A–Z.</p>
-        <p className="hint">Click a row to open it — edit the working definition, or file the same passage under another concept. When you have a handful, go to <b>02 — Throw</b> and start connecting them.</p>
+        <p className="hint">Click a row to open it — edit the description, or file the same passage under another concept. When you have a handful, go to <b>02 — Linking</b> and start connecting them.</p>
 
         <div className="scrollbox">
           {scoped.concepts.length === 0 && (
@@ -507,7 +507,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                 <div className="lhead" onClick={() => toggleRow(concept.id)} style={{ display: "flex", alignItems: "center" }}>
                   <div className="lconcept" style={{flex: 1}}>{concept.label}</div>
                   <div className="lsrc">
-                    {conceptBytes.length} byte{conceptBytes.length !== 1 ? "s" : ""}
+                    {conceptBytes.length} passage{conceptBytes.length !== 1 ? "s" : ""}
                     {elsewhere ? ` · ${elsewhere} elsewhere` : ""}
                   </div>
                 </div>
@@ -545,7 +545,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                       />
                     </div>
                     <div className="defrow">
-                      <span className="label">Working definition</span>
+                      <span className="label">Description</span>
                       <input
                         placeholder="in your words; same sense across your sources?"
                         defaultValue={concept.def ?? ""}
@@ -568,7 +568,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                               style={{ marginRight: "8px", background: "none", border: "none", padding: 0 }}
                               onClick={() => onGotoByte?.(b)}
                               disabled={!b.sourceId && !b.source}
-                              title={b.sourceId || b.source ? "Open this byte in the reading" : "No reading linked to this byte"}
+                              title={b.sourceId || b.source ? "Open this passage in the reading" : "No reading linked to this passage"}
                             >
                               goto
                             </button>
@@ -592,7 +592,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                                 style={{ background: "none", border: "none", padding: 0 }}
                                 onClick={() => removeByte(b.id)}
                               >
-                                remove byte
+                                remove passage
                               </button>
                             )}
                           </span>
@@ -649,7 +649,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
         <div className="quietrow">
           <input
             list="conceptOptions"
-            placeholder="add a concept with no byte yet (rare)"
+            placeholder="add a concept with no passage yet (rare)"
             value={newConceptOnly}
             onChange={(e) => setNewConceptOnly(e.target.value)}
           />

@@ -192,7 +192,7 @@ export default function MapTab() {
       const cur = v.pins ?? []
       const next = cur.includes(c.id) ? cur.filter(id => id !== c.id) : [...cur, c.id]
       setView(`map:${m.id}`, { ...v, pins: next })
-      flash(next.includes(c.id) ? "definition pinned to the card" : "definition unpinned")
+      flash(next.includes(c.id) ? "description pinned to the card" : "description unpinned")
     })
   }
   const bandRange = (t: Tier, h: number): [number, number] => {
@@ -324,7 +324,7 @@ export default function MapTab() {
     const ok = await confirm({
       title: `Make all ${all.length} concept${all.length !== 1 ? "s" : ""} primary?`,
       body: alreadySorted
-        ? `This overwrites the ${alreadySorted} tier${alreadySorted !== 1 ? "s" : ""} you have already set on this map. It is a starting point to demote from, not a recommendation.`
+        ? `This overwrites the ${alreadySorted} tier${alreadySorted !== 1 ? "s" : ""} you have already set on this projection. It is a starting point to demote from, not a recommendation.`
         : "A starting point to demote from, not a recommendation.",
       confirmLabel: "Make all primary",
     })
@@ -357,7 +357,7 @@ export default function MapTab() {
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return
     e.preventDefault()
     if (moveRow(idx, e.key === "ArrowUp" ? idx - 1 : idx + 1)) {
-      flash("sort list re-ordered — the map itself is unchanged")
+      flash("sort list re-ordered — the projection itself is unchanged")
     }
   }
 
@@ -374,7 +374,7 @@ export default function MapTab() {
     e.preventDefault()
     const fromIdx = sortList.findIndex(c => c.id === dragId)
     const toIdx = dropAt > fromIdx ? dropAt - 1 : dropAt
-    if (moveRow(fromIdx, toIdx)) flash("sort list re-ordered — the map itself is unchanged")
+    if (moveRow(fromIdx, toIdx)) flash("sort list re-ordered — the projection itself is unchanged")
     setDragId(null)
     setDropAt(null)
   }
@@ -488,14 +488,14 @@ export default function MapTab() {
   }
 
   const handleMapKit = () => {
-    if (!scopedState.concepts.length) { flash("nothing to map yet — lay some warp first"); return }
+    if (!scopedState.concepts.length) { flash("nothing to lay out yet — lay some warp first"); return }
     copyText(buildMapKit(
       scopedState.concepts,
       scopedState.edges,
       studentName,
       activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
     )).then(ok => {
-      if (ok) flash("map kit copied — take it to paper or Figma")
+      if (ok) flash("concept-map kit copied — take it to paper or Figma")
       else flash("select & copy by hand")
     })
   }
@@ -527,8 +527,8 @@ export default function MapTab() {
     if (!activeMap) return
     const ok = await confirm({
       title: `Delete "${activeMap.name}"?`,
-      body: "Its tiers, its essence sentence, its paragraph and its arrangement go with it. Your concepts, passages and threads are untouched.",
-      confirmLabel: "Delete this map",
+      body: "Its tiers, its one-line, its paragraph and its arrangement go with it. Your concepts, passages and threads are untouched.",
+      confirmLabel: "Delete this projection",
       danger: true,
     })
     if (ok) await removeMap(activeMap.id)
@@ -547,8 +547,8 @@ export default function MapTab() {
 
   return (
     <>
-      <p className="tasktitle">Lay out your map.</p>
-      <p className="tasksub">Your map, laid out like cards on a table (Novak &amp; Gowin&apos;s own method): sort your concepts into tiers, then arrange them by hand. The tool draws the lines you already threw and counts what it sees — it never sorts, places, or links for you. Keep more than one map: each is its own reading of the material, with its own tiers, its own essence sentence and its own paragraph. When a map reads right here, draw the real one (paper or Figma) and build your chalk talk from it.</p>
+      <p className="tasktitle">Lay out your projection.</p>
+      <p className="tasksub">Your projection, laid out like cards on a table (Novak &amp; Gowin&apos;s own method): sort your concepts into tiers, then arrange them by hand. The tool draws the lines you already threw and counts what it sees — it never sorts, places, or links for you. Keep more than one projection: each is its own reading of the material, with its own tiers, its own one-line and its own paragraph. When a projection reads right here, draw the real concept map (paper or Figma) and build your chalk talk from it.</p>
 
       <div className="rail" id="mapRail">
         <span className={`rstep${done1 ? " done" : ""}${!done1 ? " now" : ""}`}>sort</span>
@@ -569,8 +569,8 @@ export default function MapTab() {
             onClick={makeAllPrimary}
           >make all primary</button>
         </div>
-        <p className="do">Give each concept a tier: <b>P</b>rimary (the map hangs on it) · <b>S</b>econdary · <b>T</b>ertiary (example / detail) · <b>–</b> leave off. Sorted concepts land on the table below.</p>
-        <p className="hint">A–Z until you say otherwise: drag a row by its handle — or focus the handle and press ↑ / ↓ — to re-order this list, and your sequence sticks. That re-sequences the list only; the table, the counts and the map kit are untouched. <b>Make all primary</b> is a starting point, not a recommendation: it puts everything on the top tier in one move so you can demote from there.</p>
+        <p className="do">Give each concept a tier: <b>P</b>rimary (the projection hangs on it) · <b>S</b>econdary · <b>T</b>ertiary (example / detail) · <b>–</b> set aside. Sorted concepts land on the table below.</p>
+        <p className="hint">A–Z until you say otherwise: drag a row by its handle — or focus the handle and press ↑ / ↓ — to re-order this list, and your sequence sticks. That re-sequences the list only; the table, the counts and the concept-map kit are untouched. <b>Make all primary</b> is a starting point, not a recommendation: it puts everything on the top tier in one move so you can demote from there.</p>
         <div id="triageList" onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropAt(null) }}>
           {!scopedState.concepts.length ? (
             <div className="empty">
@@ -620,7 +620,7 @@ export default function MapTab() {
                 {TIERS.map(([k, name]) => (
                   <span key={k} className={`tchip${tierOf(c.id) === k ? " on" : ""}`} title={name.toLowerCase()} onClick={() => setTier(c, k)}>{k.toUpperCase()}</span>
                 ))}
-                <span className={`tchip off${tierOf(c.id) === "x" ? " on" : ""}`} title="leave off the map" onClick={() => setTier(c, "x")}>–</span>
+                <span className={`tchip off${tierOf(c.id) === "x" ? " on" : ""}`} title="set aside" onClick={() => setTier(c, "x")}>–</span>
               </span>
             </div>
           ))}
@@ -628,7 +628,7 @@ export default function MapTab() {
       </div>
 
       <div className="mapbar" id="mapSwitcher">
-        <span className="label">{wholeWeave ? "Your maps of the whole weave" : "Your maps of this reading"}</span>
+        <span className="label">{wholeWeave ? "Your projections of the whole weave" : "Your projections of this reading"}</span>
         <span className="chips" style={{ margin: 0, alignItems: "center" }}>
           {scopeMaps.map(m => (
             <span
@@ -643,14 +643,14 @@ export default function MapTab() {
           <button
             className="btn ghost mini"
             id="newMap"
-            data-tip="start another map of the same concepts — a different reading of them"
-            onClick={() => void addMap().catch(e => flash(e instanceof Error ? e.message : "could not start a map"))}
-          >+ New map</button>
+            data-tip="start another projection of the same concepts — a different reading of them"
+            onClick={() => void addMap().catch(e => flash(e instanceof Error ? e.message : "could not start a projection"))}
+          >+ New projection</button>
         </span>
         {activeMap && (
           <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
             <input
-              aria-label="Rename this map"
+              aria-label="Rename this projection"
               value={activeMap.name}
               onChange={e => renameMap(activeMap.id, e.target.value)}
               onBlur={flushMapText}
@@ -658,23 +658,23 @@ export default function MapTab() {
             />
             <button
               className="btn ghost mini"
-              aria-label={`Keep the map ${activeMap.name} as .json`}
-              data-tip="keep this map as its own file — the artifact to submit"
+              aria-label={`Keep the projection ${activeMap.name} as .json`}
+              data-tip="keep this projection as its own file — the artifact to submit"
               onClick={handleKeepMapJson}
             >keep .json</button>
             <button
               className="btn ghost mini"
-              aria-label={`Keep the map ${activeMap.name} as .md`}
-              data-tip="this map as a readable outline — notes, Obsidian, an agent"
+              aria-label={`Keep the projection ${activeMap.name} as .md`}
+              data-tip="this projection as a readable outline — notes, Obsidian, an agent"
               onClick={handleKeepMapMd}
             >keep .md</button>
-            <button className="btn ghost mini" data-tip="delete this map — concepts and threads stay" onClick={handleDeleteMap}>delete</button>
+            <button className="btn ghost mini" data-tip="delete this projection — concepts and threads stay" onClick={handleDeleteMap}>delete</button>
           </span>
         )}
       </div>
       <div className="mapbar">
-        <span className="label">The map</span>
-        <span style={{ color: "var(--ink-soft)", fontSize: 13 }}>Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋯</b> — its definition, the passages behind it, and where else you met it.</span>
+        <span className="label">The projection</span>
+        <span style={{ color: "var(--ink-soft)", fontSize: 13 }}>Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋯</b> — its description, the passages behind it, and where else you met it.</span>
       </div>
 
       {/* position:relative anchors the card menus, which are HTML over the SVG. */}
@@ -859,24 +859,24 @@ export default function MapTab() {
 
       <div className="ghostnote" id="mapMirror" style={{ marginTop: 8 }}>
         {scopedState.concepts.length > 0 && (
-          <>On the table: <b>{n.p}</b> primary · <b>{n.s}</b> secondary · <b>{n.t}</b> tertiary{off ? ` · ${off} left off` : ""}{unsorted ? <> · <span style={{ color: "var(--red)" }}>{unsorted} unsorted</span></> : ""} — {onTable.length} proposition{onTable.length !== 1 ? "s" : ""} drawn, <b>{cross}</b> running level-to-level or sideways (possible cross-links — the level-3 move; you decide if they&apos;re real). Right now this reads as: <b>{level}</b>. Counted, not judged.</>
+          <>On the table: <b>{n.p}</b> primary · <b>{n.s}</b> secondary · <b>{n.t}</b> tertiary{off ? ` · ${off} set aside` : ""}{unsorted ? <> · <span style={{ color: "var(--red)" }}>{unsorted} unsorted</span></> : ""} — {onTable.length} proposition{onTable.length !== 1 ? "s" : ""} drawn, <b>{cross}</b> running level-to-level or sideways (possible cross-links — the level-3 move; you decide if they&apos;re real). Right now this reads as: <b>{level}</b>. Counted, not judged.</>
         )}
       </div>
 
       <div className="card" style={{ marginTop: 14 }}>
-        <h2>Your read of this map {activeMap ? <span className="n">&ldquo;{activeMap.name}&rdquo; — its essence and paragraph travel with it</span> : <span className="n">starts with your first sort</span>}</h2>
+        <h2>Your read of this projection {activeMap ? <span className="n">&ldquo;{activeMap.name}&rdquo; — its one-line and paragraph travel with it</span> : <span className="n">starts with your first sort</span>}</h2>
         <p className="readq">In a sentence — what is this {wholeWeave ? "weave" : "reading"} <i>about</i>?</p>
         <input
           id="mapEssence"
-          placeholder="One line — the essence."
+          placeholder="Your one-line — the take, in a sentence."
           value={activeMap?.essence ?? ""}
           onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapEssence(m.id, v)) }}
           onBlur={flushMapText}
         />
-        <p className="hint" style={{ marginTop: 8 }}>Arranging and articulating feed each other: as the map settles, say in one short paragraph what it is about and what holds it together. Essence, paragraph, tiers and arrangement belong to this map — switch maps and each keeps its own.</p>
+        <p className="hint" style={{ marginTop: 8 }}>Arranging and articulating feed each other: as the projection settles, say in one short paragraph what it is about and what holds it together. One-line, paragraph, tiers and arrangement belong to this projection — switch projections and each keeps its own.</p>
         <textarea
           id="yourRead2"
-          placeholder="Write your read of this map here — same text as on 03 · Read."
+          placeholder="Write your read of this projection here — same text as on 03 · Vocabulary."
           value={activeMap?.read ?? ""}
           onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapRead(m.id, v)) }}
           onBlur={flushMapText}
@@ -884,7 +884,7 @@ export default function MapTab() {
       </div>
 
       <div style={{ marginTop: 10 }}>
-        <button className="btn ghost mini" data-tip="same map kit — now grouped by your tiers" onClick={handleMapKit}>Copy map kit → draw the real map</button>
+        <button className="btn ghost mini" data-tip="same concept-map kit — now grouped by your tiers" onClick={handleMapKit}>Copy the concept-map kit → draw the real concept map</button>
       </div>
     </>
   )

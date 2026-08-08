@@ -72,7 +72,7 @@ test.describe('PDF Viewer and Highlighting', () => {
       // The selection itself must be a passage, not a scrap.
       expect(selected.trim().length).toBeGreaterThanOrEqual(80);
 
-      const captureButton = page.locator('button:has-text("Capture as Byte")');
+      const captureButton = page.locator('button:has-text("Capture as Passage")');
       await expect(captureButton).toBeVisible();
       await captureButton.click();
 
@@ -81,7 +81,7 @@ test.describe('PDF Viewer and Highlighting', () => {
       const conceptInput = page.getByPlaceholder('e.g. boundary objects', { exact: true });
       await conceptInput.fill(conceptName);
 
-      const saveButton = page.locator('button:has-text("Save Byte")');
+      const saveButton = page.locator('button:has-text("Save Passage")');
       await saveButton.click();
 
       // Wait for the MODAL to close, not for the button's text: while the
@@ -89,7 +89,7 @@ test.describe('PDF Viewer and Highlighting', () => {
       // "Save Byte" locator report hidden while the modal's scrim is still
       // up, swallowing every click that follows. The heading disappears only
       // when the capture has really landed and the modal unmounted.
-      await expect(page.getByRole('heading', { name: 'Capture Byte' })).toBeHidden({ timeout: 30_000 });
+      await expect(page.getByRole('heading', { name: 'Capture Passage' })).toBeHidden({ timeout: 30_000 });
 
       // Verify the highlight is applied to the DOM immediately
       const highlight = page.locator('.loom-byte-highlight').first();
@@ -111,7 +111,7 @@ test.describe('PDF Viewer and Highlighting', () => {
       const byteDeleted = page.waitForResponse((r) =>
         r.request().method() === 'POST' && (r.request().postData() ?? '').includes(byteId!)
       );
-      await row.getByRole('button', { name: 'remove byte' }).click();
+      await row.getByRole('button', { name: 'remove passage' }).click();
       await byteDeleted;
       const conceptDeleted = page.waitForResponse((r) =>
         r.request().method() === 'POST' && /^\["[0-9a-f-]{36}"\]$/.test(r.request().postData() ?? '')
