@@ -31,6 +31,9 @@
 > the User's holdings (`VocabularyTab` — concepts, link labels, merge); the cloth
 > prompts and the duplicate read editor moved to 04 (`ClothReflection`). See
 > §2b-ii.
+> **Workflows tab** (2026-08-08): `/admin/workflows` draws the student, faculty
+> and admin flows from `src/lib/workflows.ts`. **Refactor a workflow, update that
+> file** — §2c-ii, enforced by `npm run check`.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
@@ -330,6 +333,43 @@ Before this pass 03 held the cloth prompts and a *second* read editor
 (`#readEssence`/`#yourRead`) writing the same map fields as 04's; those ids no
 longer exist. `?tab=read` and the `"read"` station key are unchanged — URL
 params are deliberately legacy (refactor spec §F).
+
+### 2c-ii. Workflows — [src/lib/workflows.ts](../src/lib/workflows.ts)
+
+`/admin/workflows` renders three flow diagrams — **Student · Faculty · Admin** —
+and they are **generated from data, never drawn**. `src/lib/workflows.ts` holds
+`FLOWS: Flow[]` (nodes + edges); [flowLayout.ts](../src/lib/flowLayout.ts) turns
+one into geometry; `FlowDiagram` draws it. Adding a step is adding a node and an
+edge — no coordinate is ever written by hand.
+
+**This is a maintenance obligation, not a decoration.** A refactor that changes
+how someone moves through Loom is not finished until the matching flow says so.
+Each flow carries a `sources` list naming the code behind it, shown on the page,
+so a reader can check the picture against the thing.
+
+`npm run check` runs [check-workflows.ts](../scripts/check-workflows.ts), which
+fails the build on the ways a *generated* diagram rots quietly — all of which
+still render, just wrongly:
+
+| Guard | The failure it catches |
+| --- | --- |
+| dangling edge ids | a connector silently dropped |
+| orphan nodes | a step added and never wired |
+| a `back` edge that does not go back | no lane to route in; falls back to a curve that can cross a box |
+| a forward edge skipping a row without routing | drawn under the box between its ends, so invisible — label and all |
+| overlapping boxes | row arithmetic drifted |
+| `wrapText` determinism | server and client must agree, or hydration breaks |
+
+Layout notes worth not re-deriving: returns run in lanes on the **right** and
+bypasses in lanes on the **left**, one lane each (two sharing a line read as one
+connector); every horizontal leg runs in a **row gap**, which holds no boxes by
+construction. The SVG carries **no per-node `<title>`** — React 19 hoists
+`<title>` into `<head>` and desynchronises hydration — so the `<details>` list
+under each diagram is its text alternative.
+
+Access: gated by `getStaffViewer` — admins **and faculty**, since the page holds
+no course data at all and the student flow is what an instructor most needs to
+read. Learners are returned to `/`.
 
 ### 2d. Courses & sections — [src/actions/courses.ts](../src/actions/courses.ts)
 

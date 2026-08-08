@@ -67,6 +67,9 @@ export default function AdminNav({ courses, isAdmin }: { courses: AdminNavCourse
               ["/admin/courses", "Courses", null] as const,
             ])
           : []),
+        // Faculty see this too: it holds no course data, and the student flow
+        // is the thing an instructor most needs to be able to read.
+        ["/admin/workflows", "Workflows", null] as const,
       ]).map(([href, label, section]) => (
         <Link
           key={href}

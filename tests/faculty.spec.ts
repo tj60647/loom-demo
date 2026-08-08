@@ -37,6 +37,8 @@ test("the nav offers the read side only — no Readings, no Courses", async ({ p
   await expect(nav.getByRole("link", { name: "Roster" })).toBeVisible({ timeout: 15_000 })
   await expect(nav.getByRole("link", { name: "Cohort Graph" })).toBeVisible()
   await expect(nav.getByRole("link", { name: "← My Loom" })).toBeVisible()
+  // Workflows is documentation, not data — faculty read it too.
+  await expect(nav.getByRole("link", { name: "Workflows" })).toBeVisible()
 
   // The write surfaces are absent from the shell, not merely disabled.
   await expect(nav.getByRole("link", { name: "Readings" })).toHaveCount(0)

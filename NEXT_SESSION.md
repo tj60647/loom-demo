@@ -1,5 +1,62 @@
 # Next Session Prompt
 
+## Addendum, 2026-08-08 latest (a Workflows tab, generated from data)
+
+**Read this first, and note the standing obligation it creates.** TJ asked for
+flow diagrams — one each for student, faculty and admin — in the admin panel,
+"maintained as we refactor the workflows".
+
+One commit on `dev`. `npm run check` (now including `check:workflows`),
+`next build` and the suite (**43 passed / 1 skipped**) are green; **no
+migration** — the tab reads nothing from the database.
+
+### The obligation
+
+**`src/lib/workflows.ts` IS the diagram.** If you change how any of those three
+people move through Loom — a step, a gate, a route, an order — update the
+matching flow in that file **in the same commit**. This is written into
+`AGENTS.md` so it is read every session, and into `docs/contracts.md` §2c-ii.
+
+Adding a step is adding a node and an edge. No coordinate is ever written by
+hand: `src/lib/flowLayout.ts` computes rows from longest-path depth and
+`FlowDiagram` draws whatever it is handed.
+
+### Why it is generated rather than drawn
+
+A hand-drawn diagram fails loudly — it stops matching and someone notices. A
+generated one fails *quietly*, by rendering a graph that is merely wrong. So
+`scripts/check-workflows.ts` (42 assertions, in `npm run check`) fails the build
+on: dangling edge ids, orphan nodes, a `back` edge that does not go back, a
+forward edge that skips a row without being routed around, overlapping boxes,
+and `wrapText` non-determinism. It cannot tell you the picture has fallen behind
+the build — that part is on the person doing the refactor.
+
+### Worth not re-deriving
+
+Three real defects were found by *looking at it*, not by type-checking:
+
+- **React 19 hoists `<title>` into `<head>`**, so an SVG `<title>` per node
+  threw a hydration error. There is none now; the `<details>` list under each
+  diagram is the text alternative, and it is better than a tooltip anyway.
+- **A return drawn from one node's edge to another's cuts straight through any
+  box between them.** Returns now run their horizontal legs in the **row gaps**
+  (box-free by construction) and their vertical legs in lanes on the right —
+  one lane each, since two sharing a line read as one connector.
+- **A forward edge that skips a row is invisible**: nodes paint over edges, so
+  it renders underneath the box between its ends, label and all. The student
+  flow's "or just read" was exactly this. Those now route through lanes on the
+  left.
+
+Access is `getStaffViewer` — admins **and faculty**. The page holds no course
+data whatsoever, and the student flow is the thing an instructor most needs to
+be able to read.
+
+### Still open
+
+- **D4** and the **Open/Reading merge** remain TJ's calls. When either lands,
+  the student flow in `workflows.ts` is part of the work.
+- Next's queue bug (vercel/next.js#90467) is still routed around, not fixed.
+
 ## Addendum, 2026-08-08 late (station 03 becomes Vocabulary)
 
 **Read this first. 03 · Vocabulary now holds what the model says it holds; the

@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run check:remap && npm run check:scoring && npm run check:auth && npm run check:overlay",
+    "check": "npm run lint && npm run typecheck && npm run check:remap && npm run check:scoring && npm run check:auth && npm run check:overlay && npm run check:workflows",
     "seed:sources": "tsx scripts/seed-sources.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "check:remap": "tsx scripts/check-offset-remap.ts",
@@ -22,7 +22,8 @@
     "check:auth": "tsx scripts/check-auth.ts",
     "check:auth:db": "tsx scripts/check-auth.ts --db",
     "check:crops": "tsx scripts/check-crops.ts",
-    "check:overlay": "tsx scripts/check-overlay.ts"
+    "check:overlay": "tsx scripts/check-overlay.ts",
+    "check:workflows": "tsx scripts/check-workflows.ts"
   },
   "dependencies": {
     "@auth/core": "^0.34.3",
