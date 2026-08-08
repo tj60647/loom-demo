@@ -316,7 +316,7 @@ export default function Shelf() {
             <h2>New to this?</h2>
             <p className="hint">
               A finished weave to poke at — Star &amp; Griesemer, already captured, threaded
-              and read. Explore it, then clear it from 06 · Keep to start your own.
+              and read. Explore it, then clear it from Keep to start your own.
             </p>
             <button className="btn ghost mini" onClick={handleLoadExample} disabled={exampleBusy}>
               load the worked example
@@ -418,7 +418,7 @@ function Untethered({ readings }: { readings: ReadingMeta[] }) {
  * A reading of the student's own, PDF first: uploaded like any course reading
  * (browser → Blob → register), it gets tab 00 and capture from the text
  * itself. Without a PDF — a book, a lecture — the card still stands, and its
- * passages are captured by hand on 01 · Open. Either way it sits on this
+ * passages are captured by hand on 01 · Reading. Either way it sits on this
  * student's shelf and nobody else's.
  */
 function AddOwnReading({ onAdded }: { onAdded: () => void }) {
@@ -620,7 +620,7 @@ function AddOwnReading({ onAdded }: { onAdded: () => void }) {
       <p className="hint">
         With the PDF, the reading opens on 00 and you capture from the text itself.
         Without one — a book, a lecture — the card still stands, and you capture its
-        passages by hand on 01 · Open. It sits on your shelf and nobody else&apos;s.
+        passages by hand on 01 · Reading. It sits on your shelf and nobody else&apos;s.
       </p>
       <div className="form-row">
         <span className="label">PDF File <span style={{ textTransform: "none", letterSpacing: 0 }}>(up to {MAX_READING_LABEL} — optional for a book or lecture)</span></span>

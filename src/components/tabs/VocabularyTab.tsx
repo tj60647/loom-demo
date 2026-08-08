@@ -156,8 +156,8 @@ export default function VocabularyTab() {
     const ok = await confirm({
       title: `Delete “${concept.label}”?`,
       body: passages
-        ? `Its ${passages} captured passage${passages !== 1 ? "s" : ""} stay${passages !== 1 ? "" : "s"} in your log, unfiled. Export from 06 · Keep first if you might want this back.`
-        : "Export from 06 · Keep first if you might want this back.",
+        ? `Its ${passages} captured passage${passages !== 1 ? "s" : ""} stay${passages !== 1 ? "" : "s"} in your log, unfiled. Export from Keep first if you might want this back.`
+        : "Export from Keep first if you might want this back.",
       confirmLabel: "Delete concept",
       danger: true,
     })

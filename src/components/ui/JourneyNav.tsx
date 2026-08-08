@@ -1,32 +1,48 @@
 "use client"
 
-// The journey, v14-style (ratified TJ 8/1): one bar right under the header on
-// every learner surface — 00 Readings · 01 Open · 02 Throw · 03 Read · 04 Map
-// · 05 Weave · 06 Keep — so the whole arc is always visible, wherever you
-// stand in it. 05 Weave is the big-picture phase the course builds toward
-// (weeks 11+ mine and quilt the whole graph): every reading at once, its own
-// station rather than the same tabs quietly scoped wider (ratified TJ 8/1).
+// The journey: one bar right under the header on every learner surface, so the
+// whole arc is always visible wherever you stand in it.
 //
 // A station you can work at HERE is a button (a workbench tab); every other
-// station is a link to where it lives. Outside a reading, Open routes to the
-// shelf: opening IS picking a text (reading-first), and the tooltip says so.
-// On /weave the WEAVE station is the underlined one — throw/read/map there
-// are its tools, the footer names the open tool — so the underline always
-// answers "where on the journey am I", never "which panel is showing".
+// station is a link to where it lives.
+//
+// 2026-08-08 (TJ): 00 Reading and 01 Open merged into a single **Reading**
+// station — the text and your captures are one place (model §3 tab 2), so
+// station 00 is now always the Library. 05 **Weave is hidden** pending a
+// decision on what it becomes (the refactor spec files it as the future Quilt
+// space, ruling 19); the `/weave` route still works and 06 Keep links to it,
+// so no whole-weave work is stranded. Unhide by flipping `hidden` below.
+//
+// Step numbers are DERIVED from the visible stations, so hiding or restoring
+// one renumbers the bar instead of leaving a gap that reads as a bug. That is
+// also why student copy should name a station rather than number it.
 
 import Link from "next/link"
 
 export type Station = "readings" | "open" | "throw" | "read" | "map" | "weave" | "keep"
 
-const STATIONS: { key: Station; step: string; label: string }[] = [
-  { key: "readings", step: "00 —", label: "Library" },
-  { key: "open", step: "01 —", label: "Open" },
-  { key: "throw", step: "02 —", label: "Linking" },
-  { key: "read", step: "03 —", label: "Vocabulary" },
-  { key: "map", step: "04 —", label: "Knowledge Graph" },
-  { key: "weave", step: "05 —", label: "Weave" },
-  { key: "keep", step: "06 —", label: "Keep" },
+const STATIONS: { key: Station; label: string; hidden?: boolean }[] = [
+  { key: "readings", label: "Library" },
+  { key: "open", label: "Reading" },
+  { key: "throw", label: "Linking" },
+  { key: "read", label: "Vocabulary" },
+  { key: "map", label: "Knowledge Graph" },
+  { key: "weave", label: "Weave", hidden: true },
+  { key: "keep", label: "Keep" },
 ]
+
+/** The visible stations, each with the number it shows. */
+export const VISIBLE_STATIONS = STATIONS.filter((s) => !s.hidden).map((s, i) => ({
+  ...s,
+  step: `${String(i).padStart(2, "0")} —`,
+}))
+
+/** The number a station displays, e.g. "04" for Knowledge Graph. Exported so
+ *  the workbench footer cannot drift from the bar above it. */
+export function stationNumber(key: Station): string {
+  const found = VISIBLE_STATIONS.findIndex((s) => s.key === key)
+  return found < 0 ? "" : String(found).padStart(2, "0")
+}
 
 const DEFAULT_HREF: Record<Station, string> = {
   readings: "/",
@@ -39,7 +55,7 @@ const DEFAULT_HREF: Record<Station, string> = {
 }
 
 const TIP: Partial<Record<Station, string>> = {
-  open: "capture happens inside a reading — pick one first",
+  open: "reading and capture happen together — pick a text first",
   weave: "the big picture — every reading at once",
 }
 
@@ -56,7 +72,7 @@ export default function JourneyNav({
 }) {
   return (
     <nav aria-label="The journey">
-      {STATIONS.map(({ key, step, label }) => {
+      {VISIBLE_STATIONS.map(({ key, step, label }) => {
         const handler = onStation[key]
         const text = labels[key] ?? label
         const activeCls = active === key ? " active" : ""

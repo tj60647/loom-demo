@@ -26,6 +26,25 @@ export async function openReading(page: Page, title: string) {
   // parallel workers can outlast the default expect timeout.
   await expect(page).toHaveURL(/\/reading\//, { timeout: 15000 });
 
-  await page.getByRole('button', { name: /Reading/i }).click();
+  // Scoped to the journey bar. Since the text and capture merged (2026-08-08)
+  // the reading station is the DEFAULT tab, so the viewer — and its own
+  // "Search this reading" button — is already on screen; an unscoped
+  // /Reading/i now matches both and is a strict-mode violation.
+  await page.locator('nav[aria-label="The journey"] button', { hasText: 'Reading' }).click();
   await expect(page.locator('text=Loading PDF...')).toBeHidden({ timeout: 15000 });
+}
+
+/**
+ * Show the capture log rail beside the text.
+ *
+ * Since the merge there is no Open tab to click: the log is a rail on the
+ * reading station, closed by default. Idempotent on purpose — a capture may
+ * have opened it already, and a blind toggle would close it again.
+ */
+export async function openCaptureLog(page: Page) {
+  const rail = page.locator('.readinglog');
+  if ((await rail.count()) === 0) {
+    await page.getByRole('button', { name: /Capture log/i }).first().click();
+  }
+  await expect(rail).toBeVisible({ timeout: 15000 });
 }

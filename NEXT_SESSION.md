@@ -1,5 +1,68 @@
 # Next Session Prompt
 
+## Addendum, 2026-08-08 last (the tab list is settled)
+
+**Read this first. The last structural gap between the model and the build is
+closed.** TJ's call: merge Open into Reading, **hide** Weave until it is
+decided, keep Keep.
+
+One commit on `dev`. `npm run check`, `next build` and the suite (**43 passed /
+1 skipped**) are green; **no migration**.
+
+The journey is now **00 Library · 01 Reading · 02 Linking · 03 Vocabulary ·
+04 Knowledge Graph · 05 Keep**.
+
+### The merge
+
+01 Reading is one station: the text on the left, the **capture log in a rail**
+beside it (`.readinglog`), closed by default and toggled from the viewer's
+toolbar where "← Back to 01 · Open" used to be. The viewer watches its own
+stage with a ResizeObserver, so opening the rail **re-fits the page** rather
+than clipping it — measured, 1500px → 1060px. `OpenTab` takes a `compact` prop
+for the rail (one column; 440px will not hold its two cards). A reference-only
+reading has no text to sit beside, so its capture side is the whole station.
+
+### Weave is hidden, not deleted
+
+`JourneyNav`'s `STATIONS` carries `hidden: true` on Weave — flip it back and the
+station returns. **The `/weave` route still works**, and **Keep now links to
+it**, because hiding the station would otherwise strand the whole-weave
+projections (04 at whole-weave scope is reachable no other way). That link is
+load-bearing until Weave is decided; do not remove it without replacing it.
+
+### One thing worth copying elsewhere
+
+**Station numbers are derived, not written.** `JourneyNav` numbers the *visible*
+stations and exports `stationNumber()`, which the workbench footer uses. So
+hiding Weave renumbered Keep from 06 to 05 in the bar and the footer at once,
+with no gap to look like a bug — and restoring Weave will undo it just as
+quietly. The corollary: **student copy should name a station, not number it.**
+Copy saying "06 · Keep" is now "Keep"; "01 · Open" is "01 · Reading".
+
+### Watch for this if a spec fails oddly
+
+Two traps this pass hit, both worth knowing:
+
+- The reading station is now the **default tab**, so the PDF viewer is on screen
+  immediately — and an unscoped `getByRole("button", {name: /Reading/i})` also
+  matches its "Search this reading" button. `tests/helpers.ts` scopes to
+  `nav[aria-label="The journey"]`.
+- A failed run leaves capture residue on Test User A (duplicate test concepts),
+  which then fails the *next* run for a different reason. `npm run seed:demo`
+  wipes and rebuilds A–D; run it before believing a second failure.
+
+### What remains
+
+- **Weave** — the only structural question left. The refactor spec files it as
+  the future Quilt space (ruling 19); `JourneyNav`'s old comment claimed TJ
+  ratified it as its own station on 8/1, which is an agent's summary and may be
+  an over-claim. Worth settling when Quilts are on the table.
+- **CI's `e2e` gate has never run**: it needs `CI_DATABASE_URL` and
+  `CI_BLOB_READ_WRITE_TOKEN` (deployments.md §CI). Until then only `checks`
+  gates a PR — the 43-test suite does not.
+- **The fresh-GitHub-account sign-in** has still never been run by a human.
+- Next's queue bug (vercel/next.js#90467) is still routed around.
+
 ## Addendum, 2026-08-08 latest (a Workflows tab, generated from data)
 
 **Read this first, and note the standing obligation it creates.** TJ asked for

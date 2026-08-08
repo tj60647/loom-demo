@@ -33,7 +33,11 @@ interface PdfViewerProps {
       query into the text it matched. */
   initialSearch?: string;
   onGotoOpenByte?: (byteId: string) => void;
-  onClose: () => void;
+  /** Whether the capture log rail is showing beside the text. */
+  logOpen?: boolean;
+  /** Show or hide that rail. Since the 2026-08-08 merge the text and the log
+      are one station, so this opens a panel rather than leaving for a tab. */
+  onToggleLog: () => void;
 }
 
 /** One byte on the clicked span, as the highlight tooltip presents it. */
@@ -46,7 +50,7 @@ type HighlightEntry = {
   endOffset: number | null;
 };
 
-export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusByteId, initialSearch, onGotoOpenByte, onClose }: PdfViewerProps) {
+export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusByteId, initialSearch, onGotoOpenByte, logOpen, onToggleLog }: PdfViewerProps) {
   const { state } = useLoom();
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -1217,12 +1221,18 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           labels shorten rather than the buttons shrinking below thumb size. */}
       <div className="pdf-toolbar">
         <div>
-          {/* This closes the text and lands on 01 Open — where the passage you
-              just captured is waiting — not on the readings list. */}
-          {/* Labelled only when the label is an arrow on its own; with the
-              words visible they are the name. */}
-          <button className="btn ghost mini" onClick={onClose} aria-label={isNarrow ? "Back to 01 · Open" : undefined}>
-            {isNarrow ? "←" : "← Back to 01 · Open"}
+          {/* The capture log lives beside the text now rather than on a tab of
+              its own, so this opens a rail instead of leaving. Labelled only
+              when the label is a glyph on its own; with the words visible they
+              are the name. */}
+          <button
+            className={`btn mini${logOpen ? "" : " ghost"}`}
+            onClick={onToggleLog}
+            aria-pressed={!!logOpen}
+            aria-label={isNarrow ? "Capture log" : undefined}
+            data-tip="your passages from this reading, filed by concept"
+          >
+            {isNarrow ? "☰" : logOpen ? "Hide capture log ›" : "‹ Capture log"}
           </button>
         </div>
 

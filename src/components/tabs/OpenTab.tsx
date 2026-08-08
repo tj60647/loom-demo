@@ -14,9 +14,12 @@ type OpenTabProps = {
   onGotoByte?: (byte: Byte) => void
   focusByteId?: string | null
   onFocusHandled?: () => void
+  /** Rendered in the reading station's side rail rather than across a page:
+   *  one column instead of two, since 420px will not hold both cards. */
+  compact?: boolean
 }
 
-export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: OpenTabProps) {
+export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compact }: OpenTabProps) {
   // `state` is the WHOLE graph and `scoped` is this reading's slice of it. The
   // split is load-bearing: the log renders what this reading evidences, but
   // naming, dedup and the delete guards must see every concept the student has
@@ -147,8 +150,8 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     const ok = await confirm({
       title: `Delete “${label}”?`,
       body: byteCount
-        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s" : ""} stay${byteCount !== 1 ? "" : "s"} in your log, unfiled. Export from 06 · Keep first if you might want this back.`
-        : "Export from 06 · Keep first if you might want this back.",
+        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s" : ""} stay${byteCount !== 1 ? "" : "s"} in your log, unfiled. Export from Keep first if you might want this back.`
+        : "Export from Keep first if you might want this back.",
       confirmLabel: "Delete concept",
       danger: true,
     })
@@ -220,7 +223,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
   }, [focusByteId, onFocusHandled, state.bytes])
 
   return (
-    <div className="two">
+    <div className={compact ? "onecol" : "two"}>
       <div className="card">
         <h2 className="heading-with-info">
           Capture a passage

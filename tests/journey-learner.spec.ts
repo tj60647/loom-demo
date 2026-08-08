@@ -16,6 +16,7 @@
  * prompts and the read.
  */
 import { test, expect } from "@playwright/test"
+import { openCaptureLog } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 // Each test is independent and removes what it adds — no serial mode, so one
@@ -90,9 +91,12 @@ test("01 · a byte captured by hand lands in the coding log — and cleans up", 
   await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
   await card.locator(".shelfmain").click()
   await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
-  // Station buttons are named "01 —Open" etc. — match by substring, never exact.
-  await page.locator("nav button", { hasText: "Open" }).click()
+  // Station buttons are named "01 —Reading" etc. — match by substring, never
+  // exact. Since the 2026-08-08 merge the capture form IS this station: the
+  // text on the left, the capture rail on the right, opened from the toolbar.
+  await page.locator("nav button", { hasText: "Reading" }).click()
   await loomLoaded(page)
+  await openCaptureLog(page)
 
   await page.locator("#bText").fill("A passage typed by the journey suite, verbatim enough for the log.")
   await page.getByPlaceholder("e.g. boundary objects · satisficing · valence").fill("journey test concept")

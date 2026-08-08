@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openReading } from './helpers';
+import { openReading, openCaptureLog } from './helpers';
 
 // Runs as Test User A (see playwright/global-setup.ts): the concepts and bytes
 // this spec captures belong to the test account, never to a real person's loom.
@@ -76,8 +76,9 @@ test.describe('PDF Viewer and Highlighting', () => {
       await expect(captureButton).toBeVisible();
       await captureButton.click();
 
-      // Modal appears, save the byte. Exact match: the Open tab's concept
-      // input starts with the same words and is still mounted behind this.
+      // Modal appears, save the byte. Exact match: the capture rail's own
+      // concept input starts with the same words and may be mounted behind
+      // this once the log has been opened.
       const conceptInput = page.getByPlaceholder('e.g. boundary objects', { exact: true });
       await conceptInput.fill(conceptName);
 
@@ -101,9 +102,9 @@ test.describe('PDF Viewer and Highlighting', () => {
       // concept, through the same UI a student would use — and await each
       // delete's server-action POST: the optimistic UI clears instantly, and
       // ending the test earlier aborts the queued fetches, leaving residue.
-      await page.locator('nav button', { hasText: 'Open' }).click();
+      await openCaptureLog(page);
       const row = page
-        .locator('.lrow', { has: page.locator('.lconcept', { hasText: conceptName }) })
+        .locator('.readinglog .lrow', { has: page.locator('.lconcept', { hasText: conceptName }) })
         .first();
       await expect(row).toBeVisible({ timeout: 5000 });
       await row.locator('.lhead').click();

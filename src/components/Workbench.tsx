@@ -18,7 +18,7 @@ import ThrowTab from "@/components/tabs/ThrowTab"
 import VocabularyTab from "@/components/tabs/VocabularyTab"
 import MapTab from "@/components/tabs/MapTab"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
-import JourneyNav, { type Station } from "@/components/ui/JourneyNav"
+import JourneyNav, { stationNumber, type Station } from "@/components/ui/JourneyNav"
 import ShelfSearch from "@/components/shelf/ShelfSearch"
 import type { Byte } from "@/lib/types"
 
@@ -37,20 +37,21 @@ export type WorkbenchSource = {
   hasFile: boolean
 }
 
-export type Tab = "reading" | "open" | "throw" | "read" | "map"
+// 2026-08-08 (TJ): "reading" IS the merged station — the text and the capture
+// log in one place (model §3 tab 2), where 00 Reading and 01 Open used to be
+// two. `?tab=open` still lands here; the URL params are legacy per §F.
+export type Tab = "reading" | "throw" | "read" | "map"
 
 const FOOT: Record<Tab, [string, string]> = {
-  reading: ["00 — READING", "THE TEXT ITSELF"],
-  open: ["01 — OPEN", "LAY THE WARP"],
-  throw: ["02 — LINKING", "ONE THREAD AT A TIME"],
-  read: ["03 — VOCABULARY", "THE WORDS YOU OWN"],
-  map: ["04 — KNOWLEDGE GRAPH", "THE CARD TABLE"],
+  reading: ["READING", "THE TEXT AND YOUR CAPTURES"],
+  throw: ["LINKING", "ONE THREAD AT A TIME"],
+  read: ["VOCABULARY", "THE WORDS YOU OWN"],
+  map: ["KNOWLEDGE GRAPH", "THE CARD TABLE"],
 }
 
 /** The journey station each workbench tab sits at. */
 const STATION_OF: Record<Tab, Station> = {
-  reading: "readings",
-  open: "open",
+  reading: "open",
   throw: "throw",
   read: "read",
   map: "map",
@@ -59,11 +60,15 @@ const STATION_OF: Record<Tab, Station> = {
 /**
  * Tabs that stay mounted once visited, hidden by `.panel`'s display rule, the
  * way v14 kept every panel in the DOM. These hold work in progress — a
- * half-typed throw sentence, the traced prompt on Read — which unmounting
- * destroys. The whole workbench is keyed by scope at the route level, so those
- * drafts belong to one reading and cannot follow the student into another.
+ * half-typed throw sentence, a half-typed passage — which unmounting destroys.
+ * The whole workbench is keyed by scope at the route level, so those drafts
+ * belong to one reading and cannot follow the student into another.
+ *
+ * `reading` is in the set for the capture side; the PdfViewer inside it is
+ * still mounted only while the tab is active, because it is heavy and its
+ * position is restored from `pdfPage` anyway.
  */
-const KEEP_ALIVE: ReadonlySet<Tab> = new Set<Tab>(["open", "throw", "read", "map"])
+const KEEP_ALIVE: ReadonlySet<Tab> = new Set<Tab>(["reading", "throw", "read", "map"])
 
 export default function Workbench({
   source,
@@ -83,14 +88,14 @@ export default function Workbench({
   // milliseconds before the workbench appeared.
   const { data: session, status } = useSession()
   const { isLoading, scoped } = useLoom()
-  const tabs: Tab[] = source
-    ? (source.hasFile ? ["reading", "open", "throw", "read", "map"] : ["open", "throw", "read", "map"])
-    : ["throw", "read", "map"]
+  const tabs: Tab[] = source ? ["reading", "throw", "read", "map"] : ["throw", "read", "map"]
+  // `?tab=open` predates the merge and is still in links and bookmarks.
+  const requested = (initialTab as string) === "open" ? "reading" : initialTab
   const firstTab: Tab =
-    initialTab && tabs.includes(initialTab)
-      ? initialTab
-      : tabs.includes("open")
-        ? "open"
+    requested && tabs.includes(requested as Tab)
+      ? (requested as Tab)
+      : tabs.includes("reading")
+        ? "reading"
         : "throw"
   const [activeTab, setActiveTab] = useState<Tab>(firstTab)
   const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([firstTab]))
@@ -98,6 +103,11 @@ export default function Workbench({
   const [pdfFocusByteId, setPdfFocusByteId] = useState<string | null>(null)
   const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
+  // The capture rail beside the text. Closed by default: reading is what the
+  // station is for, and a student who has not captured anything yet does not
+  // need half the width given to an empty log. A reference-only reading has no
+  // text to sit beside, so its capture side is the whole panel.
+  const [logOpen, setLogOpen] = useState(false)
 
   const goTo = (tab: Tab) => {
     setActiveTab(tab)
@@ -106,8 +116,8 @@ export default function Workbench({
 
   const shouldRender = (tab: Tab) => (KEEP_ALIVE.has(tab) ? visited.has(tab) : activeTab === tab)
 
-  // Inside a reading, "goto" is a tab away rather than a page away: the text is
-  // already open in this workbench.
+  // Since the merge, "goto" is not a tab away at all — the text and the log are
+  // the same station, so this only moves the page under the reader.
   const handleGotoByte = (byte: Byte) => {
     if (!source?.hasFile) return
     setPdfPage(byte.pageNumber && byte.pageNumber > 0 ? byte.pageNumber : 1)
@@ -115,9 +125,12 @@ export default function Workbench({
     goTo("reading")
   }
 
+  // A capture just landed: open the rail on it, rather than leaving the student
+  // to wonder where it went.
   const handleGotoOpenByte = (byteId: string) => {
     setOpenTargetByteId(byteId)
-    goTo("open")
+    setLogOpen(true)
+    goTo("reading")
   }
 
   // Loading comes FIRST. Until next-auth has answered we do not yet know
@@ -206,11 +219,9 @@ export default function Workbench({
         // it stays on 05 — Weave, the journey phase this place IS, while
         // throw/read/map act as its tools (the footer names the open one).
         active={source ? STATION_OF[activeTab] : "weave"}
-        // In this workbench, the tabs are stations you can work at right here;
-        // Readings and Keep (and Open, at the whole weave) are elsewhere, so
-        // JourneyNav renders them as links. Inside a text, station 00 IS this
-        // reading, so its label goes singular.
-        labels={source?.hasFile ? { readings: "Reading" } : {}}
+        // In this workbench the tabs are stations you can work at right here;
+        // Library and Keep are elsewhere, so JourneyNav renders them as links.
+        // Since the merge, station 00 is always the Library — no relabelling.
         onStation={Object.fromEntries(
           tabs.map((tab) => [STATION_OF[tab], () => goTo(tab)])
         )}
@@ -220,35 +231,53 @@ export default function Workbench({
           and wants every pixel under the journey, so main stops padding and
           stops scrolling and simply hands over its height. Every other station
           is an ordinary scrolling page. */}
-      <main className={activeTab === "reading" ? "station-reading" : undefined}>
-        {source?.hasFile && (
-          <div className={`panel ${activeTab === "reading" ? "active" : ""}`}>
-            {activeTab === "reading" && (
-              <PdfViewer
-                url={`/api/readings/${source.id}`}
-                sourceName={source.title}
-                sourceId={source.id}
-                initialPageNumber={pdfPage}
-                initialSearch={initialSearch}
-                focusByteId={pdfFocusByteId}
-                onGotoOpenByte={handleGotoOpenByte}
-                onClose={() => {
-                  setPdfFocusByteId(null)
-                  goTo("open")
-                }}
-              />
-            )}
-          </div>
-        )}
+      <main className={activeTab === "reading" && source?.hasFile ? "station-reading" : undefined}>
         {source && (
-          <div className={`panel ${activeTab === "open" ? "active" : ""}`}>
-            {shouldRender("open") && (
-              <OpenTab
-                onGotoByte={handleGotoByte}
-                focusByteId={openTargetByteId}
-                onFocusHandled={() => setOpenTargetByteId(null)}
-              />
-            )}
+          <div className={`panel ${activeTab === "reading" ? "active" : ""}`}>
+            {shouldRender("reading") &&
+              (source.hasFile ? (
+                // The merged station: the text, and the capture log beside it.
+                // The viewer's stage is watched by a ResizeObserver, so opening
+                // the rail re-fits the page rather than clipping it.
+                <div className="readingsplit">
+                  <div className="readingtext">
+                    {activeTab === "reading" && (
+                      <PdfViewer
+                        url={`/api/readings/${source.id}`}
+                        sourceName={source.title}
+                        sourceId={source.id}
+                        initialPageNumber={pdfPage}
+                        initialSearch={initialSearch}
+                        focusByteId={pdfFocusByteId}
+                        onGotoOpenByte={handleGotoOpenByte}
+                        logOpen={logOpen}
+                        onToggleLog={() => {
+                          setPdfFocusByteId(null)
+                          setLogOpen((v) => !v)
+                        }}
+                      />
+                    )}
+                  </div>
+                  {logOpen && (
+                    <aside className="readinglog" aria-label="Capture log">
+                      <OpenTab
+                        compact
+                        onGotoByte={handleGotoByte}
+                        focusByteId={openTargetByteId}
+                        onFocusHandled={() => setOpenTargetByteId(null)}
+                      />
+                    </aside>
+                  )}
+                </div>
+              ) : (
+                // A reference-only reading has no text to sit beside, so the
+                // capture side is the whole station.
+                <OpenTab
+                  onGotoByte={handleGotoByte}
+                  focusByteId={openTargetByteId}
+                  onFocusHandled={() => setOpenTargetByteId(null)}
+                />
+              ))}
           </div>
         )}
         <div className={`panel ${activeTab === "throw" ? "active" : ""}`}>
@@ -267,7 +296,9 @@ export default function Workbench({
       </main>
 
       <footer>
-        <span className="fl">{FOOT[activeTab][0]}</span>
+        {/* The number comes from the bar above, so hiding or restoring a
+            station can never leave the footer claiming a different one. */}
+        <span className="fl">{stationNumber(STATION_OF[activeTab])} — {FOOT[activeTab][0]}</span>
         <span className="fr">{FOOT[activeTab][1]}</span>
       </footer>
     </>

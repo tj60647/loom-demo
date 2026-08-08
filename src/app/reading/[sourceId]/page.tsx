@@ -13,7 +13,11 @@ type ReadingPageSearchParams = { tab?: string | string[]; q?: string | string[] 
 // anything else lands on the default first tab, as /weave does. `q` rides
 // along from a shelf-search hit and opens the reading's own search panel
 // pre-filled, so the trail of marks continues into the text itself.
-const READING_TABS = new Set<Tab>(["reading", "open", "throw", "read", "map"])
+//
+// `open` is kept as an accepted value although the tab is gone: it is in old
+// links and bookmarks, and the Workbench folds it onto `reading` (they merged
+// 2026-08-08). Legacy URL params are deliberate — refactor spec §F.
+const READING_TABS = new Set<string>(["reading", "open", "throw", "read", "map"])
 
 // Next 16: params is a Promise (async request APIs are no longer sync).
 export default async function ReadingPage({
@@ -26,7 +30,7 @@ export default async function ReadingPage({
   const { sourceId } = await params
   const resolved = await searchParams
   const rawTab = firstParam(resolved.tab)
-  const initialTab = rawTab && READING_TABS.has(rawTab as Tab) ? (rawTab as Tab) : undefined
+  const initialTab = rawTab && READING_TABS.has(rawTab) ? (rawTab as Tab) : undefined
   const initialSearch = firstParam(resolved.q)?.trim() || undefined
   const sources = await getSources()
   const source = sources.find((s) => s.id === sourceId)

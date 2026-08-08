@@ -601,3 +601,31 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .flowtext li { margin-bottom: 6px; }
 .flowtext ul { margin: 3px 0 0; padding-left: 18px; color: var(--ink-soft); font-size: 12.5px; }
 .flowwhere { color: var(--ink-soft); font-family: var(--mono); font-size: 11.5px; }
+
+/* --- The merged Reading station (text + capture log) -------------------- */
+/* One station since 2026-08-08: the text holds the room and the capture log
+   opens beside it. The viewer watches its own stage with a ResizeObserver, so
+   the page re-fits when the rail opens rather than being clipped. */
+.readingsplit { display: flex; height: 100%; min-height: 0; }
+.readingtext { flex: 1 1 auto; min-width: 0; height: 100%; }
+.readinglog {
+  flex: 0 0 auto;
+  width: min(440px, 42vw);
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-left: 1px solid var(--rule);
+  background: var(--paper);
+  padding: 16px 16px 40px;
+}
+/* One column in the rail; the two-card row needs a page's width. */
+.onecol { display: flex; flex-direction: column; gap: 16px; }
+/* The log's own scrollboxes should not fight the rail's scrolling. */
+.readinglog .scrollbox { max-height: none; }
+
+@media (max-width: 820px) {
+  /* No room for both: the rail covers the text rather than squeezing it to
+     nothing, and the toolbar button is how you get back. */
+  .readinglog { position: absolute; inset: 0 0 0 auto; width: min(100%, 460px); z-index: 5; }
+  .readingsplit { position: relative; }
+}

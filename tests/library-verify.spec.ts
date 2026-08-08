@@ -49,9 +49,10 @@ test.describe('Library verification', () => {
     await expect(page).toHaveURL(/\/reading\//, { timeout: 15000 });
     // Download moved off the library card onto the reading's scope bar.
     await expect(page.getByRole('link', { name: /Download PDF/i })).toBeVisible();
-    // Scoped to the workbench nav: "open" also matches the help button and the
-    // Next dev-tools button in a dev build.
-    await expect(page.locator('nav').getByRole('button', { name: /Open/i })).toBeVisible();
+    // Scoped to the workbench nav: the station is "01 — Reading" since the
+    // text and capture merged (2026-08-08), and an unscoped match would also
+    // hit the help button and the Next dev-tools button in a dev build.
+    await expect(page.locator('nav').getByRole('button', { name: /Reading/i })).toBeVisible();
 
     await page.screenshot({ path: 'test-results/reading-workbench.png', fullPage: true });
   });
