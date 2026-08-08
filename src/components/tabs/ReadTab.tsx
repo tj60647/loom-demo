@@ -4,10 +4,11 @@ import { useLoom } from "@/components/providers/LoomProvider"
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import type { Edge } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
-import { isWholeWeave } from "@/lib/scope"
+import { isWholeWeave, soleSourceId } from "@/lib/scope"
 import { buildMapKit } from "@/lib/mapKit"
 import { copyText } from "@/lib/clipboard"
 import ClothMap from "@/components/svg/ClothMap"
+import VocabularyOverlay from "@/components/tabs/VocabularyOverlay"
 import HistoryPanel from "@/components/ui/HistoryPanel"
 
 export default function ReadTab() {
@@ -452,6 +453,12 @@ export default function ReadTab() {
           </div>
         </div>
       </div>
+
+      {/* The Concepts and Links Overlays (ruling 28). Below your own read, not
+          beside it: the comparison is a second look at the words you already
+          have, and putting it level with them would invite you to write from
+          it. Gated on having coded the reading yourself, server-side. */}
+      <VocabularyOverlay sourceId={soleSourceId(scope)} ownCaptureCount={scoped.bytes.length} />
 
       {/* The record is of the whole weaving, not one reading's share of it, so
           it belongs where the whole weave does rather than repeating itself

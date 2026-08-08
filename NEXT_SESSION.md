@@ -1,5 +1,105 @@
 # Next Session Prompt
 
+## Addendum, 2026-08-07 latest (P3.14 — the refactor spec is executed end to end)
+
+**Read this first. P0–P3 are all landed; the work order has nothing left in it.**
+
+One commit on `dev` after `6cffa02`. `npm run check` (now including
+`check:overlay`), `next build` and the full Playwright suite (32 passed / 1
+skipped) are green; dev DB unchanged — **no migration**, the overlays are pure
+reads over rows that already existed.
+
+### P3.14 — student Overlays (ruling 28), on TJ's four decisions
+
+TJ ruled the open privacy/UX questions this session; they are enforced in
+`src/actions/overlays.ts` and nowhere else, and written into that file's header
+so the next reader doesn't have to reconstruct them:
+
+1. **The gate stays, per reading.** The archived spec's red line #8 — "the crowd
+   must not pre-code the text" — carries into v1. An overlay opens on a reading
+   only once you have captured a passage in it yourself; at the whole weave the
+   comparison covers exactly the readings you have coded.
+2. **Section and Cohort only.** No "me + colleague" band in v1, so nothing the
+   server returns is a name, an id, or resolves to one. Counts are of **people**
+   (one student filing four passages under a label counts once).
+3. **Shared objects only** — spans, Concept Labels + Descriptions, Link Labels +
+   Descriptions. The passage query selects no `content`. Notes, questions,
+   pull-quote flags, passage tiers, cloth and projection text never travel.
+4. **Faculty are not peers** in either band: an exemplar cloth read as "your
+   cohort" would be the instructor pre-coding the text.
+
+What shipped: `getPassagesOverlay` / `getVocabularyOverlay` (a fifth
+`"use server"` module — shapes and arithmetic in `src/lib/overlay.ts`, asserted
+without a database by `scripts/check-overlay.ts`); an **Overlay · Section ·
+Cohort** control in the PDF toolbar that shades peer spans in five slate steps
+under a status line that states the denominator; and **What others named** below
+the read on 03 · Vocabulary. Both are off until asked for, and re-ask when your
+own capture count changes so the capture that opens the gate opens the overlay.
+
+Two details worth not re-deriving:
+
+- **Depth comes from a sweep line, not from row counts.** Overlapping captures
+  become disjoint runs carrying their overlap depth (`heatSpans`), so eleven
+  people on one sentence is one span at depth 11, not eleven spans.
+- **Your own yellow nests inside the wash and paints over it.** Since "did
+  anyone else mark what I marked?" is the most interesting thing the view
+  answers, the overlay also draws a slate rule *above* the words — yellow
+  underlines, slate overlines, neither hides the other.
+
+`npm run seed:demo` now seeds **Test User C and D** into a new **Section 1**
+alongside A (B stays unplaced and empty — it is still the fresh-account
+fixture). They each capture the same passage A did on each reading plus one of
+their own, and share two labels, so the overlay has a real depth-2 run and a
+word held by two people. Without them every assertion in `tests/overlay.spec.ts`
+would pass against an empty comparison.
+
+### Found while verifying: a pre-existing navigation bug, not fixed
+
+**Enter a reading by clicking its shelf card, then call any Server Function, and
+about half the time the function POSTs to `/` instead of `/reading/<id>` — the
+server answers with the library's tree and the App Router replaces the workbench
+with the library.** The student is in a reading one moment and on the shelf the
+next, mid-work. Measured against a **production build**, so it is not a dev
+artifact:
+
+| entry | action | bounced |
+|---|---|---|
+| shelf click | reading search (`searchReading`) | 2/4 |
+| shelf click | passages overlay (`getPassagesOverlay`) | 2/4 |
+| **direct load** | passages overlay | **0/4** |
+
+So it is the client-side entry, not the action — the overlay only made it easy
+to hit. Same family as audit finding U-3 (navigation racing in-flight action
+POSTs); the likely culprit is the shelf's own `getUserLoomData` POST still in
+flight when the `<Link>` navigation commits, leaving the router's canonical URL
+behind on `/`. The tell in the trace is `history.replaceState -> /` from Next's
+own router mount effect.
+
+- Reproduce: `node scripts/repro-action-bounce.mjs 4 overlay` (and the control,
+  `DIRECT=1 … `). It is a **reproduction, not a check** — it exits 0 either way
+  and is expected to report bounces until this is fixed.
+- `tests/overlay.spec.ts` enters by href for this reason and asserts it is still
+  on the reading at the end of every test, so it can never pass through a
+  bounce. **`tests/reading-search.spec.ts` still enters by click and is latently
+  flaky for the same reason** — worth fixing with the bug.
+- Left alone deliberately: the fix is in `LoomProvider`'s fetch lifecycle, which
+  is its own piece of work with its own risk, and nothing in P3.14 depends on it.
+
+### What remains
+
+- **The navigation bounce above** — now the highest-value open item: it is
+  user-visible, reproducible, and pre-existing.
+- **Faculty path still untested through a browser** (carried over): the action
+  gates are asserted and the shell type-checks and builds, but no spec signs in
+  as FACULTY — the backdoor mints Test User A only. Worth a manual pass.
+- **D4 and the Open/Reading merge** are still TJ's calls (see the 08-07 morning
+  addendum). Station 03 is labelled Vocabulary but still holds the read-the-cloth
+  prompts rather than the model's Concept/Link lists; the overlay was added there
+  because that is where the ruled tab lives, and it will sit correctly when the
+  tab's own content is reconciled.
+- The [SENSITIVE] `.env.production.local` still breaks `next build`; this session
+  moved it aside twice and restored it. Delete it or re-pull real values.
+
 ## Addendum, 2026-08-07 late (P3.13 and P3.12's auth side — P3.14 is all that remains)
 
 **Read this first; the morning addendum below is now history except where noted.**

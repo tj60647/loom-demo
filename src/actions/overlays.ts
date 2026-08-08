@@ -1,0 +1,359 @@
+"use server"
+
+/**
+ * Overlays — the read-only comparison of your marks with your section's and
+ * your cohort's (docs/loom-model-build.md §2 "Overlays"; refactor spec P3.14,
+ * ruling 28). The faculty side already exists at `/admin/aggregate`; this is
+ * the student side, and it is deliberately narrower.
+ *
+ * Four decisions (TJ, 2026-08-07) are wired here and nowhere else:
+ *
+ * 1. THE GATE, PER READING. The archived spec's red line #8 — "the crowd must
+ *    not pre-code the text" — carries into v1: an overlay opens on a reading
+ *    only once the viewer has captured a passage in that reading themselves.
+ *    At the whole weave the same rule runs reading by reading: the comparison
+ *    covers the readings you have coded and no others, so the cohort's
+ *    vocabulary for a text you have not opened is not on the screen.
+ * 2. SECTION AND COHORT ONLY. No per-person band ships in v1, so nothing here
+ *    returns a name, an id, or anything that resolves to one. Counts are of
+ *    PEOPLE, never of rows that carry an author.
+ * 3. SHARED OBJECTS ONLY. Highlight spans, Concept Labels and Descriptions,
+ *    Link Labels and Descriptions. Never Notes, Questions, Pull-quote flags,
+ *    Passage Tiers, Cloth Titles/Descriptions or Projection text — the margin
+ *    and the interpretation stay the student's own. The passage QUERY below
+ *    does not select `content`: an overlay says where people marked, not what
+ *    they kept.
+ * 4. FACULTY ARE NOT PEERS. Excluded from both bands: an exemplar cloth read
+ *    as "your cohort" would be the instructor pre-coding the text, which is
+ *    the thing the gate exists to prevent.
+ *
+ * Auth is a real session every time — no dev backdoor, unlike
+ * `src/actions/loom.ts`. These read other people's work, so impersonating a
+ * seed user to see it is not a convenience this file offers.
+ */
+
+import { and, asc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm"
+import { getServerSession } from "next-auth/next"
+
+import { db } from "@/db"
+import { bytes, byteConcepts, concepts, courseMemberships, edges, sourcePages } from "@/db/schema"
+import { authOptions } from "@/lib/auth"
+import { resolveCourseIdForUser } from "@/lib/courses"
+import {
+  emptyPassagesOverlay,
+  emptyVocabularyOverlay,
+  groupTerms,
+  heatSpans,
+  type Interval,
+  type OverlayBand,
+  type OverlayBlock,
+  type PageHeat,
+  type PassagesOverlay,
+  type VocabularyOverlay,
+} from "@/lib/overlay"
+
+/**
+ * The most heat spans one reading's overlay may carry. A span is emitted per
+ * change in depth, so this is only reachable on a heavily-marked long text;
+ * whatever it cuts is reported as `droppedSpans` rather than vanishing.
+ */
+const MAX_SPANS = 4000
+
+/**
+ * Above this many in-scope concepts the edge query stops naming them and
+ * filters in memory instead — a WHERE IN with thousands of ids is a worse
+ * shape than the extra rows it saves, and the whole weave reaches that size.
+ */
+const EDGE_PUSHDOWN_LIMIT = 800
+
+type Viewer = { userId: string; courseId: string; sectionId: string | null }
+type Blocked = { blocked: OverlayBlock }
+
+const isBlocked = (value: unknown): value is Blocked =>
+  typeof value === "object" && value !== null && "blocked" in value
+
+/** Who is comparing, and the course whose cohort they are part of. */
+async function overlayViewer(): Promise<Viewer | Blocked> {
+  const session = await getServerSession(authOptions)
+  const userId = session?.user?.id
+  if (!userId) return { blocked: "signed-out" }
+
+  const courseId = await resolveCourseIdForUser(userId)
+  if (!courseId) return { blocked: "not-enrolled" }
+
+  const rows = await db
+    .select({ sectionId: courseMemberships.sectionId })
+    .from(courseMemberships)
+    .where(
+      and(
+        eq(courseMemberships.courseId, courseId),
+        eq(courseMemberships.userId, userId),
+        isNull(courseMemberships.removedAt)
+      )
+    )
+    .limit(1)
+
+  // An admin walking the learner surfaces resolves a course without being on
+  // its roster (resolveCourseIdForUser keeps that fallback for them). There is
+  // no cohort they belong to, and inventing one would hand a section's work to
+  // someone the section never enrolled.
+  if (rows.length === 0) return { blocked: "not-enrolled" }
+
+  return { userId, courseId, sectionId: rows[0].sectionId }
+}
+
+/** The people this band compares you with — never you, never faculty. */
+async function peersOf(viewer: Viewer, band: OverlayBand): Promise<string[] | Blocked> {
+  if (band === "section" && !viewer.sectionId) return { blocked: "no-section" }
+
+  const rows = await db
+    .select({ userId: courseMemberships.userId })
+    .from(courseMemberships)
+    .where(
+      and(
+        eq(courseMemberships.courseId, viewer.courseId),
+        isNull(courseMemberships.removedAt),
+        ne(courseMemberships.userId, viewer.userId),
+        ne(courseMemberships.role, "FACULTY"),
+        ...(band === "section" ? [eq(courseMemberships.sectionId, viewer.sectionId!)] : [])
+      )
+    )
+
+  return rows.map((row) => row.userId)
+}
+
+/**
+ * The readings this viewer has coded — the gate, and at the whole weave the
+ * scope as well.
+ *
+ * Not filtered by course: the question is "did you read this text yourself",
+ * and a capture whose `courseId` has not yet been adopted is still the
+ * student's own work.
+ */
+async function codedReadings(viewer: Viewer, sourceId?: string | null): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ sourceId: bytes.sourceId })
+    .from(bytes)
+    .where(
+      and(
+        eq(bytes.userId, viewer.userId),
+        isNotNull(bytes.sourceId),
+        ...(sourceId ? [eq(bytes.sourceId, sourceId)] : [])
+      )
+    )
+
+  return rows.map((row) => row.sourceId).filter((id): id is string => !!id)
+}
+
+/**
+ * Where other people marked this reading — the Passages Overlay of the Reading
+ * tab (model §2, §3.2).
+ *
+ * Returns spans and counts, never text. A span shades only if the client's own
+ * rendered text layer hashes to the same string the offsets were measured
+ * against; the ones that cannot are still counted, as `unanchored`, because a
+ * capture the tool cannot place is still a capture that happened.
+ */
+export async function getPassagesOverlay(
+  sourceIdRaw: string,
+  band: OverlayBand = "section"
+): Promise<PassagesOverlay> {
+  const sourceId = (sourceIdRaw ?? "").trim()
+  if (!sourceId) return emptyPassagesOverlay(band, "not-coded")
+
+  const viewer = await overlayViewer()
+  if (isBlocked(viewer)) return emptyPassagesOverlay(band, viewer.blocked)
+
+  // The gate: your own marks on this reading, first.
+  const coded = await codedReadings(viewer, sourceId)
+  if (coded.length === 0) return emptyPassagesOverlay(band, "not-coded")
+
+  const peers = await peersOf(viewer, band)
+  if (isBlocked(peers)) return emptyPassagesOverlay(band, peers.blocked)
+  if (peers.length === 0) return emptyPassagesOverlay(band, "no-peers")
+
+  // No `content`, no `note`, no `question`, no `tier`, no `userId` beyond what
+  // the contributor count needs — see decision 3 at the top of this file.
+  const rows = await db
+    .select({
+      userId: bytes.userId,
+      pageNumber: bytes.pageNumber,
+      startOffset: bytes.startOffset,
+      endOffset: bytes.endOffset,
+      pageContentHash: bytes.pageContentHash,
+    })
+    .from(bytes)
+    .where(and(eq(bytes.sourceId, sourceId), inArray(bytes.userId, peers)))
+
+  const base = { ...emptyPassagesOverlay(band, null), peers: peers.length }
+  if (rows.length === 0) return base
+
+  const pageHashes = new Map(
+    (
+      await db
+        .select({ pageNumber: sourcePages.pageNumber, contentHash: sourcePages.contentHash })
+        .from(sourcePages)
+        .where(eq(sourcePages.sourceId, sourceId))
+    ).map((page) => [page.pageNumber, page.contentHash] as const)
+  )
+
+  const counts = new Map<number, number>()
+  const anchored = new Map<number, Interval[]>()
+  let unanchored = 0
+
+  rows.forEach((row) => {
+    const page = row.pageNumber
+    // A hand-typed passage carries no page, so it belongs to the reading
+    // without belonging anywhere on it. Counted, never placed.
+    if (page == null || page <= 0) {
+      unanchored += 1
+      return
+    }
+    counts.set(page, (counts.get(page) ?? 0) + 1)
+
+    const canonical = pageHashes.get(page)
+    if (
+      row.startOffset == null ||
+      row.endOffset == null ||
+      !canonical ||
+      row.pageContentHash !== canonical
+    ) {
+      unanchored += 1
+      return
+    }
+    const list = anchored.get(page) ?? []
+    list.push({ start: row.startOffset, end: row.endOffset })
+    anchored.set(page, list)
+  })
+
+  const pages: PageHeat[] = []
+  let budget = MAX_SPANS
+  let droppedSpans = 0
+
+  ;[...counts.keys()]
+    .sort((a, b) => a - b)
+    .forEach((pageNumber) => {
+      const all = heatSpans(anchored.get(pageNumber) ?? [])
+      const spans = all.slice(0, Math.max(0, budget))
+      budget -= spans.length
+      droppedSpans += all.length - spans.length
+      pages.push({
+        pageNumber,
+        count: counts.get(pageNumber)!,
+        contentHash: pageHashes.get(pageNumber) ?? "",
+        spans,
+      })
+    })
+
+  return {
+    ...base,
+    contributors: new Set(rows.map((row) => row.userId)).size,
+    passages: rows.length,
+    pages,
+    unanchored,
+    droppedSpans,
+  }
+}
+
+/**
+ * What other people named — the Concepts and Links Overlays of the Vocabulary
+ * tab (model §2, §3.4).
+ *
+ * `sourceId` scopes the comparison to one reading; null compares across every
+ * reading the viewer has coded, which at the whole weave is what the gate
+ * leaves standing.
+ */
+export async function getVocabularyOverlay(
+  sourceIdRaw: string | null,
+  band: OverlayBand = "section"
+): Promise<VocabularyOverlay> {
+  const viewer = await overlayViewer()
+  if (isBlocked(viewer)) return emptyVocabularyOverlay(band, viewer.blocked)
+
+  const sourceId = (sourceIdRaw ?? "").trim() || null
+  const scope = await codedReadings(viewer, sourceId)
+  if (scope.length === 0) return emptyVocabularyOverlay(band, "not-coded")
+
+  const peers = await peersOf(viewer, band)
+  if (isBlocked(peers)) return emptyVocabularyOverlay(band, peers.blocked)
+  if (peers.length === 0) return emptyVocabularyOverlay(band, "no-peers")
+
+  // A concept is evidenced in a scope when one of its passages came from a
+  // reading in it — the derivation src/lib/scope.ts does for the student's own
+  // graph, run here over other people's rows. A concept belongs to a person,
+  // never to a reading, so this joins through the passage rather than reading
+  // any column that claims otherwise.
+  const conceptRows = await db
+    .selectDistinct({
+      id: concepts.id,
+      userId: concepts.userId,
+      label: concepts.label,
+      def: concepts.def,
+      createdAt: concepts.createdAt,
+    })
+    .from(concepts)
+    .innerJoin(byteConcepts, eq(byteConcepts.conceptId, concepts.id))
+    .innerJoin(bytes, eq(bytes.id, byteConcepts.byteId))
+    .where(
+      and(
+        inArray(concepts.userId, peers),
+        eq(concepts.courseId, viewer.courseId),
+        inArray(bytes.sourceId, scope)
+      )
+    )
+    .orderBy(asc(concepts.createdAt), asc(concepts.id))
+
+  const base = {
+    ...emptyVocabularyOverlay(band, null),
+    peers: peers.length,
+    readings: scope.length,
+    contributors: new Set(conceptRows.map((row) => row.userId)).size,
+  }
+  if (conceptRows.length === 0) return base
+
+  const inScope = new Set(conceptRows.map((row) => row.id))
+  const conceptIds = [...inScope]
+
+  const edgeRows = await db
+    .select({
+      userId: edges.userId,
+      fromId: edges.fromId,
+      toId: edges.toId,
+      handle: edges.handle,
+      sentence: edges.sentence,
+    })
+    .from(edges)
+    .where(
+      and(
+        inArray(edges.userId, peers),
+        eq(edges.courseId, viewer.courseId),
+        ...(conceptIds.length <= EDGE_PUSHDOWN_LIMIT ? [inArray(edges.fromId, conceptIds)] : [])
+      )
+    )
+    .orderBy(asc(edges.createdAt), asc(edges.id))
+
+  // Both ends in scope, exactly as `scopedGraph` requires: half a thread would
+  // be a lie here for the same reason it is on the student's own cloth.
+  const scopedEdges = edgeRows.filter((edge) => inScope.has(edge.fromId) && inScope.has(edge.toId))
+  const labelled = scopedEdges.filter((edge) => (edge.handle ?? "").trim())
+
+  const grouped = groupTerms(
+    conceptRows.map((row) => ({ userId: row.userId, label: row.label, description: row.def }))
+  )
+  const links = groupTerms(
+    labelled.map((edge) => ({
+      userId: edge.userId,
+      label: edge.handle ?? "",
+      description: edge.sentence,
+    }))
+  )
+
+  return {
+    ...base,
+    concepts: grouped.terms,
+    moreConcepts: grouped.moreTerms,
+    links: links.terms,
+    moreLinks: links.moreTerms,
+    unlabeledLinks: scopedEdges.length - labelled.length,
+  }
+}

@@ -8,6 +8,12 @@
  *     reading and one of the whole weave — each with its own tiers, essence,
  *     paragraph and card-table arrangement.
  *   test-user-b@loom.local — enrolled and empty: the fresh-account experience.
+ *   test-user-c@loom.local / test-user-d@loom.local — two colleagues in A's
+ *     discussion section, so the Overlays (P3.14, ruling 28) have a section
+ *     and a cohort to compare against. Each captures the SAME passage A did on
+ *     each reading — the depth-2 run a heatmap exists to show — plus one of
+ *     their own, and they share two labels between them so the Vocabulary
+ *     overlay counts a word at two people rather than only ever at one.
  *
  * Passages are pulled verbatim from the `source_page` rows with their canonical
  * offsets and content hashes, so they highlight precisely in the PDF viewer.
@@ -31,7 +37,7 @@
  */
 import { db } from "../src/db"
 import {
-  users, courses, courseMemberships, sources, sourcePages,
+  users, courses, courseMemberships, sections, sources, sourcePages,
   concepts, bytes, byteConcepts, edges, cloths, maps, views, graphEvents,
 } from "../src/db/schema"
 import { eq, asc, ilike, isNotNull, and } from "drizzle-orm"
@@ -40,6 +46,13 @@ import { textLayerProjection } from "../src/lib/pdfText"
 const DEMO_DOMAIN = "@loom.local"
 const USER_A = { email: "test-user-a@loom.local", name: "Test User A" }
 const USER_B = { email: "test-user-b@loom.local", name: "Test User B" }
+const USER_C = { email: "test-user-c@loom.local", name: "Test User C" }
+const USER_D = { email: "test-user-d@loom.local", name: "Test User D" }
+
+/** The discussion section A and the two colleagues share (model §2: every
+ *  account belongs to a Section). B stays unplaced on purpose — "not placed in
+ *  a section yet" is a state the section overlay has to answer for. */
+const DEMO_SECTION = { slug: "section-1", name: "Section 1" }
 
 // The two readings the demo is built from — matched by title prefix, the same
 // loose match the Playwright helper uses, since library titles get edited.
@@ -115,14 +128,34 @@ async function main() {
 
   const userA = await findOrCreateUser(USER_A)
   const userB = await findOrCreateUser(USER_B)
+  const userC = await findOrCreateUser(USER_C)
+  const userD = await findOrCreateUser(USER_D)
 
-  for (const u of [userA, userB]) {
+  const [demoSection] = await db.insert(sections)
+    .values({ courseId: course.id, slug: DEMO_SECTION.slug, name: DEMO_SECTION.name })
+    .onConflictDoUpdate({
+      target: [sections.courseId, sections.slug],
+      set: { name: DEMO_SECTION.name },
+    })
+    .returning()
+
+  const placements = [
+    { user: userA, sectionId: demoSection.id },
+    { user: userB, sectionId: null },
+    { user: userC, sectionId: demoSection.id },
+    { user: userD, sectionId: demoSection.id },
+  ]
+
+  for (const { user: u, sectionId } of placements) {
     if (!u.email.endsWith(DEMO_DOMAIN)) throw new Error(`Refusing to touch non-demo account ${u.email}`)
+    // role is re-set, not just left alone: a demo account promoted to FACULTY
+    // by a prior run would drop out of every overlay's peer set, which reads
+    // as "nobody marked this" rather than as the drift it is.
     await db.insert(courseMemberships)
-      .values({ courseId: course.id, userId: u.id, role: "LEARNER" })
+      .values({ courseId: course.id, userId: u.id, sectionId, role: "LEARNER" })
       .onConflictDoUpdate({
         target: [courseMemberships.courseId, courseMemberships.userId],
-        set: { removedAt: null },
+        set: { removedAt: null, sectionId, role: "LEARNER" },
       })
     // Demolition: the whole graph, projections and history for this demo user.
     await db.delete(edges).where(eq(edges.userId, u.id))
@@ -133,7 +166,7 @@ async function main() {
     await db.delete(views).where(eq(views.userId, u.id))
     await db.delete(graphEvents).where(eq(graphEvents.userId, u.id))
   }
-  console.log(`[seed-demo] course "${course.name}" · wiped and re-enrolled A + B`)
+  console.log(`[seed-demo] course "${course.name}" · wiped and re-enrolled A–D (A, C, D in ${DEMO_SECTION.name})`)
 
   // ---- Test User A's graph -------------------------------------------------
   // Timestamps stagger over a pretend week so "the cloth, over time" replays
@@ -268,9 +301,100 @@ async function main() {
   // No graph_event rows are inserted: getGraphEvents synthesizes create events
   // from row timestamps, so the history panel replays the staggered story above.
 
+  // ---- Two colleagues, so the Overlays have something to compare ----------
+  //
+  // An overlay is empty on a course of one, which makes it impossible to tell
+  // a working comparison from a broken one. C and D are the smallest fixture
+  // that isn't: they share a section with A, they both capture the SAME
+  // passage A did on each reading (a depth-2 run — A is the viewer and never
+  // counts himself), each adds one of their own (depth 1), and two of their
+  // labels are shared between them so the Vocabulary overlay can show a word
+  // at two people.
+  //
+  // Deliberately NOT "object worlds": tests/journey-admin.spec.ts picks the
+  // first .crow carrying that label out of an unordered aggregate, and a
+  // second student holding it would make which row it lands on a coin toss.
+  const peer = async (
+    user: { id: string },
+    conceptSpecs: [label: string, def: string][],
+    byteSpecs: [conceptIndex: number, src: typeof srcA, srcLabel: string, pick: ReturnType<typeof pickPassage>][],
+    edgeSpecs: [from: number, to: number, sentence: string, handle: string][]
+  ) => {
+    const rows = await db.insert(concepts).values(
+      conceptSpecs.map(([label, def]) => ({
+        userId: user.id, courseId: course.id, label, def, note: "", createdAt: at(),
+      }))
+    ).returning()
+
+    const seeds = byteSpecs.map(([conceptIndex, src, srcLabel, p]) => ({
+      conceptId: rows[conceptIndex].id,
+      row: {
+        id: crypto.randomUUID(),
+        userId: user.id, courseId: course.id,
+        source: srcLabel, sourceId: src.id, location: `p. ${p.pageNumber}`,
+        content: p.content, pageNumber: p.pageNumber, startOffset: p.startOffset,
+        endOffset: p.endOffset, pageContentHash: p.pageContentHash, createdAt: at(),
+      },
+    }))
+    await db.insert(bytes).values(seeds.map((s) => s.row))
+    await db.insert(byteConcepts).values(
+      seeds.map((s) => ({ byteId: s.row.id, conceptId: s.conceptId, createdAt: s.row.createdAt }))
+    )
+
+    if (edgeSpecs.length) {
+      await db.insert(edges).values(edgeSpecs.map(([from, to, sentence, handle]) => ({
+        userId: user.id, courseId: course.id,
+        fromId: rows[from].id, toId: rows[to].id, sentence, handle, createdAt: at(),
+      })))
+    }
+    return rows
+  }
+
+  // The shared spans: exactly the passages A captured first in each reading.
+  const sharedA = pickPassage(pagesA, 2, 0)
+  const sharedB = pickPassage(pagesB, 2, 0)
+
+  await peer(
+    userC,
+    [
+      ["object world talk", "The shop-floor language each discipline argues in."],
+      ["shared understanding", "The thing the meeting is actually for."],
+      ["community of practice", "People who learn by doing the same work near each other."],
+    ],
+    [
+      [0, srcA, labelA, sharedA],
+      [1, srcA, labelA, pickPassage(pagesA, 2, 2)],
+      [2, srcB, labelB, sharedB],
+    ],
+    [[0, 1, "Arguing in one world is how the other world's terms get learned.", "makes possible"]]
+  )
+
+  await peer(
+    userD,
+    [
+      ["object world talk", "Everyone speaks their own trade and calls it plain English."],
+      ["the artifact as record", "The finished thing remembers the arguments that made it."],
+      ["community of practice", "Belonging is a by-product of working alongside."],
+      ["apprenticeship", "Learning by standing close to someone doing it."],
+    ],
+    [
+      [0, srcA, labelA, sharedA],
+      [1, srcA, labelA, pickPassage(pagesA, 2, 3)],
+      [2, srcB, labelB, sharedB],
+      [3, srcB, labelB, pickPassage(pagesB, 2, 2)],
+    ],
+    [
+      [0, 1, "What the trades could not say to each other ends up settled in the object.", "makes possible"],
+      // Described but not yet coined — the visible unlabeled-link state.
+      [2, 3, "You join by doing the work badly next to someone doing it well.", ""],
+    ]
+  )
+
   const tally = { concepts: conceptRows.length, bytes: 10, edges: 6, maps: 3 }
   console.log(`[seed-demo] ${USER_A.email}: ${tally.concepts} concepts · ${tally.bytes} bytes from 2 readings · ${tally.edges} threads · ${tally.maps} maps`)
   console.log(`[seed-demo] ${USER_B.email}: enrolled, empty`)
+  console.log(`[seed-demo] ${USER_C.email}: 3 concepts · 3 bytes · 1 thread — a colleague in ${DEMO_SECTION.name}`)
+  console.log(`[seed-demo] ${USER_D.email}: 4 concepts · 4 bytes · 2 threads (1 unlabeled) — a colleague in ${DEMO_SECTION.name}`)
   console.log(`[seed-demo] sign in locally via /api/auth/test-login?as=testa`)
 }
 

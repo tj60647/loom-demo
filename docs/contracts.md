@@ -16,7 +16,10 @@
 > the admin shell admitting course faculty to its read-side, and Faculty-Section
 > invitations enrolling as FACULTY. **P3.13 landed**: reading cards carry the
 > cloth badge + Create/Open Cloth; Cloth Title/Description edit on 02 · Linking.
-> Update the invariant, then this file, as each phase lands.
+> **P3.14 landed** (ruling 28): student Overlays — the Passages heatmap in the
+> Reading tab and the Concepts/Links comparison on 03 · Vocabulary, at Section
+> and Cohort only, gated per reading on having coded it yourself.
+> **P3 is complete.** Update the invariant, then this file, as each phase lands.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
@@ -24,7 +27,7 @@ Companion to the *why* — now [loom-model-build.md](loom-model-build.md) (autho
 [loom-refactor-spec.md](loom-refactor-spec.md) (work order); historically
 [archive/loom-spec-v1.md](archive/loom-spec-v1.md). This is the *what, exactly*.
 
-**As of:** `dev`, 2026-08-07 — P3.12 auth-side + P3.13 (the cloth on the card).
+**As of:** `dev`, 2026-08-07 — P3.12 auth-side, P3.13 (the cloth on the card), P3.14 (Overlays).
 Re-stamp when it reaches master. Line numbers cite that branch and will drift; names
 and shapes are the contract, line numbers are a courtesy.
 
@@ -101,7 +104,7 @@ directly, and the `source_page` it creates has never carried the foreign key
 
 ## 2. Server actions
 
-Four `"use server"` modules: `src/actions/{loom,sources,admin,courses}.ts`.
+Five `"use server"` modules: `src/actions/{loom,sources,admin,courses,overlays}.ts`.
 Three different guard styles exist (see §5 Invariants and the audit):
 `checkAdmin()` **redirects** to `/` on failure; the two `requireAdmin()`s **throw**.
 
@@ -223,6 +226,56 @@ course's `faculty`-slug Section enrols the member with `role = 'FACULTY'`
 | `removeFromRoster` | FormData `{courseId, userId}` | void — sets `removedAt`, deletes invite, revokes sessions **only** when no app access remains |
 | `getUserLoomDataAsAdmin` | `targetUserId, courseId?` | `{concepts, bytes, edges}` (no maps/read/views) |
 | `getAggregateLoomData` | `courseId?, sectionId?` | cohort `{concepts, bytes, edges, bytesUnavailable}` — bytes fail soft |
+
+### 2c-bis. Student Overlays — [src/actions/overlays.ts](../src/actions/overlays.ts)
+
+The student side of ruling 28 (P3.14); `/admin/aggregate` remains the faculty
+side and is unchanged. Shapes and the pure arithmetic live in
+[src/lib/overlay.ts](../src/lib/overlay.ts) — a `"use server"` module may only
+export async functions, so the client imports the types from there and the two
+functions from here.
+
+Four decisions (TJ, 2026-08-07) are enforced in this module and nowhere else:
+
+1. **The gate, per reading.** The archived spec's red line #8 ("the crowd must
+   not pre-code the text") carries into v1: an overlay opens on a reading only
+   once the viewer has captured a passage in it. With no `sourceId` (the whole
+   weave) the comparison covers exactly the readings they have coded.
+2. **Section and Cohort only.** `OverlayBand = "section" | "cohort"`. No
+   per-person band, so nothing returned is a name, an id, or resolves to one;
+   counts are of **people**, never of rows carrying an author.
+3. **Shared objects only.** Spans, Concept Labels + Descriptions, Link Labels +
+   Descriptions. The passage query selects no `content`: an overlay says where
+   people marked, not what they kept. Notes, questions, pull-quote flags,
+   passage tiers, cloth and projection text never leave their owner.
+4. **Faculty are not peers** — excluded from both bands (`role <> 'FACULTY'`),
+   since an exemplar cloth read as "your cohort" is the instructor pre-coding
+   the text.
+
+Auth: a real session every time, then an active membership in the resolved
+course. **No dev backdoor** (unlike `loom.ts`) — these read other people's work.
+An admin walking the learner surfaces without a membership gets `not-enrolled`.
+
+| Action | Params | Returns |
+| --- | --- | --- |
+| `getPassagesOverlay` | `sourceId, band = "section"` | `PassagesOverlay` — `{band, blocked, peers, contributors, passages, pages[], unanchored, droppedSpans}`. Each `pages[]` entry is `{pageNumber, count, contentHash, spans[]}`; a span is `{start, end, count}`, disjoint runs with overlap depth from a sweep line (`heatSpans`). Peer bytes count toward `passages`/`count` always, but only contribute a span when their `pageContentHash` equals the reading's canonical `source_page.contentHash`; the rest are `unanchored`. `MAX_SPANS` = 4000, overflow reported as `droppedSpans` |
+| `getVocabularyOverlay` | `sourceId \| null, band = "section"` | `VocabularyOverlay` — `{band, blocked, peers, contributors, readings, concepts[], moreConcepts, links[], moreLinks, unlabeledLinks}`. A term is `{label, count, descriptions[], moreDescriptions}`; `count` is **distinct people**. Concepts are scoped through their passages (`byte.sourceId ∈ scope`), exactly as `scopedGraph` does; links need both ends in scope. Caps: 40 terms, 3 descriptions of ≤240 chars each, all overflow reported |
+
+`blocked` is one of `signed-out · not-enrolled · not-coded · no-section ·
+no-peers`, or null. Every one is a sentence the UI prints
+(`overlayBlockMessage`): an empty comparison that does not say why reads as a
+bug, and "code this reading yourself first" is the point of the gate.
+
+Client: **PdfViewer** shades in the same `Mark` pass as byte highlights —
+overlay first so a student's own yellow nests inside and paints over it, then
+bytes, then search terms (one `unmark`; competing passes would strip each
+other). Marks are `aria-hidden`, carry `data-heat` 1–5, and shade in five steps
+with a slate rule above the words so the section's mark survives under your own
+yellow. The client re-checks the hash against the live text layer and refuses to
+shade a drifted page — there is no fuzzy fallback, because it never receives the
+other student's text. **ReadTab** mounts `VocabularyOverlay` below the read.
+Both are off until asked for and re-ask when the viewer's own capture count
+changes, so the capture that opens the gate opens the overlay without a reload.
 
 ### 2d. Courses & sections — [src/actions/courses.ts](../src/actions/courses.ts)
 
@@ -381,6 +434,12 @@ delete or replace anything.
     map-text (700 ms) saves before import/reset; `flushMapText` also fires on
     `visibilitychange`/`pagehide`.
 
+13. **An overlay never resolves to a person, and never opens early.** Both
+    overlay actions gate on the viewer's own capture in the reading, exclude
+    the viewer and faculty from the peer set, and return counts of people —
+    never a name, an id, or a row that carries one (ruling 28; TJ's four
+    decisions, §2c-bis).
+
 ### Known contract debts (tracked, deliberate)
 
 - `importGraph`/`importMapArrangement` trust client-side parsing for shape; the
@@ -389,5 +448,10 @@ delete or replace anything.
   (`saveRead` was removed with the mirror in 0021.)
 - The new `bytes` margin fields (note/question/isPullQuote/tier) are contract-level
   only — no capture UI writes them yet (arrives with the P2/P3 Reading tab work).
+- **A Server Function called from a reading entered by clicking its shelf card
+  POSTs to `/` about half the time**, and the router then replaces the workbench
+  with the library. Pre-existing and not overlay-specific — the reading's own
+  search reproduces it identically, a direct load never does.
+  `scripts/repro-action-bounce.mjs` measures it; see NEXT_SESSION.md.
 - Unlabeled Passages are representable and survive import/delete, but no UI creates
   or displays them yet — the graph-view unattached group is P1.9.

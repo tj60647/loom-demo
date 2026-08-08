@@ -7,6 +7,8 @@ import CaptureModal from './CaptureModal';
 import PageSlot from './PageSlot';
 import { useLoom } from '@/components/providers/LoomProvider';
 import { searchReading, type ReadingPageHit } from '@/actions/search';
+import { getPassagesOverlay } from '@/actions/overlays';
+import { overlayBlockMessage, type OverlayBand, type PassagesOverlay } from '@/lib/overlay';
 import { hitTermsOf } from '@/lib/searchText';
 import Snippet from '@/components/ui/Snippet';
 import { Byte, Concept } from '@/lib/types';
@@ -119,6 +121,17 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // Read by the highlight applier (and its MutationObserver callback), which
   // must see the current terms without re-registering.
   const searchTermsRef = useRef<string[]>([]);
+
+  // The Passages Overlay (ruling 28): where OTHER people in this band marked
+  // the same pages, washed under the text in steps. Off by default — the page
+  // is yours first, and the gate below means it cannot open at all until you
+  // have captured a passage here yourself.
+  const [overlayBand, setOverlayBand] = useState<OverlayBand | null>(null);
+  const [overlay, setOverlay] = useState<PassagesOverlay | null>(null);
+  const [overlayBusy, setOverlayBusy] = useState(false);
+  // Same reason as searchTermsRef: the applier runs from a MutationObserver
+  // and must see the current heat without being re-registered.
+  const overlayRef = useRef<PassagesOverlay | null>(null);
 
   const hideHighlightTooltip = useCallback(() => {
     setHighlightTooltip(null);
@@ -447,6 +460,48 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     bytesRef.current = state.bytes.filter(b => (sourceId && b.sourceId === sourceId) || b.source === sourceName);
   }, [state.bytes, sourceName, sourceId]);
 
+  /**
+   * How many passages the student has captured in THIS reading. The gate is
+   * enforced on the server, but this is what re-asks after the capture that
+   * opens it: turn the overlay on before you have marked anything, capture
+   * one, and the comparison should appear without a reload.
+   */
+  const ownCaptureCount = useMemo(
+    () => (sourceId ? state.bytes.filter((b) => b.sourceId === sourceId).length : 0),
+    [state.bytes, sourceId]
+  );
+
+  /**
+   * Turn the overlay on, off, or over to the other band. Same discipline as
+   * the search panel: state resets happen in the handler, never synchronously
+   * in an effect body — so a stale wash never outlives the ask that fetched
+   * it, and no cascading render is needed to clear one.
+   */
+  const chooseOverlayBand = useCallback((next: OverlayBand) => {
+    setOverlayBusy(overlayBand !== next);
+    setOverlayBand((current) => (current === next ? null : next));
+    setOverlay(null);
+  }, [overlayBand]);
+
+  // Re-runs on `ownCaptureCount` as well as the band: capturing the passage
+  // that opens the gate must bring the comparison in without a reload. That
+  // refresh is deliberately quiet — `busy` is set by the handler above, so
+  // fresh heat replaces old heat in place instead of flashing "reading…".
+  useEffect(() => {
+    if (!overlayBand || !sourceId) return;
+    let cancelled = false;
+    getPassagesOverlay(sourceId, overlayBand)
+      .then((data) => { if (!cancelled) setOverlay(data); })
+      .catch((error) => {
+        // A failed comparison is not a failed reading: drop the heat, leave
+        // the page and every own-highlight exactly as they were.
+        console.error("[Loom overlay] the comparison failed", error);
+        if (!cancelled) setOverlay(null);
+      })
+      .finally(() => { if (!cancelled) setOverlayBusy(false); });
+    return () => { cancelled = true; };
+  }, [overlayBand, sourceId, ownCaptureCount]);
+
   // Find in this reading: the effect only schedules the debounced fetch —
   // state resets happen in the handlers (close, clear), never synchronously
   // in an effect body.
@@ -504,12 +559,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // unmark and strip whichever finished first.
   useEffect(() => {
     searchTermsRef.current = searchTerms;
+    overlayRef.current = overlay;
     if (!containerRef.current) return;
     let debounceTimer: NodeJS.Timeout;
 
     const applyHighlights = () => {
       const bytes = bytesRef.current;
-      if (bytes.length === 0 && searchTermsRef.current.length === 0) return;
+      const heatPages = overlayRef.current?.pages ?? [];
+      if (bytes.length === 0 && searchTermsRef.current.length === 0 && heatPages.length === 0) return;
 
       const textLayers = containerRef.current!.querySelectorAll('.react-pdf__Page__textContent');
 
@@ -520,7 +577,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         const pageStr = layer.parentElement?.getAttribute('data-page-number');
         const parsedPage = pageStr ? parseInt(pageStr, 10) : 0;
         const pageBytes = bytes.filter(b => b.pageNumber === parsedPage || !b.pageNumber);
-        if (pageBytes.length === 0 && searchTermsRef.current.length === 0) return;
+        const pageHeat = heatPages.find(p => p.pageNumber === parsedPage);
+        if (pageBytes.length === 0 && searchTermsRef.current.length === 0 && !pageHeat) return;
 
         const instance = new Mark(layer as HTMLElement);
         instance.unmark({
@@ -530,6 +588,37 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             // can decide, per byte, whether the offsets we stored are still
             // trustworthy against what pdf.js actually rendered this time.
             const liveHash = hashText((layer as HTMLElement).textContent || "");
+
+            // Other people's marks go down FIRST, so your own highlight nests
+            // inside and paints over: the comparison is a wash under the page,
+            // never something that covers what you captured.
+            //
+            // The hash gate is absolute here, with no fuzzy fallback — the
+            // overlay carries offsets and never the other student's text, so
+            // there is nothing to fuzzy-match against. A drifted page shades
+            // nothing and says so in the status line rather than shading the
+            // wrong sentence, which would be worse than shading none.
+            if (pageHeat && pageHeat.spans.length > 0 && pageHeat.contentHash !== liveHash) {
+              console.warn(`[Loom PDF] Page ${parsedPage} overlay not shaded: the rendered text layer has drifted from the canonical page text (${pageHeat.contentHash} vs ${liveHash}). The passages are still counted in the status line.`);
+            }
+            if (pageHeat && pageHeat.spans.length > 0 && pageHeat.contentHash === liveHash) {
+              pageHeat.spans.forEach(span => {
+                instance.markRanges([{ start: span.start, length: span.end - span.start }], {
+                  className: "loom-overlay-heat",
+                  each: (node) => {
+                    const el = node as HTMLElement;
+                    // Five steps: past five the shade stops darkening, so a
+                    // popular sentence does not black out the words under it.
+                    el.setAttribute("data-heat", String(Math.min(span.count, 5)));
+                    // The count is reported in the status line, in words. A
+                    // per-span label would put "3 people" between a screen
+                    // reader and every sentence of the reading.
+                    el.setAttribute("aria-hidden", "true");
+                  },
+                });
+              });
+            }
+
             pageBytes.forEach(byte => {
               const hasOffsets = byte.startOffset != null && byte.endOffset != null;
               const offsetsTrusted = hasOffsets && (
@@ -624,7 +713,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       observer.disconnect();
       clearTimeout(debounceTimer);
     };
-  }, [state.bytes, state.concepts, pageNumber, bindHighlightNode, sourceName, searchTerms]); // Re-run when bytes, page, or search terms change
+  }, [state.bytes, state.concepts, pageNumber, bindHighlightNode, sourceName, searchTerms, overlay]); // Re-run when bytes, page, search terms or the overlay change
 
   const handleCaptureClick = () => {
     if (highlightRect) {
@@ -639,6 +728,19 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       setHighlightRect(null);
     }
   };
+
+  /**
+   * Peer passages on what is actually in front of you. Only the paged view has
+   * a "here" to report — the strip and the matrix show many pages at once, so
+   * the status line falls back to the whole-reading total there.
+   */
+  const overlayHereCount = useMemo(() => {
+    if (!overlay?.pages.length || viewMode !== "page") return 0;
+    const shown = isTwoPage ? [pageNumber, pageNumber + 1] : [pageNumber];
+    return overlay.pages
+      .filter((page) => shown.includes(page.pageNumber))
+      .reduce((total, page) => total + page.count, 0);
+  }, [overlay, viewMode, isTwoPage, pageNumber]);
 
   const advance = isTwoPage ? 2 : 1;
   const canGoPrev = pageNumber > 1;
@@ -765,6 +867,69 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           outline: 1px solid rgba(122, 138, 110, 0.75);
           color: inherit;
         }
+        /* The Passages Overlay: where other people marked, in steps. Slate —
+           neither the byte yellow nor the search sage, because three different
+           facts about a span must never read as each other. No cursor and no
+           handlers: it is a comparison, and clicking it should do exactly what
+           clicking the paper does. */
+        .loom-overlay-heat {
+          background-color: rgba(64, 84, 112, 0.12);
+          /* A rule ABOVE the words as well as a wash behind them. Your own
+             highlight nests inside this mark and paints its yellow over the
+             wash — and "did anyone else mark the words I marked?" is the most
+             interesting thing this view can answer, so the section's mark has
+             to survive underneath your own. Yellow underlines; slate
+             overlines; neither hides the other. */
+          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.40);
+          color: inherit;
+        }
+        .loom-overlay-heat[data-heat="2"] {
+          background-color: rgba(64, 84, 112, 0.20);
+          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.55);
+        }
+        .loom-overlay-heat[data-heat="3"] {
+          background-color: rgba(64, 84, 112, 0.28);
+          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.70);
+        }
+        .loom-overlay-heat[data-heat="4"] {
+          background-color: rgba(64, 84, 112, 0.36);
+          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.82);
+        }
+        .loom-overlay-heat[data-heat="5"] {
+          background-color: rgba(64, 84, 112, 0.44);
+          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.95);
+        }
+        .pdf-overlay-ctl {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .pdf-overlay-bar {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 6px 14px;
+          padding: 7px 20px;
+          border-bottom: 1px solid var(--rule);
+          background: rgba(64, 84, 112, 0.05);
+          font-size: 13px;
+          color: var(--ink-soft);
+          flex: 0 0 auto;
+        }
+        .pdf-overlay-bar b { color: var(--ink); font-weight: 500; }
+        .pdf-overlay-scale { display: flex; align-items: center; gap: 4px; }
+        /* The same five steps the page uses, rule included. */
+        .pdf-overlay-scale i {
+          display: inline-block;
+          width: 15px;
+          height: 12px;
+          background: rgba(64, 84, 112, 0.12);
+          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.40);
+        }
+        .pdf-overlay-scale i:nth-child(2) { background: rgba(64, 84, 112, 0.20); box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.55); }
+        .pdf-overlay-scale i:nth-child(3) { background: rgba(64, 84, 112, 0.28); box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.70); }
+        .pdf-overlay-scale i:nth-child(4) { background: rgba(64, 84, 112, 0.36); box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.82); }
+        .pdf-overlay-scale i:nth-child(5) { background: rgba(64, 84, 112, 0.44); box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.95); }
         .pdf-search-panel {
           position: absolute;
           top: 64px;
@@ -1144,6 +1309,28 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </label>
           )}
 
+          {/* Overlay (ruling 28) — a read-only comparison with your discussion
+              section or the whole cohort. No names and no third band: "me +
+              colleague" is not in v1, so nothing here resolves to a person.
+              Off until asked for: the page is yours first. */}
+          {sourceId && (
+            <div className="pdf-overlay-ctl" role="group" aria-label="Compare your marks with others">
+              {!isNarrow && <span className="label">Overlay</span>}
+              <button
+                className={`btn mini ${overlayBand === "section" ? "" : "ghost"}`}
+                onClick={() => chooseOverlayBand("section")}
+                aria-pressed={overlayBand === "section"}
+                data-tip="shade where your discussion section marked this reading"
+              >Section</button>
+              <button
+                className={`btn mini ${overlayBand === "cohort" ? "" : "ghost"}`}
+                onClick={() => chooseOverlayBand("cohort")}
+                aria-pressed={overlayBand === "cohort"}
+                data-tip="shade where everyone on the course marked this reading"
+              >Cohort</button>
+            </div>
+          )}
+
           {/* Only where there is canonical page text to search — a viewer
               without a sourceId has no pages on record to ask. */}
           {sourceId && (
@@ -1169,6 +1356,57 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           </button>
         </div>
       </div>
+
+      {/* What the shading means, and what it cannot show. Every refusal below
+          is a sentence rather than an empty page: a comparison showing nothing
+          without saying why reads as a broken feature, and the commonest
+          reason here — you have not coded this reading yet — is the point of
+          the gate rather than a fault. */}
+      {overlayBand && sourceId && (
+        <div className="pdf-overlay-bar" role="status">
+          {!overlay && overlayBusy && (
+            <span>reading {overlayBand === "section" ? "your section" : "your cohort"}…</span>
+          )}
+          {!overlay && !overlayBusy && <span>The comparison could not be loaded just now.</span>}
+          {overlay?.blocked && <span>{overlayBlockMessage(overlay.blocked, overlay.band)}</span>}
+          {overlay && !overlay.blocked && overlay.contributors === 0 && (
+            <span>
+              Nobody else in {overlay.band === "section" ? "your section" : "your cohort"} has
+              marked this reading yet.
+            </span>
+          )}
+          {overlay && !overlay.blocked && overlay.contributors > 0 && (
+            <>
+              <span>
+                <b>{overlay.contributors}</b> of {overlay.peers} in{" "}
+                {overlay.band === "section" ? "your section" : "your cohort"}{" "}
+                {overlay.contributors === 1 ? "has" : "have"} marked this reading —{" "}
+                <b>{overlay.passages}</b> passage{overlay.passages !== 1 ? "s" : ""}
+                {viewMode === "page" && (
+                  <>
+                    , <b>{overlayHereCount}</b> on this {isTwoPage ? "spread" : "page"}
+                  </>
+                )}.
+              </span>
+              <span className="pdf-overlay-scale">
+                <span className="cap">fewer</span>
+                <i aria-hidden="true" /><i aria-hidden="true" /><i aria-hidden="true" />
+                <i aria-hidden="true" /><i aria-hidden="true" />
+                <span className="cap">more marked the same words</span>
+              </span>
+              {overlay.unanchored > 0 && (
+                <span className="cap">
+                  {overlay.unanchored} not placed on the page
+                </span>
+              )}
+              {overlay.droppedSpans > 0 && (
+                <span className="cap">{overlay.droppedSpans} runs past the display limit</span>
+              )}
+              <span className="cap">counted, not judged · no names</span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Find in this reading. A panel over the stage's edge, not a bar above
           it: the text keeps its room, and the hits are doors — click one and
