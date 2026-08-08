@@ -6,7 +6,7 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, emailHasAppAccess, isAdminUser } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
-import { resolveCourseId, resolveSectionId } from "@/lib/courses"
+import { ensureFacultySection, resolveCourseId, resolveSectionId } from "@/lib/courses"
 
 import { redirect } from "next/navigation"
 
@@ -42,11 +42,59 @@ async function getMemberIds(courseId: string, sectionId?: string | null) {
   return rows.map((row) => row.userId)
 }
 
-export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: string | null) {
+/**
+ * The faculty view's read gate (rulings 17/18): a site ADMIN sees any course;
+ * a member whose membership.role is FACULTY sees THIS course's read-side
+ * (roster, per-student view, cohort aggregate). Capabilities are additive —
+ * faculty keep their own student workspace untouched. Write-side admin
+ * actions stay behind checkAdmin.
+ */
+async function checkCourseFaculty(courseId: string) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) redirect("/")
+  if (isAdminUser(session.user)) return
+  const membership = await db
+    .select({ role: courseMemberships.role })
+    .from(courseMemberships)
+    .where(and(
+      eq(courseMemberships.courseId, courseId),
+      eq(courseMemberships.userId, session.user.id),
+      isNull(courseMemberships.removedAt)
+    ))
+    .limit(1)
+  if (membership[0]?.role !== "FACULTY") redirect("/")
+}
+
+/**
+ * Promote or demote a member's per-course role (ruling 18). Promotion homes
+ * them in the Faculty Section; demotion returns them to unassigned so an
+ * instructor places them deliberately.
+ */
+export async function setMemberRole(formData: FormData) {
   await checkAdmin()
 
+  const courseId = String(formData.get("courseId") ?? "")
+  const userId = String(formData.get("userId") ?? "")
+  const role = String(formData.get("role") ?? "")
+  if (!courseId || !userId || (role !== "LEARNER" && role !== "FACULTY")) return
+
+  const sectionId = role === "FACULTY" ? await ensureFacultySection(courseId) : null
+  await db
+    .update(courseMemberships)
+    .set({ role, sectionId })
+    .where(and(
+      eq(courseMemberships.courseId, courseId),
+      eq(courseMemberships.userId, userId),
+      isNull(courseMemberships.removedAt)
+    ))
+
+  revalidatePath("/admin")
+}
+
+export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: string | null) {
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) return []
+  await checkCourseFaculty(courseId)
 
   const sectionId = await resolveSectionId(courseId, sectionIdRaw)
 
@@ -118,10 +166,9 @@ export async function getRoster(
   courseIdRaw?: string | null,
   sectionIdRaw?: string | null
 ): Promise<RosterRow[]> {
-  await checkAdmin()
-
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) return []
+  await checkCourseFaculty(courseId)
   const sectionId = await resolveSectionId(courseId, sectionIdRaw)
 
   const [enrolled, invited, courseSections] = await Promise.all([
@@ -392,10 +439,9 @@ export async function removeFromRoster(formData: FormData) {
 }
 
 export async function getUserLoomDataAsAdmin(targetUserId: string, courseIdRaw?: string | null) {
-  await checkAdmin()
-
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) return { concepts: [], bytes: [], edges: [] }
+  await checkCourseFaculty(courseId)
 
   const userConcepts = await db.select().from(concepts).where(and(eq(concepts.userId, targetUserId), eq(concepts.courseId, courseId)))
   const byteRows = await db.select().from(bytes).where(and(eq(bytes.userId, targetUserId), eq(bytes.courseId, courseId)))
@@ -425,12 +471,11 @@ export async function getAggregateLoomData(
   courseIdRaw?: string | null,
   sectionIdRaw?: string | null
 ) {
-  await checkAdmin()
-
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) {
     return { concepts: [], bytes: [], edges: [], members: [], bytesUnavailable: false }
   }
+  await checkCourseFaculty(courseId)
 
   const sectionId = await resolveSectionId(courseId, sectionIdRaw)
   const userIds = await getMemberIds(courseId, sectionId)

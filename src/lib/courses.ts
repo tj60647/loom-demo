@@ -89,6 +89,26 @@ export async function resolveCourseIdForUser(
   return null
 }
 
+/**
+ * Every course carries a Faculty Section (ruling 18) — the faculty's
+ * data-model home; pedagogically they rotate among the discussion sections.
+ * Idempotent: created with the course and ensured on promotion, so
+ * pre-ruling courses grow one the first time it is needed. Not a server
+ * action — callers gate access themselves.
+ */
+export async function ensureFacultySection(courseId: string): Promise<string> {
+  const existing = await db.select({ id: sections.id }).from(sections)
+    .where(and(eq(sections.courseId, courseId), eq(sections.slug, "faculty")))
+    .limit(1)
+  if (existing.length) return existing[0].id
+  const [row] = await db.insert(sections).values({
+    courseId,
+    slug: "faculty",
+    name: "Faculty Section",
+  }).returning({ id: sections.id })
+  return row.id
+}
+
 export async function listSections(courseId: string) {
   return db
     .select()

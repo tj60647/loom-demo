@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth/next"
 import { authOptions, isAdminUser } from "@/lib/auth"
-import { getCourse, resolveCourseIdForUser, slugify } from "@/lib/courses"
+import { ensureFacultySection, getCourse, resolveCourseIdForUser, slugify } from "@/lib/courses"
 
 // Server Functions are reachable by direct POST, not only through the UI, so
 // every mutation here re-checks admin rather than trusting the calling page.
@@ -90,12 +90,14 @@ export async function createCourse(formData: FormData) {
 
   const slug = await uniqueCourseSlug(slugify(readText(formData, "slug") || name))
 
-  await db.insert(courses).values({
+  const [course] = await db.insert(courses).values({
     slug,
     name,
     term: readText(formData, "term"),
     description: readText(formData, "description"),
-  })
+  }).returning({ id: courses.id })
+
+  await ensureFacultySection(course.id)
 
   revalidateAdmin()
 }

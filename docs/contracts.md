@@ -61,7 +61,7 @@ directly, and the `source_page` it creates has never carried the foreign key
 | --- | --- | --- |
 | `course` | id · slug UNIQUE · name · term `''` · description `''` · isArchived false · createdAt | |
 | `section` | id · courseId CASCADE · slug · name · lead `''` · createdAt | UNIQUE (courseId, slug) |
-| `course_membership` | courseId CASCADE · userId CASCADE · sectionId SET NULL · role default `'LEARNER'` · createdAt · **removedAt nullable** | PK (courseId, userId). `removedAt` = soft removal (0013); every membership read filters `IS NULL`. `role` here is **never read for authz** |
+| `course_membership` | courseId CASCADE · userId CASCADE · sectionId SET NULL · role default `'LEARNER'` · createdAt · **removedAt nullable** | PK (courseId, userId). `removedAt` = soft removal (0013); every membership read filters `IS NULL`. `role = 'FACULTY'` (set via `setMemberRole`, P3.12) grants the course's read-side admin actions; every course carries a `faculty` Section (ruling 18, ensured lazily) |
 | `course_allowed_email` | courseId CASCADE · email · sectionId SET NULL · createdAt | PK (courseId, email). An invitation. Grants app access to that email in **any** course context until deleted |
 
 ### 1c. Reading library
@@ -186,6 +186,14 @@ nothing runs.
 ### 2c. Roster & cohort — [src/actions/admin.ts](../src/actions/admin.ts)
 
 `checkAdmin()` **redirects** `/` on failure (silent-success shape to a scripted caller).
+The four READ actions (`getClassData`, `getRoster`, `getUserLoomDataAsAdmin`,
+`getAggregateLoomData`) instead gate through `checkCourseFaculty(courseId)`
+(P3.12, rulings 17/18): site ADMIN → any course; an active membership with
+`role = 'FACULTY'` → that course only. Capabilities are additive — faculty keep
+their own student workspace. Write actions stay admin-only, including
+`setMemberRole(courseId, userId, LEARNER|FACULTY)`, which on promotion homes
+the member in the ensured Faculty Section and on demotion returns them to
+unassigned.
 
 | Action | Params | Returns |
 | --- | --- | --- |
