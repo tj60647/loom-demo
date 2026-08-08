@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 
-import { getVocabularyOverlay } from "@/actions/overlays"
+import { getVocabularyOverlay } from "@/lib/reads"
 import {
   overlayBlockMessage,
   type OverlayBand,

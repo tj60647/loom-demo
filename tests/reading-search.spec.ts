@@ -50,6 +50,12 @@ test("the shelf search finds a reading and stands in for the shelf while live", 
   await expect(inReading).toBeVisible({ timeout: 15_000 })
   await expect(inReading).toHaveValue("object worlds")
   await expect(page.locator(".pdf-search-hit").first()).toBeVisible({ timeout: 15_000 })
+
+  // Regression guard for the shelf bounce (NEXT_SESSION 08-07): the search
+  // that just ran is a read made after a client-side entry, and it used to be
+  // answered with the library half the time. Still standing in the reading IS
+  // the assertion.
+  await expect(page).toHaveURL(/\/reading\//)
 })
 
 test("search inside a reading lists matching pages and marks the words on the text", async ({ page }) => {
@@ -84,4 +90,9 @@ test("search inside a reading lists matching pages and marks the words on the te
   await page.getByRole("button", { name: "Close search" }).click()
   await expect(page.locator(".pdf-search-hit")).toHaveCount(0)
   await expect(page.locator(".loom-search-hit")).toHaveCount(0, { timeout: 15_000 })
+
+  // Regression guard for the shelf bounce: this test enters by clicking the
+  // card and then searches — exactly the sequence that used to bounce to the
+  // library about half the time.
+  await expect(page).toHaveURL(/\/reading\//)
 })

@@ -25,14 +25,14 @@ async function loomLoaded(page: Page) {
 /**
  * Open a reading's workbench, found by title on the shelf but entered by URL.
  *
- * Deliberately NOT a click on the card. Entering a reading by client-side
- * navigation leaves the App Router's canonical URL on `/` about half the time,
- * and the next server function then POSTs to `/` and the router replaces the
- * workbench with the library — a pre-existing fault (the reading's own search
- * reproduces it identically; see scripts/repro-action-bounce.mjs and
- * NEXT_SESSION.md). Going in by href takes that coin toss out of a spec that
- * is about overlays; every test below still asserts it is standing on the
- * reading when it finishes, so a bounce can never be mistaken for a pass.
+ * Deliberately NOT a click on the card. This entry was chosen while the shelf
+ * bounce was live (client-side entry left the router's canonical URL on `/`
+ * about half the time, and the next server function POST bounced the student
+ * to the library). That fault is fixed — client reads now go through
+ * src/lib/reads.ts, off the action queue, and tests/reading-search.spec.ts
+ * guards the click-entry path — but href entry stays here: this spec is about
+ * overlays, and the end-of-test still-on-the-reading assertions below keep
+ * their meaning either way.
  */
 async function openReadingByHref(page: Page, title: string) {
   await page.goto("/")

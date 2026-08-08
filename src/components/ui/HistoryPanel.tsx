@@ -7,7 +7,7 @@
 
 import { useMemo, useState, type SyntheticEvent } from "react"
 import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
-import { getGraphEvents } from "@/actions/loom"
+import { getGraphEvents } from "@/lib/reads"
 import type { Byte, Concept, Edge, GraphEvent, LoomState } from "@/lib/types"
 
 // Events arrive through a server-action boundary; be tolerant of a Date that

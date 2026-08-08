@@ -20,6 +20,10 @@
 > Reading tab and the Concepts/Links comparison on 03 · Vocabulary, at Section
 > and Cohort only, gated per reading on having coded it yourself.
 > **P3 is complete.** Update the invariant, then this file, as each phase lands.
+> **Shelf bounce fixed** (2026-08-07 late): client components no longer invoke
+> Server Functions for reads — every client read GETs a thin `/api` route via
+> `src/lib/reads.ts` (§3), taking reads off the App Router action queue whose
+> navigation race (vercel/next.js#90467) bounced students to the library.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
@@ -27,7 +31,7 @@ Companion to the *why* — now [loom-model-build.md](loom-model-build.md) (autho
 [loom-refactor-spec.md](loom-refactor-spec.md) (work order); historically
 [archive/loom-spec-v1.md](archive/loom-spec-v1.md). This is the *what, exactly*.
 
-**As of:** `dev`, 2026-08-07 — P3.12 auth-side, P3.13 (the cloth on the card), P3.14 (Overlays).
+**As of:** `dev`, 2026-08-07 — P3.12 auth-side, P3.13 (the cloth on the card), P3.14 (Overlays), the shelf-bounce fix (client reads via `/api`).
 Re-stamp when it reaches master. Line numbers cite that branch and will drift; names
 and shapes are the contract, line numbers are a courtesy.
 
@@ -41,6 +45,13 @@ Conventions used below:
   table no longer exist; the whole-weave paragraph lives on the whole-weave `cloth` row.
 - Server actions are HTTP-POSTable endpoints. "Auth" below is what the action itself
   enforces; nothing else stands in front of it (there is **no middleware.ts**).
+- **Client components never invoke a read action directly.** Every read a client
+  component makes goes through [src/lib/reads.ts](../src/lib/reads.ts) — a GET
+  against a thin `/api` route (§3) that calls the same action function server-side,
+  so the auth column below holds for both transports. Reads dispatched as Server
+  Functions ride the App Router's action queue, and a queued read racing a `<Link>`
+  navigation corrupts the queue's canonical URL (the shelf bounce;
+  vercel/next.js#90467). Mutations stay direct action calls.
 
 ---
 
@@ -298,6 +309,28 @@ section belongs to the course).
 | `GET /api/readings/[sourceId]?download=1` | Streams the PDF (never buffered — 4.5 MB serverless cap), RFC 6266 filename, `Cache-Control: private`. Errors: 401 / 404 / 500 JSON | Session required **in production only**; then `authorizeSourceFile` |
 | `GET /api/readings/[sourceId]/cover` | PNG cover (cached at `covers/<id>.png`; re-rendered from the PDF only on a cache miss) or SVG fallback (`no-store`) | No check of its own — inherits `authorizeSourceFile` via `getSourceForCover` (bytes-free) |
 | `POST /api/readings/upload` | Vercel Blob client-upload token exchange. Token scoped: private, PDFs only, ≤ 20 MB, path under `readings/`, random suffix. `onUploadCompleted` deliberately omitted — the client calls `registerUploadedReading` / `registerOwnUploadedReading` itself | Any signed-in session (sign-in is allowlist-gated), checked twice; what the blob may be registered *as* is decided by the register actions |
+| `GET /api/repairs/[repairId]/crop` | Streams the damage-region crop PNG for the repair review screen; `Cache-Control: private` hard cache (a crop never changes once written). Errors: 401 / 404 | Session + ADMIN (`isAdminUser` or DB role); non-admins get 404, not 403 |
+
+**Read routes** (the transport for [src/lib/reads.ts](../src/lib/reads.ts); each is a
+thin GET that calls the named §2 action, so auth, shapes and caps are that action's
+row verbatim — `respondWithRead` in [src/lib/readRoute.ts](../src/lib/readRoute.ts)
+maps thrown `Unauthorized`/`Not found` to 401/404 and anything else to a logged,
+generic 500, except where marked *verbatim errors*):
+
+| Route | §2 action |
+| --- | --- |
+| `GET /api/loom` | `getUserLoomData()` — including its orphan adoption (invariant 5's "every loom action" includes this GET) |
+| `GET /api/loom/events` | `getGraphEvents()` |
+| `GET /api/sources` | `getSources()` |
+| `GET /api/course` | `getActiveCourse()` |
+| `GET /api/search/readings?q=` | `searchReadings(q)` |
+| `GET /api/search/loom?q=` | `searchLoom(q)` |
+| `GET /api/search/reading?sourceId=&q=` | `searchReading(sourceId, q)`; 400 without `sourceId` |
+| `GET /api/overlays/passages?sourceId=&band=` | `getPassagesOverlay(sourceId, band)`; 400 without `sourceId`; any band value but `cohort` reads as `section` |
+| `GET /api/overlays/vocabulary?sourceId=&band=` | `getVocabularyOverlay(sourceId \| null, band)` — no `sourceId` means the whole weave |
+| `GET /api/repairs/settings` | `getRepairSettings()` |
+| `GET /api/draft-metadata?sourceId=` | `draftMetadataForSource(sourceId)`; *verbatim errors* — the message is the instructor's interface |
+| `GET /api/draft-metadata/own?sourceId=` | `draftMetadataForOwnSource(sourceId)`; *verbatim errors* |
 
 ---
 
@@ -448,10 +481,14 @@ delete or replace anything.
   (`saveRead` was removed with the mirror in 0021.)
 - The new `bytes` margin fields (note/question/isPullQuote/tier) are contract-level
   only — no capture UI writes them yet (arrives with the P2/P3 Reading tab work).
-- **A Server Function called from a reading entered by clicking its shelf card
-  POSTs to `/` about half the time**, and the router then replaces the workbench
-  with the library. Pre-existing and not overlay-specific — the reading's own
-  search reproduces it identically, a direct load never does.
-  `scripts/repro-action-bounce.mjs` measures it; see NEXT_SESSION.md.
+- ~~A Server Function called from a reading entered by clicking its shelf card
+  POSTs to `/` about half the time~~ — **fixed 2026-08-07** by taking client
+  reads off the action queue (the §2/§3 client-reads rule);
+  `scripts/repro-action-bounce.mjs` now measures the fix (expects 0/N, exits 1
+  on a bounce). The queue's own race (vercel/next.js#90467) is still in Next
+  16.2.x: a MUTATION in flight at navigation time can in principle still
+  corrupt the queue's canonical URL. All mutations here are gesture-driven and
+  the debounced ones flush on `pagehide`, so no known user path hits it — but
+  it is Next's bug to fix, not ours to paper over further.
 - Unlabeled Passages are representable and survive import/delete, but no UI creates
   or displays them yet — the graph-view unattached group is P1.9.

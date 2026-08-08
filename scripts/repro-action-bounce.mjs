@@ -1,26 +1,25 @@
 /**
- * REPRODUCTION of an open bug, not a check — this script is expected to FAIL
- * (report bounces) until the fault below is fixed. It exits 0 either way.
+ * Measures the shelf bounce — FIXED 2026-08-07; every mode should now report
+ * 0/N bounced. Kept as the direct measurement of the fix (the specs assert the
+ * same thing indirectly), and it now exits 1 on any bounce so it can gate a
+ * hand-run check.
  *
- * The fault: enter a reading by clicking its card on the shelf (a client-side
- * `<Link>` navigation), then call any Server Function from the workbench. About
- * half the time the function POSTs to `/` instead of `/reading/<id>`, the
- * server answers with the library's tree, and the App Router replaces the
- * workbench with the library — `history.replaceState -> /` from the router's
- * own mount effect. The student is standing in a reading one moment and on the
- * shelf the next, mid-work.
+ * The fault, while it was live: enter a reading by clicking its card (a
+ * client-side `<Link>` navigation), then call any Server Function from the
+ * workbench — about half the time it POSTed to `/` instead of `/reading/<id>`,
+ * the server answered with the library's tree, and the App Router replaced the
+ * workbench with the library, mid-work. Instrumented traces pinned the queue
+ * mechanism: three load-time read actions queued on `/`; the click navigation
+ * discarded only the PENDING one; that one's late response advanced the queue
+ * and started the next read EARLY with the pre-navigation state, whose no-op
+ * "bail-out" result was then committed over the navigation's — leaving the
+ * queue's canonicalUrl on `/` while the rendered URL looked right (upstream:
+ * vercel/next.js#90467, unfixed in Next 16.2.x; measured 2/4 bounced in prod,
+ * 5/6 in dev).
  *
- * It is NOT specific to the Overlays. Measured 2026-08-07 against a production
- * build (`next build && next start`), Test User A, "Object Worlds":
- *
- *   shelf click → reading search   (searchReading)      2/4 bounced
- *   shelf click → passages overlay (getPassagesOverlay) 2/4 bounced
- *   DIRECT LOAD → passages overlay                      0/4 bounced
- *
- * So it is the client-side entry, not the action. Same family as audit finding
- * U-3 (navigation racing in-flight action POSTs); the likely culprit is the
- * shelf's own `getUserLoomData` POST still in flight when the Link navigation
- * commits, leaving the router's canonical URL behind on `/`.
+ * The fix: client components no longer invoke Server Functions for READS at
+ * all — src/lib/reads.ts GETs thin route handlers instead, which do not touch
+ * the router. With no read action ever queued, there is nothing to race.
  *
  * Usage — needs a server and a signed-in storage state:
  *   npm run dev -- -p 3100
@@ -46,7 +45,12 @@ for (let run = 1; run <= RUNS; run += 1) {
   await ctx.addInitScript(() => localStorage.setItem("loom_has_seen_walkthrough", "true"))
   const page = await ctx.newPage()
   const posts = []
-  page.on("response", (r) => { if (r.request().method() === "POST") posts.push(new URL(r.url()).pathname) })
+  page.on("response", (r) => {
+    const url = new URL(r.url())
+    // Action POSTs are the fault's transport; /api GETs are the fixed reads.
+    if (r.request().method() === "POST") posts.push(url.pathname)
+    else if (url.pathname.startsWith("/api/")) posts.push(`GET ${url.pathname}`)
+  })
 
   await page.goto(`http://localhost:${PORT}/`)
   const card = page.locator(".shelfcard", { hasText: READING }).first()
@@ -84,5 +88,6 @@ for (let run = 1; run <= RUNS; run += 1) {
   await ctx.close()
 }
 
-console.log(`\n[repro-action-bounce] ${bounced}/${RUNS} bounced${process.env.DIRECT ? " (direct load — expect 0)" : ""}`)
+console.log(`\n[repro-action-bounce] ${bounced}/${RUNS} bounced${process.env.DIRECT ? " (direct load)" : ""} — expect 0`)
 await browser.close()
+process.exit(bounced > 0 ? 1 : 0)

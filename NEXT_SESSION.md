@@ -1,6 +1,120 @@
 # Next Session Prompt
 
-## Addendum, 2026-08-07 latest (P3.14 — the refactor spec is executed end to end)
+## Addendum, 2026-08-07 latest (the shelf bounce, fixed at the mechanism)
+
+**Read this first. The navigation bounce — the highest-value open item the
+previous addendum left — is fixed, and the fix is measured, not reasoned.**
+
+One commit on `dev` after `5af0aa2`. `npm run check`, `next build` and the
+Playwright suite are green; **no migration** — this is a transport change, not
+a data one.
+
+### What it actually was
+
+Not a race between the shelf's own fetch and the `<Link>`, which is what the
+previous session guessed. Instrumenting Next's client router (patched, traced,
+restored) showed a **queue-corruption bug in Next itself**:
+
+1. Three read Server Functions queue on load at `/` — `getSources`,
+   `getActiveCourse` (both ReadingsProvider) and `getUserLoomData`
+   (LoomProvider). The one in flight at click time is `getActiveCourse`.
+2. The click dispatches a navigation. Next marks **only the currently pending**
+   action discarded — the ones queued *behind* it are untouched.
+3. The discarded action's late response still drives the queue: it advances
+   `pending` past the still-running navigation and starts the next queued read
+   **early, against the pre-navigation state** — so `getUserLoomData` POSTs to
+   `/`.
+4. That read returns no redirect, no revalidation and no flight data, so the
+   reducer takes its bail-out path and hands back **its input state**, which
+   `handleResult` commits — silently rolling the queue's `canonicalUrl` back to
+   `/` *after* the navigation had committed `/reading/<id>`.
+5. Nothing looks wrong yet: React applies the transition updates in dispatch
+   order, so the rendered URL stays right while the queue quietly holds `/`.
+   Seconds later the first workbench read POSTs to `/`, the server answers with
+   the library, and the student is thrown out of the reading.
+
+Upstream this is **vercel/next.js#90467** — a regression introduced in Next
+16.0.0, still unfixed in 16.2.x (the only candidate patch, PR #91044, is
+unmerged). The margins are milliseconds: in the one clean run of six, the
+discarded response landed 11 ms *after* the nav commit instead of before.
+
+### The fix: client components do not invoke Server Functions for reads
+
+Next's own docs (vendored, `01-getting-started/07-mutating-data.md` and
+`02-guides/backend-for-frontend.md`) already say not to: *"Server Functions are
+designed for server-side mutations… Server Actions are queued. Using them for
+data fetching introduces sequential execution."* Reads were only ever on the
+queue because that is the path of least resistance.
+
+- **[src/lib/reads.ts](src/lib/reads.ts)** — the client's read surface. Same
+  names, same signatures, same shapes as the actions; each one GETs a thin
+  route. Client components import reads from here, **never** from
+  `@/actions/*`. JSON drops `Date`, so the loom and the capture log are revived
+  on arrival.
+- **Twelve route handlers** under `src/app/api/` (loom, loom/events, sources,
+  course, three search, two overlays, repairs/settings, two draft-metadata),
+  each calling the *same* action function server-side —
+  [src/lib/readRoute.ts](src/lib/readRoute.ts) maps `Unauthorized`/`Not found`
+  to 401/404 and everything else to a logged, generic 500. **Auth is unchanged
+  and unduplicated**: it still lives in the action, so both transports enforce
+  the same gate (including overlays' deliberate no-dev-backdoor rule).
+- Route handlers "do not participate in layouts or client-side navigations"
+  (`15-route-handlers.md`), so a read can no longer move the router. Mutations
+  stay Server Functions — that is their sanctioned use.
+
+Verified all twelve are **ƒ (Dynamic)** in the build output. Worth checking if
+you add another: a statically prerendered `/api/course` would serve one
+student's course to everyone.
+
+### The one thing the transport change broke, and how it is handled
+
+Through the queue, reads were serialized *behind* writes. They are not any
+more, so a "reload the truth" response could set out before a student's gesture
+and land after it — erasing a row they can see, and leaving an in-flight
+`createConcept` with no temp row to swap its server id onto (the concept would
+vanish until reload). LoomProvider now keeps a **write epoch**: every
+optimistic write goes through `applyLocal` and bumps it, whole-truth
+replacements (`applyTruth`: merge, the imports, reset, worked example, the
+sign-out blank) bump it too, and `loadLoom` applies only if the epoch it set
+out under still holds. All raw `setState` calls now live inside those three
+appliers — grep it if you add one.
+
+### Measured
+
+`scripts/repro-action-bounce.mjs` is now a **check, not a reproduction**: it
+expects 0 and exits 1 on any bounce. Against a production build (`next build &&
+next start -p 3100`), Test User A, "Object Worlds":
+
+| entry | action | before | after |
+|---|---|---|---|
+| shelf click | reading search | 2/4 bounced | **0/6** |
+| shelf click | passages overlay | 2/4 bounced | **0/6** |
+| direct load | passages overlay | 0/4 | **0/4** |
+
+The per-run trace line now reads `GET /api/search/reading` where it used to
+name an action POST — the read is off the queue, which is the fix, not a
+mitigation of it. `tests/reading-search.spec.ts` (which enters by **clicking**
+the card) gained end-of-test still-on-the-reading assertions, so the suite
+would catch a regression; `tests/overlay.spec.ts` still enters by href, now for
+tidiness rather than avoidance.
+
+### What remains
+
+- **Next's queue bug is still there**, and this fix routes around it rather
+  than repairing it: a *mutation* in flight when a navigation commits can still
+  corrupt the queue's canonical URL. Every mutation here is gesture-driven and
+  the debounced ones flush on `pagehide`, so no known user path hits it —
+  watch #90467/#91044 and re-measure after a Next upgrade.
+- **Faculty path still untested through a browser** (carried over): the gates
+  are asserted and the shell builds, but no spec signs in as FACULTY — the
+  backdoor mints Test User A only. Worth a manual pass.
+- **D4 and the Open/Reading merge** are still TJ's calls (08-07 morning
+  addendum). Station 03 is labelled Vocabulary but still holds the
+  read-the-cloth prompts.
+- The [SENSITIVE] `.env.production.local` still breaks `next build`; this
+  session moved it aside and restored it. Delete it or re-pull real values.
+
+## Addendum, 2026-08-07 (P3.14 — the refactor spec is executed end to end)
 
 **Read this first. P0–P3 are all landed; the work order has nothing left in it.**
 

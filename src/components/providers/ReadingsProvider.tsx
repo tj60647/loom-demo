@@ -9,8 +9,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useSession } from "next-auth/react"
-import { getSources } from "@/actions/sources"
-import { getActiveCourse } from "@/actions/courses"
+import { getSources, getActiveCourse } from "@/lib/reads"
 
 export type ReadingMeta = {
   id: string

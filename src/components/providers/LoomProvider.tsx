@@ -6,8 +6,8 @@ import { useParams } from "next/navigation"
 import type { Byte, CardTableView, Cloth, Concept, Edge, LoomMap, LoomState, LoomViews, Tier } from "@/lib/types"
 import { asLoomState, scopeOf, scopedGraph, soleSourceId, WHOLE_WEAVE, type Scope, type ScopedGraph } from "@/lib/scope"
 import { emptyViews, parseImport, type ParsedMapImport } from "@/lib/graphExport"
+import { getUserLoomData } from "@/lib/reads"
 import {
-  getUserLoomData,
   createConcept, updateConcept, deleteConcept, mergeConcepts as mergeConceptsAction,
   createByte, deleteByte, refileByte as refileByteAction, unfileByte as unfileByteAction, attributeBytes as attributeBytesAction,
   createEdge, updateEdge, deleteEdge,
@@ -151,6 +151,45 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     [state.cloths, scope.key]
   )
 
+  /**
+   * Optimistic local writes, and the epoch that counts them.
+   *
+   * Reads travel by GET now (src/lib/reads.ts) and no longer queue behind
+   * writes the way Server Functions did, so "reload the truth" can set out
+   * before a student's gesture and come back after it. Applying it then would
+   * erase a row they can already see — and worse, an in-flight create whose
+   * temp row was erased has nothing left to swap its server id onto, so the
+   * concept vanishes until the next reload. Every local write bumps the epoch;
+   * a whole-truth read applies only if the epoch it set out under still holds.
+   *
+   * A write's OWN response (mergeConcepts, the imports, the worked example)
+   * still applies unconditionally: it is the truth including that write.
+   */
+  const writeEpoch = useRef(0)
+  const applyLocal: typeof setState = (updater) => {
+    writeEpoch.current += 1
+    setState(updater)
+  }
+
+  /**
+   * Replace the whole state with a truth that already accounts for a write —
+   * a batch action's return, a reset, a sign-out blank. Bumps the epoch for
+   * the same reason a local write does: an older read must not undo it.
+   */
+  const applyTruth = useCallback((data: LoomState) => {
+    writeEpoch.current += 1
+    setState(data)
+  }, [])
+
+  /** Reload the whole loom, unless a local write overtook the request. */
+  const loadLoom = useCallback(async () => {
+    const at = writeEpoch.current
+    const data = await getUserLoomData()
+    if (writeEpoch.current !== at) return false
+    setState(data)
+    return true
+  }, [])
+
   const flashTimer = useRef<number | undefined>(undefined)
   const flash = useCallback((msg: string) => {
     setFlashMsg(msg)
@@ -166,8 +205,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (userId) {
       const startTimer = window.setTimeout(() => setIsLoading(true), 0)
-      getUserLoomData().then(data => {
-        setState(data)
+      loadLoom().then(() => {
         setIsLoading(false)
       }).catch(err => {
         console.error("Failed to load loom data", err)
@@ -176,12 +214,16 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       return () => window.clearTimeout(startTimer)
     } else {
       const resetTimer = window.setTimeout(() => {
-        setState(blankState())
+        // Signing out invalidates any read still in flight for the old user.
+        applyTruth(blankState())
         setIsLoading(false)
       }, 0)
       return () => window.clearTimeout(resetTimer)
     }
-  }, [userId])
+    // loadLoom and applyTruth are stable (useCallback, no deps): listing them
+    // satisfies the linter without making this effect re-run on anything but
+    // the user changing.
+  }, [userId, loadLoom, applyTruth])
 
   // v14 flashed on every save; here the graph mutations were silent on success,
   // so the save dot only ever confirmed the read. Callers that have something
@@ -195,29 +237,29 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     console.error("Loom mutation failed", err)
     flash(err instanceof Error && err.message !== "Unauthorized" ? err.message : "could not save — reloaded")
     try {
-      setState(await getUserLoomData())
+      await loadLoom()
     } catch (reloadErr) {
       console.error("Failed to reload loom data", reloadErr)
     }
-  }, [flash])
+  }, [flash, loadLoom])
 
   const addConcept = async (label: string, def?: string, note?: string) => {
     const tempId = crypto.randomUUID()
     const tempConcept: Concept = { id: tempId, courseId: null, userId: session!.user!.id, label, def: def || "", note: note || "", createdAt: new Date() }
-    setState(s => ({ ...s, concepts: [...s.concepts, tempConcept] }))
+    applyLocal(s => ({ ...s, concepts: [...s.concepts, tempConcept] }))
     try {
       const saved = await createConcept({ label, def, note })
-      setState(s => ({ ...s, concepts: s.concepts.map(c => c.id === tempId ? saved : c) }))
+      applyLocal(s => ({ ...s, concepts: s.concepts.map(c => c.id === tempId ? saved : c) }))
       savedOk()
       return saved
     } catch (e) {
-      setState(s => ({ ...s, concepts: s.concepts.filter(c => c.id !== tempId) }))
+      applyLocal(s => ({ ...s, concepts: s.concepts.filter(c => c.id !== tempId) }))
       throw e
     }
   }
 
   const editConcept = async (id: string, data: Partial<{label: string, def: string, note: string}>) => {
-    setState(s => ({
+    applyLocal(s => ({
       ...s,
       concepts: s.concepts.map(c => c.id === id ? { ...c, ...data } : c)
     }))
@@ -230,7 +272,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }
 
   const removeConcept = async (id: string) => {
-    setState(s => ({
+    applyLocal(s => ({
       ...s,
       concepts: s.concepts.filter(c => c.id !== id),
       // The passages survive their label (P0.1): only the pointer goes.
@@ -268,7 +310,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     // bookkeeping optimistically.
     try {
       const data = await mergeConceptsAction(sourceId, targetId)
-      setState(data)
+      applyTruth(data)
       flash("merged — evidence and threads now point at one concept")
     } catch (e) {
       await resync(e)
@@ -301,20 +343,20 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       tier: "",
       createdAt: new Date()
     }
-    setState(s => ({ ...s, bytes: [...s.bytes, tempByte] }))
+    applyLocal(s => ({ ...s, bytes: [...s.bytes, tempByte] }))
     try {
       const saved = await createByte({ conceptIds, source, sourceId: stampedSourceId, location, content, pageNumber, startOffset, endOffset, pageContentHash })
-      setState(s => ({ ...s, bytes: s.bytes.map(b => b.id === tempId ? saved : b) }))
+      applyLocal(s => ({ ...s, bytes: s.bytes.map(b => b.id === tempId ? saved : b) }))
       savedOk()
       return saved
     } catch (e) {
-      setState(s => ({ ...s, bytes: s.bytes.filter(b => b.id !== tempId) }))
+      applyLocal(s => ({ ...s, bytes: s.bytes.filter(b => b.id !== tempId) }))
       throw e
     }
   }
 
   const removeByte = async (id: string) => {
-    setState(s => ({ ...s, bytes: s.bytes.filter(b => b.id !== id) }))
+    applyLocal(s => ({ ...s, bytes: s.bytes.filter(b => b.id !== id) }))
     try {
       await deleteByte(id)
       savedOk()
@@ -325,7 +367,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const attributeBytes = async (byteIds: string[], sourceId: string) => {
     const ids = new Set(byteIds)
-    setState(s => ({
+    applyLocal(s => ({
       ...s,
       bytes: s.bytes.map(b => (ids.has(b.id) && !b.sourceId ? { ...b, sourceId } : b)),
     }))
@@ -343,7 +385,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     try {
       // The byte gains a pointer (ruling 37) — same row, one more concept.
       const saved = await refileByteAction(byteId, conceptId)
-      setState(s => ({ ...s, bytes: s.bytes.map(b => b.id === saved.id ? saved : b) }))
+      applyLocal(s => ({ ...s, bytes: s.bytes.map(b => b.id === saved.id ? saved : b) }))
       savedOk()
       return saved
     } catch (e) {
@@ -353,7 +395,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }
 
   const unfileByte = async (byteId: string, conceptId: string) => {
-    setState(s => ({
+    applyLocal(s => ({
       ...s,
       bytes: s.bytes.map(b =>
         b.id === byteId ? { ...b, conceptIds: b.conceptIds.filter(id => id !== conceptId) } : b
@@ -372,7 +414,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const updateCloth = async (data: Partial<{ title: string; description: string }>, scopeKeyArg?: string) => {
     const key = scopeKeyArg ?? scope.key
     const now = new Date()
-    setState(s => {
+    applyLocal(s => {
       const existing = s.cloths.find(c => c.scopeKey === key)
       const cloths = existing
         ? s.cloths.map(c => (c.scopeKey === key ? { ...c, ...data, updatedAt: now } : c))
@@ -390,7 +432,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     })
     try {
       const saved = await saveClothAction({ scopeKey: key, ...data })
-      setState(s => ({
+      applyLocal(s => ({
         ...s,
         cloths: s.cloths.some(c => c.scopeKey === key)
           ? s.cloths.map(c => (c.scopeKey === key ? saved : c))
@@ -425,14 +467,14 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const addEdge = async (fromId: string, toId: string, sentence: string) => {
     const tempId = crypto.randomUUID()
     const tempEdge: Edge = { id: tempId, courseId: null, userId: session!.user!.id, fromId, toId, handle: "", sentence, createdAt: new Date() }
-    setState(s => ({ ...s, edges: [...s.edges, tempEdge] }))
+    applyLocal(s => ({ ...s, edges: [...s.edges, tempEdge] }))
     const creating = (async () => {
       try {
         const saved = await createEdge({ fromId, toId, sentence })
         edgeAlias.current.set(tempId, saved.id)
         // Identity from the server, fields from the local row — a handle
         // coined mid-flight must not be wiped by the just-born server copy.
-        setState(s => ({
+        applyLocal(s => ({
           ...s,
           edges: s.edges.map(e =>
             e.id === tempId
@@ -443,7 +485,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
         savedOk()
         return saved
       } catch (e) {
-        setState(s => ({ ...s, edges: s.edges.filter(e => e.id !== tempId) }))
+        applyLocal(s => ({ ...s, edges: s.edges.filter(e => e.id !== tempId) }))
         throw e
       } finally {
         edgeCreates.current.delete(tempId)
@@ -456,7 +498,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const editEdge = async (id: string, data: Partial<{handle: string, sentence: string}>) => {
     // The state row may carry either side of the alias by now — match both.
     const knownIds = new Set([id, edgeAlias.current.get(id) ?? id])
-    setState(s => ({ ...s, edges: s.edges.map(e => knownIds.has(e.id) ? { ...e, ...data } : e) }))
+    applyLocal(s => ({ ...s, edges: s.edges.map(e => knownIds.has(e.id) ? { ...e, ...data } : e) }))
     try {
       await updateEdge(await resolveEdgeId(id), data)
       savedOk()
@@ -467,7 +509,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const removeEdge = async (id: string) => {
     const knownIds = new Set([id, edgeAlias.current.get(id) ?? id])
-    setState(s => ({
+    applyLocal(s => ({
       ...s,
       edges: s.edges.filter(e => !knownIds.has(e.id)),
       views: Object.fromEntries(
@@ -517,13 +559,13 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       scopeKey: scope.key, name: mapName, read: "", essence: "", tiers: {},
       createdAt: now, updatedAt: now,
     }
-    setState(s => ({ ...s, maps: [...s.maps, temp] }))
+    applyLocal(s => ({ ...s, maps: [...s.maps, temp] }))
     setSelectedByScope(s => ({ ...s, [scope.key]: tempId }))
     const creating = (async () => {
       try {
         const saved = await createMapAction({ scopeKey: scope.key, name: mapName })
         mapAlias.current.set(tempId, saved.id)
-        setState(s => {
+        applyLocal(s => {
           const views = { ...s.views }
           const tempKey = `map:${tempId}`
           if (views[tempKey]) {
@@ -544,7 +586,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
         savedOk()
         return saved.id
       } catch (e) {
-        setState(s => {
+        applyLocal(s => {
           const views = { ...s.views }
           delete views[`map:${tempId}`]
           return { ...s, maps: s.maps.filter(m => m.id !== tempId), views }
@@ -588,7 +630,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const setMapTiers = async (id: string, tiers: Record<string, Tier>) => {
     const stored: Record<string, Tier> = {}
     Object.entries(tiers).forEach(([cid, t]) => { if (t) stored[cid] = t })
-    setState(s => ({
+    applyLocal(s => ({
       ...s,
       maps: s.maps.map(m => m.id === id ? { ...m, tiers: stored, updatedAt: new Date() } : m),
     }))
@@ -620,7 +662,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }, [flash, resolveMapId])
 
   const queueMapText = (id: string, data: Partial<{ name: string; read: string; essence: string }>) => {
-    setState(s => ({
+    applyLocal(s => ({
       ...s,
       maps: s.maps.map(m => m.id === id ? { ...m, ...data, updatedAt: new Date() } : m),
     }))
@@ -640,7 +682,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }, [persistMapText])
 
   const removeMap = async (id: string) => {
-    setState(s => {
+    applyLocal(s => {
       const views = { ...s.views }
       delete views[`map:${id}`]
       return { ...s, maps: s.maps.filter(m => m.id !== id), views }
@@ -675,7 +717,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const viewTimers = useRef<Map<string, number>>(new Map())
   const pendingViews = useRef<Map<string, CardTableView>>(new Map())
   const setView = (key: string, next: CardTableView) => {
-    setState(s => ({ ...s, views: { ...s.views, [key]: next } }))
+    applyLocal(s => ({ ...s, views: { ...s.views, [key]: next } }))
     pendingViews.current.set(key, next)
     const existing = viewTimers.current.get(key)
     if (existing !== undefined) window.clearTimeout(existing)
@@ -714,19 +756,19 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     setSelectedByScope({})
     try {
       const data = await importGraph(parsed)
-      setState(data)
+      applyTruth(data)
       flash("imported")
     } catch (e) {
       // The batch is atomic server-side, but the client must not keep showing
       // a graph the server may or may not hold — reload the truth.
-      try { setState(await getUserLoomData()) } catch { /* initial load error path already logs */ }
+      try { await loadLoom() } catch { /* initial load error path already logs */ }
       throw e
     }
   }
 
   const importMapFile = async (parsed: ParsedMapImport) => {
     const { data, mapId, scopeKey, skipped } = await importMapArrangement(parsed)
-    setState(data)
+    applyTruth(data)
     // Make the arrival visible: the new map is the selected one in its scope.
     setSelectedByScope((prev) => ({ ...prev, [scopeKey]: mapId }))
     flash(skipped > 0 ? `projection added — ${skipped} card${skipped !== 1 ? "s" : ""} not on this table` : "projection added")
@@ -737,7 +779,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     cancelPendingSaves()
     setSelectedByScope({})
     await resetGraph()
-    setState(blankState())
+    applyTruth(blankState())
     flash("cleared — the history of your weaving is kept")
   }
 
@@ -745,7 +787,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     cancelPendingSaves()
     setSelectedByScope({})
     const data = await loadWorkedExample()
-    setState(data)
+    applyTruth(data)
     flash("worked example loaded — explore it, then reset")
   }
 

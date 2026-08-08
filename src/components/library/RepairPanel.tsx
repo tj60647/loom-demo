@@ -5,12 +5,12 @@ import {
   acceptRepair,
   applyRepairs,
   detectRepairs,
-  getRepairSettings,
   rejectRepair,
   transcribeAllRepairs,
   transcribeRepair,
   type Refused,
 } from "@/actions/repairs"
+import { getRepairSettings } from "@/lib/reads"
 
 /**
  * Reviewing proposed repairs to a damaged reading.

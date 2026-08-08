@@ -11,7 +11,8 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { searchReadings, searchLoom, type ReadingSearchHit, type LoomSearchResult } from "@/actions/search"
+import { searchReadings, searchLoom } from "@/lib/reads"
+import type { ReadingSearchHit, LoomSearchResult } from "@/actions/search"
 import Snippet from "@/components/ui/Snippet"
 
 export default function ShelfSearch({
