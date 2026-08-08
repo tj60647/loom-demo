@@ -9,8 +9,13 @@
 > client-side, never forbidden; `mergeConcepts` repairs true duplicates), unified
 > search covers the student's own concepts/links/passages (migration 0022 GIN
 > indexes + `searchLoom`), and the map view shows Unlabeled Passages as a nameable
-> unattached group. Still ruled for replacement: the student-visible "Map N"
-> strings and station names (P2 naming sweep).
+> unattached group. **P2 landed**: every student-read string speaks the ruled
+> vocabulary (projection · passage · label · description · one-line · Knowledge
+> Graph · Capture Log); tongues removed. **P3.12 landed** (action gate, then the
+> auth side): `checkCourseFaculty` on the four read actions, `setMemberRole`,
+> the admin shell admitting course faculty to its read-side, and Faculty-Section
+> invitations enrolling as FACULTY. **P3.13 landed**: reading cards carry the
+> cloth badge + Create/Open Cloth; Cloth Title/Description edit on 02 · Linking.
 > Update the invariant, then this file, as each phase lands.
 
 The complete inventory of every surface a caller can rely on: database schema, server
@@ -19,7 +24,7 @@ Companion to the *why* — now [loom-model-build.md](loom-model-build.md) (autho
 [loom-refactor-spec.md](loom-refactor-spec.md) (work order); historically
 [archive/loom-spec-v1.md](archive/loom-spec-v1.md). This is the *what, exactly*.
 
-**As of:** `chore/alpha-foundation`, 2026-08-03 — the extraction and anchoring pass.
+**As of:** `dev`, 2026-08-07 — P3.12 auth-side + P3.13 (the cloth on the card).
 Re-stamp when it reaches master. Line numbers cite that branch and will drift; names
 and shapes are the contract, line numbers are a courtesy.
 
@@ -195,10 +200,22 @@ their own student workspace. Write actions stay admin-only, including
 the member in the ensured Faculty Section and on demotion returns them to
 unassigned.
 
+The auth side (P3.12, this pass): the `/admin` layout admits admins and course
+faculty (via `listFacultyCourseIds`), faculty seeing only Roster + Cohort Graph
+tabs and only their courses; pages resolve their course through
+`getStaffViewer(courseIdRaw)` → `{courseId, isAdmin}`, which scopes a faculty
+viewer to their own courses so `/admin` entered bare lands on THEIR course. The
+roster page renders its write controls (invite, place, role, remove) only for
+admins. Enrolment-time: an invitation whose pre-assigned section is the
+course's `faculty`-slug Section enrols the member with `role = 'FACULTY'`
+(fresh enrolment only — reinstatement never re-roles; asserted in
+`scripts/check-auth.ts --db`).
+
 | Action | Params | Returns |
 | --- | --- | --- |
-| `getClassData` | `courseId?, sectionId?` | per-member `{id,name,email,section,conceptsCount,edgesCount}` (active members only) |
-| `getRoster` | `courseId?, sectionId?` | `RosterRow[]` — enrolled + pending invites merged, pending first |
+| `getClassData` | `courseId?, sectionId?` | per-member `{id,name,email,section,role,conceptsCount,edgesCount}` (active members only) |
+| `getRoster` | `courseId?, sectionId?` | `RosterRow[]` — enrolled + pending invites merged, pending first; rows carry `role` (`LEARNER` while pending) |
+| `getStaffViewer` | `courseIdRaw?` | `{courseId, isAdmin}` — admin: any course, site-first fallback; faculty: their courses only; others redirected `/` |
 | `getAllowedEmails` | `courseId?` | invites `{email, sectionId}[]` |
 | `addAllowedEmail` | FormData `{courseId, email, sectionId}` | void — upsert invitation |
 | `inviteLearners` | `(prev, FormData{courseId, emails, sectionId})` | `InviteResult {added, already, invalid, unknownSections}` — one address per line, optional `email, Section name`; section matched by name or slug, case-insensitive; no size cap |

@@ -1,5 +1,50 @@
 # Next Session Prompt
 
+## Addendum, 2026-08-07 late (P3.13 and P3.12's auth side — P3.14 is all that remains)
+
+**Read this first; the morning addendum below is now history except where noted.**
+
+Two commits on `dev` after `78d3b19` (the auth workstream, which unblocked all
+of this). Typecheck, build and the Playwright suite are green; dev DB unchanged
+(no new migrations); `docs/contracts.md` re-stamped.
+
+- **P3.13 — the cloth reaches the card.** A reading card is now a `<div>`
+  whose reading link is `.shelfmain` (Playwright specs click that, not the
+  card); below it the cloth row: badge (count, titles on hover), **Create
+  Cloth** (explicit — creates the row via `saveCloth`, then walks in) and
+  **Open Cloth** labeled by title. One cloth per scope still (schema unchanged)
+  — the row renders a list so several-per-reading lands free. Cloth
+  Title/Description are edited in a fold on **02 · Linking** (`ClothFold` in
+  ThrowTab) — which also restores an editor for the whole-weave cloth's
+  description, orphaned since 0021 absorbed `read`. `updateCloth` in
+  LoomProvider now takes an optional explicit scopeKey and returns success.
+  Shelf's July strings converted ("N passages", `00 — LIBRARY` footer).
+  New spec: `tests/cloth.spec.ts` (idempotent — no cloth delete exists, so it
+  takes whichever of Create/Open the card offers).
+- **P3.12 auth side.** `/admin` now admits course FACULTY to the read-side:
+  layout gate via `listFacultyCourseIds`, nav shows them Roster + Cohort Graph
+  only, pages resolve their course through the new `getStaffViewer` (so
+  faculty entering `/admin` bare land on *their* course), and the roster
+  renders write controls admin-only. Roster rows carry `role`; a **Make
+  faculty / Return to learner** toggle posts `setMemberRole`. Enrolment-time:
+  an invitation pre-assigned to the course's `faculty`-slug Section enrols as
+  FACULTY — fresh enrolment only, asserted in `scripts/check-auth.ts --db`
+  (the invite hint on the roster explains this to instructors).
+
+### What remains
+
+- **P3.14 (student Overlays, ruling 28)** — untouched, deliberately: it needs
+  TJ's privacy/UX decisions (below). Server side can largely reuse
+  `getAggregateLoomData` behind a member-level gate.
+- **Faculty path untested through a browser.** The action gates are asserted;
+  the shell (nav filtering, getStaffViewer resolution) type-checks and builds
+  but no Playwright spec signs in as a FACULTY member — the suite's backdoor
+  mints Test User A only. Worth a manual pass: promote a second account on
+  `/admin`, sign in as them, confirm Roster + Cohort Graph and nothing else.
+- The [SENSITIVE] `.env.production.local` still breaks `next build`; this
+  session moved it aside for the build and restored it. Delete it or re-pull
+  real values — it costs a mv/mv every build until then.
+
 ## Addendum, 2026-08-07 (the refactor spec, executed: P0–P2 complete, P3 partial)
 
 **The spec is no longer behind the build — the build now speaks the model.**
