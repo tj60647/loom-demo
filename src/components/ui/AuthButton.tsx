@@ -1,8 +1,9 @@
 "use client"
 
-import { signIn, signOut, useSession } from "next-auth/react"
+import { signOut, useSession } from "next-auth/react"
 import { usePathname } from "next/navigation"
 import { useReadings } from "@/components/providers/ReadingsProvider"
+import GithubSignInButton from "@/components/ui/GithubSignInButton"
 
 export default function AuthButton() {
   const { data: session, status } = useSession()
@@ -60,7 +61,7 @@ export default function AuthButton() {
 
   return (
     <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-      <button className="btn mini" onClick={() => signIn("github")}>Sign in with GitHub</button>
+      <GithubSignInButton />
     </div>
   )
 }

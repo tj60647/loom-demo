@@ -20,7 +20,9 @@ import { tallyByReading } from "@/lib/scope"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 import ShelfSearch from "@/components/shelf/ShelfSearch"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
+import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import JourneyNav from "@/components/ui/JourneyNav"
+import { SIGN_IN_EXPLANATION } from "@/lib/signIn"
 
 export default function Shelf() {
   // See the note in Workbench: `status` is what distinguishes "nobody is
@@ -73,11 +75,27 @@ export default function Shelf() {
   }
 
   if (!session) {
+    // The actual front door for most students — the header's button is small
+    // and off to one side. One primary action, and the one sentence that
+    // prevents the commonest failure: signing in with a GitHub account whose
+    // email the roster has never heard of.
     return (
       <main>
-        <div className="empty" style={{ marginTop: "100px" }}>
+        <div
+          className="empty"
+          style={{ marginTop: "100px", maxWidth: "680px", marginLeft: "auto", marginRight: "auto" }}
+        >
           <h2>Welcome to Loom.</h2>
-          <span className="cap">Please sign in to continue</span>
+          <span className="cap" style={{ textTransform: "none" }}>{SIGN_IN_EXPLANATION}</span>
+          <div style={{ marginTop: "20px", display: "flex", justifyContent: "center" }}>
+            <GithubSignInButton className="btn" />
+          </div>
+          {/* The guest door lives on /auth/signin, folded away, and whether it
+              is open at all is a server question — so from here it is just a
+              quiet way through for the one person who needs it. */}
+          <Link href="/auth/signin" className="cap" style={{ display: "inline-block", marginTop: "16px", textTransform: "none" }}>
+            no github account?
+          </Link>
         </div>
         <FirstRunWalkthrough autoOpen={false} />
       </main>
@@ -275,7 +293,7 @@ function Untethered({ readings }: { readings: ReadingMeta[] }) {
     const byCitation = new Map<string, string[]>()
     state.bytes.forEach((b) => {
       if (b.sourceId) return
-      const key = (b.source ?? "").trim() || " no citation"
+      const key = (b.source ?? "").trim() || "\u0000no citation"
       byCitation.set(key, [...(byCitation.get(key) ?? []), b.id])
     })
     return [...byCitation.entries()].sort((a, b) => b[1].length - a[1].length)
@@ -307,7 +325,7 @@ function Untethered({ readings }: { readings: ReadingMeta[] }) {
       {groups.map(([key, ids]) => (
         <div key={key} className="untethered">
           <div className="untetheredsrc">
-            {key === " no citation" ? <i>no citation given</i> : key}
+            {key === "\u0000no citation" ? <i>no citation given</i> : key}
             <span className="n"> · {ids.length} passage{ids.length !== 1 ? "s" : ""}</span>
           </div>
           <div className="quietrow">

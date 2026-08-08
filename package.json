@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run check:remap && npm run check:scoring",
+    "check": "npm run lint && npm run typecheck && npm run check:remap && npm run check:scoring && npm run check:auth",
     "seed:sources": "tsx scripts/seed-sources.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "check:remap": "tsx scripts/check-offset-remap.ts",
@@ -19,6 +19,8 @@
     "diagnose:readings": "tsx scripts/diagnose-readings.ts",
     "reingest:readings": "tsx scripts/reingest-readings.ts",
     "check:scoring": "tsx scripts/check-scoring.ts",
+    "check:auth": "tsx scripts/check-auth.ts",
+    "check:auth:db": "tsx scripts/check-auth.ts --db",
     "check:crops": "tsx scripts/check-crops.ts"
   },
   "dependencies": {
