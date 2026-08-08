@@ -34,6 +34,12 @@
 > **Workflows tab** (2026-08-08): `/admin/workflows` draws the student, faculty
 > and admin flows from `src/lib/workflows.ts`. **Refactor a workflow, update that
 > file** — §2c-ii, enforced by `npm run check`.
+> **A cloth starts in Reading** (2026-08-08, TJ): the reading card's cloth row
+> shows the Title and when it was last edited and opens **01 · Reading**; the
+> Cloth Title/Description moved there too (`ClothFold`), staying on Linking only
+> at the whole weave. **Open question, recorded not resolved:** a cloth and its
+> reading now open the same place, so "open the cloth" and "just read" are the
+> same act — the two objects overlap and the model has not settled it.
 > **The tab list is settled** (2026-08-08, TJ): 00 Reading and 01 Open merged
 > into one **Reading** station (text + capture rail); **05 Weave is hidden**
 > pending a decision, its route intact and linked from Keep; **Keep stays** as a
@@ -323,8 +329,8 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | Station | Component | Holds |
 | --- | --- | --- |
 | 00 Library | — (`/`) | the course's readings; always a link, never a workbench tab |
-| **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` | **the merged station** — the text, in-reading search, Passages Overlay, capture; and the reading-scoped **Capture Log** in a rail beside it (`.readinglog`, closed by default, toggled from the viewer toolbar) |
-| 02 Linking | `ThrowTab` | links, Description-then-Label, Cloth Title/Description |
+| **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** in a rail beside it (`.readinglog`, closed by default, toggled from the viewer toolbar); and the **Cloth Title/Description** at the head of that rail |
+| 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Carries `ClothFold` **only at the whole weave**, which has no Reading station |
 | **03 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); **merge Concepts — its only home**; Concepts/Links Overlays |
 | 04 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, card table; the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); the Capture Log history at the whole weave |
 | ~~05 Weave~~ | `/weave` | **hidden from the journey** (TJ, 2026-08-08) pending a decision on what it becomes. The route still works and Keep links to it, so whole-weave projections are not stranded — unhide via `hidden` in `JourneyNav`'s `STATIONS` |

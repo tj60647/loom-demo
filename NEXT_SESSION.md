@@ -1,5 +1,54 @@
 # Next Session Prompt
 
+## Addendum, 2026-08-08 evening (the cloth comes to the reading — and an open question)
+
+**Read this first, especially the open question at the end.**
+
+Several small commits on `dev`. `npm run check`, `next build` and the suite
+(43 passed / 1 skipped) green throughout; **no migration**.
+
+### What TJ ruled, in order
+
+1. **The reading card speaks its cloth.** The name outright (not a count with
+   the title on hover) plus "edited 3 hours ago" from `cloth.updatedAt`, which
+   the schema already carried. `timeAgo` in `lib/utils`.
+2. **A cloth starts in Reading**, not Linking — "that is where we read and
+   gather notes". Both doors on the card open `/reading/[id]`.
+3. **The cloth's name belongs in Reading too.** `ClothFold` is now its own
+   component, rendered at the head of the capture rail. It stays on 02 ·
+   Linking **only at the whole weave**, which has no Reading station — remove
+   that and the whole weave's cloth becomes uneditable.
+4. **Keep loses the "open your whole weave" hint.** Nothing is stranded:
+   `JourneyNav`'s 02/03/04 stations already route to `/weave` whenever you are
+   not inside a reading. My earlier warning that hiding Weave would orphan the
+   scope was wrong — the bar had it covered all along.
+
+### The open question — TJ's words: "this reading vs cloth issue is concerning, right now they kind of meant the same thing"
+
+**A cloth and its reading now open the same place.** Once a cloth exists,
+"open the cloth" and "just read" are the same act, because a cloth is a name
+for the work in a scope rather than a separate destination. The card therefore
+has two controls that do one thing, which is what made the flow feel wrong in
+the first place — and moving the destination to Reading (correctly) did not
+dissolve it.
+
+The model still grants three doors (`loom-model-build.md` §Reading card: Create
+Cloth · Open an existing one · **or just read** — browsing is not capture), so
+collapsing them is a model change, not a UI tidy. **Recorded in the model doc
+as unresolved rather than designed away.** Worth settling before the freeze;
+options as they stood:
+
+- one door — the card opens the reading, the cloth name/edited is *information*
+  on it, and Create Cloth is the only button (keeps all three model doors);
+- the cloth button is the only door and the card body is inert (drops "just
+  read", so the model line must change);
+- the card adapts — the cloth if one exists, the text if not.
+
+### Also coming
+
+**Several modes of reading** are expected inside 01 · Reading (TJ). Nothing
+built; noted in the model doc's tab 2 so whoever designs the modes finds it.
+
 ## Addendum, 2026-08-08 last (the tab list is settled)
 
 **Read this first. The last structural gap between the model and the build is

@@ -9,6 +9,7 @@ import type { Byte } from "@/lib/types"
 import { readingsOf, soleSourceId } from "@/lib/scope"
 import { contentWords, sortedByLabel } from "@/lib/utils"
 import { tidy } from "@/lib/clothMath"
+import ClothFold from "@/components/tabs/ClothFold"
 
 type OpenTabProps = {
   onGotoByte?: (byte: Byte) => void
@@ -669,6 +670,10 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
   if (compact) {
     return (
       <div className="onecol">
+        {/* The cloth names this work, so it sits at the head of it (TJ,
+            2026-08-08). Folded: you are here to read and gather, and the
+            title can wait as long as you like. */}
+        <ClothFold />
         {logCard}
         <details className="card handfold">
           <summary>
@@ -692,13 +697,16 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
   // something the library does not hold. Here typing IS the only doorway, so
   // the form leads.
   return (
-    <div className="two">
-      <div className="card">
-        {captureHeading}
-        {captureInfo}
-        {captureForm}
+    <>
+      <ClothFold />
+      <div className="two">
+        <div className="card">
+          {captureHeading}
+          {captureInfo}
+          {captureForm}
+        </div>
+        {logCard}
       </div>
-      {logCard}
-    </div>
+    </>
   )
 }

@@ -1,7 +1,8 @@
 /**
- * The cloth loop, shelf → Linking → shelf (the model's reading-card ruling:
- * badge with titles, explicit Create Cloth, Open Cloth by name — rulings
- * 20–22, 33 — plus the Cloth Title/Description edited on 02 · Linking).
+ * The cloth loop, shelf → Reading → shelf (the model's reading-card ruling:
+ * explicit Create Cloth, the cloth opened by name — rulings 20–22, 33 — plus
+ * the Cloth Title/Description, which since 2026-08-08 are edited on 01 ·
+ * Reading, the work surface a cloth starts on).
  *
  * Unlike the journey file this spec cannot remove what it makes — the UI has
  * no single-cloth delete (Keep's reset clears everything, far too blunt) — so
@@ -10,6 +11,7 @@
  * title is only saved when it differs.
  */
 import { test, expect } from "@playwright/test"
+import { openCaptureLog } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 test.beforeEach(() => test.setTimeout(120_000))
@@ -20,7 +22,7 @@ async function loomLoaded(page: import("@playwright/test").Page) {
   await expect(page.getByText("Loading your loom...")).toHaveCount(0, { timeout: 20_000 })
 }
 
-test("a cloth is created explicitly on the card, titled in Linking, and opens by name", async ({ page }) => {
+test("a cloth is created explicitly on the card, named in Reading, and opens by name", async ({ page }) => {
   await page.goto("/")
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
   await expect(card).toBeVisible({ timeout: 15_000 })
@@ -41,11 +43,11 @@ test("a cloth is created explicitly on the card, titled in Linking, and opens by
     await open.first().click()
   }
   await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
-
-  // The title lives on 02 · Linking, and is named whenever the student likes —
-  // an untitled cloth is a fine state.
-  await page.locator("nav button", { hasText: "Linking" }).click()
   await loomLoaded(page)
+
+  // The cloth is named on the work surface for its scope — inside a reading
+  // that is 01 · Reading, at the head of the capture rail (TJ, 2026-08-08).
+  await openCaptureLog(page)
   const fold = page.locator("details.invitefold", { hasText: "This cloth" })
   await expect(fold).toBeVisible({ timeout: 15_000 })
   if (!(await fold.locator("input").first().isVisible())) {
