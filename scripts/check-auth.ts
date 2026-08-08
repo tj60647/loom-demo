@@ -286,7 +286,7 @@ async function checkRoster() {
   // database nor next-auth.
   const { db, databaseLabel } = await import("../src/db")
   const { emailHasAppAccess, enrolInvitedCourses, isAdminUser } = await import("../src/lib/auth")
-  const { courseAllowedEmails, courseMemberships, courses, users } = await import("../src/db/schema")
+  const { courseAllowedEmails, courseMemberships, courses, sections, users } = await import("../src/db/schema")
   const { and, eq } = await import("drizzle-orm")
 
   console.log(`\nthe roster itself — ${databaseLabel()}`)
@@ -295,6 +295,7 @@ async function checkRoster() {
   const learner = `${stamp}@loom.check`
   let courseId = ""
   let userId = ""
+  let facultyUserId = ""
 
   try {
     courseId = (
@@ -354,6 +355,34 @@ async function checkRoster() {
     check("re-inviting them reinstates the one membership they had", reinstated.length, 1)
     check("  by clearing the removal, not by making a second row", reinstated[0]?.removedAt, null)
 
+    // An invitation addressed to the Faculty Section enrols as FACULTY
+    // (ruling 18). Fresh enrolment only: the learner above, re-invited to any
+    // section, keeps the role they already have — asserted implicitly by the
+    // reinstatement checks never touching role.
+    const facultySectionId = (
+      await db
+        .insert(sections)
+        .values({ courseId, slug: "faculty", name: "Faculty Section" })
+        .returning({ id: sections.id })
+    )[0].id
+    const facultyEmail = `${stamp}-faculty@loom.check`
+    facultyUserId = (
+      await db
+        .insert(users)
+        .values({ name: "Auth check faculty", email: facultyEmail })
+        .returning({ id: users.id })
+    )[0].id
+    await db
+      .insert(courseAllowedEmails)
+      .values({ courseId, email: facultyEmail, sectionId: facultySectionId })
+    await enrolInvitedCourses(facultyUserId, facultyEmail)
+    const facultyRows = await db
+      .select()
+      .from(courseMemberships)
+      .where(and(eq(courseMemberships.courseId, courseId), eq(courseMemberships.userId, facultyUserId)))
+    check("a Faculty Section invitation enrols as faculty", facultyRows[0]?.role, "FACULTY")
+    check("  homed in that section", facultyRows[0]?.sectionId, facultySectionId)
+
     // The admin gets in on the fallback list alone, with no roster row anywhere.
     const admin = "tjm@tjmcleish.com"
     check("the admin is recognised without a roster row", isAdminUser({ email: admin }), true)
@@ -361,6 +390,7 @@ async function checkRoster() {
     check("  however github spells it", await emailHasAppAccess(" TJM@TJMcLeish.com "), true)
   } finally {
     if (userId) await db.delete(users).where(eq(users.id, userId))
+    if (facultyUserId) await db.delete(users).where(eq(users.id, facultyUserId))
     if (courseId) await db.delete(courses).where(eq(courses.id, courseId))
   }
 }

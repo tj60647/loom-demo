@@ -23,7 +23,7 @@ function withParams(basePath: string, courseId: string | null, sectionId: string
 // section from the URL itself. This mirrors resolveCourseId/resolveSectionId on
 // the server: an unknown course falls back to the first, an unknown section
 // falls back to "all sections".
-export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
+export default function AdminNav({ courses, isAdmin }: { courses: AdminNavCourse[]; isAdmin: boolean }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -56,11 +56,17 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
       {/* Only the section you are on is filled; the rest are quiet. Five equally
           loud black blocks gave no sense of where you were. */}
       <Link href={withParams("/", activeCourseId, null)} className="btn ghost mini">← My Loom</Link>
+      {/* Faculty hold the read-side (Roster, Cohort Graph — ruling 18); the
+          library and course managers are write surfaces and stay admin's. */}
       {([
         ["/admin", "Roster", activeSectionId] as const,
         ["/admin/aggregate", "Cohort Graph", activeSectionId] as const,
-        ["/admin/library", "Readings", null] as const,
-        ["/admin/courses", "Courses", null] as const,
+        ...(isAdmin
+          ? ([
+              ["/admin/library", "Readings", null] as const,
+              ["/admin/courses", "Courses", null] as const,
+            ])
+          : []),
       ]).map(([href, label, section]) => (
         <Link
           key={href}

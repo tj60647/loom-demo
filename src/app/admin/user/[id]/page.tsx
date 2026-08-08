@@ -1,6 +1,6 @@
-import { getUserLoomDataAsAdmin } from "@/actions/admin"
+import { getStaffViewer, getUserLoomDataAsAdmin } from "@/actions/admin"
 import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
-import { firstParam, resolveCourseId } from "@/lib/courses"
+import { firstParam } from "@/lib/courses"
 import type { LoomState } from "@/lib/types"
 
 // Route segment params and searchParams are promises (Next 16 async request APIs).
@@ -17,7 +17,8 @@ export default async function UserLoomPage({
 }) {
   const resolvedParams = await params
   const resolvedSearchParams = await searchParams
-  const courseId = await resolveCourseId(firstParam(resolvedSearchParams.course))
+  // Viewer-aware: faculty resolve within their own courses (ruling 18).
+  const { courseId } = await getStaffViewer(firstParam(resolvedSearchParams.course))
   const { concepts, bytes, edges } = await getUserLoomDataAsAdmin(resolvedParams.id, courseId)
 
   const state: LoomState = { concepts, bytes, edges, maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }

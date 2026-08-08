@@ -90,6 +90,28 @@ export async function resolveCourseIdForUser(
 }
 
 /**
+ * Course ids where this user's active membership carries the FACULTY role —
+ * the courses whose read-side admin view they may enter (ruling 18). Oldest
+ * course first, matching the site-wide fallback order.
+ */
+export async function listFacultyCourseIds(userId: string): Promise<string[]> {
+  const rows = await db
+    .select({ courseId: courseMemberships.courseId })
+    .from(courseMemberships)
+    .innerJoin(courses, eq(courses.id, courseMemberships.courseId))
+    .where(
+      and(
+        eq(courseMemberships.userId, userId),
+        eq(courseMemberships.role, "FACULTY"),
+        isNull(courseMemberships.removedAt),
+        eq(courses.isArchived, false)
+      )
+    )
+    .orderBy(asc(courses.createdAt))
+  return rows.map((row) => row.courseId)
+}
+
+/**
  * Every course carries a Faculty Section (ruling 18) — the faculty's
  * data-model home; pedagogically they rotate among the discussion sections.
  * Idempotent: created with the course and ensured on promotion, so

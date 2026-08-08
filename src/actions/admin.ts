@@ -6,7 +6,7 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, emailHasAppAccess, isAdminUser } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
-import { ensureFacultySection, resolveCourseId, resolveSectionId } from "@/lib/courses"
+import { ensureFacultySection, listFacultyCourseIds, resolveCourseId, resolveSectionId } from "@/lib/courses"
 
 import { redirect } from "next/navigation"
 
@@ -17,6 +17,33 @@ export async function checkAdmin() {
   }
 
   return session
+}
+
+/**
+ * Who is looking at the admin shell, and which course they may look at.
+ *
+ * An ADMIN resolves like before — any course, site-first fallback. A course
+ * FACULTY member resolves only within the courses their membership grants
+ * (their first when the query string names another), so /admin entered bare
+ * lands on THEIR course rather than redirecting home off someone else's.
+ * Everyone else is turned away. Pages use this; the read actions keep their
+ * own checkCourseFaculty gate, so a page bug never widens access.
+ */
+export async function getStaffViewer(
+  courseIdRaw?: string | null
+): Promise<{ courseId: string | null; isAdmin: boolean }> {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) redirect("/")
+  if (isAdminUser(session.user)) {
+    return { courseId: await resolveCourseId(courseIdRaw), isAdmin: true }
+  }
+  const facultyIds = await listFacultyCourseIds(session.user.id)
+  if (facultyIds.length === 0) redirect("/")
+  const requested = await resolveCourseId(courseIdRaw)
+  return {
+    courseId: requested && facultyIds.includes(requested) ? requested : facultyIds[0],
+    isAdmin: false,
+  }
 }
 
 /**
@@ -99,7 +126,7 @@ export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: s
   const sectionId = await resolveSectionId(courseId, sectionIdRaw)
 
   const memberships = await db
-    .select({ userId: courseMemberships.userId, sectionId: courseMemberships.sectionId })
+    .select({ userId: courseMemberships.userId, sectionId: courseMemberships.sectionId, role: courseMemberships.role })
     .from(courseMemberships)
     .where(
       and(
@@ -131,6 +158,7 @@ export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: s
       sectionName: membership?.sectionId
         ? sectionById.get(membership.sectionId)?.name ?? null
         : null,
+      role: membership?.role ?? "LEARNER",
       conceptsCount: allConcepts.filter((c) => c.userId === u.id).length,
       edgesCount: allEdges.filter((e) => e.userId === u.id).length,
     }
@@ -147,6 +175,8 @@ export type RosterRow = {
   status: "enrolled" | "pending"
   sectionId: string | null
   sectionName: string | null
+  /** The per-course role — "FACULTY" gets this course's read-side (ruling 18); "LEARNER" while pending. */
+  role: string
   conceptsCount: number
   edgesCount: number
   /** False for someone enrolled via the site-wide allowlist rather than this course's. */
@@ -190,6 +220,7 @@ export async function getRoster(
     status: "enrolled",
     sectionId: u.sectionId,
     sectionName: u.sectionName,
+    role: u.role,
     conceptsCount: u.conceptsCount,
     edgesCount: u.edgesCount,
     invited: invitedByEmail.has(u.email.toLowerCase()),
@@ -208,6 +239,7 @@ export async function getRoster(
       status: "pending",
       sectionId: row.sectionId,
       sectionName: row.sectionId ? sectionById.get(row.sectionId) ?? null : null,
+      role: "LEARNER",
       conceptsCount: 0,
       edgesCount: 0,
       invited: true,

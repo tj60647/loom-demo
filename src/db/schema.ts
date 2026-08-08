@@ -80,8 +80,10 @@ export const courseMemberships = pgTable(
     sectionId: text("sectionId").references(() => sections.id, {
       onDelete: "set null",
     }),
-    // Not yet read anywhere — authorization is users.role. Kept for the
-    // per-course instructor permissions that sections will eventually need.
+    // Per-course role (ruling 18): "FACULTY" grants this course's read-side
+    // admin view (checkCourseFaculty); set by setMemberRole or by enrolling
+    // from an invitation addressed to the Faculty Section. Site-wide
+    // authorization stays users.role.
     role: text("role").default("LEARNER").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     // Soft-remove: set when an instructor removes the person from the course.

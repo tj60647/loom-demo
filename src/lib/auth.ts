@@ -2,8 +2,8 @@ import { NextAuthOptions, Profile } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
 import { DrizzleAdapter } from "@auth/drizzle-adapter"
 import { db } from "@/db"
-import { allowedEmails, courseAllowedEmails, courseMemberships, users } from "@/db/schema"
-import { and, eq, isNull, sql } from "drizzle-orm"
+import { allowedEmails, courseAllowedEmails, courseMemberships, sections, users } from "@/db/schema"
+import { and, eq, inArray, isNull, sql } from "drizzle-orm"
 import type { Adapter } from "next-auth/adapters"
 import {
   decideSignIn,
@@ -267,7 +267,25 @@ export async function enrolInvitedCourses(userId: string, emailRaw?: string | nu
     .where(eq(courseAllowedEmails.email, email))
   if (courseInvites.length === 0) return
 
-  const role = isAdminUser({ email }) ? "INSTRUCTOR" : "LEARNER"
+  // An invitation addressed to a course's Faculty Section enrols as FACULTY
+  // (ruling 18): that section IS the faculty roster, so pre-assigning it is
+  // how an instructor invites faculty. Matched by the slug ensureFacultySection
+  // mints — not imported from lib/courses, which imports from this file.
+  const facultySectionIds = new Set(
+    (
+      await db
+        .select({ id: sections.id })
+        .from(sections)
+        .where(
+          and(
+            eq(sections.slug, "faculty"),
+            inArray(sections.courseId, courseInvites.map((invite) => invite.courseId))
+          )
+        )
+    ).map((row) => row.id)
+  )
+
+  const baseRole = isAdminUser({ email }) ? "INSTRUCTOR" : "LEARNER"
   await db
     .insert(courseMemberships)
     .values(
@@ -275,7 +293,10 @@ export async function enrolInvitedCourses(userId: string, emailRaw?: string | nu
         courseId: invite.courseId,
         userId,
         sectionId: invite.sectionId,
-        role,
+        role:
+          invite.sectionId && facultySectionIds.has(invite.sectionId)
+            ? "FACULTY"
+            : baseRole,
       }))
     )
     .onConflictDoUpdate({

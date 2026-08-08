@@ -1,6 +1,6 @@
-import { getAggregateLoomData } from "@/actions/admin"
+import { getAggregateLoomData, getStaffViewer } from "@/actions/admin"
 import CohortClothPanel from "@/components/admin/CohortClothPanel"
-import { firstParam, getCourse, listSections, resolveCourseId, resolveSectionId } from "@/lib/courses"
+import { firstParam, getCourse, listSections, resolveSectionId } from "@/lib/courses"
 import type { LoomState } from "@/lib/types"
 
 type AggregatePageSearchParams = {
@@ -10,7 +10,8 @@ type AggregatePageSearchParams = {
 
 export default async function AggregateLoomPage({ searchParams }: { searchParams: Promise<AggregatePageSearchParams> }) {
   const resolvedSearchParams = await searchParams
-  const courseId = await resolveCourseId(firstParam(resolvedSearchParams.course))
+  // Viewer-aware: faculty resolve within their own courses (ruling 18).
+  const { courseId } = await getStaffViewer(firstParam(resolvedSearchParams.course))
 
   if (!courseId) {
     return (
