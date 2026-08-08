@@ -5,9 +5,12 @@
 > `byte_concept` join (Unlabeled Passages legal; concept delete never deletes bytes),
 > passage note/question/isPullQuote/tier, `edge.sentence` optional, the `cloth` table
 > (absorbing `read`), and the mirror drop (`concept.tier` gone; tiers per-map only).
-> Still ruled for replacement: the label clash-check and invariant 7 "one label = one
-> concept" (ruling 36 — warn, don't forbid; lands with P1.7 merge/homonyms), and the
-> student-visible "Map N" strings and station names (P2 naming sweep).
+> **P1 landed**: the label clash-check is gone (ruling 36 — homonyms are warned
+> client-side, never forbidden; `mergeConcepts` repairs true duplicates), unified
+> search covers the student's own concepts/links/passages (migration 0022 GIN
+> indexes + `searchLoom`), and the map view shows Unlabeled Passages as a nameable
+> unattached group. Still ruled for replacement: the student-visible "Map N"
+> strings and station names (P2 naming sweep).
 > Update the invariant, then this file, as each phase lands.
 
 The complete inventory of every surface a caller can rely on: database schema, server
@@ -87,7 +90,7 @@ directly, and the `source_page` it creates has never carried the foreign key
 | Table | Columns | Keys / notes |
 | --- | --- | --- |
 | `view` | id · courseId SET NULL · userId CASCADE · key (`'cardTable'` \| `'map:<mapId>'`) · **data jsonb** `{positions:{conceptId:{x,y}}, bends:{edgeId:{dx,dy}}, order?:string[], pins?:string[]}` · updatedAt | UNIQUE NULLS NOT DISTINCT (userId, courseId, key). Only student gestures write here (red line #7). `x` is proportional 0..1 (>1.5 read as legacy pixels) |
-| `graph_event` | id · courseId SET NULL · userId CASCADE · kind · entityType `'concept'\|'byte'\|'edge'\|'graph'\|'map'\|'cloth'` · entityId nullable · payload jsonb · at | Append-only. Survives reset and import. Kinds: `concept.create/rename/update/delete`, `byte.capture/refile/unfile/attribute/delete`, `edge.throw/coin/update/delete`, `cloth.update`, `map.create/retier/rename/update/delete/import`, `graph.reset/import/example`. Historical kinds still in the record: `byte.create`, `concept.retier`, `read.update` |
+| `graph_event` | id · courseId SET NULL · userId CASCADE · kind · entityType `'concept'\|'byte'\|'edge'\|'graph'\|'map'\|'cloth'` · entityId nullable · payload jsonb · at | Append-only. Survives reset and import. Kinds: `concept.create/rename/update/merge/delete`, `byte.capture/refile/unfile/attribute/delete`, `edge.throw/coin/update/delete`, `cloth.update`, `map.create/retier/rename/update/delete/import`, `graph.reset/import/example`. Historical kinds still in the record: `byte.create`, `concept.retier`, `read.update` |
 
 ---
 
@@ -109,7 +112,8 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | --- | --- | --- | --- |
 | `getUserLoomData()` | — | `{concepts, bytes, edges, maps, cloths, views}` — rows ordered `createdAt, id` (capture order is meaning); each byte carries `conceptIds` folded from `byte_concept` in filing order | read-only; drops orphaned `map:<id>` view rows from the response |
 | `createConcept` | `{label, def?, note?}` | inserted `Concept` | `concept.create` |
-| `updateConcept` | `id, Partial<{label,def,note}>` | void | case-insensitive label-clash check within (user, course) → throws (ruled for replacement, P1.7); `concept.rename/update` |
+| `updateConcept` | `id, Partial<{label,def,note}>` | void | no clash check (ruling 36 — homonyms legal; the client warns at coin-time); `concept.rename/update` |
+| `mergeConcepts` | `sourceId, targetId` | fresh `getUserLoomData()` | one batch: pointers repoint (collisions dropped), edges repoint, target inherits missing def/note, source deleted; prunes views/tiers; `concept.merge` {fromId, fromLabel, intoLabel, pointersMoved} |
 | `deleteConcept` | `id` | void | refuses while an edge endpoint; **bytes survive** — join rows cascade, passages become Unlabeled; prunes views + map tiers; `concept.delete` |
 | `createByte` | `{conceptIds?, source, sourceId?, location, content, anchor fields?, note?, question?, isPullQuote?, tier?}` | inserted `Byte` (+`conceptIds`) | zero conceptIds = Unlabeled Passage; byte + pointers land in one `db.batch`; verifies concept ownership; reconciles offsets against `source_page` when hashes agree; `byte.capture` (fires for every capture, named or not — `byte.create` is a historical kind) |
 | `refileByte` | `byteId, conceptId` | the same `Byte` with the pointer added | inserts one `byte_concept` row (ruling 37 — never copies); throws if already filed; `byte.refile` |
@@ -177,6 +181,7 @@ nothing runs.
 | --- | --- | --- | --- |
 | `searchReadings` | `query` | ≤30 `ReadingSearchHit` — card + page matches, ranked (card ≫ best page > breadth), each with ≤2 page excerpts | session required, else `[]` |
 | `searchReading` | `sourceId, query` | `{hits: ≤50 page-ordered snippets, truncated}` | session required **and** `sourceId` on the caller's shelf, else empty |
+| `searchLoom` | `query` | `{concepts, links, passages}` — ≤12 per kind, ranked; GIN indexes from 0022 (label≫def≫note · handle≫sentence · content≫margin) | session required, else empty; only the caller's own rows (userId + active-or-null course) |
 
 ### 2c. Roster & cohort — [src/actions/admin.ts](../src/actions/admin.ts)
 
@@ -335,9 +340,10 @@ delete or replace anything.
    `byte.sourceId` + its `byte_concept` pointers per render and discarded.
    `attributeBytes` fills NULL only, by student act. A byte-less concept appears in
    every scope (red line #4 visibility).
-7. **One label = one concept** — code-level clash check in `updateConcept` (not in
-   `createConcept`, and no DB constraint). RULED FOR REPLACEMENT by ruling 36
-   (homonyms warned, never forbidden) — lands with P1.7 merge.
+7. **Identity by object, not label** (ruling 36, landed with P1). Homonyms are
+   legal everywhere; the client warns at coin-time (create, rename) and offers
+   merge; `mergeConcepts` is the repair for true duplicates. No clash check
+   remains anywhere.
 8. **A concept in use cannot be deleted** while it is an edge endpoint.
 9. **History survives everything** — `graph_event` outlives reset and import;
    event writes are best-effort (neon-http has no cross-call transactions), graph

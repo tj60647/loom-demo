@@ -119,6 +119,21 @@ function foldEvents(events: GraphEvent[], upTo: number) {
         if (c && typeof p.label === "string") c.label = p.label
         break
       }
+      case "concept.merge": {
+        const fromId = typeof p.fromId === "string" ? p.fromId : null
+        if (fromId && e.entityId && concepts.delete(fromId)) {
+          for (const b of bytes.values()) {
+            if (b.conceptIds.includes(fromId)) {
+              b.conceptIds = [...new Set(b.conceptIds.map((cid) => (cid === fromId ? e.entityId! : cid)))]
+            }
+          }
+          for (const ed of edges.values()) {
+            if (ed.fromId === fromId) ed.fromId = e.entityId
+            if (ed.toId === fromId) ed.toId = e.entityId
+          }
+        }
+        break
+      }
       // concept.retier is a legacy kind (tiers moved onto maps, 0021) — it no
       // longer changes what the cloth draws.
       case "concept.delete": {
@@ -242,6 +257,10 @@ function describeEvent(e: GraphEvent): string {
     case "concept.rename": return "renamed a concept"
     case "concept.retier": return "re-tiered a concept"
     case "concept.update": return "revised a working definition"
+    case "concept.merge":
+      return typeof p.fromLabel === "string" && typeof p.intoLabel === "string"
+        ? `merged "${p.fromLabel}" into "${p.intoLabel}"`
+        : "merged two concepts"
     case "concept.delete": return "removed a concept"
     case "byte.create": return "captured a passage"
     case "byte.capture":

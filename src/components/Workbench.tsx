@@ -19,6 +19,7 @@ import ReadTab from "@/components/tabs/ReadTab"
 import MapTab from "@/components/tabs/MapTab"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import JourneyNav, { type Station } from "@/components/ui/JourneyNav"
+import ShelfSearch from "@/components/shelf/ShelfSearch"
 import type { Byte } from "@/lib/types"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
@@ -96,6 +97,7 @@ export default function Workbench({
   const [pdfPage, setPdfPage] = useState(1)
   const [pdfFocusByteId, setPdfFocusByteId] = useState<string | null>(null)
   const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   const goTo = (tab: Tab) => {
     setActiveTab(tab)
@@ -180,7 +182,24 @@ export default function Workbench({
             <span className="scopemeta">every reading at once</span>
           </>
         )}
+        {/* The one search field, present on every tab (ruling 34): readings,
+            concepts, links and your own passages, grouped by kind. */}
+        <button
+          className={`btn mini ${searchOpen ? "" : "ghost"}`}
+          onClick={() => setSearchOpen((v) => !v)}
+          aria-pressed={searchOpen}
+          aria-label="Search everything"
+          style={{ marginLeft: "auto" }}
+        >
+          ⌕ Search
+        </button>
       </div>
+
+      {searchOpen && (
+        <div style={{ padding: "0 24px" }}>
+          <ShelfSearch onActiveChange={() => {}} onClose={() => setSearchOpen(false)} />
+        </div>
+      )}
 
       <JourneyNav
         // Inside a reading the underline follows the tab; at the whole weave

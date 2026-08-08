@@ -66,11 +66,37 @@ export default function MapTab() {
     activeMap, scopeMaps, selectMap, addMap, renameMap, removeMap,
     setMapTiers, setMapRead, setMapEssence, flushMapText,
     setView, ensureActiveMap,
+    addConcept, refileByte,
     flash, studentName,
   } = useLoom()
   const { titleOf } = useReadings()
   const { confirm } = useDialog()
   const wholeWeave = isWholeWeave(scope)
+
+  // The scope's Unlabeled Passages — the unattached group a projection must
+  // show (ruling 38): nameable here, or left as visible remainder.
+  const unfiled = scopedState.bytes.filter((b) => b.conceptIds.length === 0)
+  const [unfiledInputs, setUnfiledInputs] = useState<Record<string, string>>({})
+  const [unfiledBusy, setUnfiledBusy] = useState<Record<string, boolean>>({})
+  const handleNameUnfiled = async (byteId: string) => {
+    if (unfiledBusy[byteId]) return
+    const nm = (unfiledInputs[byteId] ?? "").trim()
+    if (!nm) return
+    setUnfiledBusy((prev) => ({ ...prev, [byteId]: true }))
+    try {
+      // Same reuse rule as capture: an existing label joins its concept, a
+      // new one coins it — the student named it either way.
+      const existing = state.concepts.find((c) => c.label.toLowerCase() === nm.toLowerCase())
+      const concept = existing ?? (await addConcept(nm))
+      await refileByte(byteId, concept.id)
+      setUnfiledInputs((prev) => ({ ...prev, [byteId]: "" }))
+      flash(existing ? `filed under "${concept.label}"` : `named — "${concept.label}" joins your warp`)
+    } catch {
+      // refileByte resyncs and flashes before rethrowing; swallow here.
+    } finally {
+      setUnfiledBusy((prev) => ({ ...prev, [byteId]: false }))
+    }
+  }
 
   // This map's tier for a concept — '' (unsorted) when the map has no entry,
   // or no map exists yet in this scope.
@@ -796,6 +822,40 @@ export default function MapTab() {
           />
         )}
       </div>
+
+      {/* The unattached group (ruling 38): unlabeled passages are part of the
+          projection — visible remainder, never hidden (red line #4). Naming
+          one here coins (or joins) a concept and the passage enters the graph;
+          leaving it is equally legal — a passage may never gain a concept. */}
+      {unfiled.length > 0 && (
+        <div className="card" id="unfiledPassages" style={{ marginTop: 12 }}>
+          <span className="label">Unfiled passages ({unfiled.length})</span>
+          <p className="hint">
+            Captured without a concept — part of your cloth, shown here as its own group.
+            Name one to bring it onto the graph, or leave it as it is.
+          </p>
+          {unfiled.map((b) => (
+            <div key={b.id} data-byte-id={b.id} style={{ marginTop: 10, borderBottom: "1px dotted var(--rule)", paddingBottom: 8 }}>
+              <div className="passage">&quot;{b.content}&quot;</div>
+              <div className="src">{b.source || "—"}{b.location ? ` · ${b.location}` : ""}</div>
+              <div className="quietrow" style={{ marginTop: 6 }}>
+                <input
+                  placeholder="name the concept this passage evidences…"
+                  value={unfiledInputs[b.id] ?? ""}
+                  onChange={(e) => setUnfiledInputs((prev) => ({ ...prev, [b.id]: e.target.value }))}
+                />
+                <button
+                  className="btn ghost mini"
+                  onClick={() => handleNameUnfiled(b.id)}
+                  disabled={!!unfiledBusy[b.id]}
+                >
+                  Name it
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="ghostnote" id="mapMirror" style={{ marginTop: 8 }}>
         {scopedState.concepts.length > 0 && (

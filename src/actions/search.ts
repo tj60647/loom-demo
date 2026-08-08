@@ -21,6 +21,7 @@ import { sql, type SQL } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { getSources } from "@/actions/sources"
+import { resolveCourseIdForUser } from "@/lib/courses"
 import { SNIPPET_OPEN, SNIPPET_CLOSE } from "@/lib/searchText"
 
 /** ts_headline options; markers documented in src/lib/searchText.ts. */
@@ -201,6 +202,116 @@ export async function searchReadings(rawQuery: string): Promise<ReadingSearchHit
   )
 
   return scored.slice(0, MAX_READING_HITS).map((entry) => entry.hit)
+}
+
+// --- UNIFIED SEARCH, scopes 3–4 (ruling 34) ---
+// The student's own holdings: concepts (label/gloss/note), links
+// (term/sentence), and passages (text/margin). Same contract as above: plain
+// FTS, no model, the caller sees only their own rows. Grouped by kind — a
+// match in a reading is not the same act as a match in your own vocabulary.
+
+const MAX_LOOM_HITS = 12
+
+export type LoomSearchResult = {
+  concepts: { id: string; label: string; snippet: string }[]
+  links: { id: string; handle: string; fromLabel: string; toLabel: string; snippet: string }[]
+  passages: { id: string; sourceId: string | null; source: string; snippet: string }[]
+}
+
+export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
+  const empty: LoomSearchResult = { concepts: [], links: [], passages: [] }
+
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return empty
+  const userId = session.user.id
+
+  const query = normalizeQuery(rawQuery)
+  if (query.length < 2) return empty
+
+  // Same course lens the loom actions resolve — plus the not-yet-adopted
+  // null-course rows, which belong to this student all the same. Read-only:
+  // search never performs the adoption writes.
+  const courseId = await resolveCourseIdForUser(userId, null)
+  const conceptScope = courseId
+    ? sql`("concept"."courseId" = ${courseId} OR "concept"."courseId" IS NULL)`
+    : sql`"concept"."courseId" IS NULL`
+  const edgeScope = courseId
+    ? sql`("edge"."courseId" = ${courseId} OR "edge"."courseId" IS NULL)`
+    : sql`"edge"."courseId" IS NULL`
+  const byteScope = courseId
+    ? sql`("byte"."courseId" = ${courseId} OR "byte"."courseId" IS NULL)`
+    : sql`"byte"."courseId" IS NULL`
+
+  // Each vector repeats its index expression from src/db/schema.ts verbatim.
+  const conceptResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "concept"."id", "concept"."label",
+           ts_headline('english', coalesce(nullif("concept"."def", ''), "concept"."label"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           ts_rank(
+             (setweight(to_tsvector('english', coalesce("concept"."label", '')), 'A') ||
+              setweight(to_tsvector('english', coalesce("concept"."def", '')), 'B') ||
+              setweight(to_tsvector('english', coalesce("concept"."note", '')), 'C')),
+             q.query
+           ) AS rank
+    FROM "concept", q
+    WHERE "concept"."userId" = ${userId} AND ${conceptScope}
+      AND (setweight(to_tsvector('english', coalesce("concept"."label", '')), 'A') ||
+           setweight(to_tsvector('english', coalesce("concept"."def", '')), 'B') ||
+           setweight(to_tsvector('english', coalesce("concept"."note", '')), 'C')) @@ q.query
+    ORDER BY rank DESC, "concept"."createdAt"
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
+  const edgeResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "edge"."id", "edge"."handle",
+           f."label" AS "fromLabel", t."label" AS "toLabel",
+           ts_headline('english', coalesce(nullif("edge"."sentence", ''), "edge"."handle"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           ts_rank(
+             (setweight(to_tsvector('english', coalesce("edge"."handle", '')), 'A') ||
+              setweight(to_tsvector('english', coalesce("edge"."sentence", '')), 'B')),
+             q.query
+           ) AS rank
+    FROM "edge"
+    JOIN "concept" f ON f."id" = "edge"."fromId"
+    JOIN "concept" t ON t."id" = "edge"."toId", q
+    WHERE "edge"."userId" = ${userId} AND ${edgeScope}
+      AND (setweight(to_tsvector('english', coalesce("edge"."handle", '')), 'A') ||
+           setweight(to_tsvector('english', coalesce("edge"."sentence", '')), 'B')) @@ q.query
+    ORDER BY rank DESC, "edge"."createdAt"
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
+  const byteResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "byte"."id", "byte"."sourceId", "byte"."source",
+           ts_headline('english', "byte"."content", q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           ts_rank(
+             (setweight(to_tsvector('english', "byte"."content"), 'B') ||
+              setweight(to_tsvector('english', coalesce("byte"."note", '')), 'C') ||
+              setweight(to_tsvector('english', coalesce("byte"."question", '')), 'C')),
+             q.query
+           ) AS rank
+    FROM "byte", q
+    WHERE "byte"."userId" = ${userId} AND ${byteScope}
+      AND (setweight(to_tsvector('english', "byte"."content"), 'B') ||
+           setweight(to_tsvector('english', coalesce("byte"."note", '')), 'C') ||
+           setweight(to_tsvector('english', coalesce("byte"."question", '')), 'C')) @@ q.query
+    ORDER BY rank DESC, "byte"."createdAt"
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
+  return {
+    concepts: (conceptResult.rows as { id: string; label: string; snippet: string }[]).map((r) => ({
+      id: r.id, label: r.label, snippet: r.snippet,
+    })),
+    links: (edgeResult.rows as { id: string; handle: string | null; fromLabel: string; toLabel: string; snippet: string }[]).map((r) => ({
+      id: r.id, handle: r.handle ?? "", fromLabel: r.fromLabel, toLabel: r.toLabel, snippet: r.snippet,
+    })),
+    passages: (byteResult.rows as { id: string; sourceId: string | null; source: string | null; snippet: string }[]).map((r) => ({
+      id: r.id, sourceId: r.sourceId, source: r.source ?? "", snippet: r.snippet,
+    })),
+  }
 }
 
 /**

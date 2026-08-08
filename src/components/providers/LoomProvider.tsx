@@ -8,7 +8,7 @@ import { asLoomState, scopeOf, scopedGraph, soleSourceId, WHOLE_WEAVE, type Scop
 import { emptyViews, parseImport, type ParsedMapImport } from "@/lib/graphExport"
 import {
   getUserLoomData,
-  createConcept, updateConcept, deleteConcept,
+  createConcept, updateConcept, deleteConcept, mergeConcepts as mergeConceptsAction,
   createByte, deleteByte, refileByte as refileByteAction, unfileByte as unfileByteAction, attributeBytes as attributeBytesAction,
   createEdge, updateEdge, deleteEdge,
   saveView, saveCloth as saveClothAction,
@@ -37,6 +37,8 @@ interface LoomContextType {
   addConcept: (label: string, def?: string, note?: string) => Promise<Concept>
   editConcept: (id: string, data: Partial<{label: string, def: string, note: string}>) => Promise<void>
   removeConcept: (id: string) => Promise<void>
+  /** Merge source into target: pointers and threads repoint, source goes (ruling 36). */
+  mergeConcepts: (sourceId: string, targetId: string) => Promise<void>
   /** Capture a passage. Zero concept ids is a legal capture — an Unlabeled Passage. */
   addByte: (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => Promise<Byte>
   removeByte: (id: string) => Promise<void>
@@ -253,6 +255,20 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       savedOk()
     } catch (e) {
       await resync(e)
+    }
+  }
+
+  const mergeConcepts = async (sourceId: string, targetId: string) => {
+    // The server repoints pointers, threads, tiers and views in one batch and
+    // returns the whole truth — simpler and safer than replaying that
+    // bookkeeping optimistically.
+    try {
+      const data = await mergeConceptsAction(sourceId, targetId)
+      setState(data)
+      flash("merged — evidence and threads now point at one concept")
+    } catch (e) {
+      await resync(e)
+      throw e
     }
   }
 
@@ -728,7 +744,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     <LoomContext.Provider value={{
       state, scope, scoped, scopedState, isLoading,
       studentName: session?.user?.name || "",
-      addConcept, editConcept, removeConcept,
+      addConcept, editConcept, removeConcept, mergeConcepts,
       addByte, removeByte, refileByte, unfileByte, attributeBytes,
       activeCloth, updateCloth,
       addEdge, editEdge, removeEdge,

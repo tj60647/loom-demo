@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
-import type { Byte } from "@/lib/types"
+import type { Byte, Concept } from "@/lib/types"
 import { readingsOf, soleSourceId } from "@/lib/scope"
 import { contentWords, sortedByLabel } from "@/lib/utils"
 import { tidy } from "@/lib/clothMath"
@@ -22,7 +22,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
   // naming, dedup and the delete guards must see every concept the student has
   // — otherwise capturing a concept met in an earlier text would mint a
   // duplicate instead of joining its evidence (spec §2 identity).
-  const { state, scope, scoped, addConcept, addByte, editConcept, removeConcept, removeByte, refileByte, unfileByte, flash } = useLoom()
+  const { state, scope, scoped, addConcept, addByte, editConcept, removeConcept, mergeConcepts, removeByte, refileByte, unfileByte, flash } = useLoom()
   const { byId, titleOf } = useReadings()
   const { confirm, notify } = useDialog()
   const activeSourceId = soleSourceId(scope)
@@ -43,6 +43,8 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
   const [reuseNote, setReuseNote] = useState<{ label: string; where: string[] } | null>(null)
   const [refileInputs, setRefileInputs] = useState<Record<string, string>>({})
   const [refileBusy, setRefileBusy] = useState<Record<string, boolean>>({})
+  const [mergeInputs, setMergeInputs] = useState<Record<string, string>>({})
+  const [mergeBusy, setMergeBusy] = useState<Record<string, boolean>>({})
   const closeCaptureInfoButtonRef = useRef<HTMLButtonElement>(null)
 
   const [openLogRows, setOpenLogRows] = useState<Record<string, boolean>>({})
@@ -131,6 +133,44 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     }
   }
 
+  const handleMerge = async (source: Concept) => {
+    if (mergeBusy[source.id]) return
+    const nm = (mergeInputs[source.id] ?? "").trim()
+    if (!nm) {
+      await notify({
+        title: "Name the concept to keep first.",
+        body: "Type the concept this one merges into, then Merge.",
+      })
+      return
+    }
+    const target = findConcept(nm)
+    if (!target || target.id === source.id) {
+      await notify({
+        title: target ? "That is this concept." : "No concept by that name.",
+        body: "Merging repairs a duplicate you already have — name the existing concept to keep.",
+      })
+      return
+    }
+    // Always confirm: the source concept goes away, and there is no unmerge.
+    const ok = await confirm({
+      title: `Merge “${source.label}” into “${target.label}”?`,
+      body: "Every passage and thread of the first will point at the second, and the first goes away. There is no unmerge.",
+      confirmLabel: "Merge",
+      danger: true,
+    })
+    if (!ok) return
+    setMergeBusy(prev => ({ ...prev, [source.id]: true }))
+    try {
+      await mergeConcepts(source.id, target.id)
+      setMergeInputs(prev => ({ ...prev, [source.id]: "" }))
+      setOpenLogRows(prev => ({ ...prev, [target.id]: true }))
+    } catch {
+      // mergeConcepts resyncs and flashes before rethrowing; swallow here.
+    } finally {
+      setMergeBusy(prev => ({ ...prev, [source.id]: false }))
+    }
+  }
+
   const handleRemoveConcept = async (conceptId: string, byteCount: number) => {
     // Threads first: a concept woven into one cannot be deleted out from under
     // it. The server enforces this too — this is the readable version.
@@ -157,9 +197,21 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
 
   const handleAddConceptOnly = async () => {
     if (!newConceptOnly) return
-    if (!state.concepts.find(c => c.label.toLowerCase() === newConceptOnly.toLowerCase())) {
-      await addConcept(newConceptOnly)
+    const existing = state.concepts.find(c => c.label.toLowerCase() === newConceptOnly.toLowerCase())
+    if (existing) {
+      // Homonyms are warned, never forbidden (ruling 36): a shared name can
+      // be two distinct ideas. Same idea → reuse the one you have.
+      const ok = await confirm({
+        title: `You already have a concept named “${existing.label}”.`,
+        body: "Make a second, distinct concept with the same name? They stay separate (homonyms) — if they turn out to be one idea, merge them from the log.",
+        confirmLabel: "Make a homonym",
+      })
+      if (!ok) {
+        setNewConceptOnly("")
+        return
+      }
     }
+    await addConcept(newConceptOnly)
     setNewConceptOnly("")
   }
 
@@ -467,16 +519,25 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                         key={concept.label}
                         placeholder="concept label…"
                         defaultValue={concept.label}
-                        onBlur={(e) => {
-                          const v = e.target.value.trim()
+                        onBlur={async (e) => {
+                          const input = e.target
+                          const v = input.value.trim()
                           if (!v || v === concept.label) return
                           const clash = state.concepts.find(
                             c => c.id !== concept.id && c.label.toLowerCase() === v.toLowerCase()
                           )
                           if (clash) {
-                            flash("That name is already one of your concepts.")
-                            e.target.value = concept.label
-                            return
+                            // Warned, never forbidden (ruling 36): homonyms
+                            // are legal; merge handles true duplicates.
+                            const ok = await confirm({
+                              title: `You already have a concept named “${v}”.`,
+                              body: "Rename anyway? The two stay distinct concepts sharing a name — if they are one idea, merge them instead.",
+                              confirmLabel: "Rename anyway",
+                            })
+                            if (!ok) {
+                              input.value = concept.label
+                              return
+                            }
                           }
                           editConcept(concept.id, { label: v })
                           flash("renamed")
@@ -552,6 +613,16 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                         {elsewhere} more passage{elsewhere !== 1 ? "s" : ""} evidence{elsewhere === 1 ? "s" : ""} this concept in your other readings — one concept, evidence from several texts.
                       </p>
                     )}
+                    <div className="quietrow" style={{ marginTop: "12px" }}>
+                      <input
+                        list="conceptOptions"
+                        placeholder="merge into another concept…"
+                        title="the same idea captured twice? name the concept to keep — this one's passages and threads move onto it"
+                        value={mergeInputs[concept.id] ?? ""}
+                        onChange={(e) => setMergeInputs(prev => ({ ...prev, [concept.id]: e.target.value }))}
+                      />
+                      <button className="btn ghost mini" onClick={() => handleMerge(concept)} disabled={!!mergeBusy[concept.id]}>Merge</button>
+                    </div>
                     <button
                       type="button"
                       className="rm"

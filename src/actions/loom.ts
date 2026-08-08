@@ -2,7 +2,7 @@
 
 import { db } from "@/db"
 import { concepts, bytes, byteConcepts, edges, users, sourcePages, sources, cloths, views, graphEvents, maps } from "@/db/schema"
-import { and, asc, eq, inArray, isNull, like, ne, or, sql, type SQL } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull, like, or, sql, type SQL } from "drizzle-orm"
 import type { PgColumn } from "drizzle-orm/pg-core"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
@@ -261,22 +261,9 @@ export async function updateConcept(id: string, data: Partial<{ label: string, d
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
-  // One label is one concept (§2 identity). A rename that collides with
-  // another concept's label would silently mint a duplicate identity.
-  if (data.label !== undefined) {
-    const clash = await db.select({ id: concepts.id }).from(concepts)
-      .where(and(
-        eq(concepts.userId, userId),
-        inCourse(concepts.courseId, courseId),
-        ne(concepts.id, id),
-        sql`lower(${concepts.label}) = lower(${data.label})`
-      ))
-      .limit(1)
-    if (clash.length > 0) {
-      throw new Error("That name is already one of your concepts.")
-    }
-  }
-
+  // Identity is by object, not label string (ruling 36): distinct concepts
+  // may share a label — homonyms are warned about client-side at coin-time,
+  // never forbidden here. The old clash-throw collapsed homonyms.
   const updated = await db.update(concepts).set(data)
     .where(and(eq(concepts.id, id), eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))
     .returning({ id: concepts.id })
@@ -470,6 +457,57 @@ export async function refileByte(byteId: string, conceptId: string) {
     source: src.source,
   })
   return { ...src, conceptIds: [...existing.map((r) => r.conceptId), conceptId] }
+}
+
+/**
+ * Merge two concepts the student decided are one idea (ruling 36): every
+ * passage pointer and thread end of `sourceId` repoints onto `targetId`, the
+ * target inherits def/note it lacks, and the source goes. Identity is by
+ * object; merge is the student-driven repair for duplicates found later —
+ * always an explicit act, never automatic.
+ */
+export async function mergeConcepts(sourceId: string, targetId: string) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+  if (sourceId === targetId) throw new Error("That is the same concept.")
+
+  const rows = await db.select().from(concepts)
+    .where(and(inArray(concepts.id, [sourceId, targetId]), eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))
+  const source = rows.find((r) => r.id === sourceId)
+  const target = rows.find((r) => r.id === targetId)
+  if (!source || !target) throw new Error("Concept not found.")
+
+  // A pointer move that would collide with an existing (byte, target) row is
+  // dropped rather than duplicated — the passage already evidences the target.
+  const sourcePointers = await db.select().from(byteConcepts).where(eq(byteConcepts.conceptId, sourceId))
+  const targetPointers = await db.select({ byteId: byteConcepts.byteId }).from(byteConcepts).where(eq(byteConcepts.conceptId, targetId))
+  const already = new Set(targetPointers.map((r) => r.byteId))
+  const moved = sourcePointers.filter((r) => !already.has(r.byteId))
+
+  const inherit: Partial<typeof concepts.$inferInsert> = {}
+  if (!target.def && source.def) inherit.def = source.def
+  if (!target.note && source.note) inherit.note = source.note
+
+  await db.batch([
+    ...(moved.length
+      ? [db.insert(byteConcepts).values(moved.map((r) => ({ byteId: r.byteId, conceptId: targetId, createdAt: r.createdAt })))]
+      : []),
+    db.delete(byteConcepts).where(eq(byteConcepts.conceptId, sourceId)),
+    db.update(edges).set({ fromId: targetId }).where(and(eq(edges.fromId, sourceId), eq(edges.userId, userId))),
+    db.update(edges).set({ toId: targetId }).where(and(eq(edges.toId, sourceId), eq(edges.userId, userId))),
+    ...(Object.keys(inherit).length ? [db.update(concepts).set(inherit).where(eq(concepts.id, targetId))] : []),
+    db.delete(concepts).where(and(eq(concepts.id, sourceId), eq(concepts.userId, userId), inCourse(concepts.courseId, courseId))),
+  ] as unknown as Parameters<typeof db.batch>[0])
+
+  await recordEvent(userId, courseId, "concept.merge", "concept", targetId, {
+    fromId: sourceId,
+    fromLabel: source.label,
+    intoLabel: target.label,
+    pointersMoved: moved.length,
+  })
+  await pruneViews(userId, courseId, { positions: [sourceId], order: [sourceId], pins: [sourceId], tiers: [sourceId] })
+
+  return getUserLoomData()
 }
 
 /**

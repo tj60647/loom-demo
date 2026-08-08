@@ -1,15 +1,17 @@
 "use client"
 
-// Search across the shelf: which of your readings says this?
+// One search, every scope (ruling 34): which of your readings says this —
+// and which of your own concepts, links and passages do.
 //
-// Typing replaces the week-grouped shelf with ranked results — a reading per
-// row, with the page or two where the match lands. Clearing the box puts the
-// shelf back. Matching is plain text search (see src/actions/search.ts):
-// words are stemmed, "quoted phrases" match exactly, -word excludes.
+// Typing replaces the page with grouped results: readings first (a match in a
+// text is a door back into it), then the student's own holdings by kind.
+// Clearing the box puts the page back. Matching is plain text search (see
+// src/actions/search.ts): words are stemmed, "quoted phrases" match exactly,
+// -word excludes. No model anywhere near it.
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { searchReadings, type ReadingSearchHit } from "@/actions/search"
+import { searchReadings, searchLoom, type ReadingSearchHit, type LoomSearchResult } from "@/actions/search"
 import Snippet from "@/components/ui/Snippet"
 
 export default function ShelfSearch({
@@ -23,6 +25,7 @@ export default function ShelfSearch({
 }) {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<ReadingSearchHit[] | null>(null)
+  const [loomResults, setLoomResults] = useState<LoomSearchResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -39,6 +42,7 @@ export default function ShelfSearch({
     if (!active) {
       requestRef.current++
       setResults(null)
+      setLoomResults(null)
       setError(null)
       setBusy(false)
     }
@@ -51,15 +55,18 @@ export default function ShelfSearch({
     const requestId = ++requestRef.current
     const timer = window.setTimeout(() => {
       setBusy(true)
-      searchReadings(trimmed)
-        .then((hits) => {
+      // Readings and the student's own holdings, in parallel — one field,
+      // results grouped by kind.
+      Promise.all([searchReadings(trimmed), searchLoom(trimmed)])
+        .then(([hits, loom]) => {
           if (requestRef.current !== requestId) return
           setResults(hits)
+          setLoomResults(loom)
           setError(null)
         })
         .catch(() => {
           if (requestRef.current !== requestId) return
-          setError("could not search your readings just now")
+          setError("could not search just now")
         })
         .finally(() => {
           if (requestRef.current === requestId) setBusy(false)
@@ -93,13 +100,14 @@ export default function ShelfSearch({
         <div className="searchresults" aria-live="polite">
           {error && <p className="hint" style={{ color: "var(--red)" }}>{error}</p>}
 
-          {!error && results && results.length === 0 && !busy && (
+          {!error && results && results.length === 0 && !busy &&
+            !loomResults?.concepts.length && !loomResults?.links.length && !loomResults?.passages.length && (
             <div className="empty">
-              <span className="cap">none of your readings matches that</span>
+              <span className="cap">nothing of yours matches that — readings, concepts, links or passages</span>
             </div>
           )}
 
-          {!error && !results && <p className="hint">searching your readings…</p>}
+          {!error && !results && <p className="hint">searching…</p>}
 
           {!error && results && results.length > 0 && (
             <>
@@ -140,6 +148,51 @@ export default function ShelfSearch({
                       <Snippet text={excerpt.snippet} />
                     </p>
                   ))}
+                </Link>
+              ))}
+            </>
+          )}
+
+          {/* The student's own holdings, grouped by kind — scope 3/4 of the
+              one search field (ruling 34). Each hit is a door to where that
+              kind of work lives. */}
+          {!error && loomResults && loomResults.concepts.length > 0 && (
+            <>
+              <span className="cap searchtally">your concepts</span>
+              {loomResults.concepts.map((hit) => (
+                <Link key={hit.id} href="/weave?tab=open" className="searchhit">
+                  <div className="searchhithead"><h3>{hit.label}</h3></div>
+                  <p className="searchsnip"><Snippet text={hit.snippet} /></p>
+                </Link>
+              ))}
+            </>
+          )}
+          {!error && loomResults && loomResults.links.length > 0 && (
+            <>
+              <span className="cap searchtally">your links</span>
+              {loomResults.links.map((hit) => (
+                <Link key={hit.id} href="/weave?tab=throw" className="searchhit">
+                  <div className="searchhithead">
+                    <h3>
+                      {hit.fromLabel} —[{hit.handle || "…"}]→ {hit.toLabel}
+                    </h3>
+                  </div>
+                  <p className="searchsnip"><Snippet text={hit.snippet} /></p>
+                </Link>
+              ))}
+            </>
+          )}
+          {!error && loomResults && loomResults.passages.length > 0 && (
+            <>
+              <span className="cap searchtally">your passages</span>
+              {loomResults.passages.map((hit) => (
+                <Link
+                  key={hit.id}
+                  href={hit.sourceId ? `/reading/${hit.sourceId}?tab=open` : "/weave?tab=open"}
+                  className="searchhit"
+                >
+                  {hit.source ? <div className="searchhithead"><h3>{hit.source}</h3></div> : null}
+                  <p className="searchsnip"><Snippet text={hit.snippet} /></p>
                 </Link>
               ))}
             </>

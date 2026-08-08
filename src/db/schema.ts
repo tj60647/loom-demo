@@ -425,23 +425,35 @@ export const sourceRepairReadings = pgTable("source_repair_reading", {
 
 // --- LOOM TABLES ---
 
-export const concepts = pgTable("concept", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  courseId: text("courseId").references(() => courses.id, {
-    onDelete: "set null",
-  }),
-  userId: text("userId")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  label: text("label").notNull(),
-  def: text("def").default(""),
-  note: text("note").default(""),
-  // No tier here: Concept Tiers are per-map (`maps.tiers`). The concept.tier
-  // mirror was dropped in 0021 (docs/loom-refactor-spec.md P0.5).
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-})
+export const concepts = pgTable(
+  "concept",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    courseId: text("courseId").references(() => courses.id, {
+      onDelete: "set null",
+    }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    def: text("def").default(""),
+    note: text("note").default(""),
+    // No tier here: Concept Tiers are per-map (`maps.tiers`). The concept.tier
+    // mirror was dropped in 0021 (docs/loom-refactor-spec.md P0.5).
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (concept) => ({
+    // Unified search, scope 3 (ruling 34): label outranks gloss outranks
+    // note. The query in src/actions/search.ts repeats this expression
+    // verbatim — an expression index only serves exact matches.
+    searchIdx: index("concept_search_idx").using(
+      "gin",
+      sql`(setweight(to_tsvector('english', coalesce(${concept.label}, '')), 'A') || setweight(to_tsvector('english', coalesce(${concept.def}, '')), 'B') || setweight(to_tsvector('english', coalesce(${concept.note}, '')), 'C'))`
+    ),
+  })
+)
 
 // A byte — one captured passage. Concepts attach via `byte_concept` (0..n):
 // a byte with zero rows there is an Unlabeled Passage, a legal first-class
@@ -481,7 +493,15 @@ export const bytes = pgTable("byte", {
   // from the per-map Concept Tiers in `maps.tiers`.
   tier: text("tier").$type<"" | "p" | "s" | "t">().default("").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-})
+},
+(byte) => ({
+  // Unified search over the student's own captures: the passage text
+  // outranks their margin. Query side repeats this expression verbatim.
+  searchIdx: index("byte_search_idx").using(
+    "gin",
+    sql`(setweight(to_tsvector('english', ${byte.content}), 'B') || setweight(to_tsvector('english', coalesce(${byte.note}, '')), 'C') || setweight(to_tsvector('english', coalesce(${byte.question}, '')), 'C'))`
+  ),
+}))
 
 // Which concepts a byte evidences — the passage↔concept pointers of ruling 37.
 // Zero rows = an Unlabeled Passage; several rows = one passage filed under
@@ -635,26 +655,37 @@ export const graphEvents = pgTable("graph_event", {
   at: timestamp("at").defaultNow().notNull(),
 })
 
-export const edges = pgTable("edge", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  courseId: text("courseId").references(() => courses.id, {
-    onDelete: "set null",
-  }),
-  userId: text("userId")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  fromId: text("fromId")
-    .notNull()
-    .references(() => concepts.id, { onDelete: "cascade" }),
-  toId: text("toId")
-    .notNull()
-    .references(() => concepts.id, { onDelete: "cascade" }),
-  handle: text("handle").default(""),
-  // The link description — optional at throw (golden path: connect first,
-  // describe when ready). Default '' rather than nullable so render code
-  // never branches (P0.3).
-  sentence: text("sentence").default("").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-})
+export const edges = pgTable(
+  "edge",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    courseId: text("courseId").references(() => courses.id, {
+      onDelete: "set null",
+    }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    fromId: text("fromId")
+      .notNull()
+      .references(() => concepts.id, { onDelete: "cascade" }),
+    toId: text("toId")
+      .notNull()
+      .references(() => concepts.id, { onDelete: "cascade" }),
+    handle: text("handle").default(""),
+    // The link description — optional at throw (golden path: connect first,
+    // describe when ready). Default '' rather than nullable so render code
+    // never branches (P0.3).
+    sentence: text("sentence").default("").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (edge) => ({
+    // Unified search over the student's links: the coined term outranks the
+    // sentence. Query side repeats this expression verbatim.
+    searchIdx: index("edge_search_idx").using(
+      "gin",
+      sql`(setweight(to_tsvector('english', coalesce(${edge.handle}, '')), 'A') || setweight(to_tsvector('english', coalesce(${edge.sentence}, '')), 'B'))`
+    ),
+  })
+)
