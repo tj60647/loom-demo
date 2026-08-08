@@ -1,5 +1,59 @@
 # Next Session Prompt
 
+## Addendum, 2026-08-07 (the refactor spec, executed: P0–P2 complete, P3 partial)
+
+**The spec is no longer behind the build — the build now speaks the model.**
+Five commits on `dev`: `068dcac` (docs reorg: `docs/loom-model-build.md` is the
+authority, the work order is `docs/loom-refactor-spec.md`, superseded specs are
+stamped in `docs/archive/`), `38a8298` (P0 — migration 0021: `byte_concept`
+pointers, Unlabeled Passages legal, passage margin fields, `edges.sentence`
+optional, `cloth` table absorbing `read`, mirror dropped, `byte.capture` +
+`unfileByte`), `ca97b4a` (P1 — `mergeConcepts` + homonyms warned-never-forbidden,
+unified search over own concepts/links/passages with migration 0022, the
+unattached Unlabeled-Passages group in the projection view), `f647b82` (P2 —
+the naming sweep: projection / passage / label / description / one-line /
+Knowledge Graph / Capture Log everywhere a student reads, tongues removed),
+`22247cf` (P3.12 core — Faculty Section per course, `setMemberRole`,
+`checkCourseFaculty` on the four read-side admin actions). Typecheck, build and
+the full Playwright suite (28 passed / 1 skipped) are green after every one;
+`docs/contracts.md` is re-stamped at each step. Dev DB is migrated through 0022.
+
+### What remains of P3, and why it waits
+
+- **P3.13 (reading-card Create Cloth / Open Cloth buttons, count-with-hover,
+  rulings 20–22/33)** — lives in `Shelf.tsx`, which carries the UNCOMMITTED
+  auth workstream; land that first, then also convert Shelf's July strings the
+  P2 sweep deliberately skipped ("N bytes" tally line, `00 — READINGS` footer).
+- **P3.12 auth-side** — faculty entry in the UI and any enrolment-time role
+  assignment live in `src/lib/auth.ts` (same uncommitted workstream). The
+  action-layer gate is already in.
+- **P3.14 (student Overlays, ruling 28)** — Passages heatmap in the Reading
+  tab; Concepts/Links overlays in Vocabulary; me+colleague · Section · Cohort
+  granularity. Untouched: it needs privacy/UX decisions (what a student sees of
+  a colleague's work, how a colleague is picked) that deserve their own session.
+  The server side can largely reuse `getAggregateLoomData`'s shape behind a
+  member-level gate.
+
+### Decisions still open (TJ)
+
+- **D4**: Keep as a ratified sixth tab, or folded into Linking/Knowledge Graph.
+- **Open/Reading merge**: the ruled five tabs assume one integrated Reading
+  tab; stations 01 Open and 00 Reading are still separate (labels kept pending
+  the structural merge).
+- URL tab params (`?tab=map`) deliberately kept legacy (code-side per §F);
+  rename only with a redirect plan.
+
+### Toolchain notes from this pass
+
+- Never hand-space a migration timestamp ahead of real time: drizzle's
+  migrator skips any migration stamped earlier than the max applied
+  `created_at` — 0021's future stamp silently swallowed 0022 until repaired.
+- Hand-written migrations need a hand-derived `meta/*_snapshot.json` (0021's
+  was derived from 0020's and verified by `drizzle-kit generate` reporting no
+  drift) or the next `generate` re-emits the whole changeset.
+- `.env.production.local` still holds literal `[SENSITIVE]` values and breaks
+  any local production build; restore real values or delete it.
+
 ## Start here
 
 `RepairPanel` is mounted and the loop **has been run end to end through the UI**
