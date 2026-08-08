@@ -51,8 +51,13 @@ The object model, semantics, and UI structure for Loom v1. This is the authority
 
 **Concept** = Label [< 8 words, may be null at capture] + Description/Gloss [< 100 words, may be null].
 - **A Concept is a single User-level object.** Passages across Cloths and Readings *reference* it — they do not own copies. The Gloss is written in the Capture Log row but stored on the Concept.
-- **Has pointers to its Passages** [0..n] — the evidence trail, crossing the Cloth boundary; the recurrence flag is derived (Passage pointers spanning >1 Reading). Zero Passages is legal (the Concept survives its evidence; show as "no evidence," a visible state, not a block).
-- **Has pointers to its Links** [0..n].
+- **Has pointers to its Passages** [0..n] — the evidence trail, crossing the Cloth boundary; the recurrence flag is derived (Passage pointers spanning >1 Reading). Zero Passages is legal (show as "no evidence," a visible state, not a block).
+- **A Concept may precede its evidence** (ratified 2026-08-08, TJ). Naming an idea you expect to meet — and glossing what you take it to mean — before any Passage supports it is a first-class move, not an oddity: you name it, then read for support. So zero Passages is reached three ways, all legal and indistinguishable in the data:
+  - **before** — named ahead of its evidence, awaiting a Passage (this ruling);
+  - **after** — the Concept survives its evidence, its Passages having been unfiled or deleted;
+  - **never** — an idea that turned out not to be in the texts, kept or deleted as the student decides.
+  A Concept with no Passages therefore belongs to **no** Reading, and is in scope **everywhere** — it stands in every Reading's warp while the student hunts for what backs it. "No evidence" is a designation, never a warning to act on: the tool counts, it does not judge (red lines 1 and 7).
+- **Has pointers to its Links** [0..n]. An un-evidenced Concept may be linked like any other — warned, never forbidden, as with homonyms.
 - **Identity is by object, not label string.** De-duplication happens at capture time via reuse (existing Concepts tappable). Distinct Concepts *may* share a Label (homonyms) — warn at coin-time, don't forbid. A **merge** action handles discovered duplicates (repoints Passage and Link references; logged).
 - A Label need not exist before linking; naming can follow.
 

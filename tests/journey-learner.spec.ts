@@ -225,10 +225,12 @@ test("04 · three maps, and each scope keeps its own tiers and essence", async (
   await expect(page.locator("#yourRead2")).toHaveValue(/Bucciarelli watches designers/)
 
   // The cloth reflection moved here from 03: counted prompts, and the two
-  // visible failure states counted rather than hidden — the seeded
-  // no-evidence concept and the seeded sentence-only thread.
+  // states counted rather than hidden — the seeded concept with no passage and
+  // the seeded sentence-only thread. Both are designations, not faults: a
+  // concept may be named ahead of its evidence (TJ, 2026-08-08), which is why
+  // the wording is "no passage yet" and not a red instruction to fix it.
   await expect(page.locator("#clothPrompts .prompt").first()).toBeVisible({ timeout: 15_000 })
-  await expect(page.getByText(/no evidence/).first()).toBeVisible()
+  await expect(page.getByText(/no passage/).first()).toBeVisible()
   await expect(page.getByText(/no label yet/).first()).toBeVisible()
   // The whole weave carries the development record; a single reading does not.
   await expect(page.locator(".cap", { hasText: "Capture Log" })).toHaveCount(1)

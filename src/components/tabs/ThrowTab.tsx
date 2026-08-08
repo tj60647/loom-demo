@@ -348,7 +348,7 @@ export default function ThrowTab() {
         <div className="clabel">{c.label}</div>
         {isPicked
           ? <div className="pickedtag">PICK {pairA === c.id ? 1 : 2}</div>
-          : (noev && <div className="pickedtag" style={{ color: "var(--red)" }} title="no captured passage — every concept should trace to a passage">no evidence</div>)}
+          : (noev && <div className="pickedtag" style={{ color: "var(--ink-soft)" }} title="no passage backs this yet — you may have named it ahead of its evidence, which is allowed">no evidence</div>)}
       </div>
     )
   }

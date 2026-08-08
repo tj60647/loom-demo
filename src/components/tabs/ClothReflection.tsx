@@ -395,8 +395,11 @@ export default function ClothReflection() {
           {state.concepts.length > 0 && loose > 0 && (
             <div className="ghostnote" style={{ marginTop: "6px" }}>{loose} thread{loose !== 1 ? 's' : ''} with no label yet — coin one on 02 so a word can recur.</div>
           )}
+          {/* A designation, not a scolding (TJ, 2026-08-08): a concept may be
+              named ahead of its evidence on purpose. Counted, not judged — so
+              it is stated in the ordinary voice, not in red. */}
           {state.concepts.length > 0 && noEv.length > 0 && (
-            <div className="ghostnote" style={{ marginTop: "6px", color: "var(--red)" }}>{noEv.length} concept{noEv.length !== 1 ? 's' : ''} with <b>no evidence</b> yet — every concept should trace to a captured passage.</div>
+            <div className="ghostnote" style={{ marginTop: "6px" }}>{noEv.length} concept{noEv.length !== 1 ? 's' : ''} carry <b>no passage</b> yet — named ahead of their evidence, or left behind by it.</div>
           )}
           {drafted && <div className="drafted" id="readDrafted">{drafted}</div>}
         </div>

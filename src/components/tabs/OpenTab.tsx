@@ -42,6 +42,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
   const [conceptLabel, setConceptLabel] = useState("")
   const [workingDef, setWorkingDef] = useState("")
   const [newConceptOnly, setNewConceptOnly] = useState("")
+  const [newConceptDef, setNewConceptDef] = useState("")
   const [showCaptureInfo, setShowCaptureInfo] = useState(false)
   const [reuseNote, setReuseNote] = useState<{ label: string; where: string[] } | null>(null)
   const [refileInputs, setRefileInputs] = useState<Record<string, string>>({})
@@ -174,8 +175,12 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
         return
       }
     }
-    await addConcept(newConceptOnly)
+    // The gloss travels with the naming: it is the reason you expect to find
+    // this, and it is what you will read the candidate passage against.
+    await addConcept(newConceptOnly.trim(), newConceptDef.trim() || undefined)
     setNewConceptOnly("")
+    setNewConceptDef("")
+    flash("named — it shows as no evidence until a passage backs it")
   }
 
   const toggleRow = (id: string) => {
@@ -620,14 +625,34 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
           </p>
         )}
 
-        <div className="quietrow">
+        {/* Naming a concept BEFORE its evidence is a first-class move, not an
+            oddity (TJ, 2026-08-08): you name what you expect to find, describe
+            it, then read for support. It used to say "(rare)", which talked
+            students out of it, and it took no description — so the gloss you
+            had in mind at the moment of naming had nowhere to go. */}
+        <div className="aheadofit">
+          <span className="label">Name a concept before its evidence</span>
+          <p className="hint" style={{ marginTop: 2 }}>
+            Expecting an idea before you have found it in the text? Name it, say what you
+            think it is, and go looking. It shows as <b>no evidence</b> until a passage
+            backs it — a state, not a fault — and it stays in view in every reading while
+            you hunt.
+          </p>
+          <div className="quietrow" style={{ marginTop: 6 }}>
+            <input
+              list="conceptOptions"
+              placeholder="the concept you are looking for…"
+              value={newConceptOnly}
+              onChange={(e) => setNewConceptOnly(e.target.value)}
+            />
+            <button className="btn ghost mini" onClick={handleAddConceptOnly}>Add</button>
+          </div>
           <input
-            list="conceptOptions"
-            placeholder="add a concept with no passage yet (rare)"
-            value={newConceptOnly}
-            onChange={(e) => setNewConceptOnly(e.target.value)}
+            style={{ marginTop: 6 }}
+            placeholder="what you take it to mean, in your own words (optional)"
+            value={newConceptDef}
+            onChange={(e) => setNewConceptDef(e.target.value)}
           />
-          <button className="btn ghost mini" onClick={handleAddConceptOnly}>Add</button>
         </div>
       </div>
   )

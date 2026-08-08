@@ -330,6 +330,18 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | ~~05 Weave~~ | `/weave` | **hidden from the journey** (TJ, 2026-08-08) pending a decision on what it becomes. The route still works and Keep links to it, so whole-weave projections are not stranded — unhide via `hidden` in `JourneyNav`'s `STATIONS` |
 | 05 Keep | `KeepTab` (`/keep`) | export/import/reset — ratified as a deviation from the model's five (D4) |
 
+**A Concept with no Passages is in scope everywhere.** `scoped()` in
+[scope.ts](../src/lib/scope.ts) reads
+`isIn = evidenced.has(id) || !hasByte.has(id)` — the second clause is not an
+oversight. A Concept may precede its evidence (model §Concept, ratified
+2026-08-08): you name what you expect to find, gloss it, and read for support,
+so it must stand in **every** Reading's warp while you hunt. It belongs to no
+Reading, because a Passage does. Consequences worth knowing before touching
+that line: it also decides which Links are *bridges*, and an un-evidenced
+Concept is linkable like any other (warned, never forbidden). Created at the
+foot of the Capture Log — label **and** optional gloss — and flagged "no
+evidence" there, in the Linking warp, and in the cloth prompts.
+
 Scoping is the load-bearing distinction: **01 Reading's capture log is this
 reading's captures; 03 Vocabulary is everything you own.** A concept does not
 belong to a reading — a passage does — so the holdings render identically

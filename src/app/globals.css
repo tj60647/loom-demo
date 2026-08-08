@@ -643,3 +643,6 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 }
 .steprail .rsep { font-size: 12px; }
 .steprailnote { margin: -8px 0 16px; font-size: 13px; }
+/* Naming a concept before its evidence — a first-class move, so it reads as a
+   block with its own label rather than a stray input (TJ, 2026-08-08). */
+.aheadofit { margin-top: 14px; padding-top: 12px; border-top: 1px dotted var(--rule); }
