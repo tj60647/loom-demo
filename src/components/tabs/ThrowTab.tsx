@@ -159,8 +159,6 @@ export default function ThrowTab() {
   const [sentence, setSentence] = useState("")
   const [namingFor, setNamingFor] = useState<string | null>(null)
   const [nameDraft, setNameDraft] = useState("")
-  const [showOutside, setShowOutside] = useState(false)
-  const [outsideFilter, setOutsideFilter] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   // A tapped suggestion is a starting point, not the answer — return focus to
@@ -227,15 +225,17 @@ export default function ThrowTab() {
     setDrawn(false)
   }
 
-  // The shuttle draws inside this reading by default; `across` opens it to the
-  // whole graph once another reading has concepts. Chance picks the pair —
-  // every judgment about whether they cross is still the student's.
-  const drawPair = async (across = false) => {
-    const cs = across ? state.concepts : scoped.concepts
+  // The shuttle draws from whatever is in scope — this reading's concepts here,
+  // every concept at the whole weave. It no longer takes an `across` flag:
+  // linking works on this reading (TJ, 2026-08-08), and at the whole weave the
+  // scope already IS everything. Chance picks the pair; every judgment about
+  // whether they cross is still the student's.
+  const drawPair = async () => {
+    const cs = scoped.concepts
     if (cs.length < 2) {
       await notify({
         title: "Not enough warp yet.",
-        body: across
+        body: wholeWeave
           ? "Lay at least two concepts, then the shuttle has something to draw between."
           : "Lay at least two concepts in this reading on 01 · Reading, then the shuttle has something to draw between.",
       })
@@ -334,27 +334,18 @@ export default function ThrowTab() {
   // the move weeks 6-13 are built on.
   // Both bands are lists you SEARCH for a concept to pick, so both are A-Z.
   const warp = sortedByLabel(scoped.concepts)
-  const outside = sortedByLabel(
-    outsideFilter.trim()
-      ? scoped.outside.filter(c => c.label.toLowerCase().includes(outsideFilter.trim().toLowerCase()))
-      : scoped.outside
-  )
 
-  const conceptRow = (c: typeof state.concepts[number], fromElsewhere: boolean) => {
+  const conceptRow = (c: typeof state.concepts[number]) => {
     const isPicked = pairA === c.id || pairB === c.id
     const noev = bytesOf(c.id).length === 0
-    const where = fromElsewhere ? readingsOf(c.id, state.bytes).map(titleOf) : []
     return (
       <div
         key={c.id}
         className={`crow ${isPicked ? "picked" : ""}`}
         onClick={() => togglePick(c.id)}
-        title={fromElsewhere ? "evidenced in another reading — tap to thread it to this one" : "tap to load into the bench"}
+        title="tap to load into the bench"
       >
-        <div className="clabel">
-          {c.label}
-          {where.length > 0 && <span className="fromwhere">{where.join(" · ")}</span>}
-        </div>
+        <div className="clabel">{c.label}</div>
         {isPicked
           ? <div className="pickedtag">PICK {pairA === c.id ? 1 : 2}</div>
           : (noev && <div className="pickedtag" style={{ color: "var(--red)" }} title="no captured passage — every concept should trace to a passage">no evidence</div>)}
@@ -462,41 +453,26 @@ export default function ThrowTab() {
           <p className="hint">
             {wholeWeave
               ? <>Every concept you have made, across all your readings. Tap one, then a second.</>
-              : <>The concepts this reading evidences. Tap one, then a second — or reach into another reading below, which is how a thread comes to run between texts.</>}
+              : <>The concepts <b>this reading</b> evidences — the ones you captured a passage for here. Tap one, then a second.</>}
           </p>
+          {/* Ruled 2026-08-08 (TJ): linking works on this reading's concepts.
+              A concept you met elsewhere joins the warp the honest way — you
+              find a passage HERE that embodies it and file it under that same
+              concept, which is offered by name while you capture. */}
+          {!wholeWeave && scoped.outside.length > 0 && (
+            <p className="ghostnote">
+              {scoped.outside.length} more concept{scoped.outside.length !== 1 ? "s" : ""}{" "}
+              from your other readings are not listed here — this bench links what
+              <i> this</i> reading evidences. To bring one in, capture a passage from this
+              reading and file it under that concept while naming it; it then joins the
+              warp above.
+            </p>
+          )}
 
           <div className="scrollbox">
             {warp.length === 0 ? (
               <EmptyState caption="lay some warp on 01 — open first" />
-            ) : warp.map(c => conceptRow(c, false))}
-
-            {scoped.outside.length > 0 && (
-              <div className="outsideband">
-                <button
-                  type="button"
-                  className={`bandtoggle ${showOutside ? "open" : ""}`}
-                  aria-expanded={showOutside}
-                  onClick={() => setShowOutside(v => !v)}
-                >
-                  <span className="tw">▸</span> from your other readings
-                  <span className="n">({scoped.outside.length})</span>
-                </button>
-                {showOutside && (
-                  <>
-                    <div className="quietrow" style={{ padding: "6px 10px" }}>
-                      <input
-                        value={outsideFilter}
-                        onChange={e => setOutsideFilter(e.target.value)}
-                        placeholder="find a concept from another reading…"
-                      />
-                    </div>
-                    {outside.length === 0
-                      ? <p className="ghostnote" style={{ padding: "0 10px 10px" }}>nothing by that name.</p>
-                      : outside.map(c => conceptRow(c, true))}
-                  </>
-                )}
-              </div>
-            )}
+            ) : warp.map(c => conceptRow(c))}
           </div>
         </div>
 
@@ -511,15 +487,9 @@ export default function ThrowTab() {
             <button className="btn ghost mini" onClick={() => drawPair()} title="chance picks two threads you'd never elect — you do all the judging">
               ⤳ let the shuttle draw
             </button>
-            {!wholeWeave && scoped.outside.length > 0 && (
-              <button
-                className="btn ghost mini"
-                onClick={() => drawPair(true)}
-                title="chance reaches into your other readings too — you still do all the judging"
-              >
-                ⤳ across readings
-              </button>
-            )}
+            {/* No "across readings" draw here any more (TJ, 2026-08-08): this
+                bench links THIS reading's concepts. The shuttle can still reach
+                across at the whole weave, where every concept is in scope. */}
           </div>
 
           <div className="slots">
