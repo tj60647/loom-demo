@@ -86,6 +86,16 @@ function ClothFold() {
           ? "A title and a short interpretation for everything at once — every reading, one cloth."
           : "Your work on this reading, under your own name for it. The title is a sentence or headline — yours, not the reading's — and both show on the reading's card in the Library."}
       </p>
+      {/* The cloth is the whole of your work here; a projection is one lens on
+          it. Both carry a title and a description, and students reasonably
+          assume they are the same field — they are not, and a projection's
+          travel with the projection. */}
+      <p className="hint" style={{ marginTop: 6, color: "var(--ink-soft)" }}>
+        This names <b>the cloth</b> — everything you have woven{wholeWeave ? "" : " from this reading"}.
+        A <b>projection</b> on 04 · Knowledge Graph is one arrangement of it, a particular lens,
+        and carries its <i>own</i> title, one-line and description. Keep several projections and
+        each keeps its own; they can say quite different things about the same cloth.
+      </p>
       <div className="form-row">
         <span className="label">Cloth Title</span>
         <input
@@ -109,6 +119,32 @@ function ClothFold() {
     </details>
   )
 }
+
+/**
+ * The four moves of a thread, named rather than abbreviated.
+ *
+ * `railN` indexes this: 0 nothing picked · 1 one picked · 2 both picked, no
+ * sentence · 3 sentence written. `says` is the line under the bar, so the
+ * student reads what to do now rather than inferring it from a lit pill.
+ */
+const STEPS: { label: string; says: string }[] = [
+  {
+    label: "Pick a concept",
+    says: "Tap a concept in the warp on the left — one you have evidence for in this reading.",
+  },
+  {
+    label: "Pick a second",
+    says: "Tap the concept you think it hangs together with. Two picked is what wakes the bench.",
+  },
+  {
+    label: "Say how they relate",
+    says: "Write it as a sentence you would defend out loud. Long and awkward is fine — the sentence IS the thread.",
+  },
+  {
+    label: "Throw the thread",
+    says: "Throw it, and the pair is joined. Afterwards you can coin a short label for the kind of link, so a word of yours can recur.",
+  },
+]
 
 export default function ThrowTab() {
   // Scoped for what this reading is about; whole for anything that has to be
@@ -404,14 +440,20 @@ export default function ThrowTab() {
 
   return (
     <>
-      <div className="rail">
-        {['pick', 'pick', 'say', 'throw'].map((label, r) => (
+      {/* Four pills reading "pick · pick · say · throw" said the shape of the
+          move but not the move. Numbered, named, and with the current step
+          spelled out underneath, so the bar teaches instead of labelling. */}
+      <div className="rail steprail">
+        {STEPS.map((step, r) => (
           <span key={r} style={{ display: 'contents' }}>
-            {r > 0 && <span className="rsep">·</span>}
-            <span className={`rstep ${r === railN ? 'now' : ''} ${r < railN ? 'done' : ''}`}>{label}</span>
+            {r > 0 && <span className="rsep">→</span>}
+            <span className={`rstep ${r === railN ? 'now' : ''} ${r < railN ? 'done' : ''}`}>
+              <span className="stepn">{r + 1}</span> {step.label}
+            </span>
           </span>
         ))}
       </div>
+      <p className="hint steprailnote">{STEPS[railN]?.says}</p>
       <ClothFold />
       <div className="two">
         <div className="card">

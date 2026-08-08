@@ -222,15 +222,13 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
     }
   }, [focusByteId, onFocusHandled, state.bytes])
 
-  return (
-    <div className={compact ? "onecol" : "two"}>
-      <div className="card">
+  const captureHeading = (
         <h2 className="heading-with-info">
           Capture a passage
           <button
             type="button"
             className="iconbtn"
-            aria-label="Two ways to capture a passage"
+            aria-label="How capturing a passage works"
             aria-haspopup="dialog"
             aria-expanded={showCaptureInfo}
             aria-controls="captureInfoDialog"
@@ -243,6 +241,10 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
             </svg>
           </button>
         </h2>
+  )
+
+  const captureInfo = (
+    <>
         {showCaptureInfo && (
           <div className="info-scrim" onClick={() => setShowCaptureInfo(false)}>
             <section
@@ -265,19 +267,25 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
                   <path d="m6 6 12 12" />
                 </svg>
               </button>
-              <div className="info-k">same passage, different doorway</div>
-              <h2 id="captureInfoTitle">Two ways to capture a passage</h2>
+              <div className="info-k">the author&apos;s words, and your name for them</div>
+              <h2 id="captureInfoTitle">Capturing a passage</h2>
               <p>
                 A passage is always the same thing: the author&apos;s words you want to keep, attached to a concept you name.
               </p>
               <p>
-                <b>Manual capture</b> starts here. Paste or type the passage, add source and location if you have them, then name what the passage is about.
+                This reading has no text in Loom — you added it as a card for something the
+                library does not hold — so you carry the passage across yourself. Paste or
+                type it, add the source and location, then name what it is about.
               </p>
               <p>
-                <b>Assisted capture</b> starts in the reading — <b>00 · Reading</b>, the text itself. Select the passage there and capture it. Loom fills in the passage, source, page, and highlight anchor for you.
+                In a reading that <i>does</i> have its text here, you capture by <b>selecting
+                the words on the page</b> instead. Loom fills in the passage, source and page,
+                and anchors it so it lights up whenever you open the reading.
               </p>
               <p>
-                In both paths, the thinking stays yours. The word chips are only a scaffold: tap useful words from the passage, reuse an existing concept, or type a new phrase in your own language.
+                Either way the thinking stays yours. The word chips are only a scaffold: tap
+                useful words from the passage, reuse an existing concept, or type a new phrase
+                in your own language.
               </p>
               <p className="info-note">
                 Nothing is generated. Loom helps you carry the quote; you make the code.
@@ -286,7 +294,12 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
             </section>
           </div>
         )}
-        <p className="do">Do this — paste a passage here, or select text in the reading itself. Then name the concept it evidences, and gloss it in your own words.</p>
+    </>
+  )
+
+  const captureForm = (
+    <>
+        <p className="do">Do this — paste or type the passage, then name the concept it evidences and gloss it in your own words.</p>
         <p className="hint">A passage = the author&apos;s words, verbatim, with its citation. Choosing the passage is <i>your</i> judgment — that&apos;s the point. Loom can carry over source details and offer passage words to tap; it does not summarize or choose the concept for you.</p>
         
         <div className="form-row">
@@ -438,8 +451,10 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
             </button>
           </div>
         )}
-      </div>
+    </>
+  )
 
+  const logCard = (
       <div className="card">
         <h2>Capture log <span className="n">{scoped.bytes.length ? `(${scoped.bytes.length} passages · ${scoped.concepts.length} concepts)` : ""}</span></h2>
         <p className="do calm">Everything you capture from this reading lands here, A–Z.</p>
@@ -596,7 +611,10 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
 
         {scoped.outside.length > 0 && (
           <p className="ghostnote" style={{ marginTop: "10px" }}>
-            {scoped.outside.length} concept{scoped.outside.length !== 1 ? "s" : ""} from your other readings —
+            {/* Explicit {" "}: JSX drops the literal space that follows an
+                expression at a line end, which read as "7 conceptsfrom". */}
+            {scoped.outside.length} concept{scoped.outside.length !== 1 ? "s" : ""}{" "}
+            from your other readings —
             not hidden, just not evidenced here. Type one&apos;s name above to file a passage from this
             reading under it, or see them all in <Link href="/weave">your whole weave</Link>.
           </p>
@@ -612,6 +630,50 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
           <button className="btn ghost mini" onClick={handleAddConceptOnly}>Add</button>
         </div>
       </div>
+  )
+
+  // Two shapes, because the doorway differs (TJ, 2026-08-08).
+  //
+  // Beside a text you can select, the LOG is the rail and capture by hand is a
+  // fold at its foot. Typing a passage that is on screen invites paraphrase
+  // where the rule is the author's words verbatim, re-enters a page number the
+  // viewer already knows exactly, and — because a typed passage carries no
+  // offsets — produces a passage that never highlights, sitting in the same
+  // list as ones that do. The fold stays because a scanned page has no text
+  // layer to select from, and this library has those.
+  if (compact) {
+    return (
+      <div className="onecol">
+        {logCard}
+        <details className="card handfold">
+          <summary>
+            <span className="tw">▸</span>
+            <h2>Capture a passage by hand</h2>
+          </summary>
+          <p className="hint" style={{ marginTop: "10px" }}>
+            Normally you capture by <b>selecting the words in the text</b> beside this —
+            that keeps the passage verbatim and anchors it to the page, so it lights up
+            whenever you open the reading. Type one here only when you cannot select it:
+            a scanned page, a figure&apos;s caption, or something you are quoting from
+            paper. A typed passage is not anchored and will not highlight.
+          </p>
+          {captureForm}
+        </details>
+      </div>
+    )
+  }
+
+  // No text to select from — a reference-only reading the student minted for
+  // something the library does not hold. Here typing IS the only doorway, so
+  // the form leads.
+  return (
+    <div className="two">
+      <div className="card">
+        {captureHeading}
+        {captureInfo}
+        {captureForm}
+      </div>
+      {logCard}
     </div>
   )
 }

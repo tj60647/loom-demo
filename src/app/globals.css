@@ -629,3 +629,17 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
   .readinglog { position: absolute; inset: 0 0 0 auto; width: min(100%, 460px); z-index: 5; }
   .readingsplit { position: relative; }
 }
+/* Capture by hand, folded at the foot of the capture log (2026-08-08). Quiet
+   on purpose: beside a text you select, this is the exception, not the way in. */
+.handfold > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; }
+.handfold > summary::-webkit-details-marker { display: none; }
+.handfold > summary h2 { display: inline; font-size: 15px; color: var(--ink-soft); }
+.handfold[open] > summary h2 { color: var(--ink); }
+.handfold[open] > summary .tw { transform: rotate(90deg); }
+/* The Linking step bar: named moves, not four abbreviations (TJ, 2026-08-08). */
+.steprail .rstep { text-transform: none; letter-spacing: .01em; font-family: var(--body); font-size: 12.5px; }
+.steprail .stepn {
+  font-family: var(--mono); font-size: 10px; opacity: .7; margin-right: 3px;
+}
+.steprail .rsep { font-size: 12px; }
+.steprailnote { margin: -8px 0 16px; font-size: 13px; }

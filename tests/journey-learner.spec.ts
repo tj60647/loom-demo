@@ -97,6 +97,11 @@ test("01 · a byte captured by hand lands in the coding log — and cleans up", 
   await page.locator("nav button", { hasText: "Reading" }).click()
   await loomLoaded(page)
   await openCaptureLog(page)
+  // Beside a text you can select, capture-by-hand is a fold at the foot of the
+  // log (TJ, 2026-08-08) — typing a passage that is on screen is the exception,
+  // so it is one deliberate click away rather than the first thing you meet.
+  await page.locator(".readinglog details.handfold > summary").click()
+  await expect(page.locator("#bText")).toBeVisible({ timeout: 15_000 })
 
   await page.locator("#bText").fill("A passage typed by the journey suite, verbatim enough for the log.")
   await page.getByPlaceholder("e.g. boundary objects · satisficing · valence").fill("journey test concept")
