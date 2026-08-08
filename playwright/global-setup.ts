@@ -2,13 +2,17 @@ import { request, FullConfig } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 
-// Two storage states, two identities (see /api/auth/test-login):
-// - user.json   → the admin, for /admin surfaces (library-verify).
-// - testa.json  → "Test User A", the account that owns every concept, byte and
+// Three storage states, three identities (see /api/auth/test-login):
+// - user.json    → the admin, for /admin surfaces (library-verify).
+// - testa.json   → "Test User A", the account that owns every concept, byte and
 //   map the suite creates, so test data never pollutes a real person's loom.
+// - faculty.json → "Test Faculty", FACULTY on the course membership only. The
+//   admin state cannot stand in for this: an ADMIN passes every gate, so it
+//   would assert nothing about the narrower door faculty come through.
 const STATES = [
   { file: 'playwright/.auth/user.json', query: '' },
   { file: 'playwright/.auth/testa.json', query: '?as=testa' },
+  { file: 'playwright/.auth/faculty.json', query: '?as=faculty' },
 ];
 
 async function globalSetup(config: FullConfig) {

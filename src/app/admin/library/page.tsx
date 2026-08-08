@@ -1,3 +1,4 @@
+import { checkAdmin } from "@/actions/admin"
 import { getRepairSummary, getRepairsForSource } from "@/actions/repairs"
 import {
   addSourceToCourse,
@@ -44,6 +45,12 @@ export default async function AdminLibraryPage({
 }: {
   searchParams: Promise<AdminLibrarySearchParams>
 }) {
+  // The shell admits course FACULTY (ruling 18) but this is a write surface and
+  // stays admin's. Gate the page the way the Courses tab does — a redirect —
+  // rather than leaving it to the first action's `Unauthorized` throw, which
+  // faculty who typed the URL met as a 500 error page.
+  await checkAdmin()
+
   const resolved = await searchParams
   const activeCourseId = await resolveCourseId(firstParam(resolved.course))
   const activeCourse = activeCourseId ? await getCourse(activeCourseId) : null

@@ -1,5 +1,72 @@
 # Next Session Prompt
 
+## Addendum, 2026-08-08 (faculty walk through a browser, and a door that erred)
+
+**Read this first. The faculty path — carried as untested for three sessions —
+is now walked end to end by the suite, and doing it found one real bug.**
+
+One commit on `dev` after `73bb176`. `npm run check`, `next build` and the full
+Playwright suite (**39 passed / 1 skipped**, the pre-existing skip) are green;
+**no migration** — this is a test identity and a page gate.
+
+### What was blocking it, and what unblocked it
+
+The note said "the backdoor mints Test User A only", and that was the whole
+obstacle. `/api/auth/test-login` now mints a **third identity**, `?as=faculty`:
+`test-faculty@loom.local`, site role **USER**, course membership role
+**FACULTY**, homed in the ensured Faculty Section. That distinction is the
+point — the admin storage state cannot stand in for this, because an ADMIN
+passes every gate and would assert nothing about the narrower door.
+
+One trap worth not re-stepping in: the enrolment upsert now re-sets `role` on
+conflict (so a promotion never leaks between runs) but deliberately **does not
+write `sectionId` for a learner**. Writing it would have unplaced seed-demo's
+Test User A from Section 1 on every global setup, and the Overlays' section
+band would have gone empty — a green-looking failure in a different spec file.
+
+### The bug the browser found
+
+**`/admin/library` had no page-level gate.** `/admin/courses` opens with
+`checkAdmin()`, which redirects; library leaned on `getLibraryOverview()`
+*throwing* `Unauthorized`. That was invisible while only admins could reach the
+shell — but P3.12 taught the layout to admit faculty, so a faculty member who
+typed the URL got **HTTP 500, "This page couldn't load"**, measured, not
+reasoned. It is a closed door either way; it just read as a broken app. Now
+gated the same way the Courses tab is, and `tests/faculty.spec.ts` asserts both
+write tabs redirect rather than error. Verified the route is still **ƒ
+(Dynamic)** in the build output.
+
+**A new page under `/admin` must gate itself** — the layout's check shapes the
+shell, not the authorization.
+
+### Checked and found sound (so nobody re-derives it)
+
+- **Faculty cannot read another course's work.** `getUserLoomDataAsAdmin`
+  scopes every query by `courseId` *and* re-runs `checkCourseFaculty`, and the
+  page clamps the course through `getStaffViewer` first. A bogus user id
+  renders an empty loom rather than leaking one.
+- The roster shows faculty **no** write control — no invite fold, no
+  Make faculty / Return to learner, no Remove, no Withdraw, no section Assign —
+  while keeping Open Loom.
+- Their own learner workspace is untouched (capabilities are additive).
+
+### What remains
+
+- **Next's queue bug is still there** (vercel/next.js#90467), routed around
+  rather than repaired: a *mutation* in flight when a navigation commits can
+  still corrupt the queue's canonical URL. No known user path hits it —
+  re-measure with `scripts/repro-action-bounce.mjs` after a Next upgrade.
+- **The enrolment-time faculty path is still asserted without a browser.** An
+  invitation to the Faculty Section enrolling as FACULTY is covered by
+  `scripts/check-auth.ts --db`; the backdoor mints the membership directly, so
+  it does not exercise `events.signIn`. That is the same untestable seam as the
+  fresh-GitHub-account smoke test, not a new gap.
+- **D4 and the Open/Reading merge** are still TJ's calls. Station 03 is
+  labelled Vocabulary but still holds the read-the-cloth prompts.
+- The [SENSITIVE] `.env.production.local` still breaks `next build`; this
+  session moved it aside and restored it. **Delete it or re-pull real values** —
+  it has now cost a mv/mv on four consecutive sessions.
+
 ## Addendum, 2026-08-07 latest (the shelf bounce, fixed at the mechanism)
 
 **Read this first. The navigation bounce — the highest-value open item the

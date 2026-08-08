@@ -24,6 +24,9 @@
 > Server Functions for reads — every client read GETs a thin `/api` route via
 > `src/lib/reads.ts` (§3), taking reads off the App Router action queue whose
 > navigation race (vercel/next.js#90467) bounced students to the library.
+> **Faculty walked through a browser** (2026-08-08): `tests/faculty.spec.ts` signs
+> in as a FACULTY membership for the first time; `/admin/library` gained the
+> `checkAdmin()` redirect it had been missing (§2c).
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
@@ -31,7 +34,7 @@ Companion to the *why* — now [loom-model-build.md](loom-model-build.md) (autho
 [loom-refactor-spec.md](loom-refactor-spec.md) (work order); historically
 [archive/loom-spec-v1.md](archive/loom-spec-v1.md). This is the *what, exactly*.
 
-**As of:** `dev`, 2026-08-07 — P3.12 auth-side, P3.13 (the cloth on the card), P3.14 (Overlays), the shelf-bounce fix (client reads via `/api`).
+**As of:** `dev`, 2026-08-08 — P3.12 auth-side, P3.13 (the cloth on the card), P3.14 (Overlays), the shelf-bounce fix (client reads via `/api`), the faculty browser pass.
 Re-stamp when it reaches master. Line numbers cite that branch and will drift; names
 and shapes are the contract, line numbers are a courtesy.
 
@@ -225,6 +228,19 @@ course's `faculty`-slug Section enrols the member with `role = 'FACULTY'`
 (fresh enrolment only — reinstatement never re-roles; asserted in
 `scripts/check-auth.ts --db`).
 
+**The write surfaces gate themselves, by redirect.** Because the layout now
+admits faculty, `/admin/library` and `/admin/courses` each call `checkAdmin()`
+as their first statement. Library previously had no page-level gate and leaned
+on `getLibraryOverview`'s `Unauthorized` **throw**, which faculty who typed the
+URL met as a 500 error page rather than a closed door (fixed 2026-08-08). A new
+page under `/admin` must gate itself the same way — the layout's own check is
+shaped for the shell, not for authorization.
+
+Walked through a browser by `tests/faculty.spec.ts` (storage state
+`playwright/.auth/faculty.json`, minted by `/api/auth/test-login?as=faculty`):
+the read side opens, the write surfaces redirect, the roster's write controls
+are absent, and their own learner workspace still works.
+
 | Action | Params | Returns |
 | --- | --- | --- |
 | `getClassData` | `courseId?, sectionId?` | per-member `{id,name,email,section,role,conceptsCount,edgesCount}` (active members only) |
@@ -305,7 +321,7 @@ section belongs to the course).
 | Route | Behavior | Auth |
 | --- | --- | --- |
 | `GET/POST /api/auth/[...nextauth]` | NextAuth (GitHub OAuth, scope **`user:email`** only). Identity: the provider's `userinfo` override reads `GET /user/emails` on **every** sign-in and keeps only `verified === true` addresses, minus `@users.noreply.github.com`; of those it signs the student in as the first one `emailHasAppAccess` accepts, else the primary. Sign-in still admitted by `emailHasAppAccess` alone: admin fallback email ∨ any course invitation ∨ any active membership ∨ legacy allowlist. Refusals return a path, not `false` — `/auth/error?error=NoVerifiedEmail` or `?error=NotOnRoster&email=…`. Enrolment happens in `events.signIn` → `enrolInvitedCourses()` (first-OAuth `user.id` is GitHub's in the callback), idempotent upsert clearing `removedAt`. **Second provider, `email`** (guest door): registered *only* where `RESEND_API_KEY` **and** `EMAIL_FROM` are both set — absent in dev and CI, so GitHub is the sole provider there. Mailed single-use link, 24 h, token minted and hashed into `verificationToken` by NextAuth; delivery is a `fetch` to Resend (nodemailer is never required — the provider object is built inline). Both providers run the same `decideSignIn` gate, and for `email` it runs **twice**: once at the send step (`email.verificationRequest`), so an address no course invited is never mailed, and again when the link is clicked | — |
-| `GET /api/auth/test-login?as=testa` | Mints a 30-day DB session + cookies; default identity is the admin, `?as=testa` = `test-user-a@loom.local` (LEARNER, enrolled into the oldest course). Returns `{success, userId, sessionToken}` | **403 in production** (first statement); no other guard — dev/CI only |
+| `GET /api/auth/test-login?as=…` | Mints a 30-day DB session + cookies. Three identities: default = the admin; `?as=testa` = `test-user-a@loom.local` (LEARNER); `?as=faculty` = `test-faculty@loom.local` (site role USER, **membership** role FACULTY, homed in the ensured Faculty Section). All enrolled into the oldest course; the membership role is re-set on conflict so a promotion never leaks between runs, but a **learner's section is left alone** (writing one would unplace seed-demo's Test User A from Section 1 and empty the Overlays' section band). Returns `{success, userId, sessionToken}` | **403 in production** (first statement); no other guard — dev/CI only |
 | `GET /api/readings/[sourceId]?download=1` | Streams the PDF (never buffered — 4.5 MB serverless cap), RFC 6266 filename, `Cache-Control: private`. Errors: 401 / 404 / 500 JSON | Session required **in production only**; then `authorizeSourceFile` |
 | `GET /api/readings/[sourceId]/cover` | PNG cover (cached at `covers/<id>.png`; re-rendered from the PDF only on a cache miss) or SVG fallback (`no-store`) | No check of its own — inherits `authorizeSourceFile` via `getSourceForCover` (bytes-free) |
 | `POST /api/readings/upload` | Vercel Blob client-upload token exchange. Token scoped: private, PDFs only, ≤ 20 MB, path under `readings/`, random suffix. `onUploadCompleted` deliberately omitted — the client calls `registerUploadedReading` / `registerOwnUploadedReading` itself | Any signed-in session (sign-in is allowlist-gated), checked twice; what the blob may be registered *as* is decided by the register actions |

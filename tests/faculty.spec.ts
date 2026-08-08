@@ -1,0 +1,102 @@
+/**
+ * The faculty path through a browser (ruling 18) — the half of P3.12 that had
+ * only ever been type-checked and reasoned about.
+ *
+ * Runs as "Test Faculty": site role USER, course membership role FACULTY. That
+ * distinction is the whole point, and it is why the admin storage state cannot
+ * stand in here — an ADMIN passes every gate, so it would prove nothing about
+ * the narrower door. Minted by /api/auth/test-login?as=faculty, homed in the
+ * course's Faculty Section.
+ *
+ * The shape being asserted: faculty hold the READ side of their own course
+ * (Roster, Cohort Graph, a student's loom) and nothing else — the write
+ * surfaces, the roster's own write controls, and every other course stay shut.
+ * Capabilities are additive, so their own learner workspace is untouched.
+ */
+import { test, expect } from "@playwright/test"
+
+test.use({ storageState: "playwright/.auth/faculty.json" })
+
+// The admin shell renders a roster and a cohort graph over real seeded work.
+test.beforeEach(() => test.setTimeout(120_000))
+
+test("faculty enter /admin bare and land on their own course's roster", async ({ page }) => {
+  await page.goto("/admin")
+
+  await expect(page).toHaveURL(/\/admin$/, { timeout: 15_000 })
+  await expect(page.getByRole("heading", { name: "Roster" })).toBeVisible({ timeout: 15_000 })
+  // getStaffViewer resolved a course for them rather than redirecting home:
+  // the roster names it and carries rows.
+  await expect(page.locator(".rosterrow", { hasText: "Test User A" })).toHaveCount(1)
+})
+
+test("the nav offers the read side only — no Readings, no Courses", async ({ page }) => {
+  await page.goto("/admin")
+  const nav = page.locator("nav").first()
+
+  await expect(nav.getByRole("link", { name: "Roster" })).toBeVisible({ timeout: 15_000 })
+  await expect(nav.getByRole("link", { name: "Cohort Graph" })).toBeVisible()
+  await expect(nav.getByRole("link", { name: "← My Loom" })).toBeVisible()
+
+  // The write surfaces are absent from the shell, not merely disabled.
+  await expect(nav.getByRole("link", { name: "Readings" })).toHaveCount(0)
+  await expect(nav.getByRole("link", { name: "Courses" })).toHaveCount(0)
+})
+
+test("the roster is readable but carries none of its write controls", async ({ page }) => {
+  await page.goto("/admin")
+  await expect(page.getByRole("heading", { name: "Roster" })).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator(".rosterrow").first()).toBeVisible()
+
+  // Every admin-only control on this page, absent. A form rendered for someone
+  // whose submit would redirect is the failure this guards against.
+  await expect(page.locator(".invitefold")).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Make faculty" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Return to learner" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: /^Remove / })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: /^Withdraw the invitation/ })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Assign", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Place", exact: true })).toHaveCount(0)
+
+  // What they DO hold: the way into a student's work.
+  await expect(page.getByRole("link", { name: "Open Loom" }).first()).toBeVisible()
+})
+
+test("a student's loom opens read-only from the roster", async ({ page }) => {
+  await page.goto("/admin")
+  const rowA = page.locator(".rosterrow", { hasText: "Test User A" })
+  await expect(rowA).toHaveCount(1, { timeout: 15_000 })
+  await rowA.getByRole("link", { name: "Open Loom" }).click()
+
+  await expect(page).toHaveURL(/\/admin\/user\//, { timeout: 15_000 })
+  await expect(page.getByRole("heading", { name: "Student Loom (Read-Only)" })).toBeVisible()
+  // Seeded work, actually rendered — not an empty shell that would pass every
+  // assertion above while the read gate silently returned nothing.
+  await expect(page.locator(".clabel", { hasText: "object worlds" })).toBeVisible({ timeout: 15_000 })
+})
+
+test("the cohort graph renders for faculty", async ({ page }) => {
+  await page.goto("/admin/aggregate")
+  await expect(page.getByRole("heading", { name: "Cohort Graph" })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText("Aggregate data is temporarily unavailable")).toHaveCount(0)
+  await expect(page.locator(".crow", { hasText: "object worlds" }).first()).toBeVisible({ timeout: 20_000 })
+})
+
+test("the write surfaces turn faculty away instead of erroring", async ({ page }) => {
+  // Regression: /admin/library had no page-level gate, so the shell admitted
+  // faculty and getLibraryOverview's `Unauthorized` throw met them as a 500
+  // error page. Both write tabs now redirect, the way a learner's does.
+  for (const route of ["/admin/library", "/admin/courses"]) {
+    const response = await page.goto(route)
+    expect(response?.status(), `${route} should not error`).toBeLessThan(400)
+    await expect(page, `${route} should return faculty to the shelf`).toHaveURL(/\/$/, { timeout: 15_000 })
+  }
+})
+
+test("faculty keep their own learner workspace", async ({ page }) => {
+  // Capabilities are additive (ruling 18): the read-side view is granted
+  // alongside their own loom, never instead of it.
+  await page.goto("/")
+  await expect(page).toHaveURL(/\/$/, { timeout: 15_000 })
+  await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
+})
