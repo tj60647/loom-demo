@@ -10,25 +10,17 @@ import { expect, type Locator, type Page } from '@playwright/test';
 /**
  * Enter a reading through its shelf card, the way a student does.
  *
- * Since 2026-08-08 (TJ) a card has exactly ONE door. With a cloth, the card
- * body is the link. Without one, the body is inert and **Create Cloth** is the
- * only act — "just read" is a procedure inside a cloth (browse and capture
- * nothing), not a path around it. So a spec cannot assume `.shelfmain` is a
- * link; it must take whichever door the card offers, and creation is a real
- * write the first time a spec meets an unclothed reading.
+ * The card IS the entry point (TJ, 2026-08-08): one cloth per reading per user
+ * and your Base Cloth is simply there, so there is no Create Cloth button and
+ * no decision — opening the reading opens your work on it. The row beneath is
+ * metadata, never a control.
  */
 export async function enterReadingFromCard(page: Page, card: Locator) {
   // Wait for the loom to load first. The card renders "…" in its tally while
   // the graph is in flight and re-renders when the counts arrive — clicking
-  // into that re-render detaches the node and the click lands on nothing. It
-  // is also what decides which door is rendered.
+  // into that re-render detaches the node and the click lands on nothing.
   await expect(card.locator('.shelftally')).not.toHaveText('…', { timeout: 15000 });
-  const door = card.locator('a.shelfmain');
-  if (await door.count()) {
-    await door.click();
-  } else {
-    await card.getByRole('button', { name: 'Create Cloth' }).click();
-  }
+  await card.locator('a.shelfmain').click();
   await expect(page).toHaveURL(/\/reading\//, { timeout: 15000 });
 }
 

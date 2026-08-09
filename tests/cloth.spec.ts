@@ -22,7 +22,7 @@ async function loomLoaded(page: import("@playwright/test").Page) {
   await expect(page.getByText("Loading your loom...")).toHaveCount(0, { timeout: 20_000 })
 }
 
-test("a cloth is created explicitly on the card, named in Reading, and opens by name", async ({ page }) => {
+test("the card opens the reading, and carries the cloth's name and last edit", async ({ page }) => {
   await page.goto("/")
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
   await expect(card).toBeVisible({ timeout: 15_000 })
@@ -31,12 +31,9 @@ test("a cloth is created explicitly on the card, named in Reading, and opens by 
   // The cloth row renders once the loom has loaded. Creation is explicit —
   // the card link itself must never mint a cloth — so the row offers exactly
   // one of the two doors.
-  // Exactly one door (TJ, 2026-08-08): with a cloth the card body is the link,
-  // without one Create Cloth is the only act. Either opens the READING — a
-  // cloth starts where you read and gather, not where you name it.
-  const create = card.getByRole("button", { name: "Create Cloth" })
-  const door = card.locator("a.shelfmain")
-  await expect(create.or(door)).toBeVisible({ timeout: 15_000 })
+  // The card itself is the entry point — no Create Cloth button exists any
+  // more, because there is no decision to make (TJ, 2026-08-08).
+  await expect(card.getByRole("button", { name: "Create Cloth" })).toHaveCount(0)
   await enterReadingFromCard(page, card)
   await loomLoaded(page)
 
@@ -68,7 +65,7 @@ test("a cloth is created explicitly on the card, named in Reading, and opens by 
   await expect(cardAgain.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
   await expect(cardAgain.locator(".clothname")).toHaveText(CLOTH_TITLE, { timeout: 15_000 })
   await expect(cardAgain.locator(".clothmeta")).toContainText(/edited/)
-  // The name is information; the card body is the door, and there is only one.
+  // The name is metadata; the card body is the one door.
   await expect(cardAgain.locator("a.shelfmain")).toHaveAttribute("href", /\/reading\/[^?]+$/)
-  await expect(cardAgain.getByRole("button", { name: "Create Cloth" })).toHaveCount(0)
+  await expect(cardAgain.locator(".clothrow button")).toHaveCount(0)
 })

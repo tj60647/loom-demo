@@ -35,11 +35,12 @@
 > and admin flows from `src/lib/workflows.ts`. **Refactor a workflow, update that
 > file** — §2c-ii, enforced by `npm run check`.
 > **A cloth starts in Reading, and the card has one door** (2026-08-08, TJ):
-> with a cloth the card body opens it at **01 · Reading** and the cloth's row is
-> information (Title + when last edited); without one the body is **inert** and
-> Create Cloth is the only act. "Just read" is a procedure inside a cloth, not a
-> path around it — there is no way into a reading that skips the cloth, which is
-> what resolves the reading/cloth overlap. `ClothFold` moved to 01 · Reading
+> the card body opens the reading at **01 · Reading** and the cloth's row beneath
+> is **metadata, not a control** — Title (or "Base cloth") + when last edited.
+> There is no Create Cloth button: one cloth per reading per user, so there is no
+> decision to make. "Just read" is a procedure inside a cloth, not a path around
+> it — there is no way into a reading that skips the cloth, which is what
+> resolves the reading/cloth overlap. `ClothFold` moved to 01 · Reading
 > too, staying on Linking only at the whole weave.
 > **Consequence for specs:** `.shelfmain` is a link only when a cloth exists, so
 > tests enter through `enterReadingFromCard` in `tests/helpers.ts`, which takes

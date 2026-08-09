@@ -10,7 +10,6 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings, type ReadingMeta } from "@/components/providers/ReadingsProvider"
@@ -32,13 +31,9 @@ export default function Shelf() {
   // See the note in Workbench: `status` is what distinguishes "nobody is
   // signed in" from "we have not asked yet".
   const { data: session, status } = useSession()
-  const { state, isLoading, loadExample, flash, updateCloth } = useLoom()
+  const { state, isLoading, loadExample, flash } = useLoom()
   const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
-  const router = useRouter()
   const [exampleBusy, setExampleBusy] = useState(false)
-  // The reading whose Create Cloth is in flight, so double-clicks and a second
-  // card's button both wait for the first create to land.
-  const [creatingClothFor, setCreatingClothFor] = useState<string | null>(null)
   // The search bar sits behind a toggle, the reading's own ⌕ Search idiom.
   // While a query is live the results own the page; clearing the box — or
   // closing the panel — puts the week-grouped shelf back exactly as it was.
@@ -110,27 +105,6 @@ export default function Shelf() {
     )
   }
 
-  // Create is an explicit act, never a side effect of opening (the model's
-  // reading-card ruling) — so it writes the cloth row first, then walks in.
-  // On failure updateCloth has already flashed and resynced; staying on the
-  // shelf keeps the card honest about what exists.
-  const createCloth = async (sourceId: string) => {
-    setCreatingClothFor(sourceId)
-    try {
-      const ok = await updateCloth({}, sourceId)
-      if (ok) {
-        // A cloth starts in READING (TJ, 2026-08-08): that is where you read
-        // and gather, and the title can wait — an untitled cloth is a fine
-        // state, and the card says so. It briefly landed on Linking, which put
-        // the naming of the work before the work.
-        flash("cloth created — start reading")
-        router.push(`/reading/${sourceId}`)
-      }
-    } finally {
-      setCreatingClothFor(null)
-    }
-  }
-
   const readingCard = (s: ReadingMeta) => {
     const tally = tallies.get(s.id)
     // 0 or 1 today: the schema's `onePerScope` unique allows exactly one cloth
@@ -146,7 +120,11 @@ export default function Shelf() {
     // body opens it; without one, the card is inert and Create Cloth is the
     // only act. That also keeps creation explicit: a card click never mints a
     // cloth, it simply does nothing until you have asked for one.
-    const hasCloth = clothsHere.length > 0
+    // The reading card IS the entry point (TJ, 2026-08-08). There is no Create
+    // Cloth button any more and no decision to make: one cloth per reading per
+    // user, and your Base Cloth is simply there — so opening the reading opens
+    // your work on it. The row below is metadata, not a control.
+    const cloth = clothsHere[0] ?? null
     const body = (
       <>
           {s.storageKey ? (
@@ -185,44 +163,27 @@ export default function Shelf() {
       </>
     )
     return (
-      <div key={s.id} className={`shelfcard${hasCloth ? "" : " shelfnodoor"}`}>
-        {hasCloth ? (
-          <Link href={`/reading/${s.id}`} className="shelfmain">{body}</Link>
-        ) : (
-          <div className="shelfmain">{body}</div>
-        )}
-        {/* The cloth row (rulings 20–22, 33), reworked 2026-08-08 (TJ).
-
-            It is INFORMATION when a cloth exists — the name and when it was
-            last edited — because the card above is already the door, and two
-            controls doing one thing is what made this confusing. When there is
-            no cloth it carries the only act on the card. */}
+      <div key={s.id} className="shelfcard">
+        <Link href={`/reading/${s.id}`} className="shelfmain">{body}</Link>
+        {/* Metadata, not a control: your name for this work and when you last
+            touched it. "Base cloth" until you title it — the cloth is always
+            there, so there is nothing here to press. A row only exists once
+            something has been written to it, which is why the date is
+            conditional. */}
         {!isLoading && (
           <div className="clothrow">
-            {hasCloth ? (
-              clothsHere.map((c) => (
-                <span key={c.id} className="clothis">
-                  <span className="clothname">
-                    {c.title.trim() ? short(c.title, 52) : "Untitled cloth"}
-                  </span>
-                  <span className="clothmeta">
-                    {c.title.trim() ? "" : "name it · "}edited {timeAgo(c.updatedAt)}
-                  </span>
+            <span className="clothis">
+              <span className="clothname">
+                {cloth?.title.trim() ? short(cloth.title, 52) : "Base cloth"}
+              </span>
+              {cloth ? (
+                <span className="clothmeta">
+                  {cloth.title.trim() ? "" : "name it · "}edited {timeAgo(cloth.updatedAt)}
                 </span>
-              ))
-            ) : (
-              <>
-                <span className="clothnone">No cloth yet</span>
-                <button
-                  className="btn ghost mini nowrapbtn"
-                  onClick={() => createCloth(s.id)}
-                  disabled={creatingClothFor !== null}
-                  data-tip="your work on this reading — reading and gathering happen inside it, and you need never capture anything"
-                >
-                  {creatingClothFor === s.id ? "Creating…" : "Create Cloth"}
-                </button>
-              </>
-            )}
+              ) : (
+                <span className="clothmeta">nothing written here yet</span>
+              )}
+            </span>
           </div>
         )}
       </div>

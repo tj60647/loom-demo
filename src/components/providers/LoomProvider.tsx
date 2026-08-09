@@ -410,7 +410,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }
 
   // Cloth title/description: optimistic upsert against the given scope (the
-  // current one unless a caller — the shelf's Create Cloth — names another).
+  // current one unless a caller names another scope explicitly).
   const updateCloth = async (data: Partial<{ title: string; description: string }>, scopeKeyArg?: string) => {
     const key = scopeKeyArg ?? scope.key
     const now = new Date()

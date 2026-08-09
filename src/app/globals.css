@@ -660,10 +660,5 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
 .clothmeta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft); white-space: nowrap; }
-.clothnone { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
-  text-transform: uppercase; color: var(--grey); flex: 1 1 auto; }
-
-/* A card with no cloth has no door: nothing to hover, and the cursor should not
-   promise a click that does nothing (TJ, 2026-08-08). Create Cloth is the act. */
-.shelfnodoor:hover { border-color: var(--rule); background: transparent; }
-.shelfnodoor .shelfmain { cursor: default; }
+/* The cloth row is metadata now, never a control (TJ, 2026-08-08): the reading
+   card itself is the entry point, so nothing in this row is pressable. */

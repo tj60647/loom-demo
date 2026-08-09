@@ -8,8 +8,9 @@
 // stays on 02 · Linking. Folded either way — the work is the tab's business,
 // the cloth is its name, and an untitled cloth is a fine state.
 //
-// Saving here is also how a cloth begun from the shelf's Create Cloth button
-// gets its title; the shelf card shows the title and when it was last edited.
+// Saving here is what brings a cloth row into existence: the Base Cloth is
+// conceptually always there, and the row is written the first time you title or
+// describe it. The shelf card shows that title and when it was last edited.
 
 import { useState, useEffect, useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
