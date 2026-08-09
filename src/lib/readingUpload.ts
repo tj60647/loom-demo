@@ -11,7 +11,7 @@
  *
  * Uploads go browser → Blob, so this is not bounded by the 4.5MB request-body
  * cap that applies to Server Actions. It is a deliberate policy limit: the
- * bytes still have to be pulled back into a function to extract text and render
+ * passages still have to be pulled back into a function to extract text and render
  * a cover, and a scanned chapter far past this is usually a whole book that
  * wants splitting rather than a reading.
  *
@@ -27,6 +27,6 @@ export const MAX_READING_LABEL = "20MB"
 /** Every client-uploaded reading lands under this prefix. */
 export const READING_UPLOAD_PREFIX = "readings"
 
-export function formatBytes(bytes: number): string {
-  return `${(bytes / 1048576).toFixed(1)}MB`
+export function formatBytes(passages: number): string {
+  return `${(passages / 1048576).toFixed(1)}MB`
 }

@@ -20,11 +20,11 @@ interface CaptureModalProps {
    * through in silence, the modal simply vanishing, and the only sign it had
    * worked was 1500ms of "· saved ·" in the far corner of the header.
    */
-  onCaptured?: (byteId: string, conceptLabel: string) => void;
+  onCaptured?: (passageId: string, conceptLabel: string) => void;
 }
 
 export default function CaptureModal({ passage, source, sourceId, location, pageNumber, startOffset, endOffset, pageContentHash, onClose, onCaptured }: CaptureModalProps) {
-  const { state, addConcept, addByte, editConcept } = useLoom()
+  const { state, addConcept, addPassage, editConcept } = useLoom()
   const [conceptLabel, setConceptLabel] = useState("")
   const [workingDef, setWorkingDef] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -43,7 +43,7 @@ export default function CaptureModal({ passage, source, sourceId, location, page
       } else if (wdef && !concept.def) {
         await editConcept(concept.id, { def: wdef })
       }
-      const saved = await addByte([concept.id], source, location, passage, pageNumber, startOffset, endOffset, sourceId, pageContentHash)
+      const saved = await addPassage([concept.id], source, location, passage, pageNumber, startOffset, endOffset, sourceId, pageContentHash)
       onCaptured?.(saved.id, concept.label)
       onClose()
     } catch(e) {

@@ -61,7 +61,7 @@ export default function Shelf() {
     })
   }, [courseReadings])
 
-  const untethered = state.bytes.filter((b) => !b.sourceId).length
+  const untethered = state.passages.filter((b) => !b.sourceId).length
 
   if (status === "loading") {
     return (
@@ -149,7 +149,7 @@ export default function Shelf() {
                 <span className="shelfquiet">…</span>
               ) : tally ? (
                 <>
-                  {tally.bytes} passage{tally.bytes !== 1 ? "s" : ""} ·{" "}
+                  {tally.passages} passage{tally.passages !== 1 ? "s" : ""} ·{" "}
                   {tally.concepts} concept{tally.concepts !== 1 ? "s" : ""} ·{" "}
                   {tally.threads} thread{tally.threads !== 1 ? "s" : ""}
                 </>
@@ -252,7 +252,7 @@ export default function Shelf() {
             {isLoading ? "reading your loom…" : (
               <>
                 {state.concepts.length} concept{state.concepts.length !== 1 ? "s" : ""} ·{" "}
-                {state.bytes.length} passage{state.bytes.length !== 1 ? "s" : ""} ·{" "}
+                {state.passages.length} passage{state.passages.length !== 1 ? "s" : ""} ·{" "}
                 {state.edges.length} thread{state.edges.length !== 1 ? "s" : ""} in all
               </>
             )}
@@ -281,7 +281,7 @@ export default function Shelf() {
         ))}
 
         {/* A reading of the student's own: something they are coding that the
-            library does not hold. Reading-first needs every byte to have a
+            library does not hold. Reading-first needs every passage to have a
             door, so a self-found paper gets a card rather than becoming an
             untethered passage. */}
         <section style={{ marginBottom: 26 }}>
@@ -328,19 +328,19 @@ export default function Shelf() {
  * wrong would file someone's evidence under the wrong text (red line #2).
  */
 function Untethered({ readings }: { readings: ReadingMeta[] }) {
-  const { state, attributeBytes } = useLoom()
+  const { state, attributePassages } = useLoom()
   const [picked, setPicked] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
 
   const groups = useMemo(() => {
     const byCitation = new Map<string, string[]>()
-    state.bytes.forEach((b) => {
+    state.passages.forEach((b) => {
       if (b.sourceId) return
       const key = (b.source ?? "").trim() || "\u0000no citation"
       byCitation.set(key, [...(byCitation.get(key) ?? []), b.id])
     })
     return [...byCitation.entries()].sort((a, b) => b[1].length - a[1].length)
-  }, [state.bytes])
+  }, [state.passages])
 
   if (!groups.length) return null
 
@@ -349,9 +349,9 @@ function Untethered({ readings }: { readings: ReadingMeta[] }) {
     if (!sourceId) return
     setBusy(key)
     try {
-      await attributeBytes(ids, sourceId)
+      await attributePassages(ids, sourceId)
     } catch {
-      // attributeBytes resyncs and flashes; nothing more to say here.
+      // attributePassages resyncs and flashes; nothing more to say here.
     } finally {
       setBusy(null)
     }

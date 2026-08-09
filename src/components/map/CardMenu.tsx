@@ -8,12 +8,12 @@
 // are hand-wrapped for exactly that reason. It also sits outside the SVG's
 // pointer handlers, so opening a menu can never start a drag.
 
-import type { Byte, Concept } from "@/lib/types"
+import type { Passage, Concept } from "@/lib/types"
 import { short } from "@/lib/clothMath"
 
 type CardMenuProps = {
   concept: Concept
-  bytes: Byte[]
+  passages: Passage[]
   /** Titles of the readings this concept is evidenced in. */
   where: string[]
   pinned: boolean
@@ -33,7 +33,7 @@ type CardMenuProps = {
 const SHOWN = 4
 
 export default function CardMenu({
-  concept, bytes, where, pinned, left, top, bottom, onHold, onRelease, onTogglePin,
+  concept, passages, where, pinned, left, top, bottom, onHold, onRelease, onTogglePin,
 }: CardMenuProps) {
   return (
     <div
@@ -57,9 +57,9 @@ export default function CardMenu({
       )}
 
       <span className="cap" style={{ display: "block", marginTop: 12 }}>
-        the passages behind it{bytes.length ? ` (${bytes.length})` : ""}
+        the passages behind it{passages.length ? ` (${passages.length})` : ""}
       </span>
-      {bytes.length === 0 ? (
+      {passages.length === 0 ? (
         /* The twin of the string fixed in VocabularyTab on 2026-08-09, and it
            was still shipping here — on every card whose concept has no passage.
            Two rules, not one: "no evidence" is a designation and never a
@@ -72,7 +72,7 @@ export default function CardMenu({
           evidence, or its passages may have moved on.
         </p>
       ) : (
-        bytes.slice(0, SHOWN).map((b) => (
+        passages.slice(0, SHOWN).map((b) => (
           <div key={b.id} className="bytequote">
             <span className="src">{b.source || "—"}{b.location ? ` · ${b.location}` : ""}</span>
             <br />
@@ -80,8 +80,8 @@ export default function CardMenu({
           </div>
         ))
       )}
-      {bytes.length > SHOWN && (
-        <p className="ghostnote">…and {bytes.length - SHOWN} more, in your work.</p>
+      {passages.length > SHOWN && (
+        <p className="ghostnote">…and {passages.length - SHOWN} more, in your work.</p>
       )}
 
       {/* The seam, on the table: the same idea met in more than one text.

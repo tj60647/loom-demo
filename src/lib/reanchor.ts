@@ -9,9 +9,9 @@
  *
  *   - Most highlights are not on the page being repaired. Of the 23 anchored
  *     highlights here, NONE sit on a page any repair has ever been proposed for.
- *   - Many "highlights" have no offsets at all: 20 of 43 bytes were typed or
+ *   - Many "highlights" have no offsets at all: 20 of 43 passages were typed or
  *     pasted rather than selected, and carry a human-written location like
- *     "p. 387 (abstract)". Replacing a text layer cannot disturb a byte that was
+ *     "p. 387 (abstract)". Replacing a text layer cannot disturb a passage that was
  *     never measured against one.
  *   - A quote is findable. All 23 anchored quotes occur EXACTLY ONCE on their
  *     own page — none ambiguous, none missing — so the span can simply be
@@ -20,7 +20,7 @@
  * So a highlight is carried rather than mourned, and the repair is refused only
  * when one genuinely cannot be carried.
  *
- * Matching ignores whitespace, which is not a convenience. A byte's `content`
+ * Matching ignores whitespace, which is not a convenience. A passage's `content`
  * comes from the browser's selection, and `Selection.toString()` renders the
  * `<br>` pdf.js puts after each end-of-line item as a newline — while the
  * offsets index `textContent`, where that same `<br>` contributes nothing. The
@@ -97,7 +97,7 @@ export type ReanchorPlan = {
  * is refused without ever having touched the stored reading.
  *
  * Highlights on untouched pages are verified rather than assumed. The pages a
- * repair does not name come through pdf-lib's save byte-identical in extraction
+ * repair does not name come through pdf-lib's save passage-identical in extraction
  * on every document measured here, but "measured on the documents we had" is not
  * the same as "true of every PDF", and the check costs a string comparison.
  */
@@ -109,48 +109,48 @@ export function planReanchor(
   const replaced = new Set(replacedPages)
   const plan: ReanchorPlan = { moves: [], unchanged: 0, lost: [] }
 
-  for (const byte of anchored) {
-    if (byte.pageNumber == null || byte.startOffset == null || byte.endOffset == null) continue
-    const projection = pageTextAfter.get(byte.pageNumber)
+  for (const passage of anchored) {
+    if (passage.pageNumber == null || passage.startOffset == null || passage.endOffset == null) continue
+    const projection = pageTextAfter.get(passage.pageNumber)
     if (projection === undefined) {
       plan.lost.push({
-        id: byte.id,
-        pageNumber: byte.pageNumber,
+        id: passage.id,
+        pageNumber: passage.pageNumber,
         why: "the repaired reading has no such page",
-        quote: byte.content.slice(0, 80),
+        quote: passage.content.slice(0, 80),
       })
       continue
     }
 
     // Still exactly where it was? Then there is nothing to do, whether or not
     // this page was rewritten.
-    const bareAt = withoutWhitespace(projection.slice(byte.startOffset, byte.endOffset)).bare
-    if (bareAt === withoutWhitespace(byte.content).bare) {
+    const bareAt = withoutWhitespace(projection.slice(passage.startOffset, passage.endOffset)).bare
+    if (bareAt === withoutWhitespace(passage.content).bare) {
       plan.unchanged += 1
       continue
     }
 
-    const located = locateQuote(projection, byte.content)
+    const located = locateQuote(projection, passage.content)
     if (!located.found) {
       plan.lost.push({
-        id: byte.id,
-        pageNumber: byte.pageNumber,
+        id: passage.id,
+        pageNumber: passage.pageNumber,
         why:
           located.why === "ambiguous"
             ? "this passage appears more than once on the page, so the highlight cannot be placed without guessing"
             : located.why === "empty"
               ? "the highlight has no quoted text to find"
-              : replaced.has(byte.pageNumber)
+              : replaced.has(passage.pageNumber)
                 ? "the transcription of this page does not contain the quoted passage"
                 : "the quoted passage is no longer on this page",
-        quote: byte.content.slice(0, 80),
+        quote: passage.content.slice(0, 80),
       })
       continue
     }
 
     plan.moves.push({
-      id: byte.id,
-      pageNumber: byte.pageNumber,
+      id: passage.id,
+      pageNumber: passage.pageNumber,
       startOffset: located.startOffset,
       endOffset: located.endOffset,
     })

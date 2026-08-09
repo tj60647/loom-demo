@@ -19,9 +19,9 @@ export default async function UserLoomPage({
   const resolvedSearchParams = await searchParams
   // Viewer-aware: faculty resolve within their own courses (ruling 18).
   const { courseId } = await getStaffViewer(firstParam(resolvedSearchParams.course))
-  const { concepts, bytes, edges } = await getUserLoomDataAsAdmin(resolvedParams.id, courseId)
+  const { concepts, passages, edges } = await getUserLoomDataAsAdmin(resolvedParams.id, courseId)
 
-  const state: LoomState = { concepts, bytes, edges, maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
+  const state: LoomState = { concepts, passages, edges, maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
   
   // Note: We use a simple read-only wrapper around ClothMap here
   return (
@@ -32,7 +32,7 @@ export default async function UserLoomPage({
           <div className="mapbar">
             <span className="label">The cloth</span>
             <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
-              {concepts.length} concepts, {edges.length} threads, {bytes.length} passages.
+              {concepts.length} concepts, {edges.length} threads, {passages.length} passages.
             </span>
           </div>
           <div id="mapWrap">

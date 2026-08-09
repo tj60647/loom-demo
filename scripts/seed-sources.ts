@@ -1,7 +1,7 @@
 /**
  * Seeds a fresh database with the three course readings: uploads each PDF to
  * Blob storage, registers it as a `sources` row, extracts its canonical per-page
- * text into `sourcePages`, and backfills `sourceId` on any existing `bytes` rows
+ * text into `sourcePages`, and backfills `sourceId` on any existing `passages` rows
  * that reference it by an old free-text `source` label.
  *
  * The PDFs are read from storage/readings/ but are NOT committed — see
@@ -13,7 +13,7 @@
 import { readFile } from "fs/promises"
 import path from "path"
 import { db } from "../src/db"
-import { sources, sourcePages, bytes } from "../src/db/schema"
+import { sources, sourcePages, passages } from "../src/db/schema"
 import { eq } from "drizzle-orm"
 import { extractPdfPageText, textLayerProjection } from "../src/lib/pdfText"
 import { hashText } from "../src/lib/hash"
@@ -91,7 +91,7 @@ const READINGS: {
  * not have them, and the failure needs to name the file rather than surface as a
  * bare ENOENT from deep inside the loop.
  *
- * Read LAZILY, and that is the whole point: the bytes are needed only to store a
+ * Read LAZILY, and that is the whole point: the passages are needed only to store a
  * file that is not stored yet. A database that already holds these readings —
  * CI's, which persists between runs, and any deployment — needs nothing from
  * disk, so seeding it is a metadata update that should not require copyrighted
@@ -239,12 +239,12 @@ async function run() {
 
     for (const legacyLabel of reading.legacySourceLabels) {
       const updated = await db
-        .update(bytes)
+        .update(passages)
         .set({ sourceId: source.id })
-        .where(eq(bytes.source, legacyLabel))
-        .returning({ id: bytes.id })
+        .where(eq(passages.source, legacyLabel))
+        .returning({ id: passages.id })
       if (updated.length > 0) {
-        console.log(`[seed-sources] Backfilled sourceId on ${updated.length} byte(s) with source="${legacyLabel}".`)
+        console.log(`[seed-sources] Backfilled sourceId on ${updated.length} passage(s) with source="${legacyLabel}".`)
       }
     }
   }

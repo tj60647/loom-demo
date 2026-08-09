@@ -18,7 +18,7 @@ import VocabularyTab from "@/components/tabs/VocabularyTab"
 import MapTab from "@/components/tabs/MapTab"
 import JourneyNav, { stationNumber, type Station } from "@/components/ui/JourneyNav"
 import ShelfSearch from "@/components/shelf/ShelfSearch"
-import type { Byte } from "@/lib/types"
+import type { Passage } from "@/lib/types"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
 
@@ -100,14 +100,14 @@ export default function Workbench({
   const [activeTab, setActiveTab] = useState<Tab>(firstTab)
   const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([firstTab]))
   const [pdfPage, setPdfPage] = useState(1)
-  const [pdfFocusByteId, setPdfFocusByteId] = useState<string | null>(null)
+  const [pdfFocusPassageId, setPdfFocusByteId] = useState<string | null>(null)
   // Where the reader actually is, which is not the same as `pdfPage` — that
   // one is an instruction TO the viewer ("go here"), this is a report FROM it.
   // Kept apart on purpose: feeding the report back in as the instruction lets
   // a stale render drag the reader back a page.
   const [livePdfPage, setLivePdfPage] = useState(1)
   const handlePageChange = useCallback((n: number) => setLivePdfPage(n), [])
-  const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
+  const [openTargetPassageId, setOpenTargetByteId] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   // Your work — this reading's Capture Log — as a sheet over the text. Closed
   // by default: reading is what the station is for, and a student who has not
@@ -136,10 +136,10 @@ export default function Workbench({
   // are the same station, so this only moves the page under the reader. It
   // also sends the sheet back: you asked to see the passage in its page, and a
   // sheet over the right third of that page is not showing it to you.
-  const handleGotoByte = (byte: Byte) => {
+  const handleGotoPassage = (passage: Passage) => {
     if (!source?.hasFile) return
-    setPdfPage(byte.pageNumber && byte.pageNumber > 0 ? byte.pageNumber : 1)
-    setPdfFocusByteId(byte.id)
+    setPdfPage(passage.pageNumber && passage.pageNumber > 0 ? passage.pageNumber : 1)
+    setPdfFocusByteId(passage.id)
     setWorkOpen(false)
     goTo("reading")
   }
@@ -148,8 +148,8 @@ export default function Workbench({
   // slide the sheet out ON it, rather than leaving them to wonder where it
   // went. The sheet is already mounted, so the row it scrolls to has a real
   // layout box the instant this fires.
-  const handleGotoOpenByte = (byteId: string) => {
-    setOpenTargetByteId(byteId)
+  const handleGotoOpenPassage = (passageId: string) => {
+    setOpenTargetByteId(passageId)
     setWorkOpen(true)
     goTo("reading")
   }
@@ -286,8 +286,8 @@ export default function Workbench({
                     sourceId={source.id}
                     initialPageNumber={pdfPage}
                     initialSearch={initialSearch}
-                    focusByteId={pdfFocusByteId}
-                    onGotoOpenByte={handleGotoOpenByte}
+                    focusPassageId={pdfFocusPassageId}
+                    onGotoOpenPassage={handleGotoOpenPassage}
                     onPageChange={handlePageChange}
                     workOpen={workOpen}
                     onToggleWork={toggleWork}
@@ -295,8 +295,8 @@ export default function Workbench({
                       <OpenTab
                         compact
                         currentPage={livePdfPage}
-                        onGotoByte={handleGotoByte}
-                        focusByteId={openTargetByteId}
+                        onGotoPassage={handleGotoPassage}
+                        focusPassageId={openTargetPassageId}
                         onFocusHandled={handleFocusHandled}
                         onGotoVocabulary={handleGotoVocabulary}
                       />
@@ -307,8 +307,8 @@ export default function Workbench({
                 // A reference-only reading has no text to lie over, so the
                 // capture side is the whole station.
                 <OpenTab
-                  onGotoByte={handleGotoByte}
-                  focusByteId={openTargetByteId}
+                  onGotoPassage={handleGotoPassage}
+                  focusPassageId={openTargetPassageId}
                   onFocusHandled={handleFocusHandled}
                   onGotoVocabulary={handleGotoVocabulary}
                 />

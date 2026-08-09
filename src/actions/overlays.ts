@@ -36,7 +36,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 
 import { db } from "@/db"
-import { bytes, byteConcepts, concepts, courseMemberships, edges, sourcePages } from "@/db/schema"
+import { passages, passageConcepts, concepts, courseMemberships, edges, sourcePages } from "@/db/schema"
 import { authOptions, isAdminUser } from "@/lib/auth"
 import { resolveCourseIdForUser } from "@/lib/courses"
 import {
@@ -150,9 +150,9 @@ async function peersOf(
 async function codedBy(userIds: string[]): Promise<string[]> {
   if (userIds.length === 0) return []
   const rows = await db
-    .selectDistinct({ sourceId: bytes.sourceId })
-    .from(bytes)
-    .where(and(inArray(bytes.userId, userIds), isNotNull(bytes.sourceId)))
+    .selectDistinct({ sourceId: passages.sourceId })
+    .from(passages)
+    .where(and(inArray(passages.userId, userIds), isNotNull(passages.sourceId)))
   return rows.map((row) => row.sourceId).filter((id): id is string => !!id)
 }
 
@@ -189,14 +189,14 @@ export async function getPassagesOverlay(
   // the contributor count needs — see decision 3 at the top of this file.
   const rows = await db
     .select({
-      userId: bytes.userId,
-      pageNumber: bytes.pageNumber,
-      startOffset: bytes.startOffset,
-      endOffset: bytes.endOffset,
-      pageContentHash: bytes.pageContentHash,
+      userId: passages.userId,
+      pageNumber: passages.pageNumber,
+      startOffset: passages.startOffset,
+      endOffset: passages.endOffset,
+      pageContentHash: passages.pageContentHash,
     })
-    .from(bytes)
-    .where(and(eq(bytes.sourceId, sourceId), inArray(bytes.userId, peers)))
+    .from(passages)
+    .where(and(eq(passages.sourceId, sourceId), inArray(passages.userId, peers)))
 
   const base = { ...emptyPassagesOverlay(band, null), peers: peers.length }
   if (rows.length === 0) return base
@@ -311,13 +311,13 @@ export async function getVocabularyOverlay(
       createdAt: concepts.createdAt,
     })
     .from(concepts)
-    .innerJoin(byteConcepts, eq(byteConcepts.conceptId, concepts.id))
-    .innerJoin(bytes, eq(bytes.id, byteConcepts.byteId))
+    .innerJoin(passageConcepts, eq(passageConcepts.conceptId, concepts.id))
+    .innerJoin(passages, eq(passages.id, passageConcepts.passageId))
     .where(
       and(
         inArray(concepts.userId, peers),
         eq(concepts.courseId, viewer.courseId),
-        inArray(bytes.sourceId, scope)
+        inArray(passages.sourceId, scope)
       )
     )
     .orderBy(asc(concepts.createdAt), asc(concepts.id))

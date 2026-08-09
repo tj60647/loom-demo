@@ -4,15 +4,15 @@ import { useEffect, useRef, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
-import type { Byte } from "@/lib/types"
+import type { Passage } from "@/lib/types"
 import { readingsOf, soleSourceId } from "@/lib/scope"
 import { contentWords, sortedByLabel } from "@/lib/utils"
 import { tidy } from "@/lib/clothMath"
 import ClothFold from "@/components/tabs/ClothFold"
 
 type OpenTabProps = {
-  onGotoByte?: (byte: Byte) => void
-  focusByteId?: string | null
+  onGotoPassage?: (passage: Passage) => void
+  focusPassageId?: string | null
   onFocusHandled?: () => void
   /**
    * The page the reader is on, when there is a text beside this. Offered as
@@ -35,13 +35,13 @@ type OpenTabProps = {
   compact?: boolean
 }
 
-export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compact, currentPage, onGotoVocabulary }: OpenTabProps) {
+export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled, compact, currentPage, onGotoVocabulary }: OpenTabProps) {
   // `state` is the WHOLE graph and `scoped` is this reading's slice of it. The
   // split is load-bearing: the log renders what this reading evidences, but
   // naming, dedup and the delete guards must see every concept the student has
   // — otherwise capturing a concept met in an earlier text would mint a
   // duplicate instead of joining its evidence (spec §2 identity).
-  const { state, scope, scoped, addConcept, addByte, editConcept, removeConcept, removeByte, refileByte, unfileByte, flash } = useLoom()
+  const { state, scope, scoped, addConcept, addPassage, editConcept, removeConcept, removePassage, refilePassage, unfilePassage, flash } = useLoom()
   const { byId, titleOf } = useReadings()
   const { confirm, notify } = useDialog()
   const activeSourceId = soleSourceId(scope)
@@ -93,9 +93,9 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
     // naming an idea met in an earlier text reuses that concept rather than
     // minting a second one under the same label (spec §2 identity).
     let concept = findConcept(cname)
-    // Captured before the byte lands, so it says where the concept had ALREADY
+    // Captured before the passage lands, so it says where the concept had ALREADY
     // been met rather than counting the capture about to happen.
-    const metIn = concept ? readingsOf(concept.id, state.bytes) : []
+    const metIn = concept ? readingsOf(concept.id, state.passages) : []
     const metElsewhere = metIn.filter(id => id !== activeSourceId)
     if (!concept) {
       concept = await addConcept(cname, wdef || undefined)
@@ -103,7 +103,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
       await editConcept(concept.id, { def: wdef })
     }
 
-    await addByte([concept.id], source.trim() || citation, location.trim() || pageHint, text)
+    await addPassage([concept.id], source.trim() || citation, location.trim() || pageHint, text)
 
     // reset form (keep source/location if user wants to enter multiple passages from same place)
     setContent("")
@@ -127,7 +127,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
     }
   }
 
-  const handleRefile = async (b: Byte) => {
+  const handleRefile = async (b: Passage) => {
     if (refileBusy[b.id]) return
     const nm = (refileInputs[b.id] ?? "").trim()
     if (!nm) {
@@ -150,12 +150,12 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
       if (!concept) {
         concept = await addConcept(nm)
       }
-      await refileByte(b.id, concept.id)
+      await refilePassage(b.id, concept.id)
       setRefileInputs(prev => ({ ...prev, [b.id]: "" }))
       setOpenLogRows(prev => ({ ...prev, [concept!.id]: true }))
       flash("filed under a second concept")
     } catch {
-      // refileByte resyncs and flashes the server message before rethrowing;
+      // refilePassage resyncs and flashes the server message before rethrowing;
       // swallow here to avoid an unhandled rejection.
     } finally {
       setRefileBusy(prev => ({ ...prev, [b.id]: false }))
@@ -189,7 +189,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
   const handleAddConceptOnly = async () => {
     // Trim ONCE, at the top, and compare the trimmed value. This used to match
     // untrimmed and write trimmed, so "boundary objects " missed the homonym
-    // check entirely and minted a second concept with a byte-identical stored
+    // check entirely and minted a second concept with a passage-identical stored
     // label — silently, at the exact gesture designed to ask. A trailing space
     // is what a paste leaves, and what a tapped suggestion can leave.
     // It also stops " " reaching addConcept, which does not validate.
@@ -237,8 +237,8 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
   }, [showCaptureInfo])
 
   useEffect(() => {
-    if (!focusByteId) return
-    const targetByte = state.bytes.find((b) => b.id === focusByteId)
+    if (!focusPassageId) return
+    const targetByte = state.passages.find((b) => b.id === focusPassageId)
     if (!targetByte) {
       onFocusHandled?.()
       return
@@ -250,7 +250,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
     }, 0)
 
     const timer = window.setTimeout(() => {
-      const target = document.querySelector(`[data-byte-id="${focusByteId}"]`) as HTMLElement | null
+      const target = document.querySelector(`[data-passage-id="${focusPassageId}"]`) as HTMLElement | null
       target?.scrollIntoView({ behavior: "smooth", block: "center" })
       onFocusHandled?.()
     }, 40)
@@ -259,7 +259,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
       window.clearTimeout(rowTimer)
       window.clearTimeout(timer)
     }
-  }, [focusByteId, onFocusHandled, state.bytes])
+  }, [focusPassageId, onFocusHandled, state.passages])
 
   const captureHeading = (
         <h2 className="heading-with-info">
@@ -520,10 +520,10 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
    * by construction — so the split below needs no extra query.
    */
   const here = sortedByLabel(scoped.concepts).filter(c =>
-    scoped.bytes.some(b => b.conceptIds.includes(c.id))
+    scoped.passages.some(b => b.conceptIds.includes(c.id))
   )
   const namedOnly = sortedByLabel(scoped.concepts).filter(c =>
-    !scoped.bytes.some(b => b.conceptIds.includes(c.id))
+    !scoped.passages.some(b => b.conceptIds.includes(c.id))
   )
 
   const logCard = (
@@ -532,7 +532,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
             .yourwork-head, which carries the name and the same tally. On a
             reference-only reading there is no sheet, so the card carries it. */}
         {!compact && (
-          <h2>Your work <span className="n">{scoped.bytes.length ? `(${scoped.bytes.length} passages · ${scoped.concepts.length} concepts)` : ""}</span></h2>
+          <h2>Your work <span className="n">{scoped.passages.length ? `(${scoped.passages.length} passages · ${scoped.concepts.length} concepts)` : ""}</span></h2>
         )}
         {/* Teaching copy, and only where there is room for it. In the sheet
             these two paragraphs sat above the list permanently, in a 380px
@@ -571,25 +571,25 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
             // This reading's evidence for the concept. A concept met in an
             // earlier text keeps that evidence — it is counted below rather
             // than shown here, so the log stays this reading's own work.
-            const conceptBytes = scoped.bytes.filter(b => b.conceptIds.includes(concept.id))
-            const elsewhere = state.bytes.filter(
-              b => b.conceptIds.includes(concept.id) && !conceptBytes.some(x => x.id === b.id)
+            const conceptPassages = scoped.passages.filter(b => b.conceptIds.includes(concept.id))
+            const elsewhere = state.passages.filter(
+              b => b.conceptIds.includes(concept.id) && !conceptPassages.some(x => x.id === b.id)
             ).length
             
             return (
               <div key={concept.id} className={`lrow ${isOpen ? "open" : ""}`}>
                 {/* No destructive control here: this header is the row's
                     expand/collapse target, so "remove concept" lives inside the
-                    opened row next to "remove byte", labelled, as in v14. */}
+                    opened row next to "remove passage", labelled, as in v14. */}
                 <div className="lhead" onClick={() => toggleRow(concept.id)} style={{ display: "flex", alignItems: "center" }}>
                   <div className="lconcept" style={{flex: 1}}>{concept.label}</div>
                   {/* No "0 passages" under a heading that already reads NO
                       EVIDENCE: it says the same thing twice, and the zero is
                       the more judgemental of the two. A count belongs where
                       there is something to count. */}
-                  {(conceptBytes.length > 0 || elsewhere > 0) && (
+                  {(conceptPassages.length > 0 || elsewhere > 0) && (
                     <div className="lsrc">
-                      {conceptBytes.length} passage{conceptBytes.length !== 1 ? "s" : ""}
+                      {conceptPassages.length} passage{conceptPassages.length !== 1 ? "s" : ""}
                       {elsewhere ? ` · ${elsewhere} elsewhere` : ""}
                     </div>
                   )}
@@ -639,8 +639,8 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
                         }}
                       />
                     </div>
-                    {conceptBytes.map(b => (
-                      <div key={b.id} data-byte-id={b.id} style={{ marginTop: "12px", borderBottom: "1px dotted var(--rule)", paddingBottom: "8px" }}>
+                    {conceptPassages.map(b => (
+                      <div key={b.id} data-passage-id={b.id} style={{ marginTop: "12px", borderBottom: "1px dotted var(--rule)", paddingBottom: "8px" }}>
                         <div className="passage">"{b.content}"</div>
                         <div className="src">
                           {b.source || "—"}{b.location ? ` · ${b.location}` : ""}
@@ -649,7 +649,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
                               type="button"
                               className="rm"
                               style={{ marginRight: "8px", background: "none", border: "none", padding: 0 }}
-                              onClick={() => onGotoByte?.(b)}
+                              onClick={() => onGotoPassage?.(b)}
                               disabled={!b.sourceId && !b.source}
                               title={b.sourceId || b.source ? "Open this passage in the reading" : "No reading linked to this passage"}
                             >
@@ -657,13 +657,13 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
                             </button>
                             {b.conceptIds.length > 1 ? (
                               // A multi-filed passage: this row's control removes
-                              // only THIS filing — deleting the byte here would
+                              // only THIS filing — deleting the passage here would
                               // silently take every other concept's evidence too.
                               <button
                                 type="button"
                                 className="rm"
                                 style={{ background: "none", border: "none", padding: 0 }}
-                                onClick={() => unfileByte(b.id, concept.id)}
+                                onClick={() => unfilePassage(b.id, concept.id)}
                                 title="Filed under several concepts — this removes it from this one only."
                               >
                                 unfile from this concept
@@ -673,7 +673,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
                                 type="button"
                                 className="rm"
                                 style={{ background: "none", border: "none", padding: 0 }}
-                                onClick={() => removeByte(b.id)}
+                                onClick={() => removePassage(b.id)}
                               >
                                 remove passage
                               </button>
@@ -703,7 +703,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
                       type="button"
                       className="rm"
                       style={{ background: "none", border: "none", padding: 0, marginTop: "12px" }}
-                      onClick={() => handleRemoveConcept(concept.id, conceptBytes.length + elsewhere)}
+                      onClick={() => handleRemoveConcept(concept.id, conceptPassages.length + elsewhere)}
                     >
                       remove concept
                     </button>
@@ -728,7 +728,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
                 <div key={c.id} className="lrow elsewhere">
                   <div className="lhead" style={{ display: "flex", alignItems: "center" }}>
                     <div className="lconcept" style={{ flex: 1 }}>{c.label}</div>
-                    <div className="lsrc">{readingsOf(c.id, state.bytes).map(titleOf).join(" · ")}</div>
+                    <div className="lsrc">{readingsOf(c.id, state.passages).map(titleOf).join(" · ")}</div>
                   </div>
                 </div>
               ))}

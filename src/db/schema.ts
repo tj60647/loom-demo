@@ -207,7 +207,7 @@ export const sources = pgTable(
     isArchived: boolean("isArchived").default(false).notNull(),
     // Key used to locate the file in the storage backend (see src/lib/storage.ts).
     // Null for a REFERENCE-ONLY reading: a card a student minted for something
-    // they are coding that has no PDF here. Reading-first makes every byte belong
+    // they are coding that has no PDF here. Reading-first makes every passage belong
     // to a reading, so a source the library does not hold still needs a row —
     // otherwise its passages have no door and fall out of every lens.
     storageKey: text("storageKey"),
@@ -260,7 +260,7 @@ export const courseSources = pgTable(
 
 // Canonical, server-extracted plain text for each page of a source. This is
 // the stable anchor used to compute and validate highlight offsets, since the
-// client-side pdf.js text layer is not guaranteed to be byte-stable across
+// client-side pdf.js text layer is not guaranteed to be passage-stable across
 // renders/versions.
 export const sourcePages = pgTable(
   "source_page",
@@ -273,7 +273,7 @@ export const sourcePages = pgTable(
       .references(() => sources.id, { onDelete: "cascade" }),
     pageNumber: integer("pageNumber").notNull(),
     textContent: text("textContent").notNull(),
-    // Hash of textContent, duplicated onto bytes.pageContentHash at capture
+    // Hash of textContent, duplicated onto passages.pageContentHash at capture
     // time so we can cheaply detect drift without re-fetching this row.
     contentHash: text("contentHash").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -457,11 +457,11 @@ export const concepts = pgTable(
   })
 )
 
-// A byte — one captured passage. Concepts attach via `byte_concept` (0..n):
-// a byte with zero rows there is an Unlabeled Passage, a legal first-class
+// A passage — one captured passage. Concepts attach via `byte_concept` (0..n):
+// a passage with zero rows there is an Unlabeled Passage, a legal first-class
 // state (docs/loom-model-build.md §2 Passage). Deleting a concept never
-// deletes a byte — the passage survives its labels.
-export const bytes = pgTable("byte", {
+// deletes a passage — the passage survives its labels.
+export const passages = pgTable("byte", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -471,10 +471,10 @@ export const bytes = pgTable("byte", {
   userId: text("userId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  // Free-text label, kept for manually-captured bytes (e.g. from OpenTab)
+  // Free-text label, kept for manually-captured passages (e.g. from OpenTab)
   // that aren't tied to a library PDF.
   source: text("source").default(""),
-  // Set when the byte was captured from a library PDF via PdfViewer.
+  // Set when the passage was captured from a library PDF via PdfViewer.
   sourceId: text("sourceId").references(() => sources.id, {
     onDelete: "set null",
   }),
@@ -496,32 +496,32 @@ export const bytes = pgTable("byte", {
   tier: text("tier").$type<"" | "p" | "s" | "t">().default("").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 },
-(byte) => ({
+(passage) => ({
   // Unified search over the student's own captures: the passage text
   // outranks their margin. Query side repeats this expression verbatim.
   searchIdx: index("byte_search_idx").using(
     "gin",
-    sql`(setweight(to_tsvector('english', ${byte.content}), 'B') || setweight(to_tsvector('english', coalesce(${byte.note}, '')), 'C') || setweight(to_tsvector('english', coalesce(${byte.question}, '')), 'C'))`
+    sql`(setweight(to_tsvector('english', ${passage.content}), 'B') || setweight(to_tsvector('english', coalesce(${passage.note}, '')), 'C') || setweight(to_tsvector('english', coalesce(${passage.question}, '')), 'C'))`
   ),
 }))
 
-// Which concepts a byte evidences — the passage↔concept pointers of ruling 37.
+// Which concepts a passage evidences — the passage↔concept pointers of ruling 37.
 // Zero rows = an Unlabeled Passage; several rows = one passage filed under
-// several concepts (refile adds a pointer, never copies the byte). Cascades
+// several concepts (refile adds a pointer, never copies the passage). Cascades
 // both ways: losing either end removes the pointer, never the other end.
-export const byteConcepts = pgTable(
+export const passageConcepts = pgTable(
   "byte_concept",
   {
-    byteId: text("byteId")
+    passageId: text("byteId")
       .notNull()
-      .references(() => bytes.id, { onDelete: "cascade" }),
+      .references(() => passages.id, { onDelete: "cascade" }),
     conceptId: text("conceptId")
       .notNull()
       .references(() => concepts.id, { onDelete: "cascade" }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (row) => ({
-    pk: primaryKey({ columns: [row.byteId, row.conceptId] }),
+    pk: primaryKey({ columns: [row.passageId, row.conceptId] }),
     byConcept: index("byte_concept_concept_idx").on(row.conceptId),
   })
 )
@@ -645,7 +645,7 @@ export const graphEvents = pgTable("graph_event", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   // '<entity>.<act>', e.g. 'concept.create', 'concept.retier', 'edge.coin',
-  // 'byte.capture', 'cloth.update', 'graph.import', 'graph.reset',
+  // 'passage.capture', 'cloth.update', 'graph.import', 'graph.reset',
   // 'graph.example'.
   kind: text("kind").notNull(),
   entityType: text("entityType")

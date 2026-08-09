@@ -666,7 +666,7 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    Three consequences, so nobody "fixes" them:
    - The stage's width no longer changes when the sheet opens, so the viewer's
      ResizeObserver does not fire, the page does not re-fit, react-pdf does not
-     re-rasterise, no text layer is rebuilt and no byte, heat or search mark is
+     re-rasterise, no text layer is rebuilt and no passage, heat or search mark is
      re-applied. That is the point of the rebuild, not an oversight.
    - It fixes a live bug. The floating "Capture as Passage" button is placed in
      VIEWPORT coordinates taken at selection time and moved only on stage

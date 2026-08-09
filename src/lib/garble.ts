@@ -2,7 +2,7 @@
  * Gibberish induced by a bad scan.
  *
  * This is the failure the rest of the scorer could not see. Every aggregate
- * measure it has — junk bytes, letter distribution, common-word density — reads
+ * measure it has — junk passages, letter distribution, common-word density — reads
  * clean on a page like this one, from a real reading in the library:
  *
  *     "reCa vsA;DEWIGNAwCRITIQUE"        for "DESIGN AS CRITIQUE"

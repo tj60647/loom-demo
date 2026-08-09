@@ -33,7 +33,7 @@ export type WorkedExample = {
   title: string
   read: string
   concepts: ExampleConcept[]
-  bytes: ExampleByte[]
+  passages: ExampleByte[]
   edges: ExampleEdge[]
 }
 
@@ -64,7 +64,7 @@ export const WORKED_EXAMPLE: WorkedExample = {
     { key: "c7", label: "the ideal type", def: "a vague-on-purpose shared object — a good-enough map for all parties", note: "", tier: "t" },
     { key: "c8", label: "immutable mobiles", def: "", note: "a borrowed term she uses for the standardized forms. need to capture a passage.", tier: "" },
   ],
-  bytes: [
+  passages: [
     { conceptKey: "c1", source: SRC, location: "p. 393", text: "Boundary objects are objects which are both plastic enough to adapt to local needs and the constraints of the several parties employing them, yet robust enough to maintain a common identity across sites. They are weakly structured in common use, and become strongly structured in individual-site use. These objects may be abstract or concrete. They have different meanings in different social worlds but their structure is common enough to more than one world to make them recognizable, a means of translation." },
     { conceptKey: "c2", source: SRC, location: "p. 387", text: "Simply put, scientific work is heterogeneous. At the same time, science requires cooperation — to create common understandings, to ensure reliability across domains and to gather information which retains its integrity across time, space and local contingencies. This creates a 'central tension' in science between divergent viewpoints and the need for generalizable findings." },
     { conceptKey: "c3", source: SRC, location: "p. 413", text: "When participants in the intersecting worlds create representations together, their different commitments and perceptions are resolved into representations — in the sense that a fuzzy image is resolved by a microscope. This resolution does not mean consensus. Rather, representations, or inscriptions, contain at every stage the traces of multiple viewpoints, translations and incomplete battles." },

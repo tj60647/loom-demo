@@ -112,7 +112,7 @@ export const CAPABILITIES: Capability[] = [
     name: "Capture a passage",
     group: "Reading and weaving",
     student: { verdict: "yes" }, faculty: { verdict: "yes" }, admin: { verdict: "yes" },
-    gate: { file: "src/actions/loom.ts", symbol: "createByte", line: 319 },
+    gate: { file: "src/actions/loom.ts", symbol: "createPassage", line: 319 },
     enforcement: "server",
   },
   {

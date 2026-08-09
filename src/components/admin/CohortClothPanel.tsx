@@ -3,13 +3,13 @@
 // The cohort map with its material laid out. Mirrors the student's 03 · Read
 // pane — the cloth on top, what is selected read out beneath it — but where
 // the student weaves a read, the instructor inspects the weaving: a concept
-// opens the bytes behind it, an arc opens its thread, and the full concept
+// opens the passages behind it, an arc opens its thread, and the full concept
 // and thread lists sit below the map. Every quote and sentence is shown as
 // the student's own, with attribution — counted and quoted, never judged.
 
 import { useMemo, useState } from "react"
 import ClothMap from "@/components/svg/ClothMap"
-import type { Byte, Edge, LoomState } from "@/lib/types"
+import type { Passage, Edge, LoomState } from "@/lib/types"
 
 type ReadSel = { type: "concept" | "edge" | "hub"; id?: string; ids?: string[] } | null
 
@@ -18,7 +18,7 @@ export default function CohortClothPanel({
   names,
 }: {
   state: LoomState
-  /** userId → display name, for attributing concepts, bytes, and threads. */
+  /** userId → display name, for attributing concepts, passages, and threads. */
   names: Record<string, string>
 }) {
   const [readSel, setReadSel] = useState<ReadSel>(null)
@@ -28,8 +28,8 @@ export default function CohortClothPanel({
     [state.concepts]
   )
   const bytesByConcept = useMemo(() => {
-    const map = new Map<string, Byte[]>()
-    state.bytes.forEach((b) => {
+    const map = new Map<string, Passage[]>()
+    state.passages.forEach((b) => {
       b.conceptIds.forEach((conceptId) => {
         const list = map.get(conceptId) ?? []
         list.push(b)
@@ -37,7 +37,7 @@ export default function CohortClothPanel({
       })
     })
     return map
-  }, [state.bytes])
+  }, [state.passages])
 
   const who = (userId: string) => names[userId] ?? "unknown"
 
@@ -48,7 +48,7 @@ export default function CohortClothPanel({
     setReadSel(readSel?.type === "edge" && readSel.id === id ? null : { type: "edge", id })
   }
 
-  const byteQuote = (b: Byte) => (
+  const byteQuote = (b: Passage) => (
     <div key={b.id} className="bytequote">
       <span className="src">
         {who(b.userId)}
@@ -77,7 +77,7 @@ export default function CohortClothPanel({
   if (readSel?.type === "concept" && readSel.id) {
     const concept = conceptById.get(readSel.id)
     if (concept) {
-      const conceptBytes = bytesByConcept.get(concept.id) ?? []
+      const conceptPassages = bytesByConcept.get(concept.id) ?? []
       const crossings = state.edges.filter(
         (e) => e.fromId === concept.id || e.toId === concept.id
       )
@@ -87,7 +87,7 @@ export default function CohortClothPanel({
             <span className="red">{concept.label}</span>
             <span className="n">
               {" "}· {who(concept.userId)} · {crossings.length} crossing{crossings.length !== 1 ? "s" : ""} ·{" "}
-              {conceptBytes.length} passage{conceptBytes.length !== 1 ? "s" : ""}
+              {conceptPassages.length} passage{conceptPassages.length !== 1 ? "s" : ""}
             </span>
           </div>
           {concept.def ? <p className="cardmenudef">{concept.def}</p> : null}
@@ -95,12 +95,12 @@ export default function CohortClothPanel({
           <span className="cap" style={{ display: "block", marginTop: "8px" }}>
             the passages behind it
           </span>
-          {conceptBytes.length === 0 ? (
+          {conceptPassages.length === 0 ? (
             <p className="ghostnote" style={{ color: "var(--red)" }}>
               No evidence — this concept traces to no captured passage yet.
             </p>
           ) : (
-            conceptBytes.map(byteQuote)
+            conceptPassages.map(byteQuote)
           )}
 
           {crossings.length > 0 && (
@@ -162,7 +162,7 @@ export default function CohortClothPanel({
         <div className="mapbar">
           <span className="label">The collective cloth</span>
           <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
-            {state.concepts.length} concepts, {state.edges.length} threads, {state.bytes.length} passages.
+            {state.concepts.length} concepts, {state.edges.length} threads, {state.passages.length} passages.
             Click a concept to open its passages; click an arc to read the thread.
           </span>
         </div>

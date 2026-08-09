@@ -68,7 +68,7 @@ export default function MapTab() {
     activeMap, scopeMaps, selectMap, addMap, renameMap, removeMap,
     setMapTiers, setMapRead, setMapEssence, flushMapText,
     setView, ensureActiveMap,
-    addConcept, refileByte,
+    addConcept, refilePassage,
     flash, studentName,
   } = useLoom()
   const { titleOf } = useReadings()
@@ -77,26 +77,26 @@ export default function MapTab() {
 
   // The scope's Unlabeled Passages — the unattached group a projection must
   // show (ruling 38): nameable here, or left as visible remainder.
-  const unfiled = scopedState.bytes.filter((b) => b.conceptIds.length === 0)
+  const unfiled = scopedState.passages.filter((b) => b.conceptIds.length === 0)
   const [unfiledInputs, setUnfiledInputs] = useState<Record<string, string>>({})
   const [unfiledBusy, setUnfiledBusy] = useState<Record<string, boolean>>({})
-  const handleNameUnfiled = async (byteId: string) => {
-    if (unfiledBusy[byteId]) return
-    const nm = (unfiledInputs[byteId] ?? "").trim()
+  const handleNameUnfiled = async (passageId: string) => {
+    if (unfiledBusy[passageId]) return
+    const nm = (unfiledInputs[passageId] ?? "").trim()
     if (!nm) return
-    setUnfiledBusy((prev) => ({ ...prev, [byteId]: true }))
+    setUnfiledBusy((prev) => ({ ...prev, [passageId]: true }))
     try {
       // Same reuse rule as capture: an existing label joins its concept, a
       // new one coins it — the student named it either way.
       const existing = state.concepts.find((c) => c.label.toLowerCase() === nm.toLowerCase())
       const concept = existing ?? (await addConcept(nm))
-      await refileByte(byteId, concept.id)
-      setUnfiledInputs((prev) => ({ ...prev, [byteId]: "" }))
+      await refilePassage(passageId, concept.id)
+      setUnfiledInputs((prev) => ({ ...prev, [passageId]: "" }))
       flash(existing ? `filed under "${concept.label}"` : `named — "${concept.label}" joins your warp`)
     } catch {
-      // refileByte resyncs and flashes before rethrowing; swallow here.
+      // refilePassage resyncs and flashes before rethrowing; swallow here.
     } finally {
-      setUnfiledBusy((prev) => ({ ...prev, [byteId]: false }))
+      setUnfiledBusy((prev) => ({ ...prev, [passageId]: false }))
     }
   }
 
@@ -826,8 +826,8 @@ export default function MapTab() {
         {menuConcept && menuPos && (
           <CardMenu
             concept={menuConcept}
-            bytes={state.bytes.filter(b => b.conceptIds.includes(menuConcept.id))}
-            where={readingsOf(menuConcept.id, state.bytes).map(titleOf)}
+            passages={state.passages.filter(b => b.conceptIds.includes(menuConcept.id))}
+            where={readingsOf(menuConcept.id, state.passages).map(titleOf)}
             pinned={pins.includes(menuConcept.id)}
             // Clamped so a card near the right edge does not push its menu off
             // the table, and flipped above the card when it sits low enough
@@ -855,7 +855,7 @@ export default function MapTab() {
             Name one to bring it onto the graph, or leave it as it is.
           </p>
           {unfiled.map((b) => (
-            <div key={b.id} data-byte-id={b.id} style={{ marginTop: 10, borderBottom: "1px dotted var(--rule)", paddingBottom: 8 }}>
+            <div key={b.id} data-passage-id={b.id} style={{ marginTop: 10, borderBottom: "1px dotted var(--rule)", paddingBottom: 8 }}>
               <div className="passage">&quot;{b.content}&quot;</div>
               <div className="src">{b.source || "—"}{b.location ? ` · ${b.location}` : ""}</div>
               <div className="quietrow" style={{ marginTop: 6 }}>

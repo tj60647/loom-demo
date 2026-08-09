@@ -63,7 +63,7 @@ export default function ClothReflection() {
   // what the reading means (red lines #1/#7).
   const readPrompts: ReadPrompt[] = []
   const loose = state.edges.filter(e => !e.handle).length
-  const noEv = noEvidenceConcepts(state.concepts, state.bytes)
+  const noEv = noEvidenceConcepts(state.concepts, state.passages)
   if (state.concepts.length > 0) {
     const comps = allComponents(state.concepts, state.edges)
     const degs = state.concepts.map(c => ({c, d: degreeOf(state.edges, c.id)})).filter(o => o.d > 0).sort((a,b) => b.d - a.d)
@@ -223,8 +223,8 @@ export default function ClothReflection() {
       if (e) {
         const f = state.concepts.find(c => c.id === e.fromId);
         const t = state.concepts.find(c => c.id === e.toId);
-        const fBytes = state.bytes.filter(b => f && b.conceptIds.includes(f.id));
-        const tBytes = state.bytes.filter(b => t && b.conceptIds.includes(t.id));
+        const fBytes = state.passages.filter(b => f && b.conceptIds.includes(f.id));
+        const tBytes = state.passages.filter(b => t && b.conceptIds.includes(t.id));
 
         readingPane = (
           <div id="readingPane" style={{ marginTop: "16px" }}>

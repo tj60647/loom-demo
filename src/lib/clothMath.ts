@@ -79,8 +79,8 @@ export function recurringHandles(edges: Edge[]): [string, Edge[]][] {
 }
 
 /** Concepts with no captured passage — the red-line-#4 visible failure state. */
-export function noEvidenceConcepts(concepts: Concept[], bytes: { conceptIds: string[] }[]): Concept[] {
-  const evidenced = new Set(bytes.flatMap((b) => b.conceptIds))
+export function noEvidenceConcepts(concepts: Concept[], passages: { conceptIds: string[] }[]): Concept[] {
+  const evidenced = new Set(passages.flatMap((b) => b.conceptIds))
   return concepts.filter((c) => !evidenced.has(c.id))
 }
 

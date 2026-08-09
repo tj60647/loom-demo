@@ -145,7 +145,7 @@ test('export carries maps[] with id-valid tiers and no mirror residue', async ({
   // The export button snapshots current client state, which right after load
   // is still the blank pre-fetch state — retry until the loaded graph (with
   // the map test 1 made) is what lands in the file.
-  let parsed: { graph: { maps?: { name: string; essence: string; read: string; tiers: Record<string, string> }[]; concepts: { id: string; tier?: string }[]; bytes?: { conceptIds?: string[] }[]; read?: string } } | undefined;
+  let parsed: { graph: { maps?: { name: string; essence: string; read: string; tiers: Record<string, string> }[]; concepts: { id: string; tier?: string }[]; passages?: { conceptIds?: string[] }[]; read?: string } } | undefined;
   await expect(async () => {
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export .json' }).click();
@@ -170,8 +170,8 @@ test('export carries maps[] with id-valid tiers and no mirror residue', async ({
     expect(c).not.toHaveProperty('tier');
   }
   expect(parsed.graph).not.toHaveProperty('read');
-  // And every byte carries its concept pointers as an array (P0.1).
-  for (const b of parsed.graph.bytes ?? []) {
+  // And every passage carries its concept pointers as an array (P0.1).
+  for (const b of parsed.graph.passages ?? []) {
     expect(Array.isArray(b.conceptIds)).toBe(true);
   }
 });

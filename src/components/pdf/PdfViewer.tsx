@@ -12,7 +12,7 @@ import type { ReadingPageHit } from '@/actions/search';
 import { overlayBlockMessage, type OverlayBand, type PassagesOverlay } from '@/lib/overlay';
 import { hitTermsOf } from '@/lib/searchText';
 import Snippet from '@/components/ui/Snippet';
-import { Byte, Concept } from '@/lib/types';
+import { Passage, Concept } from '@/lib/types';
 import { hashText } from '@/lib/hash';
 import Mark from 'mark.js';
 
@@ -29,11 +29,11 @@ interface PdfViewerProps {
   sourceName: string;
   sourceId?: string;
   initialPageNumber?: number;
-  focusByteId?: string | null;
+  focusPassageId?: string | null;
   /** Opens the search panel pre-filled — how a shelf-search hit carries its
       query into the text it matched. */
   initialSearch?: string;
-  onGotoOpenByte?: (byteId: string) => void;
+  onGotoOpenPassage?: (passageId: string) => void;
   /**
    * The page the reader is looking at, as it changes. Capture-by-hand offers
    * it as the location so nobody retypes a page number the viewer already
@@ -54,9 +54,9 @@ interface PdfViewerProps {
   workPanel?: ReactNode;
 }
 
-/** One byte on the clicked span, as the highlight tooltip presents it. */
+/** One passage on the clicked span, as the highlight tooltip presents it. */
 type HighlightEntry = {
-  byteId: string;
+  passageId: string;
   conceptLabel: string;
   source: string;
   location: string;
@@ -64,7 +64,7 @@ type HighlightEntry = {
   endOffset: number | null;
 };
 
-export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusByteId, initialSearch, onGotoOpenByte, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
+export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
   const { state, scoped } = useLoom();
   // Drawn only for faculty and admins. Not a guard — `overlayViewer()` re-checks
   // on the server, so a student who forces the request gets an empty overlay.
@@ -76,8 +76,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [isNarrow, setIsNarrow] = useState(false);
-  // One passage can carry several bytes — the same span re-filed under a
-  // second concept, or overlapping captures. The tooltip lists every byte on
+  // One passage can carry several passages — the same span re-filed under a
+  // second concept, or overlapping captures. The tooltip lists every passage on
   // the clicked span, so no coding is hidden behind another.
   const [highlightTooltip, setHighlightTooltip] = useState<{
     entries: HighlightEntry[];
@@ -125,9 +125,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * The acknowledgement a capture gets, where the reader is actually looking.
    * One slot, not a stack: two captures inside the window read as "2 passages
    * captured" rather than climbing the corner of the page. `n` counts them so
-   * the wording can say so; `byteId` is the LAST one, which is the row to open.
+   * the wording can say so; `passageId` is the LAST one, which is the row to open.
    */
-  const [captureToast, setCaptureToast] = useState<{ byteId: string; label: string; n: number } | null>(null);
+  const [captureToast, setCaptureToast] = useState<{ passageId: string; label: string; n: number } | null>(null);
   const toastTimer = useRef<number | null>(null);
   /**
    * The element that actually scrolls in every mode — the measuring stick for
@@ -182,48 +182,48 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     setHighlightTooltip(null);
   }, []);
 
-  // Latest bytes/concepts for click-time lookups. Overlapping captures nest
-  // their <mark> elements, so the byte list for a span is read off the DOM at
+  // Latest passages/concepts for click-time lookups. Overlapping captures nest
+  // their <mark> elements, so the passage list for a span is read off the DOM at
   // click time rather than frozen per node at mark time.
-  const bytesRef = useRef<Byte[]>([]);
+  const bytesRef = useRef<Passage[]>([]);
   const conceptsRef = useRef<Concept[]>([]);
   useEffect(() => {
     conceptsRef.current = state.concepts;
   }, [state.concepts]);
 
   /**
-   * Every byte covering this node's span: the node's own byte plus the bytes
-   * of the ancestor marks it is nested inside. Ordered as the bytes appear in
+   * Every passage covering this node's span: the node's own passage plus the passages
+   * of the ancestor marks it is nested inside. Ordered as the passages appear in
    * the capture list, so the tooltip is stable no matter which layer was
    * clicked.
    */
   const entriesForNode = useCallback((node: HTMLElement): HighlightEntry[] => {
     const ids: string[] = [];
-    let el: HTMLElement | null = node.closest(".loom-byte-highlight");
+    let el: HTMLElement | null = node.closest(".loom-passage-highlight");
     while (el) {
-      const id = el.getAttribute("data-loom-byte-id");
+      const id = el.getAttribute("data-loom-passage-id");
       if (id && !ids.includes(id)) ids.push(id);
-      el = el.parentElement ? el.parentElement.closest(".loom-byte-highlight") : null;
+      el = el.parentElement ? el.parentElement.closest(".loom-passage-highlight") : null;
     }
     const orderOf = new Map(bytesRef.current.map((b, i) => [b.id, i]));
     ids.sort((a, b) => (orderOf.get(a) ?? 0) - (orderOf.get(b) ?? 0));
     return ids.flatMap((id) => {
-      const byte = bytesRef.current.find((b) => b.id === id);
-      if (!byte) return [];
-      const concept = conceptsRef.current.find((c) => c.id === byte.conceptIds[0]);
+      const passage = bytesRef.current.find((b) => b.id === id);
+      if (!passage) return [];
+      const concept = conceptsRef.current.find((c) => c.id === passage.conceptIds[0]);
       return [{
-        byteId: byte.id,
+        passageId: passage.id,
         conceptLabel: concept?.label || "Unlabeled passage",
-        source: byte.source || sourceName,
-        location: byte.location || "",
-        startOffset: byte.startOffset ?? null,
-        endOffset: byte.endOffset ?? null,
+        source: passage.source || sourceName,
+        location: passage.location || "",
+        startOffset: passage.startOffset ?? null,
+        endOffset: passage.endOffset ?? null,
       }];
     });
   }, [sourceName]);
 
-  const bindHighlightNode = useCallback((node: HTMLElement, byteId: string) => {
-    node.setAttribute("data-loom-byte-id", byteId);
+  const bindHighlightNode = useCallback((node: HTMLElement, passageId: string) => {
+    node.setAttribute("data-loom-passage-id", passageId);
 
     const showFromEvent = (event: MouseEvent | PointerEvent | FocusEvent, sticky = false) => {
       const target = (event.target as HTMLElement | null) ?? node;
@@ -296,13 +296,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   }, [initialPageNumber, sourceId, url]);
 
   useEffect(() => {
-    if (!focusByteId) return;
-    const targetByte = state.bytes.find((b) => b.id === focusByteId);
+    if (!focusPassageId) return;
+    const targetByte = state.passages.find((b) => b.id === focusPassageId);
     if (targetByte?.pageNumber && targetByte.pageNumber > 0) {
       const timer = window.setTimeout(() => setPageNumber(targetByte.pageNumber!), 0);
       return () => window.clearTimeout(timer);
     }
-  }, [focusByteId, state.bytes]);
+  }, [focusPassageId, state.passages]);
 
   useEffect(() => {
     if (numPages && pageNumber > numPages) {
@@ -346,7 +346,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            * is anchored outside every `.react-pdf__Page`. Name the passage by
            * the page it ENDS in rather than falling through to `pageNumber` —
            * nothing updates that while a continuous view is scrolled, so the
-           * byte would be filed as "p. 1" whichever page it really came from,
+           * passage would be filed as "p. 1" whichever page it really came from,
            * and then only ever be looked for on page 1.
            */
           const pageNode = startPageNode ?? endPageNode;
@@ -361,8 +361,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            * would trust that overlong range and mark the wrong text.
            *
            * The passage itself is still exactly what the student selected. Only
-           * the anchor is dropped, which puts the byte on the same fuzzy
-           * matching path as every byte captured before anchoring existed.
+           * the anchor is dropped, which puts the passage on the same fuzzy
+           * matching path as every passage captured before anchoring existed.
            */
           const spansPages = !!pageNode && !!endPageNode && pageNode !== endPageNode;
 
@@ -485,7 +485,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
-      if (target.closest(".loom-byte-highlight") || target.closest(".loom-highlight-tooltip")) {
+      if (target.closest(".loom-passage-highlight") || target.closest(".loom-highlight-tooltip")) {
         return;
       }
       hideHighlightTooltip();
@@ -500,10 +500,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   }
 
   // Keep bytesRef current (declared above, next to conceptsRef) so the
-  // MutationObserver's applier never needs state.bytes as a dependency.
+  // MutationObserver's applier never needs state.passages as a dependency.
   useEffect(() => {
-    bytesRef.current = state.bytes.filter(b => (sourceId && b.sourceId === sourceId) || b.source === sourceName);
-  }, [state.bytes, sourceName, sourceId]);
+    bytesRef.current = state.passages.filter(b => (sourceId && b.sourceId === sourceId) || b.source === sourceName);
+  }, [state.passages, sourceName, sourceId]);
 
   /**
    * How many passages the student has captured in THIS reading. The gate is
@@ -512,8 +512,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * one, and the comparison should appear without a reload.
    */
   const ownCaptureCount = useMemo(
-    () => (sourceId ? state.bytes.filter((b) => b.sourceId === sourceId).length : 0),
-    [state.bytes, sourceId]
+    () => (sourceId ? state.passages.filter((b) => b.sourceId === sourceId).length : 0),
+    [state.passages, sourceId]
   );
 
   /**
@@ -628,16 +628,16 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     toastTimer.current = window.setTimeout(() => setCaptureToast(null), 6000);
   }, [holdToast]);
 
-  const handleCaptured = useCallback((byteId: string, label: string) => {
+  const handleCaptured = useCallback((passageId: string, label: string) => {
     // With the sheet already out, the row IS the acknowledgement — scroll to it
     // rather than covering it with a card that says it happened.
     if (workOpen) {
-      onGotoOpenByte?.(byteId);
+      onGotoOpenPassage?.(passageId);
       return;
     }
-    setCaptureToast((prev) => ({ byteId, label, n: (prev?.n ?? 0) + 1 }));
+    setCaptureToast((prev) => ({ passageId, label, n: (prev?.n ?? 0) + 1 }));
     startToastTimer();
-  }, [workOpen, onGotoOpenByte, startToastTimer]);
+  }, [workOpen, onGotoOpenPassage, startToastTimer]);
 
   // The countdown is state that outlives the component if nobody clears it.
   useEffect(() => () => holdToast(), [holdToast]);
@@ -656,8 +656,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   );
 
   // Robust highlight applier using MutationObserver + React useEffect.
-  // Search-term marks ride the same pass as byte highlights: one unmark, then
-  // bytes, then search terms — two competing effects would race each other's
+  // Search-term marks ride the same pass as passage highlights: one unmark, then
+  // passages, then search terms — two competing effects would race each other's
   // unmark and strip whichever finished first.
   useEffect(() => {
     searchTermsRef.current = searchTerms;
@@ -666,9 +666,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     let debounceTimer: NodeJS.Timeout;
 
     const applyHighlights = () => {
-      const bytes = bytesRef.current;
+      const passages = bytesRef.current;
       const heatPages = overlayRef.current?.pages ?? [];
-      if (bytes.length === 0 && searchTermsRef.current.length === 0 && heatPages.length === 0) return;
+      if (passages.length === 0 && searchTermsRef.current.length === 0 && heatPages.length === 0) return;
 
       const textLayers = containerRef.current!.querySelectorAll('.react-pdf__Page__textContent');
 
@@ -678,7 +678,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
         const pageStr = layer.parentElement?.getAttribute('data-page-number');
         const parsedPage = pageStr ? parseInt(pageStr, 10) : 0;
-        const pageBytes = bytes.filter(b => b.pageNumber === parsedPage || !b.pageNumber);
+        const pageBytes = passages.filter(b => b.pageNumber === parsedPage || !b.pageNumber);
         const pageHeat = heatPages.find(p => p.pageNumber === parsedPage);
         if (pageBytes.length === 0 && searchTermsRef.current.length === 0 && !pageHeat) return;
 
@@ -687,7 +687,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           done: () => {
             let matches = 0;
             // Compute the live text layer's content hash once per page so we
-            // can decide, per byte, whether the offsets we stored are still
+            // can decide, per passage, whether the offsets we stored are still
             // trustworthy against what pdf.js actually rendered this time.
             const liveHash = hashText((layer as HTMLElement).textContent || "");
 
@@ -721,49 +721,49 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               });
             }
 
-            pageBytes.forEach(byte => {
-              const hasOffsets = byte.startOffset != null && byte.endOffset != null;
+            pageBytes.forEach(passage => {
+              const hasOffsets = passage.startOffset != null && passage.endOffset != null;
               const offsetsTrusted = hasOffsets && (
-                // No stored hash (legacy byte captured before this check
+                // No stored hash (legacy passage captured before this check
                 // existed) — fall back to trusting the offsets as before.
-                byte.pageContentHash == null || byte.pageContentHash === liveHash
+                passage.pageContentHash == null || passage.pageContentHash === liveHash
               );
 
               if (offsetsTrusted) {
                 // Precision mode!
                 instance.markRanges([{
-                  start: byte.startOffset!,
-                  length: byte.endOffset! - byte.startOffset!
+                  start: passage.startOffset!,
+                  length: passage.endOffset! - passage.startOffset!
                 }], {
-                  className: "loom-byte-highlight",
+                  className: "loom-passage-highlight",
                   each: (node) => {
-                    const concept = state.concepts.find((c) => c.id === byte.conceptIds[0]);
-                    const a11y = `${concept?.label || "Unlabeled passage"}. ${byte.source || sourceName}${byte.location ? `, ${byte.location}` : ""}. Characters ${byte.startOffset ?? "?"}-${byte.endOffset ?? "?"}.`;
+                    const concept = state.concepts.find((c) => c.id === passage.conceptIds[0]);
+                    const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
                     (node as HTMLElement).setAttribute("aria-label", a11y);
                     (node as HTMLElement).setAttribute("tabindex", "0");
-                    bindHighlightNode(node as HTMLElement, byte.id);
+                    bindHighlightNode(node as HTMLElement, passage.id);
                   },
                   done: (count) => matches += count
                 });
               } else {
                 if (hasOffsets) {
-                  console.warn(`[Loom PDF] Page ${parsedPage} text layer has drifted from the anchored content (hash mismatch); falling back to fuzzy matching for byte ${byte.id}.`);
+                  console.warn(`[Loom PDF] Page ${parsedPage} text layer has drifted from the anchored content (hash mismatch); falling back to fuzzy matching for passage ${passage.id}.`);
                 }
                 // Legacy / drifted fuzzy mode
-                instance.mark(byte.content, {
+                instance.mark(passage.content, {
                   accuracy: "partially",
                   separateWordSearch: false,
-                  className: "loom-byte-highlight",
+                  className: "loom-passage-highlight",
                   acrossElements: true,
                   diacritics: true,
                   ignoreJoiners: true,
                   ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
                   each: (node) => {
-                    const concept = state.concepts.find((c) => c.id === byte.conceptIds[0]);
-                    const a11y = `${concept?.label || "Unlabeled passage"}. ${byte.source || sourceName}${byte.location ? `, ${byte.location}` : ""}. Characters ${byte.startOffset ?? "?"}-${byte.endOffset ?? "?"}.`;
+                    const concept = state.concepts.find((c) => c.id === passage.conceptIds[0]);
+                    const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
                     (node as HTMLElement).setAttribute("aria-label", a11y);
                     (node as HTMLElement).setAttribute("tabindex", "0");
-                    bindHighlightNode(node as HTMLElement, byte.id);
+                    bindHighlightNode(node as HTMLElement, passage.id);
                   },
                   done: (count) => matches += count
                 });
@@ -771,7 +771,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             });
             if (matches > 0) console.log(`[Loom PDF] Applied ${matches} highlights on Page ${parsedPage}.`);
 
-            // Search hits, marked after the bytes so a passage that is both
+            // Search hits, marked after the passages so a passage that is both
             // captured and searched shows the search mark on top. The terms
             // are whole word forms from the document, so "exactly" marks the
             // word and not every substring echo of it.
@@ -791,7 +791,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       });
     };
 
-    // 1. Run whenever this effect triggers (e.g. when state.bytes changes)
+    // 1. Run whenever this effect triggers (e.g. when state.passages changes)
     applyHighlights();
 
     // 2. Also observe the DOM for when react-pdf injects the text layer spans
@@ -822,7 +822,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       observer.disconnect();
       clearTimeout(debounceTimer);
     };
-  }, [state.bytes, state.concepts, pageNumber, bindHighlightNode, sourceName, searchTerms, overlay, stageEl]); // Re-run when bytes, page, search terms or the overlay change — and if the stage node itself is replaced
+  }, [state.passages, state.concepts, pageNumber, bindHighlightNode, sourceName, searchTerms, overlay, stageEl]); // Re-run when passages, page, search terms or the overlay change — and if the stage node itself is replaced
 
   const handleCaptureClick = () => {
     if (highlightRect) {
@@ -865,7 +865,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
   /**
    * In the continuous views a page is somewhere to scroll to, not something to
-   * turn to — so "go to this byte's page" (and the initial page) brings the
+   * turn to — so "go to this passage's page" (and the initial page) brings the
    * page into view instead of swapping what is rendered.
    */
   useEffect(() => {
@@ -878,7 +878,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     }, 60);
     return () => window.clearTimeout(timer);
     // numPages matters: on the first load the slots do not exist yet, so
-    // without it this ran once against an empty stage and "go to this byte's
+    // without it this ran once against an empty stage and "go to this passage's
     // page" quietly did nothing until you changed page by hand.
   }, [pageNumber, viewMode, numPages]);
 
@@ -986,7 +986,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // Calculate page dimensions based on fit mode
   // What the toggle carries when the sheet is shut. Cheap and permanent, and
   // it answers "did that save?" without opening anything.
-  const workCount = scoped.bytes.length;
+  const workCount = scoped.passages.length;
 
   const calcPageProps = () => {
     if (fitMode === "height") {
@@ -1019,14 +1019,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     >
 
       <style>{`
-        .loom-byte-highlight {
+        .loom-passage-highlight {
           background-color: rgba(255, 204, 0, 0.4);
           border-bottom: 2px solid rgba(255, 204, 0, 0.8);
           color: inherit;
           cursor: help;
           pointer-events: auto;
         }
-        /* A searched word on the page. Sage, not the byte yellow: a search
+        /* A searched word on the page. Sage, not the passage yellow: a search
            hit is a place the text says something, never a passage anyone
            captured — the two must not be readable as each other. */
         .loom-search-hit {
@@ -1035,7 +1035,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           color: inherit;
         }
         /* The Passages Overlay: where other people marked, in steps. Slate —
-           neither the byte yellow nor the search sage, because three different
+           neither the passage yellow nor the search sage, because three different
            facts about a span must never read as each other. No cursor and no
            handlers: it is a comparison, and clicking it should do exactly what
            clicking the paper does. */
@@ -1837,8 +1837,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           <div className="yourwork-head">
             <h2 id="yourwork-title">Your work</h2>
             <span className="n">
-              {scoped.bytes.length
-                ? `${scoped.bytes.length} passage${scoped.bytes.length === 1 ? "" : "s"} · ${scoped.concepts.length} concept${scoped.concepts.length === 1 ? "" : "s"}`
+              {scoped.passages.length
+                ? `${scoped.passages.length} passage${scoped.passages.length === 1 ? "" : "s"} · ${scoped.concepts.length} concept${scoped.concepts.length === 1 ? "" : "s"}`
                 : "nothing captured here yet"}
             </span>
             <button
@@ -1874,10 +1874,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             type="button"
             className="btn ghost mini compact"
             onClick={() => {
-              const target = captureToast.byteId;
+              const target = captureToast.passageId;
               setCaptureToast(null);
               holdToast();
-              onGotoOpenByte?.(target);
+              onGotoOpenPassage?.(target);
             }}
           >
             In your work ›
@@ -1995,14 +1995,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </button>
           </div>
           {highlightTooltip.entries.map((entry) => (
-            <div className="entry" key={entry.byteId}>
+            <div className="entry" key={entry.passageId}>
               <div className="coding">{entry.conceptLabel}</div>
               <div className="foot">
                 {entry.source}
                 {entry.location ? ` | ${entry.location}` : ""}
                 {` | chars ${entry.startOffset ?? "?"}-${entry.endOffset ?? "?"}`}
               </div>
-              {onGotoOpenByte ? (
+              {onGotoOpenPassage ? (
                 <button
                   type="button"
                   onClick={(event) => {
@@ -2010,7 +2010,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                     // Find and the sheet share the right edge; this one opens
                     // the sheet, so the other has to go.
                     if (searchOpen) closeSearch();
-                    onGotoOpenByte(entry.byteId);
+                    onGotoOpenPassage(entry.passageId);
                     hideHighlightTooltip();
                   }}
                 >

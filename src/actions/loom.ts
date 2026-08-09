@@ -1,14 +1,14 @@
 "use server"
 
 import { db } from "@/db"
-import { concepts, bytes, byteConcepts, edges, users, sourcePages, sources, cloths, views, graphEvents, maps } from "@/db/schema"
+import { concepts, passages, passageConcepts, edges, users, sourcePages, sources, cloths, views, graphEvents, maps } from "@/db/schema"
 import { and, asc, eq, inArray, isNull, like, or, sql, type SQL } from "drizzle-orm"
 import type { PgColumn } from "drizzle-orm/pg-core"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { resolveCourseIdForUser } from "@/lib/courses"
 import { scopeFromKey, scopeOf } from "@/lib/scope"
-import type { Byte, CardTableView, GraphEvent, LoomMap, LoomViews, PassageTier, Tier } from "@/lib/types"
+import type { Passage, CardTableView, GraphEvent, LoomMap, LoomViews, PassageTier, Tier } from "@/lib/types"
 import type { ParsedImport, ParsedMapImport } from "@/lib/graphExport"
 import { WORKED_EXAMPLE, WORKED_EXAMPLE_SOURCE } from "@/lib/example"
 import { textLayerProjection } from "@/lib/pdfText"
@@ -40,7 +40,7 @@ async function resolveActiveCourseId(userId: string, courseIdRaw?: string | null
   // Pre-course-scoping rows carry a null courseId. Adopt them into whichever
   // course this learner is actually working in.
   await db.update(concepts).set({ courseId }).where(and(eq(concepts.userId, userId), isNull(concepts.courseId)))
-  await db.update(bytes).set({ courseId }).where(and(eq(bytes.userId, userId), isNull(bytes.courseId)))
+  await db.update(passages).set({ courseId }).where(and(eq(passages.userId, userId), isNull(passages.courseId)))
   await db.update(edges).set({ courseId }).where(and(eq(edges.userId, userId), isNull(edges.courseId)))
   await db.update(graphEvents).set({ courseId }).where(and(eq(graphEvents.userId, userId), isNull(graphEvents.courseId)))
   await db.update(maps).set({ courseId }).where(and(eq(maps.userId, userId), isNull(maps.courseId)))
@@ -175,25 +175,25 @@ export async function getUserLoomData() {
   const userConcepts = await db.select().from(concepts)
     .where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))
     .orderBy(asc(concepts.createdAt), asc(concepts.id))
-  const byteRows = await db.select().from(bytes)
-    .where(and(eq(bytes.userId, userId), inCourse(bytes.courseId, courseId)))
-    .orderBy(asc(bytes.createdAt), asc(bytes.id))
+  const passageRows = await db.select().from(passages)
+    .where(and(eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
+    .orderBy(asc(passages.createdAt), asc(passages.id))
   // The passage↔concept pointers, in the order they were filed — folded onto
-  // each byte as `conceptIds` so the client sees one object per passage.
+  // each passage as `conceptIds` so the client sees one object per passage.
   const junctionRows = await db.select({
-    byteId: byteConcepts.byteId,
-    conceptId: byteConcepts.conceptId,
-  }).from(byteConcepts)
-    .innerJoin(bytes, eq(byteConcepts.byteId, bytes.id))
-    .where(and(eq(bytes.userId, userId), inCourse(bytes.courseId, courseId)))
-    .orderBy(asc(byteConcepts.createdAt), asc(byteConcepts.conceptId))
+    passageId: passageConcepts.passageId,
+    conceptId: passageConcepts.conceptId,
+  }).from(passageConcepts)
+    .innerJoin(passages, eq(passageConcepts.passageId, passages.id))
+    .where(and(eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
+    .orderBy(asc(passageConcepts.createdAt), asc(passageConcepts.conceptId))
   const conceptIdsByByte = new Map<string, string[]>()
   junctionRows.forEach((row) => {
-    const list = conceptIdsByByte.get(row.byteId) ?? []
+    const list = conceptIdsByByte.get(row.passageId) ?? []
     list.push(row.conceptId)
-    conceptIdsByByte.set(row.byteId, list)
+    conceptIdsByByte.set(row.passageId, list)
   })
-  const userBytes: Byte[] = byteRows.map((b) => ({
+  const userBytes: Passage[] = passageRows.map((b) => ({
     ...b,
     conceptIds: conceptIdsByByte.get(b.id) ?? [],
   }))
@@ -230,7 +230,7 @@ export async function getUserLoomData() {
 
   return {
     concepts: userConcepts,
-    bytes: userBytes,
+    passages: userBytes,
     edges: userEdges,
     maps: userMaps as LoomMap[],
     cloths: clothRows,
@@ -316,11 +316,11 @@ function findClosestTextIndex(text: string, needle: string, preferredStart?: num
   return bestIndex
 }
 
-export async function createByte(data: { conceptIds?: string[], source: string, sourceId?: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, pageContentHash?: string, note?: string, question?: string, isPullQuote?: boolean, tier?: PassageTier }) {
+export async function createPassage(data: { conceptIds?: string[], source: string, sourceId?: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, pageContentHash?: string, note?: string, question?: string, isPullQuote?: boolean, tier?: PassageTier }) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
-  // The same check `attributeBytes` makes below, for the same reason — this is
+  // The same check `attributePassages` makes below, for the same reason — this is
   // the door it was left open beside. `sourceId` arrives from the client, and
   // the only thing that stopped it naming a reading the student was never
   // entitled to see (a staged one, or another student's private upload) was
@@ -371,9 +371,9 @@ export async function createByte(data: { conceptIds?: string[], source: string, 
       } else {
         pageContentHash = data.pageContentHash ?? page.contentHash
         if (canonicalIndex === -1) {
-          console.warn(`[createByte] Could not anchor byte content to sourcePage ${data.sourceId}#${data.pageNumber}; falling back to client-provided offsets.`)
+          console.warn(`[createPassage] Could not anchor passage content to sourcePage ${data.sourceId}#${data.pageNumber}; falling back to client-provided offsets.`)
         } else {
-          console.warn(`[createByte] Browser text layer differs from sourcePage ${data.sourceId}#${data.pageNumber}; preserving client-provided offsets.`)
+          console.warn(`[createPassage] Browser text layer differs from sourcePage ${data.sourceId}#${data.pageNumber}; preserving client-provided offsets.`)
         }
       }
     }
@@ -391,16 +391,16 @@ export async function createByte(data: { conceptIds?: string[], source: string, 
     if (owned.size !== conceptIds.length) throw new Error("Concept not found.")
   }
 
-  // The byte and its concept pointers land in one batch: zero pointers is a
+  // The passage and its concept pointers land in one batch: zero pointers is a
   // legal capture (an Unlabeled Passage), a half-written pointer set is not.
   // Server actions are directly POSTable, so the enum-ish fields are
   // sanitized rather than trusted; pointer createdAt is staggered because
   // filing order is meaning and same-statement rows would tie.
   const tier: PassageTier = data.tier === "p" || data.tier === "s" || data.tier === "t" ? data.tier : ""
-  const byteId = crypto.randomUUID()
+  const passageId = crypto.randomUUID()
   const pointerBase = Date.now()
-  const byteInsert = db.insert(bytes).values({
-    id: byteId,
+  const byteInsert = db.insert(passages).values({
+    id: passageId,
     courseId,
     userId,
     source: data.source,
@@ -419,13 +419,13 @@ export async function createByte(data: { conceptIds?: string[], source: string, 
   const [inserted] = conceptIds.length
     ? (await db.batch([
         byteInsert,
-        db.insert(byteConcepts).values(conceptIds.map((conceptId, i) => ({ byteId, conceptId, createdAt: new Date(pointerBase + i) }))),
+        db.insert(passageConcepts).values(conceptIds.map((conceptId, i) => ({ passageId, conceptId, createdAt: new Date(pointerBase + i) }))),
       ]))[0]
     : await byteInsert
 
-  // byte.capture fires for every capture, named or not — the Log is complete
-  // (JC Aug 7 / P0.6). byte.create remains only as a historical kind.
-  await recordEvent(userId, courseId, "byte.capture", "byte", byteId, {
+  // passage.capture fires for every capture, named or not — the Log is complete
+  // (JC Aug 7 / P0.6). passage.create remains only as a historical kind.
+  await recordEvent(userId, courseId, "byte.capture", "byte", passageId, {
     conceptIds,
     source: data.source,
     location: data.location,
@@ -435,16 +435,16 @@ export async function createByte(data: { conceptIds?: string[], source: string, 
 
 /**
  * File a passage under another concept (spec §3 Open; red line #2 names
- * re-file as permitted capture automation). Ruling 37 semantics: the byte
+ * re-file as permitted capture automation). Ruling 37 semantics: the passage
  * gains a pointer — one passage, several concepts, no row copies. The
  * passage's anchor and margin stay singular.
  */
-export async function refileByte(byteId: string, conceptId: string) {
+export async function refilePassage(passageId: string, conceptId: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
-  const rows = await db.select().from(bytes)
-    .where(and(eq(bytes.id, byteId), eq(bytes.userId, userId), inCourse(bytes.courseId, courseId)))
+  const rows = await db.select().from(passages)
+    .where(and(eq(passages.id, passageId), eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
     .limit(1)
   const src = rows[0]
   if (!src) throw new Error("Passage not found.")
@@ -454,16 +454,16 @@ export async function refileByte(byteId: string, conceptId: string) {
     .limit(1)
   if (!owned.length) throw new Error("Concept not found.")
 
-  const existing = await db.select({ conceptId: byteConcepts.conceptId }).from(byteConcepts)
-    .where(eq(byteConcepts.byteId, byteId))
-    .orderBy(asc(byteConcepts.createdAt), asc(byteConcepts.conceptId))
+  const existing = await db.select({ conceptId: passageConcepts.conceptId }).from(passageConcepts)
+    .where(eq(passageConcepts.passageId, passageId))
+    .orderBy(asc(passageConcepts.createdAt), asc(passageConcepts.conceptId))
   if (existing.some((r) => r.conceptId === conceptId)) {
     throw new Error("Already filed under that concept.")
   }
 
-  await db.insert(byteConcepts).values({ byteId, conceptId })
+  await db.insert(passageConcepts).values({ passageId, conceptId })
 
-  await recordEvent(userId, courseId, "byte.refile", "byte", byteId, {
+  await recordEvent(userId, courseId, "byte.refile", "byte", passageId, {
     conceptId,
     source: src.source,
   })
@@ -488,12 +488,12 @@ export async function mergeConcepts(sourceId: string, targetId: string) {
   const target = rows.find((r) => r.id === targetId)
   if (!source || !target) throw new Error("Concept not found.")
 
-  // A pointer move that would collide with an existing (byte, target) row is
+  // A pointer move that would collide with an existing (passage, target) row is
   // dropped rather than duplicated — the passage already evidences the target.
-  const sourcePointers = await db.select().from(byteConcepts).where(eq(byteConcepts.conceptId, sourceId))
-  const targetPointers = await db.select({ byteId: byteConcepts.byteId }).from(byteConcepts).where(eq(byteConcepts.conceptId, targetId))
-  const already = new Set(targetPointers.map((r) => r.byteId))
-  const moved = sourcePointers.filter((r) => !already.has(r.byteId))
+  const sourcePointers = await db.select().from(passageConcepts).where(eq(passageConcepts.conceptId, sourceId))
+  const targetPointers = await db.select({ passageId: passageConcepts.passageId }).from(passageConcepts).where(eq(passageConcepts.conceptId, targetId))
+  const already = new Set(targetPointers.map((r) => r.passageId))
+  const moved = sourcePointers.filter((r) => !already.has(r.passageId))
 
   const inherit: Partial<typeof concepts.$inferInsert> = {}
   if (!target.def && source.def) inherit.def = source.def
@@ -501,9 +501,9 @@ export async function mergeConcepts(sourceId: string, targetId: string) {
 
   await db.batch([
     ...(moved.length
-      ? [db.insert(byteConcepts).values(moved.map((r) => ({ byteId: r.byteId, conceptId: targetId, createdAt: r.createdAt })))]
+      ? [db.insert(passageConcepts).values(moved.map((r) => ({ passageId: r.passageId, conceptId: targetId, createdAt: r.createdAt })))]
       : []),
-    db.delete(byteConcepts).where(eq(byteConcepts.conceptId, sourceId)),
+    db.delete(passageConcepts).where(eq(passageConcepts.conceptId, sourceId)),
     db.update(edges).set({ fromId: targetId }).where(and(eq(edges.fromId, sourceId), eq(edges.userId, userId))),
     db.update(edges).set({ toId: targetId }).where(and(eq(edges.toId, sourceId), eq(edges.userId, userId))),
     ...(Object.keys(inherit).length ? [db.update(concepts).set(inherit).where(eq(concepts.id, targetId))] : []),
@@ -522,24 +522,24 @@ export async function mergeConcepts(sourceId: string, targetId: string) {
 }
 
 /**
- * Remove one concept pointer from a passage — refileByte's inverse; the
- * pointer model needs both directions. The byte itself is untouched: with no
+ * Remove one concept pointer from a passage — refilePassage's inverse; the
+ * pointer model needs both directions. The passage itself is untouched: with no
  * pointers left it is an Unlabeled Passage, not gone.
  */
-export async function unfileByte(byteId: string, conceptId: string) {
+export async function unfilePassage(passageId: string, conceptId: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
-  const rows = await db.select({ id: bytes.id }).from(bytes)
-    .where(and(eq(bytes.id, byteId), eq(bytes.userId, userId), inCourse(bytes.courseId, courseId)))
+  const rows = await db.select({ id: passages.id }).from(passages)
+    .where(and(eq(passages.id, passageId), eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
     .limit(1)
   if (!rows.length) throw new Error("Passage not found.")
 
-  const removed = await db.delete(byteConcepts)
-    .where(and(eq(byteConcepts.byteId, byteId), eq(byteConcepts.conceptId, conceptId)))
-    .returning({ conceptId: byteConcepts.conceptId })
+  const removed = await db.delete(passageConcepts)
+    .where(and(eq(passageConcepts.passageId, passageId), eq(passageConcepts.conceptId, conceptId)))
+    .returning({ conceptId: passageConcepts.conceptId })
   if (removed.length > 0) {
-    await recordEvent(userId, courseId, "byte.unfile", "byte", byteId, { conceptId })
+    await recordEvent(userId, courseId, "byte.unfile", "byte", passageId, { conceptId })
   }
 }
 
@@ -549,14 +549,14 @@ export async function unfileByte(byteId: string, conceptId: string) {
  * Bytes captured before reading-first, and any captured outside a reading,
  * carry free-text `source` and no `sourceId`, so they have no door and fall out
  * of every lens. This is the way back in — and it is the STUDENT saying it.
- * Matching `byte.source` text against library titles would be the tool deciding
+ * Matching `passage.source` text against library titles would be the tool deciding
  * what they meant, which is exactly the judgment red line #2 keeps out of the
  * machine's hands.
  */
-export async function attributeBytes(byteIds: string[], sourceId: string) {
+export async function attributePassages(passageIds: string[], sourceId: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
-  if (!byteIds.length) return 0
+  if (!passageIds.length) return 0
 
   // Not merely "does this id exist" — that admitted any reading in the
   // library, including another student's private upload, letting one learner
@@ -565,14 +565,14 @@ export async function attributeBytes(byteIds: string[], sourceId: string) {
   // the same one that guards the file itself.
   await authorizeSourceAccess(sourceId)
 
-  const updated = await db.update(bytes).set({ sourceId })
+  const updated = await db.update(passages).set({ sourceId })
     .where(and(
-      inArray(bytes.id, byteIds),
-      eq(bytes.userId, userId),
-      inCourse(bytes.courseId, courseId),
-      isNull(bytes.sourceId)
+      inArray(passages.id, passageIds),
+      eq(passages.userId, userId),
+      inCourse(passages.courseId, courseId),
+      isNull(passages.sourceId)
     ))
-    .returning({ id: bytes.id })
+    .returning({ id: passages.id })
 
   if (updated.length) {
     await recordEvent(userId, courseId, "byte.attribute", "byte", null, {
@@ -583,17 +583,17 @@ export async function attributeBytes(byteIds: string[], sourceId: string) {
   return updated.length
 }
 
-export async function deleteByte(id: string) {
+export async function deletePassage(id: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
-  // Read the pointers first: the join rows cascade with the byte, and the
+  // Read the pointers first: the join rows cascade with the passage, and the
   // event should say what the passage was filed under when it went.
-  const pointers = await db.select({ conceptId: byteConcepts.conceptId }).from(byteConcepts)
-    .where(eq(byteConcepts.byteId, id))
-  const removed = await db.delete(bytes)
-    .where(and(eq(bytes.id, id), eq(bytes.userId, userId), inCourse(bytes.courseId, courseId)))
-    .returning({ id: bytes.id })
+  const pointers = await db.select({ conceptId: passageConcepts.conceptId }).from(passageConcepts)
+    .where(eq(passageConcepts.passageId, id))
+  const removed = await db.delete(passages)
+    .where(and(eq(passages.id, id), eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
+    .returning({ id: passages.id })
   if (removed.length > 0) {
     await recordEvent(userId, courseId, "byte.delete", "byte", id, {
       conceptIds: pointers.map((r) => r.conceptId),
@@ -853,16 +853,16 @@ export async function getGraphEvents(): Promise<GraphEvent[]> {
   recorded
     .filter((e) => e.kind === "graph.import" || e.kind === "graph.example")
     .forEach((e) => {
-      const snapshot = (e.payload as { snapshot?: { concepts?: { id: string }[]; bytes?: { id: string }[]; edges?: { id: string }[]; maps?: { id: string }[] } } | null)?.snapshot
+      const snapshot = (e.payload as { snapshot?: { concepts?: { id: string }[]; passages?: { id: string }[]; edges?: { id: string }[]; maps?: { id: string }[] } } | null)?.snapshot
       snapshot?.concepts?.forEach((c) => covered.add(c.id))
-      snapshot?.bytes?.forEach((b) => covered.add(b.id))
+      snapshot?.passages?.forEach((b) => covered.add(b.id))
       snapshot?.edges?.forEach((ed) => covered.add(ed.id))
       snapshot?.maps?.forEach((m) => covered.add(m.id))
     })
 
   const [userConcepts, userBytes, userEdges] = [
     await db.select().from(concepts).where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId))).orderBy(asc(concepts.createdAt), asc(concepts.id)),
-    await db.select().from(bytes).where(and(eq(bytes.userId, userId), inCourse(bytes.courseId, courseId))).orderBy(asc(bytes.createdAt), asc(bytes.id)),
+    await db.select().from(passages).where(and(eq(passages.userId, userId), inCourse(passages.courseId, courseId))).orderBy(asc(passages.createdAt), asc(passages.id)),
     await db.select().from(edges).where(and(eq(edges.userId, userId), inCourse(edges.courseId, courseId))).orderBy(asc(edges.createdAt), asc(edges.id)),
   ]
 
@@ -919,7 +919,7 @@ export async function resetGraph() {
 
   await db.batch([
     db.delete(edges).where(and(eq(edges.userId, userId), inCourse(edges.courseId, courseId))),
-    db.delete(bytes).where(and(eq(bytes.userId, userId), inCourse(bytes.courseId, courseId))),
+    db.delete(passages).where(and(eq(passages.userId, userId), inCourse(passages.courseId, courseId))),
     db.delete(concepts).where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId))),
     db.delete(maps).where(and(eq(maps.userId, userId), inCourse(maps.courseId, courseId))),
     db.delete(cloths).where(and(eq(cloths.userId, userId), inCourse(cloths.courseId, courseId))),
@@ -927,11 +927,11 @@ export async function resetGraph() {
   ])
 }
 
-const IMPORT_LIMITS = { concepts: 400, bytes: 2000, edges: 2000, maps: 40, cloths: 40 }
+const IMPORT_LIMITS = { concepts: 400, passages: 2000, edges: 2000, maps: 40, cloths: 40 }
 
 type GraphSnapshot = {
   concepts: { id: string; label: string }[]
-  bytes: { id: string; conceptIds: string[] }[]
+  passages: { id: string; conceptIds: string[] }[]
   edges: { id: string; fromId: string; toId: string; sentence: string; handle: string }[]
   maps?: { id: string; name: string; scopeKey: string }[]
   cloths?: { id: string; scopeKey: string; title: string }[]
@@ -952,7 +952,7 @@ export async function importGraph(parsed: ParsedImport) {
   const courseId = await resolveActiveCourseId(userId)
 
   if (parsed.concepts.length > IMPORT_LIMITS.concepts ||
-      parsed.bytes.length > IMPORT_LIMITS.bytes ||
+      parsed.passages.length > IMPORT_LIMITS.passages ||
       parsed.edges.length > IMPORT_LIMITS.edges ||
       parsed.maps.length > IMPORT_LIMITS.maps ||
       parsed.cloths.length > IMPORT_LIMITS.cloths) {
@@ -961,7 +961,7 @@ export async function importGraph(parsed: ParsedImport) {
 
   // Imported anchors, map scopes and cloth scopes may point at readings this
   // deployment doesn't have; only keep sourceIds that actually resolve.
-  const anchorIds = [...new Set(parsed.bytes.map((b) => b.anchor?.sourceId).filter((v): v is string => !!v))]
+  const anchorIds = [...new Set(parsed.passages.map((b) => b.anchor?.sourceId).filter((v): v is string => !!v))]
   const scopeSourceIds = [...new Set([
     ...parsed.maps.flatMap((m) => (m.scopeKey ? m.scopeKey.split(",") : [])),
     ...parsed.cloths.flatMap((c) => (c.scopeKey ? c.scopeKey.split(",") : [])),
@@ -980,18 +980,18 @@ export async function importGraph(parsed: ParsedImport) {
     id: conceptIdByKey.get(c.key)!,
     courseId, userId, label: c.label, def: c.def, note: c.note,
   }))
-  // Every byte survives — a passage whose concept keys don't resolve arrives
+  // Every passage survives — a passage whose concept keys don't resolve arrives
   // as an Unlabeled Passage rather than being dropped (red line #5). Pointer
   // createdAt is staggered per row: filing order is meaning, and rows born in
   // one statement would otherwise tie and come back in reminted-UUID order.
   const pointerBase = Date.now()
   let pointerSeq = 0
-  const byteConceptRows: { byteId: string; conceptId: string; createdAt: Date }[] = []
-  const byteRows = parsed.bytes.map((b) => {
+  const byteConceptRows: { passageId: string; conceptId: string; createdAt: Date }[] = []
+  const passageRows = parsed.passages.map((b) => {
     const id = crypto.randomUUID()
     b.conceptKeys.forEach((key) => {
       const conceptId = conceptIdByKey.get(key)
-      if (conceptId) byteConceptRows.push({ byteId: id, conceptId, createdAt: new Date(pointerBase + pointerSeq++) })
+      if (conceptId) byteConceptRows.push({ passageId: id, conceptId, createdAt: new Date(pointerBase + pointerSeq++) })
     })
     const anchor = b.anchor && knownSources.has(b.anchor.sourceId) ? b.anchor : undefined
     return {
@@ -1011,9 +1011,9 @@ export async function importGraph(parsed: ParsedImport) {
   })
   const conceptIdsByByte = new Map<string, string[]>()
   byteConceptRows.forEach((r) => {
-    const list = conceptIdsByByte.get(r.byteId) ?? []
+    const list = conceptIdsByByte.get(r.passageId) ?? []
     list.push(r.conceptId)
-    conceptIdsByByte.set(r.byteId, list)
+    conceptIdsByByte.set(r.passageId, list)
   })
   const edgeRows = parsed.edges
     .filter((e) => conceptIdByKey.has(e.fromKey) && conceptIdByKey.has(e.toKey))
@@ -1110,14 +1110,14 @@ export async function importGraph(parsed: ParsedImport) {
 
   const snapshot: GraphSnapshot = {
     concepts: conceptRows.map((c) => ({ id: c.id, label: c.label })),
-    bytes: byteRows.map((b) => ({ id: b.id, conceptIds: conceptIdsByByte.get(b.id) ?? [] })),
+    passages: passageRows.map((b) => ({ id: b.id, conceptIds: conceptIdsByByte.get(b.id) ?? [] })),
     edges: edgeRows.map((e) => ({ id: e.id, fromId: e.fromId, toId: e.toId, sentence: e.sentence, handle: e.handle })),
     maps: mapRows.map((m) => ({ id: m.id, name: m.name, scopeKey: m.scopeKey })),
     cloths: clothRows.map((c) => ({ id: c.id, scopeKey: c.scopeKey, title: c.title })),
   }
   await recordEvent(userId, courseId, "graph.import", "graph", null, {
     concepts: conceptRows.length,
-    bytes: byteRows.length,
+    passages: passageRows.length,
     edges: edgeRows.length,
     maps: mapRows.length,
     cloths: clothRows.length,
@@ -1126,14 +1126,14 @@ export async function importGraph(parsed: ParsedImport) {
 
   const statements = [
     db.delete(edges).where(and(eq(edges.userId, userId), inCourse(edges.courseId, courseId))),
-    db.delete(bytes).where(and(eq(bytes.userId, userId), inCourse(bytes.courseId, courseId))),
+    db.delete(passages).where(and(eq(passages.userId, userId), inCourse(passages.courseId, courseId))),
     db.delete(concepts).where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId))),
     db.delete(maps).where(and(eq(maps.userId, userId), inCourse(maps.courseId, courseId))),
     db.delete(cloths).where(and(eq(cloths.userId, userId), inCourse(cloths.courseId, courseId))),
     db.delete(views).where(and(eq(views.userId, userId), inCourse(views.courseId, courseId))),
     ...(conceptRows.length ? [db.insert(concepts).values(conceptRows)] : []),
-    ...(byteRows.length ? [db.insert(bytes).values(byteRows)] : []),
-    ...(byteConceptRows.length ? [db.insert(byteConcepts).values(byteConceptRows)] : []),
+    ...(passageRows.length ? [db.insert(passages).values(passageRows)] : []),
+    ...(byteConceptRows.length ? [db.insert(passageConcepts).values(byteConceptRows)] : []),
     ...(edgeRows.length ? [db.insert(edges).values(edgeRows)] : []),
     ...(mapRows.length ? [db.insert(maps).values(mapRows)] : []),
     ...(clothRows.length ? [db.insert(cloths).values(clothRows)] : []),
@@ -1245,7 +1245,7 @@ export async function loadWorkedExample() {
     throw new Error("The worked example only loads into an empty loom — reset first if you mean to.")
   }
 
-  // The example needs a door: reading-first places a byte by its sourceId, so
+  // The example needs a door: reading-first places a passage by its sourceId, so
   // without a card of its own the whole example would sit outside every reading
   // and the shelf would look empty next to a full loom. Reused rather than
   // re-minted, since reset clears the cloth but not this card.
@@ -1272,12 +1272,12 @@ export async function loadWorkedExample() {
     id: conceptIdByKey.get(c.key)!,
     courseId, userId, label: c.label, def: c.def, note: c.note,
   }))
-  const byteConceptRows: { byteId: string; conceptId: string }[] = []
-  const byteRows = WORKED_EXAMPLE.bytes
+  const byteConceptRows: { passageId: string; conceptId: string }[] = []
+  const passageRows = WORKED_EXAMPLE.passages
     .filter((b) => conceptIdByKey.has(b.conceptKey))
     .map((b) => {
       const id = crypto.randomUUID()
-      byteConceptRows.push({ byteId: id, conceptId: conceptIdByKey.get(b.conceptKey)! })
+      byteConceptRows.push({ passageId: id, conceptId: conceptIdByKey.get(b.conceptKey)! })
       return {
         id,
         courseId, userId,
@@ -1294,10 +1294,10 @@ export async function loadWorkedExample() {
       sentence: e.sentence, handle: e.handle,
     }))
 
-  const byteConceptIds = new Map(byteConceptRows.map((r) => [r.byteId, [r.conceptId]]))
+  const byteConceptIds = new Map(byteConceptRows.map((r) => [r.passageId, [r.conceptId]]))
   const snapshot: GraphSnapshot = {
     concepts: conceptRows.map((c) => ({ id: c.id, label: c.label })),
-    bytes: byteRows.map((b) => ({ id: b.id, conceptIds: byteConceptIds.get(b.id) ?? [] })),
+    passages: passageRows.map((b) => ({ id: b.id, conceptIds: byteConceptIds.get(b.id) ?? [] })),
     edges: edgeRows.map((e) => ({ id: e.id, fromId: e.fromId, toId: e.toId, sentence: e.sentence, handle: e.handle })),
   }
   await recordEvent(userId, courseId, "graph.example", "graph", null, {
@@ -1314,8 +1314,8 @@ export async function loadWorkedExample() {
 
   await db.batch([
     db.insert(concepts).values(conceptRows),
-    db.insert(bytes).values(byteRows),
-    db.insert(byteConcepts).values(byteConceptRows),
+    db.insert(passages).values(passageRows),
+    db.insert(passageConcepts).values(byteConceptRows),
     db.insert(edges).values(edgeRows),
     db.insert(maps).values({ courseId, userId, scopeKey: "", name: "Projection 1", read: WORKED_EXAMPLE.read, essence: "", tiers: exampleTiers }),
   ])

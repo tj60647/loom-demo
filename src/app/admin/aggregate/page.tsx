@@ -31,7 +31,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     : null
 
   let concepts: LoomState["concepts"] = []
-  let bytes: LoomState["bytes"] = []
+  let passages: LoomState["passages"] = []
   let edges: LoomState["edges"] = []
   let members: { id: string; name: string }[] = []
   let bytesUnavailable = false
@@ -40,7 +40,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   try {
     const aggregate = await getAggregateLoomData(courseId, sectionId)
     concepts = aggregate.concepts
-    bytes = aggregate.bytes
+    passages = aggregate.passages
     edges = aggregate.edges
     members = aggregate.members
     bytesUnavailable = aggregate.bytesUnavailable
@@ -49,7 +49,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     aggregateUnavailable = true
   }
 
-  const state: LoomState = { concepts, bytes, edges, maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
+  const state: LoomState = { concepts, passages, edges, maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
   const names = Object.fromEntries(members.map((member) => [member.id, member.name]))
 
   return (

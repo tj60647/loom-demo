@@ -13,7 +13,7 @@
  * means the question can be asked directly and cheaply rather than inferred:
  *
  *   - Is the span findable at its own offset? If `indexOf` lands somewhere
- *     earlier, the reconciliation in `createByte` will silently re-anchor the
+ *     earlier, the reconciliation in `createPassage` will silently re-anchor the
  *     student's passage to the wrong place on the page.
  *   - Is it unique? A span that occurs twice is one the fuzzy fallback in
  *     PdfViewer can mark in the wrong spot once the precise path is unavailable.

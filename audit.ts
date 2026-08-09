@@ -1,19 +1,19 @@
 import { db } from "./src/db";
-import { bytes } from "./src/db/schema";
+import { passages } from "./src/db/schema";
 
 async function audit() {
-  const allBytes = await db.select().from(bytes);
-  console.log(`Found ${allBytes.length} bytes in the database.`);
+  const allBytes = await db.select().from(passages);
+  console.log(`Found ${allBytes.length} passages in the database.`);
   
   const malformed = allBytes.filter(b => b.startOffset === null || b.endOffset === null);
-  console.log(`Found ${malformed.length} bytes with NULL offsets (fallback to fuzzy mode).`);
+  console.log(`Found ${malformed.length} passages with NULL offsets (fallback to fuzzy mode).`);
   
   const valid = allBytes.filter(b => b.startOffset !== null && b.endOffset !== null);
-  console.log(`Found ${valid.length} bytes with VALID offsets.`);
+  console.log(`Found ${valid.length} passages with VALID offsets.`);
   
-  console.log("\nDetails of bytes:");
+  console.log("\nDetails of passages:");
   for (const b of allBytes) {
-    console.log(`- Byte ID: ${b.id}`);
+    console.log(`- Passage ID: ${b.id}`);
     console.log(`  Source: ${b.source}, Page: ${b.pageNumber}`);
     console.log(`  Content length: ${b.content.length}`);
     console.log(`  startOffset: ${b.startOffset}, endOffset: ${b.endOffset}`);

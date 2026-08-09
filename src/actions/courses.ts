@@ -191,7 +191,7 @@ export async function setCourseArchived(formData: FormData) {
 /**
  * Hard-deletes a course. Cascades to sections, memberships, allowlist entries,
  * and course_source rows — but NOT to the readings themselves, which live in
- * the shared library, nor to student concepts/bytes/edges, whose courseId is
+ * the shared library, nor to student concepts/passages/edges, whose courseId is
  * set null so the work survives.
  */
 export async function deleteCourse(formData: FormData) {

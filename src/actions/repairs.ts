@@ -20,7 +20,7 @@ import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth/next"
 import { db } from "@/db"
 import { authOptions, isAdminUser } from "@/lib/auth"
-import { bytes, sourceRepairs, sourceRepairReadings, sources, users } from "@/db/schema"
+import { passages, sourceRepairs, sourceRepairReadings, sources, users } from "@/db/schema"
 import { readingStorage } from "@/lib/storage"
 import { detectRepairsForSource, repairSettings, transcribeRepairRegion } from "@/lib/repairPipeline"
 import { ACCEPTED_OVERLAP_FLOOR, acceptedTextMatchesReadings } from "@/lib/repairReview"
@@ -154,17 +154,17 @@ export async function getRepairSummary() {
       .select({ sourceId: sourceRepairs.sourceId, status: sourceRepairs.status, value: count() })
       .from(sourceRepairs)
       .groupBy(sourceRepairs.sourceId, sourceRepairs.status),
-    // Only highlights with offsets. A byte typed or pasted rather than selected
+    // Only highlights with offsets. A passage typed or pasted rather than selected
     // was never measured against a text layer, so replacing one cannot disturb
-    // it — 20 of this library's 43 bytes are that kind, carrying a written
+    // it — 20 of this library's 43 passages are that kind, carrying a written
     // location like "p. 387 (abstract)" and nothing to move. Counting them made
     // the panel say "7 highlights anchored to this reading" about a reading with
     // none, and refused a repair that would have broken nothing.
     db
-      .select({ sourceId: bytes.sourceId, value: count() })
-      .from(bytes)
-      .where(isNotNull(bytes.startOffset))
-      .groupBy(bytes.sourceId),
+      .select({ sourceId: passages.sourceId, value: count() })
+      .from(passages)
+      .where(isNotNull(passages.startOffset))
+      .groupBy(passages.sourceId),
   ])
 
   const repairs: Record<string, { total: number; proposed: number; accepted: number; applied: number }> = {}
@@ -178,7 +178,7 @@ export async function getRepairSummary() {
 
   const highlights: Record<string, number> = {}
   for (const row of highlightRows) {
-    // A byte captured outside the library has no sourceId and anchors to nothing.
+    // A passage captured outside the library has no sourceId and anchors to nothing.
     if (row.sourceId) highlights[row.sourceId] = row.value
   }
 
@@ -411,25 +411,25 @@ export async function applyRepairs(sourceId: string) {
     /**
      * Can every existing highlight be carried across?
      *
-     * This used to be a flat refusal whenever any byte referenced the reading,
-     * which was wrong three times over: bytes with no offsets were never
+     * This used to be a flat refusal whenever any passage referenced the reading,
+     * which was wrong three times over: passages with no offsets were never
      * measured against a text layer and cannot be disturbed by one; highlights
      * on pages this repair does not touch are not affected; and a quote that
      * occurs exactly once on its page can simply be found again. All of that is
      * decided HERE — against the repaired reading built in memory, before a
-     * single byte of it is stored — so a repair that would strand a highlight is
+     * single passage of it is stored — so a repair that would strand a highlight is
      * refused having changed nothing.
      */
     const anchored = await db
       .select({
-        id: bytes.id,
-        content: bytes.content,
-        pageNumber: bytes.pageNumber,
-        startOffset: bytes.startOffset,
-        endOffset: bytes.endOffset,
+        id: passages.id,
+        content: passages.content,
+        pageNumber: passages.pageNumber,
+        startOffset: passages.startOffset,
+        endOffset: passages.endOffset,
       })
-      .from(bytes)
-      .where(and(eq(bytes.sourceId, sourceId), isNotNull(bytes.startOffset)))
+      .from(passages)
+      .where(and(eq(passages.sourceId, sourceId), isNotNull(passages.startOffset)))
 
     const projectionsAfter = new Map(
       pagesAfter.map((page) => [page.pageNumber, textLayerProjection(page.textContent)])
@@ -457,13 +457,13 @@ export async function applyRepairs(sourceId: string) {
     for (const move of plan.moves) {
       const projection = projectionsAfter.get(move.pageNumber) ?? ""
       await db
-        .update(bytes)
+        .update(passages)
         .set({
           startOffset: move.startOffset,
           endOffset: move.endOffset,
           pageContentHash: hashText(projection),
         })
-        .where(eq(bytes.id, move.id))
+        .where(eq(passages.id, move.id))
     }
 
     await db

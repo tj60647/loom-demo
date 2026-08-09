@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/db"
-import { users, concepts, bytes, byteConcepts, edges, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
+import { users, concepts, passages, passageConcepts, edges, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, emailHasAppAccess, isAdminUser } from "@/lib/auth"
@@ -472,7 +472,7 @@ export async function removeFromRoster(formData: FormData) {
 
 export async function getUserLoomDataAsAdmin(targetUserId: string, courseIdRaw?: string | null) {
   const courseId = await resolveCourseId(courseIdRaw)
-  if (!courseId) return { concepts: [], bytes: [], edges: [] }
+  if (!courseId) return { concepts: [], passages: [], edges: [] }
   await checkCourseFaculty(courseId)
 
   // The TARGET must be on this roster, not merely the viewer's course. This
@@ -493,30 +493,30 @@ export async function getUserLoomDataAsAdmin(targetUserId: string, courseIdRaw?:
       isNull(courseMemberships.removedAt)
     ))
     .limit(1)
-  if (!onRoster.length) return { concepts: [], bytes: [], edges: [] }
+  if (!onRoster.length) return { concepts: [], passages: [], edges: [] }
 
   const userConcepts = await db.select().from(concepts).where(and(eq(concepts.userId, targetUserId), eq(concepts.courseId, courseId)))
-  const byteRows = await db.select().from(bytes).where(and(eq(bytes.userId, targetUserId), eq(bytes.courseId, courseId)))
+  const passageRows = await db.select().from(passages).where(and(eq(passages.userId, targetUserId), eq(passages.courseId, courseId)))
   const userEdges = await db.select().from(edges).where(and(eq(edges.userId, targetUserId), eq(edges.courseId, courseId)))
 
-  return { concepts: userConcepts, bytes: await foldConceptIds(byteRows), edges: userEdges }
+  return { concepts: userConcepts, passages: await foldConceptIds(passageRows), edges: userEdges }
 }
 
-/** Fold byte_concept pointers onto byte rows as `conceptIds` (capture order). */
-async function foldConceptIds<T extends { id: string }>(byteRows: T[]): Promise<(T & { conceptIds: string[] })[]> {
-  if (!byteRows.length) return []
+/** Fold byte_concept pointers onto passage rows as `conceptIds` (capture order). */
+async function foldConceptIds<T extends { id: string }>(passageRows: T[]): Promise<(T & { conceptIds: string[] })[]> {
+  if (!passageRows.length) return []
   const junction = await db
-    .select({ byteId: byteConcepts.byteId, conceptId: byteConcepts.conceptId })
-    .from(byteConcepts)
-    .where(inArray(byteConcepts.byteId, byteRows.map((b) => b.id)))
-    .orderBy(asc(byteConcepts.createdAt), asc(byteConcepts.conceptId))
+    .select({ passageId: passageConcepts.passageId, conceptId: passageConcepts.conceptId })
+    .from(passageConcepts)
+    .where(inArray(passageConcepts.passageId, passageRows.map((b) => b.id)))
+    .orderBy(asc(passageConcepts.createdAt), asc(passageConcepts.conceptId))
   const byByte = new Map<string, string[]>()
   junction.forEach((row) => {
-    const list = byByte.get(row.byteId) ?? []
+    const list = byByte.get(row.passageId) ?? []
     list.push(row.conceptId)
-    byByte.set(row.byteId, list)
+    byByte.set(row.passageId, list)
   })
-  return byteRows.map((b) => ({ ...b, conceptIds: byByte.get(b.id) ?? [] }))
+  return passageRows.map((b) => ({ ...b, conceptIds: byByte.get(b.id) ?? [] }))
 }
 
 export async function getAggregateLoomData(
@@ -525,7 +525,7 @@ export async function getAggregateLoomData(
 ) {
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) {
-    return { concepts: [], bytes: [], edges: [], members: [], bytesUnavailable: false }
+    return { concepts: [], passages: [], edges: [], members: [], bytesUnavailable: false }
   }
   await checkCourseFaculty(courseId)
 
@@ -533,7 +533,7 @@ export async function getAggregateLoomData(
   const userIds = await getMemberIds(courseId, sectionId)
 
   if (userIds.length === 0) {
-    return { concepts: [], bytes: [], edges: [], members: [], bytesUnavailable: false }
+    return { concepts: [], passages: [], edges: [], members: [], bytesUnavailable: false }
   }
 
   const allConcepts = await db
@@ -556,12 +556,12 @@ export async function getAggregateLoomData(
   try {
     const allBytes = await db
       .select()
-      .from(bytes)
-      .where(and(eq(bytes.courseId, courseId), inArray(bytes.userId, userIds)))
-    return { concepts: allConcepts, bytes: await foldConceptIds(allBytes), edges: allEdges, members, bytesUnavailable: false }
+      .from(passages)
+      .where(and(eq(passages.courseId, courseId), inArray(passages.userId, userIds)))
+    return { concepts: allConcepts, passages: await foldConceptIds(allBytes), edges: allEdges, members, bytesUnavailable: false }
   } catch (error) {
-    // Fail soft so aggregate map still renders if byte schema/data is temporarily inconsistent.
-    console.error("[getAggregateLoomData] Failed to load bytes for aggregate view", error)
-    return { concepts: allConcepts, bytes: [], edges: allEdges, members, bytesUnavailable: true }
+    // Fail soft so aggregate map still renders if passage schema/data is temporarily inconsistent.
+    console.error("[getAggregateLoomData] Failed to load passages for aggregate view", error)
+    return { concepts: allConcepts, passages: [], edges: allEdges, members, bytesUnavailable: true }
   }
 }

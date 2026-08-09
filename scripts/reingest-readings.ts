@@ -17,7 +17,7 @@
  * --force flag exists because that distinction should be a deliberate act.
  *
  * One blob store is shared by every environment, and the page text lives in a
- * per-environment database, so this reads production bytes wherever it is run.
+ * per-environment database, so this reads production passages wherever it is run.
  * It writes only to the database it is pointed at, plus the shared cover key.
  *
  * Usage:
@@ -30,7 +30,7 @@
  */
 import { count, eq, inArray, isNotNull, and } from "drizzle-orm"
 import { db, databaseLabel } from "../src/db"
-import { bytes, sources } from "../src/db/schema"
+import { passages, sources } from "../src/db/schema"
 import { readingStorage } from "../src/lib/storage"
 import { reingestSource } from "../src/lib/reingest"
 import { diagnoseExtraction } from "../src/lib/extractionDiagnosis"
@@ -85,8 +85,8 @@ async function main() {
     // deliberate decision rather than a batch run.
     const [{ value: byteCount }] = await db
       .select({ value: count() })
-      .from(bytes)
-      .where(eq(bytes.sourceId, row.id))
+      .from(passages)
+      .where(eq(passages.sourceId, row.id))
 
     if (byteCount > 0 && !force) {
       console.log(

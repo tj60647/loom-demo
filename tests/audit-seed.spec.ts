@@ -6,7 +6,7 @@ import { openReading } from './helpers';
 test.use({ storageState: 'playwright/.auth/testa.json' });
 
 test.describe('Audit Seed Bytes', () => {
-  test('verify seed bytes are highlighted', async ({ page }) => {
+  test('verify seed passages are highlighted', async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem("loom_has_seen_walkthrough", "true");
     });
@@ -21,7 +21,7 @@ test.describe('Audit Seed Bytes', () => {
     await page.waitForTimeout(1000);
 
     // Check how many highlights exist
-    const highlights = page.locator('.loom-byte-highlight');
+    const highlights = page.locator('.loom-passage-highlight');
     const count = await highlights.count();
     console.log(`Found ${count} highlighted elements on Page 4.`);
 

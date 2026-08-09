@@ -53,7 +53,7 @@ function reviveLoomState(raw: LoomState): LoomState {
   return {
     ...raw,
     concepts: raw.concepts.map((c) => ({ ...c, createdAt: asDate(c.createdAt) })),
-    bytes: raw.bytes.map((b) => ({ ...b, createdAt: asDate(b.createdAt) })),
+    passages: raw.passages.map((b) => ({ ...b, createdAt: asDate(b.createdAt) })),
     edges: raw.edges.map((e) => ({ ...e, createdAt: asDate(e.createdAt) })),
     maps: raw.maps.map((m) => ({ ...m, createdAt: asDate(m.createdAt), updatedAt: asDate(m.updatedAt) })),
     cloths: raw.cloths.map((c) => ({ ...c, createdAt: asDate(c.createdAt), updatedAt: asDate(c.updatedAt) })),

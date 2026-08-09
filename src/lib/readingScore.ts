@@ -5,7 +5,7 @@
  * survive text extraction well enough to be usable inside Loom?" — can students
  * quote from it, and will their highlight offsets anchor? A scanned photocopy
  * with no text layer looks identical to a clean digital PDF on the library
- * card; it is useless the moment someone tries to capture a byte from it.
+ * card; it is useless the moment someone tries to capture a passage from it.
  *
  * Two passes, mirroring the guide's eval runner in the Colloquy repo:
  *
@@ -73,7 +73,7 @@ const JUNK_CHAR = /[\uFFFD\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\uE
 /**
  * Relative frequency of a–z in English prose, used as a reference profile. A
  * wrong-but-valid character mapping permutes the distribution, so comparing
- * against this catches substitution-style breakage that byte inspection can't.
+ * against this catches substitution-style breakage that passage inspection can't.
  */
 const ENGLISH_LETTER_FREQ: Record<string, number> = {
   a: 0.08167, b: 0.01492, c: 0.02782, d: 0.04253, e: 0.12702, f: 0.02228,
@@ -117,7 +117,7 @@ const GLYPH_NAME_LEAK =
 /**
  * A punctuation mark between two letters — `INTERAC$IVE`. This is what a
  * ligature code looks like once it has resolved to the ASCII punctuation that
- * shares its byte value, which is the most common way a broken font map stays
+ * shares its passage value, which is the most common way a broken font map stays
  * invisible to every other check.
  *
  * Two exclusions, both learned from false positives on this library's own
@@ -417,7 +417,7 @@ export function computeExtractionMetrics(
     coverRendered: boolean
     /**
      * Optional: the file's structure, from probePdfStructure. Optional because
-     * it needs the PDF bytes, which a rescore over stored page rows does not
+     * it needs the PDF passages, which a rescore over stored page rows does not
      * have. Absent means "not measured", never "measured as fine".
      */
     structure?: PdfStructure
@@ -511,7 +511,7 @@ export function scoreFromMetrics(metrics: ExtractionMetrics, pages: ScorablePage
   // characters are correct, the letter distribution is perfect, the common words
   // are all present — and yet a student quoting a sentence gets
   // `designismore thanastyle`. For a tool whose whole purpose is capturing
-  // passages, that is a legibility failure however clean the bytes are.
+  // passages, that is a legibility failure however clean the passages are.
   //
   // The floor of 0.5% is our own line-end join, measured across this library;
   // the thresholds sit well clear of it. See LONG_TOKEN_CHARS.
@@ -533,7 +533,7 @@ export function scoreFromMetrics(metrics: ExtractionMetrics, pages: ScorablePage
       : null
   const { ceiling, reason } = legibilityCeiling(likeness)
   // A null ceiling means the language check could not run. Abstain outright
-  // rather than reporting the junk-byte number alone as if it settled the
+  // rather than reporting the junk-passage number alone as if it settled the
   // question — the judge can still fill this in, since it reads the words.
   legibility = ceiling == null ? null : Math.min(legibility, ceiling)
 
@@ -825,7 +825,7 @@ export async function judgeSourceScore(sourceId: string) {
     if (!verdict) return
 
     // The judge overrides legibility — it read the words, the heuristic only
-    // counted bytes. Coverage and anchorability stay as computed: those are
+    // counted passages. Coverage and anchorability stay as computed: those are
     // measurements, and a model's opinion of them is worth less.
     //
     // Run-together words are a measurement too, and one the judge is poorly

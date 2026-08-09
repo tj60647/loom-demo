@@ -9,7 +9,7 @@
  *
  * Timing matters more than it looks. A student's highlight is anchored to the
  * text layer of the PDF as it was when they made it, so replacing a reading's
- * bytes after a cohort has worked on it breaks their anchors. Run this before a
+ * passages after a cohort has worked on it breaks their anchors. Run this before a
  * course opens, not during it.
  *
  * Usage:
@@ -104,7 +104,7 @@ function readingsFromFiles(files: string[]): Reading[] {
 async function diagnose(reading: Reading): Promise<Report> {
   const buffer = await reading.load()
 
-  // Both passes over the same bytes: the canonical text the app itself stores,
+  // Both passes over the same passages: the canonical text the app itself stores,
   // and the structural probe that can see what the text cannot.
   const pages = await extractPdfPageText(buffer)
   const structure = await probePdfStructure(buffer)

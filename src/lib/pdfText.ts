@@ -1,14 +1,14 @@
 /**
  * Server-side canonical text extraction for PDF pages, used to seed
  * `sourcePages` when a reading is added to the library, and to (re)validate
- * highlight offsets in `createByte`.
+ * highlight offsets in `createPassage`.
  *
  * WHERE HIGHLIGHT OFFSETS ACTUALLY LIVE. Not here. pdf.js builds the browser
  * text layer as one <span> per item plus a bare <br> after each end-of-line
  * item, and a <br> contributes nothing to `textContent` — so the DOM string is
  * the item strings concatenated with nothing between them. That DOM string is
  * what PdfViewer hashes and what every startOffset/endOffset indexes into.
- * Nothing anywhere slices this module's output by a byte offset.
+ * Nothing anywhere slices this module's output by a passage offset.
  *
  * That is why this file used to join with the empty string, and why the warning
  * that once stood here — "changing any of it silently moves every existing
@@ -79,8 +79,8 @@ function joinPageItems(items: PdfTextItem[]) {
 /**
  * The browser's text-layer string, recovered from stored page text.
  *
- * This is the string `bytes.startOffset`/`endOffset` index into and the input
- * `bytes.pageContentHash` is taken over, so anything comparing a client capture
+ * This is the string `passages.startOffset`/`endOffset` index into and the input
+ * `passages.pageContentHash` is taken over, so anything comparing a client capture
  * against stored text has to come through here first — otherwise it is
  * searching a string the client has never seen.
  *

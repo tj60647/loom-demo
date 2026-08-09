@@ -2,7 +2,7 @@
  * The learner journey, end to end, against the seeded demonstration account.
  *
  * Requires `npm run seed:demo` to have run: Test User A holds 8 concepts,
- * 10 bytes from two readings, 6 threads and 3 maps ("The whole cloth" at the
+ * 10 passages from two readings, 6 threads and 3 maps ("The whole cloth" at the
  * whole weave, "Object worlds, sorted" and "A practice lens" per reading).
  * Every mutation this file makes, it removes again — the seeded data is
  * asserted, never changed.
@@ -85,7 +85,7 @@ test("00 · the shelf shows the readings with the student's own tallies", async 
   await expect(page.locator('input[type="file"]')).toHaveCount(0)
 })
 
-test("01 · a byte captured by hand lands in the coding log — and cleans up", async ({ page }) => {
+test("01 · a passage captured by hand lands in the coding log — and cleans up", async ({ page }) => {
   await page.goto("/")
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
   await enterReadingFromCard(page, card)
@@ -115,15 +115,15 @@ test("01 · a byte captured by hand lands in the coding log — and cleans up", 
   await expect(row).toHaveCount(1, { timeout: 15_000 })
 
   // Cleanup through the product's own controls. Since 0021 a passage survives
-  // its concept (P0.1) — remove the byte first so nothing unlabeled lingers,
+  // its concept (P0.1) — remove the passage first so nothing unlabeled lingers,
   // then the concept. The optimistic UI clears instantly, so each delete's
   // server-action POST must be awaited: ending the test any earlier closes
   // the page and aborts the serially-queued fetches, and the "deleted" rows
   // resurface on the next load as residue.
   await row.locator(".lhead").click()
-  const byteId = await row.locator("[data-byte-id]").first().getAttribute("data-byte-id")
+  const passageId = await row.locator("[data-passage-id]").first().getAttribute("data-passage-id")
   const byteDeleted = page.waitForResponse((r) =>
-    r.request().method() === "POST" && (r.request().postData() ?? "").includes(byteId!)
+    r.request().method() === "POST" && (r.request().postData() ?? "").includes(passageId!)
   )
   await row.getByRole("button", { name: "remove passage" }).click()
   await byteDeleted
@@ -272,10 +272,10 @@ test("06 · keep lists every map, and the whole-cloth export carries them all", 
   const names = data.graph.maps.map((m: { name: string }) => m.name)
   expect(names).toEqual(expect.arrayContaining(["The whole cloth", "Object worlds, sorted", "A practice lens"]))
   // Bytes carry their reading (anchor provenance survives the export contract).
-  const anchored = data.graph.bytes.filter((b: { anchor?: { sourceId?: string } }) => b.anchor?.sourceId)
+  const anchored = data.graph.passages.filter((b: { anchor?: { sourceId?: string } }) => b.anchor?.sourceId)
   expect(anchored.length).toBeGreaterThanOrEqual(10)
-  // The P0 contract: every byte carries its concept pointers as an array.
-  for (const b of data.graph.bytes) {
+  // The P0 contract: every passage carries its concept pointers as an array.
+  for (const b of data.graph.passages) {
     expect(Array.isArray(b.conceptIds)).toBe(true)
   }
   // The whole-weave cloth carries the read paragraph — the 0021 successor to

@@ -112,7 +112,7 @@ test("a proposed page shows a crop the reviewer can actually see", async ({ page
 
   // The assertion the whole file is for. A broken or blank-serving crop route
   // leaves an <img> that is present, sized by CSS, and completely useless —
-  // only naturalWidth tells you the bytes arrived and decoded.
+  // only naturalWidth tells you the passages arrived and decoded.
   await expect
     .poll(() => crop.evaluate((img: HTMLImageElement) => img.naturalWidth), { timeout: 20_000 })
     .toBeGreaterThan(0)

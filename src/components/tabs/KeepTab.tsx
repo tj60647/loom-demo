@@ -98,7 +98,7 @@ export default function KeepTab() {
       const cloth = parsed.cloth
       const ok = await confirm({
         title: "Replace your cloth with this file?",
-        body: `It holds ${cloth.concepts.length} concept${cloth.concepts.length !== 1 ? "s" : ""}, ${cloth.bytes.length} passage${cloth.bytes.length !== 1 ? "s" : ""}, ${cloth.edges.length} thread${cloth.edges.length !== 1 ? "s" : ""} and ${cloth.maps.length} projection${cloth.maps.length !== 1 ? "s" : ""}. What is on the table now is replaced, not merged. Your weaving history is kept either way.`,
+        body: `It holds ${cloth.concepts.length} concept${cloth.concepts.length !== 1 ? "s" : ""}, ${cloth.passages.length} passage${cloth.passages.length !== 1 ? "s" : ""}, ${cloth.edges.length} thread${cloth.edges.length !== 1 ? "s" : ""} and ${cloth.maps.length} projection${cloth.maps.length !== 1 ? "s" : ""}. What is on the table now is replaced, not merged. Your weaving history is kept either way.`,
         confirmLabel: "Replace my cloth",
         danger: true,
       })
@@ -119,7 +119,7 @@ export default function KeepTab() {
   const handleReset = async () => {
     const ok = await confirm({
       title: "Clear this course's cloth?",
-      body: `${state.concepts.length} concept${state.concepts.length !== 1 ? "s" : ""}, ${state.bytes.length} passage${state.bytes.length !== 1 ? "s" : ""}, ${state.edges.length} thread${state.edges.length !== 1 ? "s" : ""} and ${state.maps.length} projection${state.maps.length !== 1 ? "s" : ""} — tiers, one-lines and descriptions — all go. Export first — a .json makes this reversible. Your weaving history, below, survives either way.`,
+      body: `${state.concepts.length} concept${state.concepts.length !== 1 ? "s" : ""}, ${state.passages.length} passage${state.passages.length !== 1 ? "s" : ""}, ${state.edges.length} thread${state.edges.length !== 1 ? "s" : ""} and ${state.maps.length} projection${state.maps.length !== 1 ? "s" : ""} — tiers, one-lines and descriptions — all go. Export first — a .json makes this reversible. Your weaving history, below, survives either way.`,
       confirmLabel: "Clear the table",
       danger: true,
     })
@@ -169,7 +169,7 @@ export default function KeepTab() {
       </div>
 
       <div className="card" style={{ marginBottom: 14 }}>
-        <h2>Take it all out <span className="n">{`${state.concepts.length} concepts · ${state.bytes.length} passages · ${state.edges.length} threads`}</span></h2>
+        <h2>Take it all out <span className="n">{`${state.concepts.length} concepts · ${state.passages.length} passages · ${state.edges.length} threads`}</span></h2>
         <p className="do">The whole cloth in one file — every concept, passage, thread and every projection at once. Download one now and again whenever you&apos;ve done real work.</p>
         <p className="hint"><b>.json</b> is the complete, exact record and the only file that restores everything — import it back here later and your cloth returns exactly as you left it, projections and all. It is the backup behind every projection you keep; if you keep one file, keep this one.</p>
         <p className="hint"><b>.md</b> is a readable outline of the whole weave — plain Markdown for reading, quoting, and pasting. It is <b>not</b> re-importable.</p>

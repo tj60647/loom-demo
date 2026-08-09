@@ -3,7 +3,7 @@
 import { db } from "@/db"
 import { viewingAsStudent } from "@/lib/viewAsServer"
 import {
-  bytes,
+  passages,
   courseMemberships,
   courseSources,
   courses,
@@ -203,7 +203,7 @@ export async function getCourseSources(courseIdRaw?: string | null) {
  * working in, plus any reference-only readings they added for themselves.
  *
  * Their own readings carry no `course_source` row, so they appear here and on
- * nobody else's shelf. They exist because reading-first needs every byte to
+ * nobody else's shelf. They exist because reading-first needs every passage to
  * belong to a reading — a passage from something the library does not hold
  * still needs a door (docs/archive/reading-scope-and-map-passes.md §A.6).
  */
@@ -309,7 +309,7 @@ export async function createOwnReading(data: {
  * The learner half of the browser → Blob upload: a reading of the student's
  * own with the PDF behind it, so tab 00 and capture-from-the-text work the
  * same as for course readings. Storage checks match the admin path exactly —
- * prefix, size cap, PDF magic bytes — and the same ingest runs, but the
+ * prefix, size cap, PDF magic passages — and the same ingest runs, but the
  * result keeps `createOwnReading`'s bounds: isOwn, never added to any course,
  * on this student's shelf and nobody else's (admins see it listed on the
  * Readings tab, as they do every own reading).
@@ -365,7 +365,7 @@ export async function registerOwnUploadedReading(data: {
 }
 
 /**
- * Registers a new reading in the shared library: stores the uploaded PDF bytes
+ * Registers a new reading in the shared library: stores the uploaded PDF passages
  * in backend-managed storage (not /public, so it's only reachable via the
  * authenticated /api/readings/[sourceId] route) and extracts + persists the
  * canonical per-page text used to anchor highlight offsets.
@@ -384,7 +384,7 @@ export async function createSource(data: {
   file: File
 }) {
   // Before the blob write, not after (audit S-5): an unauthorized caller must
-  // not get bytes into storage even transiently.
+  // not get passages into storage even transiently.
   const session = await requireAdmin()
 
   const arrayBuffer = await data.file.arrayBuffer()
@@ -396,7 +396,7 @@ export async function createSource(data: {
 }
 
 /**
- * Everything that happens once a reading's bytes are in storage, wherever they
+ * Everything that happens once a reading's passages are in storage, wherever they
  * came from: validate, record the row, extract the canonical page text, render
  * a cover.
  *
@@ -424,7 +424,7 @@ async function ingestReading(data: {
   const userId = data.userId
   const buffer = data.buffer
 
-  // Verify this is actually a PDF (magic bytes: "%PDF-") before storing it
+  // Verify this is actually a PDF (magic passages: "%PDF-") before storing it
   // and serving it back with a `Content-Type: application/pdf` header —
   // don't trust the client-supplied MIME type or file extension alone.
   if (buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
@@ -498,7 +498,7 @@ async function ingestReading(data: {
  *
  * `storageKey` is the pathname the Blob SDK returned to the browser. It is
  * treated as untrusted input — the prefix is checked, the blob is fetched
- * server-side, and its real size and PDF magic bytes are verified here rather
+ * server-side, and its real size and PDF magic passages are verified here rather
  * than taken on the client's word.
  */
 export async function registerUploadedReading(data: {
@@ -573,8 +573,8 @@ export async function rescoreSourceAction(formData: FormData) {
   // the way that happens by accident.
   const [{ value: byteCount }] = await db
     .select({ value: count() })
-    .from(bytes)
-    .where(eq(bytes.sourceId, sourceId))
+    .from(passages)
+    .where(eq(passages.sourceId, sourceId))
 
   if (byteCount > 0) {
     await rescoreSource(sourceId)
@@ -589,7 +589,7 @@ export async function rescoreSourceAction(formData: FormData) {
   // STORED page rows, so on its own it can never show the effect of a repaired
   // PDF or of a change to extraction itself — and it carried the old
   // cover-rendered verdict forward, so a rebuilt cover never moved the score.
-  // Re-ingesting settles all three together from the bytes as they stand.
+  // Re-ingesting settles all three together from the passages as they stand.
   try {
     await reingestSource(sourceId, await readingStorage.get(source.storageKey))
   } catch (error) {
@@ -940,7 +940,7 @@ async function authorizeSourceFile(sourceId: string) {
  * serves a small cached PNG on the happy path; fetching the whole PDF just to
  * prove the caller may see its thumbnail made every library page view
  * download the entire shelf — up to 20MB × every card (the CI stall of
- * 2026-08-02). Callers that go on to render fetch the bytes themselves from
+ * 2026-08-02). Callers that go on to render fetch the passages themselves from
  * `source.storageKey`, which authorization has already vouched for.
  */
 export async function getSourceForCover(sourceId: string) {
@@ -949,7 +949,7 @@ export async function getSourceForCover(sourceId: string) {
 }
 
 /**
- * The reading's bytes in memory. For callers that genuinely need the whole
+ * The reading's passages in memory. For callers that genuinely need the whole
  * file — cover rendering, text extraction. To send it to a browser, use
  * `getSourceFileStream`: buffering a reading larger than 4.5MB is fine here
  * and fatal in a Vercel Function response.

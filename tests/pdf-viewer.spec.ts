@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { openReading, openYourWork } from './helpers';
 
-// Runs as Test User A (see playwright/global-setup.ts): the concepts and bytes
+// Runs as Test User A (see playwright/global-setup.ts): the concepts and passages
 // this spec captures belong to the test account, never to a real person's loom.
 test.use({ storageState: 'playwright/.auth/testa.json' });
 
@@ -13,7 +13,7 @@ const pdfsToTest = [
 
 test.describe('PDF Viewer and Highlighting', () => {
   for (const pdf of pdfsToTest) {
-    test(`should highlight captured byte in ${pdf.cardTitle}`, async ({ page }) => {
+    test(`should highlight captured passage in ${pdf.cardTitle}`, async ({ page }) => {
       // Three of these run in parallel against a dev server that compiles on
       // demand; the save round-trip alone can outlast the 30s default.
       test.setTimeout(60_000);
@@ -76,7 +76,7 @@ test.describe('PDF Viewer and Highlighting', () => {
       await expect(captureButton).toBeVisible();
       await captureButton.click();
 
-      // Modal appears, save the byte. Exact match: Your work's own concept
+      // Modal appears, save the passage. Exact match: Your work's own concept
       // input starts with the same words and is mounted behind this at all
       // times now — the sheet is parked off-screen, not unmounted.
       const conceptInput = page.getByPlaceholder('e.g. boundary objects', { exact: true });
@@ -87,18 +87,18 @@ test.describe('PDF Viewer and Highlighting', () => {
 
       // Wait for the MODAL to close, not for the button's text: while the
       // save is in flight the button reads "Saving..." — which makes a
-      // "Save Byte" locator report hidden while the modal's scrim is still
+      // "Save Passage" locator report hidden while the modal's scrim is still
       // up, swallowing every click that follows. The heading disappears only
       // when the capture has really landed and the modal unmounted.
       await expect(page.getByRole('heading', { name: 'Capture Passage' })).toBeHidden({ timeout: 30_000 });
 
       // Verify the highlight is applied to the DOM immediately
-      const highlight = page.locator('.loom-byte-highlight').first();
+      const highlight = page.locator('.loom-passage-highlight').first();
       await expect(highlight).toBeVisible({ timeout: 5000 });
 
       // The capture WAS the test — the data must not outlive it, or every run
-      // stacks another identical concept onto the account. Since 0021 a byte
-      // survives its concept (P0.1), so remove the byte first, then the
+      // stacks another identical concept onto the account. Since 0021 a passage
+      // survives its concept (P0.1), so remove the passage first, then the
       // concept, through the same UI a student would use — and await each
       // delete's server-action POST: the optimistic UI clears instantly, and
       // ending the test earlier aborts the queued fetches, leaving residue.
@@ -108,9 +108,9 @@ test.describe('PDF Viewer and Highlighting', () => {
         .first();
       await expect(row).toBeVisible({ timeout: 5000 });
       await row.locator('.lhead').click();
-      const byteId = await row.locator('[data-byte-id]').first().getAttribute('data-byte-id');
+      const passageId = await row.locator('[data-passage-id]').first().getAttribute('data-passage-id');
       const byteDeleted = page.waitForResponse((r) =>
-        r.request().method() === 'POST' && (r.request().postData() ?? '').includes(byteId!)
+        r.request().method() === 'POST' && (r.request().postData() ?? '').includes(passageId!)
       );
       await row.getByRole('button', { name: 'remove passage' }).click();
       await byteDeleted;

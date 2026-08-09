@@ -1,7 +1,7 @@
 /**
  * Demonstration accounts, rebuilt from scratch on every run.
  *
- *   test-user-a@loom.local — a worked loom: 10 bytes captured from two readings
+ *   test-user-a@loom.local — a worked loom: 10 passages captured from two readings
  *     (Object Worlds, Communities of Practice), 8 concepts (one evidenced in
  *     both readings, one deliberately evidence-less), 6 threads (two of them
  *     cross-reading bridges, one sentence-only), and THREE MAPS — one of each
@@ -38,7 +38,7 @@
 import { db } from "../src/db"
 import {
   users, courses, courseMemberships, sections, sources, sourcePages,
-  concepts, bytes, byteConcepts, edges, cloths, maps, views, graphEvents,
+  concepts, passages, passageConcepts, edges, cloths, maps, views, graphEvents,
 } from "../src/db/schema"
 import { eq, asc, ilike, isNotNull, and } from "drizzle-orm"
 import { textLayerProjection } from "../src/lib/pdfText"
@@ -62,12 +62,12 @@ const READING_B = "Communities of practice" // Wenger (any edition/paper)
 type PageRow = { pageNumber: number; textContent: string; contentHash: string }
 
 /** Find a real sentence on a page: starts with a capital, ends with a stop,
- *  120–420 chars. `skip` picks later sentences so bytes don't collide. */
+ *  120–420 chars. `skip` picks later sentences so passages don't collide. */
 function pickPassage(pages: PageRow[], fromPage: number, skip = 0):
   { content: string; pageNumber: number; startOffset: number; endOffset: number; pageContentHash: string } {
   const re = /[A-Z][^.?!]{120,420}[.?!]/g
   for (const page of pages.filter((p) => p.pageNumber >= fromPage)) {
-    // Offsets on a byte index the browser's text layer, not the stored page
+    // Offsets on a passage index the browser's text layer, not the stored page
     // text — the two differ by the line boundaries extractPdfPageText records.
     // Matching against the stored text would mint offsets that are correct for
     // no string anyone ever reads.
@@ -159,7 +159,7 @@ async function main() {
       })
     // Demolition: the whole graph, projections and history for this demo user.
     await db.delete(edges).where(eq(edges.userId, u.id))
-    await db.delete(bytes).where(eq(bytes.userId, u.id))
+    await db.delete(passages).where(eq(passages.userId, u.id))
     await db.delete(concepts).where(eq(concepts.userId, u.id))
     await db.delete(maps).where(eq(maps.userId, u.id))
     await db.delete(cloths).where(eq(cloths.userId, u.id))
@@ -188,11 +188,11 @@ async function main() {
     C("negotiation of meaning", "Meaning is not transmitted but worked out, continuously, between people and their reifications."),
     C("shared vocabulary", "The words a group coins for its own relations — the tongue a practice speaks.", "No passage captured for this yet."),
   ]).returning()
-  // The eighth concept ("shared vocabulary") stays byte-less and untiered on
+  // The eighth concept ("shared vocabulary") stays passage-less and untiered on
   // purpose — the visible no-evidence state — so it is never referenced again.
   const [oworlds, social, compromise, cop, lpp, reif, negmean] = conceptRows
 
-  // Concepts attach through byte_concept rows (P0.1): the byte row carries the
+  // Concepts attach through byte_concept rows (P0.1): the passage row carries the
   // passage, the join row carries the filing.
   const B = (c: { id: string }, src: typeof srcA, srcLabel: string, p: ReturnType<typeof pickPassage>) => ({
     id: crypto.randomUUID(), conceptId: c.id,
@@ -215,9 +215,9 @@ async function main() {
     B(reif, srcB, labelB, pickPassage(pagesB, 5, 0)),
     B(negmean, srcB, labelB, pickPassage(pagesB, 6, 1)),
   ]
-  await db.insert(bytes).values(byteSeeds.map(({ conceptId: _conceptId, ...row }) => row))
-  await db.insert(byteConcepts).values(
-    byteSeeds.map((b) => ({ byteId: b.id, conceptId: b.conceptId, createdAt: b.createdAt }))
+  await db.insert(passages).values(byteSeeds.map(({ conceptId: _conceptId, ...row }) => row))
+  await db.insert(passageConcepts).values(
+    byteSeeds.map((b) => ({ passageId: b.id, conceptId: b.conceptId, createdAt: b.createdAt }))
   )
 
   const E = (from: { id: string }, to: { id: string }, sentence: string, handle = "") => ({
@@ -336,9 +336,9 @@ async function main() {
         endOffset: p.endOffset, pageContentHash: p.pageContentHash, createdAt: at(),
       },
     }))
-    await db.insert(bytes).values(seeds.map((s) => s.row))
-    await db.insert(byteConcepts).values(
-      seeds.map((s) => ({ byteId: s.row.id, conceptId: s.conceptId, createdAt: s.row.createdAt }))
+    await db.insert(passages).values(seeds.map((s) => s.row))
+    await db.insert(passageConcepts).values(
+      seeds.map((s) => ({ passageId: s.row.id, conceptId: s.conceptId, createdAt: s.row.createdAt }))
     )
 
     if (edgeSpecs.length) {
@@ -390,11 +390,11 @@ async function main() {
     ]
   )
 
-  const tally = { concepts: conceptRows.length, bytes: 10, edges: 6, maps: 3 }
-  console.log(`[seed-demo] ${USER_A.email}: ${tally.concepts} concepts · ${tally.bytes} bytes from 2 readings · ${tally.edges} threads · ${tally.maps} maps`)
+  const tally = { concepts: conceptRows.length, passages: 10, edges: 6, maps: 3 }
+  console.log(`[seed-demo] ${USER_A.email}: ${tally.concepts} concepts · ${tally.passages} passages from 2 readings · ${tally.edges} threads · ${tally.maps} maps`)
   console.log(`[seed-demo] ${USER_B.email}: enrolled, empty`)
-  console.log(`[seed-demo] ${USER_C.email}: 3 concepts · 3 bytes · 1 thread — a colleague in ${DEMO_SECTION.name}`)
-  console.log(`[seed-demo] ${USER_D.email}: 4 concepts · 4 bytes · 2 threads (1 unlabeled) — a colleague in ${DEMO_SECTION.name}`)
+  console.log(`[seed-demo] ${USER_C.email}: 3 concepts · 3 passages · 1 thread — a colleague in ${DEMO_SECTION.name}`)
+  console.log(`[seed-demo] ${USER_D.email}: 4 concepts · 4 passages · 2 threads (1 unlabeled) — a colleague in ${DEMO_SECTION.name}`)
   console.log(`[seed-demo] sign in locally via /api/auth/test-login?as=testa`)
 }
 

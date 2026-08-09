@@ -59,17 +59,17 @@ export default function VocabularyTab() {
   const conceptStats = useMemo(() => {
     const stats = new Map<string, { passages: number; readings: string[] }>()
     for (const concept of state.concepts) stats.set(concept.id, { passages: 0, readings: [] })
-    for (const byte of state.bytes) {
-      for (const conceptId of byte.conceptIds) {
+    for (const passage of state.passages) {
+      for (const conceptId of passage.conceptIds) {
         const row = stats.get(conceptId)
         if (!row) continue
         row.passages += 1
-        const key = byte.sourceId ?? (byte.source ? `t:${byte.source}` : null)
+        const key = passage.sourceId ?? (passage.source ? `t:${passage.source}` : null)
         if (key && !row.readings.includes(key)) row.readings.push(key)
       }
     }
     return stats
-  }, [state.concepts, state.bytes])
+  }, [state.concepts, state.passages])
 
   const readingName = (key: string) =>
     key.startsWith("t:") ? key.slice(2) : titleOf(key) ?? "a reading"
@@ -120,7 +120,7 @@ export default function VocabularyTab() {
     }
     return sortedByLabel(state.concepts.filter((c) => c.id !== sourceId)).map((c) => {
       const dup = (seen.get(c.label.trim().toLowerCase()) ?? 0) > 1
-      const n = state.bytes.filter((b) => b.conceptIds.includes(c.id)).length
+      const n = state.passages.filter((b) => b.conceptIds.includes(c.id)).length
       return {
         id: c.id,
         label: dup ? `${c.label} — ${n} passage${n === 1 ? "" : "s"}` : c.label,
@@ -430,7 +430,7 @@ export default function VocabularyTab() {
           view. Below the holdings, not beside them: the comparison is a second
           look at words you already have. Re-checked server-side. */}
       {isStaff && (
-        <VocabularyOverlay sourceId={soleSourceId(scope)} ownCaptureCount={scoped.bytes.length} />
+        <VocabularyOverlay sourceId={soleSourceId(scope)} ownCaptureCount={scoped.passages.length} />
       )}
     </>
   )

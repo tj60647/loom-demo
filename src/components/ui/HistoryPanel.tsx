@@ -8,7 +8,7 @@
 import { useMemo, useState, type SyntheticEvent } from "react"
 import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
 import { getGraphEvents } from "@/lib/reads"
-import type { Byte, Concept, Edge, GraphEvent, LoomState } from "@/lib/types"
+import type { Passage, Concept, Edge, GraphEvent, LoomState } from "@/lib/types"
 
 // Events arrive through a server-action boundary; be tolerant of a Date that
 // serialized to a string.
@@ -20,7 +20,7 @@ function makeConcept(id: string, label: string, at: Date): Concept {
   return { id, courseId: null, userId: "", label, def: "", note: "", createdAt: at }
 }
 
-function makeByte(id: string, conceptIds: string[], at: Date): Byte {
+function makeByte(id: string, conceptIds: string[], at: Date): Passage {
   return {
     id, courseId: null, userId: "", conceptIds,
     source: "", sourceId: null, location: "", content: "",
@@ -51,7 +51,7 @@ function makeEdge(id: string, fromId: string, toId: string, sentence: string, at
 function seedFromSnapshot(
   snapshot: unknown,
   concepts: Map<string, Concept>,
-  bytes: Map<string, Byte>,
+  passages: Map<string, Passage>,
   edges: Map<string, Edge>,
   at: Date,
 ) {
@@ -66,11 +66,11 @@ function seedFromSnapshot(
       }
     }
   }
-  if (Array.isArray(s.bytes)) {
-    for (const raw of s.bytes) {
+  if (Array.isArray(s.passages)) {
+    for (const raw of s.passages) {
       const b = raw as Record<string, unknown> | null
       if (b && typeof b.id === "string") {
-        bytes.set(b.id, makeByte(b.id, pointerIds(b), at))
+        passages.set(b.id, makeByte(b.id, pointerIds(b), at))
       }
     }
   }
@@ -93,11 +93,11 @@ function seedFromSnapshot(
  */
 function foldEvents(events: GraphEvent[], upTo: number) {
   const concepts = new Map<string, Concept>()
-  const bytes = new Map<string, Byte>()
+  const passages = new Map<string, Passage>()
   const edges = new Map<string, Edge>()
-  // Pre-0021 bytes (recorded as byte.create) died with their concept — the
-  // old cascade — while byte.capture bytes survive as Unlabeled. The record
-  // spans both eras, so the fold must replay each byte under the semantics
+  // Pre-0021 passages (recorded as passage.create) died with their concept — the
+  // old cascade — while passage.capture passages survive as Unlabeled. The record
+  // spans both eras, so the fold must replay each passage under the semantics
   // it actually lived under.
   const cascadeEraBytes = new Set<string>()
   let readRevisions = 0
@@ -122,7 +122,7 @@ function foldEvents(events: GraphEvent[], upTo: number) {
       case "concept.merge": {
         const fromId = typeof p.fromId === "string" ? p.fromId : null
         if (fromId && e.entityId && concepts.delete(fromId)) {
-          for (const b of bytes.values()) {
+          for (const b of passages.values()) {
             if (b.conceptIds.includes(fromId)) {
               b.conceptIds = [...new Set(b.conceptIds.map((cid) => (cid === fromId ? e.entityId! : cid)))]
             }
@@ -138,11 +138,11 @@ function foldEvents(events: GraphEvent[], upTo: number) {
       // longer changes what the cloth draws.
       case "concept.delete": {
         if (e.entityId && concepts.delete(e.entityId)) {
-          for (const [id, b] of bytes) {
+          for (const [id, b] of passages) {
             if (!b.conceptIds.includes(e.entityId)) continue
-            // Cascade-era bytes actually died with their concept; 0021-era
+            // Cascade-era passages actually died with their concept; 0021-era
             // passages survive their label and only the pointer goes.
-            if (cascadeEraBytes.has(id)) bytes.delete(id)
+            if (cascadeEraBytes.has(id)) passages.delete(id)
             else b.conceptIds = b.conceptIds.filter((cid) => cid !== e.entityId)
           }
           for (const [id, ed] of edges) if (ed.fromId === e.entityId || ed.toId === e.entityId) edges.delete(id)
@@ -152,8 +152,8 @@ function foldEvents(events: GraphEvent[], upTo: number) {
       case "byte.create":
       case "byte.capture": {
         if (e.entityId) {
-          bytes.set(e.entityId, makeByte(e.entityId, pointerIds(p), at))
-          // Recorded byte.create = the pre-0021 cascade era. Synthesized
+          passages.set(e.entityId, makeByte(e.entityId, pointerIds(p), at))
+          // Recorded passage.create = the pre-0021 cascade era. Synthesized
           // creates are minted from rows alive TODAY, so they demonstrably
           // survived — replay them with survive semantics.
           if (e.kind === "byte.create" && p.synthesized !== true) cascadeEraBytes.add(e.entityId)
@@ -162,13 +162,13 @@ function foldEvents(events: GraphEvent[], upTo: number) {
       }
       case "byte.refile": {
         if (e.entityId && typeof p.conceptId === "string") {
-          const b = bytes.get(e.entityId)
+          const b = passages.get(e.entityId)
           if (b && !b.conceptIds.includes(p.conceptId)) {
             b.conceptIds = [...b.conceptIds, p.conceptId]
           } else if (!b) {
-            // Pre-0021 refile events minted a NEW byte row under this id —
-            // cascade-era rows like any other byte.create of their day.
-            bytes.set(e.entityId, makeByte(e.entityId, [p.conceptId], at))
+            // Pre-0021 refile events minted a NEW passage row under this id —
+            // cascade-era rows like any other passage.create of their day.
+            passages.set(e.entityId, makeByte(e.entityId, [p.conceptId], at))
             cascadeEraBytes.add(e.entityId)
           }
         }
@@ -176,13 +176,13 @@ function foldEvents(events: GraphEvent[], upTo: number) {
       }
       case "byte.unfile": {
         if (e.entityId && typeof p.conceptId === "string") {
-          const b = bytes.get(e.entityId)
+          const b = passages.get(e.entityId)
           if (b) b.conceptIds = b.conceptIds.filter((cid) => cid !== p.conceptId)
         }
         break
       }
       case "byte.delete": {
-        if (e.entityId) bytes.delete(e.entityId)
+        if (e.entityId) passages.delete(e.entityId)
         break
       }
       case "edge.throw": {
@@ -218,7 +218,7 @@ function foldEvents(events: GraphEvent[], upTo: number) {
       // Reset clears the cloth.
       case "graph.reset": {
         concepts.clear()
-        bytes.clear()
+        passages.clear()
         edges.clear()
         break
       }
@@ -230,9 +230,9 @@ function foldEvents(events: GraphEvent[], upTo: number) {
       case "graph.import":
       case "graph.example": {
         concepts.clear()
-        bytes.clear()
+        passages.clear()
         edges.clear()
-        seedFromSnapshot(p.snapshot, concepts, bytes, edges, at)
+        seedFromSnapshot(p.snapshot, concepts, passages, edges, at)
         break
       }
       // concept.update (def/note) doesn't change what the cloth draws.
@@ -243,7 +243,7 @@ function foldEvents(events: GraphEvent[], upTo: number) {
 
   return {
     concepts: [...concepts.values()],
-    bytes: [...bytes.values()],
+    passages: [...passages.values()],
     edges: [...edges.values()],
     readRevisions,
   }
@@ -323,7 +323,7 @@ export default function HistoryPanel() {
   const mapState: LoomState | null = cloth
     ? {
         concepts: cloth.concepts,
-        bytes: cloth.bytes,
+        passages: cloth.passages,
         edges: cloth.edges,
         maps: [],
         cloths: [],
@@ -382,7 +382,7 @@ export default function HistoryPanel() {
           />
 
           <p className="cap" style={{ margin: "4px 0 2px" }}>
-            {cloth.concepts.length} concepts · {cloth.edges.length} threads · {cloth.bytes.length} passages —{" "}
+            {cloth.concepts.length} concepts · {cloth.edges.length} threads · {cloth.passages.length} passages —{" "}
             {atMax ? "now" : when ? `as of ${when}` : "before the first recorded act"}
             {cloth.readRevisions > 0 && (
               <>

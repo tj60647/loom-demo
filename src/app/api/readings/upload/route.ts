@@ -6,7 +6,7 @@ import { MAX_READING_BYTES, READING_UPLOAD_PREFIX } from "@/lib/readingUpload"
 
 /**
  * Mints short-lived tokens so the browser can upload a reading straight to Blob
- * storage, instead of pushing the bytes through a Server Action.
+ * storage, instead of pushing the passages through a Server Action.
  *
  * Why this route exists: a serverless function's request body is hard-capped at
  * 4.5MB on Vercel, which no config raises, and course readings are scanned book

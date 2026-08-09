@@ -1,7 +1,7 @@
 /** Per-map concept sort: '' unsorted · p/s/t tiers · x set aside. */
 export type Tier = "" | "p" | "s" | "t" | "x"
 
-/** Passage tier — on the byte itself. '' unranked; no "set aside" for passages. */
+/** Passage tier — on the passage itself. '' unranked; no "set aside" for passages. */
 export type PassageTier = "" | "p" | "s" | "t"
 
 export type Concept = {
@@ -14,7 +14,7 @@ export type Concept = {
   createdAt: Date
 }
 
-export type Byte = {
+export type Passage = {
   id: string
   courseId: string | null
   userId: string
@@ -102,7 +102,7 @@ export type ExtractionMetrics = {
   /**
    * Punctuation marks sitting between two letters (`INTERAC$IVE`). The
    * signature of ligature codes resolving to the ASCII punctuation that happens
-   * to share their byte value.
+   * to share their passage value.
    */
   punctuationInWord?: number
   /**
@@ -277,7 +277,7 @@ export type GraphEvent = {
 
 export type LoomState = {
   concepts: Concept[]
-  bytes: Byte[]
+  passages: Passage[]
   edges: Edge[]
   maps: LoomMap[]
   /** One per scope the student has titled or described ('' = whole weave). */
@@ -291,8 +291,8 @@ export type LoomState = {
 // but no consumer of the graph is required to read it.
 
 /**
- * Capture provenance for a byte taken from a library PDF. An extension to the
- * §6 byte shape (recorded in the spec changelog): part of the student's own
+ * Capture provenance for a passage taken from a library PDF. An extension to the
+ * §6 passage shape (recorded in the spec changelog): part of the student's own
  * record, safe for consumers to ignore.
  */
 export type ExportByteAnchor = {
@@ -307,7 +307,7 @@ export type LoomExport = {
   graph: {
     student: string
     concepts: { id: string; label: string; def: string; note: string }[]
-    bytes: {
+    passages: {
       id: string
       /** Empty array = an Unlabeled Passage. Legacy files carry `conceptId`. */
       conceptIds: string[]

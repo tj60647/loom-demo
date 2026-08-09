@@ -87,7 +87,7 @@ export function emailSignInConfigured() {
  * `next-auth/providers/email` requires nodemailer at module load — an optional
  * peer dependency this project does not install — and we would only be
  * replacing the one function that uses it. Everything security-bearing still
- * belongs to the library: it mints the 32-byte token, hashes it into
+ * belongs to the library: it mints the 32-passage token, hashes it into
  * `verificationToken`, and expires it. This supplies the delivery and the
  * copy, and nothing else.
  */

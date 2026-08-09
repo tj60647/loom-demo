@@ -3,13 +3,13 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { useParams } from "next/navigation"
-import type { Byte, CardTableView, Cloth, Concept, Edge, LoomMap, LoomState, LoomViews, Tier } from "@/lib/types"
+import type { Passage, CardTableView, Cloth, Concept, Edge, LoomMap, LoomState, LoomViews, Tier } from "@/lib/types"
 import { asLoomState, scopeOf, scopedGraph, soleSourceId, WHOLE_WEAVE, type Scope, type ScopedGraph } from "@/lib/scope"
 import { emptyViews, parseImport, type ParsedMapImport } from "@/lib/graphExport"
 import { getUserLoomData } from "@/lib/reads"
 import {
   createConcept, updateConcept, deleteConcept, mergeConcepts as mergeConceptsAction,
-  createByte, deleteByte, refileByte as refileByteAction, unfileByte as unfileByteAction, attributeBytes as attributeBytesAction,
+  createPassage, deletePassage, refilePassage as refileByteAction, unfilePassage as unfileByteAction, attributePassages as attributeBytesAction,
   createEdge, updateEdge, deleteEdge,
   saveView, saveCloth as saveClothAction,
   createMap as createMapAction, updateMap as updateMapAction, deleteMap as deleteMapAction,
@@ -40,14 +40,14 @@ interface LoomContextType {
   /** Merge source into target: pointers and threads repoint, source goes (ruling 36). */
   mergeConcepts: (sourceId: string, targetId: string) => Promise<void>
   /** Capture a passage. Zero concept ids is a legal capture — an Unlabeled Passage. */
-  addByte: (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => Promise<Byte>
-  removeByte: (id: string) => Promise<void>
+  addPassage: (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => Promise<Passage>
+  removePassage: (id: string) => Promise<void>
   /** Say which reading passages came from — the student's answer, never a guess. */
-  attributeBytes: (byteIds: string[], sourceId: string) => Promise<number>
-  /** File a passage under another concept — adds a pointer, never copies the byte. */
-  refileByte: (byteId: string, conceptId: string) => Promise<Byte>
-  /** Remove one concept pointer from a passage — the byte itself survives. */
-  unfileByte: (byteId: string, conceptId: string) => Promise<void>
+  attributePassages: (passageIds: string[], sourceId: string) => Promise<number>
+  /** File a passage under another concept — adds a pointer, never copies the passage. */
+  refilePassage: (passageId: string, conceptId: string) => Promise<Passage>
+  /** Remove one concept pointer from a passage — the passage itself survives. */
+  unfilePassage: (passageId: string, conceptId: string) => Promise<void>
   /** The current scope's cloth (title + description), or null before one is written. */
   activeCloth: Cloth | null
   /**
@@ -107,7 +107,7 @@ interface LoomContextType {
 
 const LoomContext = createContext<LoomContextType | null>(null)
 
-const blankState = (): LoomState => ({ concepts: [], bytes: [], edges: [], maps: [], cloths: [], views: emptyViews() })
+const blankState = (): LoomState => ({ concepts: [], passages: [], edges: [], maps: [], cloths: [], views: emptyViews() })
 
 export function LoomProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession()
@@ -227,7 +227,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   // v14 flashed on every save; here the graph mutations were silent on success,
   // so the save dot only ever confirmed the read. Callers that have something
-  // more specific to say ("byte added", "thread thrown") flash after this and
+  // more specific to say ("passage added", "thread thrown") flash after this and
   // simply win, since the last message displayed is the one that shows.
   const savedOk = useCallback(() => flash("saved"), [flash])
 
@@ -276,7 +276,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       ...s,
       concepts: s.concepts.filter(c => c.id !== id),
       // The passages survive their label (P0.1): only the pointer goes.
-      bytes: s.bytes.map(b =>
+      passages: s.passages.map(b =>
         b.conceptIds.includes(id)
           ? { ...b, conceptIds: b.conceptIds.filter(cid => cid !== id) }
           : b
@@ -318,13 +318,13 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const addByte = async (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => {
+  const addPassage = async (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => {
     const tempId = crypto.randomUUID()
-    // Capturing inside a reading stamps that reading, so a byte taken by hand
+    // Capturing inside a reading stamps that reading, so a passage taken by hand
     // has the same provenance as one taken from the PDF and lands in the same
     // lens. An explicit sourceId (the PDF capture path) always wins.
     const stampedSourceId = sourceId ?? soleSourceId(scope) ?? undefined
-    const tempByte: Byte = {
+    const tempPassage: Passage = {
       id: tempId,
       courseId: null,
       userId: session!.user!.id,
@@ -343,36 +343,36 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       tier: "",
       createdAt: new Date()
     }
-    applyLocal(s => ({ ...s, bytes: [...s.bytes, tempByte] }))
+    applyLocal(s => ({ ...s, passages: [...s.passages, tempPassage] }))
     try {
-      const saved = await createByte({ conceptIds, source, sourceId: stampedSourceId, location, content, pageNumber, startOffset, endOffset, pageContentHash })
-      applyLocal(s => ({ ...s, bytes: s.bytes.map(b => b.id === tempId ? saved : b) }))
+      const saved = await createPassage({ conceptIds, source, sourceId: stampedSourceId, location, content, pageNumber, startOffset, endOffset, pageContentHash })
+      applyLocal(s => ({ ...s, passages: s.passages.map(b => b.id === tempId ? saved : b) }))
       savedOk()
       return saved
     } catch (e) {
-      applyLocal(s => ({ ...s, bytes: s.bytes.filter(b => b.id !== tempId) }))
+      applyLocal(s => ({ ...s, passages: s.passages.filter(b => b.id !== tempId) }))
       throw e
     }
   }
 
-  const removeByte = async (id: string) => {
-    applyLocal(s => ({ ...s, bytes: s.bytes.filter(b => b.id !== id) }))
+  const removePassage = async (id: string) => {
+    applyLocal(s => ({ ...s, passages: s.passages.filter(b => b.id !== id) }))
     try {
-      await deleteByte(id)
+      await deletePassage(id)
       savedOk()
     } catch (e) {
       await resync(e)
     }
   }
 
-  const attributeBytes = async (byteIds: string[], sourceId: string) => {
-    const ids = new Set(byteIds)
+  const attributePassages = async (passageIds: string[], sourceId: string) => {
+    const ids = new Set(passageIds)
     applyLocal(s => ({
       ...s,
-      bytes: s.bytes.map(b => (ids.has(b.id) && !b.sourceId ? { ...b, sourceId } : b)),
+      passages: s.passages.map(b => (ids.has(b.id) && !b.sourceId ? { ...b, sourceId } : b)),
     }))
     try {
-      const n = await attributeBytesAction(byteIds, sourceId)
+      const n = await attributeBytesAction(passageIds, sourceId)
       flash(n === 1 ? "passage placed in its reading" : `${n} passages placed in their reading`)
       return n
     } catch (e) {
@@ -381,11 +381,11 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const refileByte = async (byteId: string, conceptId: string) => {
+  const refilePassage = async (passageId: string, conceptId: string) => {
     try {
-      // The byte gains a pointer (ruling 37) — same row, one more concept.
-      const saved = await refileByteAction(byteId, conceptId)
-      applyLocal(s => ({ ...s, bytes: s.bytes.map(b => b.id === saved.id ? saved : b) }))
+      // The passage gains a pointer (ruling 37) — same row, one more concept.
+      const saved = await refileByteAction(passageId, conceptId)
+      applyLocal(s => ({ ...s, passages: s.passages.map(b => b.id === saved.id ? saved : b) }))
       savedOk()
       return saved
     } catch (e) {
@@ -394,15 +394,15 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const unfileByte = async (byteId: string, conceptId: string) => {
+  const unfilePassage = async (passageId: string, conceptId: string) => {
     applyLocal(s => ({
       ...s,
-      bytes: s.bytes.map(b =>
-        b.id === byteId ? { ...b, conceptIds: b.conceptIds.filter(id => id !== conceptId) } : b
+      passages: s.passages.map(b =>
+        b.id === passageId ? { ...b, conceptIds: b.conceptIds.filter(id => id !== conceptId) } : b
       ),
     }))
     try {
-      await unfileByteAction(byteId, conceptId)
+      await unfileByteAction(passageId, conceptId)
       flash("unfiled — the passage keeps its other filings")
     } catch (e) {
       await resync(e)
@@ -796,7 +796,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       state, scope, scoped, scopedState, isLoading,
       studentName: session?.user?.name || "",
       addConcept, editConcept, removeConcept, mergeConcepts,
-      addByte, removeByte, refileByte, unfileByte, attributeBytes,
+      addPassage, removePassage, refilePassage, unfilePassage, attributePassages,
       activeCloth, updateCloth,
       addEdge, editEdge, removeEdge,
       maps: state.maps, scopeMaps, activeMap,

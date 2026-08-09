@@ -104,7 +104,7 @@ test("the cohort map renders the section's woven concepts", async ({ page }) => 
   await expect(page.locator(".crow", { hasText: "object worlds" }).first()).toBeVisible()
   await expect(page.locator(".thread .sent").first()).toBeVisible()
 
-  // A concept opens the bytes behind it — the student's own captures, with
+  // A concept opens the passages behind it — the student's own captures, with
   // attribution — plus the threads that cross it.
   await page.locator(".crow", { hasText: "object worlds" }).first().click()
   await expect(page.locator(".threadhead", { hasText: "object worlds" })).toBeVisible()

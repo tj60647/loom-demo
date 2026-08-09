@@ -126,7 +126,7 @@ export default function ThrowTab() {
 
   // Whole-graph: a concept evidenced in an earlier reading is not evidence-less
   // just because this reading has not quoted it.
-  const bytesOf = (conceptId: string) => state.bytes.filter(b => b.conceptIds.includes(conceptId))
+  const passagesOf = (conceptId: string) => state.passages.filter(b => b.conceptIds.includes(conceptId))
   const conceptById = (id: string) => state.concepts.find(c => c.id === id)
 
   const togglePick = (id: string) => {
@@ -279,7 +279,7 @@ export default function ThrowTab() {
 
   const conceptRow = (c: typeof state.concepts[number]) => {
     const isPicked = pairA === c.id || pairB === c.id
-    const noev = bytesOf(c.id).length === 0
+    const noev = passagesOf(c.id).length === 0
     return (
       <div
         key={c.id}

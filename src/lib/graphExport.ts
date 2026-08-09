@@ -36,7 +36,7 @@ export function buildExport(state: LoomState, student: string): LoomExport {
         def: c.def || "",
         note: c.note || "",
       })),
-      bytes: state.bytes.map((b) => ({
+      passages: state.passages.map((b) => ({
         id: b.id,
         // Empty = an Unlabeled Passage; it travels like any other capture.
         conceptIds: b.conceptIds,
@@ -49,7 +49,7 @@ export function buildExport(state: LoomState, student: string): LoomExport {
         ...(b.question ? { question: b.question } : {}),
         ...(b.isPullQuote ? { isPullQuote: true } : {}),
         ...(b.tier ? { tier: b.tier } : {}),
-        // Capture provenance for PDF-captured bytes — a contract extension
+        // Capture provenance for PDF-captured passages — a contract extension
         // (see spec changelog); consumers may ignore it.
         ...(b.sourceId
           ? {
@@ -181,7 +181,7 @@ export function buildMarkdown(
   lines.push("## Concepts", "")
   const emitConcept = (c: Concept) => {
     lines.push(`- **${c.label}**${c.def ? ` — ${c.def}` : ""}${c.note ? ` _(${c.note})_` : ""}`)
-    state.bytes
+    state.passages
       .filter((b) => b.conceptIds.includes(c.id))
       .forEach((b) => {
         const cite = [b.source, b.location].filter(Boolean).join(" · ")
@@ -193,7 +193,7 @@ export function buildMarkdown(
 
   // Unlabeled passages are part of the record, not leftovers to hide
   // (red line #4: empty states are visible).
-  const unfiled = state.bytes.filter((b) => b.conceptIds.length === 0)
+  const unfiled = state.passages.filter((b) => b.conceptIds.length === 0)
   if (unfiled.length) {
     lines.push("## Unfiled passages", "")
     unfiled.forEach((b) => {
@@ -214,14 +214,14 @@ export function buildMarkdown(
 
 // --- IMPORT ---
 // Accepts the §6 shape, v14's flat shape, and (via v14's migrate() semantics)
-// the legacy v2/v3 shapes: triples+noticings become edges, byte notes fold onto
+// the legacy v2/v3 shapes: triples+noticings become edges, passage notes fold onto
 // their concept. Original ids become symbolic keys; the server remints real ids
 // and remaps the view geometry to match.
 
 export type ParsedImport = {
   student: string
   concepts: { key: string; label: string; def: string; note: string }[]
-  bytes: {
+  passages: {
     /** Empty = an Unlabeled Passage (kept, never dropped). */
     conceptKeys: string[]
     source: string
@@ -296,7 +296,17 @@ export function parseImport(raw: string): ParsedImport {
   }
 
   const rawConcepts = Array.isArray(data.concepts) ? (data.concepts as Record<string, unknown>[]) : []
-  const rawBytes = Array.isArray(data.bytes) ? (data.bytes as Record<string, unknown>[]) : []
+  // `passages` since 2026-08-09; `bytes` before it. Both are read, and that is
+  // not politeness — red line 5 is "the student's work is never inaccessible",
+  // and every .json a student exported before the rename says `bytes`. Renaming
+  // the key without this would have quietly orphaned every file already in
+  // their hands, which no test would have caught because no test imports an old
+  // file. Same move `importGraph` already makes for pre-maps files.
+  const rawBytes = Array.isArray(data.passages)
+    ? (data.passages as Record<string, unknown>[])
+    : Array.isArray(data.bytes)
+      ? (data.bytes as Record<string, unknown>[])
+      : []
   const rawEdges = Array.isArray(data.edges) ? (data.edges as Record<string, unknown>[]) : []
 
   // Legacy files carry a concept-level tier; it feeds the pre-maps map
@@ -317,14 +327,14 @@ export function parseImport(raw: string): ParsedImport {
     })
   const conceptKeys = new Set(concepts.map((c) => c.key))
 
-  // A byte survives even when its concepts don't resolve — it arrives as an
+  // A passage survives even when its concepts don't resolve — it arrives as an
   // Unlabeled Passage rather than being dropped (red line #5). Only text-less
   // rows have nothing to keep.
-  const bytes = rawBytes
+  const passages = rawBytes
     .filter((b) => str(b.text) || str(b.content))
     .map((b) => {
       // New shape: conceptIds array. Legacy: a single conceptId string. In
-      // the legacy shape, byte.note belonged to the CONCEPT (folded below),
+      // the legacy shape, passage.note belonged to the CONCEPT (folded below),
       // so it must not double as a passage note.
       const isNewShape = Array.isArray(b.conceptIds)
       const rawIds = isNewShape ? (b.conceptIds as unknown[]) : [b.conceptId]
@@ -355,7 +365,7 @@ export function parseImport(raw: string): ParsedImport {
       }
     })
 
-  // Legacy v2/v3: byte.note folds onto its concept (joined with ' · ').
+  // Legacy v2/v3: passage.note folds onto its concept (joined with ' · ').
   rawBytes.forEach((b) => {
     if (Array.isArray(b.conceptIds)) return
     const note = str(b.note)
@@ -484,7 +494,7 @@ export function parseImport(raw: string): ParsedImport {
   return {
     student: str(data.student),
     concepts,
-    bytes,
+    passages,
     edges,
     cloths,
     cardTable,
@@ -528,7 +538,7 @@ export type LoomMapExport = {
   graph: {
     /** `tier` here is THIS map's tier — the file is a sorted graph on its own. */
     concepts: { id: string; label: string; def: string; note: string; tier: Tier }[]
-    bytes: LoomExport["graph"]["bytes"]
+    passages: LoomExport["graph"]["passages"]
     edges: LoomExport["graph"]["edges"]
   }
   view?: CardTableView
@@ -577,15 +587,15 @@ export function buildMapExport(
         note: c.note || "",
         tier: map.tiers[c.id] ?? "",
       })),
-      // A concept's evidence travels whole — every byte of every member
+      // A concept's evidence travels whole — every passage of every member
       // concept, not only the scope's own passages — so the file stands
       // alone. The scope's own unlabeled passages travel too: a projection
       // shows them as its unattached group.
-      bytes: state.bytes
+      passages: state.passages
         .filter(
           (b) =>
             b.conceptIds.some((id) => memberIds.has(id)) ||
-            scoped.bytes.some((sb) => sb.id === b.id)
+            scoped.passages.some((sb) => sb.id === b.id)
         )
         .map((b) => ({
           id: b.id,
@@ -652,7 +662,7 @@ export function buildMapMarkdown(
     lines.push(`## ${name}`, "")
     group.forEach((c) => {
       lines.push(`- **${c.label}**${c.def ? ` — ${c.def}` : ""}${c.note ? ` _(${c.note})_` : ""}`)
-      state.bytes
+      state.passages
         .filter((b) => b.conceptIds.includes(c.id))
         .forEach((b) => {
           const cite = [b.source, b.location].filter(Boolean).join(" · ")
@@ -662,7 +672,7 @@ export function buildMapMarkdown(
     lines.push("")
   })
 
-  const unfiled = scoped.bytes.filter((b) => b.conceptIds.length === 0)
+  const unfiled = scoped.passages.filter((b) => b.conceptIds.length === 0)
   if (unfiled.length) {
     lines.push("## Unfiled passages", "")
     unfiled.forEach((b) => {
