@@ -10,9 +10,14 @@ Cloth.
 2. **A Cloth has NOT more than one Reading.** That axis is dropped — §6's
    "many-Readings" row is now moot, and the whole-weave Cloth stays the special
    case it already is rather than becoming the general one.
-3. Still open: a Reading with more than one Cloth — see **§9**, which is where
-   the answer now lives, because TJ's observation that *the Projection is the
-   lens* changes the question.
+3. **Ruled — §9:** *One Cloth per Reading per User, but a Cloth may have
+   several Users.* So several Cloths exist on a Reading across the class, and a
+   student never chooses between "new Cloth" and "new Projection" — a second
+   Cloth arises only through co-creation.
+
+**Nothing is built.** What remains to design is the several-Users half:
+`cloth_member`, membership-based authorization across the 84 ownership checks
+(§1), the Overlay constraints in §4, and the export contract in §5.
 
 The three axes look like one feature. They are not: **two of them are nearly
 free and one is a re-keying of the whole graph**. Sections 1–8 work that out;
@@ -219,9 +224,18 @@ Compare what each object actually carries:
 | Exportable on its own | ✓ | ✓ |
 | **Evidence** | **✓ — Passages, Links, Capture Log** | — (reads the Cloth's) |
 
-**A Projection carries strictly more interpretive apparatus than a Cloth
-does.** The Cloth's distinguishing content is not interpretation — it is the
-evidence. So: *the Cloth is the evidence, the Projection is the lens.*
+**A Projection carries more interpretive apparatus than a Cloth does.** What
+distinguishes a Cloth is that it *holds the evidence*. So: *the Cloth is the
+evidence, the Projection is the lens.*
+
+Refined by TJ the same day, and the refinement matters: **they work together,
+because the evidence is subject to interpretation by the reader.** A Cloth is
+not raw material a Projection then interprets — choosing which Passage to keep
+is already judgment. The difference is **level, not kind**: the Cloth is the
+reading you made while gathering, the Projection re-reads it by arranging. So
+Cloth Description stays interpretive, and the table below compares apparatus,
+not one object's interpretation against another's neutrality. (Model doc §2,
+"Reading · Cloth · Projection".)
 
 That settles the redundancy question for interpretation, and leaves exactly one
 thing multiple Cloths can do that Projections cannot.
@@ -254,9 +268,10 @@ Given TJ's ruling 1, this argument is live. Everything below is against.
 5. **Cost for no new capability** — cloth ids threaded through scope, a picker,
    and a rule for which Cloth the Reading card's one door opens.
 
-### The rule this yields
+### The rule this yields — RATIFIED (TJ, 2026-08-08)
 
-If co-authorship is the *only* thing multiple Cloths buy, the rule follows:
+If co-authorship is the *only* thing multiple Cloths buy, the rule follows —
+and TJ ruled it: *"feels solid."*
 
 > **One Cloth per Reading per User — but a Cloth may have several Users.**
 

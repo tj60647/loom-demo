@@ -45,13 +45,47 @@ The object model, semantics, and UI structure for Loom v1. This is the authority
 - **"Just read" is a procedure, not a path.** Browsing without capturing happens *inside* a Cloth — you open it and add nothing. There is no second way in that skips the Cloth, and no UI component for reading-without-one. This supersedes the earlier reading of "browsing is not capture" as *a Reading may be opened without a Cloth*; the phrase means **a Cloth never obliges you to capture**.
 - A Cloth opens where the work starts — **01 · Reading** — not where it is named.
 
+### Reading · Cloth · Projection — three levels of one reader's work
+
+*Ratified 2026-08-08 (TJ). The sentence the rest of §2 hangs on:*
+
+> **The Cloth is the evidence; the Projection is the lens — and they work
+> together, because the evidence is subject to interpretation by the reader.**
+
+- The **Reading** is the text. It is not yours.
+- The **Cloth** is what you kept from it, and what you take that to be.
+  Interpretation begins here, at selection — *choosing the passage is your
+  judgment, and that is the point*. A Cloth is therefore **never raw
+  evidence**, and its Title and Description are interpretive by design.
+- The **Projection** interprets again, by **arrangement**: Tiers, a shape, a
+  One-line and a paragraph — one take of several possible over the same
+  material.
+
+**The difference is level, not kind.** Both are the reader's. A Projection does
+not add interpretation to a neutral Cloth; it re-reads an already-interpreted
+one.
+
+What this settles, and where each was ruled:
+- A second Cloth on a Reading is redundant *for interpretation* — that is what
+  Projections are for. What a second Cloth carries is **co-authorship**
+  ([cloth-cardinality.md](cloth-cardinality.md) §9).
+- The read paragraph belongs to the **Projection**, which is why 03's duplicate
+  editor was retired to 04.
+- The Cloth is **named where its evidence is gathered** — 01 · Reading.
+- **Cloth Description stays interpretive.** It is not lens-work in the wrong
+  object; it is the reading you made while gathering.
+
 **Cloth** = Cloth Title + Cloth Description + one Reading + Passages + Concepts (referenced) + Links + Capture Log + Projections.
 - Cloth Title ≠ Reading Title — a sentence or headline. Cloth Description = a short interpretation of the Reading.
-- One Cloth = one Reading = one User. **Several Cloths per Reading per User are allowed** — ratified 2026-08-08 (TJ), and the Reading card is shaped for it:
-  - Every Reading has a **Base Cloth** — the default, always there, never asked for. A Reading is therefore never door-less: opening it opens the Base Cloth. (This is what makes "just read happens in a Cloth" work without an inert card.)
-  - Beside it, **Create new cloth** adds another. *That* creation stays explicit; the Base Cloth's does not, because it is the reading's default state rather than an act.
-  - Each Cloth shows as its own row — Title (or "Base cloth") and when it was last edited — and each row is its own door.
-- **NOT YET BUILT** (as of 2026-08-08). The schema enforces `onePerScope`: `unique(userId, courseId, scopeKey)` on `cloth`, and a Cloth is addressed *by scope*, not by id — `scope.key` is the Reading id, `activeCloth` resolves by it, `updateCloth(data, scopeKey)` writes by it.
+- **Cardinality — ratified 2026-08-08 (TJ):**
+  > **One Cloth per Reading per User — but a Cloth may have several Users.**
+  - A Cloth has **exactly one Reading**. (The earlier "a Cloth with several Readings" axis is dropped; the whole-weave Cloth, `scopeKey ''`, stays the special case it already is rather than becoming the general one.)
+  - Several Cloths therefore exist on a Reading **across the class** — mine, Sam's, ours — but **a student never chooses between "new Cloth" and "new Projection"**. They only ever make Projections. A second Cloth on a Reading arises **only through co-creation**, never as another lens.
+  - Every Reading has a **Base Cloth** for you — the default, always there, never asked for — so a Reading is never door-less and *"just read happens in a Cloth"* needs no inert card.
+  - **Two Users co-creating or joining a Cloth is wanted** and is the reason this cardinality is not simply 1:1.
+  - *Why this and not several per User: a Projection already carries Title, One-line, Description, Tiers and an arrangement — strictly more apparatus than a Cloth. The only thing a second Cloth can express that a Projection cannot is **co-authorship**. Full argument: [cloth-cardinality.md](cloth-cardinality.md) §9.*
+  - *Load-bearing consequence: because a User has exactly one Cloth per Reading, `(user, reading)` still identifies the Cloth, so **`byte` needs no `clothId`** and co-creation costs join tables plus an authorization change rather than a re-keying of the graph. Allow a User two Cloths on one Reading and that stops being true. Overlaying two people's Cloths on one Reading is the deferred **Join**.*
+- **NOT YET BUILT** (as of 2026-08-08). The schema enforces `onePerScope`: `unique(userId, courseId, scopeKey)` on `cloth` — which already matches "one per Reading per User"; what is missing is the **several-Users** half (`cloth_member`, membership-based authorization) and addressing a Cloth by id rather than scope key.
 - **The question that decides the size of it — written up in [cloth-cardinality.md](cloth-cardinality.md), awaiting TJ's ruling: do two Cloths on one Reading share its Passages, or partition them?** The definition above gives a Cloth its own Passages, Links and Capture Log — but `byte`, `edge` and `map` carry **no `clothId`**; they hang off the Reading (`byte.sourceId`) and the scope key. So today a Cloth is only a Title and a Description over one Reading's work, which is why a Reading and its Cloth "kind of mean the same thing" (TJ). Partitioning is a migration plus a rewrite of `src/lib/scope.ts` and everything that reads it; sharing makes a second Cloth a second *reading* of the same evidence. **Undecided — do not implement either until it is.**
 
 **Passage** = Characters (Beginning → Ending Point) + Time Stamp + Concept pointers [0..n] + Notes + Questions + Pull-quote Flag + Passage Tier.

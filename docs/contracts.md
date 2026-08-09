@@ -45,14 +45,16 @@
 > tests enter through `enterReadingFromCard` in `tests/helpers.ts`, which takes
 > whichever door is there — and *creates a cloth* the first time it meets an
 > unclothed reading.
-> **Several cloths per reading: ratified, not built** (2026-08-08, TJ). The
-> target is a **Base Cloth** on every reading (default, always openable) plus
-> **Create new cloth** for further ones, each its own row and its own door. The
-> build enforces `onePerScope` — `unique(userId, courseId, scopeKey)` on
-> `cloth` — and addresses a cloth by scope key rather than id. Blocking
-> question, undecided: whether two cloths on one reading **share** its passages
-> or **partition** them; `byte`/`edge`/`map` carry no `clothId`, so partitioning
-> is a migration plus a rewrite of `src/lib/scope.ts`. See the model doc §Cloth.
+> **Cloth cardinality ratified, not built** (2026-08-08, TJ): **one cloth per
+> reading per user, but a cloth may have several users.** The `onePerScope`
+> unique already matches the first half; the unbuilt half is **several users** —
+> `cloth_member`, membership-based authorization across the 84 ownership checks,
+> and an export contract that can name more than one author. A student never
+> chooses between "new cloth" and "new projection": a second cloth on a reading
+> arises only through co-creation, because a projection already carries more
+> interpretive apparatus than a cloth does. Because `(user, reading)` still
+> identifies the cloth, **`byte` needs no `clothId`**. See
+> [cloth-cardinality.md](cloth-cardinality.md) and the model doc §2.
 > **The tab list is settled** (2026-08-08, TJ): 00 Reading and 01 Open merged
 > into one **Reading** station (text + capture rail); **05 Weave is hidden**
 > pending a decision, its route intact and linked from Keep; **Keep stays** as a
