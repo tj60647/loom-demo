@@ -1,13 +1,22 @@
 # Cloth cardinality — a design note
 
-**Status: for TJ's ruling. Nothing here is built, and nothing should be built
-until the §7 question is answered.** Written 2026-08-08 at TJ's request, after
-they asked to enable three things: a Cloth with more than one Reading, a Cloth
-with more than one User, and a Reading with more than one Cloth.
+**Status: partly ruled. Nothing here is built.** Written 2026-08-08 at TJ's
+request, after they asked to enable three things: a Cloth with more than one
+Reading, a Cloth with more than one User, and a Reading with more than one
+Cloth.
+
+**Ruled since (TJ, 2026-08-08):**
+1. **Two Users co-creating / joining a Cloth is wanted.** Keep this axis.
+2. **A Cloth has NOT more than one Reading.** That axis is dropped — §6's
+   "many-Readings" row is now moot, and the whole-weave Cloth stays the special
+   case it already is rather than becoming the general one.
+3. Still open: a Reading with more than one Cloth — see **§9**, which is where
+   the answer now lives, because TJ's observation that *the Projection is the
+   lens* changes the question.
 
 The three axes look like one feature. They are not: **two of them are nearly
-free and one is a re-keying of the whole graph**, and which is which depends
-entirely on a single question — §7 — that has not been decided.
+free and one is a re-keying of the whole graph**. Sections 1–8 work that out;
+**§9 is the current state of the question** and supersedes §7's framing.
 
 ---
 
@@ -189,3 +198,89 @@ whose meaning is undecided, which is worse than not adding it. §7 first.
 That deferral stands with the model doc's existing line — *Join, Quilt, and
 Shared / co-created Cloths are defined, deferred; do not build, do not delete
 stubs.*
+
+---
+
+## 9. Does multiple-Cloths-per-Reading survive, now that Projections exist?
+
+TJ, 2026-08-08: *"the projection is the lens on a reading. a cloth can have
+many projections. maybe there is no reason to have both multiple cloths of
+reading and multiple projections of cloth?"*
+
+Compare what each object actually carries:
+
+| | Cloth | Projection |
+| --- | --- | --- |
+| Title | ✓ | ✓ |
+| A paragraph | Description | Description |
+| A one-sentence take | — | One-line |
+| Concept Tiers | — | ✓ (per-Projection) |
+| An arrangement / view | — | ✓ (List · Hierarchical · Cards) |
+| Exportable on its own | ✓ | ✓ |
+| **Evidence** | **✓ — Passages, Links, Capture Log** | — (reads the Cloth's) |
+
+**A Projection carries strictly more interpretive apparatus than a Cloth
+does.** The Cloth's distinguishing content is not interpretation — it is the
+evidence. So: *the Cloth is the evidence, the Projection is the lens.*
+
+That settles the redundancy question for interpretation, and leaves exactly one
+thing multiple Cloths can do that Projections cannot.
+
+### For — the one argument that survives
+
+**Co-authorship is a property of the Cloth, and Projections cannot express
+it.** A Projection belongs to a Cloth; membership lives on the Cloth. "My solo
+work on Bucciarelli" and "the Cloth I co-create with Sam on Bucciarelli" are
+two bodies of work with **different access**, and no number of Projections says
+"Sam may see this half and not that half."
+
+Given TJ's ruling 1, this argument is live. Everything below is against.
+
+### Against
+
+1. **Two objects, one job.** If a second Cloth shares the Reading's evidence,
+   it differs from a Projection only by being a container — a title with
+   Projections hanging off it, and the Projections already have titles. This
+   reproduces the "a Reading and its Cloth kind of mean the same thing" problem
+   one level down.
+2. **It forces a choice with no rule.** "New Projection or new Cloth?" is a
+   fork the student must answer on every second take, and nothing in the model
+   tells them which. Ambiguous forks cost comprehension.
+3. **The Projection is already designed for this** — *"One Cloth may have many
+   Projections — each a different take; title the takes."*
+4. **Red line 5 gets muddy.** Whole-artifact export is *the Cloth*. Several
+   Cloths per Reading split a student's work on one text across several
+   "whole" artifacts.
+5. **Cost for no new capability** — cloth ids threaded through scope, a picker,
+   and a rule for which Cloth the Reading card's one door opens.
+
+### The rule this yields
+
+If co-authorship is the *only* thing multiple Cloths buy, the rule follows:
+
+> **One Cloth per Reading per User — but a Cloth may have several Users.**
+
+Three consequences, and the third is the reason to prefer it:
+
+- Several Cloths exist on a Reading **across the class** (mine, Sam's, ours),
+  but **no student ever chooses between "new Cloth" and "new Projection"**.
+  They only ever make Projections. A second Cloth appears when someone
+  *co-creates*, never as a lens.
+- The vocabulary comes clean: **a Cloth is whose work this is; a Projection is
+  what it says.**
+- **`byte` still needs no `clothId`.** Because a User has exactly one Cloth per
+  Reading, `(user, reading)` still identifies the Cloth; membership on the
+  Cloth decides who may see the evidence. Co-authorship therefore costs join
+  tables and an authorization change — **not** the graph re-keying of §2 B.
+
+### The catch, stated plainly
+
+That rule means a student cannot hold a solo Cloth *and* a shared Cloth on the
+same Reading. Co-creating carries their existing captures on that Reading into
+the shared view. Overlaying two people's Cloths on one Reading is precisely the
+model's **Join**, which is already defined and deferred — so Join is where that
+case belongs, not here.
+
+Allow a User two Cloths on one Reading and `(user, reading)` stops identifying
+the Cloth — at which point `byte.clothId` is required and you are back in §2 B's
+migration. **The one-per-User rule is exactly what keeps co-authorship cheap.**
