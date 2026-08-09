@@ -50,11 +50,11 @@ reading for support is a first-class move. There is no equivalent for a verb.
 You cannot coin "sets the terms for", say what you mean by it, and then hunt for
 the pair it joins — because a Label with no Link has nowhere to live.
 
-**Vocabulary half-lies.** §3 tab 4 promises "browse/filter Concepts (**full
+**Vocabulary half-lies.** The model's §3 tab 4 promises "browse/filter Concepts (**full
 objects**) and Link Labels". Concepts are full objects. Link Labels are grouped
 strings.
 
-## 2b. The UI already has pre-existing Links — it just cannot store them
+## 3. The UI already has pre-existing Links — it just cannot store them
 
 TJ, 2026-08-09: *"the UI includes sample links that don't know what the
 concepts to be linked are, correct? The idea of pre-existing links is there."*
@@ -81,7 +81,7 @@ Three consequences, and they are the strongest part of the argument:
 2. **What is missing today is precisely the Link Description.** Six verbs
    offered with no gloss anywhere. A student taps "leads to" with no account of
    what it means — and "leads to" is the exact verb that gets used for both
-   causation and mere sequence. The field §3 proposes is the hole in what has
+   causation and mere sequence. The field §4 proposes is the hole in what has
    already shipped.
 3. **Copy-by-string is why the vocabulary cannot be trusted.** Two uses of
    "leads to" are unrelated rows coinciding only by a `lower(handle)` match, so
@@ -89,7 +89,7 @@ Three consequences, and they are the strongest part of the argument:
    Link List, silently. That is the same failure `mergeConcepts` repairs on the
    noun side, happening today on the verb side with nothing to repair it.
 
-## 3. The proposal (TJ, 2026-08-09)
+## 4. The proposal (TJ, 2026-08-09)
 
 > *"A Thread is Concept–Link–Concept, and it contains the references, correct?
 > Not the link itself."* … *"Can't a Link have a description that is independent
@@ -140,7 +140,7 @@ first" — a Thread can be thrown with a sentence and no label at all. That is t
   a verb named ahead of its use. Exactly parallel to a Concept with no Passages,
   and it should be a designation, never a warning (red lines 1 and 7).
 
-## 4. What it costs
+## 5. What it costs
 
 ### The migration is cheaper than it looks
 
@@ -181,7 +181,65 @@ Per [AGENTS.md](../AGENTS.md) §F the DB may keep the July names, so `edge` does
   string, not on `linkId` — this gets no harder, but it does not get simpler
   either, and the code should say why.
 
-## 5. The one design rule to hold
+## 6. Merge, and the rule that keeps it honest
+
+TJ, 2026-08-09: *"I want to be careful with the mergeConcepts and the
+mergeLinks. These could be making decisions on the student's behalf and I want
+to avoid that."*
+
+Right to raise, and the current merge survives the test — but the reasoning
+matters more than the verdict, because it is the rule any link merge inherits.
+
+**`mergeConcepts` decides nothing today.** `VocabularyTab.handleMerge` makes the
+student type the concept to keep; if the name matches nothing it **refuses
+rather than guesses** ("No concept by that name"); it confirms destructively
+with the consequence stated plainly — *"Every passage and thread of the first
+will point at the second, and the first goes away. There is no unmerge."*
+Nothing in the codebase proposes a merge, ranks candidates, or detects
+duplicates. It is a tool the student picks up, not advice they receive.
+
+Two holes found while confirming that, both written up in
+[naming-decisions.md](naming-decisions.md) §1: `recordEvent` is best-effort, so
+a merge can succeed while its provenance row does not; and merge resolves its
+target **by label**, so with two legal homonyms named "framing" it silently
+picks the first and the confirm — which renders `target.label` — cannot tell the
+student which one it is about to absorb. A link merge must not inherit that:
+**pick by object, not by label string.**
+
+### The rule
+
+> **Merge is always student-initiated and never suggested. The tool may show
+> that two labels coincide; it may never say that they *should* be one.**
+
+Counting is allowed — the Link List can show that "leads to" appears eleven
+times and "lead to" twice, because that is a fact about the text of the labels.
+The inference that those are one verb is the student's, and so is the act.
+A "3 possible duplicates" badge would be judging (red line 3), and an
+auto-merge would be deciding what the student meant (red line 2).
+
+### Prevention beats repair — which revises §5
+
+An earlier draft of this note said `mergeLinks` was **mandatory**. That was
+overstated, and TJ's concern is what exposes it.
+
+The reason near-duplicate labels accumulate today is that tapping a chip runs
+`pickWord(word)` → `setNameDraft(word)`: it **copies a string into a text
+field** (§3). So *"leads to"*, *"lead to"* and *"leads to "* become three
+entries with nothing relating them. Under the object model a chip can attach a
+**`linkId`** instead — choosing the object rather than copying its name — and
+the duplicates largely stop being *created*.
+
+That matters for exactly the reason TJ raised: **prevention decides nothing for
+anybody; repair always risks it.** Merge should be a rarely-needed escape hatch,
+not load-bearing cleanup. It is still wanted — a student who free-types a label
+they have used before will still make a near-duplicate, and a genuine change of
+mind ("I have been using two verbs for one relation") needs somewhere to go —
+but it is no longer the thing the design leans on.
+
+**So: build tap-to-attach with the object model, and `mergeLinks` after, if the
+vocabulary actually silts up.** That ordering is also cheaper.
+
+## 7. The one design rule to hold
 
 **Never prompt for the Link Description at throw time.** The golden path is
 Description-before-Label *for the Thread*; adding a third writing task at the
@@ -195,35 +253,39 @@ glosses get sharpened. Null by default; most everyday verbs ("leads to",
 "is part of") will stay null forever, and that is fine. The value is in the
 coined ones.
 
-## 6. What it buys
+## 8. What it buys
 
 1. **A Link may precede its Thread** — the missing symmetry with
    *a Concept may precede its evidence*.
-2. **Vocabulary stops half-lying** — Link Labels become the full objects §3
-   already promises.
+2. **Vocabulary stops half-lying** — Link Labels become the full objects the
+   model's §3 already promises.
 3. **A real teaching signal.** A student using "leads to" for both causation and
    mere sequence ends up with one Link whose gloss does not fit half its
    Threads. That is visible, countable, and *descriptive* — the tool shows it,
    it does not judge it.
 
-## 7. Recommendation
+## 9. Recommendation
 
-**Do it, as its own phase, and only with `mergeLinks` in the same phase.**
+**Do it, as its own phase, with tap-to-attach in the same phase and
+`mergeLinks` deferred until the vocabulary is observed to silt up.**
 
 The change is coherent, it resolves two asymmetries TJ found rather than
-inventing a need, and the migration is additive except for dropping one column.
-The risk is not technical: it is that Links-as-objects without a merge action
-produces a vocabulary list nobody trusts, which is worse than the derived list
-we have now.
+inventing a need, the affordance is already on screen (§3), and the migration
+is additive except for dropping one column. The risk is not technical: it is
+that Links-as-objects **without tap-to-attach** would keep minting near
+-duplicates by string copy, and a vocabulary list nobody trusts is worse than
+the derived list we have now. Merge is the repair for that; attaching the object
+is the prevention, and prevention is the half that cannot decide anything on a
+student's behalf (§6).
 
 **Not urgent.** Nothing shipped depends on it, and the derived Link List built
 on 2026-08-09 is correct under the current model.
 
-## 8. Open
+## 10. Open
 
 - **Does a Link belong to the User, the Course, or the app?** Concepts are
   User-level. `PLAIN_VERBS` is none of those three today — it is **hardcoded in
-  a component** (§2b), which is why the question has never had to be answered.
+  a component** (§3), which is why the question has never had to be answered.
   Under the object model it does: the six starters become seeded Links, and the
   choice is between a shared read-only tier and **a per-user copy at first
   use**. Per-user fits everything else — Concepts are User-level, merge operates

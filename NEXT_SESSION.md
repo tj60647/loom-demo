@@ -130,6 +130,36 @@ makes or breaks it — **there is no `mergeLinks` and it would become mandatory*
 in **[docs/link-as-object.md](docs/link-as-object.md)**. Recommended: do it, as
 its own phase, not urgent.
 
+### 6b. Where the tool decides what the student meant
+
+TJ, on merge: *"these could be making decisions on the student's behalf and I
+want to avoid that."* **Merge is the clean one** — student-typed target, refuses
+to guess, confirms with "there is no unmerge", and nothing in the repo proposes
+one. The check turned up three other things, all written up in
+**[docs/naming-decisions.md](docs/naming-decisions.md)** and **none changed in
+code** pending TJ's rulings:
+
+- **A plain bug.** `handleAddConceptOnly` matches the label **untrimmed** and
+  writes it **trimmed**, so `"boundary objects "` misses the homonym confirm
+  entirely and silently mints a duplicate with a byte-identical label. One-line
+  fix; recommended regardless of the rulings.
+- **The three naming paths disagree.** Naming ahead of evidence asks; capture by
+  hand joins silently then asserts ("it is one concept, not two"); **capture
+  from the PDF — the busiest path — joins silently and says nothing.** Proposed:
+  turn the note into an offer ("Not the same idea? Make it a separate concept")
+  and give the PDF path one at all.
+- **The Source field promises an override it does not have.** The label says
+  "this reading, unless you say otherwise", but saying otherwise sets
+  `byte.source` (a string) while `byte.sourceId` — what every lens reads — is
+  stamped from the open reading, and `attributeBytes` is guarded by
+  `isNull(sourceId)` so it can never be re-attributed.
+
+Also in that note: a sweep finding I **corrected rather than passed on**
+(`resolveActiveCourseId` is a narrow legacy migration, not "data destruction"),
+and a list of leads I did not verify — of which `mapKit.ts`'s "busiest first —
+the top few are your primary candidates" is the likeliest genuine red-line-3
+problem.
+
 ### 7. Traps this session
 
 - **`overflow: hidden` vs `overflow: clip` on `.pdf-body`.** Clip makes no
