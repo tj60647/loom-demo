@@ -3,8 +3,9 @@ import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } fro
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
-import CaptureModal from './CaptureModal';
+import CaptureModal, { type CaptureReuse } from './CaptureModal';
 import PageSlot from './PageSlot';
+import ReuseOffer from '@/components/ui/ReuseOffer';
 import { useLoom } from '@/components/providers/LoomProvider';
 import { useReadings } from '@/components/providers/ReadingsProvider';
 import { searchReading, getPassagesOverlay } from '@/lib/reads';
@@ -127,7 +128,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * captured" rather than climbing the corner of the page. `n` counts them so
    * the wording can say so; `passageId` is the LAST one, which is the row to open.
    */
-  const [captureToast, setCaptureToast] = useState<{ passageId: string; label: string; n: number } | null>(null);
+  const [captureToast, setCaptureToast] = useState<{ passageId: string; label: string; n: number; reuse?: CaptureReuse } | null>(null);
   const toastTimer = useRef<number | null>(null);
   /**
    * The element that actually scrolls in every mode — the measuring stick for
@@ -628,16 +629,23 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     toastTimer.current = window.setTimeout(() => setCaptureToast(null), 6000);
   }, [holdToast]);
 
-  const handleCaptured = useCallback((passageId: string, label: string) => {
+  const handleCaptured = useCallback((passageId: string, label: string, reuse?: CaptureReuse) => {
     // With the sheet already out, the row IS the acknowledgement — scroll to it
-    // rather than covering it with a card that says it happened.
-    if (workOpen) {
+    // rather than covering it with a card that says it happened. A reuse still
+    // has to be said, though: the sheet shows the passage under its concept and
+    // nothing there reveals that the concept came from another reading.
+    if (workOpen && !reuse) {
       onGotoOpenPassage?.(passageId);
       return;
     }
-    setCaptureToast((prev) => ({ passageId, label, n: (prev?.n ?? 0) + 1 }));
-    startToastTimer();
-  }, [workOpen, onGotoOpenPassage, startToastTimer]);
+    setCaptureToast((prev) => ({ passageId, label, n: (prev?.n ?? 0) + 1, reuse }));
+    // A toast carrying a DECISION does not count down. Six seconds is the
+    // budget for reading an acknowledgement, not for deciding whether two
+    // readings mean the same thing by a word — and a choice that expires is
+    // a choice made for you, which is the whole thing this note exists to
+    // avoid. It stays until dismissed or answered.
+    if (reuse) holdToast(); else startToastTimer();
+  }, [workOpen, onGotoOpenPassage, startToastTimer, holdToast]);
 
   // The countdown is state that outlives the component if nobody clears it.
   useEffect(() => () => holdToast(), [holdToast]);
@@ -1870,6 +1878,22 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               ? `${captureToast.n} passages captured.`
               : <>Passage captured — filed under <b>{captureToast.label}</b>.</>}
           </p>
+          {/* The seam, in the toast rather than as its own card (TJ,
+              2026-08-09: the PDF path should be the QUIETER of the two).
+              Same component the capture form renders, so the busiest path in
+              the app and the hand path cannot say different things about the
+              same event. */}
+          {captureToast.reuse && (
+            <ReuseOffer
+              className="captoast-seam"
+              passageId={captureToast.passageId}
+              conceptId={captureToast.reuse.conceptId}
+              label={captureToast.reuse.label}
+              where={captureToast.reuse.whereIds.map(readings.titleOf)}
+              filledDescription={captureToast.reuse.filledDescription}
+              onResolved={() => setCaptureToast(null)}
+            />
+          )}
           <button
             type="button"
             className="btn ghost mini compact"

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { contentWords } from "@/lib/utils"
+import { readingsOf } from "@/lib/scope"
 
 interface CaptureModalProps {
   passage: string;
@@ -20,7 +21,23 @@ interface CaptureModalProps {
    * through in silence, the modal simply vanishing, and the only sign it had
    * worked was 1500ms of "· saved ·" in the far corner of the header.
    */
-  onCaptured?: (passageId: string, conceptLabel: string) => void;
+  onCaptured?: (passageId: string, conceptLabel: string, reuse?: CaptureReuse) => void;
+}
+
+/**
+ * The concept this capture joined had already been evidenced in OTHER readings.
+ *
+ * Reported up rather than shown here, because the modal closes on save: the
+ * acknowledgement belongs in the toast the viewer draws, where it can be read
+ * against the page. Undefined whenever the concept is new, or was only ever
+ * met in this reading — neither is ambiguous. See `ReuseOffer`.
+ */
+export type CaptureReuse = {
+  conceptId: string
+  label: string
+  /** Titles of the other readings, resolved by the viewer via `titleOf`. */
+  whereIds: string[]
+  filledDescription: string
 }
 
 export default function CaptureModal({ passage, source, sourceId, location, pageNumber, startOffset, endOffset, pageContentHash, onClose, onCaptured }: CaptureModalProps) {
@@ -38,13 +55,27 @@ export default function CaptureModal({ passage, source, sourceId, location, page
       // existing one that has none, and never overwrites what you wrote before.
       const wdef = workingDef.trim()
       let concept = state.concepts.find(c => c.label.toLowerCase() === cname.toLowerCase())
+      // Read BEFORE the passage lands, or this capture counts itself as prior
+      // evidence. Same rule and same trigger as the hand path in OpenTab —
+      // only readings other than this one make the reuse ambiguous.
+      const metElsewhere = concept
+        ? readingsOf(concept.id, state.passages).filter(id => id !== sourceId)
+        : []
+      let filledDescription = ""
       if (!concept) {
         concept = await addConcept(cname, wdef || undefined)
       } else if (wdef && !concept.def) {
         await editConcept(concept.id, { def: wdef })
+        filledDescription = wdef
       }
       const saved = await addPassage([concept.id], source, location, passage, pageNumber, startOffset, endOffset, sourceId, pageContentHash)
-      onCaptured?.(saved.id, concept.label)
+      onCaptured?.(
+        saved.id,
+        concept.label,
+        metElsewhere.length
+          ? { conceptId: concept.id, label: concept.label, whereIds: metElsewhere, filledDescription }
+          : undefined
+      )
       onClose()
     } catch(e) {
       console.error(e)
@@ -72,7 +103,10 @@ export default function CaptureModal({ passage, source, sourceId, location, page
 
         <div style={{ marginBottom: "20px", display: "flex", gap: "16px" }}>
           <div style={{ flex: 1 }}>
-            <span className="label">Source</span>
+            {/* "Citation", matching the hand-capture form since 2026-08-09.
+                Read-only here — a capture off the page is unambiguously from
+                the page, so this path never offered an override to break. */}
+            <span className="label">Citation</span>
             <div className="hint">{source}</div>
           </div>
           <div style={{ flex: 1 }}>

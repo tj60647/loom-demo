@@ -9,6 +9,7 @@ import { readingsOf, soleSourceId } from "@/lib/scope"
 import { contentWords, sortedByLabel } from "@/lib/utils"
 import { tidy } from "@/lib/clothMath"
 import ClothFold from "@/components/tabs/ClothFold"
+import ReuseOffer from "@/components/ui/ReuseOffer"
 
 type OpenTabProps = {
   onGotoPassage?: (passage: Passage) => void
@@ -65,7 +66,16 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
   const [newConceptOnly, setNewConceptOnly] = useState("")
   const [newConceptDef, setNewConceptDef] = useState("")
   const [showCaptureInfo, setShowCaptureInfo] = useState(false)
-  const [reuseNote, setReuseNote] = useState<{ label: string; where: string[] } | null>(null)
+  // Carries the passage and concept ids now, not just the copy: the note has
+  // an action in it since 2026-08-09 ("make it a separate concept"), and that
+  // needs to know which passage to move and which concept to move it off.
+  const [reuseNote, setReuseNote] = useState<{
+    passageId: string
+    conceptId: string
+    label: string
+    where: string[]
+    filledDescription: string
+  } | null>(null)
   const [refileInputs, setRefileInputs] = useState<Record<string, string>>({})
   const [refileBusy, setRefileBusy] = useState<Record<string, boolean>>({})
   const closeCaptureInfoButtonRef = useRef<HTMLButtonElement>(null)
@@ -97,13 +107,18 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     // been met rather than counting the capture about to happen.
     const metIn = concept ? readingsOf(concept.id, state.passages) : []
     const metElsewhere = metIn.filter(id => id !== activeSourceId)
+    // Whether THIS capture is what filled the borrowed concept's Description.
+    // If the student then separates, that sentence goes with the new concept
+    // rather than staying on one they have just said is a different idea.
+    let filledDescription = ""
     if (!concept) {
       concept = await addConcept(cname, wdef || undefined)
     } else if (wdef && !concept.def) {
       await editConcept(concept.id, { def: wdef })
+      filledDescription = wdef
     }
 
-    await addPassage([concept.id], source.trim() || citation, location.trim() || pageHint, text)
+    const saved = await addPassage([concept.id], source.trim() || citation, location.trim() || pageHint, text)
 
     // reset form (keep source/location if user wants to enter multiple passages from same place)
     setContent("")
@@ -117,8 +132,11 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     // Counted, not judged — it says the reuse happened, never that it is right.
     if (metElsewhere.length) {
       setReuseNote({
+        passageId: saved.id,
+        conceptId: concept.id,
         label: concept.label,
         where: metElsewhere.map(titleOf),
+        filledDescription,
       })
       flash("passage added — you've named this concept before")
     } else {
@@ -341,19 +359,42 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
         <p className="do">Do this — paste or type the passage, then name the concept it evidences and gloss it in your own words.</p>
         <p className="hint">A passage = the author&apos;s words, verbatim, with its citation. Choosing the passage is <i>your</i> judgment — that&apos;s the point. Loom can carry over source details and offer passage words to tap; it does not summarize or choose the concept for you.</p>
         
+        {/* 2026-08-09 (TJ): this said "(this reading, unless you say
+            otherwise)" and could not keep the promise. Typing here sets
+            `passage.source`, a citation STRING; `passage.sourceId` — what
+            `scopedGraph`, the tallies, the overlays and the export anchors all
+            actually read — is stamped from the open reading either way, and
+            `attributePassages` is guarded by `isNull(sourceId)` so it can
+            never be re-attributed afterwards.
+
+            The field's real job is worth keeping: recording that these words
+            are Suchman's even though you met them quoted inside Bucciarelli.
+            So it is named for that job, the false promise is gone, and the
+            filing it never mentioned is now stated outright — which is
+            strictly more than the old label offered, since a student could
+            not previously see where their passage was going at all. */}
         <div className="form-row">
           <span className="label">
-            Source — author, work
-            {citation ? <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--grey)" }}> (this reading, unless you say otherwise)</span> : null}
+            Citation — author, work
           </span>
           <input
             className="mono-in"
             placeholder={citation || "Suchman, Plans and Situated Actions"}
-            title="who wrote it, and what work it's from"
+            title="who wrote the words — change it when the passage quotes someone else"
             value={source}
             onChange={(e) => setSource(e.target.value)}
           />
         </div>
+        {/* Names the READING, not the citation string. Using `citation` here
+            printed the same text that is already in the field above, so the
+            line read as an echo of the input — the exact opposite of its job,
+            which is to show that the two are different things. */}
+        {activeSourceId ? (
+          <p className="ghostnote" style={{ marginTop: "-4px", marginBottom: "10px" }}>
+            Filed under <i>{titleOf(activeSourceId)}</i> — the reading you have open. The citation
+            travels with the passage and may name someone else; the filing follows the reading.
+          </p>
+        ) : null}
 
         <div className="form-row">
           <span className="label">
@@ -479,23 +520,20 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                 : "Name the concept this passage evidences — a short noun phrase (the author's own term is often best)."}
           </p>
         )}
+        {/* The seam. Until 2026-08-09 this said "it is one concept, not two" —
+            a verdict on a question only the student can answer, delivered
+            after the fact. `ReuseOffer` is the shared version of this moment;
+            the PDF path renders the same component so the two cannot drift
+            apart again. */}
         {reuseNote && (
-          <div className="seam" role="status">
-            <span className="cap">the same concept, twice</span>
-            <p>
-              You&apos;ve named <b>{reuseNote.label}</b> before — in{" "}
-              {reuseNote.where.map((w, i) => (
-                <span key={w + i}>
-                  {i > 0 && (i === reuseNote.where.length - 1 ? " and " : ", ")}
-                  <i>{w}</i>
-                </span>
-              ))}
-              . This passage joins its evidence there; it is one concept, not two.
-            </p>
-            <button type="button" className="btn ghost mini compact" onClick={() => setReuseNote(null)}>
-              noted
-            </button>
-          </div>
+          <ReuseOffer
+            passageId={reuseNote.passageId}
+            conceptId={reuseNote.conceptId}
+            label={reuseNote.label}
+            where={reuseNote.where}
+            filledDescription={reuseNote.filledDescription}
+            onResolved={() => setReuseNote(null)}
+          />
         )}
     </>
   )
