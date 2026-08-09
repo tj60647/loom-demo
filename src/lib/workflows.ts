@@ -83,7 +83,12 @@ const student: Flow = {
     { id: "overlay", label: "Compare a section, or all of them", where: "Overlays — faculty and admins only" },
     { id: "sort", label: "Sort into tiers, arrange the cards", where: "03 · Knowledge Graph" },
     { id: "write", label: "Trace the prompts, write the one-line and the read", where: "03 · Knowledge Graph" },
-    { id: "weave", label: "Every reading at once", where: "/weave — station hidden, reached from Keep" },
+    // There used to be a "weave" node here, labelled "Every reading at once"
+    // and sited at "/weave — station hidden, reached from Keep". Both halves of
+    // that were wrong: the station is hidden AND nothing links to `/weave`, from
+    // Keep or anywhere else, so the diagram drew a step in the student's path
+    // that no student can take. The whole-weave path is unresolved (TJ,
+    // 2026-08-09) and the diagram must not assert a route the build lacks.
     { id: "keep", label: "Export the cloth or a projection", where: "Keep", kind: "end" },
   ],
   edges: [
@@ -105,8 +110,7 @@ const student: Flow = {
     { from: "vocab", to: "sort" },
     { from: "sort", to: "write" },
     { from: "write", to: "library", label: "next reading", back: true },
-    { from: "write", to: "weave" },
-    { from: "weave", to: "keep" },
+    { from: "write", to: "keep" },
   ],
 }
 

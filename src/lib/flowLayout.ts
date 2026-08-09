@@ -311,7 +311,35 @@ export function layoutFlow(flow: Flow): LaidFlow {
     })
   }
 
-  const height = Math.max(y - ROW_GAP + MARGIN, lowestLeg + 16)
+  // Return labels all sit at one x in the outer gutter (`outerLane + 10`), so
+  // two returns whose vertical spans have similar midpoints print ON TOP of
+  // each other. The lanes themselves are separated one-per-return, for the
+  // reason given above; the labels naming them were not, which undoes it — a
+  // reader sees one chip over another and can attribute neither to a line.
+  //
+  // Observed on the student flow, where "next reading" (y=1183) covered
+  // "another passage" (y=1189). It is not a wide-glyph case: they are 6px
+  // apart and the text is 14px tall.
+  //
+  // Resolved deterministically — sort by y, then push each label down to clear
+  // the one above. Deterministic matters here: this arithmetic runs on the
+  // server AND the client, and a tie broken differently in the two would be a
+  // hydration mismatch. Sorting by labelY with the lane index as tie-break is
+  // total, so both sides agree. Labels move only downward and only when they
+  // would overlap, so a flow with well-spaced returns is untouched.
+  const LABEL_LINE_H = 17
+  const backLabelled = edges
+    .filter((e) => e.edge.back && e.edge.label)
+    .sort((a, b) => a.labelY - b.labelY || (laneOf.get(a.edge) ?? 0) - (laneOf.get(b.edge) ?? 0))
+  for (let i = 1; i < backLabelled.length; i++) {
+    const prev = backLabelled[i - 1]
+    const cur = backLabelled[i]
+    if (cur.labelY - prev.labelY < LABEL_LINE_H) cur.labelY = prev.labelY + LABEL_LINE_H
+  }
+
+  // A label pushed past the last leg would sit below the canvas.
+  const lowestLabel = backLabelled.length ? backLabelled[backLabelled.length - 1].labelY : 0
+  const height = Math.max(y - ROW_GAP + MARGIN, lowestLeg + 16, lowestLabel + 16)
   return { width, height, nodes: [...placed.values()], edges }
 }
 

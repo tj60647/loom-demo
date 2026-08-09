@@ -8,10 +8,19 @@
 //
 // 2026-08-08 (TJ): 00 Reading and 01 Open merged into a single **Reading**
 // station — the text and your captures are one place (model §3 tab 2), so
-// station 00 is now always the Library. 05 **Weave is hidden** pending a
-// decision on what it becomes (the refactor spec files it as the future Quilt
-// space, ruling 19); the `/weave` route still works and 06 Keep links to it,
-// so no whole-weave work is stranded. Unhide by flipping `hidden` below.
+// station 00 is now always the Library.
+//
+// 05 **Weave stays hidden**, and the note that used to sit here was wrong about
+// why that was safe. It claimed "the `/weave` route still works and 06 Keep
+// links to it, so no whole-weave work is stranded." **Keep never linked to it.**
+// Nothing does — verified 2026-08-09 by grepping every `/weave` in the repo, so
+// the whole weave has had no door at all since the station was hidden.
+//
+// TJ, 2026-08-09: **the whole-weave path is unresolved**, collaboration on a
+// cloth and the Quilt are both wanted but the ambiguity about how they manifest
+// "should not inform the current design" — "the whole weave will only confuse
+// things in this moment." So do not build a home for it and do not unhide this
+// on the strength of a guess about what it becomes.
 //
 // Step numbers are DERIVED from the visible stations, so hiding or restoring
 // one renumbers the bar instead of leaving a gap that reads as a bug. That is
