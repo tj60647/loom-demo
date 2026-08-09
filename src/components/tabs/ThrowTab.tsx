@@ -2,14 +2,16 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
-import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
-import { isWholeWeave, readingsOf } from "@/lib/scope"
+import { isWholeWeave } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import ClothFold from "@/components/tabs/ClothFold"
 
 const PLAIN_VERBS = ['leads to','depends on','is part of','goes against','is the same as','sets up'];
+
+/** How many of the student's own Link Labels the coin-time row offers. */
+const SUGGESTED_LABELS = 12;
 
 const OPENERS = [
   'this means that',
@@ -58,10 +60,11 @@ const STEPS: { label: string; says: string }[] = [
 
 export default function ThrowTab() {
   // Scoped for what this reading is about; whole for anything that has to be
-  // TRUE. A thread that runs out of this reading has one end outside it, so
-  // label lookups and the evidence check both read the whole graph.
+  // TRUE. The thread lists are `scoped` — this reading's own work, and since
+  // 2026-08-09 only that — while the evidence check, the duplicate-pair guard
+  // and the coined-label vocabulary all read the whole graph, because those
+  // are facts about the student rather than about this bench.
   const { state, scoped, scope, addEdge, editEdge, removeEdge, flash, setUndoStack, setRedoStack } = useLoom()
-  const { titleOf } = useReadings()
   const { confirm, notify } = useDialog()
   const [pairA, setPairA] = useState<string | null>(null)
   const [pairB, setPairB] = useState<string | null>(null)
@@ -236,7 +239,36 @@ export default function ThrowTab() {
   const byNamed = (a: { handle: string | null }, b: { handle: string | null }) =>
     (a.handle ? 1 : 0) - (b.handle ? 1 : 0)
   const orderedEdges = [...scoped.edges].sort(byNamed)
-  const orderedBridges = [...scoped.bridges].sort(byNamed)
+  // The Link List (model §Student: "belongs to the User, spans Cloths: the
+  // reusable Link Labels, tappable at coin-time"). DERIVED, not stored — there
+  // is no link-label table, and there is not meant to be: a Link Label is a
+  // parameter of a Link, and what recurs is the verb, not the Link. So a label
+  // enters this list by having been used once, and no other way. Read off
+  // `state`, never `scoped` — the labels cross readings even though, since
+  // 2026-08-09, the threads themselves do not. Same derivation as
+  // VocabularyTab's label groups, which is the list's full home.
+  // Deduped case-insensitively (one word typed twice with different capitals
+  // is one label), most-used first so the vocabulary you actually lean on is
+  // nearest the hand, then alphabetical so the order is stable across renders.
+  const ownLabels = (() => {
+    const counts = new Map<string, { label: string; n: number }>()
+    for (const edge of state.edges) {
+      const h = edge.handle?.trim()
+      if (!h) continue
+      const key = h.toLowerCase()
+      const hit = counts.get(key)
+      if (hit) hit.n += 1
+      else counts.set(key, { label: h, n: 1 })
+    }
+    const all = [...counts.values()]
+      .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label))
+      .map(x => x.label)
+    // Twelve chips is what the row holds before it becomes a wall of verbs.
+    // The count says what is not shown rather than quietly ending the list —
+    // this IS the Link List (model §Student), and a truncated view of it that
+    // does not admit to being truncated misreports what the student owns.
+    return { shown: all.slice(0, SUGGESTED_LABELS), rest: Math.max(0, all.length - SUGGESTED_LABELS) }
+  })()
   const wholeWeave = isWholeWeave(scope)
 
   // Concepts from the student's other readings, reachable and searchable but
@@ -270,13 +302,8 @@ export default function ThrowTab() {
     // a thread the student threw should stay visible and removable,
     // not vanish silently because one end went missing.
     const sel = namingFor === e.id
-    // On a bridge, name the reading the far end came from — otherwise the row
-    // reads as an unexplained stranger among this reading's concepts.
-    const inScope = new Set(scoped.concepts.map(c => c.id))
-    const far = !wholeWeave
-      ? [e.fromId, e.toId].find(id => !inScope.has(id))
-      : undefined
-    const farWhere = far ? readingsOf(far, state.bytes).map(titleOf) : []
+    // No far-end pill any more: with the bridges band gone, every row here has
+    // both ends in scope, so there is never a reading to name.
 
     return (
       <div key={e.id} className={`thread ${sel ? "sel" : ""}`}>
@@ -292,7 +319,6 @@ export default function ThrowTab() {
           {e.handle
             ? <span className="pill beaten">label</span>
             : <span className="pill loose">description</span>}
-          {farWhere.length > 0 && <span className="pill">from {farWhere.join(" · ")}</span>}
           <span className="act" onClick={() => toggleNamer(e.id, e.handle)}>
             {sel ? 'close' : (e.handle ? 'edit label' : 'coin a label')}
           </span>
@@ -324,6 +350,28 @@ export default function ThrowTab() {
                 autoFocus
               />
             </div>
+            {/* Your own labels first, from EVERY reading — TJ, 2026-08-09:
+                "links from other readings may show up as link options". The
+                threads themselves stay this reading's own (the bridges band
+                went in the same ruling), but a label is vocabulary, not
+                evidence: coining "sets the terms for" in one text and reaching
+                for it again in the next is the reuse the course wants, and
+                retyping it by hand is how you end up with two labels that mean
+                one thing. Everyday verbs stay underneath as the fallback for
+                someone who has not coined any yet. */}
+            {ownLabels.shown.length > 0 && (
+              <>
+                <div className="rnote">
+                  Labels you have coined before
+                  {ownLabels.rest > 0 && <> — the {ownLabels.shown.length} you reach for most, of {ownLabels.shown.length + ownLabels.rest}</>}:
+                </div>
+                <div className="chips">
+                  {ownLabels.shown.map(v => (
+                    <span key={v} className="verbchip borrowed" onClick={() => pickWord(v)}>{v}</span>
+                  ))}
+                </div>
+              </>
+            )}
             <div className="rnote">Stuck for a word? Tap an everyday suggestion:</div>
             <div className="chips">
               {PLAIN_VERBS.map(v => (
@@ -477,21 +525,17 @@ export default function ThrowTab() {
             ) : orderedEdges.map(threadRow)}
           </div>
 
-          {/* Bridges are the point of the back half of the term, so they get
-              their own band and their own count rather than being filtered out
-              of sight. Counted, never judged. */}
-          {!wholeWeave && orderedBridges.length > 0 && (
-            <>
-              <h3 style={{fontFamily: "var(--display)", fontSize: "17px", borderBottom: "1px solid var(--rule)", paddingBottom: "5px", margin: "18px 0 6px"}}>
-                Threads that run out of this reading{' '}
-                <span className="n" style={{fontFamily: "var(--mono)", fontSize: "11px", color: "var(--grey)"}}>({orderedBridges.length})</span>
-              </h3>
-              <p className="hint">Each of these ties a concept here to one you met in another text. They belong to both readings and show up in either.</p>
-              <div className="scrollbox">
-                {orderedBridges.map(threadRow)}
-              </div>
-            </>
-          )}
+          {/* No band of threads from elsewhere (TJ, 2026-08-09: "threads from
+              other readings should not show up in the linking"). It used to
+              show `scoped.bridges` — threads with one end outside this
+              reading — under "Threads that run out of this reading". Since the
+              ruling of 2026-08-08 removed the outside-concepts band and the
+              across-readings shuttle, a student can no longer MAKE a bridge
+              from inside a reading, so by construction every row in that band
+              had been thrown somewhere else. It had become a list of other
+              readings' work sitting in this reading's Linking. The threads
+              still exist and still show at the whole weave; they are simply
+              not this bench's business. */}
         </div>
       </div>
     </>
