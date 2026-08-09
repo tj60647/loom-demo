@@ -44,10 +44,12 @@ test("the nav offers the read side only — no Readings, no Courses", async ({ p
   // Their own learner surfaces, on the same bar and one click away.
   await expect(nav.getByRole("link", { name: /Library/ })).toBeVisible()
   await expect(nav.getByRole("link", { name: /Keep/ })).toBeVisible()
-  // Workflows left the admin nav for the header (TJ, 2026-08-08) — it is not an
-  // admin surface at all now; students read their own flow there.
-  await expect(nav.getByRole("link", { name: "Workflows" })).toHaveCount(0)
-  await expect(page.locator('header a[href="/workflows"]')).toBeVisible()
+  // Workflows sits right of Courses in the staff group (TJ, 2026-08-09) and is
+  // therefore NOT duplicated in the header — it is drawn there only for someone
+  // with no staff group to carry it. It is still not an admin surface: a
+  // student reads their own flow, and gets the header link instead.
+  await expect(staff.getByRole("link", { name: "Workflows" })).toBeVisible()
+  await expect(page.locator('header a[href="/workflows"]')).toHaveCount(0)
 
   // The write surfaces are absent from the bar, not merely disabled — the
   // staff group is filtered by isAdmin, and faculty are staff but not admin.
@@ -125,7 +127,7 @@ test("the student lens hides every staff surface, and gives a way back", async (
   const staff = nav.locator(".staffgroup a")
 
   await expect(pill).toHaveText("Faculty", { timeout: 15_000 })
-  await expect(staff).toHaveCount(2)
+  await expect(staff).toHaveCount(3)   // Roster · Cohort Graph · Workflows
 
   await page.locator("header button", { hasText: "View as student" }).click()
 
@@ -135,6 +137,10 @@ test("the student lens hides every staff surface, and gives a way back", async (
     .toBeVisible({ timeout: 15_000 })
   await expect(staff).toHaveCount(0)
   await expect(pill).toHaveCount(0)
+  // ...and Workflows comes BACK to the header, because that is where a student
+  // finds it. The lens masks isStaff, and the header draws the link for anyone
+  // without a staff group — so this falls out rather than being special-cased.
+  await expect(page.locator('header a[href="/workflows"]')).toBeVisible()
 
   // Workflows is decided on the SERVER, which is why the flag is a cookie: a
   // client-only mask could not have reached this one. A student reads their
@@ -147,5 +153,5 @@ test("the student lens hides every staff surface, and gives a way back", async (
   await page.goto("/")
   await page.locator("header button", { hasText: "Viewing as student" }).click()
   await expect(pill).toHaveText("Faculty", { timeout: 15_000 })
-  await expect(staff).toHaveCount(2)
+  await expect(staff).toHaveCount(3)
 })

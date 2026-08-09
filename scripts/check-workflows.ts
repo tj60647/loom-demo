@@ -9,7 +9,11 @@
  *
  * Run: npx tsx scripts/check-workflows.ts   (part of `npm run check`)
  */
+import { existsSync, readFileSync } from "node:fs"
+import { join } from "node:path"
+
 import { FLOWS, toMermaid, type Flow } from "../src/lib/workflows"
+import { CAPABILITIES } from "../src/lib/capabilities"
 import { danglingEdgeIds, orphanNodeIds, layoutFlow, nodeDepths, wrapText } from "../src/lib/flowLayout"
 
 let failures = 0
@@ -162,6 +166,58 @@ assert(
   wrapText("a b c d e f g h i j k l m n o p", 3, 2).length === 2,
   "respects the line cap",
   "exceeded maxLines"
+)
+
+/**
+ * The role/capability matrix — the same contract as the flows above.
+ *
+ * The rot guarded against here is the one that matters most for a matrix about
+ * ACCESS: someone renames a gate, the matrix keeps naming the old one, and the
+ * page carries on stating a fact that stopped being true. A wrong row about
+ * who can see what is worse than no row at all.
+ *
+ * `gate.line` is deliberately NOT asserted. Line numbers rot on every edit,
+ * and a checker that cries wolf is a checker somebody switches off.
+ */
+console.log("\ncapabilities — every row names a gate that still exists")
+
+const repoRoot = join(__dirname, "..")
+
+assert(
+  new Set(CAPABILITIES.map((c) => c.id)).size === CAPABILITIES.length,
+  "capability ids are unique",
+  "two rows share an id"
+)
+
+for (const cap of CAPABILITIES) {
+  const abs = join(repoRoot, cap.gate.file)
+  if (!existsSync(abs)) {
+    fail(`${cap.id} — gate file exists`, `${cap.gate.file} is not on disk`)
+    continue
+  }
+  assert(
+    readFileSync(abs, "utf8").includes(cap.gate.symbol),
+    `${cap.id} — ${cap.gate.symbol} still in ${cap.gate.file}`,
+    "renamed or removed, and the matrix would keep naming it"
+  )
+}
+
+// A hole must say what it is, or it reads as an ordinary row.
+for (const cap of CAPABILITIES.filter((c) => c.enforcement === "ui-only")) {
+  assert(!!cap.hole, `${cap.id} — a ui-only row explains its hole`, "set `hole`")
+}
+
+// "qualified" is a promise that the note says how.
+let unexplained = 0
+for (const cap of CAPABILITIES) {
+  for (const access of [cap.student, cap.faculty, cap.admin]) {
+    if (access.verdict === "qualified" && !access.note) unexplained++
+  }
+}
+assert(
+  unexplained === 0,
+  "every qualified verdict explains itself",
+  `${unexplained} bare "qualified" verdicts tell a reader nothing`
 )
 
 console.log(

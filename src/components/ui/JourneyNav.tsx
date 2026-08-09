@@ -114,6 +114,11 @@ const STAFF_ITEMS: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/admin/aggregate", label: "Cohort Graph" },
   { href: "/admin/library", label: "Readings", adminOnly: true },
   { href: "/admin/courses", label: "Courses", adminOnly: true },
+  // Right of Courses (TJ, 2026-08-09). Not an admin surface — a student reads
+  // their own flow there, and the header keeps the link for them (see
+  // Header.tsx). It sits here for staff because they are the ones who read all
+  // three flows, and because the header should not carry it twice.
+  { href: "/workflows", label: "Workflows" },
 ]
 
 /** Why a station is greyed. Says what to do, never what went wrong. */

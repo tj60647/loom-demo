@@ -277,6 +277,82 @@ Covered by `tests/faculty.spec.ts` — "the student lens hides every staff
 surface, and gives a way back", which asserts **absence**, because the failure
 mode here is silent.
 
+### 6f. Who can reach what — the matrix, and two holes it found
+
+TJ, 2026-08-09: *"i think we need a matrix of what roles have access to. this
+can go in the workflows."* and *"put the workflows next to courses, to the right
+of it."*
+
+**Workflows moved into the staff group**, right of Courses. It is still not an
+admin surface — a student reads their own flow — so the header keeps the link
+for anyone with **no staff group to carry it**. That falls out rather than being
+special-cased: a staff member wearing the student lens has `isStaff` masked, so
+the header link comes back exactly as a student sees it. `faculty.spec.ts`
+asserts that handover.
+
+**`src/lib/capabilities.ts` is the matrix**, on the same contract as
+`workflows.ts` — the file IS the artefact. `/workflows` renders it under the
+diagrams, for everyone: the flows show how each person *moves*, this shows what
+they may *reach*, and a student learning that the overlays are not theirs (and
+why) is the tool being honest rather than quiet.
+
+Two rules are written into the file, because both were nearly broken while
+writing it:
+
+1. **Name the gate that REFUSES, not the UI that hides.** A hidden button is not
+   access control — a Server Function is callable directly.
+2. **Do not write a row you have not read.** A plausible row is worse than none,
+   because this gets used to reason about who can see what.
+
+`scripts/check-workflows.ts` gained 22 assertions: every `gate.file` exists,
+every `gate.symbol` still appears in it, every `qualified` verdict carries a
+note, every `ui-only` row states its hole. **It caught a wrong row on its first
+run** — `roster-invite` named `requireAdmin` in `admin.ts`, which uses
+`checkAdmin`. `gate.line` is deliberately NOT asserted: line numbers rot on
+every edit, and a checker that cries wolf gets switched off.
+
+**Two real holes came out of deriving it, both verified in the source and both
+fixed:**
+
+- **`peersOf` excluded `FACULTY` but not `INSTRUCTOR`.** `enrolInvitedCourses`
+  writes `courseMemberships.role = "INSTRUCTOR"` for an admin who joins by
+  invitation (`auth.ts`), and no gate reads that string — it passes everything
+  by being an admin instead. But `peersOf` matched `ne(role, "FACULTY")`, so
+  **an admin's own captures counted as a peer in both overlay bands** — which is
+  decision 4 in that same file, eight lines above: *"an exemplar cloth read as
+  'your cohort' would be the instructor pre-coding the text, which is the thing
+  the gate exists to prevent."* Now matched positively: `eq(role, "LEARNER")`.
+- **`createByte` never authorized its `sourceId`.** `attributeBytes` does, with
+  a comment naming the risk exactly — *"that admitted any reading in the
+  library, including another student's private upload"* — and the sibling
+  function in the same file took `sourceId` straight from the client. The UI
+  only offers shelf readings, so this was **UI-hidden and server-permissive**: a
+  direct Server Function POST could file a passage against a staged reading or
+  another student's private upload and pull its title into the graph and the
+  export. Now `authorizeSourceAccess` runs first, only when a sourceId is
+  claimed (a hand capture with none is a legal unattributed passage, P0.1).
+
+**Recorded in `MATRIX_NOTES`, not fixed** — these are TJ's calls:
+
+- **There is no stored "Student" role.** It is the absence of two flags: an
+  active membership that is not FACULTY, held by someone who is not a site
+  admin.
+- **`INSTRUCTOR` is written and never read.** Either write `"FACULTY"` at
+  `auth.ts`, or leave it — `peersOf` no longer depends on the answer.
+- **Faculty are not admins for readings**: they cannot see or open a staged
+  reading, even in their own course. The model doc's §4 describes Library as one
+  "Admin/Faculty" view; the build gives it to admin alone. **§3 lines 158/160
+  also still promise students the Passages and Concepts/Links Overlays, which
+  the 08-08 ruling removed** — the model doc is out of date on both.
+
+**Two more found and NOT fixed, deliberately** (from the same sweep, verified
+by quotation but not by me): `authorizeSourceAccess` falls fully open to
+unauthenticated callers when `NODE_ENV !== "production"` — deliberate and
+commented, but it is the only gate whose *shape* changes by environment, so a
+preview built as development would be open. And `getUserLoomDataAsAdmin` gates
+the course but not the target's membership, so a **removed** member's work stays
+readable to faculty.
+
 ### 7. Traps this session
 
 - **`overflow: hidden` vs `overflow: clip` on `.pdf-body`.** Clip makes no

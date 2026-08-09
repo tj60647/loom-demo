@@ -4,11 +4,15 @@ import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useLoom } from "@/components/providers/LoomProvider"
+import { useReadings } from "@/components/providers/ReadingsProvider"
 import AuthButton from "./AuthButton"
 
 export default function Header({ deployEnv }: { deployEnv?: string }) {
   const { data: session } = useSession()
   const { flashMsg } = useLoom()
+  // Masked by the student lens, which is what makes the workflows link below
+  // come back for a staff member viewing as a student.
+  const { course } = useReadings()
   const [showAbout, setShowAbout] = useState(false)
   // Nothing on an admin page writes to a loom, so the save dot sat there as a
   // bare em dash for the whole visit and read as a stray character.
@@ -46,8 +50,15 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
           about
         </button>
         {/* Beside About (TJ, 2026-08-08), and reachable from every page — it is
-            not an admin surface: a student reads their own flow there. */}
-        {session && (
+            not an admin surface: a student reads their own flow there.
+            Since 2026-08-09 it also sits right of Courses in the journey bar's
+            staff group (TJ), so it is drawn HERE only for those who have no
+            staff group to carry it — otherwise the header and the bar would
+            both offer the same link, which is what the Administration and
+            Cohort Map buttons were removed for. A staff member wearing the
+            student lens has `isStaff` masked to false and so gets it back
+            here, which is exactly what a student sees. */}
+        {session && !course?.isStaff && (
           <Link
             href="/workflows"
             className="btn ghost mini"

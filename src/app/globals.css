@@ -845,3 +845,35 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .clothmeta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft); white-space: nowrap; }
 /* The cloth row is metadata now, never a control (TJ, 2026-08-08): the reading
    card itself is the entry point, so nothing in this row is pressable. */
+
+/* --- Who can reach what: the role/capability matrix on /workflows --------- */
+/* Rendered from src/lib/capabilities.ts, which npm run check asserts against.
+   Quiet on purpose: it is a reference table, not a dashboard. */
+.matrix{margin-top:36px;border-top:1px solid var(--rule);padding-top:22px}
+.matrix h2{font-size:21px;margin-bottom:4px}
+.matrix .hint{max-width:64ch}
+/* Wide tables scroll in their own box; the page must never scroll sideways. */
+.scrollx{overflow-x:auto;margin-top:14px}
+.mtable{border-collapse:collapse;width:100%;font-size:14px}
+.mtable th,.mtable td{text-align:left;padding:7px 10px;border-bottom:1px dotted var(--rule);vertical-align:top}
+.mtable thead th{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--grey);border-bottom:1px solid var(--rule)}
+.mtable tbody th[scope="row"]{font-weight:400;font-family:var(--body)}
+.mgroup th{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ochre);padding-top:16px;border-bottom:none}
+/* One column each for the three roles: narrow, so the glyphs line up and the
+   eye can run down a role rather than across a row. */
+.mcell{width:132px}
+.mcell span[aria-hidden]{font-size:15px}
+.m-yes span[aria-hidden]{color:var(--sage)}
+.m-qualified span[aria-hidden]{color:var(--ochre)}
+.m-no span[aria-hidden]{color:var(--grey)}
+.mnote{display:block;font-size:12px;line-height:1.35;color:var(--ink-soft);margin-top:2px}
+.mgate{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft)}
+.mfile{display:block;color:var(--grey);font-size:10.5px;margin-top:2px}
+/* A hole is a finding and should read like one. */
+.mhole{background:rgba(178,58,43,.05)}
+.mhole th[scope="row"]{color:var(--red)}
+.mnotes{margin-top:18px;padding-left:18px;max-width:76ch}
+.mnotes li{font-size:13.5px;color:var(--ink-soft);margin-bottom:7px}
+/* For content that must reach a screen reader but not the page. */
+.visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0}
