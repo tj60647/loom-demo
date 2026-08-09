@@ -89,7 +89,7 @@ Companion to the *why* — now [loom-model-build.md](loom-model-build.md) (autho
 [loom-refactor-spec.md](loom-refactor-spec.md) (work order); historically
 [archive/loom-spec-v1.md](archive/loom-spec-v1.md). This is the *what, exactly*.
 
-**As of:** `dev`, 2026-08-08 — P3.12 auth-side, P3.13 (the cloth on the card), P3.14 (Overlays), the shelf-bounce fix (client reads via `/api`), the faculty browser pass.
+**As of:** `dev`, 2026-08-08 (end of session) — P3.12 auth-side, P3.13, P3.14, the shelf-bounce fix, the faculty browser pass, and a day of TJ's rulings: station 03 → Vocabulary, Reading and Open merged, Weave hidden, Linking scoped to its reading, concepts before evidence, the cloth on the card, Overlays to faculty with a section picker, 03/04 swapped, and `/workflows`. See NEXT_SESSION.md's 08-08 addendum for the ordered list.
 Re-stamp when it reaches master. Line numbers cite that branch and will drift; names
 and shapes are the contract, line numbers are a courtesy.
 

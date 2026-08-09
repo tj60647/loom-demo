@@ -1,330 +1,151 @@
 # Next Session Prompt
 
-## Addendum, 2026-08-08 evening (the cloth comes to the reading — and an open question)
-
-**Read this first, especially the open question at the end.**
-
-Several small commits on `dev`. `npm run check`, `next build` and the suite
-(43 passed / 1 skipped) green throughout; **no migration**.
-
-### What TJ ruled, in order
-
-1. **The reading card speaks its cloth.** The name outright (not a count with
-   the title on hover) plus "edited 3 hours ago" from `cloth.updatedAt`, which
-   the schema already carried. `timeAgo` in `lib/utils`.
-2. **A cloth starts in Reading**, not Linking — "that is where we read and
-   gather notes". Both doors on the card open `/reading/[id]`.
-3. **The cloth's name belongs in Reading too.** `ClothFold` is now its own
-   component, rendered at the head of the capture rail. It stays on 02 ·
-   Linking **only at the whole weave**, which has no Reading station — remove
-   that and the whole weave's cloth becomes uneditable.
-4. **Keep loses the "open your whole weave" hint.** Nothing is stranded:
-   `JourneyNav`'s 02/03/04 stations already route to `/weave` whenever you are
-   not inside a reading. My earlier warning that hiding Weave would orphan the
-   scope was wrong — the bar had it covered all along.
-
-### RESOLVED, same evening — one door
-
-TJ: *"'just read' means they can browse the pdf without having to add passages
-or concepts, seems more procedure than requiring a ui component or path. 'just
-read' happens in a cloth."*
-
-So the reading card has **exactly one door**, and the overlap below is settled
-rather than open:
-
-- **No cloth** — the card body is inert (`.shelfnodoor`, no link, no hover, no
-  pointer cursor) and **Create Cloth** is the only act. Creation stays explicit:
-  a card click never mints a cloth.
-- **A cloth** — the card body opens it at 01 · Reading, and the cloth's row
-  becomes *information* (Title + when last edited) rather than a second control.
-
-The phrase "browsing is not capture" is re-read: it means **a cloth never
-obliges you to capture**, not "a reading may be opened without a cloth". The
-model doc is updated at §Reading card and in the §5 journey line.
-
-**Consequence worth knowing before writing a spec:** `.shelfmain` is a link only
-when a cloth exists. Every spec now enters through **`enterReadingFromCard`** in
-`tests/helpers.ts`, which takes whichever door the card offers — and therefore
-*creates a cloth* the first time it meets an unclothed reading. That is a real
-write; `npm run seed:demo` clears the demo users' cloths.
-
-### The question as it stood before that ruling (kept for the reasoning)
-
-**A cloth and its reading now open the same place.** Once a cloth exists,
-"open the cloth" and "just read" are the same act, because a cloth is a name
-for the work in a scope rather than a separate destination. The card therefore
-has two controls that do one thing, which is what made the flow feel wrong in
-the first place — and moving the destination to Reading (correctly) did not
-dissolve it.
-
-The model then granted three doors (Create Cloth · Open an existing one · **or
-just read**), so collapsing them was a model change rather than a UI tidy —
-which is why it went to TJ rather than being decided here. The ruling above
-took the first option and re-read the third as a procedure.
-
-### Also coming
-
-**Several modes of reading** are expected inside 01 · Reading (TJ). Nothing
-built; noted in the model doc's tab 2 so whoever designs the modes finds it.
-
-## Addendum, 2026-08-08 last (the tab list is settled)
-
-**Read this first. The last structural gap between the model and the build is
-closed.** TJ's call: merge Open into Reading, **hide** Weave until it is
-decided, keep Keep.
-
-One commit on `dev`. `npm run check`, `next build` and the suite (**43 passed /
-1 skipped**) are green; **no migration**.
-
-The journey is now **00 Library · 01 Reading · 02 Linking · 03 Vocabulary ·
-04 Knowledge Graph · 05 Keep**.
-
-### The merge
-
-01 Reading is one station: the text on the left, the **capture log in a rail**
-beside it (`.readinglog`), closed by default and toggled from the viewer's
-toolbar where "← Back to 01 · Open" used to be. The viewer watches its own
-stage with a ResizeObserver, so opening the rail **re-fits the page** rather
-than clipping it — measured, 1500px → 1060px. `OpenTab` takes a `compact` prop
-for the rail (one column; 440px will not hold its two cards). A reference-only
-reading has no text to sit beside, so its capture side is the whole station.
-
-### Weave is hidden, not deleted
-
-`JourneyNav`'s `STATIONS` carries `hidden: true` on Weave — flip it back and the
-station returns. **The `/weave` route still works**, and **Keep now links to
-it**, because hiding the station would otherwise strand the whole-weave
-projections (04 at whole-weave scope is reachable no other way). That link is
-load-bearing until Weave is decided; do not remove it without replacing it.
-
-### One thing worth copying elsewhere
-
-**Station numbers are derived, not written.** `JourneyNav` numbers the *visible*
-stations and exports `stationNumber()`, which the workbench footer uses. So
-hiding Weave renumbered Keep from 06 to 05 in the bar and the footer at once,
-with no gap to look like a bug — and restoring Weave will undo it just as
-quietly. The corollary: **student copy should name a station, not number it.**
-Copy saying "06 · Keep" is now "Keep"; "01 · Open" is "01 · Reading".
-
-### Watch for this if a spec fails oddly
-
-Two traps this pass hit, both worth knowing:
-
-- The reading station is now the **default tab**, so the PDF viewer is on screen
-  immediately — and an unscoped `getByRole("button", {name: /Reading/i})` also
-  matches its "Search this reading" button. `tests/helpers.ts` scopes to
-  `nav[aria-label="The journey"]`.
-- A failed run leaves capture residue on Test User A (duplicate test concepts),
-  which then fails the *next* run for a different reason. `npm run seed:demo`
-  wipes and rebuilds A–D; run it before believing a second failure.
-
-### What remains
-
-- **Weave** — the only structural question left. The refactor spec files it as
-  the future Quilt space (ruling 19); `JourneyNav`'s old comment claimed TJ
-  ratified it as its own station on 8/1, which is an agent's summary and may be
-  an over-claim. Worth settling when Quilts are on the table.
-- **CI's `e2e` gate has never run**: it needs `CI_DATABASE_URL` and
-  `CI_BLOB_READ_WRITE_TOKEN` (deployments.md §CI). Until then only `checks`
-  gates a PR — the 43-test suite does not.
-- **The fresh-GitHub-account sign-in** has still never been run by a human.
-- Next's queue bug (vercel/next.js#90467) is still routed around.
-
-## Addendum, 2026-08-08 latest (a Workflows tab, generated from data)
-
-**Read this first, and note the standing obligation it creates.** TJ asked for
-flow diagrams — one each for student, faculty and admin — in the admin panel,
-"maintained as we refactor the workflows".
-
-One commit on `dev`. `npm run check` (now including `check:workflows`),
-`next build` and the suite (**43 passed / 1 skipped**) are green; **no
-migration** — the tab reads nothing from the database.
-
-### The obligation
-
-**`src/lib/workflows.ts` IS the diagram.** If you change how any of those three
-people move through Loom — a step, a gate, a route, an order — update the
-matching flow in that file **in the same commit**. This is written into
-`AGENTS.md` so it is read every session, and into `docs/contracts.md` §2c-ii.
-
-Adding a step is adding a node and an edge. No coordinate is ever written by
-hand: `src/lib/flowLayout.ts` computes rows from longest-path depth and
-`FlowDiagram` draws whatever it is handed.
-
-### Why it is generated rather than drawn
-
-A hand-drawn diagram fails loudly — it stops matching and someone notices. A
-generated one fails *quietly*, by rendering a graph that is merely wrong. So
-`scripts/check-workflows.ts` (42 assertions, in `npm run check`) fails the build
-on: dangling edge ids, orphan nodes, a `back` edge that does not go back, a
-forward edge that skips a row without being routed around, overlapping boxes,
-and `wrapText` non-determinism. It cannot tell you the picture has fallen behind
-the build — that part is on the person doing the refactor.
-
-### Worth not re-deriving
-
-Three real defects were found by *looking at it*, not by type-checking:
-
-- **React 19 hoists `<title>` into `<head>`**, so an SVG `<title>` per node
-  threw a hydration error. There is none now; the `<details>` list under each
-  diagram is the text alternative, and it is better than a tooltip anyway.
-- **A return drawn from one node's edge to another's cuts straight through any
-  box between them.** Returns now run their horizontal legs in the **row gaps**
-  (box-free by construction) and their vertical legs in lanes on the right —
-  one lane each, since two sharing a line read as one connector.
-- **A forward edge that skips a row is invisible**: nodes paint over edges, so
-  it renders underneath the box between its ends, label and all. The student
-  flow's "or just read" was exactly this. Those now route through lanes on the
-  left.
-
-Access is `getStaffViewer` — admins **and faculty**. The page holds no course
-data whatsoever, and the student flow is the thing an instructor most needs to
-be able to read.
-
-### Still open
-
-- **D4** and the **Open/Reading merge** remain TJ's calls. When either lands,
-  the student flow in `workflows.ts` is part of the work.
-- Next's queue bug (vercel/next.js#90467) is still routed around, not fixed.
-
-## Addendum, 2026-08-08 late (station 03 becomes Vocabulary)
-
-**Read this first. 03 · Vocabulary now holds what the model says it holds; the
-cloth reflection moved to 04.** TJ's call this session.
-
-One commit on `dev`. `npm run check`, `next build` and the full Playwright suite
-(39 passed / 1 skipped) are green; **no migration** — nothing about the data
-changed, only which tab renders it.
-
-### What moved, and why it was safe to move
-
-Model §3 tab 4 says Vocabulary is *the User's holdings*: browse/filter Concepts
-and Link Labels, recurrence, edit Descriptions, merge. Station 03 was holding
-the cloth-reflection prompts and a **second read editor** whose `#readEssence` /
-`#yourRead` wrote the same map fields as 04's `#mapEssence` / `#yourRead2`. So
-nothing had to be invented and nothing was lost:
-
-- **New `VocabularyTab`** (03) — every concept and link label you own, filter on
-  each, descriptions editable in place, recurrence counted, **merge**. It is
-  **UNSCOPED**, and that is the point: a concept does not belong to a reading, a
-  passage does, so the holdings read the same inside a reading as at the whole
-  weave. 01 Open keeps the *reading-scoped* Capture Log.
-- **New `ClothReflection`** (rendered by `MapTab`, 04) — the cloth, the counted
-  prompts, the traced-threads pane, and the whole-weave Capture Log history. It
-  sits directly above the read it feeds, which is what it was always for.
-- **Merge now has exactly one home.** It was on 01 Open; the model puts it on
-  Vocabulary, and judging whether two concepts are one needs the whole list in
-  front of you. `handleMerge` and its state are gone from `OpenTab`.
-- `#readEssence` / `#yourRead` **no longer exist** — grep for them before
-  believing any older spec or note.
-
-### Verified in a browser, not only type-checked
-
-Drove it as Test User A: 03 shows all 8 seeded concepts and 5 link labels *both*
-at `/weave?tab=read` and inside a reading (the unscoped behaviour, confirmed);
-the filter narrows 8 → 2 on "object" and says so when it matches nothing; a row
-opens to its description and Merge. 04 carries the prompts, the cloth SVG and
-the read editor, and the Capture Log renders at the whole weave but **not**
-inside a reading — the pre-existing rule, preserved.
-
-`tests/journey-learner.spec.ts`'s 03 test was rewritten to assert the words
-(and that `#yourRead`/`#clothPrompts` are absent); its 04 test picked up the
-prompt and read assertions. Copy updated in `KeepTab`, `FirstRunWalkthrough`
-and the workbench footer, which all pointed students at the old 03.
-
-### What remains
-
-- **D4** (keep 06 Keep as its own station, or fold it into Linking/Knowledge
-  Graph) and the **Open/Reading merge** are still TJ's calls — untouched. This
-  pass was deliberately compatible with either: 01 Open now holds capture plus
-  its own log, which is the shape the model's merged Reading tab wants.
-- **Next's queue bug** (vercel/next.js#90467) is still routed around, not fixed.
-- The enrolment-time faculty path is still asserted without a browser
-  (`scripts/check-auth.ts --db`), the same untestable seam as the fresh-GitHub
-  smoke test.
-
-## Addendum, 2026-08-08 (faculty walk through a browser, and a door that erred)
-
-**Read this first. The faculty path — carried as untested for three sessions —
-is now walked end to end by the suite, and doing it found one real bug.**
-
-One commit on `dev` after `73bb176`. `npm run check`, `next build` and the full
-Playwright suite (**39 passed / 1 skipped**, the pre-existing skip) are green;
-**no migration** — this is a test identity and a page gate.
-
-### What was blocking it, and what unblocked it
-
-The note said "the backdoor mints Test User A only", and that was the whole
-obstacle. `/api/auth/test-login` now mints a **third identity**, `?as=faculty`:
-`test-faculty@loom.local`, site role **USER**, course membership role
-**FACULTY**, homed in the ensured Faculty Section. That distinction is the
-point — the admin storage state cannot stand in for this, because an ADMIN
-passes every gate and would assert nothing about the narrower door.
-
-One trap worth not re-stepping in: the enrolment upsert now re-sets `role` on
-conflict (so a promotion never leaks between runs) but deliberately **does not
-write `sectionId` for a learner**. Writing it would have unplaced seed-demo's
-Test User A from Section 1 on every global setup, and the Overlays' section
-band would have gone empty — a green-looking failure in a different spec file.
-
-### The bug the browser found
-
-**`/admin/library` had no page-level gate.** `/admin/courses` opens with
-`checkAdmin()`, which redirects; library leaned on `getLibraryOverview()`
-*throwing* `Unauthorized`. That was invisible while only admins could reach the
-shell — but P3.12 taught the layout to admit faculty, so a faculty member who
-typed the URL got **HTTP 500, "This page couldn't load"**, measured, not
-reasoned. It is a closed door either way; it just read as a broken app. Now
-gated the same way the Courses tab is, and `tests/faculty.spec.ts` asserts both
-write tabs redirect rather than error. Verified the route is still **ƒ
-(Dynamic)** in the build output.
-
-**A new page under `/admin` must gate itself** — the layout's check shapes the
-shell, not the authorization.
-
-### Checked and found sound (so nobody re-derives it)
-
-- **Faculty cannot read another course's work.** `getUserLoomDataAsAdmin`
-  scopes every query by `courseId` *and* re-runs `checkCourseFaculty`, and the
-  page clamps the course through `getStaffViewer` first. A bogus user id
-  renders an empty loom rather than leaking one.
-- The roster shows faculty **no** write control — no invite fold, no
-  Make faculty / Return to learner, no Remove, no Withdraw, no section Assign —
-  while keeping Open Loom.
-- Their own learner workspace is untouched (capabilities are additive).
-
-### What remains
-
-- **Next's queue bug is still there** (vercel/next.js#90467), routed around
-  rather than repaired: a *mutation* in flight when a navigation commits can
-  still corrupt the queue's canonical URL. No known user path hits it —
+## Addendum, 2026-08-08 (a long day of TJ's rulings — read this, then the open items)
+
+**Nineteen commits on `dev`, `c3761a0`…`c50c5c4`, all pushed.** `npm run check`
+(now including `check:workflows`), `next build` and the Playwright suite
+(**43 passed / 1 skipped**) are green at the end of every one. **No migration
+all day** — nothing this session changed the database.
+
+This replaces five separate 08-08 addenda written as the day went; they each
+said "read this first", which stopped being useful. Nothing below is lost from
+them.
+
+---
+
+### 1. What TJ ruled, in the order it happened
+
+Each of these is recorded in `docs/loom-model-build.md` (the authority) and
+reflected in `docs/contracts.md` (as built).
+
+- **Station 03 is Vocabulary** — the User's holdings: every Concept and Link
+  Label across all readings, filter, edit Descriptions, **merge** (its only
+  home). The cloth prompts and a *duplicate* read editor moved to the graph tab
+  as `ClothReflection`.
+- **00 Reading and 01 Open merged** into one **Reading** station: the text, with
+  the capture log in a rail beside it.
+- **05 Weave is hidden** (not deleted — `hidden: true` in `JourneyNav`'s
+  `STATIONS`); **Keep stays** as a ratified deviation (D4 answered).
+- **Linking works on this reading's concepts only.** The "from your other
+  readings" band and the across-readings shuttle draw are gone. A concept met
+  elsewhere joins the warp by capturing a passage here under it.
+- **A Concept may precede its evidence** — name it, gloss it, then read for
+  support. "No evidence" is a designation, never a warning.
+- **A cloth starts in Reading**, is *named* there too (`ClothFold` moved), and
+  the reading card is **the one door**: no Create Cloth button, the cloth row is
+  metadata (title, "edited …").
+- **Cloth cardinality**: *one cloth per reading per user, but a cloth may have
+  several users.* Ratified; **not built**. See §5.
+- **Overlays are faculty/admin only**, with a **section picker** (off · All
+  sections · each by name).
+- **03 and 04 swapped**: 03 Knowledge Graph, 04 Vocabulary.
+- **Workflows moved to `/workflows`**, out of `/admin`, into the header beside
+  About. Students see the student flow only.
+
+### 2. The sentence the model now hangs on
+
+> **The Cloth is the evidence; the Projection is the lens — and they work
+> together, because the evidence is subject to interpretation by the reader.**
+
+TJ's, and then TJ's own correction of it, which is the important half: choosing
+which passage to keep is *already* judgment, so a Cloth is never raw evidence
+and its Description is interpretive **by design**. The difference between a
+Cloth and a Projection is **level, not kind** — the Cloth is the reading you
+made while gathering, the Projection re-reads it by arranging.
+
+That one line settles four things that arrived as separate questions: why a
+second cloth is redundant *for interpretation*, why the read paragraph belongs
+to the Projection, why the cloth is named where its evidence is gathered, and
+why Cloth Description stays put. Model doc §2, "Reading · Cloth · Projection".
+
+### 3. Bugs found by looking, not by type-checking
+
+Each of these compiled and shipped fine:
+
+- **`/admin/library` 500'd for faculty.** It had no page-level gate and leaned
+  on `getLibraryOverview` *throwing* `Unauthorized`. Invisible until the shell
+  learned to admit faculty. **House rule: a page under `/admin` gates itself.**
+- **The header's "?" was dead on every `/admin` page.** It dispatches
+  `loom:walkthrough`; `FirstRunWalkthrough` was mounted only on the shelf, Keep
+  and the workbench. Now mounted once in the root layout.
+- **React 19 hoists `<title>` into `<head>`**, so an SVG `<title>` per diagram
+  node threw a hydration error.
+- **JSX drops a literal space after an expression at a line end** — "7
+  conceptsfrom your other readings". Fixed with an explicit `{" "}`.
+- A **faculty viewer's Section band was structurally empty** (they sit in the
+  Faculty Section, which `peersOf` excludes) — which is what the picker fixed.
+
+### 4. Traps that cost time today
+
+- **The suite's summary line never flushes** when a dev-server child holds the
+  output open — this affects a redirect to a file, not just a pipe.
+  **`grep -c "^  ok "` with no `^  x ` is the reliable signal.**
+- **A failed run leaves capture residue** on Test User A (duplicate test
+  concepts) which then fails the *next* run for an unrelated reason.
+  **`npm run seed:demo` before believing a second failure.**
+- `enterReadingFromCard` in `tests/helpers.ts` is now the single way a spec
+  enters a reading — **six spec files** go through it rather than clicking
+  `.shelfmain` themselves.
+- Station numbers are **derived** from the visible stations
+  (`JourneyNav.VISIBLE_STATIONS` / `stationNumber()`), and the workbench footer
+  reads from the same place. **Student copy should name a station, not number
+  it** — "Keep", not "06 · Keep".
+- **`src/lib/workflows.ts` IS the diagram.** A workflow change is not finished
+  until that file says so; `npm run check` fails on dangling edges and orphan
+  nodes but cannot tell you the picture has fallen behind. `AGENTS.md` says so.
+
+### 5. Open — TJ's calls
+
+- **Cloth co-authorship** (the several-users half of the ratified cardinality).
+  Not built. The blocking work is `cloth_member`, membership-based
+  authorization across **84** row-ownership checks, and an export contract that
+  can name more than one author. Full analysis, including why sharing beats
+  partitioning: **`docs/cloth-cardinality.md`**.
+- **05 Weave** — hidden pending a decision on what it becomes. `JourneyNav`'s
+  old comment claimed TJ ratified it as its own station on 8/1; that is an
+  agent's summary, not TJ's word, so treat it as unverified.
+- **The section picker lists the Faculty Section**, which always reads empty
+  (ruling 4 excludes faculty from peer counts). Drop it from the list?
+- **Several modes of reading** are expected inside 01 · Reading (TJ). Nothing
+  built; noted in the model doc's tab 2.
+
+### 6. Next, and ready to start
+
+Two items TJ raised and asked for, in size order:
+
+1. **Capture log → "Notes", as a slide-out.** TJ: *"the current capture log
+   button is a little weird. it seems like it should be 'notes' at least, if
+   not having the ux also changed."* Today it is a rail toggled from the PDF
+   toolbar (`.readinglog`, `openCaptureLog` in `tests/helpers.ts` drives it).
+   The rename is small; the slide-out/toast behaviour is the real work.
+2. **Manual capture for unselectable diagrams**, and possibly a **screen snip**.
+   TJ: the concept maps in *Learning How to Learn* (p56 is the known-damaged
+   sideways one) have no selectable text, so highlighting cannot reach them —
+   which is a better justification for by-hand capture than the copy currently
+   in the fold. **A snip is a bigger feature**: `byte` has no image column and
+   the blob store would need a path for it, so scope it separately.
+
+### 7. Carried over, still true
+
+- **Next's queue bug** (vercel/next.js#90467) is routed around, not fixed;
   re-measure with `scripts/repro-action-bounce.mjs` after a Next upgrade.
-- **The enrolment-time faculty path is still asserted without a browser.** An
-  invitation to the Faculty Section enrolling as FACULTY is covered by
-  `scripts/check-auth.ts --db`; the backdoor mints the membership directly, so
-  it does not exercise `events.signIn`. That is the same untestable seam as the
-  fresh-GitHub-account smoke test, not a new gap.
-- **D4 and the Open/Reading merge** are still TJ's calls. Station 03 is
-  labelled Vocabulary but still holds the read-the-cloth prompts.
-- ~~The [SENSITIVE] `.env.production.local` breaks `next build`~~ — **closed,
-  and it was never the file that needed deleting, only its name.** TJ's call:
-  renamed to **`.env.production.pulled`**. Next auto-loads
-  `.env.production.local` during a production build and nothing else does; its
-  `[SENSITIVE]` `NEXTAUTH_URL` fails the prerender of `/_not-found` with
-  `ERR_INVALID_URL`. `LOOM_ENV_FILE` takes any path, so the rename ends the
-  mv/mv *and* keeps the production escape hatch — verified both ways: `next
-  build` is clean with the file in place, and
-  `LOOM_ENV_FILE=.env.production.pulled` reaches a different Neon endpoint than
-  `.env.local` (checked by hostname, not by trust). Docs updated in README,
-  deployments.md, reading-quality.md and `src/db/index.ts`.
+- **CI's `e2e` gate has never run** — it needs `CI_DATABASE_URL` and
+  `CI_BLOB_READ_WRITE_TOKEN` (deployments.md §CI). Until then only `checks`
+  gates a PR, so the 43-test suite is *not* the gate.
+- **The fresh-GitHub-account sign-in** has still never been run by a human.
+- The pulled Vercel env file is now **`.env.production.pulled`** — `next build`
+  runs clean with it in place, and `LOOM_ENV_FILE` still reaches production.
+  It holds a **real** production `DATABASE_URL` and blob tokens; only
+  `GITHUB_ID`, `GITHUB_SECRET`, `NEXTAUTH_SECRET` and `NEXTAUTH_URL` are
+  `[SENSITIVE]` placeholders.
 
-  Correct the record while you are here: the old note claimed `vercel env pull`
-  redacts `DATABASE_URL` to `[SENSITIVE]` in this file. It does not — that file
-  holds a **real** production connection string and real blob tokens
-  (`BLOB_READ_WRITE_TOKEN`, `BLOB_STORE_ID`, `BLOB_WEBHOOK_PUBLIC_KEY`), added
-  by hand after the pull. Only `GITHUB_ID`, `GITHUB_SECRET`, `NEXTAUTH_SECRET`
-  and `NEXTAUTH_URL` are placeholders. It is live credentials in the working
-  tree, gitignored — treat it as such.
+---
+
+> **Everything below is history.** It is kept for the reasoning and the
+> measurements, not as a description of the build. Where it disagrees with the
+> 08-08 addendum above — and it does, on the station list, the reading card, the
+> Overlays and station 03 — **the addendum above wins**, and
+> `docs/loom-model-build.md` wins over both.
 
 ## Addendum, 2026-08-07 latest (the shelf bounce, fixed at the mechanism)
 
@@ -1150,10 +971,22 @@ Two things that will waste your time if you don't know them:
 
 ```bash
 git status -sb
-npm run check                              # eslint + tsc
-npx tsx scripts/check-migrations.ts        # what Neon actually has
-npm run dev -- -p 3100
+npm run check          # eslint · tsc · remap · scoring · auth · overlay · workflows
+npm run seed:demo      # wipes and rebuilds Test Users A–D; do this before believing a test failure
+npm run dev -- -p 3100 # 3000 is inside a Windows excluded range on this machine
 ```
+
+Then the suite, in its own terminal — **redirect to a file, never a pipe**, and
+read the count rather than waiting for the summary line (see §4 above):
+
+```bash
+npx playwright test --config=playwright.3100.config.ts > run.txt 2>&1
+grep -c "^  ok " run.txt      # 43 is green
+grep    "^  x  " run.txt      # empty is green
+```
+
+`npx tsx scripts/check-migrations.ts` still reports what Neon actually has;
+nothing this session needed it, because no migration was written.
 
 ## Definition of done for the next session
 
