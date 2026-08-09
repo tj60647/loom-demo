@@ -106,22 +106,42 @@ export default function VocabularyTab() {
     ([label, edges]) => matches(label, lq) || edges.some((e) => matches(e.sentence, lq))
   )
 
-  const handleMerge = async (source: Concept) => {
-    const name = (mergeInputs[source.id] ?? "").trim()
-    if (!name) {
-      await notify({
-        title: "Name the concept to keep first.",
-        body: "Type the concept this one merges into, then Merge.",
-      })
-      return
+  /**
+   * Every other concept, as merge targets. Labels that appear more than once
+   * carry their passage count, because that is the only thing on screen that
+   * distinguishes two legal homonyms — and picking the wrong one is not
+   * recoverable ("There is no unmerge").
+   */
+  const mergeTargets = (sourceId: string) => {
+    const seen = new Map<string, number>()
+    for (const c of state.concepts) {
+      const key = c.label.trim().toLowerCase()
+      seen.set(key, (seen.get(key) ?? 0) + 1)
     }
-    const target = state.concepts.find(
-      (c) => c.label.trim().toLowerCase() === name.toLowerCase()
-    )
+    return sortedByLabel(state.concepts.filter((c) => c.id !== sourceId)).map((c) => {
+      const dup = (seen.get(c.label.trim().toLowerCase()) ?? 0) > 1
+      const n = state.bytes.filter((b) => b.conceptIds.includes(c.id)).length
+      return {
+        id: c.id,
+        label: dup ? `${c.label} — ${n} passage${n === 1 ? "" : "s"}` : c.label,
+      }
+    })
+  }
+
+  const handleMerge = async (source: Concept) => {
+    // BY OBJECT, not by label string. `mergeInputs` holds a concept id now,
+    // because a label cannot identify a concept: the model says so outright
+    // ("Identity is by object, not label string") and homonyms are a ratified
+    // legal state. Resolving with `.find()` on the label meant that with two
+    // concepts named "framing" this silently absorbed whichever was created
+    // first — and the confirm below renders `target.label`, identical for
+    // both, so the dialog could not even say which one it was about to take.
+    const targetId = mergeInputs[source.id] ?? ""
+    const target = state.concepts.find((c) => c.id === targetId)
     if (!target || target.id === source.id) {
       await notify({
-        title: target ? "That is this concept." : "No concept by that name.",
-        body: "Merging repairs a duplicate you already have — name the existing concept to keep.",
+        title: "Pick the concept to keep first.",
+        body: "Merging repairs a duplicate you already have — choose the one that stays, then Merge.",
       })
       return
     }
@@ -254,22 +274,39 @@ export default function VocabularyTab() {
                             : "."}
                         </p>
                       ) : (
-                        <p className="ghostnote" style={{ marginTop: "10px", color: "var(--red)" }}>
-                          No passage evidences this yet — every concept should trace to
-                          something you captured.
+                        /* A designation, not a warning (TJ, 2026-08-08: "a
+                           Concept may precede its evidence"; red line 4:
+                           "empty states are visible, not blocked"). This said
+                           "every concept SHOULD trace to something you
+                           captured", in red — an instruction to fix a state
+                           the model made first-class that same week. */
+                        <p className="ghostnote" style={{ marginTop: "10px" }}>
+                          No passage evidences this yet. You may have named it ahead of
+                          finding it, or its passages may have moved on.
                         </p>
                       )}
 
                       <div className="quietrow" style={{ marginTop: "12px" }}>
-                        <input
-                          list="conceptOptions"
-                          placeholder="merge into another concept…"
-                          title="the same idea captured twice? name the concept to keep — this one's passages and threads move onto it"
+                        {/* A picker, not a text field. Typing a NAME to choose
+                            an OBJECT is the bug: two concepts may legally share
+                            one label, and then no amount of typing can say
+                            which. Homonyms carry their passage count so they
+                            can be told apart at the moment it matters. */}
+                        <select
+                          className="tinput inline"
+                          style={{ flex: 1 }}
+                          aria-label={`Merge “${concept.label}” into`}
+                          title="the same idea captured twice? pick the concept to keep — this one's passages and threads move onto it"
                           value={mergeInputs[concept.id] ?? ""}
                           onChange={(e) =>
                             setMergeInputs((p) => ({ ...p, [concept.id]: e.target.value }))
                           }
-                        />
+                        >
+                          <option value="">merge into another concept…</option>
+                          {mergeTargets(concept.id).map((t) => (
+                            <option key={t.id} value={t.id}>{t.label}</option>
+                          ))}
+                        </select>
                         <button
                           className="btn ghost mini"
                           onClick={() => handleMerge(concept)}
@@ -292,12 +329,6 @@ export default function VocabularyTab() {
               )
             })}
           </div>
-          {/* The merge field completes against every concept the student has. */}
-          <datalist id="conceptOptions">
-            {state.concepts.map((c) => (
-              <option key={c.id} value={c.label} />
-            ))}
-          </datalist>
         </div>
 
         <div className="card">

@@ -187,8 +187,15 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
   }
 
   const handleAddConceptOnly = async () => {
-    if (!newConceptOnly) return
-    const existing = state.concepts.find(c => c.label.toLowerCase() === newConceptOnly.toLowerCase())
+    // Trim ONCE, at the top, and compare the trimmed value. This used to match
+    // untrimmed and write trimmed, so "boundary objects " missed the homonym
+    // check entirely and minted a second concept with a byte-identical stored
+    // label — silently, at the exact gesture designed to ask. A trailing space
+    // is what a paste leaves, and what a tapped suggestion can leave.
+    // It also stops " " reaching addConcept, which does not validate.
+    const name = newConceptOnly.trim()
+    if (!name) return
+    const existing = state.concepts.find(c => c.label.toLowerCase() === name.toLowerCase())
     if (existing) {
       // Homonyms are warned, never forbidden (ruling 36): a shared name can
       // be two distinct ideas. Same idea → reuse the one you have.
@@ -204,7 +211,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
     }
     // The gloss travels with the naming: it is the reason you expect to find
     // this, and it is what you will read the candidate passage against.
-    await addConcept(newConceptOnly.trim(), newConceptDef.trim() || undefined)
+    await addConcept(name, newConceptDef.trim() || undefined)
     setNewConceptOnly("")
     setNewConceptDef("")
     flash("named — it shows as no evidence until a passage backs it")

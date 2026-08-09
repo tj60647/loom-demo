@@ -11,7 +11,7 @@ Weave) gates four items; taking it first is worth more than any code below it.
 
 ---
 
-## Phase 0 — defects. No ruling needed, do them now
+## Phase 0 — defects. **DONE 2026-08-09**
 
 Four things that are simply wrong. None needs a decision, none is more than a
 few lines, and each is currently costing something.
@@ -23,8 +23,27 @@ few lines, and each is currently costing something.
 | 0.3 | **`getUserLoomDataAsAdmin` never checks the target is on the roster.** It gates the *course* with `checkCourseFaculty` and then takes `targetUserId` unchecked. A **removed** member's work stays fully readable to faculty; the only thing stopping worse is that the queries are `courseId`-scoped, which is a filter, not a gate. | `admin.ts:473` | small |
 | 0.4 | **`mapKit` gives a student advice.** `buildMapKit` writes *"CONCEPTS (busiest first — **the top few are your primary candidates**)"* and *"**A POSSIBLE ARMATURE** (your largest chain — one spine to hang the rest on)"* into a copyable kit, from `MapTab` — a student tab. Red line 3: *counted, never judged: no scoring, no completion states, **no advice**.* Counting is fine; ranking with an interpretive gloss is not. Reword to describe, not direct. | `mapKit.ts:49,63` | copy only |
 
-**Do 0.1–0.3 in one commit and 0.4 in another** — the first three are
-correctness, the fourth is a red-line reading TJ may want to word himself.
+**A fifth, found while fixing 0.2 and fixed with it.** Directly above the merge
+control, an un-evidenced concept was labelled — in `var(--red)` — *"No passage
+evidences this yet — every concept **should** trace to something you captured."*
+That is an instruction to repair a state the model made first-class the same
+week: *a Concept may precede its evidence* (TJ, 2026-08-08), and red line 4,
+*"empty states are visible, not blocked"*. Now black, and descriptive: "You may
+have named it ahead of finding it, or its passages may have moved on."
+
+**How 0.2 was fixed matters more than that it was.** The bug was not a bad
+lookup — it was asking for a **label** to identify an **object**, when the model
+says outright that "identity is by object, not label string" and homonyms are
+legal. So the text field became a picker holding concept **ids**; homonyms carry
+their passage count, because that is the only thing on screen that tells two of
+them apart, and the choice is not recoverable ("There is no unmerge"). The
+`conceptOptions` datalist lost its last consumer and went with it.
+
+*Copy note for TJ:* 0.4's three headings now read "CONCEPTS (most threads first
+— the number is how many touch each)", "THE LONGEST CHAIN (the most threads that
+connect end to end)" and "NO THREAD TOUCHES THESE YET". Each says what was
+counted and how it was ordered; none says what to do about it. Reword freely —
+the rule is the point, not the wording.
 
 ---
 
@@ -164,8 +183,9 @@ Not features, but the reason to believe any of the above.
 
 ## Where I would start
 
-**Phase 0, then the 05 Weave ruling.** Phase 0 is four small fixes that are
-costing something today and need nobody's permission; the Weave ruling is the
-one answer that changes how much of Phase 2 exists at all.
+~~Phase 0~~ **done 2026-08-09** — five fixes, no rulings spent.
 
-Everything else can wait for those two to land.
+**Next: the 05 Weave ruling** (Phase 1). It is the one answer that changes how
+much of Phase 2 exists at all, and nothing below it should be built first.
+
+Everything else can wait for that to land.

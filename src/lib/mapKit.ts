@@ -2,6 +2,15 @@
 // verbatim from v14 (loom-v14-example.html buildMapKit). Counting and sorting
 // only; the arranging (the thinking) stays with the student. This is the
 // hand-off out of the tool: an exploratory instrument's exit, not a document.
+//
+// "Counting and sorting only" is the whole rule, and three headings here broke
+// it (fixed 2026-08-09). They said "the top few are your PRIMARY CANDIDATES",
+// "one spine to HANG THE REST ON", and "STILL LOOSE (DECIDE: secondary,
+// tertiary, or set aside)" — a ranking with an interpretive gloss, a
+// recommendation, and an instruction to resolve a state red line 4 says is
+// legal. This is a STUDENT surface (MapTab), and red line 3 is "counted, never
+// judged: no scoring, no completion states, NO ADVICE". Every heading may say
+// what was counted and how it was ordered. None may say what to do about it.
 
 import type { Concept, Edge, Tier } from "./types"
 import { allComponents, degreeOf } from "./clothMath"
@@ -46,7 +55,7 @@ export function buildMapKit(
       })
     })
   } else {
-    out += "CONCEPTS (busiest first — the top few are your primary candidates):" + NL
+    out += "CONCEPTS (most threads first — the number is how many touch each):" + NL
     degs.forEach((o) => {
       out += "  [" + o.d + "] " + o.c.label + (o.c.def ? "  —  " + o.c.def : "") + NL
     })
@@ -60,7 +69,7 @@ export function buildMapKit(
 
   const comps = allComponents(concepts, edges)
   if (comps.length && comps[0].edges.length >= 2) {
-    out += NL + "A POSSIBLE ARMATURE (your largest chain — one spine to hang the rest on):" + NL
+    out += NL + "THE LONGEST CHAIN (the most threads that connect end to end):" + NL
     comps[0].edges.forEach((e) => {
       out += "  " + label(e.fromId) + " → " + label(e.toId) + NL
     })
@@ -70,7 +79,7 @@ export function buildMapKit(
   if (unwoven.length) {
     out +=
       NL +
-      "STILL LOOSE (decide: secondary, tertiary, or set aside):" +
+      "NO THREAD TOUCHES THESE YET:" +
       NL +
       unwoven.map((c) => "  " + c.label).join(NL) +
       NL

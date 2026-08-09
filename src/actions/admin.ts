@@ -475,6 +475,26 @@ export async function getUserLoomDataAsAdmin(targetUserId: string, courseIdRaw?:
   if (!courseId) return { concepts: [], bytes: [], edges: [] }
   await checkCourseFaculty(courseId)
 
+  // The TARGET must be on this roster, not merely the viewer's course. This
+  // gated the course and then took targetUserId unchecked; what stopped it
+  // being worse was that the queries below are courseId-scoped — a filter, not
+  // a gate. The gap it left was real: removal is soft (`removedAt`), and every
+  // other surface honours it — sign-in, course resolution, the faculty list,
+  // file access and both overlay bands all check `isNull(removedAt)` — so a
+  // removed member's whole loom stayed readable here alone. Nothing links to
+  // it any more either: `getRoster` omits them, so this closes a door that no
+  // longer has a handle on it.
+  const onRoster = await db
+    .select({ userId: courseMemberships.userId })
+    .from(courseMemberships)
+    .where(and(
+      eq(courseMemberships.courseId, courseId),
+      eq(courseMemberships.userId, targetUserId),
+      isNull(courseMemberships.removedAt)
+    ))
+    .limit(1)
+  if (!onRoster.length) return { concepts: [], bytes: [], edges: [] }
+
   const userConcepts = await db.select().from(concepts).where(and(eq(concepts.userId, targetUserId), eq(concepts.courseId, courseId)))
   const byteRows = await db.select().from(bytes).where(and(eq(bytes.userId, targetUserId), eq(bytes.courseId, courseId)))
   const userEdges = await db.select().from(edges).where(and(eq(edges.userId, targetUserId), eq(edges.courseId, courseId)))

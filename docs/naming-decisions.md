@@ -1,6 +1,10 @@
 # Where the tool decides what the student meant — the naming paths
 
-**Status: OPEN. Raised by TJ, 2026-08-09. Nothing changed in code. TJ's ruling.**
+**Status: PARTLY CLOSED. Raised by TJ, 2026-08-09.** §1's homonym hole and §3's
+trim bug were fixed the same day (Phase 0 of [open-work.md](open-work.md)); they
+were defects, not decisions. **§2 and §4 remain TJ's rulings** — both are
+behaviour changes on the busiest path in the app, and neither should be folded
+in without an answer.
 
 Red line 2 (`loom-model-build.md` §6, binding):
 
@@ -19,9 +23,10 @@ badly enough to be worth correcting in place (§5).
 
 ## 1. Merge is clean — and it is worth saying why
 
-`VocabularyTab.handleMerge` makes the student type the concept to keep; a name
-that matches nothing **refuses rather than guesses** ("No concept by that
-name"); the confirm is `danger: true` and states the consequence — *"Every
+`VocabularyTab.handleMerge` makes the student **choose** the concept to keep
+(a text field until 2026-08-09, see the second caveat below); it refuses rather
+than guesses when nothing is chosen; the confirm is `danger: true` and states
+the consequence — *"Every
 passage and thread of the first will point at the second, and the first goes
 away. There is no unmerge."* Nothing in the repo proposes, ranks or detects a
 merge candidate.
@@ -38,14 +43,17 @@ Two caveats found while confirming it:
   and only warns, so a merge can succeed while its provenance row does not.
   Fine as a design (the graph tables are the source of truth) but it means the
   Capture Log is not a guaranteed record of a destructive act.
-- **Merge resolves its target by label — among homonyms the model explicitly
-  permits.** `state.concepts.find(c => c.label.trim().toLowerCase() === …)`
-  returns the *first* match. Homonyms are a ratified legal state, and
-  `updateConcept` says outright that "identity is by object, not label string".
-  So with two concepts named "framing", merge silently picks one, and the
-  confirm renders `target.label` — **identical for both**, so the dialog cannot
-  tell the student which one it is about to absorb. This is a real hole in an
-  otherwise careful action.
+- **Merge resolved its target by label — among homonyms the model explicitly
+  permits. FIXED 2026-08-09.** It matched with
+  `state.concepts.find(c => c.label.trim().toLowerCase() === …)`, which returns
+  the *first* match. Homonyms are a ratified legal state and `updateConcept`
+  says outright that "identity is by object, not label string" — so with two
+  concepts named "framing", merge silently absorbed one, and the confirm
+  renders `target.label`, **identical for both**, so the dialog could not even
+  say which. The fix was not a better lookup: asking for a *label* to identify
+  an *object* was the bug. The field is now a **picker holding concept ids**,
+  and homonyms carry their passage count, because that is the only thing on
+  screen that tells two of them apart and the act is not recoverable.
 
 ## 2. The three naming paths disagree
 
@@ -75,7 +83,7 @@ note from an assertion into an offer:
 No friction in the common case, no data loss, and the student holds the
 decision. The PDF path needs the same note, which it has never had.
 
-## 3. A real bug: the homonym confirm can be skipped by a trailing space
+## 3. A real bug: the homonym confirm can be skipped by a trailing space — **FIXED 2026-08-09**
 
 `OpenTab.handleAddConceptOnly` matches **untrimmed** and writes **trimmed**:
 
@@ -168,8 +176,7 @@ Each deserves its own look before anyone acts:
 
 ## 7. Recommendation
 
-1. **Fix §3 now** — it is a one-line trim, it is a plain bug, and it defeats a
-   confirm the model requires.
+1. ~~Fix §3~~ — **done 2026-08-09**, along with §1's homonym hole.
 2. **Rule on §2** — the offer-not-assertion change, and giving the PDF path the
    note it never had. This is a behaviour change on the busiest path in the app,
    which is why it is written down rather than done.
