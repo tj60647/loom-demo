@@ -6,6 +6,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import CaptureModal from './CaptureModal';
 import PageSlot from './PageSlot';
 import { useLoom } from '@/components/providers/LoomProvider';
+import { useReadings } from '@/components/providers/ReadingsProvider';
 import { searchReading, getPassagesOverlay } from '@/lib/reads';
 import type { ReadingPageHit } from '@/actions/search';
 import { overlayBlockMessage, type OverlayBand, type PassagesOverlay } from '@/lib/overlay';
@@ -52,6 +53,9 @@ type HighlightEntry = {
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusByteId, initialSearch, onGotoOpenByte, logOpen, onToggleLog }: PdfViewerProps) {
   const { state } = useLoom();
+  // Drawn only for faculty and admins. Not a guard — `overlayViewer()` re-checks
+  // on the server, so a student who forces the request gets an empty overlay.
+  const isStaff = !!useReadings().course?.isStaff;
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [isNarrow, setIsNarrow] = useState(false);
@@ -1319,11 +1323,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </label>
           )}
 
-          {/* Overlay (ruling 28) — a read-only comparison with your discussion
-              section or the whole cohort. No names and no third band: "me +
-              colleague" is not in v1, so nothing here resolves to a person.
-              Off until asked for: the page is yours first. */}
-          {sourceId && (
+          {/* Overlay (ruling 28) — a read-only comparison with a discussion
+              section or the whole cohort. **Faculty and admins only** (TJ,
+              2026-08-08): students do not get this at all, and faculty meet it
+              here because they hold their own learner surfaces alongside the
+              faculty view. No names and no third band, so nothing here
+              resolves to a person. Off until asked for. */}
+          {sourceId && isStaff && (
             <div className="pdf-overlay-ctl" role="group" aria-label="Compare your marks with others">
               {!isNarrow && <span className="label">Overlay</span>}
               <button

@@ -1,20 +1,24 @@
 /**
- * The student Overlays (P3.14, ruling 28): the read-only comparison of your
- * marks with your discussion section's and your cohort's.
+ * The Overlays (ruling 28): the read-only comparison of a section's or the
+ * cohort's marks.
  *
- * Runs as Test User A. Relies on `npm run seed:demo`, which now seeds two
- * colleagues — Test User C and Test User D, both in A's Section 1 — who each
- * captured the SAME passage A did on each reading plus one of their own, and
- * who share two labels between them. Without them every assertion below would
- * pass against an empty comparison, which is exactly the failure this spec
- * exists to catch.
+ * **Faculty and admins only** (TJ, 2026-08-08). They were student-facing when
+ * built; they are not now, so this runs as **Test Faculty** and the last test
+ * asserts a learner is offered nothing at all.
+ *
+ * Relies on `npm run seed:demo`, which seeds Test Users A, C and D with
+ * overlapping captures and shared labels — without them every assertion here
+ * would pass against an empty comparison, which is the failure this spec
+ * exists to catch. Note the COHORT band is the one under test: a faculty
+ * viewer sits in the Faculty Section, and `peersOf` excludes faculty, so their
+ * "section" is structurally empty — see the note in NEXT_SESSION.md.
  *
  * Read-only throughout: nothing here writes, so it needs no cleanup.
  */
 import { test, expect, type Page } from "@playwright/test"
 import { enterReadingFromCard } from "./helpers"
 
-test.use({ storageState: "playwright/.auth/testa.json" })
+test.use({ storageState: "playwright/.auth/faculty.json" })
 test.beforeEach(() => test.setTimeout(120_000))
 
 const READING = "Object Worlds"
@@ -55,13 +59,13 @@ test("the passages overlay shades the section's marks, deepest where they agree"
   await expect(page.locator(".loom-overlay-heat")).toHaveCount(0)
 
   await page.getByRole("group", { name: "Compare your marks with others" })
-    .getByRole("button", { name: "Section" })
+    .getByRole("button", { name: "Cohort" })
     .click()
 
   const bar = page.locator(".pdf-overlay-bar")
   await expect(bar).toBeVisible({ timeout: 20_000 })
   // Counted in people, and the denominator is stated so a count is readable.
-  await expect(bar).toContainText(/\d+ of \d+ in your section (has|have) marked this reading/, {
+  await expect(bar).toContainText(/\d+ of \d+ in your (section|cohort) (has|have) marked this reading/, {
     timeout: 20_000,
   })
   await expect(bar).toContainText("counted, not judged · no names")
@@ -85,18 +89,23 @@ test("the passages overlay shades the section's marks, deepest where they agree"
   }
   expect(shaded, "no page of this reading shows the section's marks").toBe(true)
 
-  // Two colleagues captured the same span, so that run is one shade deeper
-  // than a span only one of them marked. This is the whole point of a heatmap
-  // — a per-span count that never resolves to a person.
-  await expect(page.locator('.loom-overlay-heat[data-heat="2"]').first()).toBeVisible({
-    timeout: 15_000,
-  })
+  // Several people captured the same span, so that run is shaded deeper than
+  // one only a single person marked. This is the whole point of a heatmap — a
+  // per-span count that never resolves to a person.
+  //
+  // Depth, not an exact number: the seed has A, C and D on the same passage,
+  // and how many of them are peers depends on who is looking (the viewer is
+  // always excluded). Pinning "2" broke the moment this spec became a faculty
+  // viewer, for whom A is a peer too.
+  await expect(
+    page.locator('.loom-overlay-heat[data-heat="2"], .loom-overlay-heat[data-heat="3"], .loom-overlay-heat[data-heat="4"]').first()
+  ).toBeVisible({ timeout: 15_000 })
   // The comparison is never a door into anybody: no names, and no handlers.
   await expect(heat.first()).toHaveAttribute("aria-hidden", "true")
 
   // Turning it off takes the wash away and leaves the reading as it was.
   await page.getByRole("group", { name: "Compare your marks with others" })
-    .getByRole("button", { name: "Section" })
+    .getByRole("button", { name: "Cohort" })
     .click()
   await expect(page.locator(".pdf-overlay-bar")).toHaveCount(0)
   await expect(page.locator(".loom-overlay-heat")).toHaveCount(0, { timeout: 15_000 })
@@ -114,8 +123,8 @@ test("the vocabulary overlay counts a word by people, and names nobody", async (
   // Nothing is compared until asked.
   await expect(panel).toContainText("Nothing is compared until you ask")
 
-  await panel.getByRole("button", { name: "My section" }).click()
-  await expect(panel).toContainText(/\d+ of \d+ in your section/, { timeout: 20_000 })
+  await panel.getByRole("button", { name: "The cohort" }).click()
+  await expect(panel).toContainText(/\d+ of \d+ in your (section|cohort)/, { timeout: 20_000 })
 
   // Both colleagues reached for this label, so it counts two PEOPLE — not the
   // four rows their passages make.
@@ -135,29 +144,23 @@ test("the vocabulary overlay counts a word by people, and names nobody", async (
   await expect(page).toHaveURL(/\/reading\//)
 })
 
-test("the gate holds: a reading you have not coded refuses the comparison", async ({ page }) => {
-  await page.goto("/")
-  await loomLoaded(page)
+test.describe("a student is offered no comparison at all", () => {
+  test.use({ storageState: "playwright/.auth/testa.json" })
 
-  // A card the student has captured nothing from says so on its tally, which
-  // is how this spec finds one without hard-coding a title that may be
-  // rescheduled or archived out of the course.
-  const uncoded = page
-    .locator(".shelfcard")
-    .filter({ has: page.getByText("nothing captured here yet") })
-    .first()
-  await expect(uncoded, "every reading is coded — seed a fresh library to test the gate")
-    .toBeVisible({ timeout: 15_000 })
-  await enterReadingFromCard(page, uncoded)
-  await loomLoaded(page)
+  test("neither control is drawn, on the text or in Vocabulary", async ({ page }) => {
+    // Overlays became faculty/admin-only (TJ, 2026-08-08). The old per-reading
+    // capture gate went with them: it existed so the crowd could not pre-code a
+    // student's reading, and there is no student reading one now.
+    await openReadingByHref(page, READING)
+    await page.locator("nav button", { hasText: "Reading" }).click()
+    await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 20_000 })
+    await expect(
+      page.getByRole("group", { name: "Compare your marks with others" })
+    ).toHaveCount(0)
 
-  await page.locator("nav button", { hasText: "Vocabulary" }).click()
-  const panel = page.locator(".card", { hasText: "What others named" })
-  await panel.getByRole("button", { name: "My section" }).click()
-
-  await expect(panel).toContainText("Your marks first", { timeout: 20_000 })
-  await expect(panel).toContainText("The crowd must not pre-code the text")
-  // And nothing of anyone else's leaked in alongside the refusal.
-  await expect(panel.locator(".readitem")).toHaveCount(0)
-  await expect(page).toHaveURL(/\/reading\//)
+    await page.locator("nav button", { hasText: "Vocabulary" }).click()
+    await expect(page.locator(".card", { hasText: "What others named" })).toHaveCount(0)
+    // And their own holdings are untouched — this removed a comparison, not a tab.
+    await expect(page.locator(".lrow[data-concept-id]").first()).toBeVisible({ timeout: 15_000 })
+  })
 })

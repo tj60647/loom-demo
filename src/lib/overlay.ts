@@ -24,7 +24,16 @@ export type OverlayBand = "section" | "cohort"
 export type OverlayBlock =
   | "signed-out"
   | "not-enrolled"
-  /** The gate: you have not captured a passage in this reading yet. */
+  /**
+   * Overlays are a FACULTY and ADMIN capability (TJ, 2026-08-08). Students do
+   * not see them at all — they reach the rest of the workspace, not this.
+   * Faculty get here through their own learner surfaces, which they hold
+   * alongside the faculty view.
+   */
+  | "not-staff"
+  /** The old student gate: you had not captured a passage in this reading yet.
+   *  Retired with the student overlays, kept so a stored/typed value still
+   *  renders a sentence rather than falling through the switch. */
   | "not-coded"
   | "no-section"
   | "no-peers"
@@ -258,8 +267,10 @@ export function overlayBlockMessage(block: OverlayBlock, band: OverlayBand): str
       return "Sign in to compare."
     case "not-enrolled":
       return "An overlay compares you with a course you are enrolled in."
+    case "not-staff":
+      return "Overlays are part of the faculty view."
     case "not-coded":
-      return "Your marks first — capture a passage here and the overlay opens. The crowd must not pre-code the text."
+      return "Your marks first — capture a passage here and the overlay opens."
     case "no-section":
       return "You are not placed in a discussion section yet. Try the cohort."
     case "no-peers":

@@ -2,7 +2,7 @@
 
 import { db } from "@/db"
 import { courseMemberships, courses, sections } from "@/db/schema"
-import { and, eq } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth/next"
 import { authOptions, isAdminUser } from "@/lib/auth"
@@ -39,7 +39,25 @@ export async function getActiveCourse() {
   if (!courseId) return null
 
   const course = await getCourse(courseId)
-  return course ? { id: course.id, name: course.name, term: course.term } : null
+  if (!course) return null
+
+  // `isStaff` rides along because every learner surface already reads this, and
+  // the Overlays are a faculty/admin capability (TJ, 2026-08-08) whose CONTROLS
+  // must not render for a student. It decides what is drawn, never what may be
+  // read — `overlayViewer()` re-checks server-side, so a tampered client gets
+  // an empty overlay, not someone else's marks.
+  const membership = await db
+    .select({ role: courseMemberships.role })
+    .from(courseMemberships)
+    .where(and(
+      eq(courseMemberships.courseId, courseId),
+      eq(courseMemberships.userId, session.user.id),
+      isNull(courseMemberships.removedAt)
+    ))
+    .limit(1)
+  const isStaff = isAdminUser(session.user) || membership[0]?.role === "FACULTY"
+
+  return { id: course.id, name: course.name, term: course.term, isStaff }
 }
 
 /** Appends -2, -3, … until the slug is free. */

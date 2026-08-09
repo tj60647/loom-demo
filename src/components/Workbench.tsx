@@ -9,7 +9,6 @@
 // tiers): a reading's map sorts only against that reading's concepts.
 
 import { useState } from "react"
-import Link from "next/link"
 import dynamic from "next/dynamic"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
@@ -45,8 +44,8 @@ export type Tab = "reading" | "throw" | "read" | "map"
 const FOOT: Record<Tab, [string, string]> = {
   reading: ["READING", "THE TEXT AND YOUR CAPTURES"],
   throw: ["LINKING", "ONE THREAD AT A TIME"],
-  read: ["VOCABULARY", "THE WORDS YOU OWN"],
   map: ["KNOWLEDGE GRAPH", "THE CARD TABLE"],
+  read: ["VOCABULARY", "THE WORDS YOU OWN"],
 }
 
 /** The journey station each workbench tab sits at. */
@@ -88,7 +87,9 @@ export default function Workbench({
   // milliseconds before the workbench appeared.
   const { data: session, status } = useSession()
   const { isLoading, scoped } = useLoom()
-  const tabs: Tab[] = source ? ["reading", "throw", "read", "map"] : ["throw", "read", "map"]
+  // Tab order follows the journey bar: Knowledge Graph (03) before Vocabulary
+  // (04). The keys are legacy — `map` is the graph, `read` is Vocabulary.
+  const tabs: Tab[] = source ? ["reading", "throw", "map", "read"] : ["throw", "map", "read"]
   // `?tab=open` predates the merge and is still in links and bookmarks.
   const requested = (initialTab as string) === "open" ? "reading" : initialTab
   const firstTab: Tab =
@@ -168,7 +169,8 @@ export default function Workbench({
   return (
     <>
       <div className="scopebar">
-        <Link href="/" className="scopeback">‹ library</Link>
+        {/* No "‹ library" here (TJ, 2026-08-08): 00 · Library is in the journey
+            bar directly below, so this was a second door to the same place. */}
         {source ? (
           <>
             <span className="scopetitle">{source.title}</span>

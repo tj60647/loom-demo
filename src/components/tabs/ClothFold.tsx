@@ -89,7 +89,7 @@ export default function ClothFold() {
           travel with the projection. */}
       <p className="hint" style={{ marginTop: 6, color: "var(--ink-soft)" }}>
         This names <b>the cloth</b> — everything you have woven{wholeWeave ? "" : " from this reading"}.
-        A <b>projection</b> on 04 · Knowledge Graph is one arrangement of it, a particular lens,
+        A <b>projection</b> on 03 · Knowledge Graph is one arrangement of it, a particular lens,
         and carries its <i>own</i> title, one-line and description. Keep several projections and
         each keeps its own; they can say quite different things about the same cloth.
       </p>

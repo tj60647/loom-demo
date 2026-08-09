@@ -105,9 +105,9 @@ export default function VocabularyOverlay({
       </h2>
       <p className="hint">
         The same words other people reached for
-        {sourceId ? " in this reading" : " in the readings you have coded"}
-        {" "}— no names, and never anyone&apos;s notes or questions. It opens only where you have
-        coded the reading yourself, so the crowd cannot name a text for you before you have read it.
+        {sourceId ? " in this reading" : " across the course's readings"}
+        {" "}— no names, and never anyone&apos;s notes or questions. Faculty and admins only:
+        a comparison put in front of a student would name the text for them before they had read it.
       </p>
 
       <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>

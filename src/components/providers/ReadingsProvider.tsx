@@ -26,7 +26,15 @@ export type ReadingMeta = {
 }
 
 /** The course these readings belong to — null before it loads, or if none. */
-export type ActiveCourse = { id: string; name: string; term: string }
+export type ActiveCourse = {
+  id: string
+  name: string
+  term: string
+  /** Faculty of this course, or a site admin. Decides whether the Overlay
+   *  controls are drawn at all — students never see them (TJ, 2026-08-08).
+   *  Not an authorization: the overlay actions re-check server-side. */
+  isStaff: boolean
+}
 
 type ReadingsContextValue = {
   readings: ReadingMeta[]

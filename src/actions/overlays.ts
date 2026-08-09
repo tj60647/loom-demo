@@ -37,7 +37,7 @@ import { getServerSession } from "next-auth/next"
 
 import { db } from "@/db"
 import { bytes, byteConcepts, concepts, courseMemberships, edges, sourcePages } from "@/db/schema"
-import { authOptions } from "@/lib/auth"
+import { authOptions, isAdminUser } from "@/lib/auth"
 import { resolveCourseIdForUser } from "@/lib/courses"
 import {
   emptyPassagesOverlay,
@@ -82,7 +82,7 @@ async function overlayViewer(): Promise<Viewer | Blocked> {
   if (!courseId) return { blocked: "not-enrolled" }
 
   const rows = await db
-    .select({ sectionId: courseMemberships.sectionId })
+    .select({ sectionId: courseMemberships.sectionId, role: courseMemberships.role })
     .from(courseMemberships)
     .where(
       and(
@@ -98,6 +98,14 @@ async function overlayViewer(): Promise<Viewer | Blocked> {
   // no cohort they belong to, and inventing one would hand a section's work to
   // someone the section never enrolled.
   if (rows.length === 0) return { blocked: "not-enrolled" }
+
+  // Decision 0 (TJ, 2026-08-08): overlays are a FACULTY and ADMIN capability.
+  // Students never see them. Faculty arrive through their own learner
+  // surfaces, which they hold alongside the faculty view — capabilities are
+  // additive — so the control appears there for them and nowhere for a
+  // student. Enforced here, so no page bug can widen it.
+  const staff = isAdminUser(session.user) || rows[0].role === "FACULTY"
+  if (!staff) return { blocked: "not-staff" }
 
   return { userId, courseId, sectionId: rows[0].sectionId }
 }
@@ -122,26 +130,13 @@ async function peersOf(viewer: Viewer, band: OverlayBand): Promise<string[] | Bl
   return rows.map((row) => row.userId)
 }
 
-/**
- * The readings this viewer has coded — the gate, and at the whole weave the
- * scope as well.
- *
- * Not filtered by course: the question is "did you read this text yourself",
- * and a capture whose `courseId` has not yet been adopted is still the
- * student's own work.
- */
-async function codedReadings(viewer: Viewer, sourceId?: string | null): Promise<string[]> {
+/** The readings a set of people have coded — the whole-weave comparison scope. */
+async function codedBy(userIds: string[]): Promise<string[]> {
+  if (userIds.length === 0) return []
   const rows = await db
     .selectDistinct({ sourceId: bytes.sourceId })
     .from(bytes)
-    .where(
-      and(
-        eq(bytes.userId, viewer.userId),
-        isNotNull(bytes.sourceId),
-        ...(sourceId ? [eq(bytes.sourceId, sourceId)] : [])
-      )
-    )
-
+    .where(and(inArray(bytes.userId, userIds), isNotNull(bytes.sourceId)))
   return rows.map((row) => row.sourceId).filter((id): id is string => !!id)
 }
 
@@ -164,9 +159,10 @@ export async function getPassagesOverlay(
   const viewer = await overlayViewer()
   if (isBlocked(viewer)) return emptyPassagesOverlay(band, viewer.blocked)
 
-  // The gate: your own marks on this reading, first.
-  const coded = await codedReadings(viewer, sourceId)
-  if (coded.length === 0) return emptyPassagesOverlay(band, "not-coded")
+  // The old per-reading capture gate is gone with the student overlays: it
+  // existed so the crowd could not pre-code a student's reading, and there is
+  // no student here to protect. An instructor seeing where a section marked is
+  // the job (they already have /admin/aggregate, ungated).
 
   const peers = await peersOf(viewer, band)
   if (isBlocked(peers)) return emptyPassagesOverlay(band, peers.blocked)
@@ -259,9 +255,10 @@ export async function getPassagesOverlay(
  * What other people named — the Concepts and Links Overlays of the Vocabulary
  * tab (model §2, §3.4).
  *
- * `sourceId` scopes the comparison to one reading; null compares across every
- * reading the viewer has coded, which at the whole weave is what the gate
- * leaves standing.
+ * `sourceId` scopes the comparison to one reading; null compares across the
+ * whole course, which at the whole weave is every reading the peers have
+ * coded. (It used to mean "every reading YOU have coded" — that was the
+ * student gate doing double duty as a scope, and it went with the gate.)
  */
 export async function getVocabularyOverlay(
   sourceIdRaw: string | null,
@@ -271,12 +268,16 @@ export async function getVocabularyOverlay(
   if (isBlocked(viewer)) return emptyVocabularyOverlay(band, viewer.blocked)
 
   const sourceId = (sourceIdRaw ?? "").trim() || null
-  const scope = await codedReadings(viewer, sourceId)
-  if (scope.length === 0) return emptyVocabularyOverlay(band, "not-coded")
 
   const peers = await peersOf(viewer, band)
   if (isBlocked(peers)) return emptyVocabularyOverlay(band, peers.blocked)
   if (peers.length === 0) return emptyVocabularyOverlay(band, "no-peers")
+
+  // One reading, or every reading these peers have coded. It used to be every
+  // reading the VIEWER had coded — the student gate doing double duty as a
+  // scope — which would now hold a faculty member to the texts they happened
+  // to capture in.
+  const scope = sourceId ? [sourceId] : await codedBy(peers)
 
   // A concept is evidenced in a scope when one of its passages came from a
   // reading in it — the derivation src/lib/scope.ts does for the student's own

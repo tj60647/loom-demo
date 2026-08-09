@@ -597,7 +597,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
                         {elsewhere} more passage{elsewhere !== 1 ? "s" : ""} evidence{elsewhere === 1 ? "s" : ""} this concept in your other readings — one concept, evidence from several texts.
                       </p>
                     )}
-                    {/* Merge lives on 03 · Vocabulary (model §3 tab 4), where
+                    {/* Merge lives on 04 · Vocabulary (model §3 tab 4), where
                         you can see every concept you own at once — which is
                         what you need to judge whether two are really one. */}
                     <button

@@ -46,6 +46,17 @@
 > tests enter through `enterReadingFromCard` in `tests/helpers.ts`, which takes
 > whichever door is there — and *creates a cloth* the first time it meets an
 > unclothed reading.
+> **Overlays are faculty/admin only** (2026-08-08, TJ): students see no Overlay
+> control at all. `overlayViewer()` returns `not-staff` for a learner, and the
+> two surfaces (the PDF toolbar band and Vocabulary's "What others named") render
+> only when `getActiveCourse().isStaff` — a *drawing* decision; the actions
+> re-check server-side. The per-reading capture gate is retired with them.
+> Known gap: a faculty viewer's **Section** band is structurally empty, since
+> they sit in the Faculty Section and `peersOf` excludes faculty.
+> **Stations 03 and 04 swapped** (2026-08-08, TJ): **03 Knowledge Graph, 04
+> Vocabulary**. Keys stay legacy — `map` is the graph, `read` is Vocabulary —
+> so `?tab=` is unchanged. The workbench footer and student copy follow the bar,
+> which numbers itself.
 > **Cloth cardinality ratified, not built** (2026-08-08, TJ): **one cloth per
 > reading per user, but a cloth may have several users.** The `onePerScope`
 > unique already matches the first half; the unbuilt half is **several users** —

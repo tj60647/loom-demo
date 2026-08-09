@@ -120,7 +120,7 @@ export default function ClothReflection() {
     if (rec.length) {
       readPrompts.push({
         key: 'your words', gap: false,
-        q: <>You&apos;ve reached for <b>&ldquo;{rec[0][0]}&rdquo;</b> on {rec[0][1].length} threads — it&apos;s becoming one of your own labels. See it with the rest on <b>03 · Vocabulary</b>.</>,
+        q: <>You&apos;ve reached for <b>&ldquo;{rec[0][0]}&rdquo;</b> on {rec[0][1].length} threads — it&apos;s becoming one of your own labels. See it with the rest on <b>04 · Vocabulary</b>.</>,
         move: 'a coinage forming'
       })
     }

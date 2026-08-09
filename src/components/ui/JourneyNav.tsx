@@ -25,8 +25,12 @@ const STATIONS: { key: Station; label: string; hidden?: boolean }[] = [
   { key: "readings", label: "Library" },
   { key: "open", label: "Reading" },
   { key: "throw", label: "Linking" },
-  { key: "read", label: "Vocabulary" },
+  // Knowledge Graph before Vocabulary (TJ, 2026-08-08): you lay the graph out
+  // and read it, and the vocabulary you have collected is what you check
+  // afterwards. Keys stay legacy — `read` is Vocabulary, `map` is Knowledge
+  // Graph, and `?tab=` keeps speaking them (refactor spec §F).
   { key: "map", label: "Knowledge Graph" },
+  { key: "read", label: "Vocabulary" },
   { key: "weave", label: "Weave", hidden: true },
   { key: "keep", label: "Keep" },
 ]

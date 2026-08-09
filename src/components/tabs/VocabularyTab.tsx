@@ -1,6 +1,6 @@
 "use client"
 
-// 03 · Vocabulary — the User's holdings (model §3 tab 4).
+// 04 · Vocabulary — the User's holdings (model §3 tab 4).
 //
 // This tab is deliberately UNSCOPED where every other workbench tab is scoped.
 // A concept does not belong to a reading (a passage does), so your vocabulary
@@ -34,7 +34,8 @@ export default function VocabularyTab() {
     state, scope, scoped,
     editConcept, removeConcept, mergeConcepts, editEdge, flash,
   } = useLoom()
-  const { titleOf } = useReadings()
+  const { titleOf, course } = useReadings()
+  const isStaff = !!course?.isStaff
   const { confirm, notify } = useDialog()
 
   const [conceptFilter, setConceptFilter] = useState("")
@@ -391,10 +392,14 @@ export default function VocabularyTab() {
         </div>
       </div>
 
-      {/* The Concepts and Links Overlays (ruling 28). Below your own holdings,
-          not beside them: the comparison is a second look at words you already
-          have. Gated per reading on having coded it yourself, server-side. */}
-      <VocabularyOverlay sourceId={soleSourceId(scope)} ownCaptureCount={scoped.bytes.length} />
+      {/* The Concepts and Links Overlays (ruling 28) — **faculty and admins
+          only** (TJ, 2026-08-08). Students never meet this; faculty do, here,
+          because they hold their own learner surfaces alongside the faculty
+          view. Below the holdings, not beside them: the comparison is a second
+          look at words you already have. Re-checked server-side. */}
+      {isStaff && (
+        <VocabularyOverlay sourceId={soleSourceId(scope)} ownCaptureCount={scoped.bytes.length} />
+      )}
     </>
   )
 }

@@ -138,7 +138,11 @@ What this settles, and where each was ruled:
 
 **Search** — one capability, four scopes: **this Reading** (in the Reading tab) · **all Readings** · **my Lists** · **everything** (Lists AND Readings, results grouped by kind: Reading text · Concepts · Links · own Passages/Notes/Glosses). Scopes 2–4 live in a **persistent search field** across tabs. Plain full-text search; no model in the loop — a match is a fact about the text.
 
-**Overlays** — read-only comparisons at me + colleague · Discussion Section · Cohort:
+**Overlays** — read-only comparisons at Discussion Section · Cohort.
+- **FACULTY AND ADMINS ONLY** (ratified 2026-08-08, TJ). Students never meet them. Faculty reach them through their *own* learner surfaces — Library · Reading · Linking · Knowledge Graph · Vocabulary · Keep — which they hold alongside the faculty view, capabilities being additive.
+- The per-Reading capture gate went with the student overlays: it existed so the crowd could not pre-code a *student's* reading, and there is no student reading one. An instructor seeing where a section marked is the job — `/admin/aggregate` was always ungated.
+- **Open:** the *Section* band has no referent on the learner surfaces for faculty. They sit in the Faculty Section, and the peer query excludes faculty, so "your section" is structurally empty for them. Per-section comparison has a picker at `/admin/aggregate`; whether these surfaces need one, or should offer Cohort only, is undecided.
+- Bands (superseded phrasing, kept for the shape) — me + colleague · Discussion Section · Cohort:
 - Passages Overlay (highlight heatmap) — Reading tab.
 - Concepts Overlay (incl. Definitions where possible) and Links Overlay — Vocabulary tab.
 - Also available in the faculty view at Section/Cohort granularity.
