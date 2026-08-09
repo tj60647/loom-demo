@@ -112,3 +112,40 @@ test("faculty keep their own learner workspace", async ({ page }) => {
   await expect(page).toHaveURL(/\/$/, { timeout: 15_000 })
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
 })
+
+test("the student lens hides every staff surface, and gives a way back", async ({ page }) => {
+  // TJ, 2026-08-09: "i think we need a 'view as student' flag by the
+  // admin/faculty pill in the header." Its failure mode is SILENT — a lens
+  // that leaves staff chrome on screen is worse than none, because it invites
+  // a faculty member to conclude a student sees something they do not. So this
+  // asserts the absence, not just the presence.
+  await page.goto("/")
+  const nav = page.locator('nav[aria-label="The journey"]')
+  const pill = page.locator("header .pill.beaten")
+  const staff = nav.locator(".staffgroup a")
+
+  await expect(pill).toHaveText("Faculty", { timeout: 15_000 })
+  await expect(staff).toHaveCount(2)
+
+  await page.locator("header button", { hasText: "View as student" }).click()
+
+  // Everything staff, gone — and the pill with it, since the lens masks the
+  // course's isStaff/isAdmin rather than each consumer.
+  await expect(page.locator("header button", { hasText: "Viewing as student" }))
+    .toBeVisible({ timeout: 15_000 })
+  await expect(staff).toHaveCount(0)
+  await expect(pill).toHaveCount(0)
+
+  // Workflows is decided on the SERVER, which is why the flag is a cookie: a
+  // client-only mask could not have reached this one. A student reads their
+  // own flow, so the picker has nothing to pick between and hides itself.
+  await page.goto("/workflows")
+  await expect(page.locator(".flowpicker button")).toHaveCount(1, { timeout: 15_000 })
+
+  // The way back, from an ordinary learner surface — the toggle draws from the
+  // UNMASKED role for exactly this reason.
+  await page.goto("/")
+  await page.locator("header button", { hasText: "Viewing as student" }).click()
+  await expect(pill).toHaveText("Faculty", { timeout: 15_000 })
+  await expect(staff).toHaveCount(2)
+})

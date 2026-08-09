@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/db"
+import { viewingAsStudent } from "@/lib/viewAsServer"
 import {
   bytes,
   courseMemberships,
@@ -213,7 +214,12 @@ export async function getSources(courseIdRaw?: string | null) {
     ? await resolveCourseIdForUser(session.user.id, courseIdRaw)
     : await resolveCourseId(courseIdRaw)
 
-  const admin = isAdminUser(session?.user)
+  // An admin's shelf includes UNPUBLISHED readings; a student's does not. The
+  // student lens has to reach this or "view as student" would show a row no
+  // student can see (TJ, 2026-08-09). It only ever NARROWS — withhold, never
+  // grant. Deliberately not applied to `authorizeSourceAccess` below: that is
+  // an authorization path, and the lens is a display preference.
+  const admin = isAdminUser(session?.user) && !(await viewingAsStudent())
 
   const rows = courseId
     ? await db

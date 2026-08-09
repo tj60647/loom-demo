@@ -38,6 +38,15 @@ export type ActiveCourse = {
    *  Faculty are staff but not admin — the journey bar grades the staff group
    *  by this (TJ, 2026-08-09). Not an authorization; every page re-gates. */
   isAdmin: boolean
+  /**
+   * Staff REGARDLESS of the student lens — the one field that must not be
+   * masked, because it is what draws the control for taking the lens off.
+   * Use this for nothing else: every "should this be drawn?" question is
+   * `isStaff` / `isAdmin` above, which the lens does mask.
+   */
+  staffTruly: boolean
+  /** The student lens is on. See src/lib/viewAs.ts. */
+  viewingAsStudent: boolean
   /** The course's sections, for the Overlay picker. Empty for a student. */
   sections: { id: string; name: string }[]
 }

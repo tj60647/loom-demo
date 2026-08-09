@@ -234,6 +234,49 @@ changed and the tab did not. Widening the key would remount the bench and
 destroy the drafts `KEEP_ALIVE` exists to protect. It is now a callback the
 Workbench owns (`onGotoVocabulary`), verified by clicking it.
 
+### 6e. View as student — a lens, not a lock
+
+TJ asked whether *"What others named — counted, not judged"* was for students.
+**It is faculty/admin only** and always was (`VocabularyTab`'s `isStaff` gate,
+re-checked by `overlayViewer()`) — the 08-08 ruling holds. It read as out of
+place because it sits inside the faculty member's **own learner surface** with
+nothing saying whose view it is. Hence the flag.
+
+- **A cookie** (`src/lib/viewAs.ts` + `viewAsServer.ts`), not client state,
+  because three differences are decided on the server: `/workflows` renders
+  three flows for staff and one for a student; the Library query returns
+  `isVisible=false` rows to an admin; and `getActiveCourse` is what tells every
+  client surface it is staff at all. A URL param was rejected — `/keep` is
+  prerendered, `useSearchParams` already forced a Suspense boundary once, and
+  the header's plain `<a href>` navigations would drop it silently.
+- **Masked once**, in `getActiveCourse`, so every consumer goes quiet together
+  and none of them has to know the lens exists. `staffTruly` rides along
+  **unmasked, for one purpose**: drawing the control that takes the lens off.
+  Without it a staff member could put the lens on and have no way back.
+- **Withholds, never grants.** Every use hides a control or NARROWS a query, so
+  a student who sets the cookie by hand gets what they already had. It is not a
+  security boundary and `authorizeSourceAccess` is deliberately untouched.
+- Turning it on while standing on `/admin` returns you to the Library — a
+  student cannot be there, and with the staff group masked nothing on the page
+  would admit it. The `/admin` gate itself is unchanged: a lens, not a lock.
+- **The header pill now reads from the COURSE, not the session.**
+  `session.user.isAdmin` is the site role and the lens cannot touch it — which
+  is exactly how a "viewing as student" header would have kept wearing an Admin
+  pill. It shows **Admin** / **Faculty** (faculty had none before), and the
+  duplicate **Administration** and **Cohort Map** buttons are gone: the staff
+  group replaced them, finishing §6d.
+
+**Limits of the illusion, honestly.** The shelf count did not change under test
+because **all 23 seeded readings are visible** — the unpublished path is right
+but unexercised by this data. And a faculty member sits in the Faculty Section,
+which `peersOf` excludes, and their own loom is usually empty: the lens shows
+what a student's Loom *looks like*, never what a given student's *contains*.
+`/admin/user/[id]` stays the tool for that.
+
+Covered by `tests/faculty.spec.ts` — "the student lens hides every staff
+surface, and gives a way back", which asserts **absence**, because the failure
+mode here is silent.
+
 ### 7. Traps this session
 
 - **`overflow: hidden` vs `overflow: clip` on `.pdf-body`.** Clip makes no

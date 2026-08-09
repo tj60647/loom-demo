@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/db"
+import { viewingAsStudent } from "@/lib/viewAsServer"
 import { courseMemberships, courses, sections } from "@/db/schema"
 import { and, asc, eq, isNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
@@ -59,8 +60,17 @@ export async function getActiveCourse() {
   // Faculty hold the read-side of their own courses; the library and course
   // managers are write surfaces and stay admin's. Same rule the /admin layout
   // and AdminNav already enforce — this only carries it to the journey bar.
-  const isAdmin = isAdminUser(session.user)
-  const isStaff = isAdmin || membership[0]?.role === "FACULTY"
+  const adminTruly = isAdminUser(session.user)
+  const staffTruly = adminTruly || membership[0]?.role === "FACULTY"
+
+  // The student lens (TJ, 2026-08-09). Masked HERE, once, so that every client
+  // surface gated on isStaff/isAdmin goes quiet together and no consumer has to
+  // know the lens exists. The unmasked truth rides along as `staffTruly`, for
+  // exactly one purpose: drawing the control that takes the lens off again.
+  // Without it a staff member could put the lens on and have no way back.
+  const asStudent = staffTruly && (await viewingAsStudent())
+  const isAdmin = adminTruly && !asStudent
+  const isStaff = staffTruly && !asStudent
 
   // The sections a staff viewer may overlay. Empty for a student — they see no
   // Overlay control at all, so the list would only be a leak of names.
@@ -72,7 +82,11 @@ export async function getActiveCourse() {
         .orderBy(asc(sections.name))
     : []
 
-  return { id: course.id, name: course.name, term: course.term, isStaff, isAdmin, sections: courseSections }
+  return {
+    id: course.id, name: course.name, term: course.term,
+    isStaff, isAdmin, sections: courseSections,
+    staffTruly, viewingAsStudent: asStudent,
+  }
 }
 
 /** Appends -2, -3, … until the slug is free. */

@@ -6,6 +6,7 @@ import { db } from "@/db"
 import { courseMemberships } from "@/db/schema"
 import { authOptions, isAdminUser } from "@/lib/auth"
 import { resolveCourseIdForUser } from "@/lib/courses"
+import { viewingAsStudent } from "@/lib/viewAsServer"
 import WorkflowsBoard from "@/components/admin/WorkflowsBoard"
 
 /**
@@ -44,6 +45,10 @@ export default async function WorkflowsPage() {
       isStaff = membership[0]?.role === "FACULTY"
     }
   }
+  // The student lens (TJ, 2026-08-09). Staff read all three flows and a student
+  // reads their own, so without this "view as student" would still show three —
+  // and this page is decided on the server, where a client mask cannot reach.
+  if (isStaff && (await viewingAsStudent())) isStaff = false
 
   return (
     <main style={{ padding: "20px" }}>
