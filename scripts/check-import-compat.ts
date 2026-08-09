@@ -81,6 +81,60 @@ assert(
   "the concept list changed, which means the sniff is reading the wrong branch"
 )
 
+/**
+ * The import confirm must not describe a file by what survived reading it.
+ *
+ * `parseImport` drops a concept with a blank label, and then drops any link
+ * left dangling by that drop. Both arrays it returns are therefore counts of
+ * what LANDS — and Keep's confirm quoted them as "It holds N concepts …", on
+ * the branch that replaces the student's cloth outright. `dropped` is what
+ * lets the dialog say the other number, so it is asserted here rather than
+ * trusted: the losses are invisible by construction, and a round-trip test
+ * cannot see them because the current code never EMITS a blank-label concept.
+ */
+console.log("\nimport losses — the file's contents and what arrives are different numbers")
+
+const lossy = parseImport(
+  JSON.stringify({
+    student: "Test User A",
+    concepts: [
+      { id: "c1", label: "boundary objects" },
+      { id: "c2", label: "   " }, // blank after trim — dropped
+      { id: "c3", label: "" }, // blank — dropped
+    ],
+    passages: [
+      { id: "b1", conceptIds: ["c1"], content: "kept" },
+      { id: "b2", conceptIds: ["c1"], content: "" }, // no text — dropped
+    ],
+    edges: [
+      { id: "e1", fromId: "c1", toId: "c1", sentence: "kept" },
+      { id: "e2", fromId: "c1", toId: "c2", sentence: "dangles onto a dropped concept" },
+      { id: "e3", fromId: "c3", toId: "c1", sentence: "dangles the other way" },
+    ],
+  })
+)
+
+assert(
+  lossy.concepts.length === 1 && lossy.dropped.concepts === 2,
+  "a blank-label concept is dropped, and the drop is counted",
+  `arrived ${lossy.concepts.length}, reported dropped ${lossy.dropped.concepts}; expected 1 and 2`
+)
+assert(
+  lossy.edges.length === 1 && lossy.dropped.edges === 2,
+  "a link left dangling by that drop goes too, and is counted",
+  `arrived ${lossy.edges.length}, reported dropped ${lossy.dropped.edges}; expected 1 and 2`
+)
+assert(
+  lossy.passages.length === 1 && lossy.dropped.passages === 1,
+  "a text-less passage is dropped, and is counted",
+  `arrived ${lossy.passages.length}, reported dropped ${lossy.dropped.passages}; expected 1 and 1`
+)
+assert(
+  now.dropped.concepts === 0 && now.dropped.edges === 0 && now.dropped.passages === 0,
+  "a clean file reports no losses, so the dialog stays quiet",
+  `got ${JSON.stringify(now.dropped)}; a false loss would warn on every ordinary import`
+)
+
 console.log(
   failures === 0
     ? `\n[check-import-compat] all ${checks} assertions passed`

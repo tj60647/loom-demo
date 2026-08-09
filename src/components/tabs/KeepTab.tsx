@@ -96,9 +96,30 @@ export default function KeepTab() {
       }
 
       const cloth = parsed.cloth
+      // These counts are what will ARRIVE, not what the file contains: the
+      // parser drops blank-label concepts and any link left dangling by that
+      // drop. The sentence used to open "It holds …" and then quote them,
+      // which described the file by what survived reading it — on the one
+      // branch here that destroys work. Say both numbers, and only mention the
+      // loss when there is one.
+      const plural = (n: number, word: string) => `${n} ${word}${n !== 1 ? "s" : ""}`
+      /** "a, b and c" — the losses are a list a person reads, not a join(", "). */
+      const listOf = (parts: string[]) =>
+        parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0]
+      const lostParts = [
+        cloth.dropped.concepts ? `${plural(cloth.dropped.concepts, "concept")} with no label` : null,
+        cloth.dropped.edges ? `${plural(cloth.dropped.edges, "thread")} left with nothing to join` : null,
+        cloth.dropped.passages ? `${plural(cloth.dropped.passages, "passage")} with no text` : null,
+      ].filter((p): p is string => p !== null)
       const ok = await confirm({
         title: "Replace your cloth with this file?",
-        body: `It holds ${cloth.concepts.length} concept${cloth.concepts.length !== 1 ? "s" : ""}, ${cloth.passages.length} passage${cloth.passages.length !== 1 ? "s" : ""}, ${cloth.edges.length} thread${cloth.edges.length !== 1 ? "s" : ""} and ${cloth.maps.length} projection${cloth.maps.length !== 1 ? "s" : ""}. What is on the table now is replaced, not merged. Your weaving history is kept either way.`,
+        body:
+          `${plural(cloth.concepts.length, "concept")}, ${plural(cloth.passages.length, "passage")}, ` +
+          `${plural(cloth.edges.length, "thread")} and ${plural(cloth.maps.length, "projection")} will arrive. ` +
+          (lostParts.length
+            ? `The file also holds ${listOf(lostParts)}, which cannot be read and will not arrive — lost either way, but worth knowing before you replace what you have. `
+            : "") +
+          `What is on the table now is replaced, not merged. Your weaving history is kept either way.`,
         confirmLabel: "Replace my cloth",
         danger: true,
       })

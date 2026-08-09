@@ -247,6 +247,21 @@ export type ParsedImport = {
   maps: { key: string; scopeKey: string; name: string; essence: string; read: string; tiers: Record<string, Tier> }[]
   /** Per-map geometry keyed by map *key*, inner keys concept/edge keys. */
   mapViews: Record<string, CardTableView>
+  /**
+   * What the file held that will NOT arrive.
+   *
+   * The arrays above are already filtered — a concept with a blank label is
+   * dropped, and so is any link left dangling by that drop. Every count a
+   * caller can read is therefore a count of what LANDS, and the import confirm
+   * was presenting them as *"It holds N concepts …"*: a claim about the file,
+   * measured after the losses. That confirm is the **destructive** one ("What
+   * is on the table now is replaced, not merged"), so a student approved a
+   * replace without being told what the file would lose on the way in.
+   *
+   * Zeroes for a clean file, which is the common case — a caller should say
+   * nothing at all rather than announce that nothing was dropped.
+   */
+  dropped: { concepts: number; passages: number; edges: number }
 }
 
 function str(v: unknown): string {
@@ -383,13 +398,19 @@ export function parseImport(raw: string): ParsedImport {
       sentence: str(e.sentence),
       handle: str(e.handle),
     }))
+  // Counted here, before the legacy triples below are appended, so this is the
+  // number of LINKS the file lost — not a diff against a list that grew again.
+  let droppedEdges = rawEdges.length - edges.length
 
   // Legacy v2/v3: triples become edges; the linked noticing's text is the sentence.
   if (Array.isArray(data.triples)) {
     const noticings = Array.isArray(data.noticings) ? (data.noticings as Record<string, unknown>[]) : []
     const noticingText = (id: unknown) => str(noticings.find((n) => n.id === id)?.text)
     ;(data.triples as Record<string, unknown>[]).forEach((t, i) => {
-      if (!conceptKeys.has(str(t.fromId)) || !conceptKeys.has(str(t.toId))) return
+      if (!conceptKeys.has(str(t.fromId)) || !conceptKeys.has(str(t.toId))) {
+        droppedEdges++
+        return
+      }
       edges.push({
         key: str(t.id) || `t-${i}`,
         fromKey: str(t.fromId),
@@ -500,6 +521,11 @@ export function parseImport(raw: string): ParsedImport {
     cardTable,
     maps,
     mapViews,
+    dropped: {
+      concepts: rawConcepts.length - concepts.length,
+      passages: rawPassages.length - passages.length,
+      edges: droppedEdges,
+    },
   }
 }
 
