@@ -133,8 +133,12 @@ export default function Shelf() {
 
   const readingCard = (s: ReadingMeta) => {
     const tally = tallies.get(s.id)
-    // 0 or 1 today — the schema keeps one cloth per scope for now — but the
-    // card renders a list, so several cloths per reading lands here for free.
+    // 0 or 1 today: the schema's `onePerScope` unique allows exactly one cloth
+    // per (user, course, reading). Several per reading is ratified (TJ,
+    // 2026-08-08 — a Base Cloth plus "Create new cloth") but NOT built, and it
+    // no longer "lands free" here: this card has one door, so several cloths
+    // need a rule for which one it opens, and a cloth needs an identity of its
+    // own — today it is addressed by scope key, not id. See the model doc.
     const clothsHere = state.cloths.filter((c) => c.scopeKey === s.id)
     // Exactly ONE door per card (TJ, 2026-08-08). "Just read" is a procedure,
     // not a path — you browse inside a cloth without capturing anything — so

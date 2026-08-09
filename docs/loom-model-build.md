@@ -46,7 +46,12 @@ The object model, semantics, and UI structure for Loom v1. This is the authority
 
 **Cloth** = Cloth Title + Cloth Description + one Reading + Passages + Concepts (referenced) + Links + Capture Log + Projections.
 - Cloth Title ≠ Reading Title — a sentence or headline. Cloth Description = a short interpretation of the Reading.
-- One Cloth = one Reading = one User. Multiple Cloths per Reading per User allowed.
+- One Cloth = one Reading = one User. **Several Cloths per Reading per User are allowed** — ratified 2026-08-08 (TJ), and the Reading card is shaped for it:
+  - Every Reading has a **Base Cloth** — the default, always there, never asked for. A Reading is therefore never door-less: opening it opens the Base Cloth. (This is what makes "just read happens in a Cloth" work without an inert card.)
+  - Beside it, **Create new cloth** adds another. *That* creation stays explicit; the Base Cloth's does not, because it is the reading's default state rather than an act.
+  - Each Cloth shows as its own row — Title (or "Base cloth") and when it was last edited — and each row is its own door.
+- **NOT YET BUILT** (as of 2026-08-08). The schema enforces `onePerScope`: `unique(userId, courseId, scopeKey)` on `cloth`, and a Cloth is addressed *by scope*, not by id — `scope.key` is the Reading id, `activeCloth` resolves by it, `updateCloth(data, scopeKey)` writes by it.
+- **The question that decides the size of it: do two Cloths on one Reading share its Passages, or partition them?** The definition above gives a Cloth its own Passages, Links and Capture Log — but `byte`, `edge` and `map` carry **no `clothId`**; they hang off the Reading (`byte.sourceId`) and the scope key. So today a Cloth is only a Title and a Description over one Reading's work, which is why a Reading and its Cloth "kind of mean the same thing" (TJ). Partitioning is a migration plus a rewrite of `src/lib/scope.ts` and everything that reads it; sharing makes a second Cloth a second *reading* of the same evidence. **Undecided — do not implement either until it is.**
 
 **Passage** = Characters (Beginning → Ending Point) + Time Stamp + Concept pointers [0..n] + Notes + Questions + Pull-quote Flag + Passage Tier.
 - Anchoring contract: offsets computed against canonical server-extracted page text, hashed (contentHash) so drift is detectable.
