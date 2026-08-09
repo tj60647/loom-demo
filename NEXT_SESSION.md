@@ -408,6 +408,25 @@ where height is worth most. Staff items are 14.5px with tighter side padding;
 one row now down to 1440, two rows at 1280 and below, which is fair for twelve
 items.
 
+### 6i. The plan for what is outstanding
+
+**[docs/open-work.md](docs/open-work.md)** orders everything left, and says why
+in that order. The two things worth knowing without opening it:
+
+- **05 Weave is the ruling that gates the most.** The whole-weave Cloth, the
+  whole-weave Projections and `ShelfSearch`'s three `/weave` links are all
+  stranded by the 2026-08-09 ruling — and if Weave comes back as a station, they
+  un-strand themselves. Building viewers for them first means building twice.
+- **`mapKit` is a confirmed red-line-3 finding, not a lead.** `buildMapKit`
+  writes *"the top few are your primary candidates"* and *"A POSSIBLE ARMATURE —
+  one spine to hang the rest on"* into a copyable kit, from `MapTab`, which is a
+  **student** tab. Red line 3 is "counted, never judged … **no advice**".
+  Counting is fine; ranking with an interpretive gloss is not.
+
+Phase 0 of that plan is four defects that need no ruling: the trim bug, merge
+picking among homonyms by label, `getUserLoomDataAsAdmin` not checking the
+target's membership, and the mapKit copy.
+
 ### 7. Traps this session
 
 - **`overflow: hidden` vs `overflow: clip` on `.pdf-body`.** Clip makes no
