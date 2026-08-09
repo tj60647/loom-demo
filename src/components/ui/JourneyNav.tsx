@@ -119,6 +119,11 @@ const STAFF_ITEMS: { href: string; label: string; adminOnly?: boolean }[] = [
   // Header.tsx). It sits here for staff because they are the ones who read all
   // three flows, and because the header should not carry it twice.
   { href: "/workflows", label: "Workflows" },
+  // Its own tab, not a section under the diagrams (TJ, 2026-08-09): the flows
+  // are a picture of movement and this is a table of permission, and a reader
+  // looking for one should not have to scroll past the other. Staff only —
+  // it cites the file and line that enforces each row.
+  { href: "/access", label: "Access" },
 ]
 
 /** Why a station is greyed. Says what to do, never what went wrong. */

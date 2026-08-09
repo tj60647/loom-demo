@@ -49,6 +49,7 @@ test("the nav offers the read side only — no Readings, no Courses", async ({ p
   // with no staff group to carry it. It is still not an admin surface: a
   // student reads their own flow, and gets the header link instead.
   await expect(staff.getByRole("link", { name: "Workflows" })).toBeVisible()
+  await expect(staff.getByRole("link", { name: "Access" })).toBeVisible()
   await expect(page.locator('header a[href="/workflows"]')).toHaveCount(0)
 
   // The write surfaces are absent from the bar, not merely disabled — the
@@ -127,7 +128,7 @@ test("the student lens hides every staff surface, and gives a way back", async (
   const staff = nav.locator(".staffgroup a")
 
   await expect(pill).toHaveText("Faculty", { timeout: 15_000 })
-  await expect(staff).toHaveCount(3)   // Roster · Cohort Graph · Workflows
+  await expect(staff).toHaveCount(4)   // Roster · Cohort Graph · Workflows · Access
 
   await page.locator("header button", { hasText: "View as student" }).click()
 
@@ -153,5 +154,22 @@ test("the student lens hides every staff surface, and gives a way back", async (
   await page.goto("/")
   await page.locator("header button", { hasText: "Viewing as student" }).click()
   await expect(pill).toHaveText("Faculty", { timeout: 15_000 })
-  await expect(staff).toHaveCount(3)
+  await expect(staff).toHaveCount(4)
+})
+
+test("Workflows and Access keep the frame, and Access is staff only", async ({ page }) => {
+  // TJ, 2026-08-09: "the workflows tab should behave like the others, change
+  // what is below, not replacing the frame." These used to be a bare <main>,
+  // so reaching one from the bar made the bar itself disappear.
+  for (const route of ["/workflows", "/access"]) {
+    await page.goto(route)
+    await expect(page.locator('nav[aria-label="The journey"]'), `${route} keeps the journey`)
+      .toBeVisible({ timeout: 15_000 })
+    await expect(page.locator(".scopebar"), `${route} keeps the scopebar`).toBeVisible()
+    await expect(page.locator("footer"), `${route} keeps the footer`).toBeVisible()
+  }
+  await expect(page.locator(".mtable")).toBeVisible()
+  // The matrix left the workflows page when it became its own tab.
+  await page.goto("/workflows")
+  await expect(page.locator(".mtable")).toHaveCount(0)
 })

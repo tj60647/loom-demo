@@ -5,8 +5,9 @@ import { CAPABILITIES, MATRIX_NOTES, type Access, type CapabilityGroup } from "@
 /**
  * Who can do what, rendered from src/lib/capabilities.ts.
  *
- * Beside the flows because it answers the question they raise: the diagrams
- * show how each person MOVES, and this shows what each person may REACH.
+ * Its own tab (/access) rather than a section under the workflow diagrams:
+ * the flows are a picture of movement and this is a table of permission, and a
+ * reader looking for one should not have to scroll past the other.
  *
  * Every row names the server gate that refuses — not the UI that hides the
  * button — and `npm run check` asserts those gates still exist, so a rename
@@ -45,7 +46,6 @@ export default function RoleMatrix() {
 
   return (
     <section className="matrix">
-      <h2>Who can reach what</h2>
       <p className="hint">
         Read off the code that enforces it, not the buttons that are drawn.
         <b> ●</b> yes · <b>◐</b> yes, with the limit named · <b>—</b> no.

@@ -8,7 +8,7 @@ import { authOptions, isAdminUser } from "@/lib/auth"
 import { resolveCourseIdForUser } from "@/lib/courses"
 import { viewingAsStudent } from "@/lib/viewAsServer"
 import WorkflowsBoard from "@/components/admin/WorkflowsBoard"
-import RoleMatrix from "@/components/admin/RoleMatrix"
+import MetaPage from "@/components/ui/MetaPage"
 
 /**
  * Workflows — how each kind of person moves through Loom.
@@ -52,20 +52,19 @@ export default async function WorkflowsPage() {
   if (isStaff && (await viewingAsStudent())) isStaff = false
 
   return (
-    <main style={{ padding: "20px" }}>
-      <h1>Workflows</h1>
+    // The frame stays; only this changes (TJ, 2026-08-09). The matrix that
+    // briefly lived under these diagrams is its own tab now — Access.
+    <MetaPage
+      title="Workflows"
+      meta={isStaff ? "how each person moves through Loom" : "how you move through Loom"}
+      foot="GENERATED FROM THE CODE"
+    >
       <p style={{ marginBottom: "20px" }}>
         {isStaff
           ? "What each person does, in order, and where each step happens. Kept beside the code rather than in a drawing tool, so it can be corrected in the same commit that changes the thing."
           : "What you do in Loom, in order, and where each step happens. Kept beside the code rather than in a drawing tool, so it stays true as the tool changes."}
       </p>
       <WorkflowsBoard showAll={isStaff} />
-      {/* Beside the flows because it answers the question they raise: the
-          diagrams show how each person MOVES, this shows what they may REACH
-          (TJ, 2026-08-09). Shown to everyone — a student learning that the
-          overlays are not theirs, and why, is the tool being honest rather
-          than quiet. */}
-      <RoleMatrix />
-    </main>
+    </MetaPage>
   )
 }

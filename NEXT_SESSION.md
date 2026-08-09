@@ -353,6 +353,29 @@ preview built as development would be open. And `getUserLoomDataAsAdmin` gates
 the course but not the target's membership, so a **removed** member's work stays
 readable to faculty.
 
+### 6g. Access is its own tab, and the reference pages keep the frame
+
+TJ, 2026-08-09: *"the workflows tab should behave like the others, change what
+is below, not replacing the frame."* and *"make 'access' its own tab."*
+
+- **`src/components/ui/MetaPage.tsx`** is the frame for a reference page.
+  `/workflows` was a bare `<main>`, so reaching it from the journey bar made the
+  bar itself vanish — the whole frame was replaced rather than the work inside
+  it. Both pages now wear the same scopebar / journey / footer as the Library
+  and Keep, with no station `active`: they are not steps on the student's arc.
+- **`/access`** is the matrix, on its own. Under the diagrams was the wrong
+  shape — the flows are a picture of *movement*, this is a table of
+  *permission*, and a reader looking for one had to scroll past the other.
+- **Staff only**, unlike Workflows — not because the contents are secret (they
+  describe gates, not data) but because each row cites the **file and line**
+  that enforces it, which is maintainer's material. A student asking "why can't
+  I see the overlays?" should be answered in the surface, not in a table of
+  source references. `tests/access.spec.ts` asserts a student is returned to the
+  shelf and keeps their header Workflows link.
+- The gate deliberately does **not** consult the student lens, for the same
+  reason `/admin` does not: the lens hides the tab, and a lens is not a lock —
+  turning it on should not eject a reader from a page they are mid-way through.
+
 ### 7. Traps this session
 
 - **`overflow: hidden` vs `overflow: clip` on `.pdf-body`.** Clip makes no

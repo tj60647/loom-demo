@@ -849,8 +849,10 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* --- Who can reach what: the role/capability matrix on /workflows --------- */
 /* Rendered from src/lib/capabilities.ts, which npm run check asserts against.
    Quiet on purpose: it is a reference table, not a dashboard. */
-.matrix{margin-top:36px;border-top:1px solid var(--rule);padding-top:22px}
-.matrix h2{font-size:21px;margin-bottom:4px}
+/* No top rule and no heading of its own: since it became the Access tab the
+   scopebar carries the title, and the divider it used to need — it sat under
+   the workflow diagrams — was left drawing a stray line under the nav. */
+.matrix{margin-top:2px}
 .matrix .hint{max-width:64ch}
 /* Wide tables scroll in their own box; the page must never scroll sideways. */
 .scrollx{overflow-x:auto;margin-top:14px}
