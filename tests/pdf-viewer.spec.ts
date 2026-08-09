@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openReading, openCaptureLog } from './helpers';
+import { openReading, openYourWork } from './helpers';
 
 // Runs as Test User A (see playwright/global-setup.ts): the concepts and bytes
 // this spec captures belong to the test account, never to a real person's loom.
@@ -76,9 +76,9 @@ test.describe('PDF Viewer and Highlighting', () => {
       await expect(captureButton).toBeVisible();
       await captureButton.click();
 
-      // Modal appears, save the byte. Exact match: the capture rail's own
-      // concept input starts with the same words and may be mounted behind
-      // this once the log has been opened.
+      // Modal appears, save the byte. Exact match: Your work's own concept
+      // input starts with the same words and is mounted behind this at all
+      // times now — the sheet is parked off-screen, not unmounted.
       const conceptInput = page.getByPlaceholder('e.g. boundary objects', { exact: true });
       await conceptInput.fill(conceptName);
 
@@ -102,9 +102,9 @@ test.describe('PDF Viewer and Highlighting', () => {
       // concept, through the same UI a student would use — and await each
       // delete's server-action POST: the optimistic UI clears instantly, and
       // ending the test earlier aborts the queued fetches, leaving residue.
-      await openCaptureLog(page);
+      await openYourWork(page);
       const row = page
-        .locator('.readinglog .lrow', { has: page.locator('.lconcept', { hasText: conceptName }) })
+        .locator('#yourwork .lrow', { has: page.locator('.lconcept', { hasText: conceptName }) })
         .first();
       await expect(row).toBeVisible({ timeout: 5000 });
       await row.locator('.lhead').click();
@@ -123,4 +123,28 @@ test.describe('PDF Viewer and Highlighting', () => {
       await expect(page.locator('.lconcept', { hasText: conceptName })).toHaveCount(0, { timeout: 5000 });
     });
   }
+
+  // The two properties the 2026-08-09 rebuild is FOR. Until then the capture
+  // side was a rail that squeezed the text above 820px, so opening it re-fitted
+  // the page and re-rasterised it under the reader.
+  test('Your work slides over the text without moving the page', async ({ page }) => {
+    await openReading(page, 'Object Worlds');
+    const stage = page.locator('.pdf-stage');
+    const before = await stage.boundingBox();
+    await openYourWork(page);
+    // The whole point: the stage keeps its box, so nothing re-fits, nothing
+    // re-rasterises, and the words do not move under a selection in progress.
+    expect((await stage.boundingBox())?.width).toBe(before?.width);
+  });
+
+  test('Escape sends Your work back and hands focus to its button', async ({ page }) => {
+    await openReading(page, 'Object Worlds');
+    await openYourWork(page);
+    await page.keyboard.press('Escape');
+    // toBeHidden is honest here only because the sheet goes visibility:hidden
+    // at the end of the slide — a transform alone would still read as visible.
+    await expect(page.locator('#yourwork')).toBeHidden({ timeout: 5000 });
+    await expect(page.locator('#yourwork-toggle')).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#yourwork-toggle')).toBeFocused();
+  });
 });

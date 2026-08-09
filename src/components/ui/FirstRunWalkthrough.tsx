@@ -11,7 +11,7 @@ const GUIDE = [
   p:'You read anywhere — paper, PDF, screen — marking what strikes you. Then you bring the best passages here. Over three moves, the pieces become a graph of your own understanding. The tool holds the structure; you do all the thinking.',
   loom:'Three moves, in order: 01 Reading · 02 Linking · 03 Knowledge Graph, where you lay it out and read it. 04 Vocabulary is the words you have collected along the way. 00 Library is where you start, and Keep is where your work comes out.'},
  {k:'01 — reading', h:'① Read, capture and name',
-  p:'The text and your captures are one place. Highlight a passage in the reading — or paste one with its citation — and name the concept it evidences: a short noun phrase, often the author\'s own term ("boundary objects"). Gloss it in your own words in the description; crude is welcome there. The capture log opens beside the text.',
+  p:'The text and your captures are one place. Highlight a passage in the reading — or paste one with its citation — and name the concept it evidences: a short noun phrase, often the author\'s own term ("boundary objects"). Gloss it in your own words in the description; crude is welcome there. Your work slides out over the text.',
   loom:'Warp = your concepts: the threads held under tension first. Choosing the passage is the judgment.'},
  {k:'02 — throw', h:'② Connect two concepts',
   p:'Tap two of your concepts, then say — however awkwardly — how they hang together. That sentence IS the connection. Later, coin a short label for it so a kind of link can recur; the machine never names it for you.',

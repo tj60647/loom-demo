@@ -11,7 +11,7 @@
  * title is only saved when it differs.
  */
 import { test, expect } from "@playwright/test"
-import { enterReadingFromCard, openCaptureLog } from "./helpers"
+import { enterReadingFromCard, openYourWork } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 test.beforeEach(() => test.setTimeout(120_000))
@@ -38,8 +38,8 @@ test("the card opens the reading, and carries the cloth's name and last edit", a
   await loomLoaded(page)
 
   // The cloth is named on the work surface for its scope — inside a reading
-  // that is 01 · Reading, at the head of the capture rail (TJ, 2026-08-08).
-  await openCaptureLog(page)
+  // that is 01 · Reading, at the head of Your work (TJ, 2026-08-08).
+  await openYourWork(page)
   const fold = page.locator("details.invitefold", { hasText: "This cloth" })
   await expect(fold).toBeVisible({ timeout: 15_000 })
   if (!(await fold.locator("input").first().isVisible())) {

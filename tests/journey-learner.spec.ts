@@ -16,7 +16,7 @@
  * prompts and the read.
  */
 import { test, expect } from "@playwright/test"
-import { enterReadingFromCard, openCaptureLog } from "./helpers"
+import { enterReadingFromCard, openYourWork } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 // Each test is independent and removes what it adds — no serial mode, so one
@@ -91,22 +91,27 @@ test("01 · a byte captured by hand lands in the coding log — and cleans up", 
   await enterReadingFromCard(page, card)
   // Station buttons are named "01 —Reading" etc. — match by substring, never
   // exact. Since the 2026-08-08 merge the capture form IS this station: the
-  // text on the left, the capture rail on the right, opened from the toolbar.
+  // text holding the room, and Your work slid out over it from the toolbar.
   await page.locator("nav button", { hasText: "Reading" }).click()
   await loomLoaded(page)
-  await openCaptureLog(page)
-  // Beside a text you can select, capture-by-hand is a fold at the foot of the
-  // log (TJ, 2026-08-08) — typing a passage that is on screen is the exception,
-  // so it is one deliberate click away rather than the first thing you meet.
-  await page.locator(".readinglog details.handfold > summary").click()
+  await openYourWork(page)
+  // Beside a text you can select, capture-by-hand is a fold at the foot of
+  // Your work (TJ, 2026-08-08) — typing a passage that is on screen is the
+  // exception, so it is one deliberate click away rather than the first thing
+  // you meet.
+  await page.locator("#yourwork details.handfold > summary").click()
   await expect(page.locator("#bText")).toBeVisible({ timeout: 15_000 })
 
   await page.locator("#bText").fill("A passage typed by the journey suite, verbatim enough for the log.")
   await page.getByPlaceholder("e.g. boundary objects · satisficing · valence").fill("journey test concept")
-  await page.getByPlaceholder("ch. 3, p. 49").fill("p. 999")
+  // By id, not by placeholder: since 2026-08-09 the Location field offers the
+  // page you are actually on ("p. 11"), so the old literal never matched.
+  await page.locator("#bLocation").fill("p. 999")
   await page.getByRole("button", { name: "Add passage" }).click()
 
-  const row = page.locator(".lrow", { hasText: "journey test concept" })
+  // Scoped to the sheet: it is mounted permanently now, so an unscoped
+  // .lrow is a strict-mode violation waiting on the next surface that grows one.
+  const row = page.locator("#yourwork .lrow", { hasText: "journey test concept" })
   await expect(row).toHaveCount(1, { timeout: 15_000 })
 
   // Cleanup through the product's own controls. Since 0021 a passage survives

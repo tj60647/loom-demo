@@ -5,8 +5,9 @@
 // This tab is deliberately UNSCOPED where every other workbench tab is scoped.
 // A concept does not belong to a reading (a passage does), so your vocabulary
 // is the whole lexicon you have built across every text, not this reading's
-// slice of it. 01 Open's Capture Log stays the reading-scoped record of what
-// you captured *here*; this is the list of words you now own.
+// slice of it. 01 Reading's "Your work" (the Capture Log) stays the
+// reading-scoped record of what you captured *here*; this is the list of words
+// you now own.
 //
 // It holds what the model gives Vocabulary and nothing else: browse/filter
 // Concepts as full objects and Link Labels, recurrence, edit Descriptions,

@@ -8,7 +8,7 @@
 // is honest per reading now that placement is per-map (maps carry their own
 // tiers): a reading's map sorts only against that reading's concepts.
 
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import dynamic from "next/dynamic"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
@@ -101,13 +101,29 @@ export default function Workbench({
   const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([firstTab]))
   const [pdfPage, setPdfPage] = useState(1)
   const [pdfFocusByteId, setPdfFocusByteId] = useState<string | null>(null)
+  // Where the reader actually is, which is not the same as `pdfPage` — that
+  // one is an instruction TO the viewer ("go here"), this is a report FROM it.
+  // Kept apart on purpose: feeding the report back in as the instruction lets
+  // a stale render drag the reader back a page.
+  const [livePdfPage, setLivePdfPage] = useState(1)
+  const handlePageChange = useCallback((n: number) => setLivePdfPage(n), [])
   const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
-  // The capture rail beside the text. Closed by default: reading is what the
-  // station is for, and a student who has not captured anything yet does not
-  // need half the width given to an empty log. A reference-only reading has no
-  // text to sit beside, so its capture side is the whole panel.
-  const [logOpen, setLogOpen] = useState(false)
+  // Your work — this reading's Capture Log — as a sheet over the text. Closed
+  // by default: reading is what the station is for, and a student who has not
+  // captured anything does not need a panel over the page. It is handed to the
+  // viewer rather than rendered beside it (see PdfViewer's `workPanel`),
+  // because it has to travel with the reading into fullscreen — which is
+  // position:fixed with its own stacking context, and swallowed the old rail
+  // whole. A reference-only reading has no text to lie over, so its capture
+  // side is the whole panel.
+  const [workOpen, setWorkOpen] = useState(false)
+  // Stable identity: PdfViewer's window keydown effect takes this as a dep,
+  // and an inline arrow re-bound the reading's whole keyboard every render.
+  const toggleWork = useCallback(() => {
+    setPdfFocusByteId(null)
+    setWorkOpen((v) => !v)
+  }, [])
 
   const goTo = (tab: Tab) => {
     setActiveTab(tab)
@@ -116,22 +132,32 @@ export default function Workbench({
 
   const shouldRender = (tab: Tab) => (KEEP_ALIVE.has(tab) ? visited.has(tab) : activeTab === tab)
 
-  // Since the merge, "goto" is not a tab away at all — the text and the log are
-  // the same station, so this only moves the page under the reader.
+  // Since the merge, "goto" is not a tab away at all — the text and your work
+  // are the same station, so this only moves the page under the reader. It
+  // also sends the sheet back: you asked to see the passage in its page, and a
+  // sheet over the right third of that page is not showing it to you.
   const handleGotoByte = (byte: Byte) => {
     if (!source?.hasFile) return
     setPdfPage(byte.pageNumber && byte.pageNumber > 0 ? byte.pageNumber : 1)
     setPdfFocusByteId(byte.id)
+    setWorkOpen(false)
     goTo("reading")
   }
 
-  // A capture just landed: open the rail on it, rather than leaving the student
-  // to wonder where it went.
+  // A capture just landed, or somebody pressed "In your work" on a highlight:
+  // slide the sheet out ON it, rather than leaving them to wonder where it
+  // went. The sheet is already mounted, so the row it scrolls to has a real
+  // layout box the instant this fires.
   const handleGotoOpenByte = (byteId: string) => {
     setOpenTargetByteId(byteId)
-    setLogOpen(true)
+    setWorkOpen(true)
     goTo("reading")
   }
+
+  // Stable identity again: OpenTab's focus effect lists this in its deps and
+  // the sheet is mounted permanently now, so an inline arrow re-ran that
+  // effect on every Workbench render while a target was set.
+  const handleFocusHandled = useCallback(() => setOpenTargetByteId(null), [])
 
   // Loading comes FIRST. Until next-auth has answered we do not yet know
   // whether anybody is signed in, and guessing "signed out" is the guess that
@@ -235,46 +261,39 @@ export default function Workbench({
           <div className={`panel ${activeTab === "reading" ? "active" : ""}`}>
             {shouldRender("reading") &&
               (source.hasFile ? (
-                // The merged station: the text, and the capture log beside it.
-                // The viewer's stage is watched by a ResizeObserver, so opening
-                // the rail re-fits the page rather than clipping it.
-                <div className="readingsplit">
-                  <div className="readingtext">
-                    {activeTab === "reading" && (
-                      <PdfViewer
-                        url={`/api/readings/${source.id}`}
-                        sourceName={source.title}
-                        sourceId={source.id}
-                        initialPageNumber={pdfPage}
-                        initialSearch={initialSearch}
-                        focusByteId={pdfFocusByteId}
-                        onGotoOpenByte={handleGotoOpenByte}
-                        logOpen={logOpen}
-                        onToggleLog={() => {
-                          setPdfFocusByteId(null)
-                          setLogOpen((v) => !v)
-                        }}
-                      />
-                    )}
-                  </div>
-                  {logOpen && (
-                    <aside className="readinglog" aria-label="Capture log">
+                // The merged station. The text holds the whole room; Your work
+                // slides over it. Nothing here reserves space for the sheet —
+                // the page NOT moving is the change (see globals.css).
+                activeTab === "reading" && (
+                  <PdfViewer
+                    url={`/api/readings/${source.id}`}
+                    sourceName={source.title}
+                    sourceId={source.id}
+                    initialPageNumber={pdfPage}
+                    initialSearch={initialSearch}
+                    focusByteId={pdfFocusByteId}
+                    onGotoOpenByte={handleGotoOpenByte}
+                    onPageChange={handlePageChange}
+                    workOpen={workOpen}
+                    onToggleWork={toggleWork}
+                    workPanel={
                       <OpenTab
                         compact
+                        currentPage={livePdfPage}
                         onGotoByte={handleGotoByte}
                         focusByteId={openTargetByteId}
-                        onFocusHandled={() => setOpenTargetByteId(null)}
+                        onFocusHandled={handleFocusHandled}
                       />
-                    </aside>
-                  )}
-                </div>
+                    }
+                  />
+                )
               ) : (
-                // A reference-only reading has no text to sit beside, so the
+                // A reference-only reading has no text to lie over, so the
                 // capture side is the whole station.
                 <OpenTab
                   onGotoByte={handleGotoByte}
                   focusByteId={openTargetByteId}
-                  onFocusHandled={() => setOpenTargetByteId(null)}
+                  onFocusHandled={handleFocusHandled}
                 />
               ))}
           </div>

@@ -206,7 +206,7 @@ export default function Shelf() {
         <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", margin: "0 0 3px" }}>
           <p className="tasktitle" style={{ margin: 0 }}>Pick a reading.</p>
           <button
-            className={`btn mini tip-below ${searchOpen ? "" : "ghost"}`}
+            className={`btn mini ${searchOpen ? "" : "ghost"}`}
             onClick={() => {
               if (searchOpen) {
                 setSearchOpen(false)

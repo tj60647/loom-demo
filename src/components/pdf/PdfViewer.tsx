@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -34,11 +34,24 @@ interface PdfViewerProps {
       query into the text it matched. */
   initialSearch?: string;
   onGotoOpenByte?: (byteId: string) => void;
-  /** Whether the capture log rail is showing beside the text. */
-  logOpen?: boolean;
-  /** Show or hide that rail. Since the 2026-08-08 merge the text and the log
-      are one station, so this opens a panel rather than leaving for a tab. */
-  onToggleLog: () => void;
+  /**
+   * The page the reader is looking at, as it changes. Capture-by-hand offers
+   * it as the location so nobody retypes a page number the viewer already
+   * knows exactly (TJ, 2026-08-09).
+   */
+  onPageChange?: (pageNumber: number) => void;
+  /** Whether Your work — this reading's Capture Log — is slid out. */
+  workOpen?: boolean;
+  /** Slide it out, or send it back. Since the 2026-08-08 merge the text and
+      the capture side are one station, so this opens a sheet over the reading
+      rather than leaving for a tab. */
+  onToggleWork: () => void;
+  /**
+   * What goes inside it. The viewer owns the sheet — its geometry, its
+   * keyboard, its focus — because the sheet lives inside .pdf-shell so that
+   * fullscreen carries it along; the workbench owns only what is written on it.
+   */
+  workPanel?: ReactNode;
 }
 
 /** One byte on the clicked span, as the highlight tooltip presents it. */
@@ -51,8 +64,8 @@ type HighlightEntry = {
   endOffset: number | null;
 };
 
-export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusByteId, initialSearch, onGotoOpenByte, logOpen, onToggleLog }: PdfViewerProps) {
-  const { state } = useLoom();
+export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusByteId, initialSearch, onGotoOpenByte, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
+  const { state, scoped } = useLoom();
   // Drawn only for faculty and admins. Not a guard — `overlayViewer()` re-checks
   // on the server, so a student who forces the request gets an empty overlay.
   const readings = useReadings();
@@ -96,6 +109,26 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   const [aspect, setAspect] = useState(11 / 8.5);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const workPanelRef = useRef<HTMLElement>(null);
+  const workToggleRef = useRef<HTMLButtonElement>(null);
+  const workWasOpen = useRef(false);
+  /**
+   * Was the reader working INSIDE the sheet when the close was asked for?
+   * Read at the moment of the request and not in the effect below, because
+   * `inert` blurs its subtree immediately — by the time an effect runs,
+   * document.activeElement is already <body> and the answer is always "no".
+   * Getting this wrong drops a keyboard reader at the top of the document,
+   * silently, with nothing to show for it.
+   */
+  const workHadFocus = useRef(false);
+  /**
+   * The acknowledgement a capture gets, where the reader is actually looking.
+   * One slot, not a stack: two captures inside the window read as "2 passages
+   * captured" rather than climbing the corner of the page. `n` counts them so
+   * the wording can say so; `byteId` is the LAST one, which is the row to open.
+   */
+  const [captureToast, setCaptureToast] = useState<{ byteId: string; label: string; n: number } | null>(null);
+  const toastTimer = useRef<number | null>(null);
   /**
    * The element that actually scrolls in every mode — the measuring stick for
    * page size and the root the slots check visibility against.
@@ -557,6 +590,63 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     resetSearchResults();
   }, [resetSearchResults]);
 
+  /**
+   * Every way of opening or closing Your work goes through here: the toolbar
+   * button, the ✕ in its head bar, and Escape. Two things have to happen on
+   * the way, and neither of them belongs to the workbench.
+   *
+   * Declared here, above the keyboard effect that lists it as a dependency —
+   * a `const` sited below that effect is in the temporal dead zone when the
+   * dep array is built, and the reading dies on first render.
+   */
+  const requestToggleWork = useCallback(() => {
+    workHadFocus.current = !!workPanelRef.current?.contains(document.activeElement);
+    // Find-in-reading and the sheet share the same strip of the right edge.
+    // Two panels stacked there means the lower one is open, invisible, and
+    // eats the first Escape.
+    if (!workOpen && searchOpen) closeSearch();
+    // The sheet and the toast say the same thing; the sheet says it better.
+    if (!workOpen) setCaptureToast(null);
+    onToggleWork();
+  }, [workOpen, searchOpen, closeSearch, onToggleWork]);
+
+  /** Clear the toast's countdown without clearing the toast. */
+  const holdToast = useCallback(() => {
+    if (toastTimer.current !== null) {
+      window.clearTimeout(toastTimer.current);
+      toastTimer.current = null;
+    }
+  }, []);
+
+  /**
+   * Start (or restart) the countdown. Six seconds: long enough to read eleven
+   * words and decide, short enough that it is gone before it becomes furniture.
+   * Restarted rather than stacked on a second capture — see captureToast.
+   */
+  const startToastTimer = useCallback(() => {
+    holdToast();
+    toastTimer.current = window.setTimeout(() => setCaptureToast(null), 6000);
+  }, [holdToast]);
+
+  const handleCaptured = useCallback((byteId: string, label: string) => {
+    // With the sheet already out, the row IS the acknowledgement — scroll to it
+    // rather than covering it with a card that says it happened.
+    if (workOpen) {
+      onGotoOpenByte?.(byteId);
+      return;
+    }
+    setCaptureToast((prev) => ({ byteId, label, n: (prev?.n ?? 0) + 1 }));
+    startToastTimer();
+  }, [workOpen, onGotoOpenByte, startToastTimer]);
+
+  // The countdown is state that outlives the component if nobody clears it.
+  useEffect(() => () => holdToast(), [holdToast]);
+
+  // Tell the workbench where we are. Deliberately NOT fed back in as
+  // initialPageNumber — that prop drives the page, and a round trip would let
+  // a stale render pull the reader back to a page they had already left.
+  useEffect(() => { onPageChange?.(pageNumber); }, [pageNumber, onPageChange]);
+
   // The word forms Postgres marked in the snippets — the document's own words
   // (stemming happened server-side), so an exact, case-insensitive mark on the
   // text layer finds them again.
@@ -719,13 +809,20 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       }
     });
 
-    observer.observe(containerRef.current, { childList: true, subtree: true });
+    // Rooted on the STAGE, not the shell. Your work renders inside .pdf-shell
+    // now and its rows are full of <span>s — which the predicate above cannot
+    // tell from a new text layer — so every open, every expanded concept row
+    // and every keystroke in the capture form would schedule a debounced unmark
+    // and re-mark of every visible text layer. applyHighlights only ever
+    // queries .react-pdf__Page__textContent, so nothing in the sheet was ever
+    // going to be marked; only the cost would have been real.
+    observer.observe(stageRef.current ?? containerRef.current, { childList: true, subtree: true });
 
     return () => {
       observer.disconnect();
       clearTimeout(debounceTimer);
     };
-  }, [state.bytes, state.concepts, pageNumber, bindHighlightNode, sourceName, searchTerms, overlay]); // Re-run when bytes, page, search terms or the overlay change
+  }, [state.bytes, state.concepts, pageNumber, bindHighlightNode, sourceName, searchTerms, overlay, stageEl]); // Re-run when bytes, page, search terms or the overlay change — and if the stage node itself is replaced
 
   const handleCaptureClick = () => {
     if (highlightRect) {
@@ -788,15 +885,38 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in a modal or input
-      if (showCaptureModal || document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
+      // A dialog owns the keyboard while it is up — the capture modal, Loom's
+      // confirm (which you can raise from inside the sheet: "remove concept"),
+      // an info panel, the walkthrough. Escape there is theirs, and `f` must
+      // not throw a reader into fullscreen out from under one.
+      if (showCaptureModal || document.querySelector(".info-scrim, .scrim.show")) return;
+
+      const active = document.activeElement as HTMLElement | null;
+      const typing =
+        active?.tagName === "INPUT" ||
+        active?.tagName === "TEXTAREA" ||
+        active?.tagName === "SELECT" ||
+        !!active?.isContentEditable;
+      const inWork = !!active?.closest?.("[data-yourwork]");
+      // A field outside the sheet owns every key, Escape included — the search
+      // input closes its own panel that way.
+      if (typing && !inWork) return;
+      // Inside the sheet nothing steers the reading. The guard used to name
+      // INPUT and TEXTAREA only, so Left/Right on a <select> turned the page
+      // under it, and `f` pressed on any button or <summary> in the log —
+      // which is most of it — threw the reader into fullscreen. Escape is the
+      // one key that gets out.
+      if (inWork && e.key !== "Escape") return;
 
       if (e.key === 'Escape') {
         // One Escape, one thing: dismiss the tooltip if one is open, then the
-        // search panel, then fullscreen. Doing several at once would take the
-        // reading away from someone who only meant to close a label.
+        // search panel, then Your work, then fullscreen. Doing several at once
+        // would take the reading away from someone who only meant to close a
+        // label. Your work comes before fullscreen because it is the nearer
+        // thing — Escape means the topmost surface, not the biggest one.
         if (highlightTooltip) hideHighlightTooltip();
         else if (searchOpen) closeSearch();
+        else if (workOpen) requestToggleWork();
         else if (isFullscreen) setIsFullscreen(false);
         return;
       }
@@ -818,7 +938,38 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal, viewMode, isFullscreen, highlightTooltip, searchOpen, closeSearch]);
+  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal, viewMode, isFullscreen, highlightTooltip, searchOpen, closeSearch, workOpen, requestToggleWork]);
+
+  /**
+   * Your work is not a dialog: the reading stays live and selectable behind
+   * it, so nothing is trapped and nothing is scrimmed. But the tab order has
+   * to follow the eye. Opening seats focus on the sheet — it is the last thing
+   * in the shell, so otherwise a keyboard reader tabs the entire text layer to
+   * reach it. Closing hands focus back to the button that did it, but only if
+   * the reader was in there: yanking focus out of the page because a panel
+   * shut elsewhere is worse than leaving it be. The <body> check is the
+   * fallback for the one close that does not come through requestToggleWork —
+   * pressing "goto" on a passage, which closes the sheet from inside it.
+   *
+   * preventScroll on both: the sheet is its own scroller, and focus() would
+   * jump it before the reader has seen the top.
+   */
+  useEffect(() => {
+    if (!!workOpen === workWasOpen.current) return;   // not a transition; also skips mount
+    workWasOpen.current = !!workOpen;
+    if (workOpen) {
+      // Next frame: focus() on a visibility:hidden element is a no-op.
+      const raf = requestAnimationFrame(() =>
+        workPanelRef.current?.focus({ preventScroll: true })
+      );
+      return () => cancelAnimationFrame(raf);
+    }
+    const active = document.activeElement;
+    if (workHadFocus.current || !active || active === document.body) {
+      workToggleRef.current?.focus({ preventScroll: true });
+    }
+    workHadFocus.current = false;
+  }, [workOpen]);
 
   /**
    * Matrix page width: a contact sheet of four across on a desktop stage (two
@@ -833,6 +984,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   );
 
   // Calculate page dimensions based on fit mode
+  // What the toggle carries when the sheet is shut. Cheap and permanent, and
+  // it answers "did that save?" without opening anything.
+  const workCount = scoped.bytes.length;
+
   const calcPageProps = () => {
     if (fitMode === "height") {
       // The stage is the real estate; the padding around the pages is the only
@@ -1127,6 +1282,35 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         .pdf-stage.mode-strip { overflow-x: auto; overflow-y: hidden; }
         .pdf-stage.mode-matrix { overflow: auto; }
 
+        /* The pages, and the sheet over them. No size of its own: it is the
+           stage's old box, split off only so Your work has something to be
+           absolute inside that is NOT the toolbar. Column, because the stage
+           is flex:1 1 auto and was a column child of the shell — the stage's
+           content box, and therefore the ResizeObserver, stage.w/h and
+           containerWidth, must measure exactly what they measured before this
+           refactor.
+
+           overflow:clip, NOT overflow:hidden, and the difference is
+           load-bearing. Closed, the sheet is parked a full panel-width off the
+           right edge, and a transformed box still counts toward its ancestor's
+           scrolling area. "hidden" would make this a scroll container holding
+           440px of horizontal scroll with no scrollbar to warn you — so any
+           focus() inside the parked sheet that did not pass preventScroll (a
+           browser autoscroll, not our own call) would slide the whole reading
+           sideways with no way back. "clip" makes no scroll container at all,
+           so there is nothing to scroll. Note that scrollWidth still reports
+           the overflow either way — the scrolling AREA is not the same
+           question as whether the box scrolls — which is why
+           tests/pdf-fit.spec.ts measures .pdf-stage and not this. */
+        .pdf-body {
+          flex: 1 1 auto;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          overflow: clip;
+        }
+
         .pdf-strip-run {
           display: flex;
           align-items: center;
@@ -1229,18 +1413,35 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           labels shorten rather than the buttons shrinking below thumb size. */}
       <div className="pdf-toolbar">
         <div>
-          {/* The capture log lives beside the text now rather than on a tab of
-              its own, so this opens a rail instead of leaving. Labelled only
-              when the label is a glyph on its own; with the words visible they
-              are the name. */}
+          {/* The one door to Your work, and it never moves: the sheet covers
+              the reading, never this toolbar, so the way out is exactly where
+              the way in was. `aria-expanded` + `aria-controls`, not
+              `aria-pressed` — this is a disclosure, not a setting.
+              The count replaces the old ‹/› chevrons, which were rail
+              semantics: they said which way the text would be pushed, and
+              nothing is pushed any more. It also does more work than they did
+              — a student who has just captured a passage can see that it
+              exists without opening anything. Labelled only when the label is
+              a glyph on its own; with the words visible they are the name.
+              The label does NOT change to "Hide your work" when it opens, and
+              that is deliberate: it used to, and the button went from a narrow
+              ghost to a wide filled one, reflowing the toolbar under the
+              reader's eye at the exact moment their attention was already
+              moving. Filled-vs-ghost says which state it is in — the same way
+              Page/Strip/Matrix do — and aria-expanded says it properly. */}
           <button
-            className={`btn mini${logOpen ? "" : " ghost"}`}
-            onClick={onToggleLog}
-            aria-pressed={!!logOpen}
-            aria-label={isNarrow ? "Capture log" : undefined}
+            id="yourwork-toggle"
+            ref={workToggleRef}
+            className={`btn mini${workOpen ? "" : " ghost"}`}
+            onClick={requestToggleWork}
+            aria-expanded={!!workOpen}
+            aria-controls="yourwork"
+            aria-label={isNarrow ? "Your work" : undefined}
             data-tip="your passages from this reading, filed by concept"
           >
-            {isNarrow ? "☰" : logOpen ? "Hide capture log ›" : "‹ Capture log"}
+            {isNarrow
+              ? (workCount ? `☰ ${workCount}` : "☰")
+              : (workCount ? `Your work · ${workCount}` : "Your work")}
           </button>
         </div>
 
@@ -1364,7 +1565,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           {sourceId && (
             <button
               className={`btn mini ${searchOpen ? "" : "ghost"}`}
-              onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+              // Find and Your work share the right edge, so opening either
+              // sends the other back. Without the symmetry the lower one sits
+              // there open and invisible, eating the first Escape.
+              onClick={() => {
+                if (searchOpen) { closeSearch(); return; }
+                if (workOpen) onToggleWork();
+                setSearchOpen(true);
+              }}
               data-tip="find a word or phrase in this reading"
               aria-pressed={searchOpen}
               aria-label="Search this reading"
@@ -1502,6 +1710,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         </div>
       )}
 
+      {/* The pages, and Your work over them. This wrapper exists for one
+          reason: it is the sheet's containing block, so the sheet covers the
+          reading and stops at the toolbar. The frame of the reading — modes,
+          fit, find, fullscreen, and the overlay bar above — stays reachable
+          while your work is out. The stage is still the only measured box, and
+          it measures exactly what it measured before. */}
+      <div className="pdf-body">
+
       {/* Main Content Area — one <Document> for all three layouts, so
           switching views never re-fetches or re-parses the PDF. */}
       <div ref={attachStage} className={`pdf-stage mode-${viewMode}`}>
@@ -1598,11 +1814,91 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         </Document>
       </div>
 
+      {/* Your work — the reading-scoped Capture Log. ("Capture Log" stays the
+          model's name for the object; "Your work" is the student's name for
+          the surface.) ALWAYS mounted, parked off the right edge when closed:
+          a half-typed hand capture, an opened concept row and where you had
+          scrolled to all survive the toggle, and a capture that has just
+          landed has a row with real layout to scroll to — OpenTab does that
+          40ms later, and scrollIntoView on an element with no layout box
+          silently does nothing, which is how someone who pressed "In your
+          work" landed at the top of the list instead of on their passage. */}
+      {workPanel && (
+        <aside
+          id="yourwork"
+          className="yourwork"
+          data-yourwork=""
+          data-open={workOpen ? "true" : "false"}
+          aria-labelledby="yourwork-title"
+          inert={!workOpen}
+          tabIndex={-1}
+          ref={workPanelRef}
+        >
+          <div className="yourwork-head">
+            <h2 id="yourwork-title">Your work</h2>
+            <span className="n">
+              {scoped.bytes.length
+                ? `${scoped.bytes.length} passage${scoped.bytes.length === 1 ? "" : "s"} · ${scoped.concepts.length} concept${scoped.concepts.length === 1 ? "" : "s"}`
+                : "nothing captured here yet"}
+            </span>
+            <button
+              type="button"
+              className="btn ghost mini compact yourwork-close"
+              onClick={requestToggleWork}
+              aria-label="Close your work"
+            >✕</button>
+          </div>
+          <div className="yourwork-body">{workPanel}</div>
+        </aside>
+      )}
+
+      {/* The capture said so. A small card in the corner of the page, for six
+          seconds — the everyday acknowledgement, so that opening the sheet
+          becomes something you do to BROWSE rather than something you do to
+          check that your work survived. Held open while the pointer is on it,
+          because six seconds is short if you are still reading the sentence.
+          role=status on the sentence only: a live region wrapping the button
+          would re-announce the whole card every time the count changes. */}
+      {captureToast && (
+        <div
+          className="captoast"
+          onPointerEnter={holdToast}
+          onPointerLeave={startToastTimer}
+        >
+          <p role="status">
+            {captureToast.n > 1
+              ? `${captureToast.n} passages captured.`
+              : <>Passage captured — filed under <b>{captureToast.label}</b>.</>}
+          </p>
+          <button
+            type="button"
+            className="btn ghost mini compact"
+            onClick={() => {
+              const target = captureToast.byteId;
+              setCaptureToast(null);
+              holdToast();
+              onGotoOpenByte?.(target);
+            }}
+          >
+            In your work ›
+          </button>
+          <button
+            type="button"
+            className="btn ghost mini compact captoast-x"
+            aria-label="Dismiss"
+            onClick={() => { holdToast(); setCaptureToast(null); }}
+          >✕</button>
+        </div>
+      )}
+      </div>
+
       {/* Paging bar, phone only — and only where there are pages to turn. The
           strip and the matrix are scrolled, so a Prev/Next pair there would be
           a control for something the view does not do, sitting on top of the
-          reading. */}
-      {isNarrow && viewMode === "page" && (
+          reading. Gone while Your work is out: it is fixed to the WINDOW at
+          z-index 8000, so it would cut a bar across the bottom of the sheet,
+          to turn a page nobody can see. */}
+      {isNarrow && viewMode === "page" && !workOpen && (
         <div
           style={{
             position: "fixed",
@@ -1662,6 +1958,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           startOffset={captureData.startOffset}
           endOffset={captureData.endOffset}
           pageContentHash={captureData.pageContentHash}
+          onCaptured={handleCaptured}
           onClose={() => {
             setShowCaptureModal(false);
             setCaptureData(null);
@@ -1710,11 +2007,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
+                    // Find and the sheet share the right edge; this one opens
+                    // the sheet, so the other has to go.
+                    if (searchOpen) closeSearch();
                     onGotoOpenByte(entry.byteId);
                     hideHighlightTooltip();
                   }}
                 >
-                  Goto Capture Log
+                  In your work ›
                 </button>
               ) : null}
             </div>

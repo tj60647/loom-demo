@@ -73,7 +73,7 @@ export default function CardMenu({
         ))
       )}
       {bytes.length > SHOWN && (
-        <p className="ghostnote">…and {bytes.length - SHOWN} more, in the capture log.</p>
+        <p className="ghostnote">…and {bytes.length - SHOWN} more, in your work.</p>
       )}
 
       {/* The seam, on the table: the same idea met in more than one text.

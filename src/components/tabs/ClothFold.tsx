@@ -4,7 +4,7 @@
 //
 // Home moved 2026-08-08 (TJ): it belongs on the work surface for its scope. A
 // cloth starts in READING, so inside a reading this renders in 01 · Reading
-// beside the capture log; the whole weave has no Reading station, so there it
+// at the head of Your work; the whole weave has no Reading station, so there it
 // stays on 02 · Linking. Folded either way — the work is the tab's business,
 // the cloth is its name, and an untitled cloth is a fine state.
 //

@@ -77,7 +77,7 @@ const student: Flow = {
     { id: "read", label: "Read the text", where: "01 · Reading" },
     { id: "ahead", label: "Or name a concept you expect, and gloss it — then read for support", where: "01 · Reading — shows as “no evidence” until a passage backs it" },
     { id: "capture", label: "Highlight a passage", where: "01 · Reading" },
-    { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — the capture log, beside the text" },
+    { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — Your work, slid out over the text" },
     { id: "link", label: "Pick two concepts, say the sentence, coin a label", where: "02 · Linking" },
     { id: "vocab", label: "Sharpen descriptions, merge duplicates", where: "04 · Vocabulary" },
     { id: "overlay", label: "Compare a section, or all of them", where: "Overlays — faculty and admins only" },

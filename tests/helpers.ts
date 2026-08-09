@@ -40,16 +40,30 @@ export async function openReading(page: Page, title: string) {
 }
 
 /**
- * Show the capture log rail beside the text.
+ * Slide Your work out over the text.
  *
- * Since the merge there is no Open tab to click: the log is a rail on the
- * reading station, closed by default. Idempotent on purpose — a capture may
- * have opened it already, and a blind toggle would close it again.
+ * Since 2026-08-09 the sheet is always in the DOM, parked off the right edge,
+ * so its presence proves nothing and the old `count() === 0` guard would skip
+ * the click and then fail the visibility assertion. The toggle's aria-expanded
+ * is the only honest reading of whether it is open. Idempotent on purpose — a
+ * capture may have opened it already, and a blind click would send it back.
  */
-export async function openCaptureLog(page: Page) {
-  const rail = page.locator('.readinglog');
-  if ((await rail.count()) === 0) {
-    await page.getByRole('button', { name: /Capture log/i }).first().click();
+export async function openYourWork(page: Page) {
+  // By id, not by role+name: the head bar's close button is named "Close your
+  // work", which a /Your work/i role match also finds. `.first()` would work
+  // today by DOM order and break the day somebody reorders the toolbar.
+  const toggle = page.locator('#yourwork-toggle');
+  await expect(toggle).toBeVisible({ timeout: 15000 });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click();
   }
-  await expect(rail).toBeVisible({ timeout: 15000 });
+  const panel = page.locator('#yourwork');
+  await expect(panel).toBeVisible({ timeout: 15000 });
+  // The sheet takes 200ms to arrive and Playwright's actionability check does
+  // not wait for a transform to settle: a click dispatched mid-slide lands
+  // where the panel was, not where it is.
+  await expect
+    .poll(() => panel.evaluate((el) => getComputedStyle(el).transform), { timeout: 5000 })
+    .toBe('none');
+  return panel;
 }

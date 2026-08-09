@@ -14,9 +14,16 @@ interface CaptureModalProps {
   endOffset?: number;
   pageContentHash?: string;
   onClose: () => void;
+  /**
+   * A capture landed. Fired before onClose so the viewer can say so where the
+   * reader is looking — until 2026-08-09 a capture taken from the page went
+   * through in silence, the modal simply vanishing, and the only sign it had
+   * worked was 1500ms of "· saved ·" in the far corner of the header.
+   */
+  onCaptured?: (byteId: string, conceptLabel: string) => void;
 }
 
-export default function CaptureModal({ passage, source, sourceId, location, pageNumber, startOffset, endOffset, pageContentHash, onClose }: CaptureModalProps) {
+export default function CaptureModal({ passage, source, sourceId, location, pageNumber, startOffset, endOffset, pageContentHash, onClose, onCaptured }: CaptureModalProps) {
   const { state, addConcept, addByte, editConcept } = useLoom()
   const [conceptLabel, setConceptLabel] = useState("")
   const [workingDef, setWorkingDef] = useState("")
@@ -36,7 +43,8 @@ export default function CaptureModal({ passage, source, sourceId, location, page
       } else if (wdef && !concept.def) {
         await editConcept(concept.id, { def: wdef })
       }
-      await addByte([concept.id], source, location, passage, pageNumber, startOffset, endOffset, sourceId, pageContentHash)
+      const saved = await addByte([concept.id], source, location, passage, pageNumber, startOffset, endOffset, sourceId, pageContentHash)
+      onCaptured?.(saved.id, concept.label)
       onClose()
     } catch(e) {
       console.error(e)

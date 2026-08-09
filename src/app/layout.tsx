@@ -6,6 +6,7 @@ import { ReadingsProvider } from "@/components/providers/ReadingsProvider";
 import { DialogProvider } from "@/components/providers/DialogProvider";
 import Header from "@/components/ui/Header";
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough";
+import TipLayer from "@/components/ui/TipLayer";
 
 // Which deployment this is. VERCEL_ENV is "production" only on the real
 // site; the dev alias builds as "preview" and local `next dev` leaves it
@@ -44,6 +45,10 @@ export default function RootLayout({
                     header still drew it (TJ, 2026-08-08). It decides for itself
                     whether to open unprompted. */}
                 <FirstRunWalkthrough />
+                {/* The hover tips, in the top layer. Mounted once, here, for
+                    the same reason the walkthrough is: [data-tip] is on
+                    controls in the header, the admin nav and every page. */}
+                <TipLayer />
                 {children}
               </DialogProvider>
             </ReadingsProvider>

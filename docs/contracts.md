@@ -367,10 +367,10 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | Station | Component | Holds |
 | --- | --- | --- |
 | 00 Library | — (`/`) | the course's readings; always a link, never a workbench tab |
-| **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** in a rail beside it (`.readinglog`, closed by default, toggled from the viewer toolbar); and the **Cloth Title/Description** at the head of that rail |
+| **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** as **Your work** (`#yourwork`), a sheet that slides over the text — closed by default, toggled from the viewer toolbar, and mounted *inside* `.pdf-shell` so it survives fullscreen; and the **Cloth Title/Description** at the head of that sheet |
 | 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Carries `ClothFold` **only at the whole weave**, which has no Reading station |
 | **03 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); **merge Concepts — its only home**; Concepts/Links Overlays |
-| 04 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, card table; the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); the Capture Log history at the whole weave |
+| 04 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, card table; the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); the Capture Log history at the whole weave (`HistoryPanel` — since 2026-08-09 the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**) |
 | ~~05 Weave~~ | `/weave` | **hidden from the journey** (TJ, 2026-08-08) pending a decision on what it becomes. The route still works and Keep links to it, so whole-weave projections are not stranded — unhide via `hidden` in `JourneyNav`'s `STATIONS` |
 | 05 Keep | `KeepTab` (`/keep`) | export/import/reset — ratified as a deviation from the model's five (D4) |
 
@@ -383,10 +383,10 @@ so it must stand in **every** Reading's warp while you hunt. It belongs to no
 Reading, because a Passage does. Consequences worth knowing before touching
 that line: it also decides which Links are *bridges*, and an un-evidenced
 Concept is linkable like any other (warned, never forbidden). Created at the
-foot of the Capture Log — label **and** optional gloss — and flagged "no
+foot of Your work — label **and** optional gloss — and flagged "no
 evidence" there, in the Linking warp, and in the cloth prompts.
 
-Scoping is the load-bearing distinction: **01 Reading's capture log is this
+Scoping is the load-bearing distinction: **01 Reading's Your work is this
 reading's captures; 03 Vocabulary is everything you own.** A concept does not
 belong to a reading — a passage does — so the holdings render identically
 inside a reading and at the whole weave. The Overlay alone stays reading-gated.

@@ -15,12 +15,20 @@ type OpenTabProps = {
   onGotoByte?: (byte: Byte) => void
   focusByteId?: string | null
   onFocusHandled?: () => void
-  /** Rendered in the reading station's side rail rather than across a page:
-   *  one column instead of two, since 420px will not hold both cards. */
+  /**
+   * The page the reader is on, when there is a text beside this. Offered as
+   * the Location so a hand capture does not make anyone retype a page number
+   * the viewer already knows exactly (TJ, 2026-08-09).
+   */
+  currentPage?: number
+  /** Rendered in the reading station's slide-out card (Your work) rather than
+   *  across a page: one column instead of two, since 380px will not hold both;
+   *  no heading of its own (the card's head bar carries it) and no teaching
+   *  prose (it would be read once and scrolled past forever). */
   compact?: boolean
 }
 
-export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compact }: OpenTabProps) {
+export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compact, currentPage }: OpenTabProps) {
   // `state` is the WHOLE graph and `scoped` is this reading's slice of it. The
   // split is load-bearing: the log renders what this reading evidences, but
   // naming, dedup and the delete guards must see every concept the student has
@@ -37,6 +45,11 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
   const citation = activeReading
     ? [activeReading.author, activeReading.title].filter(Boolean).join(", ")
     : ""
+  // The page you are looking at, in the form a citation takes. Offered the
+  // same way the citation is — as a placeholder that the empty field falls
+  // back to — so it is a default, never a lock: the passage may be a footnote
+  // carried over from the page before, or quoted from somewhere else entirely.
+  const pageHint = currentPage && currentPage > 0 ? `p. ${currentPage}` : ""
   const [source, setSource] = useState("")
   const [location, setLocation] = useState("")
   const [content, setContent] = useState("")
@@ -51,6 +64,12 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
   const closeCaptureInfoButtonRef = useRef<HTMLButtonElement>(null)
 
   const [openLogRows, setOpenLogRows] = useState<Record<string, boolean>>({})
+
+  // Unique per surface: VocabularyTab declares a <datalist id="conceptOptions">
+  // too, and both tabs are kept alive. Whichever mounted first wins the id, so
+  // the other's autocomplete quietly offered the wrong list. The sheet is
+  // mounted permanently now, which would have made that permanent.
+  const listId = compact ? "conceptOptions-reading" : "conceptOptions"
 
   const findConcept = (label: string) =>
     state.concepts.find(c => c.label.toLowerCase() === label.toLowerCase())
@@ -77,7 +96,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
       await editConcept(concept.id, { def: wdef })
     }
 
-    await addByte([concept.id], source.trim() || citation, location.trim(), text)
+    await addByte([concept.id], source.trim() || citation, location.trim() || pageHint, text)
 
     // reset form (keep source/location if user wants to enter multiple passages from same place)
     setContent("")
@@ -97,7 +116,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
       flash("passage added — you've named this concept before")
     } else {
       setReuseNote(null)
-      flash("passage added — in its log row you can also file it under a second concept")
+      flash("passage added — in its row you can also file it under a second concept")
     }
   }
 
@@ -152,7 +171,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
     const ok = await confirm({
       title: `Delete “${label}”?`,
       body: byteCount
-        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s" : ""} stay${byteCount !== 1 ? "" : "s"} in your log, unfiled. Export from Keep first if you might want this back.`
+        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s" : ""} stay${byteCount !== 1 ? "" : "s"} in your work, unfiled. Export from Keep first if you might want this back.`
         : "Export from Keep first if you might want this back.",
       confirmLabel: "Delete concept",
       danger: true,
@@ -168,7 +187,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
       // be two distinct ideas. Same idea → reuse the one you have.
       const ok = await confirm({
         title: `You already have a concept named “${existing.label}”.`,
-        body: "Make a second, distinct concept with the same name? They stay separate (homonyms) — if they turn out to be one idea, merge them from the log.",
+        body: "Make a second, distinct concept with the same name? They stay separate (homonyms) — if they turn out to be one idea, merge them in Vocabulary.",
         confirmLabel: "Make a homonym",
       })
       if (!ok) {
@@ -323,10 +342,17 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
         </div>
 
         <div className="form-row">
-          <span className="label">Location</span>
+          <span className="label">
+            Location
+            {pageHint ? <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--grey)" }}> (the page you are on, unless you say otherwise)</span> : null}
+          </span>
+          {/* Named, because the placeholder is no longer a constant: it is the
+              page you are on. A spec matching the old literal broke the moment
+              this started offering "p. 11" (2026-08-09). */}
           <input
+            id="bLocation"
             className="mono-in"
-            placeholder="ch. 3, p. 49"
+            placeholder={pageHint || "ch. 3, p. 49"}
             title="page, chapter, or timestamp — so you (and readers) can get back to the source"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
@@ -351,7 +377,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
               A <b>concept</b> is the idea this passage evidences — a <b>short noun phrase</b>, often the author's own words. If she names it ("boundary objects"), use her name for it. Your own-words gloss goes in the <b>description</b> — a sentence is fine there, crude is welcome. Rename anything later.
             </div>
             <div className="snote" style={{marginTop: "5px", color: "var(--ink-soft)"}}>
-              One passage can hold several concepts — capture it once, then "also file under another concept" from the log.
+              One passage can hold several concepts — capture it once, then "also file under another concept" from your work.
             </div>
             <div className="snote" style={{fontSize: "12px", color: "var(--ink-soft)", marginTop: "8px"}}>
               Stuck naming it? <b style={{color: "var(--ink)", fontWeight: 500}}>Point at the words in the passage that carry the point</b> and tap to build the concept from the author's own words.
@@ -394,9 +420,9 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
         </div>
         
         <div className="form-row">
-          <span className="label">Concept — a short noun phrase naming the idea <span style={{textTransform: "none", letterSpacing: 0, color: "var(--grey)"}}>(one per passage — you can file the same passage under a second concept from the log)</span></span>
+          <span className="label">Concept — a short noun phrase naming the idea <span style={{textTransform: "none", letterSpacing: 0, color: "var(--grey)"}}>(one per passage — you can file the same passage under a second concept from your work)</span></span>
           <input
-            list="conceptOptions"
+            list={listId}
             placeholder="e.g. boundary objects · satisficing · valence"
             title="a noun phrase, not a sentence — if the author names it, use her name for it"
             value={conceptLabel}
@@ -405,7 +431,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
           {/* Every concept, alphabetically — this is how you find one you
               already made, including from another reading, so that it joins its
               evidence instead of becoming a duplicate. */}
-          <datalist id="conceptOptions">
+          <datalist id={listId}>
             {sortedByLabel(state.concepts).map(c => <option key={c.id} value={c.label} />)}
           </datalist>
         </div>
@@ -424,7 +450,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
           className="btn"
           onClick={handleAddByte}
           disabled={!content.trim() || !conceptLabel.trim()}
-          title="files the passage under its concept in your capture log"
+          title="files the passage under its concept, in your work"
         >
           Add passage
         </button>
@@ -462,15 +488,30 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
 
   const logCard = (
       <div className="card">
-        <h2>Capture log <span className="n">{scoped.bytes.length ? `(${scoped.bytes.length} passages · ${scoped.concepts.length} concepts)` : ""}</span></h2>
-        <p className="do calm">Everything you capture from this reading lands here, A–Z.</p>
-        <p className="hint">Click a row to open it — edit the description, or file the same passage under another concept. When you have a handful, go to <b>02 — Linking</b> and start connecting them.</p>
+        {/* In the sheet, the panel's own head bar IS this heading — see
+            .yourwork-head, which carries the name and the same tally. On a
+            reference-only reading there is no sheet, so the card carries it. */}
+        {!compact && (
+          <h2>Your work <span className="n">{scoped.bytes.length ? `(${scoped.bytes.length} passages · ${scoped.concepts.length} concepts)` : ""}</span></h2>
+        )}
+        {/* Teaching copy, and only where there is room for it. In the sheet
+            these two paragraphs sat above the list permanently, in a 380px
+            column — read once, then scrolled past on every visit for the rest
+            of the course. The list itself is self-evident once you have used
+            it once; the reference-only view, which is a whole page and is where
+            a student meets capture with no text beside it, keeps them. */}
+        {!compact && (
+          <>
+            <p className="do calm">Everything you capture from this reading lands here, A–Z.</p>
+            <p className="hint">Click a row to open it — edit the description, or file the same passage under another concept. When you have a handful, go to <b>02 — Linking</b> and start connecting them.</p>
+          </>
+        )}
 
         <div className="scrollbox">
           {scoped.concepts.length === 0 && (
             <div className="empty">
               <svg width="34" height="18" viewBox="0 0 34 18" fill="none" stroke="#a39f92" strokeWidth="1.3"><path d="M2 13 L7 5 L12 13 L17 5 L22 13 L27 5 L32 13"/></svg>
-              <span className="cap">the log fills as you lay warp</span>
+              <span className="cap">your work fills as you lay warp</span>
             </div>
           )}
           {sortedByLabel(scoped.concepts).map(concept => {
@@ -641,7 +682,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
           </p>
           <div className="quietrow" style={{ marginTop: 6 }}>
             <input
-              list="conceptOptions"
+              list={listId}
               placeholder="the concept you are looking for…"
               value={newConceptOnly}
               onChange={(e) => setNewConceptOnly(e.target.value)}
@@ -683,9 +724,12 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
           <p className="hint" style={{ marginTop: "10px" }}>
             Normally you capture by <b>selecting the words in the text</b> beside this —
             that keeps the passage verbatim and anchors it to the page, so it lights up
-            whenever you open the reading. Type one here only when you cannot select it:
-            a scanned page, a figure&apos;s caption, or something you are quoting from
-            paper. A typed passage is not anchored and will not highlight.
+            whenever you open the reading. But <b>some things on a page cannot be
+            selected at all</b>: a concept map, a diagram&apos;s labels, a figure drawn
+            by hand, a page that was photographed rather than typeset. There is no text
+            layer under them for a highlight to hold on to, so this is how you keep
+            them. Loom fills in the reading and the page you are on; a typed passage is
+            not anchored and will not highlight.
           </p>
           {captureForm}
         </details>
