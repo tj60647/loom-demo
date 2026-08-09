@@ -8,6 +8,7 @@
 
 import { useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
+import HistoryPanel from "@/components/ui/HistoryPanel"
 import { useDialog } from "@/components/providers/DialogProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import {
@@ -118,7 +119,7 @@ export default function KeepTab() {
   const handleReset = async () => {
     const ok = await confirm({
       title: "Clear this course's cloth?",
-      body: `${state.concepts.length} concept${state.concepts.length !== 1 ? "s" : ""}, ${state.bytes.length} passage${state.bytes.length !== 1 ? "s" : ""}, ${state.edges.length} thread${state.edges.length !== 1 ? "s" : ""} and ${state.maps.length} projection${state.maps.length !== 1 ? "s" : ""} — tiers, one-lines and descriptions — all go. Export first — a .json makes this reversible. Your weaving history on 03 · Knowledge Graph survives either way.`,
+      body: `${state.concepts.length} concept${state.concepts.length !== 1 ? "s" : ""}, ${state.bytes.length} passage${state.bytes.length !== 1 ? "s" : ""}, ${state.edges.length} thread${state.edges.length !== 1 ? "s" : ""} and ${state.maps.length} projection${state.maps.length !== 1 ? "s" : ""} — tiers, one-lines and descriptions — all go. Export first — a .json makes this reversible. Your weaving history, below, survives either way.`,
       confirmLabel: "Clear the table",
       danger: true,
     })
@@ -199,10 +200,23 @@ export default function KeepTab() {
         <h2>Clear the table</h2>
         <p className="do calm">Only if you mean it — reset empties this course&apos;s cloth and starts you blank.</p>
         <p className="hint">Reset removes the concepts, the passages, the threads, and your projections — every tier, one-line, description and arrangement — for this course. It cannot be undone from inside Loom. An export taken beforehand is the whole safety net — with a .json in hand, a reset is reversible by importing it back.</p>
-        <p className="hint">What survives on purpose: the development history — the record of weaving, on <b>03 Knowledge Graph</b>. Reset clears the cloth, not the record of weaving it. Your growth stays visible even when the table is empty.</p>
+        <p className="hint">What survives on purpose: the development history — the <b>Capture Log</b> at the foot of this page. Reset clears the cloth, not the record of weaving it. Your growth stays visible even when the table is empty.</p>
         <p className="ghostnote">You will be asked to confirm. Export first if there is any doubt.</p>
         <button className="btn ghost" data-tip="clear this course's cloth and start blank — your weaving history is kept" onClick={handleReset} style={{ marginTop: 4 }}>Reset this cloth</button>
       </div>
+
+      {/* The Capture Log — the ledger of every capture and every link, in the
+          order it happened. It lives here as of 2026-08-09 because it used to
+          render ONLY at the whole weave (MapTab, behind `wholeWeave &&`), and
+          the whole-weave workbench is not supported in v1. It is also in no
+          export: `buildExport` and `buildMarkdown` carry concepts, passages,
+          threads, cloths, maps and views — `graphEvents` appear in none of
+          them. So without a home here it would have been unreachable AND
+          unkeepable, which is red line 5 outright, on the very page that
+          promises the history survives a reset. Keep is the right home
+          regardless: the Log is course-wide and Keep is now every reading at
+          once. */}
+      <HistoryPanel />
     </>
   )
 }

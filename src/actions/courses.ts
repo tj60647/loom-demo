@@ -55,7 +55,12 @@ export async function getActiveCourse() {
       isNull(courseMemberships.removedAt)
     ))
     .limit(1)
-  const isStaff = isAdminUser(session.user) || membership[0]?.role === "FACULTY"
+  // Two grades, not one (TJ, 2026-08-09: "admin role has even more tabs").
+  // Faculty hold the read-side of their own courses; the library and course
+  // managers are write surfaces and stay admin's. Same rule the /admin layout
+  // and AdminNav already enforce — this only carries it to the journey bar.
+  const isAdmin = isAdminUser(session.user)
+  const isStaff = isAdmin || membership[0]?.role === "FACULTY"
 
   // The sections a staff viewer may overlay. Empty for a student — they see no
   // Overlay control at all, so the list would only be a leak of names.
@@ -67,7 +72,7 @@ export async function getActiveCourse() {
         .orderBy(asc(sections.name))
     : []
 
-  return { id: course.id, name: course.name, term: course.term, isStaff, sections: courseSections }
+  return { id: course.id, name: course.name, term: course.term, isStaff, isAdmin, sections: courseSections }
 }
 
 /** Appends -2, -3, … until the slug is free. */

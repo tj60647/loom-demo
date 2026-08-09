@@ -34,6 +34,10 @@ export type ActiveCourse = {
    *  controls are drawn at all — students never see them (TJ, 2026-08-08).
    *  Not an authorization: the overlay actions re-check server-side. */
   isStaff: boolean
+  /** A SITE admin, who also holds the write surfaces (Readings, Courses).
+   *  Faculty are staff but not admin — the journey bar grades the staff group
+   *  by this (TJ, 2026-08-09). Not an authorization; every page re-gates. */
+  isAdmin: boolean
   /** The course's sections, for the Overlay picker. Empty for a student. */
   sections: { id: string; name: string }[]
 }

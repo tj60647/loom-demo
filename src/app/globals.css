@@ -54,13 +54,41 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
    "this is a thing you press" — and a mis-drag on a card leaves half the
    action row highlighted. Selection stays on for anything a reader might
    legitimately want to copy: page text, transcriptions, tooltips, hints. */
-.btn,.act,summary,nav button,nav a.station{-webkit-user-select:none;user-select:none}
+.btn,.act,summary,nav button,nav .station{-webkit-user-select:none;user-select:none}
 #saveDot{font-family:var(--mono);font-size:10px;color:var(--ink-soft);align-self:center}
 nav{display:flex;border-bottom:1px solid var(--rule);padding:0 26px;background:var(--paper-2);flex-wrap:wrap}
-nav button,nav a.station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
-nav button.active,nav a.station.active{color:var(--ink);border-bottom-color:var(--ochre)}
+/* `.station`, not `a.station`: a station with nowhere to go is a <span>
+   (JourneyNav's READING_ONLY) and must keep the same padding and rhythm as
+   the links beside it, or the greyed ones run together. */
+nav button,nav .station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
+nav button.active,nav .station.active{color:var(--ink);border-bottom-color:var(--ochre)}
+/* A station with nowhere to go (JourneyNav's READING_ONLY, TJ 2026-08-09).
+   Still drawn and still numbered — the arc is meant to be visible whole — but
+   quieter than a link and not interactive. Not `disabled`, because it is not a
+   control that happens to be off; it is a place you are not standing near.
+   cursor:default rather than not-allowed: nothing is forbidden here, there is
+   simply no text open yet. */
+nav .station.off{color:var(--dot);cursor:default;text-decoration:none}
+/* The staff group: the same bar, pushed to the right, in its own colour
+   (TJ, 2026-08-09). Sage rather than the journey's ink/ochre, because these
+   are a different KIND of thing — not steps in the arc a student walks, which
+   is also why they carry no numbers. margin-left:auto does the pushing, so the
+   group falls in under the stations rather than overlapping them when the bar
+   wraps on a narrow screen. */
+nav .staffgroup{margin-left:auto;display:flex;align-items:stretch;flex-wrap:wrap}
+nav .station.staff{color:var(--sage);font-size:16px}
+nav .station.staff:hover{color:var(--ink)}
+nav .station.staff.active{color:var(--sage);border-bottom-color:var(--sage)}
+
+/* A button that reads as prose. Used where the action is a tab change the
+   Workbench owns, so it cannot be an <a> — see OpenTab's "see them all in
+   Vocabulary". */
+.linkish{background:none;border:none;padding:0;font:inherit;color:var(--ochre);
+  text-decoration:underline;cursor:pointer}
+.linkish:hover{opacity:.8}
+nav .station.off .step{color:var(--dot)}
 nav .step{font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-right:7px;color:var(--grey)}
-nav button.active .step,nav a.station.active .step{color:var(--ochre)}
+nav button.active .step,nav .station.active .step{color:var(--ochre)}
 /* Full-bleed so the scrollbar rides the window edge rather than the edge of a
    centred column; the 1100px measure is kept by padding instead of max-width. */
 main{padding:24px max(26px,calc((100% - 1100px)/2)) 86px;margin:0}

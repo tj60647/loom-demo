@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import KeepTab from "@/components/tabs/KeepTab"
-import JourneyNav from "@/components/ui/JourneyNav"
+import JourneyNav, { stationNumber } from "@/components/ui/JourneyNav"
 
 export default function KeepPage() {
   // See the note in Workbench: "loading" is not "signed out".
@@ -36,16 +36,19 @@ export default function KeepPage() {
   return (
     <>
       <div className="scopebar">
-        <Link href="/" className="scopeback">‹ readings</Link>
+        <Link href="/" className="scopeback">‹ library</Link>
         <span className="scopetitle">Keep</span>
-        <span className="scopemeta">your projections as files, and the whole cloth behind them</span>
+        <span className="scopemeta">every reading at once — your projections as files, and the whole cloth behind them</span>
       </div>
       <JourneyNav active="keep" />
       <main>
         <KeepTab />
       </main>
       <footer>
-        <span className="fl">06 — KEEP</span>
+        {/* Derived, like the workbench footer: Weave is hidden, so Keep is
+            05 and not the 06 this line used to hardcode — the bar above said
+            one number and the foot said another. */}
+        <span className="fl">{stationNumber("keep")} — KEEP</span>
         <span className="fr">YOURS TO TAKE</span>
       </footer>
     </>

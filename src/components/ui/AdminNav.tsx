@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 export type AdminNavCourse = {
@@ -11,19 +10,11 @@ export type AdminNavCourse = {
   sections: { id: string; name: string }[]
 }
 
-function withParams(basePath: string, courseId: string | null, sectionId: string | null) {
-  const params = new URLSearchParams()
-  if (courseId) params.set("course", courseId)
-  if (sectionId) params.set("section", sectionId)
-  const query = params.toString()
-  return query ? `${basePath}?${query}` : basePath
-}
-
 // Layouts don't receive searchParams, so the nav resolves the active course and
 // section from the URL itself. This mirrors resolveCourseId/resolveSectionId on
 // the server: an unknown course falls back to the first, an unknown section
 // falls back to "all sections".
-export default function AdminNav({ courses, isAdmin }: { courses: AdminNavCourse[]; isAdmin: boolean }) {
+export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -52,33 +43,17 @@ export default function AdminNav({ courses, isAdmin }: { courses: AdminNavCourse
   }
 
   return (
+    // Which course, and which section — and nothing else. The tabs that used to
+    // lead this row (My Loom · Roster · Cohort Graph · Readings · Courses) moved
+    // to the journey bar's staff group on 2026-08-09 (TJ), so a faculty member
+    // holds one navigation rather than swapping between two. What is left is
+    // not a menu: it is the scope every page below reads, and it belongs beside
+    // them rather than in a bar about where you can go.
     <nav style={{ marginBottom: "20px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-      {/* Only the section you are on is filled; the rest are quiet. Five equally
-          loud black blocks gave no sense of where you were. */}
-      <Link href={withParams("/", activeCourseId, null)} className="btn ghost mini">← My Loom</Link>
-      {/* Faculty hold the read-side (Roster, Cohort Graph — ruling 18); the
-          library and course managers are write surfaces and stay admin's. */}
-      {([
-        ["/admin", "Roster", activeSectionId] as const,
-        ["/admin/aggregate", "Cohort Graph", activeSectionId] as const,
-        ...(isAdmin
-          ? ([
-              ["/admin/library", "Readings", null] as const,
-              ["/admin/courses", "Courses", null] as const,
-            ])
-          : []),
-      ]).map(([href, label, section]) => (
-        <Link
-          key={href}
-          href={withParams(href, activeCourseId, section)}
-          className={`btn mini${pathname === href ? "" : " ghost"}`}
-          aria-current={pathname === href ? "page" : undefined}
-        >
-          {label}
-        </Link>
-      ))}
-
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+      {/* Left, not right: with the tabs gone this row holds only the scope, and
+          a lone pair of pickers pushed to the far edge of an empty bar read as
+          leftovers. They line up with the page heading underneath instead. */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
         {courses.length === 0 ? (
           <span className="hint" style={{ fontSize: "13px" }}>No courses yet</span>
         ) : (

@@ -32,17 +32,25 @@ test("faculty enter /admin bare and land on their own course's roster", async ({
 
 test("the nav offers the read side only — no Readings, no Courses", async ({ page }) => {
   await page.goto("/admin")
-  const nav = page.locator("nav").first()
+  // Since 2026-08-09 (TJ) there is ONE bar: the journey, with the staff group
+  // on its right. The separate admin tab row is gone, which is why there is no
+  // "← My Loom" any more — 00 Library is right there on the same bar, and that
+  // is the point of merging them (capabilities are additive).
+  const nav = page.locator('nav[aria-label="The journey"]')
+  const staff = nav.locator(".staffgroup")
 
-  await expect(nav.getByRole("link", { name: "Roster" })).toBeVisible({ timeout: 15_000 })
-  await expect(nav.getByRole("link", { name: "Cohort Graph" })).toBeVisible()
-  await expect(nav.getByRole("link", { name: "← My Loom" })).toBeVisible()
+  await expect(staff.getByRole("link", { name: "Roster" })).toBeVisible({ timeout: 15_000 })
+  await expect(staff.getByRole("link", { name: "Cohort Graph" })).toBeVisible()
+  // Their own learner surfaces, on the same bar and one click away.
+  await expect(nav.getByRole("link", { name: /Library/ })).toBeVisible()
+  await expect(nav.getByRole("link", { name: /Keep/ })).toBeVisible()
   // Workflows left the admin nav for the header (TJ, 2026-08-08) — it is not an
   // admin surface at all now; students read their own flow there.
   await expect(nav.getByRole("link", { name: "Workflows" })).toHaveCount(0)
   await expect(page.locator('header a[href="/workflows"]')).toBeVisible()
 
-  // The write surfaces are absent from the shell, not merely disabled.
+  // The write surfaces are absent from the bar, not merely disabled — the
+  // staff group is filtered by isAdmin, and faculty are staff but not admin.
   await expect(nav.getByRole("link", { name: "Readings" })).toHaveCount(0)
   await expect(nav.getByRole("link", { name: "Courses" })).toHaveCount(0)
 })

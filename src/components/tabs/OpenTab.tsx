@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import Link from "next/link"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
@@ -21,6 +20,14 @@ type OpenTabProps = {
    * the viewer already knows exactly (TJ, 2026-08-09).
    */
   currentPage?: number
+  /**
+   * Show the student their whole vocabulary. A callback and not an href: the
+   * Workbench seeds `activeTab` once and is keyed on the reading id, so
+   * navigating to `?tab=read` changes the URL and leaves the tab exactly where
+   * it was. Widening that key would remount the bench and destroy the drafts
+   * KEEP_ALIVE exists to protect.
+   */
+  onGotoVocabulary?: () => void
   /** Rendered in the reading station's slide-out card (Your work) rather than
    *  across a page: one column instead of two, since 380px will not hold both;
    *  no heading of its own (the card's head bar carries it) and no teaching
@@ -28,7 +35,7 @@ type OpenTabProps = {
   compact?: boolean
 }
 
-export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compact, currentPage }: OpenTabProps) {
+export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compact, currentPage, onGotoVocabulary }: OpenTabProps) {
   // `state` is the WHOLE graph and `scoped` is this reading's slice of it. The
   // split is load-bearing: the log renders what this reading evidences, but
   // naming, dedup and the delete guards must see every concept the student has
@@ -663,7 +670,13 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
             {scoped.outside.length} concept{scoped.outside.length !== 1 ? "s" : ""}{" "}
             from your other readings —
             not hidden, just not evidenced here. Type one&apos;s name above to file a passage from this
-            reading under it, or see them all in <Link href="/weave">your whole weave</Link>.
+            reading under it{onGotoVocabulary ? <>, or <button type="button" className="linkish" onClick={onGotoVocabulary}>see them all in Vocabulary</button></> : null}.
+            {/* Vocabulary, not "your whole weave" (TJ, 2026-08-09): that link
+                went to /weave, which v1 does not support. Vocabulary is the
+                right home anyway — the model has it UNSCOPED, "the User's
+                holdings ... every Concept and Link Label across all readings",
+                so it answers "show me the others" exactly, and it is reachable
+                without leaving this text. */}
           </p>
         )}
 

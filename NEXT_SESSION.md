@@ -160,6 +160,80 @@ and a list of leads I did not verify — of which `mapKit.ts`'s "busiest first �
 the top few are your primary candidates" is the likeliest genuine red-line-3
 problem.
 
+### 6c. Keep is every reading; the whole weave is withdrawn from the bar
+
+TJ, 2026-08-09: *"i want keep to be about all the readings, but links out of keep
+cant go to 'your whole weave' because we arent supporting this yet. keep is
+either per reading, or if all readings then 2/3/4 are greyed out."*
+
+- **02 Linking · 03 Knowledge Graph · 04 Vocabulary render greyed and inert**
+  wherever they are not a tab you can work at right here — the Library and Keep.
+  A `<span aria-label="… — open a reading first">`, not a disabled `<button>`:
+  it is not a control that is switched off, it is a place you are not standing
+  near. Keyed off "is there a handler", not off a route list.
+- **04 Vocabulary is the arguable one** — the model has it UNSCOPED, the User's
+  holdings across every reading. It is greyed anyway because `/weave` is the
+  only surface that renders it outside a text. `JourneyNav`'s `READING_ONLY` is
+  where that decision lands when `/weave` is ruled on.
+- Two bugs found on the way: `KeepPage` hardcoded `06 — KEEP` while the derived
+  bar said `05 —Keep`; and the base nav rule was `nav a.station`, so a `<span>`
+  station got no padding and the greyed ones ran together as
+  `02 — Linking03 — Knowledge Graph`.
+
+**The red-line-5 catch, and it is the reason not to ship this ruling naively.**
+The **Capture Log renders in exactly one place** — `MapTab`, behind
+`{wholeWeave && …}` — and **no export contains it**: `buildExport` and
+`buildMarkdown` carry concepts, passages, threads, cloths, maps and views, and
+`graphEvents` appear in none of them. Withdrawing `/weave` would have made it
+unreachable *and* unkeepable, on the very page whose reset dialog promises "your
+weaving history survives either way". **It now renders at the foot of Keep**, and
+that copy is corrected. Keep is the right home regardless: the Log is
+course-wide and Keep is now every reading at once.
+
+**Still stranded, not fixed — product calls:** the **whole-weave Cloth** (title
+and description; its only editor is `ThrowTab`, and Keep lists projections
+only), and **whole-weave Projections** (Keep names and exports them; nothing
+opens them). Plus **`ShelfSearch`'s three links into `/weave`** — one of which
+is the last live route to an untethered passage.
+
+### 6d. One bar: the staff group joins the journey
+
+TJ, 2026-08-09: *"in faculty or admin mode, menu items should appear to the
+right of this instead of an administration panel"* … *"admin role has even more
+tabs."*
+
+`JourneyNav` now carries a **`.staffgroup`** on its right, in sage, unnumbered
+(they are not steps on the student's arc): **Roster · Cohort Graph** for
+FACULTY, plus **Readings · Courses** for site ADMIN. It renders on **every**
+surface, `/admin` included — which is the point: the model already says faculty
+"reach [the overlays] through their *own* learner surfaces … **capabilities
+being additive**", and two separate navigations said the opposite.
+
+- `AdminNav` keeps **only** the course and section pickers, now left-aligned:
+  that row is the page's scope, not a menu. `← My Loom` is gone — 00 Library is
+  on the same bar.
+- `getActiveCourse` gained **`isAdmin`** beside `isStaff`, which conflated the
+  two. Decides what is **drawn**, never what may be read; every page re-gates.
+- Staff links carry the course you are already looking at (the URL's `?course=`
+  on an admin page, the on-screen course elsewhere), so moving between staff
+  surfaces does not reset to "the first course".
+- `src/lib/workflows.ts` moved in the same commit per AGENTS.md: the faculty
+  flow's "Enter the admin shell" is now "Enter the teaching surfaces · the
+  journey bar's staff group, from anywhere".
+
+**Trap:** `useSearchParams()` forces a Suspense boundary or it takes the whole
+route client-side — putting it inline in `JourneyNav` broke the build with
+*"useSearchParams() should be wrapped in a suspense boundary at page /keep"*,
+because `/keep` is statically prerendered. The staff group is its own component
+under `<Suspense fallback={null}>`, and `/keep` is still `○` in the build output.
+
+**A correction to §6b's fix.** The `your whole weave` link was repointed at
+`?tab=read` — and that was **dead**. `Workbench` seeds `activeTab` once with
+`useState(firstTab)` and `reading/page.tsx` keys it on `source.id`, so the URL
+changed and the tab did not. Widening the key would remount the bench and
+destroy the drafts `KEEP_ALIVE` exists to protect. It is now a callback the
+Workbench owns (`onGotoVocabulary`), verified by clicking it.
+
 ### 7. Traps this session
 
 - **`overflow: hidden` vs `overflow: clip` on `.pdf-body`.** Clip makes no

@@ -159,6 +159,10 @@ export default function Workbench({
   // effect on every Workbench render while a target was set.
   const handleFocusHandled = useCallback(() => setOpenTargetByteId(null), [])
 
+  // "See them all in Vocabulary", from the capture side. The tab is this
+  // component's state, so it has to be moved from here.
+  const handleGotoVocabulary = useCallback(() => goTo("read"), [])
+
   // Loading comes FIRST. Until next-auth has answered we do not yet know
   // whether anybody is signed in, and guessing "signed out" is the guess that
   // shows a sign-in screen to someone who is already signed in.
@@ -283,6 +287,7 @@ export default function Workbench({
                         onGotoByte={handleGotoByte}
                         focusByteId={openTargetByteId}
                         onFocusHandled={handleFocusHandled}
+                        onGotoVocabulary={handleGotoVocabulary}
                       />
                     }
                   />
@@ -294,6 +299,7 @@ export default function Workbench({
                   onGotoByte={handleGotoByte}
                   focusByteId={openTargetByteId}
                   onFocusHandled={handleFocusHandled}
+                  onGotoVocabulary={handleGotoVocabulary}
                 />
               ))}
           </div>
