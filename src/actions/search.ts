@@ -238,7 +238,7 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
   const edgeScope = courseId
     ? sql`("edge"."courseId" = ${courseId} OR "edge"."courseId" IS NULL)`
     : sql`"edge"."courseId" IS NULL`
-  const byteScope = courseId
+  const passageScope = courseId
     ? sql`("byte"."courseId" = ${courseId} OR "byte"."courseId" IS NULL)`
     : sql`"byte"."courseId" IS NULL`
 
@@ -282,7 +282,7 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
     LIMIT ${MAX_LOOM_HITS}
   `)
 
-  const byteResult = await db.execute(sql`
+  const passageResult = await db.execute(sql`
     WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
     SELECT "byte"."id", "byte"."sourceId", "byte"."source",
            ts_headline('english', "byte"."content", q.query, ${HEADLINE_OPTIONS}) AS snippet,
@@ -293,7 +293,7 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
              q.query
            ) AS rank
     FROM "byte", q
-    WHERE "byte"."userId" = ${userId} AND ${byteScope}
+    WHERE "byte"."userId" = ${userId} AND ${passageScope}
       AND (setweight(to_tsvector('english', "byte"."content"), 'B') ||
            setweight(to_tsvector('english', coalesce("byte"."note", '')), 'C') ||
            setweight(to_tsvector('english', coalesce("byte"."question", '')), 'C')) @@ q.query
@@ -308,7 +308,7 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
     links: (edgeResult.rows as { id: string; handle: string | null; fromLabel: string; toLabel: string; snippet: string }[]).map((r) => ({
       id: r.id, handle: r.handle ?? "", fromLabel: r.fromLabel, toLabel: r.toLabel, snippet: r.snippet,
     })),
-    passages: (byteResult.rows as { id: string; sourceId: string | null; source: string | null; snippet: string }[]).map((r) => ({
+    passages: (passageResult.rows as { id: string; sourceId: string | null; source: string | null; snippet: string }[]).map((r) => ({
       id: r.id, sourceId: r.sourceId, source: r.source ?? "", snippet: r.snippet,
     })),
   }

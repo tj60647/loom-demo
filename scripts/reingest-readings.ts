@@ -83,14 +83,14 @@ async function main() {
     // The whole safety question in one query: replacing page text moves every
     // offset measured against it, so a reading anyone has highlighted needs a
     // deliberate decision rather than a batch run.
-    const [{ value: byteCount }] = await db
+    const [{ value: passageCount }] = await db
       .select({ value: count() })
       .from(passages)
       .where(eq(passages.sourceId, row.id))
 
-    if (byteCount > 0 && !force) {
+    if (passageCount > 0 && !force) {
       console.log(
-        `  HOLD   ${row.title} — ${byteCount} highlight${byteCount === 1 ? "" : "s"} anchored to the current text; re-run with --force to replace it anyway`
+        `  HOLD   ${row.title} — ${passageCount} highlight${passageCount === 1 ? "" : "s"} anchored to the current text; re-run with --force to replace it anyway`
       )
       skipped += 1
       continue
@@ -108,13 +108,13 @@ async function main() {
         const metrics = computeExtractionMetrics(pages, { coverRendered: true, structure })
         const diagnosis = diagnoseExtraction(metrics, structure.fonts)
         console.log(
-          `  would  ${row.title} — ${pages.length} pages, ${byteCount} highlights, remedy: ${diagnosis.remedy}`
+          `  would  ${row.title} — ${pages.length} pages, ${passageCount} highlights, remedy: ${diagnosis.remedy}`
         )
         continue
       }
 
       const result = await reingestSource(row.id, buffer)
-      const warn = byteCount > 0 ? ` — REPLACED text under ${byteCount} highlights` : ""
+      const warn = passageCount > 0 ? ` — REPLACED text under ${passageCount} highlights` : ""
       console.log(
         `  ok     ${row.title} — ${result.replacedPages} → ${result.pageCount} pages, cover ${
           result.coverRendered ? "rendered" : "FAILED"

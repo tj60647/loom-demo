@@ -223,8 +223,8 @@ export default function ClothReflection() {
       if (e) {
         const f = state.concepts.find(c => c.id === e.fromId);
         const t = state.concepts.find(c => c.id === e.toId);
-        const fBytes = state.passages.filter(b => f && b.conceptIds.includes(f.id));
-        const tBytes = state.passages.filter(b => t && b.conceptIds.includes(t.id));
+        const fromPassages = state.passages.filter(b => f && b.conceptIds.includes(f.id));
+        const toPassages = state.passages.filter(b => t && b.conceptIds.includes(t.id));
 
         readingPane = (
           <div id="readingPane" style={{ marginTop: "16px" }}>
@@ -236,8 +236,8 @@ export default function ClothReflection() {
               <div key={c!.id} style={{ marginBottom: "16px" }}>
                 <div className="label" style={{ marginTop: "8px" }}>{c!.label}</div>
                 {c!.def && <div style={{ fontSize: "13.5px", color: "var(--ink-soft)" }}>{c!.def}</div>}
-                {(c === f ? fBytes : tBytes).map(b => (
-                  <div key={b.id} className="bytequote">
+                {(c === f ? fromPassages : toPassages).map(b => (
+                  <div key={b.id} className="passagequote">
                     <span className="src">{b.source || '—'}{b.location ? ` · ${b.location}` : ''}</span><br/>
                     {b.content}
                   </div>

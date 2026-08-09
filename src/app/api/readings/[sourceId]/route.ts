@@ -5,7 +5,7 @@ import { getSourceFileStream } from "@/actions/sources"
 
 /**
  * A Content-Disposition a browser can actually receive. HTTP header values are
- * ByteStrings — anything above U+00FF throws when the Response is constructed,
+ * PassageStrings — anything above U+00FF throws when the Response is constructed,
  * so a title with an em dash or a curly quote ("Learning How to Learn — Chapter
  * 1", week 1 of this very course) took the whole route down and, until the
  * catch below learned to tell failures apart, reported itself as a 404 on a

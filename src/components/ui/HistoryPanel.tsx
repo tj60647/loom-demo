@@ -20,7 +20,7 @@ function makeConcept(id: string, label: string, at: Date): Concept {
   return { id, courseId: null, userId: "", label, def: "", note: "", createdAt: at }
 }
 
-function makeByte(id: string, conceptIds: string[], at: Date): Passage {
+function makePassage(id: string, conceptIds: string[], at: Date): Passage {
   return {
     id, courseId: null, userId: "", conceptIds,
     source: "", sourceId: null, location: "", content: "",
@@ -70,7 +70,7 @@ function seedFromSnapshot(
     for (const raw of s.passages) {
       const b = raw as Record<string, unknown> | null
       if (b && typeof b.id === "string") {
-        passages.set(b.id, makeByte(b.id, pointerIds(b), at))
+        passages.set(b.id, makePassage(b.id, pointerIds(b), at))
       }
     }
   }
@@ -99,7 +99,7 @@ function foldEvents(events: GraphEvent[], upTo: number) {
   // old cascade — while passage.capture passages survive as Unlabeled. The record
   // spans both eras, so the fold must replay each passage under the semantics
   // it actually lived under.
-  const cascadeEraBytes = new Set<string>()
+  const cascadeEraPassages = new Set<string>()
   let readRevisions = 0
 
   for (let i = 0; i < upTo && i < events.length; i++) {
@@ -142,7 +142,7 @@ function foldEvents(events: GraphEvent[], upTo: number) {
             if (!b.conceptIds.includes(e.entityId)) continue
             // Cascade-era passages actually died with their concept; 0021-era
             // passages survive their label and only the pointer goes.
-            if (cascadeEraBytes.has(id)) passages.delete(id)
+            if (cascadeEraPassages.has(id)) passages.delete(id)
             else b.conceptIds = b.conceptIds.filter((cid) => cid !== e.entityId)
           }
           for (const [id, ed] of edges) if (ed.fromId === e.entityId || ed.toId === e.entityId) edges.delete(id)
@@ -152,11 +152,11 @@ function foldEvents(events: GraphEvent[], upTo: number) {
       case "byte.create":
       case "byte.capture": {
         if (e.entityId) {
-          passages.set(e.entityId, makeByte(e.entityId, pointerIds(p), at))
+          passages.set(e.entityId, makePassage(e.entityId, pointerIds(p), at))
           // Recorded passage.create = the pre-0021 cascade era. Synthesized
           // creates are minted from rows alive TODAY, so they demonstrably
           // survived — replay them with survive semantics.
-          if (e.kind === "byte.create" && p.synthesized !== true) cascadeEraBytes.add(e.entityId)
+          if (e.kind === "byte.create" && p.synthesized !== true) cascadeEraPassages.add(e.entityId)
         }
         break
       }
@@ -168,8 +168,8 @@ function foldEvents(events: GraphEvent[], upTo: number) {
           } else if (!b) {
             // Pre-0021 refile events minted a NEW passage row under this id —
             // cascade-era rows like any other passage.create of their day.
-            passages.set(e.entityId, makeByte(e.entityId, [p.conceptId], at))
-            cascadeEraBytes.add(e.entityId)
+            passages.set(e.entityId, makePassage(e.entityId, [p.conceptId], at))
+            cascadeEraPassages.add(e.entityId)
           }
         }
         break

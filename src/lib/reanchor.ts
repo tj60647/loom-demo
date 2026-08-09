@@ -72,7 +72,7 @@ export function locateQuote(projection: string, quote: string): QuoteLocation {
   }
 }
 
-export type AnchoredByte = {
+export type AnchoredPassage = {
   id: string
   content: string
   pageNumber: number | null
@@ -102,7 +102,7 @@ export type ReanchorPlan = {
  * the same as "true of every PDF", and the check costs a string comparison.
  */
 export function planReanchor(
-  anchored: AnchoredByte[],
+  anchored: AnchoredPassage[],
   pageTextAfter: Map<number, string>,
   replacedPages: number[]
 ): ReanchorPlan {

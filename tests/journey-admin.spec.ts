@@ -108,8 +108,8 @@ test("the cohort map renders the section's woven concepts", async ({ page }) => 
   // attribution — plus the threads that cross it.
   await page.locator(".crow", { hasText: "object worlds" }).first().click()
   await expect(page.locator(".threadhead", { hasText: "object worlds" })).toBeVisible()
-  await expect(page.locator(".bytequote").first()).toBeVisible()
-  await expect(page.locator(".bytequote").first()).toContainText("Test User A")
+  await expect(page.locator(".passagequote").first()).toBeVisible()
+  await expect(page.locator(".passagequote").first()).toContainText("Test User A")
 })
 
 test.describe("authorization boundary", () => {

@@ -187,15 +187,15 @@ export async function getUserLoomData() {
     .innerJoin(passages, eq(passageConcepts.passageId, passages.id))
     .where(and(eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
     .orderBy(asc(passageConcepts.createdAt), asc(passageConcepts.conceptId))
-  const conceptIdsByByte = new Map<string, string[]>()
+  const conceptIdsByPassage = new Map<string, string[]>()
   junctionRows.forEach((row) => {
-    const list = conceptIdsByByte.get(row.passageId) ?? []
+    const list = conceptIdsByPassage.get(row.passageId) ?? []
     list.push(row.conceptId)
-    conceptIdsByByte.set(row.passageId, list)
+    conceptIdsByPassage.set(row.passageId, list)
   })
-  const userBytes: Passage[] = passageRows.map((b) => ({
+  const userPassages: Passage[] = passageRows.map((b) => ({
     ...b,
-    conceptIds: conceptIdsByByte.get(b.id) ?? [],
+    conceptIds: conceptIdsByPassage.get(b.id) ?? [],
   }))
   const userEdges = await db.select().from(edges)
     .where(and(eq(edges.userId, userId), inCourse(edges.courseId, courseId)))
@@ -230,7 +230,7 @@ export async function getUserLoomData() {
 
   return {
     concepts: userConcepts,
-    passages: userBytes,
+    passages: userPassages,
     edges: userEdges,
     maps: userMaps as LoomMap[],
     cloths: clothRows,
@@ -399,7 +399,7 @@ export async function createPassage(data: { conceptIds?: string[], source: strin
   const tier: PassageTier = data.tier === "p" || data.tier === "s" || data.tier === "t" ? data.tier : ""
   const passageId = crypto.randomUUID()
   const pointerBase = Date.now()
-  const byteInsert = db.insert(passages).values({
+  const passageInsert = db.insert(passages).values({
     id: passageId,
     courseId,
     userId,
@@ -418,10 +418,10 @@ export async function createPassage(data: { conceptIds?: string[], source: strin
   }).returning()
   const [inserted] = conceptIds.length
     ? (await db.batch([
-        byteInsert,
+        passageInsert,
         db.insert(passageConcepts).values(conceptIds.map((conceptId, i) => ({ passageId, conceptId, createdAt: new Date(pointerBase + i) }))),
       ]))[0]
-    : await byteInsert
+    : await passageInsert
 
   // passage.capture fires for every capture, named or not — the Log is complete
   // (JC Aug 7 / P0.6). passage.create remains only as a historical kind.
@@ -546,7 +546,7 @@ export async function unfilePassage(passageId: string, conceptId: string) {
 /**
  * Say which reading a passage came from.
  *
- * Bytes captured before reading-first, and any captured outside a reading,
+ * Passages captured before reading-first, and any captured outside a reading,
  * carry free-text `source` and no `sourceId`, so they have no door and fall out
  * of every lens. This is the way back in — and it is the STUDENT saying it.
  * Matching `passage.source` text against library titles would be the tool deciding
@@ -860,7 +860,7 @@ export async function getGraphEvents(): Promise<GraphEvent[]> {
       snapshot?.maps?.forEach((m) => covered.add(m.id))
     })
 
-  const [userConcepts, userBytes, userEdges] = [
+  const [userConcepts, userPassages, userEdges] = [
     await db.select().from(concepts).where(and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId))).orderBy(asc(concepts.createdAt), asc(concepts.id)),
     await db.select().from(passages).where(and(eq(passages.userId, userId), inCourse(passages.courseId, courseId))).orderBy(asc(passages.createdAt), asc(passages.id)),
     await db.select().from(edges).where(and(eq(edges.userId, userId), inCourse(edges.courseId, courseId))).orderBy(asc(edges.createdAt), asc(edges.id)),
@@ -873,7 +873,7 @@ export async function getGraphEvents(): Promise<GraphEvent[]> {
       entityId: c.id, payload: { label: c.label, synthesized: true }, at: c.createdAt,
     })
   )
-  userBytes.filter((b) => !covered.has(b.id)).forEach((b) =>
+  userPassages.filter((b) => !covered.has(b.id)).forEach((b) =>
     synthesized.push({
       id: `synth-b-${b.id}`, userId, courseId, kind: "byte.create", entityType: "byte",
       entityId: b.id, payload: { source: b.source, synthesized: true }, at: b.createdAt,
@@ -986,12 +986,12 @@ export async function importGraph(parsed: ParsedImport) {
   // one statement would otherwise tie and come back in reminted-UUID order.
   const pointerBase = Date.now()
   let pointerSeq = 0
-  const byteConceptRows: { passageId: string; conceptId: string; createdAt: Date }[] = []
+  const passageConceptRows: { passageId: string; conceptId: string; createdAt: Date }[] = []
   const passageRows = parsed.passages.map((b) => {
     const id = crypto.randomUUID()
     b.conceptKeys.forEach((key) => {
       const conceptId = conceptIdByKey.get(key)
-      if (conceptId) byteConceptRows.push({ passageId: id, conceptId, createdAt: new Date(pointerBase + pointerSeq++) })
+      if (conceptId) passageConceptRows.push({ passageId: id, conceptId, createdAt: new Date(pointerBase + pointerSeq++) })
     })
     const anchor = b.anchor && knownSources.has(b.anchor.sourceId) ? b.anchor : undefined
     return {
@@ -1009,11 +1009,11 @@ export async function importGraph(parsed: ParsedImport) {
       tier: b.tier ?? ("" as PassageTier),
     }
   })
-  const conceptIdsByByte = new Map<string, string[]>()
-  byteConceptRows.forEach((r) => {
-    const list = conceptIdsByByte.get(r.passageId) ?? []
+  const conceptIdsByPassage = new Map<string, string[]>()
+  passageConceptRows.forEach((r) => {
+    const list = conceptIdsByPassage.get(r.passageId) ?? []
     list.push(r.conceptId)
-    conceptIdsByByte.set(r.passageId, list)
+    conceptIdsByPassage.set(r.passageId, list)
   })
   const edgeRows = parsed.edges
     .filter((e) => conceptIdByKey.has(e.fromKey) && conceptIdByKey.has(e.toKey))
@@ -1110,7 +1110,7 @@ export async function importGraph(parsed: ParsedImport) {
 
   const snapshot: GraphSnapshot = {
     concepts: conceptRows.map((c) => ({ id: c.id, label: c.label })),
-    passages: passageRows.map((b) => ({ id: b.id, conceptIds: conceptIdsByByte.get(b.id) ?? [] })),
+    passages: passageRows.map((b) => ({ id: b.id, conceptIds: conceptIdsByPassage.get(b.id) ?? [] })),
     edges: edgeRows.map((e) => ({ id: e.id, fromId: e.fromId, toId: e.toId, sentence: e.sentence, handle: e.handle })),
     maps: mapRows.map((m) => ({ id: m.id, name: m.name, scopeKey: m.scopeKey })),
     cloths: clothRows.map((c) => ({ id: c.id, scopeKey: c.scopeKey, title: c.title })),
@@ -1133,7 +1133,7 @@ export async function importGraph(parsed: ParsedImport) {
     db.delete(views).where(and(eq(views.userId, userId), inCourse(views.courseId, courseId))),
     ...(conceptRows.length ? [db.insert(concepts).values(conceptRows)] : []),
     ...(passageRows.length ? [db.insert(passages).values(passageRows)] : []),
-    ...(byteConceptRows.length ? [db.insert(passageConcepts).values(byteConceptRows)] : []),
+    ...(passageConceptRows.length ? [db.insert(passageConcepts).values(passageConceptRows)] : []),
     ...(edgeRows.length ? [db.insert(edges).values(edgeRows)] : []),
     ...(mapRows.length ? [db.insert(maps).values(mapRows)] : []),
     ...(clothRows.length ? [db.insert(cloths).values(clothRows)] : []),
@@ -1272,12 +1272,12 @@ export async function loadWorkedExample() {
     id: conceptIdByKey.get(c.key)!,
     courseId, userId, label: c.label, def: c.def, note: c.note,
   }))
-  const byteConceptRows: { passageId: string; conceptId: string }[] = []
+  const passageConceptRows: { passageId: string; conceptId: string }[] = []
   const passageRows = WORKED_EXAMPLE.passages
     .filter((b) => conceptIdByKey.has(b.conceptKey))
     .map((b) => {
       const id = crypto.randomUUID()
-      byteConceptRows.push({ passageId: id, conceptId: conceptIdByKey.get(b.conceptKey)! })
+      passageConceptRows.push({ passageId: id, conceptId: conceptIdByKey.get(b.conceptKey)! })
       return {
         id,
         courseId, userId,
@@ -1294,10 +1294,10 @@ export async function loadWorkedExample() {
       sentence: e.sentence, handle: e.handle,
     }))
 
-  const byteConceptIds = new Map(byteConceptRows.map((r) => [r.passageId, [r.conceptId]]))
+  const passageConceptIds = new Map(passageConceptRows.map((r) => [r.passageId, [r.conceptId]]))
   const snapshot: GraphSnapshot = {
     concepts: conceptRows.map((c) => ({ id: c.id, label: c.label })),
-    passages: passageRows.map((b) => ({ id: b.id, conceptIds: byteConceptIds.get(b.id) ?? [] })),
+    passages: passageRows.map((b) => ({ id: b.id, conceptIds: passageConceptIds.get(b.id) ?? [] })),
     edges: edgeRows.map((e) => ({ id: e.id, fromId: e.fromId, toId: e.toId, sentence: e.sentence, handle: e.handle })),
   }
   await recordEvent(userId, courseId, "graph.example", "graph", null, {
@@ -1315,7 +1315,7 @@ export async function loadWorkedExample() {
   await db.batch([
     db.insert(concepts).values(conceptRows),
     db.insert(passages).values(passageRows),
-    db.insert(passageConcepts).values(byteConceptRows),
+    db.insert(passageConcepts).values(passageConceptRows),
     db.insert(edges).values(edgeRows),
     db.insert(maps).values({ courseId, userId, scopeKey: "", name: "Projection 1", read: WORKED_EXAMPLE.read, essence: "", tiers: exampleTiers }),
   ])

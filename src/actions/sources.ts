@@ -571,16 +571,16 @@ export async function rescoreSourceAction(formData: FormData) {
   // the page text every stored offset was measured against; the batch script
   // carries a --force for the deliberate case, and this button should not be
   // the way that happens by accident.
-  const [{ value: byteCount }] = await db
+  const [{ value: passageCount }] = await db
     .select({ value: count() })
     .from(passages)
     .where(eq(passages.sourceId, sourceId))
 
-  if (byteCount > 0) {
+  if (passageCount > 0) {
     await rescoreSource(sourceId)
     revalidateLibrary()
     throw new Error(
-      `Rescored, but the reading was not re-processed: ${byteCount} highlight${byteCount === 1 ? " is" : "s are"} anchored to its current text. ` +
+      `Rescored, but the reading was not re-processed: ${passageCount} highlight${passageCount === 1 ? " is" : "s are"} anchored to its current text. ` +
         `Use "npx tsx scripts/reingest-readings.ts ${sourceId} --force" if you mean to replace it anyway.`
     )
   }

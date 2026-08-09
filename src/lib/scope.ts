@@ -48,7 +48,7 @@ export function soleSourceId(scope: Scope): string | null {
 export type ScopedGraph = {
   /** Concepts evidenced in this scope, in capture order. */
   concepts: Concept[]
-  /** Bytes captured from this scope's readings. */
+  /** Passages captured from this scope's readings. */
   passages: Passage[]
   /** Threads with both ends in scope — this reading's internal weave. */
   edges: Edge[]
@@ -87,18 +87,18 @@ export function scopedGraph(state: LoomState, scope: Scope): ScopedGraph {
 
   const inScope = new Set(scope.sourceIds)
   const evidenced = new Set<string>()
-  const hasByte = new Set<string>()
+  const hasPassage = new Set<string>()
   const passages: Passage[] = []
 
   state.passages.forEach((b) => {
-    b.conceptIds.forEach((id) => hasByte.add(id))
+    b.conceptIds.forEach((id) => hasPassage.add(id))
     if (b.sourceId && inScope.has(b.sourceId)) {
       b.conceptIds.forEach((id) => evidenced.add(id))
       passages.push(b)
     }
   })
 
-  const isIn = (conceptId: string) => evidenced.has(conceptId) || !hasByte.has(conceptId)
+  const isIn = (conceptId: string) => evidenced.has(conceptId) || !hasPassage.has(conceptId)
 
   const concepts: Concept[] = []
   const outside: Concept[] = []
@@ -143,11 +143,11 @@ export type ReadingTally = { passages: number; concepts: number; threads: number
  */
 export function tallyByReading(state: LoomState): Map<string, ReadingTally> {
   const conceptsBySource = new Map<string, Set<string>>()
-  const byteCount = new Map<string, number>()
+  const passageCount = new Map<string, number>()
 
   state.passages.forEach((b) => {
     if (!b.sourceId) return
-    byteCount.set(b.sourceId, (byteCount.get(b.sourceId) ?? 0) + 1)
+    passageCount.set(b.sourceId, (passageCount.get(b.sourceId) ?? 0) + 1)
     const set = conceptsBySource.get(b.sourceId) ?? new Set<string>()
     b.conceptIds.forEach((id) => set.add(id))
     conceptsBySource.set(b.sourceId, set)
@@ -156,7 +156,7 @@ export function tallyByReading(state: LoomState): Map<string, ReadingTally> {
   const tallies = new Map<string, ReadingTally>()
   // Keyed by passage count, not by concept map: a reading whose only captures are
   // unlabeled passages still counts — the passage is the act, not the label.
-  byteCount.forEach((count, sourceId) => {
+  passageCount.forEach((count, sourceId) => {
     const conceptIds = conceptsBySource.get(sourceId) ?? new Set<string>()
     // A thread counts for a reading when either end is evidenced in it — the
     // same rule the workbench uses, so the card and the tab agree.

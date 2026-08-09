@@ -81,7 +81,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
   const findConcept = (label: string) =>
     state.concepts.find(c => c.label.toLowerCase() === label.toLowerCase())
 
-  const handleAddByte = async () => {
+  const handleAddPassage = async () => {
     // Trim before testing: whitespace is not a passage, and " boundary objects "
     // must match the existing "boundary objects" rather than mint a duplicate.
     const text = content.trim()
@@ -110,7 +110,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     setConceptLabel("")
     setWorkingDef("")
     // The flash points at "its log row", so open that row — otherwise the
-    // affordance it advertises is off screen (v14 set openByte on add).
+    // affordance it advertises is off screen (v14 set openPassage on add).
     setOpenLogRows(prev => ({ ...prev, [concept.id]: true }))
     // The seam between readings: meeting the same concept in a second text is
     // the move the course is trying to teach, and it used to happen silently.
@@ -162,7 +162,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     }
   }
 
-  const handleRemoveConcept = async (conceptId: string, byteCount: number) => {
+  const handleRemoveConcept = async (conceptId: string, passageCount: number) => {
     // Threads first: a concept woven into one cannot be deleted out from under
     // it. The server enforces this too — this is the readable version.
     if (state.edges.some(e => e.fromId === conceptId || e.toId === conceptId)) {
@@ -177,8 +177,8 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     const label = state.concepts.find(c => c.id === conceptId)?.label ?? "this concept"
     const ok = await confirm({
       title: `Delete “${label}”?`,
-      body: byteCount
-        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s" : ""} stay${byteCount !== 1 ? "" : "s"} in your work, unfiled. Export from Keep first if you might want this back.`
+      body: passageCount
+        ? `Its ${passageCount} captured passage${passageCount !== 1 ? "s" : ""} stay${passageCount !== 1 ? "" : "s"} in your work, unfiled. Export from Keep first if you might want this back.`
         : "Export from Keep first if you might want this back.",
       confirmLabel: "Delete concept",
       danger: true,
@@ -238,14 +238,14 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
 
   useEffect(() => {
     if (!focusPassageId) return
-    const targetByte = state.passages.find((b) => b.id === focusPassageId)
-    if (!targetByte) {
+    const targetPassage = state.passages.find((b) => b.id === focusPassageId)
+    if (!targetPassage) {
       onFocusHandled?.()
       return
     }
 
     const rowTimer = window.setTimeout(() => {
-      const firstConcept = targetByte.conceptIds[0]
+      const firstConcept = targetPassage.conceptIds[0]
       if (firstConcept) setOpenLogRows((prev) => ({ ...prev, [firstConcept]: true }))
     }, 0)
 
@@ -462,7 +462,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
 
         <button
           className="btn"
-          onClick={handleAddByte}
+          onClick={handleAddPassage}
           disabled={!content.trim() || !conceptLabel.trim()}
           title="files the passage under its concept, in your work"
         >
@@ -503,7 +503,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
   /**
    * The three kinds a Concept can be, relative to THIS reading (TJ,
    * 2026-08-09). `scope.ts` already computes them — `evidenced` (a passage
-   * here) and `hasByte` (a passage anywhere) — but `isIn` buckets the first
+   * here) and `hasPassage` (a passage anywhere) — but `isIn` buckets the first
    * and third together, because both belong in this reading's warp and both
    * are linkable here. That is right for scoping and under-drawn for reading:
    * one is evidence you hold, the other is a name you are carrying.

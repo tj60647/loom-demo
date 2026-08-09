@@ -27,7 +27,7 @@ export default function CohortClothPanel({
     () => new Map(state.concepts.map((c) => [c.id, c])),
     [state.concepts]
   )
-  const bytesByConcept = useMemo(() => {
+  const passagesByConcept = useMemo(() => {
     const map = new Map<string, Passage[]>()
     state.passages.forEach((b) => {
       b.conceptIds.forEach((conceptId) => {
@@ -48,8 +48,8 @@ export default function CohortClothPanel({
     setReadSel(readSel?.type === "edge" && readSel.id === id ? null : { type: "edge", id })
   }
 
-  const byteQuote = (b: Passage) => (
-    <div key={b.id} className="bytequote">
+  const passageQuote = (b: Passage) => (
+    <div key={b.id} className="passagequote">
       <span className="src">
         {who(b.userId)}
         {b.source ? ` · ${b.source}` : ""}
@@ -77,7 +77,7 @@ export default function CohortClothPanel({
   if (readSel?.type === "concept" && readSel.id) {
     const concept = conceptById.get(readSel.id)
     if (concept) {
-      const conceptPassages = bytesByConcept.get(concept.id) ?? []
+      const conceptPassages = passagesByConcept.get(concept.id) ?? []
       const crossings = state.edges.filter(
         (e) => e.fromId === concept.id || e.toId === concept.id
       )
@@ -100,7 +100,7 @@ export default function CohortClothPanel({
               No evidence — this concept traces to no captured passage yet.
             </p>
           ) : (
-            conceptPassages.map(byteQuote)
+            conceptPassages.map(passageQuote)
           )}
 
           {crossings.length > 0 && (
@@ -142,7 +142,7 @@ export default function CohortClothPanel({
               {c.def ? (
                 <div style={{ fontSize: "13.5px", color: "var(--ink-soft)" }}>{c.def}</div>
               ) : null}
-              {(bytesByConcept.get(c.id) ?? []).map(byteQuote)}
+              {(passagesByConcept.get(c.id) ?? []).map(passageQuote)}
             </div>
           ))}
         </div>
@@ -186,7 +186,7 @@ export default function CohortClothPanel({
           ) : (
             <div className="scrollbox">
               {state.concepts.map((c) => {
-                const count = bytesByConcept.get(c.id)?.length ?? 0
+                const count = passagesByConcept.get(c.id)?.length ?? 0
                 return (
                   <div
                     key={c.id}

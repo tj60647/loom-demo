@@ -73,7 +73,7 @@ export default function CardMenu({
         </p>
       ) : (
         passages.slice(0, SHOWN).map((b) => (
-          <div key={b.id} className="bytequote">
+          <div key={b.id} className="passagequote">
             <span className="src">{b.source || "—"}{b.location ? ` · ${b.location}` : ""}</span>
             <br />
             {short(b.content, 240)}

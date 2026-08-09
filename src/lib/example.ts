@@ -15,7 +15,7 @@ export type ExampleConcept = {
   tier: "" | "p" | "s" | "t" | "x"
 }
 
-export type ExampleByte = {
+export type ExamplePassage = {
   conceptKey: string
   source: string
   location: string
@@ -33,7 +33,7 @@ export type WorkedExample = {
   title: string
   read: string
   concepts: ExampleConcept[]
-  passages: ExampleByte[]
+  passages: ExamplePassage[]
   edges: ExampleEdge[]
 }
 

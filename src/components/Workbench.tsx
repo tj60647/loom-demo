@@ -100,14 +100,14 @@ export default function Workbench({
   const [activeTab, setActiveTab] = useState<Tab>(firstTab)
   const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([firstTab]))
   const [pdfPage, setPdfPage] = useState(1)
-  const [pdfFocusPassageId, setPdfFocusByteId] = useState<string | null>(null)
+  const [pdfFocusPassageId, setPdfFocusPassageId] = useState<string | null>(null)
   // Where the reader actually is, which is not the same as `pdfPage` — that
   // one is an instruction TO the viewer ("go here"), this is a report FROM it.
   // Kept apart on purpose: feeding the report back in as the instruction lets
   // a stale render drag the reader back a page.
   const [livePdfPage, setLivePdfPage] = useState(1)
   const handlePageChange = useCallback((n: number) => setLivePdfPage(n), [])
-  const [openTargetPassageId, setOpenTargetByteId] = useState<string | null>(null)
+  const [openTargetPassageId, setOpenTargetPassageId] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   // Your work — this reading's Capture Log — as a sheet over the text. Closed
   // by default: reading is what the station is for, and a student who has not
@@ -121,7 +121,7 @@ export default function Workbench({
   // Stable identity: PdfViewer's window keydown effect takes this as a dep,
   // and an inline arrow re-bound the reading's whole keyboard every render.
   const toggleWork = useCallback(() => {
-    setPdfFocusByteId(null)
+    setPdfFocusPassageId(null)
     setWorkOpen((v) => !v)
   }, [])
 
@@ -139,7 +139,7 @@ export default function Workbench({
   const handleGotoPassage = (passage: Passage) => {
     if (!source?.hasFile) return
     setPdfPage(passage.pageNumber && passage.pageNumber > 0 ? passage.pageNumber : 1)
-    setPdfFocusByteId(passage.id)
+    setPdfFocusPassageId(passage.id)
     setWorkOpen(false)
     goTo("reading")
   }
@@ -149,7 +149,7 @@ export default function Workbench({
   // went. The sheet is already mounted, so the row it scrolls to has a real
   // layout box the instant this fires.
   const handleGotoOpenPassage = (passageId: string) => {
-    setOpenTargetByteId(passageId)
+    setOpenTargetPassageId(passageId)
     setWorkOpen(true)
     goTo("reading")
   }
@@ -157,7 +157,7 @@ export default function Workbench({
   // Stable identity again: OpenTab's focus effect lists this in its deps and
   // the sheet is mounted permanently now, so an inline arrow re-ran that
   // effect on every Workbench render while a target was set.
-  const handleFocusHandled = useCallback(() => setOpenTargetByteId(null), [])
+  const handleFocusHandled = useCallback(() => setOpenTargetPassageId(null), [])
 
   // "See them all in Vocabulary", from the capture side. The tab is this
   // component's state, so it has to be moved from here.

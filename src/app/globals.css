@@ -219,8 +219,8 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
 .report .cap{display:block;margin:13px 0 3px;color:var(--ink-soft)}
 .report .line{font-size:14.5px;padding:1px 0}
 .report .ct{font-family:var(--mono);font-size:11px;color:var(--grey)}
-.bytequote{margin:5px 0 10px;padding-left:9px;border-left:2px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
-.bytequote .src{font-family:var(--mono);font-size:10px}
+.passagequote{margin:5px 0 10px;padding-left:9px;border-left:2px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+.passagequote .src{font-family:var(--mono);font-size:10px}
 .legend{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-top:8px;display:flex;gap:22px;flex-wrap:wrap}
 .legend .sw{display:inline-block;width:22px;height:0;border-top-width:2px;vertical-align:middle;margin-right:5px}
 /* footer rule, poster-style. pointer-events:none because a fixed full-width
@@ -474,7 +474,7 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
   border-bottom:1px solid var(--rule);padding-bottom:5px}
 .cardmenudef{font-size:13.5px;line-height:1.45;color:var(--ink);margin:3px 0 9px}
 .cardmenuwhere{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin:3px 0 0;line-height:1.5}
-.cardmenu .bytequote{margin:6px 0 8px}
+.cardmenu .passagequote{margin:6px 0 8px}
 .cardmenu .ghostnote{margin:3px 0 0}
 
 /* Roster: one learner per row — a roster is scanned, not read, so each entry

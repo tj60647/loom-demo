@@ -302,7 +302,7 @@ export function parseImport(raw: string): ParsedImport {
   // the key without this would have quietly orphaned every file already in
   // their hands, which no test would have caught because no test imports an old
   // file. Same move `importGraph` already makes for pre-maps files.
-  const rawBytes = Array.isArray(data.passages)
+  const rawPassages = Array.isArray(data.passages)
     ? (data.passages as Record<string, unknown>[])
     : Array.isArray(data.bytes)
       ? (data.bytes as Record<string, unknown>[])
@@ -330,7 +330,7 @@ export function parseImport(raw: string): ParsedImport {
   // A passage survives even when its concepts don't resolve — it arrives as an
   // Unlabeled Passage rather than being dropped (red line #5). Only text-less
   // rows have nothing to keep.
-  const passages = rawBytes
+  const passages = rawPassages
     .filter((b) => str(b.text) || str(b.content))
     .map((b) => {
       // New shape: conceptIds array. Legacy: a single conceptId string. In
@@ -366,7 +366,7 @@ export function parseImport(raw: string): ParsedImport {
     })
 
   // Legacy v2/v3: passage.note folds onto its concept (joined with ' · ').
-  rawBytes.forEach((b) => {
+  rawPassages.forEach((b) => {
     if (Array.isArray(b.conceptIds)) return
     const note = str(b.note)
     if (!note) return

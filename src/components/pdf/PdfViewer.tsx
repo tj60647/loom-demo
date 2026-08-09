@@ -185,7 +185,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // Latest passages/concepts for click-time lookups. Overlapping captures nest
   // their <mark> elements, so the passage list for a span is read off the DOM at
   // click time rather than frozen per node at mark time.
-  const bytesRef = useRef<Passage[]>([]);
+  const passagesRef = useRef<Passage[]>([]);
   const conceptsRef = useRef<Concept[]>([]);
   useEffect(() => {
     conceptsRef.current = state.concepts;
@@ -205,10 +205,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       if (id && !ids.includes(id)) ids.push(id);
       el = el.parentElement ? el.parentElement.closest(".loom-passage-highlight") : null;
     }
-    const orderOf = new Map(bytesRef.current.map((b, i) => [b.id, i]));
+    const orderOf = new Map(passagesRef.current.map((b, i) => [b.id, i]));
     ids.sort((a, b) => (orderOf.get(a) ?? 0) - (orderOf.get(b) ?? 0));
     return ids.flatMap((id) => {
-      const passage = bytesRef.current.find((b) => b.id === id);
+      const passage = passagesRef.current.find((b) => b.id === id);
       if (!passage) return [];
       const concept = conceptsRef.current.find((c) => c.id === passage.conceptIds[0]);
       return [{
@@ -297,9 +297,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
   useEffect(() => {
     if (!focusPassageId) return;
-    const targetByte = state.passages.find((b) => b.id === focusPassageId);
-    if (targetByte?.pageNumber && targetByte.pageNumber > 0) {
-      const timer = window.setTimeout(() => setPageNumber(targetByte.pageNumber!), 0);
+    const targetPassage = state.passages.find((b) => b.id === focusPassageId);
+    if (targetPassage?.pageNumber && targetPassage.pageNumber > 0) {
+      const timer = window.setTimeout(() => setPageNumber(targetPassage.pageNumber!), 0);
       return () => window.clearTimeout(timer);
     }
   }, [focusPassageId, state.passages]);
@@ -499,10 +499,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     setNumPages(numPages);
   }
 
-  // Keep bytesRef current (declared above, next to conceptsRef) so the
+  // Keep passagesRef current (declared above, next to conceptsRef) so the
   // MutationObserver's applier never needs state.passages as a dependency.
   useEffect(() => {
-    bytesRef.current = state.passages.filter(b => (sourceId && b.sourceId === sourceId) || b.source === sourceName);
+    passagesRef.current = state.passages.filter(b => (sourceId && b.sourceId === sourceId) || b.source === sourceName);
   }, [state.passages, sourceName, sourceId]);
 
   /**
@@ -666,7 +666,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     let debounceTimer: NodeJS.Timeout;
 
     const applyHighlights = () => {
-      const passages = bytesRef.current;
+      const passages = passagesRef.current;
       const heatPages = overlayRef.current?.pages ?? [];
       if (passages.length === 0 && searchTermsRef.current.length === 0 && heatPages.length === 0) return;
 
@@ -678,9 +678,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
         const pageStr = layer.parentElement?.getAttribute('data-page-number');
         const parsedPage = pageStr ? parseInt(pageStr, 10) : 0;
-        const pageBytes = passages.filter(b => b.pageNumber === parsedPage || !b.pageNumber);
+        const pagePassages = passages.filter(b => b.pageNumber === parsedPage || !b.pageNumber);
         const pageHeat = heatPages.find(p => p.pageNumber === parsedPage);
-        if (pageBytes.length === 0 && searchTermsRef.current.length === 0 && !pageHeat) return;
+        if (pagePassages.length === 0 && searchTermsRef.current.length === 0 && !pageHeat) return;
 
         const instance = new Mark(layer as HTMLElement);
         instance.unmark({
@@ -721,7 +721,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               });
             }
 
-            pageBytes.forEach(passage => {
+            pagePassages.forEach(passage => {
               const hasOffsets = passage.startOffset != null && passage.endOffset != null;
               const offsetsTrusted = hasOffsets && (
                 // No stored hash (legacy passage captured before this check

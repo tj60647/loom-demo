@@ -203,7 +203,7 @@ async function main() {
   })
   const labelA = "Bucciarelli, Designing Engineers"
   const labelB = "Wenger, Communities of Practice"
-  const byteSeeds = [
+  const passageSeeds = [
     B(oworlds, srcA, labelA, pickPassage(pagesA, 2, 0)),
     B(oworlds, srcA, labelA, pickPassage(pagesA, 4, 1)),
     B(social, srcA, labelA, pickPassage(pagesA, 3, 0)),
@@ -215,9 +215,9 @@ async function main() {
     B(reif, srcB, labelB, pickPassage(pagesB, 5, 0)),
     B(negmean, srcB, labelB, pickPassage(pagesB, 6, 1)),
   ]
-  await db.insert(passages).values(byteSeeds.map(({ conceptId: _conceptId, ...row }) => row))
+  await db.insert(passages).values(passageSeeds.map(({ conceptId: _conceptId, ...row }) => row))
   await db.insert(passageConcepts).values(
-    byteSeeds.map((b) => ({ passageId: b.id, conceptId: b.conceptId, createdAt: b.createdAt }))
+    passageSeeds.map((b) => ({ passageId: b.id, conceptId: b.conceptId, createdAt: b.createdAt }))
   )
 
   const E = (from: { id: string }, to: { id: string }, sentence: string, handle = "") => ({
@@ -317,7 +317,7 @@ async function main() {
   const peer = async (
     user: { id: string },
     conceptSpecs: [label: string, def: string][],
-    byteSpecs: [conceptIndex: number, src: typeof srcA, srcLabel: string, pick: ReturnType<typeof pickPassage>][],
+    passageSpecs: [conceptIndex: number, src: typeof srcA, srcLabel: string, pick: ReturnType<typeof pickPassage>][],
     edgeSpecs: [from: number, to: number, sentence: string, handle: string][]
   ) => {
     const rows = await db.insert(concepts).values(
@@ -326,7 +326,7 @@ async function main() {
       }))
     ).returning()
 
-    const seeds = byteSpecs.map(([conceptIndex, src, srcLabel, p]) => ({
+    const seeds = passageSpecs.map(([conceptIndex, src, srcLabel, p]) => ({
       conceptId: rows[conceptIndex].id,
       row: {
         id: crypto.randomUUID(),

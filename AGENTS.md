@@ -10,7 +10,30 @@ This version has breaking changes — APIs, conventions, and file structure may 
 2. **`docs/loom-refactor-spec.md` is the work order** — how the code gets there, executed in phase sequence (P0 → P1 → P2 → P3).
 3. **`docs/archive/` is superseded** — historical only. Never implement from anything in it.
 
-**Vocabulary** (full map: refactor spec §F; code speaks the July names, UI strings must use the model names, DB renames optional): `bytes` = **Passages**, `maps` = **Projections**, `maps.essence` = **Projection One-line**, `maps.read` = **Projection Description**, `edges` = **Links**, `edges.handle` = **Link Labels**, `edges.sentence` = **Link Description**, `sources` = **Readings**, the shelf = **Library**; tongues are deprecated for v1.
+**Vocabulary** (full map: refactor spec §F): `maps` = **Projections**,
+`maps.essence` = **Projection One-line**, `maps.read` = **Projection
+Description**, `edges` = **Links**, `edges.handle` = **Link Labels**,
+`edges.sentence` = **Link Description**, `sources` = **Readings**, the shelf =
+**Library**; tongues are deprecated for v1.
+
+**`bytes` are gone — they are `passages`, in the code as well as the UI**
+(2026-08-09). The old rule here said "code speaks the July names"; it no longer
+does for this object. If you meet the word **byte** in the codebase it is one of
+exactly two things, never a Passage:
+
+1. **A database name kept for compatibility** — the `byte` and `byte_concept`
+   tables, the `byteId` column, `byte_search_idx`, the raw SQL in
+   `src/actions/search.ts`, and the `graph_event.kind` values `"byte.capture"`,
+   `"byte.refile"` and friends. Those strings are already written to rows;
+   renaming them would need a migration and would blank every student's Capture
+   Log, which replays by matching `kind`. DB renames stay optional per §F. The
+   long version is on the `passages` table in `src/db/schema.ts`.
+2. **Genuine file data** — `formatBytes`, `byteLength`, `maximumSizeInBytes`,
+   `textLayerRepair`'s `bytes: Buffer`, `src/lib/storage.ts`. These are octets,
+   not Passages, and must not be renamed.
+
+The other names in the map above still follow the old rule: code speaks July,
+UI strings speak the model.
 
 # Keep the workflow diagrams true
 

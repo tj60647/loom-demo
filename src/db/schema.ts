@@ -461,6 +461,27 @@ export const concepts = pgTable(
 // a passage with zero rows there is an Unlabeled Passage, a legal first-class
 // state (docs/loom-model-build.md §2 Passage). Deleting a concept never
 // deletes a passage — the passage survives its labels.
+/**
+ * Passages.
+ *
+ * THE TABLE IS STILL CALLED `byte`, AND THAT IS DELIBERATE. "Byte" was this
+ * object's July name; the model calls it a Passage and, since 2026-08-09, so
+ * does every identifier in the codebase. What did not move is anything that is
+ * a STRING IN THE DATABASE — this table, `byte_concept`, the `byteId` column,
+ * the index names, the raw SQL in `src/actions/search.ts`, and the
+ * `graph_event.kind` values ("byte.capture", "byte.refile", …) which are
+ * already written to rows.
+ *
+ * Renaming those buys nothing a reader of the app can see, and costs a
+ * migration plus a rewrite of history: the Capture Log replays by matching
+ * `kind`, so renaming those values would silently blank every student's
+ * existing history. AGENTS.md §F has always had DB renames as optional.
+ *
+ * So: if you are reading the code and see "byte", it is one of exactly two
+ * things — a database name kept for compatibility (here and the places listed
+ * above), or genuine FILE DATA (`formatBytes`, `byteLength`, textLayerRepair's
+ * `bytes: Buffer`, storage.ts). It is never a Passage.
+ */
 export const passages = pgTable("byte", {
   id: text("id")
     .primaryKey()

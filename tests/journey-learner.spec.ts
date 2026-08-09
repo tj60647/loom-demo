@@ -122,11 +122,11 @@ test("01 · a passage captured by hand lands in the coding log — and cleans up
   // resurface on the next load as residue.
   await row.locator(".lhead").click()
   const passageId = await row.locator("[data-passage-id]").first().getAttribute("data-passage-id")
-  const byteDeleted = page.waitForResponse((r) =>
+  const passageDeleted = page.waitForResponse((r) =>
     r.request().method() === "POST" && (r.request().postData() ?? "").includes(passageId!)
   )
   await row.getByRole("button", { name: "remove passage" }).click()
-  await byteDeleted
+  await passageDeleted
   const conceptDeleted = page.waitForResponse((r) =>
     r.request().method() === "POST" && /^\["[0-9a-f-]{36}"\]$/.test(r.request().postData() ?? "")
   )

@@ -9,7 +9,7 @@ import { emptyViews, parseImport, type ParsedMapImport } from "@/lib/graphExport
 import { getUserLoomData } from "@/lib/reads"
 import {
   createConcept, updateConcept, deleteConcept, mergeConcepts as mergeConceptsAction,
-  createPassage, deletePassage, refilePassage as refileByteAction, unfilePassage as unfileByteAction, attributePassages as attributeBytesAction,
+  createPassage, deletePassage, refilePassage as refilePassageAction, unfilePassage as unfilePassageAction, attributePassages as attributePassagesAction,
   createEdge, updateEdge, deleteEdge,
   saveView, saveCloth as saveClothAction,
   createMap as createMapAction, updateMap as updateMapAction, deleteMap as deleteMapAction,
@@ -372,7 +372,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       passages: s.passages.map(b => (ids.has(b.id) && !b.sourceId ? { ...b, sourceId } : b)),
     }))
     try {
-      const n = await attributeBytesAction(passageIds, sourceId)
+      const n = await attributePassagesAction(passageIds, sourceId)
       flash(n === 1 ? "passage placed in its reading" : `${n} passages placed in their reading`)
       return n
     } catch (e) {
@@ -384,7 +384,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const refilePassage = async (passageId: string, conceptId: string) => {
     try {
       // The passage gains a pointer (ruling 37) — same row, one more concept.
-      const saved = await refileByteAction(passageId, conceptId)
+      const saved = await refilePassageAction(passageId, conceptId)
       applyLocal(s => ({ ...s, passages: s.passages.map(b => b.id === saved.id ? saved : b) }))
       savedOk()
       return saved
@@ -402,7 +402,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       ),
     }))
     try {
-      await unfileByteAction(passageId, conceptId)
+      await unfilePassageAction(passageId, conceptId)
       flash("unfiled — the passage keeps its other filings")
     } catch (e) {
       await resync(e)

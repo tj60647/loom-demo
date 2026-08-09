@@ -510,13 +510,13 @@ async function foldConceptIds<T extends { id: string }>(passageRows: T[]): Promi
     .from(passageConcepts)
     .where(inArray(passageConcepts.passageId, passageRows.map((b) => b.id)))
     .orderBy(asc(passageConcepts.createdAt), asc(passageConcepts.conceptId))
-  const byByte = new Map<string, string[]>()
+  const byPassage = new Map<string, string[]>()
   junction.forEach((row) => {
-    const list = byByte.get(row.passageId) ?? []
+    const list = byPassage.get(row.passageId) ?? []
     list.push(row.conceptId)
-    byByte.set(row.passageId, list)
+    byPassage.set(row.passageId, list)
   })
-  return passageRows.map((b) => ({ ...b, conceptIds: byByte.get(b.id) ?? [] }))
+  return passageRows.map((b) => ({ ...b, conceptIds: byPassage.get(b.id) ?? [] }))
 }
 
 export async function getAggregateLoomData(
@@ -525,7 +525,7 @@ export async function getAggregateLoomData(
 ) {
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) {
-    return { concepts: [], passages: [], edges: [], members: [], bytesUnavailable: false }
+    return { concepts: [], passages: [], edges: [], members: [], passagesUnavailable: false }
   }
   await checkCourseFaculty(courseId)
 
@@ -533,7 +533,7 @@ export async function getAggregateLoomData(
   const userIds = await getMemberIds(courseId, sectionId)
 
   if (userIds.length === 0) {
-    return { concepts: [], passages: [], edges: [], members: [], bytesUnavailable: false }
+    return { concepts: [], passages: [], edges: [], members: [], passagesUnavailable: false }
   }
 
   const allConcepts = await db
@@ -554,14 +554,14 @@ export async function getAggregateLoomData(
   const members = memberRows.map((u) => ({ id: u.id, name: u.name || u.email }))
 
   try {
-    const allBytes = await db
+    const allPassages = await db
       .select()
       .from(passages)
       .where(and(eq(passages.courseId, courseId), inArray(passages.userId, userIds)))
-    return { concepts: allConcepts, passages: await foldConceptIds(allBytes), edges: allEdges, members, bytesUnavailable: false }
+    return { concepts: allConcepts, passages: await foldConceptIds(allPassages), edges: allEdges, members, passagesUnavailable: false }
   } catch (error) {
     // Fail soft so aggregate map still renders if passage schema/data is temporarily inconsistent.
     console.error("[getAggregateLoomData] Failed to load passages for aggregate view", error)
-    return { concepts: allConcepts, passages: [], edges: allEdges, members, bytesUnavailable: true }
+    return { concepts: allConcepts, passages: [], edges: allEdges, members, passagesUnavailable: true }
   }
 }

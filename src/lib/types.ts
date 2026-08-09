@@ -295,7 +295,7 @@ export type LoomState = {
  * §6 passage shape (recorded in the spec changelog): part of the student's own
  * record, safe for consumers to ignore.
  */
-export type ExportByteAnchor = {
+export type ExportPassageAnchor = {
   sourceId: string
   pageNumber: number | null
   startOffset: number | null
@@ -319,7 +319,7 @@ export type LoomExport = {
       question?: string
       isPullQuote?: boolean
       tier?: PassageTier
-      anchor?: ExportByteAnchor
+      anchor?: ExportPassageAnchor
     }[]
     edges: { id: string; fromId: string; toId: string; sentence: string; handle: string }[]
     /**

@@ -34,7 +34,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   let passages: LoomState["passages"] = []
   let edges: LoomState["edges"] = []
   let members: { id: string; name: string }[] = []
-  let bytesUnavailable = false
+  let passagesUnavailable = false
   let aggregateUnavailable = false
 
   try {
@@ -43,7 +43,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     passages = aggregate.passages
     edges = aggregate.edges
     members = aggregate.members
-    bytesUnavailable = aggregate.bytesUnavailable
+    passagesUnavailable = aggregate.passagesUnavailable
   } catch (error) {
     console.error("[AggregateLoomPage] Aggregate query failed", error)
     aggregateUnavailable = true
@@ -67,7 +67,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
         </p>
       )}
 
-      {bytesUnavailable && (
+      {passagesUnavailable && (
         <p className="tasksub" style={{ marginBottom: "12px", color: "var(--red)" }}>
           Passage records could not be loaded. The concept/thread graph is still shown.
         </p>
