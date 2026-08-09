@@ -76,7 +76,11 @@ nav .station.off{color:var(--dot);cursor:default;text-decoration:none}
    group falls in under the stations rather than overlapping them when the bar
    wraps on a narrow screen. */
 nav .staffgroup{margin-left:auto;display:flex;align-items:stretch;flex-wrap:wrap}
-nav .station.staff{color:var(--sage);font-size:16px}
+/* Tighter than a journey station: there are six of them, and at 1440px — an
+   ordinary laptop — the bar wrapped to two rows, which costs 47px of height on
+   the reading station, where height is worth the most. Still comfortably above
+   a thumb target because .station keeps its 11px vertical padding. */
+nav .station.staff{color:var(--sage);font-size:14.5px;padding-left:11px;padding-right:11px}
 nav .station.staff:hover{color:var(--ink)}
 nav .station.staff.active{color:var(--sage);border-bottom-color:var(--sage)}
 

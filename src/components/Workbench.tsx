@@ -170,9 +170,20 @@ export default function Workbench({
     // The journey stays put while the loom loads: it is the one fixed thing
     // under the header, and blinking it out mid-load makes the app look like
     // it is rebuilding itself around you.
+    //
+    // It carries its handlers while loading too, and that matters more since
+    // 2026-08-09: a station with no handler now renders GREYED, so passing
+    // none here made every entry into a reading flash four unavailable
+    // stations before correcting itself — an outright lie, and a worse one
+    // than the plain links it used to draw. The tabs are local state, so the
+    // handlers are valid before any data arrives; only the content below is
+    // not ready.
     return (
       <>
-        <JourneyNav active={source ? STATION_OF[activeTab] : "weave"} />
+        <JourneyNav
+          active={source ? STATION_OF[activeTab] : "weave"}
+          onStation={Object.fromEntries(tabs.map((tab) => [STATION_OF[tab], () => goTo(tab)]))}
+        />
         <main>
           <div className="empty" style={{ marginTop: "100px" }}>
             <h2>Loading your loom...</h2>

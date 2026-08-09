@@ -376,6 +376,38 @@ is below, not replacing the frame."* and *"make 'access' its own tab."*
   reason `/admin` does not: the lens hides the tab, and a lens is not a lock —
   turning it on should not eject a reader from a page they are mid-way through.
 
+### 6h. The staff group's order, and 01 Reading greys out too
+
+TJ, 2026-08-09: *"i think the admin/faculty tabs should be courses, readings,
+roster, cohort graph, workflows, access"* and *"should 01-reading be greyed out?
+we cant get there except through the library."*
+
+- **Ordered the way the work happens**: make the course, put readings in it, see
+  who is enrolled, read what they wove — then the two reference pages, which are
+  read rather than worked. The admin-only pair leads, so a faculty member's
+  group starts at Roster rather than opening with two gaps.
+- **01 Reading greys out.** Yes, and for a sharper reason than 02/03/04: its
+  href went to `/`, which is the station immediately to its LEFT — a second
+  door to one room dressed as a door to another. It carries its own reason
+  ("pick a text in the Library — opening one is how you get here") because the
+  general one would have been circular on the Reading station itself.
+  Verified nothing depended on the link: every spec targets `nav button`, the
+  handler form that only exists inside a reading.
+
+**A real flash this exposed.** `Workbench`'s loading branch rendered `JourneyNav`
+with **no** `onStation`, which used to draw plain links and now draws four
+GREYED stations — so a direct load into a reading flashed "these are
+unavailable" and then corrected itself. Measured by polling the bar every 60ms
+through a direct load: `ASSSSA +loading` before, `ABBBBA +loading` after. The
+tabs are local state, so the handlers are valid before any data arrives; only
+the content below is not ready.
+
+**Sizing:** six staff items plus six stations wrapped the bar to two rows at
+1440px — an ordinary laptop — costing 47px of height on the reading station,
+where height is worth most. Staff items are 14.5px with tighter side padding;
+one row now down to 1440, two rows at 1280 and below, which is fair for twelve
+items.
+
 ### 7. Traps this session
 
 - **`overflow: hidden` vs `overflow: clip` on `.pdf-body`.** Clip makes no

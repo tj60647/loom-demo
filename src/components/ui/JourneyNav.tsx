@@ -82,10 +82,9 @@ const DEFAULT_HREF: Record<Station, string> = {
  * reading is the whole-weave workbench. When `/weave` is ruled on, this set is
  * where that decision lands.
  */
-const READING_ONLY: ReadonlySet<Station> = new Set<Station>(["throw", "map", "read"])
+const READING_ONLY: ReadonlySet<Station> = new Set<Station>(["open", "throw", "map", "read"])
 
 const TIP: Partial<Record<Station, string>> = {
-  open: "reading and capture happen together — pick a text first",
   weave: "the big picture — every reading at once",
 }
 
@@ -110,24 +109,40 @@ const TIP: Partial<Record<Station, string>> = {
  * student walks — and these are not steps in it.
  */
 const STAFF_ITEMS: { href: string; label: string; adminOnly?: boolean }[] = [
+  // Ordered the way the work happens (TJ, 2026-08-09): make the course, put
+  // readings in it, see who is enrolled, then read what they wove. The two
+  // reference pages come last because they are read rather than worked.
+  // Admin-only items lead, so a faculty member's group starts at Roster
+  // rather than opening with two gaps.
+  { href: "/admin/courses", label: "Courses", adminOnly: true },
+  { href: "/admin/library", label: "Readings", adminOnly: true },
   { href: "/admin", label: "Roster" },
   { href: "/admin/aggregate", label: "Cohort Graph" },
-  { href: "/admin/library", label: "Readings", adminOnly: true },
-  { href: "/admin/courses", label: "Courses", adminOnly: true },
-  // Right of Courses (TJ, 2026-08-09). Not an admin surface — a student reads
-  // their own flow there, and the header keeps the link for them (see
-  // Header.tsx). It sits here for staff because they are the ones who read all
-  // three flows, and because the header should not carry it twice.
+  // Not an admin surface — a student reads their own flow there, and the
+  // header keeps the link for them (see Header.tsx). It sits here for staff
+  // because they read all three flows, and the header should not carry it twice.
   { href: "/workflows", label: "Workflows" },
-  // Its own tab, not a section under the diagrams (TJ, 2026-08-09): the flows
-  // are a picture of movement and this is a table of permission, and a reader
-  // looking for one should not have to scroll past the other. Staff only —
-  // it cites the file and line that enforces each row.
+  // Its own tab, not a section under the diagrams: the flows are a picture of
+  // movement and this is a table of permission, and a reader looking for one
+  // should not have to scroll past the other. Staff only — it cites the file
+  // and line that enforces each row.
   { href: "/access", label: "Access" },
 ]
 
-/** Why a station is greyed. Says what to do, never what went wrong. */
-const OFF_TIP = "open a reading first — this works inside a text"
+/**
+ * Why a station is greyed. Says what to do, never what went wrong.
+ *
+ * 01 Reading gets its own line because the general one would be circular
+ * ("open a reading first" — on the Reading station). It is greyed for a
+ * slightly different reason too: its href went to the Library, which is the
+ * station immediately to its left, so it was a second door to one room
+ * dressed as a door to another (TJ, 2026-08-09: "we cant get there except
+ * through the library").
+ */
+const OFF_REASON: Partial<Record<Station, string>> = {
+  open: "pick a text in the Library — opening one is how you get here",
+}
+const OFF_TIP_DEFAULT = "open a reading first — this works inside a text"
 
 /**
  * The staff group, split out for one mechanical reason: it is the only part of
@@ -207,12 +222,13 @@ export default function JourneyNav({
         // <span>, not a disabled <button>: it is not a control that happens to
         // be off, it is a place you are not standing near.
         if (READING_ONLY.has(key)) {
+          const why = OFF_REASON[key] ?? OFF_TIP_DEFAULT
           return (
             // aria-label, not just data-tip: the tip bubble is aria-hidden and
             // never appears on touch or keyboard focus (globals.css), and
             // aria-disabled on a span with no role is ignored outright — so
             // without this the word is simply grey and unexplained.
-            <span key={key} className="station off" aria-label={`${text} — ${OFF_TIP}`} data-tip={OFF_TIP}>
+            <span key={key} className="station off" aria-label={`${text} — ${why}`} data-tip={why}>
               <span className="step">{step}</span>
               {text}
             </span>
