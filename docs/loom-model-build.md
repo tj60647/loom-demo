@@ -38,9 +38,11 @@ The object model, semantics, and UI structure for Loom v1. This is the authority
 - A **reference-only Reading** is legal: a card with title/author and no PDF, minted by a student so hand-captured passages still have a door; it sits on their shelf only.
 - PDFs are behind login, marked for educational use only; ingestion runs the extraction-score gate (deterministic pass + optional LLM judge).
 - **Removal is forward-only**: an archived Reading leaves the go-forward Library; existing Cloths and their references persist untouched.
-- Renders in the Library as a **Reading card**: metadata + a **Create Cloth** button when there is none (creation is always explicit, never a side effect of opening) + one row per Cloth carrying its **Title and when it was last edited**, which opens it. A Reading may be opened to read without a Cloth — browsing is not capture.
-  - *Revised 2026-08-08 (TJ), from a count-with-hover badge: the Title is the information, so it is shown outright, and "edited …" says the work is alive. Both doors open **01 · Reading** — a Cloth starts where you read and gather, not where you name it.*
-  - *Open: a Cloth and its Reading now open the same place, so "open the Cloth" and "just read" are the same act once a Cloth exists. The two objects overlap in the build in a way the model has not yet resolved (TJ, 2026-08-08). Recorded, not designed away.*
+- Renders in the Library as a **Reading card** with **exactly one door** (ratified 2026-08-08, TJ):
+  - **No Cloth yet** — the card body is inert and a **Create Cloth** button is the only act. Creation stays explicit: a click on the card never mints a Cloth.
+  - **A Cloth exists** — the card body opens it, at **01 · Reading**. The Cloth's row is then *information*: its **Title** and **when it was last edited**, shown outright rather than counted with the title on hover.
+- **"Just read" is a procedure, not a path.** Browsing without capturing happens *inside* a Cloth — you open it and add nothing. There is no second way in that skips the Cloth, and no UI component for reading-without-one. This supersedes the earlier reading of "browsing is not capture" as *a Reading may be opened without a Cloth*; the phrase means **a Cloth never obliges you to capture**.
+- A Cloth opens where the work starts — **01 · Reading** — not where it is named.
 
 **Cloth** = Cloth Title + Cloth Description + one Reading + Passages + Concepts (referenced) + Links + Capture Log + Projections.
 - Cloth Title ≠ Reading Title — a sentence or headline. Cloth Description = a short interpretation of the Reading.
@@ -124,7 +126,7 @@ The object model, semantics, and UI structure for Loom v1. This is the authority
 
 ## 5. Golden path
 
-Invited → authorized → log in. Library (sorted by Assigned Date; badges show existing Cloths). **Create Cloth** on a Reading card (or Open an existing one; or just read — browsing is not capture). Highlight Passages — every capture appends to the Capture Log, named or not. Optionally tier Passages, add Notes/Questions/Pull-quote. Identify Concepts (0..n per Passage; reuse across Readings; Label optional at capture). Connect Concepts — naming not required first; Description before Label; Labels accrue in the Link List. Each completed triple is a Thread and should read aloud as a sentence. In Knowledge Graph, arrange the Cloth via Projections — tier per-Projection; title the takes and give each its One-line; Unlabeled Passages stay visible as remainder. Export the Cloth or a Projection. Search anything, anywhere, in one field.
+Invited → authorized → log in. Library (sorted by Assigned Date; badges show existing Cloths). **Create Cloth** on a Reading card, or open the Cloth already there — one door either way; browsing without capturing happens inside the Cloth. Highlight Passages — every capture appends to the Capture Log, named or not. Optionally tier Passages, add Notes/Questions/Pull-quote. Identify Concepts (0..n per Passage; reuse across Readings; Label optional at capture). Connect Concepts — naming not required first; Description before Label; Labels accrue in the Link List. Each completed triple is a Thread and should read aloud as a sentence. In Knowledge Graph, arrange the Cloth via Projections — tier per-Projection; title the takes and give each its One-line; Unlabeled Passages stay visible as remainder. Export the Cloth or a Projection. Search anything, anywhere, in one field.
 
 ---
 

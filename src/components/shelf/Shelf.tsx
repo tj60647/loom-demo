@@ -136,9 +136,15 @@ export default function Shelf() {
     // 0 or 1 today — the schema keeps one cloth per scope for now — but the
     // card renders a list, so several cloths per reading lands here for free.
     const clothsHere = state.cloths.filter((c) => c.scopeKey === s.id)
-    return (
-      <div key={s.id} className="shelfcard">
-        <Link href={`/reading/${s.id}`} className="shelfmain">
+    // Exactly ONE door per card (TJ, 2026-08-08). "Just read" is a procedure,
+    // not a path — you browse inside a cloth without capturing anything — so
+    // there is no separate way in that skips the cloth. With a cloth, the card
+    // body opens it; without one, the card is inert and Create Cloth is the
+    // only act. That also keeps creation explicit: a card click never mints a
+    // cloth, it simply does nothing until you have asked for one.
+    const hasCloth = clothsHere.length > 0
+    const body = (
+      <>
           {s.storageKey ? (
             <SourceThumbnail sourceId={s.id} title={s.title} />
           ) : (
@@ -172,36 +178,33 @@ export default function Shelf() {
               )}
             </p>
           </div>
-        </Link>
-        {/* The cloth row (rulings 20–22, 33). Reworked 2026-08-08 (TJ): it was
-            not intuitive and gave no feedback.
+      </>
+    )
+    return (
+      <div key={s.id} className={`shelfcard${hasCloth ? "" : " shelfnodoor"}`}>
+        {hasCloth ? (
+          <Link href={`/reading/${s.id}`} className="shelfmain">{body}</Link>
+        ) : (
+          <div className="shelfmain">{body}</div>
+        )}
+        {/* The cloth row (rulings 20–22, 33), reworked 2026-08-08 (TJ).
 
-            The core problem was that "Open Cloth" and the card above pointed at
-            the SAME url, so two controls did one thing and the difference the
-            model draws — browse the text vs. open your work on it — was
-            invisible. The card is still the text; the cloth now opens at 02 ·
-            Linking, where its title and description live.
-
-            And the name was hidden behind a hover tooltip on a badge that
-            counted to one. The title is the information, so it is the row; the
-            count is gone, and "edited …" says the work is alive. */}
+            It is INFORMATION when a cloth exists — the name and when it was
+            last edited — because the card above is already the door, and two
+            controls doing one thing is what made this confusing. When there is
+            no cloth it carries the only act on the card. */}
         {!isLoading && (
           <div className="clothrow">
-            {clothsHere.length > 0 ? (
+            {hasCloth ? (
               clothsHere.map((c) => (
-                <Link
-                  key={c.id}
-                  href={`/reading/${s.id}`}
-                  className="clothopen"
-                  data-tip="your work on this reading — opens at 01 · Reading, where you read and gather"
-                >
+                <span key={c.id} className="clothis">
                   <span className="clothname">
                     {c.title.trim() ? short(c.title, 52) : "Untitled cloth"}
                   </span>
                   <span className="clothmeta">
                     {c.title.trim() ? "" : "name it · "}edited {timeAgo(c.updatedAt)}
                   </span>
-                </Link>
+                </span>
               ))
             ) : (
               <>
@@ -210,7 +213,7 @@ export default function Shelf() {
                   className="btn ghost mini nowrapbtn"
                   onClick={() => createCloth(s.id)}
                   disabled={creatingClothFor !== null}
-                  data-tip="your work on this reading, under your own title — made only when you ask"
+                  data-tip="your work on this reading — reading and gathering happen inside it, and you need never capture anything"
                 >
                   {creatingClothFor === s.id ? "Creating…" : "Create Cloth"}
                 </button>

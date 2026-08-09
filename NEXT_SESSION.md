@@ -23,7 +23,32 @@ Several small commits on `dev`. `npm run check`, `next build` and the suite
    not inside a reading. My earlier warning that hiding Weave would orphan the
    scope was wrong — the bar had it covered all along.
 
-### The open question — TJ's words: "this reading vs cloth issue is concerning, right now they kind of meant the same thing"
+### RESOLVED, same evening — one door
+
+TJ: *"'just read' means they can browse the pdf without having to add passages
+or concepts, seems more procedure than requiring a ui component or path. 'just
+read' happens in a cloth."*
+
+So the reading card has **exactly one door**, and the overlap below is settled
+rather than open:
+
+- **No cloth** — the card body is inert (`.shelfnodoor`, no link, no hover, no
+  pointer cursor) and **Create Cloth** is the only act. Creation stays explicit:
+  a card click never mints a cloth.
+- **A cloth** — the card body opens it at 01 · Reading, and the cloth's row
+  becomes *information* (Title + when last edited) rather than a second control.
+
+The phrase "browsing is not capture" is re-read: it means **a cloth never
+obliges you to capture**, not "a reading may be opened without a cloth". The
+model doc is updated at §Reading card and in the §5 journey line.
+
+**Consequence worth knowing before writing a spec:** `.shelfmain` is a link only
+when a cloth exists. Every spec now enters through **`enterReadingFromCard`** in
+`tests/helpers.ts`, which takes whichever door the card offers — and therefore
+*creates a cloth* the first time it meets an unclothed reading. That is a real
+write; `npm run seed:demo` clears the demo users' cloths.
+
+### The question as it stood before that ruling (kept for the reasoning)
 
 **A cloth and its reading now open the same place.** Once a cloth exists,
 "open the cloth" and "just read" are the same act, because a cloth is a name
@@ -32,17 +57,10 @@ has two controls that do one thing, which is what made the flow feel wrong in
 the first place — and moving the destination to Reading (correctly) did not
 dissolve it.
 
-The model still grants three doors (`loom-model-build.md` §Reading card: Create
-Cloth · Open an existing one · **or just read** — browsing is not capture), so
-collapsing them is a model change, not a UI tidy. **Recorded in the model doc
-as unresolved rather than designed away.** Worth settling before the freeze;
-options as they stood:
-
-- one door — the card opens the reading, the cloth name/edited is *information*
-  on it, and Create Cloth is the only button (keeps all three model doors);
-- the cloth button is the only door and the card body is inert (drops "just
-  read", so the model line must change);
-- the card adapts — the cloth if one exists, the text if not.
+The model then granted three doors (Create Cloth · Open an existing one · **or
+just read**), so collapsing them was a model change rather than a UI tidy —
+which is why it went to TJ rather than being decided here. The ruling above
+took the first option and re-read the third as a procedure.
 
 ### Also coming
 

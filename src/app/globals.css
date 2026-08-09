@@ -651,18 +651,19 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    the affordance, not a count with the name hidden on hover, and "edited …"
    says the work is alive. The whole row is the door — it opens at 02 · Linking,
    which is what distinguishes it from the card above (that opens the text). */
-.clothopen {
+.clothis {
   display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
   flex: 1 1 auto; min-width: 0;
-  text-decoration: none; color: inherit;
-  padding: 4px 8px; margin: -4px -8px; border-radius: 5px;
 }
-.clothopen:hover { background: rgba(168,132,63,.12); }
 .clothname {
   font-family: var(--display); font-size: 14px; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
-.clothopen:hover .clothname { text-decoration: underline; text-underline-offset: 2px; }
 .clothmeta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft); white-space: nowrap; }
 .clothnone { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
   text-transform: uppercase; color: var(--grey); flex: 1 1 auto; }
+
+/* A card with no cloth has no door: nothing to hover, and the cursor should not
+   promise a click that does nothing (TJ, 2026-08-08). Create Cloth is the act. */
+.shelfnodoor:hover { border-color: var(--rule); background: transparent; }
+.shelfnodoor .shelfmain { cursor: default; }

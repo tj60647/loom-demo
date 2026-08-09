@@ -34,12 +34,17 @@
 > **Workflows tab** (2026-08-08): `/admin/workflows` draws the student, faculty
 > and admin flows from `src/lib/workflows.ts`. **Refactor a workflow, update that
 > file** — §2c-ii, enforced by `npm run check`.
-> **A cloth starts in Reading** (2026-08-08, TJ): the reading card's cloth row
-> shows the Title and when it was last edited and opens **01 · Reading**; the
-> Cloth Title/Description moved there too (`ClothFold`), staying on Linking only
-> at the whole weave. **Open question, recorded not resolved:** a cloth and its
-> reading now open the same place, so "open the cloth" and "just read" are the
-> same act — the two objects overlap and the model has not settled it.
+> **A cloth starts in Reading, and the card has one door** (2026-08-08, TJ):
+> with a cloth the card body opens it at **01 · Reading** and the cloth's row is
+> information (Title + when last edited); without one the body is **inert** and
+> Create Cloth is the only act. "Just read" is a procedure inside a cloth, not a
+> path around it — there is no way into a reading that skips the cloth, which is
+> what resolves the reading/cloth overlap. `ClothFold` moved to 01 · Reading
+> too, staying on Linking only at the whole weave.
+> **Consequence for specs:** `.shelfmain` is a link only when a cloth exists, so
+> tests enter through `enterReadingFromCard` in `tests/helpers.ts`, which takes
+> whichever door is there — and *creates a cloth* the first time it meets an
+> unclothed reading.
 > **The tab list is settled** (2026-08-08, TJ): 00 Reading and 01 Open merged
 > into one **Reading** station (text + capture rail); **05 Weave is hidden**
 > pending a decision, its route intact and linked from Keep; **Keep stays** as a

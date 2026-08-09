@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { enterReadingFromCard } from './helpers';
 import fs from 'fs';
 
 /**
@@ -180,7 +181,7 @@ test('04 Map lives inside a reading workbench, scoped to it', async ({ page }) =
   const card = page.locator('.shelfcard').first();
   await expect(card).toBeVisible({ timeout: 15000 });
   await expect(card.locator('.shelftally')).not.toHaveText('…', { timeout: 15000 });
-  await card.locator('.shelfmain').click();
+  await enterReadingFromCard(page, card);
   await expect(page).toHaveURL(/\/reading\//);
 
   await waitForLoom(page);

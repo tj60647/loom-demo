@@ -7,6 +7,7 @@
  * fixture. Search is read-only: nothing to clean up.
  */
 import { test, expect } from "@playwright/test"
+import { enterReadingFromCard } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 // Dev-server compile latency puts several 15s waits in sequence.
@@ -65,7 +66,7 @@ test("search inside a reading lists matching pages and marks the words on the te
   // Same trap tests/helpers.ts documents: clicking during the tally
   // re-render detaches the card mid-click.
   await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
-  await card.locator(".shelfmain").click()
+  await enterReadingFromCard(page, card)
   await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
 
   // Tab 00 — the text itself.

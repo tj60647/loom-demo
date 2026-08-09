@@ -12,6 +12,7 @@
  * Read-only throughout: nothing here writes, so it needs no cleanup.
  */
 import { test, expect, type Page } from "@playwright/test"
+import { enterReadingFromCard } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 test.beforeEach(() => test.setTimeout(120_000))
@@ -38,10 +39,10 @@ async function openReadingByHref(page: Page, title: string) {
   await page.goto("/")
   const card = page.locator(".shelfcard", { hasText: title }).first()
   await expect(card, "seed missing — run `npm run seed:demo` first").toBeVisible({ timeout: 15_000 })
-  const href = await card.locator(".shelfmain").getAttribute("href")
-  expect(href, "the reading card has no link").toBeTruthy()
-  await page.goto(href!)
-  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
+  // Whichever door the card offers: since 2026-08-08 an unclothed reading has
+  // no link at all, only Create Cloth. (The name is historical — entering by
+  // href was how this spec dodged the navigation bounce, which is now fixed.)
+  await enterReadingFromCard(page, card)
   await loomLoaded(page)
 }
 
@@ -147,9 +148,7 @@ test("the gate holds: a reading you have not coded refuses the comparison", asyn
     .first()
   await expect(uncoded, "every reading is coded — seed a fresh library to test the gate")
     .toBeVisible({ timeout: 15_000 })
-  const href = await uncoded.locator(".shelfmain").getAttribute("href")
-  await page.goto(href!)
-  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
+  await enterReadingFromCard(page, uncoded)
   await loomLoaded(page)
 
   await page.locator("nav button", { hasText: "Vocabulary" }).click()

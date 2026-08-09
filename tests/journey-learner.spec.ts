@@ -16,7 +16,7 @@
  * prompts and the read.
  */
 import { test, expect } from "@playwright/test"
-import { openCaptureLog } from "./helpers"
+import { enterReadingFromCard, openCaptureLog } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 // Each test is independent and removes what it adds — no serial mode, so one
@@ -88,9 +88,7 @@ test("00 · the shelf shows the readings with the student's own tallies", async 
 test("01 · a byte captured by hand lands in the coding log — and cleans up", async ({ page }) => {
   await page.goto("/")
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
-  await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
-  await card.locator(".shelfmain").click()
-  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
+  await enterReadingFromCard(page, card)
   // Station buttons are named "01 —Reading" etc. — match by substring, never
   // exact. Since the 2026-08-08 merge the capture form IS this station: the
   // text on the left, the capture rail on the right, opened from the toolbar.
@@ -187,9 +185,7 @@ test("03 · vocabulary is every word you own, across all your readings", async (
   // whole weave. Entering through a reading is the stronger check.
   await page.goto("/")
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
-  await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
-  await card.locator(".shelfmain").click()
-  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
+  await enterReadingFromCard(page, card)
   await page.locator("nav button", { hasText: "Vocabulary" }).click()
 
   // All 8 seeded concepts, not this reading's slice — including the seeded
@@ -239,9 +235,7 @@ test("04 · three maps, and each scope keeps its own tiers and essence", async (
   // and the whole-weave map does not leak in.
   await page.goto("/")
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
-  await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
-  await card.locator(".shelfmain").click()
-  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
+  await enterReadingFromCard(page, card)
   await page.locator("nav button", { hasText: "Knowledge Graph" }).click()
   await expect(page.locator("#mapSwitcher")).toContainText("Your projections of this reading", { timeout: 15_000 })
   await expect(page.locator("#mapSwitcher .chip", { hasText: "The whole cloth" })).toHaveCount(0)
