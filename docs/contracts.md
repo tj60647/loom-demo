@@ -373,11 +373,11 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | — | **`src/lib/viewAs.ts`** · `viewAsServer.ts` | **View as student** (TJ, 2026-08-09) — a lens beside the header pill. A **cookie**, because three differences are decided server-side and a client flag could not reach them: `/workflows` (three flows vs one), the Library query (an admin's shelf carries `isVisible=false` rows), and `getActiveCourse` itself. Masked **once**, in `getActiveCourse`, so every `isStaff`/`isAdmin` consumer goes quiet together; `staffTruly` rides along **unmasked for one purpose only** — drawing the control that takes the lens off. **Withholds, never grants**: every use hides a control or NARROWS a query, and no authorization path consults it (`authorizeSourceAccess` deliberately untouched). Not a security boundary |
 | — | `JourneyNav` · `.staffgroup` | **the staff group, right of the journey, in sage** (TJ, 2026-08-09) — Roster · Cohort Graph for FACULTY, plus Readings · Courses for site ADMIN, on **every** surface including `/admin`. Unnumbered: they are not steps on the student's arc. Replaces `AdminNav`'s tab row, which now holds only the course/section pickers. Drawn from `course.isStaff` / `course.isAdmin`; decides what is drawn, never what may be read |
 | **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** as **Your work** (`#yourwork`), a sheet that slides over the text — closed by default, toggled from the viewer toolbar, and mounted *inside* `.pdf-shell` so it survives fullscreen; and the **Cloth Title/Description** at the head of that sheet |
-| 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Carries `ClothFold` **only at the whole weave**, which has no Reading station |
+| 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Carries `ClothFold` **only at the whole weave**, which has no Reading station — and, since nothing links to `/weave`, **no student can reach that branch**, so the whole-weave Cloth's only editor is currently unreachable |
 | **03 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); **merge Concepts — its only home**; Concepts/Links Overlays |
 | 04 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, card table; the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); the Capture Log history at the whole weave (`HistoryPanel` — since 2026-08-09 the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**) |
-| ~~05 Weave~~ | `/weave` | **hidden from the journey** (TJ, 2026-08-08) pending a decision on what it becomes. The route still works and Keep links to it, so whole-weave projections are not stranded — unhide via `hidden` in `JourneyNav`'s `STATIONS` |
-| 05 Keep | `KeepTab` (`/keep`) | **every reading at once** (TJ, 2026-08-09); export/import/reset — ratified as a deviation from the model's five (D4) — **and the Capture Log** (`HistoryPanel`), moved here from the whole weave because that was its only render AND no export contains `graphEvents`, so withdrawing `/weave` would have made it unreachable and unkeepable at once (red line 5) |
+| ~~05 Weave~~ | `/weave` | **hidden from the journey, and with no door at all.** The 08-08 row here said "The route still works and Keep links to it, so whole-weave projections are not stranded" — **the second clause was false.** Keep never linked to it; verified 2026-08-09 by grepping every `/weave` in the repo. The only remaining references are `JourneyNav`'s three dead `DEFAULT_HREF`s (their stations are greyed, so never read) and `ShelfSearch`'s three hits. So the whole-weave Cloth, the whole-weave Projections, and the last route to an untethered Passage have all been unreachable since the station was hidden. **TJ, 2026-08-09: the whole-weave path is unresolved** — cloth collaboration and the Quilt are both wanted, but "the ambiguity about how they manifest should not inform the current design", and "the whole weave will only confuse things in this moment". Nothing is to be built for it on a guess |
+| 05 Keep | `KeepTab` (`/keep`) | export/import/reset — ratified as a deviation from the model's five (D4) — **and the Capture Log** (`HistoryPanel`), moved here from the whole weave because that was its only render AND no export contains `graphEvents`, so withdrawing `/weave` would have made it unreachable and unkeepable at once (red line 5). **TJ, 2026-08-09: Keep is "more about the student library or cloth collection" than a whole weave** — so it is not the whole weave's home, and the "every reading at once" framing is what that ruling narrows |
 
 **A Concept with no Passages is in scope everywhere.** `scoped()` in
 [scope.ts](../src/lib/scope.ts) reads
@@ -565,7 +565,17 @@ map can never reach the replace path.**
 ### 4e. Whole-cloth import (replace)
 
 Client parse: flattens `{graph, views}`; validates tiers; drops blank-label concepts
-and text-less passages — but a passage whose concepts don't resolve now SURVIVES as an
+and text-less passages — **and reports what it dropped**, since 2026-08-09, in
+`ParsedImport.dropped {concepts, passages, edges}`. That exists because every array
+`parseImport` returns is a count of what LANDS, and the replace confirm was quoting
+them as *"It holds N concepts …"* — the file described by what survived reading it,
+on the one branch that destroys work. The dialog now says *"… will arrive"* and then
+names the losses, only when there are any. Edges are counted before the legacy
+`triples` are appended, so the number is the file's loss and not a diff against a
+list that grew back. Guarded by `scripts/check-import-compat.ts`, which a round-trip
+test cannot replace: the current code never *emits* a blank-label concept, so the
+shape that triggers the drop cannot arise from an export.
+A passage whose concepts don't resolve SURVIVES as an
 Unlabeled Passage (red line #5), where it used to be dropped as an orphan; accepts
 `conceptIds` (new) or `conceptId` (legacy), `text` or `content`; folds legacy v2/v3
 shapes (legacy passage notes onto the concept — a new-shape passage's `note` stays on the

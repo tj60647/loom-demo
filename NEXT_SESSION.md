@@ -1,5 +1,131 @@
 # Next Session Prompt
 
+## Addendum, 2026-08-09 later (the Weave ruling, 2.1 and 2.2 ruled and built)
+
+`npm run check` (8 scripts), `next build` and the Playwright suite (**51 passed
+/ 1 skipped** — the 49 plus two new) are green. **No migration.** Read
+[docs/open-work.md](docs/open-work.md) first — it is the plan and it is current.
+
+**Three of TJ's calls landed this session:** 05 Weave (§1 below), and **2.1 and
+2.2 — the naming paths and the Source override — now ruled AND built** (§7).
+
+### 1. The 05 Weave ruling: "not now", which releases the gate rather than answering it
+
+> **TJ:** *"the whole weave path is unresolved… **the ambiguity about how they
+> manifest should not inform the current design.** the keep… is more about the
+> student library or cloth collection than a whole weave. it may be easier to
+> **remove the weave concept** and reintroduce the collab and quilt at a later
+> date."*
+
+So **build nothing for the whole weave**, and **Keep is not its home**. Phase 2
+is unblocked. Whether the concept is *removed* is still open; the for/against
+is in `open-work.md` §Phase 1, and the two facts that bear on it are:
+
+- **Production is three migrations behind** — 20 applied, so it never saw 0021,
+  0022 or 0023. Its schema is the pre-rename one, and 5 of its 10 projections
+  sit at `scopeKey ''`. A removal migration would land three migrations *plus* a
+  removal at once.
+- **Dev's whole-weave rows that carry text are `seed-demo.ts` fixtures**, not
+  student work.
+
+**A first pass was written on the earlier reading of this ruling and reverted in
+full** — `loom-model-build.md`, `ClothFold`, `KeepTab` and `ThrowTab` are back
+to their original state. Only verified fact was kept.
+
+### 2. "Keep links to /weave" was false, and one of the three liars was a rendered diagram
+
+Nothing links to `/weave` — grepped, every site. Three places said otherwise:
+`JourneyNav`'s header comment, a `contracts.md` row, and **`src/lib/workflows.ts`,
+which drew a student-flow node reading "Every reading at once · /weave — station
+hidden, reached from Keep".** The diagram asserted a step no student could take.
+Node removed, `write → keep` direct, layout re-flowed itself. **This is exactly
+the failure AGENTS.md warns about** — `check-workflows.ts` passes on a picture
+that has fallen behind the build.
+
+### 3. Phase 2.3 — all three leads verified in source, one fixed
+
+- **A · The shuttle's `crossed` check is unscoped.** [ThrowTab.tsx:157] tests
+  `state.edges` (all of them) against `scoped.concepts` (this reading's), so a
+  pair linked in *another* reading is withheld here — and since the 08-09 band
+  removal **the edge causing it is invisible from this tab**. Milder than the
+  note claimed: there is an `every pair crossed — drawing any` fallback.
+  **Not fixed** — it is a behaviour change of the same family as 2.1.
+- **B · Import re-scopes a projection to the whole weave** when its readings do
+  not resolve ([loom.ts:1185]). Its own comment justifies the fallback as
+  keeping the work *"reachable"*; it is not. **Blocked** on the weave decision.
+- **C · The import confirm described the file by what survived reading it.
+  FIXED.** See below.
+
+### 4. What was fixed
+
+- **The import confirm under-reported a destructive replace.** `parseImport`
+  drops blank-label concepts and the links left dangling by that drop, so every
+  count it returns is what *lands* — and the dialog quoted them as *"It holds N
+  concepts…"* on the branch that replaces the cloth outright. `ParsedImport`
+  now carries `dropped {concepts, passages, edges}`, and the dialog says both
+  numbers, mentioning losses only when there are any. Edge losses are counted
+  **before** the legacy `triples` are appended.
+  **Guarded** — four new assertions in `check-import-compat.ts` (now 9). A
+  round-trip test cannot cover this: the current code never *emits* a
+  blank-label concept, so the triggering shape cannot come from an export.
+- **Every back-edge label in a workflow diagram was drawn at the same `x`**, so
+  two returns with similar midpoints printed on top of each other — "next
+  reading" over "another passage", 6px apart, 14px text. **Pre-existing**,
+  proven by laying out the pre-edit and post-edit graphs and getting identical
+  coordinates. Lanes were separated one-per-return deliberately; their labels
+  were not. `flowLayout.ts` now de-collides them deterministically — which
+  matters because that arithmetic runs on server *and* client, and a tie broken
+  differently would be a hydration mismatch.
+
+### 5. Traps
+
+- **`next start` sets `NODE_ENV=production`, so `/api/auth/test-login` 403s** —
+  the Playwright suite cannot run against a production build. It needs `next
+  dev`. (`reuseExistingServer` will happily hand it a prod server that then
+  fails every spec at global setup.)
+- **Killing the dev server while Playwright is tearing down makes it exit 2**
+  with every test green. Read the log before believing the exit code.
+- **`check-vocabulary.ts` flags a doc that names the `byte` table** — including
+  a true statement about a production database that predates 0023. The exemption
+  is a ±3-line window mentioning the rename, so *say why* the old name is there
+  rather than suppressing it.
+
+### 6. Phase 2.1 and 2.2 — ruled and built
+
+Full rationale, including the alternatives rejected and why, is in
+[docs/naming-decisions.md](docs/naming-decisions.md) §2a and §4a.
+
+- **2.1 — one shared `ReuseOffer`, on all three capture paths.** It reports the
+  join and offers the way out; it does not rule and does not block. Fires only
+  when the concept was evidenced in a **different** reading — a second passage
+  under the same concept in the same reading is not ambiguous and gets nothing.
+  - **Not a blocking confirm**, because recurrence across readings is the v1
+    substrate the model names; a dialog that fires on it teaches that it is
+    exceptional, and it is the goal.
+  - **Not left silent**, because the "they picked it off the datalist" defence
+    fails: the list offers every concept undifferentiated, so nothing
+    distinguishes one made here from one made weeks ago elsewhere.
+  - **A toast with a decision in it does not count down.** The plain capture
+    toast clears after 6s; with an offer, the timer is never started.
+  - **Separating MOVES a borrowed gloss.** If this capture filled the reused
+    concept's empty Description, the split gives that sentence to the new
+    concept and clears it from the old — never touching one written earlier.
+- **2.2 — "Source" is "Citation".** The override was never real, so the promise
+  went and the field stayed, renamed for the job it does. The filing it never
+  mentioned is now stated: *"Filed under <reading> — the reading you have
+  open."* Honouring the override was rejected because there is no route from
+  free text to a `sourceId`, and a shelf picker would defeat the case the field
+  exists for: quoting a work that is **not** on your shelf.
+
+### 7. Next
+
+The **weave-removal decision** (§1), then **lead A** — the shuttle's unscoped
+`crossed` check, which is the same family as 2.1 and should probably get the
+same treatment: offer the pair and say where you already linked it. **Lead B**
+stays blocked on the weave.
+
+---
+
 ## Addendum, 2026-08-09 (TJ's rulings, the Passage rename, and access made legible)
 
 **Seventeen commits on `dev`, `0636b9a`…HEAD, all pushed.** `npm run check` —

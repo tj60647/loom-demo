@@ -1,10 +1,21 @@
 # Where the tool decides what the student meant — the naming paths
 
-**Status: PARTLY CLOSED. Raised by TJ, 2026-08-09.** §1's homonym hole and §3's
-trim bug were fixed the same day (Phase 0 of [open-work.md](open-work.md)); they
-were defects, not decisions. **§2 and §4 remain TJ's rulings** — both are
-behaviour changes on the busiest path in the app, and neither should be folded
-in without an answer.
+**Status: CLOSED. Raised by TJ, 2026-08-09, and ruled the same day.** §1's
+homonym hole and §3's trim bug were defects, not decisions, and were fixed with
+Phase 0 of [open-work.md](open-work.md). **§2 and §4 were TJ's calls and are now
+ruled and built** — see §2a and §4a below for what shipped and why.
+
+> **§2 — the offer, not the verdict and not the question.** All three capture
+> paths now render one shared component, `ReuseOffer`. It fires only when the
+> concept was already evidenced in a **different** reading, says so, and offers
+> *"Not the same idea? Make it a separate concept."* The PDF path — the busiest
+> — carries it inside the capture toast rather than as its own card, because TJ
+> ruled that path the quieter of the two.
+>
+> **§4 — the Source field is a Citation field.** The override was never real, so
+> the promise is gone rather than the field. It is named for the job it actually
+> does, and the filing it never mentioned is now stated: *"Filed under <the
+> reading> — the reading you have open."*
 
 Red line 2 (`loom-model-build.md` §6, binding):
 
@@ -83,6 +94,38 @@ note from an assertion into an offer:
 No friction in the common case, no data loss, and the student holds the
 decision. The PDF path needs the same note, which it has never had.
 
+## 2a. What shipped (2026-08-09) — and the two arguments that decided it
+
+`src/components/ui/ReuseOffer.tsx`, rendered by **both** capture paths, so they
+can no longer drift apart. Trigger unchanged from the hand path's existing one:
+`metElsewhere.length > 0`, computed **before** the passage lands so the capture
+does not count itself as prior evidence.
+
+**Against asking (a blocking confirm), which was the obvious alternative:**
+cross-Reading Concept recurrence is the v1 substrate the model names (§1), so a
+dialog that fires on recurrence and not on novelty teaches that recurrence is
+the exceptional case. It is the goal.
+
+**Against leaving it silent:** the datalist defence — "they picked the label off
+a list, so they chose it" — does not hold. `CaptureModal`'s datalist offers
+**every** concept undifferentiated, so nothing on screen distinguishes one made
+in this reading from one made three weeks ago in another.
+
+Two details worth not re-deriving:
+
+- **A toast carrying a decision does not count down.** The plain capture toast
+  clears after six seconds; with an offer in it, the timer is not started. A
+  choice that expires is a choice made for you.
+- **Separating MOVES the gloss it borrowed.** If this capture is what filled the
+  reused concept's empty Description, that sentence was written about the *new*
+  idea — so the split gives it to the new concept and clears it from the old.
+  It never touches a Description the student wrote earlier. `ReuseOffer` gets
+  `filledDescription` for exactly this, empty in the common case.
+
+Guarded by `tests/reuse-seam.spec.ts`: the offer appears across readings, does
+**not** appear for a second passage in the same reading, and taking it leaves
+two same-label concepts holding one passage each.
+
 ## 3. A real bug: the homonym confirm can be skipped by a trailing space — **FIXED 2026-08-09**
 
 `OpenTab.handleAddConceptOnly` matches **untrimmed** and writes **trimmed**:
@@ -132,6 +175,31 @@ Worth noting the stamp is usually *right* — you are typing a passage while
 reading that text. The defect is the promise, so the fix is a choice: either
 honour the override, or stop offering it. Both are TJ's call, and the second is
 one string.
+
+## 4a. What shipped (2026-08-09) — and why NOT "honour it"
+
+The field is now **"Citation — author, work"**, with no "unless you say
+otherwise", plus a line naming the filing: *"Filed under <reading> — the reading
+you have open. The citation travels with the passage and may name someone else;
+the filing follows the reading."* `CaptureModal`'s read-only twin says
+"Citation" too — and "Source" was a July word anyway (the vocabulary map has
+`sources` = **Readings**).
+
+**Honouring the override was rejected on three grounds**, and the third is the
+one that settles it:
+
+1. There is no route from free text to a `sourceId`. "Suchman, *Plans and
+   Situated Actions*" is not a reading id, so the field would have to become a
+   picker over the shelf — a different field with a different meaning.
+2. It would have to respect `createPassage`'s `sourceId` authorization (added
+   2026-08-09), so the picker must be shelf-scoped.
+3. **Which defeats the case that motivates the field.** The whole point of
+   "this passage may be quoting someone else" is that the quoted work is *not*
+   on your shelf. A picker cannot express it; a citation string can.
+
+So the interface now states what it does. That is strictly more than the old
+label offered — a student previously could not see where their passage was
+filed at all.
 
 ## 5. A finding I am correcting rather than passing on
 

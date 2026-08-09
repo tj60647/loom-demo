@@ -47,9 +47,34 @@ the rule is the point, not the wording.
 
 ---
 
-## Phase 1 — the ruling that gates the most: **05 Weave**
+## Phase 1 — **05 Weave: ruled 2026-08-09, and the answer is "not now"**
 
-**Take this before anything in Phase 2.** The whole weave is currently hidden
+> **TJ, 2026-08-09:** *"the whole weave path is unresolved. i know we will want a
+> way for students to collaborate on a cloth, and there is an idea about a
+> quilt. **the ambiguity about how they manifest should not inform the current
+> design.** the keep will allow downloading of content, but **it is more about
+> the student library or cloth collection** than a whole weave. it may be easier
+> to **remove the weave concept** and reintroduce the collab and quilt at a later
+> date. the whole weave will only confuse things in this moment."*
+>
+> So: **build nothing for the whole weave, and do not shape anything around
+> Quilt or co-authorship.** That releases the gate below rather than answering
+> it — Phase 2 may proceed. Keep is **not** the whole weave's home; the
+> "every reading at once" framing is what this narrows.
+>
+> **Still open, and TJ's:** whether the weave concept is *removed* outright.
+> Two facts bearing on it, both measured 2026-08-09 —
+> **(1)** the dev DB holds 2 whole-weave cloths and 5 whole-weave projections,
+> but the ones carrying text are `seed-demo.ts` fixtures, not student work;
+> **(2)** **production is three migrations behind** — 20 applied, so it has
+> never seen 0021, 0022 or **0023, the rename**: its schema is still the
+> pre-rename one (`byte` and `read` tables, and no `cloth` or `passage`). It
+> holds 5 of its 10 projections at `scopeKey ''`. So any removal migration has
+> to be planned against a database three steps back, not against dev — and
+> landing 0021–0023 *and* a removal together is the highest-risk sequencing this
+> repo has attempted.
+
+**Superseded framing, kept for the reasoning.** The whole weave was hidden
 from the journey, its stations grey out, and nothing links to `/weave` — but the
 route still works and three pieces of student work live only there:
 
@@ -70,7 +95,18 @@ Three ways out, and they cost very differently:
    its own, and the strandings need an interim home regardless.
 
 **Building viewers for stranded whole-weave work before this is answered means
-building them twice.** That is the whole reason this phase is first.
+building them twice.** That is the whole reason this phase was first — and the
+ruling above resolves it by forbidding the building rather than by choosing one
+of the three.
+
+**One claim in the framing above was false and is now corrected.** It said the
+route "still works and Keep links to it". **Keep never linked to it** — verified
+by grepping every `/weave` in the repo. Three places asserted otherwise and have
+been fixed: `JourneyNav`'s header comment, this table's row in
+[contracts.md](contracts.md), and — worst — `src/lib/workflows.ts`, which
+**rendered a student-flow node** reading *"Every reading at once · /weave —
+station hidden, reached from Keep"*. The diagram drew a step no student could
+take. That node is gone and `write → keep` is direct.
 
 ---
 
@@ -80,27 +116,68 @@ These are three questions about the same surface, and answering them separately
 would mean touching the capture path three times. Full analysis:
 [naming-decisions.md](naming-decisions.md).
 
-- **2.1 The three naming paths disagree.** Naming ahead of evidence *asks*;
-  capture by hand joins silently then *asserts* ("it is one concept, not two");
-  **capture from the PDF — the busiest path — joins silently and says nothing.**
-  Proposed: turn the note into an offer ("Not the same idea? — Make it a
-  separate concept") and give the PDF path a note at all. Not "ask every time":
-  most of the time the reuse is the move the course teaches. **TJ's call**, because
-  it is a behaviour change on the busiest path in the app.
-- **2.2 The Source field promises an override it does not have.** The label says
-  *"this reading, unless you say otherwise"*, but saying otherwise sets
-  `passage.source` (a string) while `passage.sourceId` — what `scopedGraph`, the
-  tallies, the overlays and the export anchors all read — is stamped from the
-  open reading. `attributePassages` is guarded by `isNull(sourceId)`, so it can
-  never be re-attributed afterwards. **Honour the override, or stop offering
-  it.** The second is one string. **TJ's call.**
-- **2.3 The unverified leads**, which should be checked before either of the
-  above is built, because two touch the same code: `ThrowTab`'s `crossed`
-  suppression (a pair already linked *anywhere* is never offered by the shuttle,
-  with no reason given — and since 2026-08-09 those other-reading threads are
-  not even visible); import silently re-scoping a Projection to the whole weave;
-  and import dropping blank-label concepts and dangling links while Keep reports
-  the *post-drop* counts as the file's contents.
+- **2.1 The three naming paths disagreed. RULED AND BUILT 2026-08-09.** Naming
+  ahead of evidence *asked*; capture by hand joined silently then *asserted*
+  ("it is one concept, not two"); capture from the PDF — the busiest path —
+  joined silently and said nothing. All three now render one shared
+  `ReuseOffer`: it fires only when the concept was evidenced in a **different**
+  reading, reports the join, and offers *"Not the same idea? Make it a separate
+  concept."* The PDF path carries it inside the capture toast (TJ: that path is
+  the quieter of the two), and a toast with a decision in it does not count
+  down. Rationale and the rejected alternatives:
+  [naming-decisions.md §2a](naming-decisions.md). Guarded by
+  `tests/reuse-seam.spec.ts`.
+- **2.2 The Source field promised an override it did not have. RULED AND BUILT
+  2026-08-09.** It is a **Citation** field now — the promise is gone, the field
+  stays, and the filing it never mentioned is stated outright ("Filed under
+  <the reading> — the reading you have open"). *Honouring* the override was
+  rejected: there is no route from free text to a `sourceId`, and a shelf picker
+  would defeat the very case the field exists for — quoting a work that is
+  **not** on your shelf. [naming-decisions.md §4a](naming-decisions.md).
+- **2.3 The three leads — all now VERIFIED in source (2026-08-09), none fixed.**
+  Each was read against the code rather than inferred, and two came out sharper
+  than the note that raised them.
+
+  - **A · The shuttle's `crossed` check is unscoped.**
+    [ThrowTab.tsx:157](../src/components/tabs/ThrowTab.tsx#L157) tests
+    `state.edges` — **every** edge the student owns — while the candidate list
+    is `scoped.concepts`, this reading's. So two concepts both evidenced here,
+    already linked in a *different* reading, are dropped from the draw. Not
+    absolute, which the original note overstated: if every pair is crossed it
+    draws one anyway and flashes *"every pair crossed — drawing any"*. The
+    defect is the common case — a pair silently never comes up, and since the
+    "threads that run out of this reading" band was removed on 2026-08-09
+    **the edge causing it is invisible from here**, so there is nothing on
+    screen that could explain the absence.
+  - **B · Import re-scopes a Projection to the whole weave, silently.**
+    [loom.ts:1185-1189](../src/actions/loom.ts#L1185-L1189): unresolvable
+    reading ids filter to none, and `scopeOf([]).key` is `""`. The comment
+    above it justifies the fallback as keeping *"the student's tiers, essence
+    and read reachable (red line #5)"* — **they are not reachable**, because
+    nothing links to `/weave`. The fallback that exists to protect the work is
+    what buries it. Fixing it needs the whole-weave question answered first.
+  - **C · Import drops rows, and the confirm reported the post-drop count as
+    the file's contents. FIXED 2026-08-09** — the one of the three that needed
+    no ruling. [graphExport.ts:316](../src/lib/graphExport.ts#L316) drops
+    concepts with a blank label; [:378](../src/lib/graphExport.ts#L378) drops
+    edges whose endpoints did not survive that. `parseImport` returns the
+    **filtered** arrays, and `KeepTab`'s dialog read them as *"It holds N
+    concepts … N threads"* — a claim about the file, measured after the losses,
+    on the **destructive** branch ("What is on the table now is replaced, not
+    merged").
+
+    `ParsedImport` now carries `dropped: {concepts, passages, edges}` and the
+    dialog says both numbers — *"… will arrive"*, then what "cannot be read and
+    will not", and only when there is something to report, so an ordinary
+    import is unchanged. Edge losses are counted **before** the legacy
+    triples are appended, or the number would be a diff against a list that
+    grew again.
+
+    **Guarded**, because this class of bug is invisible by construction:
+    `scripts/check-import-compat.ts` gained four assertions on a deliberately
+    lossy file. A round-trip test could never catch it — the current code never
+    *emits* a blank-label concept, so the shape that triggers the drop cannot
+    arise from an export.
 
 ---
 
@@ -189,7 +266,25 @@ and the database (migration 0023), the **three kinds** a Concept can be relative
 to a reading, and two guards that did not exist —
 `scripts/check-import-compat.ts` and `scripts/check-vocabulary.ts`.
 
-**Next: the 05 Weave ruling** (Phase 1). It is the one answer that changes how
-much of Phase 2 exists at all, and nothing below it should be built first.
+~~**Next: the 05 Weave ruling** (Phase 1).~~ **Ruled 2026-08-09** — *build
+nothing for the whole weave* (§Phase 1). Nothing was built for it; three false
+claims that it had a door were removed, one of which was **rendering as a step
+in the student workflow diagram**.
 
-Everything else can wait for that to land.
+**Next: Phase 2.** Its three leads (2.3) are now verified in source and written
+up above with file and line — that was the work the plan asked for before 2.1
+and 2.2 get built. **2.1 and 2.2 are still TJ's calls** and are what to take
+next; lead **C** (import under-reports what a destructive replace will drop) is
+the one of the three that needs no ruling at all and can be fixed on its own.
+Lead **B** is blocked on whether the weave concept is removed.
+
+**Found on the way, unrelated to any of it and now fixed:** every back-edge
+label in a workflow diagram was drawn at the same `x`, so two returns whose
+spans had similar midpoints printed **on top of each other** — "next reading"
+sat over "another passage" on the student flow, 6px apart with 14px text. The
+lanes were separated one-per-return on purpose and the labels naming them were
+not, which undid it. `check-workflows.ts` catches invisible connectors but had
+nothing to say about an illegible label; the layout now de-collides them
+deterministically ([flowLayout.ts](../src/lib/flowLayout.ts), and see the note
+there on why determinism is load-bearing for a diagram rendered on both server
+and client).
