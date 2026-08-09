@@ -1,6 +1,167 @@
 # Next Session Prompt
 
-## Addendum, 2026-08-08 (a long day of TJ's rulings — read this, then the open items)
+## Addendum, 2026-08-09 (Your work, the capture toast, the tips, and Linking's scope)
+
+**Read this first.** `npm run check`, `next build` and the Playwright suite are
+green. **No migration** — nothing here touched the database.
+
+### 1. "Capture log" is now **Your work**, and it behaves like one
+
+TJ: *"the current capture log button is a little weird… it seems like it should
+be 'notes' at least, if not having the ux also changed."*
+
+- **The word is "Your work"**, not "Notes" — TJ's call, because **Notes already
+  names a field on the Passage** (`byte.note`). The **model doc's object name
+  stays `Capture Log`**; only student-visible strings changed. Both authority
+  docs already used "Capture Log" for `graphEvents`/`HistoryPanel`
+  (`loom-refactor-spec.md:19`), so the reading rail was the impostor — this
+  rename *resolved* a collision rather than making one.
+- **The rail became a card over the text.** It was a flex sibling that squeezed
+  the page above 820px and only overlaid below it — the same button doing two
+  different things depending on window width. Now `#yourwork`: inset 12px,
+  380px wide, rounded, shadowed, height-capped to clear the footer, sliding in
+  from the right. **It is rendered inside `.pdf-shell`** (a new `.pdf-body`
+  wrapper) because `.pdf-shell.fullscreen` is `position:fixed; z-index:6000`
+  with its own stacking context and swallowed the old rail whole.
+- **Always mounted, parked off-screen** (`visibility` + `transform`, with the
+  asymmetric transition — read the comment, it is not a typo). Drafts survive
+  the toggle, and a just-landed capture has a real layout box to scroll to.
+- **The toolbar button no longer changes shape.** It read `Your work · 5`
+  closed and `Hide your work` open — narrow ghost to wide filled — reflowing
+  the toolbar under the reader's eye. One label, one width, ghost vs filled.
+
+### 2. The capture toast — the thing that actually answered the complaint
+
+TJ, on the first cut: *"still very disruptive… i thought we were making a slide
+out panel from the side like toast thing."*
+
+**A capture from the page used to land in complete silence.** `CaptureModal`
+saved and vanished; the only acknowledgement was 1500ms of `· saved ·` in the
+header, a screen away from where the reader was looking. *That* is why the
+panel had to be opened at all — you opened it to check, not to browse.
+
+`.captoast`: bottom-right, 6s, held on pointer-enter, `In your work ›` opens the
+card on that row. Two captures inside the window become "2 passages captured"
+rather than stacking. If the card is already open there is no toast — the row
+is the acknowledgement, so it scrolls to it instead.
+
+### 3. The hover tips were broken nearly everywhere — measured, not guessed
+
+TJ: *"there appear to be mouseover bubbles for many things that are getting
+blocked because they are 'behind' things."* Audited in Chromium across ~70
+`[data-tip]` sites in 15 files:
+
+| Surface | Before |
+|---|---|
+| Header tips, **including `?`**, on every page | ~90% clipped by `body{overflow:hidden}` |
+| All six reading-toolbar tips | 80% clipped; 93% below 900px |
+| Journey nav tip | 100% clipped below 900px |
+| `.scrollbox` lower rows | 100% clipped at the bottom |
+
+**Two mechanisms.** Most of it is overflow clipping, which **no z-index value
+can fix**. On top of that `.pdf-toolbar` is a flex item with `z-index:10`, and a
+flex item with a z-index makes a stacking context — so a bubble asking for 30
+painted at an effective 10, under Your work at 25.
+
+Fix: **`src/components/ui/TipLayer.tsx`** — one element at the document root
+using the native `popover` attribute, so it lives in the **top layer**: above
+every stacking context by construction, clipped by nothing, and carrying **no
+z-index**, so the ladder in `globals.css` never needs renumbering for it again.
+Listeners are delegated — **not one of the ~70 call sites changed**. `.tip-below`
+and the `.scrollbox` flip are deleted. The contract is unchanged and deliberate:
+aria-hidden, mouse-only, never touch, never keyboard, `pointer-events:none`.
+
+### 4. Linking shows this reading's threads only
+
+TJ: *"threads from other readings should not show up in the linking. links from
+other readings may show up as link options."*
+
+- **The main list was already correct** (`scoped.edges`). The offender was the
+  second band, *"Threads that run out of this reading"* (`scoped.bridges`).
+  Decisive detail: the 08-08 ruling removed the outside-concepts band and the
+  across-readings shuttle, so **a student can no longer create a bridge from
+  inside a reading** — every row in that band had been thrown somewhere else.
+  Gone, with the now-unreachable "from *(reading)*" pill.
+- **The permissive half did not exist at all.** Label suggestions were six
+  hardcoded everyday verbs (`PLAIN_VERBS`) with no way to reuse one you coined.
+  Linking now offers **"Labels you have coined before"** — the **Link List**
+  (model §Student), derived from `state.edges`, deduped case-insensitively,
+  most-used first, capped at 12 **and it says so** ("the 12 you reach for most,
+  of 27"), with Vocabulary as the full home.
+
+### 5. Capture by hand — prefilled, and honestly justified
+
+- **Location now offers the page you are on** (TJ), the same way Source already
+  offered the citation: placeholder plus empty-field fallback, so it is a
+  default and never a lock. The field gained `id="bLocation"` — **the spec used
+  to match the literal placeholder `ch. 3, p. 49`, which a dynamic placeholder
+  breaks.** The suite caught exactly that.
+- The fold's copy now leads with the real case: *some things on a page cannot be
+  selected at all* — a concept map, a diagram's labels, a page photographed
+  rather than typeset. (*Learning How to Learn* p56 is the known one.)
+
+### 6. Vocabulary check TJ raised, and its answer
+
+*"are we misusing link object and link label…? how do we get link label without
+link?"* Answered from the model, not from memory:
+
+- `Link = Beginning Concept + Ending Concept + Link Description + Link Label`.
+  The two Concepts are **structural, not a tag**; the Label is a nullable
+  parameter. So a Link Label is **not** an object — TJ was right about that.
+- But the **Link List is first-class on the Student** (model §33), and §122
+  calls the asymmetry deliberate: the Concept List holds full objects, the Link
+  List holds only the vocabulary, *"because Links (edges) live in Cloths; what
+  recurs is the relationship-verb vocabulary."*
+- **You cannot get a Link Label without a Link.** There is no link-label table;
+  the list is derived from `handle` on every Link. A label enters the vocabulary
+  by being used once, and no other way.
+
+**Open, and genuinely undecided:** that is an asymmetry with the 08-08 ruling
+that *a Concept may precede its evidence*. There is no "a Link Label may precede
+its Link" — you cannot coin a verb you expect to need and hunt for the pair.
+
+TJ then took it further, and the further version is better: *"a Thread is
+Concept–Link–Concept, and it **contains the references** — not the Link itself"*
+and *"my hunch is that a Thread will have its own Description."* That is right,
+and it resolves both asymmetries: **Link** becomes a User-level object (Label +
+its own gloss, "what I mean by this verb"), **Thread** carries the references
+and the per-pair sentence. Full analysis, the migration, and the one thing that
+makes or breaks it — **there is no `mergeLinks` and it would become mandatory** —
+in **[docs/link-as-object.md](docs/link-as-object.md)**. Recommended: do it, as
+its own phase, not urgent.
+
+### 7. Traps this session
+
+- **`overflow: hidden` vs `overflow: clip` on `.pdf-body`.** Clip makes no
+  scroll container, so the parked card cannot be scrolled into view by a stray
+  `focus()`. But **`scrollWidth` still reports the overflow either way** — the
+  scrolling *area* is not the same question as whether the box scrolls. That is
+  why `tests/pdf-fit.spec.ts` now measures `.pdf-stage` by name instead of
+  walking two `parentElement`s up from `.react-pdf__Document`.
+- **Do not edit source while the Playwright suite is running** against the
+  hot-reloading dev server. Cost one confusing mid-run failure.
+- A `const` used in a `useEffect` dep array must be declared **above** that
+  effect — the design spec sited `requestToggleWork` below it, which is a
+  temporal-dead-zone crash on first render.
+- The CSS in `PdfViewer` lives in a **JSX template literal**: a backtick inside
+  a comment there closes the string and the whole reading fails to parse.
+
+### 8. Still open
+
+- **The screen snip** — [docs/screen-snip.md](docs/screen-snip.md), rewritten
+  this session. It is **much smaller than the old handoff claimed**: a snip of a
+  library PDF needs no image storage at all (rect + `sourceId` + page, rendered
+  on demand, exactly as `sourceRepairs.region` and the crop route already do).
+  TJ settled the export question — *"the snips will be small, i'm not worried
+  about the copyright"* — so the image embeds. One number left open: the size
+  cap, worth measuring against p56 rather than guessing.
+- **Cloth co-authorship**, **05 Weave**, **the Faculty Section in the section
+  picker**, **several modes of reading** — all carried over unchanged from
+  08-08 §5.
+
+---
+
+## Addendum, 2026-08-08 (a long day of TJ's rulings — history, but still true)
 
 **Nineteen commits on `dev`, `c3761a0`…`c50c5c4`, all pushed.** `npm run check`
 (now including `check:workflows`), `next build` and the Playwright suite

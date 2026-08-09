@@ -67,3 +67,8 @@ next-env.d.ts
 # Regenerated on demand (5MB for English), and nothing in the repo depends on it.
 eng.traineddata
 *.traineddata
+
+# The Playwright suite is redirected to a file, never a pipe (NEXT_SESSION.md
+# kickoff): a dev-server child holds stdout open, so a pipe never sees EOF.
+run.txt
+run*.txt
