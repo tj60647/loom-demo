@@ -2,7 +2,7 @@
 
 import { db } from "@/db"
 import { courseMemberships, courses, sections } from "@/db/schema"
-import { and, eq, isNull } from "drizzle-orm"
+import { and, asc, eq, isNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth/next"
 import { authOptions, isAdminUser } from "@/lib/auth"
@@ -57,7 +57,17 @@ export async function getActiveCourse() {
     .limit(1)
   const isStaff = isAdminUser(session.user) || membership[0]?.role === "FACULTY"
 
-  return { id: course.id, name: course.name, term: course.term, isStaff }
+  // The sections a staff viewer may overlay. Empty for a student — they see no
+  // Overlay control at all, so the list would only be a leak of names.
+  const courseSections = isStaff
+    ? await db
+        .select({ id: sections.id, name: sections.name })
+        .from(sections)
+        .where(eq(sections.courseId, courseId))
+        .orderBy(asc(sections.name))
+    : []
+
+  return { id: course.id, name: course.name, term: course.term, isStaff, sections: courseSections }
 }
 
 /** Appends -2, -3, … until the slug is free. */

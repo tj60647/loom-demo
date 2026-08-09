@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import KeepTab from "@/components/tabs/KeepTab"
-import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import JourneyNav from "@/components/ui/JourneyNav"
 
 export default function KeepPage() {
@@ -30,7 +29,6 @@ export default function KeepPage() {
           <h2>Welcome to Loom.</h2>
           <span className="cap">Please sign in to continue</span>
         </div>
-        <FirstRunWalkthrough autoOpen={false} />
       </main>
     )
   }
@@ -45,7 +43,6 @@ export default function KeepPage() {
       <JourneyNav active="keep" />
       <main>
         <KeepTab />
-        <FirstRunWalkthrough />
       </main>
       <footer>
         <span className="fl">06 — KEEP</span>

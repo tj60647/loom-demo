@@ -12,5 +12,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "sourceId is required" }, { status: 400 })
   }
   const band = params.get("band") === "cohort" ? "cohort" : "section"
-  return respondWithRead("getPassagesOverlay", () => getPassagesOverlay(sourceId, band))
+  // Staff choose which section to compare; absent means their own.
+  const sectionId = params.get("section")
+  return respondWithRead("getPassagesOverlay", () => getPassagesOverlay(sourceId, band, sectionId))
 }

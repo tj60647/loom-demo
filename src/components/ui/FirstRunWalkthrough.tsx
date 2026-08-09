@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
+import { usePathname } from "next/navigation"
 
 /** Pre-per-user key; still read once so existing students aren't re-onboarded. */
 const LEGACY_SEEN_KEY = "loom_has_seen_walkthrough"
@@ -34,6 +35,13 @@ const GUIDE = [
  */
 export default function FirstRunWalkthrough({ autoOpen = true }: { autoOpen?: boolean }) {
   const { data: session } = useSession();
+  // Mounted once in the root layout so the header's "?" always has a listener.
+  // It therefore has to decide for itself where the unprompted pop-up is
+  // welcome: the learner surfaces, not the admin shell or the sign-in screens.
+  // Opening BY THE BUTTON still works everywhere — that is the point.
+  const pathname = usePathname();
+  const welcome =
+    autoOpen && !(pathname?.startsWith("/admin") || pathname?.startsWith("/auth"));
   const [show, setShow] = useState(false);
   const [step, setStep] = useState(0);
 
@@ -44,7 +52,7 @@ export default function FirstRunWalkthrough({ autoOpen = true }: { autoOpen?: bo
   const storageKey = userId ? `${LEGACY_SEEN_KEY}:${userId}` : null;
 
   useEffect(() => {
-    if (!autoOpen || !storageKey) return;
+    if (!welcome || !storageKey) return;
     // Adopt the pre-per-user flag once, then clear it, so this student keeps
     // their "already seen" state without suppressing the next student's.
     const legacy = localStorage.getItem(LEGACY_SEEN_KEY);
@@ -56,7 +64,7 @@ export default function FirstRunWalkthrough({ autoOpen = true }: { autoOpen?: bo
       const timer = window.setTimeout(() => setShow(true), 0);
       return () => window.clearTimeout(timer);
     }
-  }, [autoOpen, storageKey]);
+  }, [welcome, storageKey]);
 
   useEffect(() => {
     const reopen = () => {

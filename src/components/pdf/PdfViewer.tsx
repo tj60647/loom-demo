@@ -55,7 +55,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   const { state } = useLoom();
   // Drawn only for faculty and admins. Not a guard — `overlayViewer()` re-checks
   // on the server, so a student who forces the request gets an empty overlay.
-  const isStaff = !!useReadings().course?.isStaff;
+  const readings = useReadings();
+  const isStaff = !!readings.course?.isStaff;
+  const courseSections = readings.course?.sections ?? [];
+  // Which section is being compared; "" is every section — the cohort.
+  const [overlaySection, setOverlaySection] = useState<string>("");
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [isNarrow, setIsNarrow] = useState(false);
@@ -485,20 +489,20 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * in an effect body — so a stale wash never outlives the ask that fetched
    * it, and no cascading render is needed to clear one.
    */
-  const chooseOverlayBand = useCallback((next: OverlayBand) => {
-    setOverlayBusy(overlayBand !== next);
-    setOverlayBand((current) => (current === next ? null : next));
+  const chooseOverlayBand = useCallback((next: OverlayBand, sectionId?: string | null) => {
+    setOverlayBusy(true);
+    setOverlaySection(sectionId ?? "");
+    setOverlayBand(next);
     setOverlay(null);
-  }, [overlayBand]);
+  }, []);
 
-  // Re-runs on `ownCaptureCount` as well as the band: capturing the passage
-  // that opens the gate must bring the comparison in without a reload. That
-  // refresh is deliberately quiet — `busy` is set by the handler above, so
-  // fresh heat replaces old heat in place instead of flashing "reading…".
+  // Re-runs on the chosen section too, so switching sections re-reads without
+  // a reload. `busy` is set by the handler, so fresh heat replaces old heat in
+  // place instead of flashing "reading…".
   useEffect(() => {
     if (!overlayBand || !sourceId) return;
     let cancelled = false;
-    getPassagesOverlay(sourceId, overlayBand)
+    getPassagesOverlay(sourceId, overlayBand, overlaySection || null)
       .then((data) => { if (!cancelled) setOverlay(data); })
       .catch((error) => {
         // A failed comparison is not a failed reading: drop the heat, leave
@@ -508,7 +512,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       })
       .finally(() => { if (!cancelled) setOverlayBusy(false); });
     return () => { cancelled = true; };
-  }, [overlayBand, sourceId, ownCaptureCount]);
+  }, [overlayBand, overlaySection, sourceId, ownCaptureCount]);
 
   // Find in this reading: the effect only schedules the debounced fetch —
   // state resets happen in the handlers (close, clear), never synchronously
@@ -1332,18 +1336,26 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           {sourceId && isStaff && (
             <div className="pdf-overlay-ctl" role="group" aria-label="Compare your marks with others">
               {!isNarrow && <span className="label">Overlay</span>}
-              <button
-                className={`btn mini ${overlayBand === "section" ? "" : "ghost"}`}
-                onClick={() => chooseOverlayBand("section")}
-                aria-pressed={overlayBand === "section"}
-                data-tip="shade where your discussion section marked this reading"
-              >Section</button>
-              <button
-                className={`btn mini ${overlayBand === "cohort" ? "" : "ghost"}`}
-                onClick={() => chooseOverlayBand("cohort")}
-                aria-pressed={overlayBand === "cohort"}
-                data-tip="shade where everyone on the course marked this reading"
-              >Cohort</button>
+              {/* A picker, not two buttons (TJ, 2026-08-08): faculty teach across
+                  sections, so "your section" had no referent for them — they sit
+                  in the Faculty Section, which the peer query excludes. */}
+              <select
+                className="tinput inline"
+                aria-label="Which section to compare"
+                value={overlayBand ? overlaySection : "off"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "off") { setOverlayBand(null); setOverlay(null); return; }
+                  setOverlaySection(v === "all" ? "" : v);
+                  chooseOverlayBand(v === "all" ? "cohort" : "section", v === "all" ? null : v);
+                }}
+              >
+                <option value="off">off</option>
+                <option value="all">All sections</option>
+                {courseSections.map((sec) => (
+                  <option key={sec.id} value={sec.id}>{sec.name}</option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -1381,13 +1393,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       {overlayBand && sourceId && (
         <div className="pdf-overlay-bar" role="status">
           {!overlay && overlayBusy && (
-            <span>reading {overlayBand === "section" ? "your section" : "your cohort"}…</span>
+            <span>reading {overlayBand === "section" ? "that section" : "the cohort"}…</span>
           )}
           {!overlay && !overlayBusy && <span>The comparison could not be loaded just now.</span>}
           {overlay?.blocked && <span>{overlayBlockMessage(overlay.blocked, overlay.band)}</span>}
           {overlay && !overlay.blocked && overlay.contributors === 0 && (
             <span>
-              Nobody else in {overlay.band === "section" ? "your section" : "your cohort"} has
+              Nobody in {overlay.band === "section" ? "that section" : "the cohort"} has
               marked this reading yet.
             </span>
           )}
@@ -1395,7 +1407,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             <>
               <span>
                 <b>{overlay.contributors}</b> of {overlay.peers} in{" "}
-                {overlay.band === "section" ? "your section" : "your cohort"}{" "}
+                {overlay.band === "section" ? "that section" : "the cohort"}{" "}
                 {overlay.contributors === 1 ? "has" : "have"} marked this reading —{" "}
                 <b>{overlay.passages}</b> passage{overlay.passages !== 1 ? "s" : ""}
                 {viewMode === "page" && (

@@ -37,8 +37,10 @@ test("the nav offers the read side only — no Readings, no Courses", async ({ p
   await expect(nav.getByRole("link", { name: "Roster" })).toBeVisible({ timeout: 15_000 })
   await expect(nav.getByRole("link", { name: "Cohort Graph" })).toBeVisible()
   await expect(nav.getByRole("link", { name: "← My Loom" })).toBeVisible()
-  // Workflows is documentation, not data — faculty read it too.
-  await expect(nav.getByRole("link", { name: "Workflows" })).toBeVisible()
+  // Workflows left the admin nav for the header (TJ, 2026-08-08) — it is not an
+  // admin surface at all now; students read their own flow there.
+  await expect(nav.getByRole("link", { name: "Workflows" })).toHaveCount(0)
+  await expect(page.locator('header a[href="/workflows"]')).toBeVisible()
 
   // The write surfaces are absent from the shell, not merely disabled.
   await expect(nav.getByRole("link", { name: "Readings" })).toHaveCount(0)

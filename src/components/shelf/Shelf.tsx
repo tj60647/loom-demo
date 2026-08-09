@@ -22,7 +22,6 @@ import { short } from "@/lib/clothMath"
 import { timeAgo } from "@/lib/utils"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 import ShelfSearch from "@/components/shelf/ShelfSearch"
-import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import JourneyNav from "@/components/ui/JourneyNav"
 import { SIGN_IN_EXPLANATION } from "@/lib/signIn"
@@ -100,7 +99,6 @@ export default function Shelf() {
             no github account?
           </Link>
         </div>
-        <FirstRunWalkthrough autoOpen={false} />
       </main>
     )
   }
@@ -310,8 +308,6 @@ export default function Shelf() {
           </div>
         )}
         </>)}
-
-        <FirstRunWalkthrough />
       </main>
 
       <footer>

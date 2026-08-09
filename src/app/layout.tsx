@@ -5,6 +5,7 @@ import { LoomProvider } from "@/components/providers/LoomProvider";
 import { ReadingsProvider } from "@/components/providers/ReadingsProvider";
 import { DialogProvider } from "@/components/providers/DialogProvider";
 import Header from "@/components/ui/Header";
+import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough";
 
 // Which deployment this is. VERCEL_ENV is "production" only on the real
 // site; the dev alias builds as "preview" and local `next dev` leaves it
@@ -37,6 +38,12 @@ export default function RootLayout({
             <ReadingsProvider>
               <DialogProvider>
                 <Header deployEnv={deployEnv} />
+                {/* One mount, here, so the header's "?" always has a listener.
+                    It used to live on the shelf, Keep and the workbench only —
+                    which left the button dead on every /admin page, where the
+                    header still drew it (TJ, 2026-08-08). It decides for itself
+                    whether to open unprompted. */}
+                <FirstRunWalkthrough />
                 {children}
               </DialogProvider>
             </ReadingsProvider>

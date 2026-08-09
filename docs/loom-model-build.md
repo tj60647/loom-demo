@@ -141,7 +141,7 @@ What this settles, and where each was ruled:
 **Overlays** — read-only comparisons at Discussion Section · Cohort.
 - **FACULTY AND ADMINS ONLY** (ratified 2026-08-08, TJ). Students never meet them. Faculty reach them through their *own* learner surfaces — Library · Reading · Linking · Knowledge Graph · Vocabulary · Keep — which they hold alongside the faculty view, capabilities being additive.
 - The per-Reading capture gate went with the student overlays: it existed so the crowd could not pre-code a *student's* reading, and there is no student reading one. An instructor seeing where a section marked is the job — `/admin/aggregate` was always ungated.
-- **Open:** the *Section* band has no referent on the learner surfaces for faculty. They sit in the Faculty Section, and the peer query excludes faculty, so "your section" is structurally empty for them. Per-section comparison has a picker at `/admin/aggregate`; whether these surfaces need one, or should offer Cohort only, is undecided.
+- **A picker, resolved 2026-08-08 (TJ):** the control is a dropdown — *off · All sections · each Section by name* — so faculty compare any Section they teach, or all at once. This closes the gap where "your section" had no referent for them: they sit in the Faculty Section, which the peer query excludes. Copy says "that section" and "the cohort", never "your".
 - Bands (superseded phrasing, kept for the shape) — me + colleague · Discussion Section · Cohort:
 - Passages Overlay (highlight heatmap) — Reading tab.
 - Concepts Overlay (incl. Definitions where possible) and Links Overlay — Vocabulary tab.

@@ -48,11 +48,22 @@
 > unclothed reading.
 > **Overlays are faculty/admin only** (2026-08-08, TJ): students see no Overlay
 > control at all. `overlayViewer()` returns `not-staff` for a learner, and the
-> two surfaces (the PDF toolbar band and Vocabulary's "What others named") render
-> only when `getActiveCourse().isStaff` — a *drawing* decision; the actions
-> re-check server-side. The per-reading capture gate is retired with them.
-> Known gap: a faculty viewer's **Section** band is structurally empty, since
-> they sit in the Faculty Section and `peersOf` excludes faculty.
+> two surfaces (the PDF toolbar and Vocabulary's "What others named") render only
+> when `getActiveCourse().isStaff` — a *drawing* decision; the actions re-check
+> server-side. The per-reading capture gate is retired with them.
+> **A section picker, not two buttons:** both surfaces offer *off · All sections
+> · each section by name*, and `getPassagesOverlay` / `getVocabularyOverlay` take
+> an optional `sectionId` (absent = the viewer's own, the pre-picker meaning).
+> That closes the gap where a faculty viewer's band was structurally empty —
+> they sit in the Faculty Section, which `peersOf` excludes. Wording followed:
+> "that section" / "the cohort", never "your".
+> **Workflows moved to `/workflows`** and out of `/admin` entirely: reached from
+> the **header, beside About**, on every page. A **student sees the student flow
+> only**; faculty and admins see all three. `WorkflowsBoard` takes `showAll`.
+> **`FirstRunWalkthrough` is mounted once in the root layout**, so the header's
+> "?" has a listener on every page — it was mounted only on the shelf, Keep and
+> the workbench, which left that button dead on every `/admin` page. It decides
+> for itself where the unprompted pop-up is welcome (not `/admin`, not `/auth`).
 > **Stations 03 and 04 swapped** (2026-08-08, TJ): **03 Knowledge Graph, 04
 > Vocabulary**. Keys stay legacy — `map` is the graph, `read` is Vocabulary —
 > so `?tab=` is unchanged. The workbench footer and student copy follow the bar,

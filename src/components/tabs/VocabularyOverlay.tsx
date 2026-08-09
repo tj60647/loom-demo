@@ -3,7 +3,7 @@
 // The Concepts and Links Overlays of the Vocabulary tab (model §2 "Overlays",
 // §3.4; refactor spec P3.14, ruling 28).
 //
-// Read-only, anonymous, and gated: the words your section or your cohort
+// Read-only, anonymous, and faculty-only: the words a section or the cohort
 // reached for in the readings YOU have coded. It opens only when asked — your
 // own vocabulary is the thing this tab is for, and the comparison is a second
 // look at it, never the first.
@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from "react"
 
 import { getVocabularyOverlay } from "@/lib/reads"
+import { useReadings } from "@/components/providers/ReadingsProvider"
 import {
   overlayBlockMessage,
   type OverlayBand,
@@ -51,23 +52,27 @@ export default function VocabularyOverlay({
   ownCaptureCount: number
 }) {
   const [band, setBand] = useState<OverlayBand | null>(null)
+  /** Which section is being compared; "" means every section — the cohort. */
+  const [sectionId, setSectionId] = useState("")
   const [data, setData] = useState<VocabularyOverlayData | null>(null)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
+  const courseSections = useReadings().course?.sections ?? []
 
   /**
-   * On, off, or over to the other band. The reset lives here rather than in
-   * the effect below: a synchronous setState in an effect body is a cascading
-   * render, and PdfViewer's search panel already settled this pattern.
+   * Off, or on to a chosen set. The reset lives here rather than in the effect
+   * below: a synchronous setState in an effect body is a cascading render, and
+   * PdfViewer's search panel already settled this pattern.
    */
   const toggle = useCallback(
-    (next: OverlayBand) => {
-      setBusy(band !== next)
-      setBand((current) => (current === next ? null : next))
+    (next: OverlayBand | null, section = "") => {
+      setBusy(!!next)
+      setBand(next)
+      setSectionId(section)
       setData(null)
       setFailed(false)
     },
-    [band]
+    []
   )
 
   // Re-runs on `ownCaptureCount` too, so coding the reading opens the gate
@@ -77,7 +82,7 @@ export default function VocabularyOverlay({
   useEffect(() => {
     if (!band) return
     let cancelled = false
-    getVocabularyOverlay(sourceId, band)
+    getVocabularyOverlay(sourceId, band, sectionId || null)
       .then((result) => {
         if (!cancelled) setData(result)
       })
@@ -94,9 +99,9 @@ export default function VocabularyOverlay({
     return () => {
       cancelled = true
     }
-  }, [band, sourceId, ownCaptureCount])
+  }, [band, sectionId, sourceId, ownCaptureCount])
 
-  const setName = data?.band === "cohort" || band === "cohort" ? "your cohort" : "your section"
+  const setName = data?.band === "cohort" || band === "cohort" ? "the cohort" : "that section"
 
   return (
     <div className="card" style={{ marginTop: "22px" }}>
@@ -110,24 +115,26 @@ export default function VocabularyOverlay({
         a comparison put in front of a student would name the text for them before they had read it.
       </p>
 
+      {/* A picker, not two buttons (TJ, 2026-08-08): faculty teach across
+          sections, so a single "my section" had no referent for them. */}
       <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
         <span className="label">Compare with</span>
-        <button
-          className={`btn mini ${band === "section" ? "" : "ghost"}`}
-          onClick={() => toggle("section")}
-          aria-pressed={band === "section"}
-          data-tip="the words your discussion section used"
+        <select
+          className="tinput inline"
+          aria-label="Which section to compare"
+          value={band ? sectionId : "off"}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v === "off") { toggle(null); return }
+            toggle(v === "all" ? "cohort" : "section", v === "all" ? "" : v)
+          }}
         >
-          My section
-        </button>
-        <button
-          className={`btn mini ${band === "cohort" ? "" : "ghost"}`}
-          onClick={() => toggle("cohort")}
-          aria-pressed={band === "cohort"}
-          data-tip="the words everyone on the course used"
-        >
-          The cohort
-        </button>
+          <option value="off">off</option>
+          <option value="all">All sections</option>
+          {courseSections.map((sec) => (
+            <option key={sec.id} value={sec.id}>{sec.name}</option>
+          ))}
+        </select>
         {band && busy && <span className="cap">reading {setName}…</span>}
       </div>
 
@@ -153,7 +160,7 @@ export default function VocabularyOverlay({
         <>
           <p className="ghostnote" style={{ marginTop: "10px" }}>
             <b>{data.contributors}</b> of {data.peers} in{" "}
-            {data.band === "section" ? "your section" : "your cohort"}{" "}
+            {data.band === "section" ? "that section" : "the cohort"}{" "}
             {data.contributors === 1 ? "has" : "have"} named something
             {sourceId ? " in this reading" : ` across the ${data.readings} reading${data.readings !== 1 ? "s" : ""} you have coded`}.
             {" "}Counted by the words people typed: two who wrote the same label count as two, and

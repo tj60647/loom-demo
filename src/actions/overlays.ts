@@ -111,8 +111,16 @@ async function overlayViewer(): Promise<Viewer | Blocked> {
 }
 
 /** The people this band compares you with — never you, never faculty. */
-async function peersOf(viewer: Viewer, band: OverlayBand): Promise<string[] | Blocked> {
-  if (band === "section" && !viewer.sectionId) return { blocked: "no-section" }
+async function peersOf(
+  viewer: Viewer,
+  band: OverlayBand,
+  /** Which section, when the viewer chose one. Staff pick any section of the
+   *  course; without it this falls back to the viewer's own, which is what a
+   *  section band meant before the picker (TJ, 2026-08-08). */
+  sectionId?: string | null
+): Promise<string[] | Blocked> {
+  const section = sectionId ?? viewer.sectionId
+  if (band === "section" && !section) return { blocked: "no-section" }
 
   const rows = await db
     .select({ userId: courseMemberships.userId })
@@ -123,7 +131,7 @@ async function peersOf(viewer: Viewer, band: OverlayBand): Promise<string[] | Bl
         isNull(courseMemberships.removedAt),
         ne(courseMemberships.userId, viewer.userId),
         ne(courseMemberships.role, "FACULTY"),
-        ...(band === "section" ? [eq(courseMemberships.sectionId, viewer.sectionId!)] : [])
+        ...(band === "section" ? [eq(courseMemberships.sectionId, section!)] : [])
       )
     )
 
@@ -151,7 +159,8 @@ async function codedBy(userIds: string[]): Promise<string[]> {
  */
 export async function getPassagesOverlay(
   sourceIdRaw: string,
-  band: OverlayBand = "section"
+  band: OverlayBand = "section",
+  sectionId?: string | null
 ): Promise<PassagesOverlay> {
   const sourceId = (sourceIdRaw ?? "").trim()
   if (!sourceId) return emptyPassagesOverlay(band, "not-coded")
@@ -164,7 +173,7 @@ export async function getPassagesOverlay(
   // no student here to protect. An instructor seeing where a section marked is
   // the job (they already have /admin/aggregate, ungated).
 
-  const peers = await peersOf(viewer, band)
+  const peers = await peersOf(viewer, band, sectionId)
   if (isBlocked(peers)) return emptyPassagesOverlay(band, peers.blocked)
   if (peers.length === 0) return emptyPassagesOverlay(band, "no-peers")
 
@@ -262,14 +271,15 @@ export async function getPassagesOverlay(
  */
 export async function getVocabularyOverlay(
   sourceIdRaw: string | null,
-  band: OverlayBand = "section"
+  band: OverlayBand = "section",
+  sectionId?: string | null
 ): Promise<VocabularyOverlay> {
   const viewer = await overlayViewer()
   if (isBlocked(viewer)) return emptyVocabularyOverlay(band, viewer.blocked)
 
   const sourceId = (sourceIdRaw ?? "").trim() || null
 
-  const peers = await peersOf(viewer, band)
+  const peers = await peersOf(viewer, band, sectionId)
   if (isBlocked(peers)) return emptyVocabularyOverlay(band, peers.blocked)
   if (peers.length === 0) return emptyVocabularyOverlay(band, "no-peers")
 

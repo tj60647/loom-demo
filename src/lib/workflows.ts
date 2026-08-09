@@ -80,7 +80,7 @@ const student: Flow = {
     { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — the capture log, beside the text" },
     { id: "link", label: "Pick two concepts, say the sentence, coin a label", where: "02 · Linking" },
     { id: "vocab", label: "Sharpen descriptions, merge duplicates", where: "04 · Vocabulary" },
-    { id: "overlay", label: "Compare with your section or cohort", where: "Overlays — only once you have coded it yourself" },
+    { id: "overlay", label: "Compare a section, or all of them", where: "Overlays — faculty and admins only" },
     { id: "sort", label: "Sort into tiers, arrange the cards", where: "03 · Knowledge Graph" },
     { id: "write", label: "Trace the prompts, write the one-line and the read", where: "03 · Knowledge Graph" },
     { id: "weave", label: "Every reading at once", where: "/weave — station hidden, reached from Keep" },

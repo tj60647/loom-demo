@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import { useSession } from "next-auth/react"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useLoom } from "@/components/providers/LoomProvider"
 import AuthButton from "./AuthButton"
@@ -44,6 +45,17 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
         >
           about
         </button>
+        {/* Beside About (TJ, 2026-08-08), and reachable from every page — it is
+            not an admin surface: a student reads their own flow there. */}
+        {session && (
+          <Link
+            href="/workflows"
+            className="btn ghost mini"
+            data-tip="how you move through Loom, step by step"
+          >
+            workflows
+          </Link>
+        )}
         <button
           onClick={() => window.dispatchEvent(new Event("loom:walkthrough"))}
           className="helpbtn"

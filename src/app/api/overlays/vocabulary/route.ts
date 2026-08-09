@@ -7,5 +7,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams
   const sourceId = params.get("sourceId")
   const band = params.get("band") === "cohort" ? "cohort" : "section"
-  return respondWithRead("getVocabularyOverlay", () => getVocabularyOverlay(sourceId, band))
+  // Staff choose which section to compare; absent means their own.
+  const sectionId = params.get("section")
+  return respondWithRead("getVocabularyOverlay", () => getVocabularyOverlay(sourceId, band, sectionId))
 }

@@ -13,7 +13,7 @@ import { test, expect } from "@playwright/test"
 test.beforeEach(() => test.setTimeout(120_000))
 
 test("all three diagrams render, and switching actor swaps them", async ({ page }) => {
-  await page.goto("/admin/workflows")
+  await page.goto("/workflows")
   await expect(page.getByRole("heading", { name: "Workflows" })).toBeVisible({ timeout: 15_000 })
 
   const nodes = page.locator("[data-flow-node]")
@@ -35,7 +35,7 @@ test("all three diagrams render, and switching actor swaps them", async ({ page 
 })
 
 test("every node carries its label, and the diagram has a text alternative", async ({ page }) => {
-  await page.goto("/admin/workflows")
+  await page.goto("/workflows")
   await expect(page.getByRole("heading", { name: "Workflows" })).toBeVisible({ timeout: 15_000 })
 
   // Labels are wrapped into <text> lines, so there are at least as many lines
@@ -62,21 +62,29 @@ test.describe("who may read the workflows", () => {
   test.use({ storageState: "playwright/.auth/faculty.json" })
 
   test("faculty may — it holds no course data", async ({ page }) => {
-    await page.goto("/admin/workflows")
+    await page.goto("/workflows")
     await expect(page.getByRole("heading", { name: "Workflows" })).toBeVisible({ timeout: 15_000 })
     await expect(page.locator("[data-flow-node]").first()).toBeVisible()
     // Still no write surfaces in their nav.
     const nav = page.locator("nav").first()
-    await expect(nav.getByRole("link", { name: "Workflows" })).toBeVisible()
     await expect(nav.getByRole("link", { name: "Courses" })).toHaveCount(0)
   })
 })
 
-test.describe("who may not", () => {
+test.describe("a student reads their own flow, and only that", () => {
   test.use({ storageState: "playwright/.auth/testa.json" })
 
-  test("a learner is returned to the shelf", async ({ page }) => {
-    await page.goto("/admin/workflows")
-    await expect(page).toHaveURL(/\/$/, { timeout: 15_000 })
+  test("the student flow, no picker, reached from the header", async ({ page }) => {
+    // Moved out of /admin (TJ, 2026-08-08): a student may read how they move
+    // through Loom. The other two describe surfaces they cannot reach.
+    await page.goto("/workflows")
+    await expect(page.getByRole("heading", { name: "Workflows" })).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator("[data-flow-node='capture']")).toHaveCount(1)
+    await expect(page.getByRole("tab", { name: "Faculty" })).toHaveCount(0)
+    await expect(page.getByRole("tab", { name: "Admin" })).toHaveCount(0)
+
+    // And it is reachable from every page, beside About.
+    await page.goto("/")
+    await expect(page.locator('header a[href="/workflows"]')).toBeVisible({ timeout: 15_000 })
   })
 })

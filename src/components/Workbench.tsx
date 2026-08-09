@@ -16,7 +16,6 @@ import OpenTab from "@/components/tabs/OpenTab"
 import ThrowTab from "@/components/tabs/ThrowTab"
 import VocabularyTab from "@/components/tabs/VocabularyTab"
 import MapTab from "@/components/tabs/MapTab"
-import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import JourneyNav, { stationNumber, type Station } from "@/components/ui/JourneyNav"
 import ShelfSearch from "@/components/shelf/ShelfSearch"
 import type { Byte } from "@/lib/types"
@@ -148,7 +147,6 @@ export default function Workbench({
           <div className="empty" style={{ marginTop: "100px" }}>
             <h2>Loading your loom...</h2>
           </div>
-          <FirstRunWalkthrough autoOpen={false} />
         </main>
       </>
     )
@@ -161,7 +159,6 @@ export default function Workbench({
           <h2>Welcome to Loom.</h2>
           <span className="cap">Please sign in to continue</span>
         </div>
-        <FirstRunWalkthrough autoOpen={false} />
       </main>
     )
   }
@@ -294,7 +291,6 @@ export default function Workbench({
         <div className={`panel ${activeTab === "map" ? "active" : ""}`}>
           {shouldRender("map") && <MapTab />}
         </div>
-        <FirstRunWalkthrough />
       </main>
 
       <footer>

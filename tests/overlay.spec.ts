@@ -58,14 +58,12 @@ test("the passages overlay shades the section's marks, deepest where they agree"
   // Off until asked for: the page is the student's own first.
   await expect(page.locator(".loom-overlay-heat")).toHaveCount(0)
 
-  await page.getByRole("group", { name: "Compare your marks with others" })
-    .getByRole("button", { name: "Cohort" })
-    .click()
+  await page.getByLabel("Which section to compare").selectOption({ label: "All sections" })
 
   const bar = page.locator(".pdf-overlay-bar")
   await expect(bar).toBeVisible({ timeout: 20_000 })
   // Counted in people, and the denominator is stated so a count is readable.
-  await expect(bar).toContainText(/\d+ of \d+ in your (section|cohort) (has|have) marked this reading/, {
+  await expect(bar).toContainText(/\d+ of \d+ in (that section|the cohort) (has|have) marked this reading/, {
     timeout: 20_000,
   })
   await expect(bar).toContainText("counted, not judged · no names")
@@ -104,9 +102,7 @@ test("the passages overlay shades the section's marks, deepest where they agree"
   await expect(heat.first()).toHaveAttribute("aria-hidden", "true")
 
   // Turning it off takes the wash away and leaves the reading as it was.
-  await page.getByRole("group", { name: "Compare your marks with others" })
-    .getByRole("button", { name: "Cohort" })
-    .click()
+  await page.getByLabel("Which section to compare").selectOption("off")
   await expect(page.locator(".pdf-overlay-bar")).toHaveCount(0)
   await expect(page.locator(".loom-overlay-heat")).toHaveCount(0, { timeout: 15_000 })
   // Asking for a comparison must never cost you your place in the reading.
@@ -123,8 +119,8 @@ test("the vocabulary overlay counts a word by people, and names nobody", async (
   // Nothing is compared until asked.
   await expect(panel).toContainText("Nothing is compared until you ask")
 
-  await panel.getByRole("button", { name: "The cohort" }).click()
-  await expect(panel).toContainText(/\d+ of \d+ in your (section|cohort)/, { timeout: 20_000 })
+  await panel.getByLabel("Which section to compare").selectOption({ label: "All sections" })
+  await expect(panel).toContainText(/\d+ of \d+ in (that section|the cohort)/, { timeout: 20_000 })
 
   // Both colleagues reached for this label, so it counts two PEOPLE — not the
   // four rows their passages make.
@@ -154,9 +150,7 @@ test.describe("a student is offered no comparison at all", () => {
     await openReadingByHref(page, READING)
     await page.locator("nav button", { hasText: "Reading" }).click()
     await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 20_000 })
-    await expect(
-      page.getByRole("group", { name: "Compare your marks with others" })
-    ).toHaveCount(0)
+    await expect(page.getByLabel("Which section to compare")).toHaveCount(0)
 
     await page.locator("nav button", { hasText: "Vocabulary" }).click()
     await expect(page.locator(".card", { hasText: "What others named" })).toHaveCount(0)

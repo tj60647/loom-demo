@@ -99,19 +99,26 @@ export function searchReading(sourceId: string, rawQuery: string): Promise<Readi
 }
 
 /** Peer passage heat for a reading — see getPassagesOverlay in src/actions/overlays.ts. */
-export function getPassagesOverlay(sourceId: string, band: OverlayBand = "section"): Promise<PassagesOverlay> {
+export function getPassagesOverlay(
+  sourceId: string,
+  band: OverlayBand = "section",
+  sectionId?: string | null
+): Promise<PassagesOverlay> {
+  const section = sectionId ? `&section=${encodeURIComponent(sectionId)}` : ""
   return readJson<PassagesOverlay>(
-    `/api/overlays/passages?sourceId=${encodeURIComponent(sourceId)}&band=${band}`
+    `/api/overlays/passages?sourceId=${encodeURIComponent(sourceId)}&band=${band}${section}`
   )
 }
 
 /** What others named — see getVocabularyOverlay in src/actions/overlays.ts. */
 export function getVocabularyOverlay(
   sourceId: string | null,
-  band: OverlayBand = "section"
+  band: OverlayBand = "section",
+  sectionId?: string | null
 ): Promise<VocabularyOverlay> {
   const scope = sourceId ? `sourceId=${encodeURIComponent(sourceId)}&` : ""
-  return readJson<VocabularyOverlay>(`/api/overlays/vocabulary?${scope}band=${band}`)
+  const section = sectionId ? `&section=${encodeURIComponent(sectionId)}` : ""
+  return readJson<VocabularyOverlay>(`/api/overlays/vocabulary?${scope}band=${band}${section}`)
 }
 
 type RepairSettings = Awaited<ReturnType<typeof getRepairSettingsAction>>

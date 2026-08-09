@@ -20,10 +20,14 @@ const LEGEND: { kind: string; label: string }[] = [
   { kind: "denied", label: "a door shut to them" },
 ]
 
-export default function WorkflowsBoard() {
-  const [activeKey, setActiveKey] = useState(FLOWS[0].key)
+export default function WorkflowsBoard({ showAll = true }: { showAll?: boolean }) {
+  // A student sees their own flow only (TJ, 2026-08-08): the other two describe
+  // surfaces they cannot reach, and a chart of shut doors is a puzzle rather
+  // than a help. Faculty and admins work the seam, so they see all three.
+  const flows = showAll ? FLOWS : FLOWS.filter((f) => f.key === "student")
+  const [activeKey, setActiveKey] = useState(flows[0].key)
   const [copied, setCopied] = useState(false)
-  const flow = FLOWS.find((f) => f.key === activeKey) ?? FLOWS[0]
+  const flow = flows.find((f) => f.key === activeKey) ?? flows[0]
 
   const handleCopy = () => {
     copyText(toMermaid(flow)).then((ok) => {
@@ -34,8 +38,9 @@ export default function WorkflowsBoard() {
 
   return (
     <>
-      <div className="flowpicker" role="tablist" aria-label="Whose workflow">
-        {FLOWS.map((f) => (
+      {/* One flow needs no picker. */}
+      <div className="flowpicker" role="tablist" aria-label="Whose workflow" hidden={flows.length < 2}>
+        {flows.map((f) => (
           <button
             key={f.key}
             role="tab"

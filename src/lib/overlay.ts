@@ -261,7 +261,9 @@ export const emptyVocabularyOverlay = (
 
 /** The sentence under an overlay that is showing nothing, in the student's terms. */
 export function overlayBlockMessage(block: OverlayBlock, band: OverlayBand): string {
-  const set = band === "section" ? "your section" : "your cohort"
+  // "that section", not "your section": since the Overlays became a faculty
+  // capability the viewer PICKS a section, and rarely their own (TJ, 2026-08-08).
+  const set = band === "section" ? "that section" : "the cohort"
   switch (block) {
     case "signed-out":
       return "Sign in to compare."
