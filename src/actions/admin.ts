@@ -502,7 +502,7 @@ export async function getUserLoomDataAsAdmin(targetUserId: string, courseIdRaw?:
   return { concepts: userConcepts, passages: await foldConceptIds(passageRows), edges: userEdges }
 }
 
-/** Fold byte_concept pointers onto passage rows as `conceptIds` (capture order). */
+/** Fold passage_concept pointers onto passage rows as `conceptIds` (capture order). */
 async function foldConceptIds<T extends { id: string }>(passageRows: T[]): Promise<(T & { conceptIds: string[] })[]> {
   if (!passageRows.length) return []
   const junction = await db

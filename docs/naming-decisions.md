@@ -60,7 +60,7 @@ Two caveats found while confirming it:
 | Path | On a label you already have |
 |---|---|
 | `OpenTab.handleAddConceptOnly` — name a concept ahead of evidence | **Asks** — "Make a second, distinct concept with the same name?" (but see §3) |
-| `OpenTab.handleAddByte` — capture by hand | **Joins silently**, then a post-hoc note |
+| `OpenTab.handleAddPassage` — capture by hand | **Joins silently**, then a post-hoc note |
 | `CaptureModal.handleCapture` — capture from the PDF, **the main path** | **Joins silently**, no note |
 
 `findConcept` matches `label.toLowerCase()` across the whole graph. So typing
@@ -108,14 +108,14 @@ not validate, so an empty-label concept is insertable. Same one-line cause.)
 
 ## 4. The Source field promises an override it does not have
 
-`LoomProvider.addByte`:
+`LoomProvider.addPassage`:
 
 ```ts
 const stampedSourceId = sourceId ?? soleSourceId(scope) ?? undefined
 ```
 
-A hand capture stores the typed citation in `byte.source` (free text) and sets
-`byte.sourceId` — the field **every lens actually reads**: `scopedGraph`, the
+A hand capture stores the typed citation in `passage.source` (free text) and sets
+`passage.sourceId` — the field **every lens actually reads**: `scopedGraph`, the
 per-reading tallies, the overlays, the export anchors — from the open reading.
 
 The interface says otherwise. The Source label reads *"(this reading, **unless
@@ -123,8 +123,8 @@ you say otherwise**)"*, and the capture help says the passage "may be quoting
 someone else". Saying otherwise changes the citation string and **not** the
 attribution.
 
-It is also effectively permanent: `attributeBytes` is the only writer of
-`bytes.sourceId` and it is guarded by `isNull(bytes.sourceId)`, so an
+It is also effectively permanent: `attributePassages` is the only writer of
+`passages.sourceId` and it is guarded by `isNull(passages.sourceId)`, so an
 already-stamped passage can never be re-attributed. Deleting it is the only
 escape.
 

@@ -5,7 +5,7 @@ import { openReading } from './helpers';
 // (see playwright/global-setup.ts). No mocked session — the cookie is real.
 test.use({ storageState: 'playwright/.auth/testa.json' });
 
-test.describe('Audit Seed Bytes', () => {
+test.describe('Audit Seed Passages', () => {
   test('verify seed passages are highlighted', async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem("loom_has_seen_walkthrough", "true");

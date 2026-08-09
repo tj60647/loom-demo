@@ -16,21 +16,17 @@ Description**, `edges` = **Links**, `edges.handle` = **Link Labels**,
 `edges.sentence` = **Link Description**, `sources` = **Readings**, the shelf =
 **Library**; tongues are deprecated for v1.
 
-**`bytes` are gone — they are `passages`, in the code as well as the UI**
-(2026-08-09). The old rule here said "code speaks the July names"; it no longer
-does for this object. If you meet the word **byte** in the codebase it is one of
-exactly two things, never a Passage:
+**`bytes` are gone.** They are `passages` — in the code, in the UI, and since
+migration 0023 in the database too (table, join, columns, indexes, constraints,
+and the `graph_event.kind` values that had already been written as
+"byte.capture"). The old rule here said "code speaks the July names"; for this
+object nothing does.
 
-1. **A database name kept for compatibility** — the `byte` and `byte_concept`
-   tables, the `byteId` column, `byte_search_idx`, the raw SQL in
-   `src/actions/search.ts`, and the `graph_event.kind` values `"byte.capture"`,
-   `"byte.refile"` and friends. Those strings are already written to rows;
-   renaming them would need a migration and would blank every student's Capture
-   Log, which replays by matching `kind`. DB renames stay optional per §F. The
-   long version is on the `passages` table in `src/db/schema.ts`.
-2. **Genuine file data** — `formatBytes`, `byteLength`, `maximumSizeInBytes`,
-   `textLayerRepair`'s `bytes: Buffer`, `src/lib/storage.ts`. These are octets,
-   not Passages, and must not be renamed.
+If you meet the word **byte** in this repo it is **file data** and never a
+Passage: `formatBytes`, `byteLength`, `maximumSizeInBytes`, `textLayerRepair`'s
+`bytes: Buffer`, `src/lib/storage.ts`. Those are octets. (`drizzle/*.sql` before
+0023 is history and says `byte` throughout; that is what a migration log is
+for.)
 
 The other names in the map above still follow the old rule: code speaks July,
 UI strings speak the model.

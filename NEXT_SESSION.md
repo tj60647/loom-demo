@@ -1,460 +1,245 @@
 # Next Session Prompt
 
-## Addendum, 2026-08-09 (Your work, the capture toast, the tips, and Linking's scope)
+## Addendum, 2026-08-09 (TJ's rulings, the Passage rename, and access made legible)
 
-**Read this first.** `npm run check`, `next build` and the Playwright suite are
-green. **No migration** — nothing here touched the database.
+**Seventeen commits on `dev`, `0636b9a`…HEAD, all pushed.** `npm run check` —
+now **seven** scripts — `next build` and the Playwright suite (**49 passed / 1
+skipped**) are green at the end. **One migration: 0023**, the only one all week.
 
-### 1. "Capture log" is now **Your work**, and it behaves like one
+This replaces the nine sections written as the day went. Nothing below is lost
+from them; the ordering is now by subject rather than by the hour.
+
+**Start with §8.** The one ruling that gates the most is still unmade.
+
+---
+
+### 1. The capture side is "Your work", and a capture says so
 
 TJ: *"the current capture log button is a little weird… it seems like it should
-be 'notes' at least, if not having the ux also changed."*
+be 'notes' at least, if not having the ux also changed."* Then, on the first
+cut: *"still very disruptive… i thought we were making a slide out panel from
+the side like toast thing."*
 
-- **The word is "Your work"**, not "Notes" — TJ's call, because **Notes already
-  names a field on the Passage** (`byte.note`). The **model doc's object name
-  stays `Capture Log`**; only student-visible strings changed. Both authority
-  docs already used "Capture Log" for `graphEvents`/`HistoryPanel`
-  (`loom-refactor-spec.md:19`), so the reading rail was the impostor — this
-  rename *resolved* a collision rather than making one.
-- **The rail became a card over the text.** It was a flex sibling that squeezed
-  the page above 820px and only overlaid below it — the same button doing two
-  different things depending on window width. Now `#yourwork`: inset 12px,
-  380px wide, rounded, shadowed, height-capped to clear the footer, sliding in
-  from the right. **It is rendered inside `.pdf-shell`** (a new `.pdf-body`
-  wrapper) because `.pdf-shell.fullscreen` is `position:fixed; z-index:6000`
-  with its own stacking context and swallowed the old rail whole.
-- **Always mounted, parked off-screen** (`visibility` + `transform`, with the
-  asymmetric transition — read the comment, it is not a typo). Drafts survive
-  the toggle, and a just-landed capture has a real layout box to scroll to.
-- **The toolbar button no longer changes shape.** It read `Your work · 5`
-  closed and `Hide your work` open — narrow ghost to wide filled — reflowing
-  the toolbar under the reader's eye. One label, one width, ghost vs filled.
+- **The word is "Your work"** — not "Notes", which already names a field on the
+  Passage. The model doc's object stays **Capture Log**; only student-visible
+  strings changed. Both authority docs already used "Capture Log" for
+  `graphEvents`/`HistoryPanel`, so the rail was the impostor and this rename
+  *resolved* a collision.
+- **A card over the text, not a wall across it.** `#yourwork`: inset 12px,
+  380px, height-capped to clear the footer, rendered inside `.pdf-shell` (a new
+  `.pdf-body` wrapper) so it survives fullscreen, which is `position:fixed;
+  z-index:6000` and swallowed the old rail whole. Always mounted, parked
+  off-screen — drafts survive the toggle and a landed capture has a layout box
+  to scroll to.
+- **The toolbar button no longer changes shape.** It went narrow-ghost to
+  wide-filled and reflowed the toolbar under the reader's eye.
+- **`.captoast` is what actually answered the complaint.** A capture from the
+  page used to land in *silence* — `CaptureModal` saved and vanished, and the
+  only sign was 1500ms of "· saved ·" in the header. That is why the panel had
+  to be opened at all: to check, not to browse.
 
-### 2. The capture toast — the thing that actually answered the complaint
+### 2. The hover tips were broken nearly everywhere — measured, not guessed
 
-TJ, on the first cut: *"still very disruptive… i thought we were making a slide
-out panel from the side like toast thing."*
+Audited in Chromium across ~70 `[data-tip]` sites: the header's, **including
+`?`, ~90% clipped on every page** by `body{overflow:hidden}`; all six
+reading-toolbar tips 80% (93% below 900px); the journey nav's 100% below 900px;
+`.scrollbox` lower rows 100%.
 
-**A capture from the page used to land in complete silence.** `CaptureModal`
-saved and vanished; the only acknowledgement was 1500ms of `· saved ·` in the
-header, a screen away from where the reader was looking. *That* is why the
-panel had to be opened at all — you opened it to check, not to browse.
+Two mechanisms. Most of it is **overflow clipping, which no z-index can fix**;
+on top of that `.pdf-toolbar` is a flex item with `z-index:10`, and a flex item
+with a z-index makes a stacking context, so a bubble asking for 30 painted at an
+effective 10 — under Your work at 25.
 
-`.captoast`: bottom-right, 6s, held on pointer-enter, `In your work ›` opens the
-card on that row. Two captures inside the window become "2 passages captured"
-rather than stacking. If the card is already open there is no toast — the row
-is the acknowledgement, so it scrolls to it instead.
-
-### 3. The hover tips were broken nearly everywhere — measured, not guessed
-
-TJ: *"there appear to be mouseover bubbles for many things that are getting
-blocked because they are 'behind' things."* Audited in Chromium across ~70
-`[data-tip]` sites in 15 files:
-
-| Surface | Before |
-|---|---|
-| Header tips, **including `?`**, on every page | ~90% clipped by `body{overflow:hidden}` |
-| All six reading-toolbar tips | 80% clipped; 93% below 900px |
-| Journey nav tip | 100% clipped below 900px |
-| `.scrollbox` lower rows | 100% clipped at the bottom |
-
-**Two mechanisms.** Most of it is overflow clipping, which **no z-index value
-can fix**. On top of that `.pdf-toolbar` is a flex item with `z-index:10`, and a
-flex item with a z-index makes a stacking context — so a bubble asking for 30
-painted at an effective 10, under Your work at 25.
-
-Fix: **`src/components/ui/TipLayer.tsx`** — one element at the document root
+**`src/components/ui/TipLayer.tsx`** draws one element at the document root
 using the native `popover` attribute, so it lives in the **top layer**: above
-every stacking context by construction, clipped by nothing, and carrying **no
-z-index**, so the ladder in `globals.css` never needs renumbering for it again.
-Listeners are delegated — **not one of the ~70 call sites changed**. `.tip-below`
-and the `.scrollbox` flip are deleted. The contract is unchanged and deliberate:
-aria-hidden, mouse-only, never touch, never keyboard, `pointer-events:none`.
+every stacking context by construction, clipped by nothing, carrying **no
+z-index**. Listeners are delegated — not one of the ~70 call sites changed.
 
-### 4. Linking shows this reading's threads only
+### 3. Linking, Keep, and the whole weave
 
-TJ: *"threads from other readings should not show up in the linking. links from
-other readings may show up as link options."*
+- **Linking shows this reading's threads only** (TJ). The main list was already
+  correct; the offender was the *"Threads that run out of this reading"* band.
+  Decisive: the 08-08 ruling removed the across-readings shuttle, so a student
+  can no longer **make** a bridge from inside a reading — every row there had
+  been thrown somewhere else.
+- **The Link List is offered at coin-time** — the permissive half of the same
+  ruling, which did not exist at all. Capped at 12 **and it says so**.
+- **Keep is every reading**, and **02/03/04 grey out** wherever they are not a
+  live tab. **01 Reading greys too** (TJ): its href went to `/`, the station
+  immediately to its left — a second door to one room dressed as a door to
+  another.
+- **The Capture Log moved to Keep**, and this was not cosmetic. It rendered in
+  exactly one place (`MapTab`, behind `wholeWeave &&`) and appears in **no
+  export** — so withdrawing `/weave` would have made it unreachable *and*
+  unkeepable at once, on the page whose reset dialog promises the history
+  survives. Red line 5.
 
-- **The main list was already correct** (`scoped.edges`). The offender was the
-  second band, *"Threads that run out of this reading"* (`scoped.bridges`).
-  Decisive detail: the 08-08 ruling removed the outside-concepts band and the
-  across-readings shuttle, so **a student can no longer create a bridge from
-  inside a reading** — every row in that band had been thrown somewhere else.
-  Gone, with the now-unreachable "from *(reading)*" pill.
-- **The permissive half did not exist at all.** Label suggestions were six
-  hardcoded everyday verbs (`PLAIN_VERBS`) with no way to reuse one you coined.
-  Linking now offers **"Labels you have coined before"** — the **Link List**
-  (model §Student), derived from `state.edges`, deduped case-insensitively,
-  most-used first, capped at 12 **and it says so** ("the 12 you reach for most,
-  of 27"), with Vocabulary as the full home.
+### 4. Access is legible now
 
-### 5. Capture by hand — prefilled, and honestly justified
+- **One bar.** `JourneyNav` carries a `.staffgroup` on the right, in sage,
+  unnumbered: **Courses · Readings · Roster · Cohort Graph · Workflows ·
+  Access** (admin-only pair first, so faculty do not open with two gaps). It
+  renders on every surface including `/admin`; `AdminNav` keeps only the
+  course/section pickers. That is the model's own account of the role —
+  capabilities are additive — and two navigations said the opposite.
+- **View as student** — a lens beside the pill, which now reads **Admin** or
+  **Faculty** from the *course* rather than the session. A **cookie**, because
+  three differences are decided server-side: `/workflows` (three flows vs one),
+  the Library query (an admin's shelf carries `isVisible=false` rows), and
+  `getActiveCourse` itself. Masked **once**, in `getActiveCourse`;
+  `staffTruly` rides along unmasked for one purpose — drawing the way back out.
+  **It withholds, never grants**, and no authorization path consults it.
+- **`/access`** is the role/capability matrix, its own tab, staff only (each row
+  cites the file and line that enforces it). `src/lib/capabilities.ts` **is** the
+  matrix and `check-workflows.ts` asserts every gate still exists — it caught a
+  wrong row on its first run.
+- **`MetaPage`** gives `/workflows` and `/access` the scopebar/journey/footer, so
+  a reference page changes what is below rather than replacing the frame.
 
-- **Location now offers the page you are on** (TJ), the same way Source already
-  offered the citation: placeholder plus empty-field fallback, so it is a
-  default and never a lock. The field gained `id="bLocation"` — **the spec used
-  to match the literal placeholder `ch. 3, p. 49`, which a dynamic placeholder
-  breaks.** The suite caught exactly that.
-- The fold's copy now leads with the real case: *some things on a page cannot be
-  selected at all* — a concept map, a diagram's labels, a page photographed
-  rather than typeset. (*Learning How to Learn* p56 is the known one.)
+### 5. Two authorization holes, found by building the matrix
 
-### 6. Vocabulary check TJ raised, and its answer
-
-*"are we misusing link object and link label…? how do we get link label without
-link?"* Answered from the model, not from memory:
-
-- `Link = Beginning Concept + Ending Concept + Link Description + Link Label`.
-  The two Concepts are **structural, not a tag**; the Label is a nullable
-  parameter. So a Link Label is **not** an object — TJ was right about that.
-- But the **Link List is first-class on the Student** (model §33), and §122
-  calls the asymmetry deliberate: the Concept List holds full objects, the Link
-  List holds only the vocabulary, *"because Links (edges) live in Cloths; what
-  recurs is the relationship-verb vocabulary."*
-- **You cannot get a Link Label without a Link.** There is no link-label table;
-  the list is derived from `handle` on every Link. A label enters the vocabulary
-  by being used once, and no other way.
-
-**Open, and genuinely undecided:** that is an asymmetry with the 08-08 ruling
-that *a Concept may precede its evidence*. There is no "a Link Label may precede
-its Link" — you cannot coin a verb you expect to need and hunt for the pair.
-
-TJ then took it further, and the further version is better: *"a Thread is
-Concept–Link–Concept, and it **contains the references** — not the Link itself"*
-and *"my hunch is that a Thread will have its own Description."* That is right,
-and it resolves both asymmetries: **Link** becomes a User-level object (Label +
-its own gloss, "what I mean by this verb"), **Thread** carries the references
-and the per-pair sentence. Full analysis, the migration, and the one thing that
-makes or breaks it — **there is no `mergeLinks` and it would become mandatory** —
-in **[docs/link-as-object.md](docs/link-as-object.md)**. Recommended: do it, as
-its own phase, not urgent.
-
-### 6b. Where the tool decides what the student meant
-
-TJ, on merge: *"these could be making decisions on the student's behalf and I
-want to avoid that."* **Merge is the clean one** — student-typed target, refuses
-to guess, confirms with "there is no unmerge", and nothing in the repo proposes
-one. The check turned up three other things, all written up in
-**[docs/naming-decisions.md](docs/naming-decisions.md)** and **none changed in
-code** pending TJ's rulings:
-
-- **A plain bug.** `handleAddConceptOnly` matches the label **untrimmed** and
-  writes it **trimmed**, so `"boundary objects "` misses the homonym confirm
-  entirely and silently mints a duplicate with a byte-identical label. One-line
-  fix; recommended regardless of the rulings.
-- **The three naming paths disagree.** Naming ahead of evidence asks; capture by
-  hand joins silently then asserts ("it is one concept, not two"); **capture
-  from the PDF — the busiest path — joins silently and says nothing.** Proposed:
-  turn the note into an offer ("Not the same idea? Make it a separate concept")
-  and give the PDF path one at all.
-- **The Source field promises an override it does not have.** The label says
-  "this reading, unless you say otherwise", but saying otherwise sets
-  `byte.source` (a string) while `byte.sourceId` — what every lens reads — is
-  stamped from the open reading, and `attributeBytes` is guarded by
-  `isNull(sourceId)` so it can never be re-attributed.
-
-Also in that note: a sweep finding I **corrected rather than passed on**
-(`resolveActiveCourseId` is a narrow legacy migration, not "data destruction"),
-and a list of leads I did not verify — of which `mapKit.ts`'s "busiest first —
-the top few are your primary candidates" is the likeliest genuine red-line-3
-problem.
-
-### 6c. Keep is every reading; the whole weave is withdrawn from the bar
-
-TJ, 2026-08-09: *"i want keep to be about all the readings, but links out of keep
-cant go to 'your whole weave' because we arent supporting this yet. keep is
-either per reading, or if all readings then 2/3/4 are greyed out."*
-
-- **02 Linking · 03 Knowledge Graph · 04 Vocabulary render greyed and inert**
-  wherever they are not a tab you can work at right here — the Library and Keep.
-  A `<span aria-label="… — open a reading first">`, not a disabled `<button>`:
-  it is not a control that is switched off, it is a place you are not standing
-  near. Keyed off "is there a handler", not off a route list.
-- **04 Vocabulary is the arguable one** — the model has it UNSCOPED, the User's
-  holdings across every reading. It is greyed anyway because `/weave` is the
-  only surface that renders it outside a text. `JourneyNav`'s `READING_ONLY` is
-  where that decision lands when `/weave` is ruled on.
-- Two bugs found on the way: `KeepPage` hardcoded `06 — KEEP` while the derived
-  bar said `05 —Keep`; and the base nav rule was `nav a.station`, so a `<span>`
-  station got no padding and the greyed ones ran together as
-  `02 — Linking03 — Knowledge Graph`.
-
-**The red-line-5 catch, and it is the reason not to ship this ruling naively.**
-The **Capture Log renders in exactly one place** — `MapTab`, behind
-`{wholeWeave && …}` — and **no export contains it**: `buildExport` and
-`buildMarkdown` carry concepts, passages, threads, cloths, maps and views, and
-`graphEvents` appear in none of them. Withdrawing `/weave` would have made it
-unreachable *and* unkeepable, on the very page whose reset dialog promises "your
-weaving history survives either way". **It now renders at the foot of Keep**, and
-that copy is corrected. Keep is the right home regardless: the Log is
-course-wide and Keep is now every reading at once.
-
-**Still stranded, not fixed — product calls:** the **whole-weave Cloth** (title
-and description; its only editor is `ThrowTab`, and Keep lists projections
-only), and **whole-weave Projections** (Keep names and exports them; nothing
-opens them). Plus **`ShelfSearch`'s three links into `/weave`** — one of which
-is the last live route to an untethered passage.
-
-### 6d. One bar: the staff group joins the journey
-
-TJ, 2026-08-09: *"in faculty or admin mode, menu items should appear to the
-right of this instead of an administration panel"* … *"admin role has even more
-tabs."*
-
-`JourneyNav` now carries a **`.staffgroup`** on its right, in sage, unnumbered
-(they are not steps on the student's arc): **Roster · Cohort Graph** for
-FACULTY, plus **Readings · Courses** for site ADMIN. It renders on **every**
-surface, `/admin` included — which is the point: the model already says faculty
-"reach [the overlays] through their *own* learner surfaces … **capabilities
-being additive**", and two separate navigations said the opposite.
-
-- `AdminNav` keeps **only** the course and section pickers, now left-aligned:
-  that row is the page's scope, not a menu. `← My Loom` is gone — 00 Library is
-  on the same bar.
-- `getActiveCourse` gained **`isAdmin`** beside `isStaff`, which conflated the
-  two. Decides what is **drawn**, never what may be read; every page re-gates.
-- Staff links carry the course you are already looking at (the URL's `?course=`
-  on an admin page, the on-screen course elsewhere), so moving between staff
-  surfaces does not reset to "the first course".
-- `src/lib/workflows.ts` moved in the same commit per AGENTS.md: the faculty
-  flow's "Enter the admin shell" is now "Enter the teaching surfaces · the
-  journey bar's staff group, from anywhere".
-
-**Trap:** `useSearchParams()` forces a Suspense boundary or it takes the whole
-route client-side — putting it inline in `JourneyNav` broke the build with
-*"useSearchParams() should be wrapped in a suspense boundary at page /keep"*,
-because `/keep` is statically prerendered. The staff group is its own component
-under `<Suspense fallback={null}>`, and `/keep` is still `○` in the build output.
-
-**A correction to §6b's fix.** The `your whole weave` link was repointed at
-`?tab=read` — and that was **dead**. `Workbench` seeds `activeTab` once with
-`useState(firstTab)` and `reading/page.tsx` keys it on `source.id`, so the URL
-changed and the tab did not. Widening the key would remount the bench and
-destroy the drafts `KEEP_ALIVE` exists to protect. It is now a callback the
-Workbench owns (`onGotoVocabulary`), verified by clicking it.
-
-### 6e. View as student — a lens, not a lock
-
-TJ asked whether *"What others named — counted, not judged"* was for students.
-**It is faculty/admin only** and always was (`VocabularyTab`'s `isStaff` gate,
-re-checked by `overlayViewer()`) — the 08-08 ruling holds. It read as out of
-place because it sits inside the faculty member's **own learner surface** with
-nothing saying whose view it is. Hence the flag.
-
-- **A cookie** (`src/lib/viewAs.ts` + `viewAsServer.ts`), not client state,
-  because three differences are decided on the server: `/workflows` renders
-  three flows for staff and one for a student; the Library query returns
-  `isVisible=false` rows to an admin; and `getActiveCourse` is what tells every
-  client surface it is staff at all. A URL param was rejected — `/keep` is
-  prerendered, `useSearchParams` already forced a Suspense boundary once, and
-  the header's plain `<a href>` navigations would drop it silently.
-- **Masked once**, in `getActiveCourse`, so every consumer goes quiet together
-  and none of them has to know the lens exists. `staffTruly` rides along
-  **unmasked, for one purpose**: drawing the control that takes the lens off.
-  Without it a staff member could put the lens on and have no way back.
-- **Withholds, never grants.** Every use hides a control or NARROWS a query, so
-  a student who sets the cookie by hand gets what they already had. It is not a
-  security boundary and `authorizeSourceAccess` is deliberately untouched.
-- Turning it on while standing on `/admin` returns you to the Library — a
-  student cannot be there, and with the staff group masked nothing on the page
-  would admit it. The `/admin` gate itself is unchanged: a lens, not a lock.
-- **The header pill now reads from the COURSE, not the session.**
-  `session.user.isAdmin` is the site role and the lens cannot touch it — which
-  is exactly how a "viewing as student" header would have kept wearing an Admin
-  pill. It shows **Admin** / **Faculty** (faculty had none before), and the
-  duplicate **Administration** and **Cohort Map** buttons are gone: the staff
-  group replaced them, finishing §6d.
-
-**Limits of the illusion, honestly.** The shelf count did not change under test
-because **all 23 seeded readings are visible** — the unpublished path is right
-but unexercised by this data. And a faculty member sits in the Faculty Section,
-which `peersOf` excludes, and their own loom is usually empty: the lens shows
-what a student's Loom *looks like*, never what a given student's *contains*.
-`/admin/user/[id]` stays the tool for that.
-
-Covered by `tests/faculty.spec.ts` — "the student lens hides every staff
-surface, and gives a way back", which asserts **absence**, because the failure
-mode here is silent.
-
-### 6f. Who can reach what — the matrix, and two holes it found
-
-TJ, 2026-08-09: *"i think we need a matrix of what roles have access to. this
-can go in the workflows."* and *"put the workflows next to courses, to the right
-of it."*
-
-**Workflows moved into the staff group**, right of Courses. It is still not an
-admin surface — a student reads their own flow — so the header keeps the link
-for anyone with **no staff group to carry it**. That falls out rather than being
-special-cased: a staff member wearing the student lens has `isStaff` masked, so
-the header link comes back exactly as a student sees it. `faculty.spec.ts`
-asserts that handover.
-
-**`src/lib/capabilities.ts` is the matrix**, on the same contract as
-`workflows.ts` — the file IS the artefact. `/workflows` renders it under the
-diagrams, for everyone: the flows show how each person *moves*, this shows what
-they may *reach*, and a student learning that the overlays are not theirs (and
-why) is the tool being honest rather than quiet.
-
-Two rules are written into the file, because both were nearly broken while
-writing it:
-
-1. **Name the gate that REFUSES, not the UI that hides.** A hidden button is not
-   access control — a Server Function is callable directly.
-2. **Do not write a row you have not read.** A plausible row is worse than none,
-   because this gets used to reason about who can see what.
-
-`scripts/check-workflows.ts` gained 22 assertions: every `gate.file` exists,
-every `gate.symbol` still appears in it, every `qualified` verdict carries a
-note, every `ui-only` row states its hole. **It caught a wrong row on its first
-run** — `roster-invite` named `requireAdmin` in `admin.ts`, which uses
-`checkAdmin`. `gate.line` is deliberately NOT asserted: line numbers rot on
-every edit, and a checker that cries wolf gets switched off.
-
-**Two real holes came out of deriving it, both verified in the source and both
-fixed:**
+Both verified in source before changing anything:
 
 - **`peersOf` excluded `FACULTY` but not `INSTRUCTOR`.** `enrolInvitedCourses`
-  writes `courseMemberships.role = "INSTRUCTOR"` for an admin who joins by
-  invitation (`auth.ts`), and no gate reads that string — it passes everything
-  by being an admin instead. But `peersOf` matched `ne(role, "FACULTY")`, so
-  **an admin's own captures counted as a peer in both overlay bands** — which is
-  decision 4 in that same file, eight lines above: *"an exemplar cloth read as
-  'your cohort' would be the instructor pre-coding the text, which is the thing
-  the gate exists to prevent."* Now matched positively: `eq(role, "LEARNER")`.
-- **`createByte` never authorized its `sourceId`.** `attributeBytes` does, with
-  a comment naming the risk exactly — *"that admitted any reading in the
-  library, including another student's private upload"* — and the sibling
-  function in the same file took `sourceId` straight from the client. The UI
-  only offers shelf readings, so this was **UI-hidden and server-permissive**: a
-  direct Server Function POST could file a passage against a staged reading or
-  another student's private upload and pull its title into the graph and the
-  export. Now `authorizeSourceAccess` runs first, only when a sourceId is
-  claimed (a hand capture with none is a legal unattributed passage, P0.1).
+  writes `INSTRUCTOR` for an admin who joins by invitation, so **an admin's own
+  captures counted as a peer in both overlay bands** — which is decision 4 in
+  that same file, eight lines above the query. Now matched positively as
+  `LEARNER`, which cannot rot the same way when the next role string appears.
+- **`createPassage` never authorized its `sourceId`**, while `attributePassages`
+  in the same file does, with a comment naming the risk. UI-hidden and
+  server-permissive: a direct Server Function POST could file a passage against
+  a staged reading or another student's private upload.
 
-**Recorded in `MATRIX_NOTES`, not fixed** — these are TJ's calls:
+### 6. bytes → Passages, everywhere, including the database
 
-- **There is no stored "Student" role.** It is the absence of two flags: an
-  active membership that is not FACULTY, held by someone who is not a site
-  admin.
-- **`INSTRUCTOR` is written and never read.** Either write `"FACULTY"` at
-  `auth.ts`, or leave it — `peersOf` no longer depends on the answer.
-- **Faculty are not admins for readings**: they cannot see or open a staged
-  reading, even in their own course. The model doc's §4 describes Library as one
-  "Admin/Faculty" view; the build gives it to admin alone. **§3 lines 158/160
-  also still promise students the Passages and Concepts/Links Overlays, which
-  the 08-08 ruling removed** — the model doc is out of date on both.
+**Migration 0023** renamed the tables, the join, the column, three indexes,
+seven constraints, and the `graph_event.kind` / `entityType` values. Verified
+against the database: no object named `byte` remains, 46 passages and 46 join
+rows intact, all 95 events renamed, and `drizzle-kit generate` reports **no
+drift** — the hand-derived snapshot matches.
 
-**Two more found and NOT fixed, deliberately** (from the same sweep, verified
-by quotation but not by me): `authorizeSourceAccess` falls fully open to
-unauthenticated callers when `NODE_ENV !== "production"` — deliberate and
-commented, but it is the only gate whose *shape* changes by environment, so a
-preview built as development would be open. And `getUserLoomDataAsAdmin` gates
-the course but not the target's membership, so a **removed** member's work stays
-readable to faculty.
+**It took four passes**, and the reasons are worth keeping:
 
-### 6g. Access is its own tab, and the reference pages keep the frame
+1. A word-boundary regex **cannot see camelCase** (`pageBytes`, `bytesByConcept`,
+   `conceptIdsByByte`, `handleAddByte`, the `.bytequote` class — 41 of them).
+2. A case-insensitive grep **matches `getByText`**, which made whole test files
+   look guilty and hid the real ones in the noise.
+3. **`tsc` cannot see a string.** The first pass renamed `pgTable("byte")`,
+   `text("byteId")`, 13 raw-SQL references and the `graph_event.kind` values —
+   and everything type-checked and built, because the types were consistent;
+   they just pointed at tables and values that did not exist. 23 tests caught
+   it. Had the event kinds shipped, every Capture Log would have gone silent.
+4. The **docs** are where the vocabulary is defined, and they were last. `README`
+   still described the object as "bytes" in its feature list; `AGENTS.md` still
+   declared *"code speaks the July names"*, so anyone handed the repo would have
+   concluded it called Passages bytes **on purpose**.
 
-TJ, 2026-08-09: *"the workflows tab should behave like the others, change what
-is below, not replacing the frame."* and *"make 'access' its own tab."*
+**Where the word legitimately survives, and nowhere else:** file data
+(`formatBytes`, `byteLength`, `textLayerRepair`'s `bytes: Buffer`,
+`storage.ts`), the import fallback, the migration note, and history — the
+archive, the v14 audits, and `course-deployment-notes.md`, which records the
+**etymology**: CAVEAT called a captured datum a "byte", which is where the word
+came from.
 
-- **`src/components/ui/MetaPage.tsx`** is the frame for a reference page.
-  `/workflows` was a bare `<main>`, so reaching it from the journey bar made the
-  bar itself vanish — the whole frame was replaced rather than the work inside
-  it. Both pages now wear the same scopebar / journey / footer as the Library
-  and Keep, with no station `active`: they are not steps on the student's arc.
-- **`/access`** is the matrix, on its own. Under the diagrams was the wrong
-  shape — the flows are a picture of *movement*, this is a table of
-  *permission*, and a reader looking for one had to scroll past the other.
-- **Staff only**, unlike Workflows — not because the contents are secret (they
-  describe gates, not data) but because each row cites the **file and line**
-  that enforces it, which is maintainer's material. A student asking "why can't
-  I see the overlays?" should be answered in the surface, not in a table of
-  source references. `tests/access.spec.ts` asserts a student is returned to the
-  shelf and keeps their header Workflows link.
-- The gate deliberately does **not** consult the student lens, for the same
-  reason `/admin` does not: the lens hides the tab, and a lens is not a lock —
-  turning it on should not eject a reader from a page they are mid-way through.
+**Two new guards, both proven by watching them fail:**
 
-### 6h. The staff group's order, and 01 Reading greys out too
+- **`scripts/check-import-compat.ts`** — the export key became `passages`, and
+  every `.json` exported before today says `bytes`. `parseImport` reads both.
+  The suite could never have caught this: it round-trips what the *current* code
+  emits, which is exactly the shape blind to a key rename.
+- **`scripts/check-vocabulary.ts`** — no Passage is called a byte, in code or in
+  the live docs; and **every event kind emitted has a `case` in HistoryPanel**,
+  which guards a silent truncation of a student's history.
 
-TJ, 2026-08-09: *"i think the admin/faculty tabs should be courses, readings,
-roster, cohort graph, workflows, access"* and *"should 01-reading be greyed out?
-we cant get there except through the library."*
+### 7. Defects fixed, and the red lines they crossed
 
-- **Ordered the way the work happens**: make the course, put readings in it, see
-  who is enrolled, read what they wove — then the two reference pages, which are
-  read rather than worked. The admin-only pair leads, so a faculty member's
-  group starts at Roster rather than opening with two gaps.
-- **01 Reading greys out.** Yes, and for a sharper reason than 02/03/04: its
-  href went to `/`, which is the station immediately to its LEFT — a second
-  door to one room dressed as a door to another. It carries its own reason
-  ("pick a text in the Library — opening one is how you get here") because the
-  general one would have been circular on the Reading station itself.
-  Verified nothing depended on the link: every spec targets `nav button`, the
-  handler form that only exists inside a reading.
+Phase 0 of [docs/open-work.md](docs/open-work.md), plus what the copy sweep found:
 
-**A real flash this exposed.** `Workbench`'s loading branch rendered `JourneyNav`
-with **no** `onStation`, which used to draw plain links and now draws four
-GREYED stations — so a direct load into a reading flashed "these are
-unavailable" and then corrected itself. Measured by polling the bar every 60ms
-through a direct load: `ASSSSA +loading` before, `ABBBBA +loading` after. The
-tabs are local state, so the handlers are valid before any data arrives; only
-the content below is not ready.
+- **The trim bug** — `handleAddConceptOnly` matched **untrimmed** and wrote
+  **trimmed**, so `"boundary objects "` skipped the homonym confirm and minted a
+  silent duplicate at the exact gesture designed to ask.
+- **Merge picked among homonyms by label.** Not a bad lookup — asking for a
+  *label* to identify an *object*, which the model rules out in as many words
+  while also making homonyms legal. Now a **picker holding concept ids**.
+- **`getUserLoomDataAsAdmin`** never checked the target's membership, so a
+  **removed** member's loom stayed readable to faculty.
+- **`mapKit` gave a student advice** — *"the top few are your primary
+  candidates"*, *"one spine to hang the rest on"*, *"STILL LOOSE (decide: …)"* —
+  from a student tab. Red line 3: counted, never judged, **no advice**.
+- **Two red warnings on a legal state**, in `VocabularyTab` and its twin in
+  `CardMenu`: *"every concept **should** trace to a passage"*, in `var(--red)` —
+  which `globals.css` reserves for *"the one selected thing"*. Eight days after
+  the ruling that a Concept may precede its evidence.
 
-**Sizing:** six staff items plus six stations wrapped the bar to two rows at
-1440px — an ordinary laptop — costing 47px of height on the reading station,
-where height is worth most. Staff items are 14.5px with tighter side padding;
-one row now down to 1440, two rows at 1280 and below, which is fair for twelve
-items.
+**The lesson worth carrying:** red lines 3 and 4 have **no test**. Everything
+else this session was caught by a gate; these were caught by reading the copy
+against the rules. A `check-copy.ts` scanning student-facing strings for
+imperatives would not be airtight, but it would have caught all four.
 
-### 6i. The plan for what is outstanding
+### 8. The three kinds — and the ruling that gates everything
 
-**[docs/open-work.md](docs/open-work.md)** orders everything left, and says why
-in that order. The two things worth knowing without opening it:
+TJ: *"aren't there 3 states for concepts?"* Yes, and `scope.ts` already computed
+them. Your work now draws them: **In this reading · No evidence · In your other
+readings**, the third naming the concepts where it used to give a bare count.
 
-- **05 Weave is the ruling that gates the most.** The whole-weave Cloth, the
-  whole-weave Projections and `ShelfSearch`'s three `/weave` links are all
-  stranded by the 2026-08-09 ruling — and if Weave comes back as a station, they
-  un-strand themselves. Building viewers for them first means building twice.
-- **`mapKit` is a confirmed red-line-3 finding, not a lead.** `buildMapKit`
-  writes *"the top few are your primary candidates"* and *"A POSSIBLE ARMATURE —
-  one spine to hang the rest on"* into a copyable kit, from `MapTab`, which is a
-  **student** tab. Red line 3 is "counted, never judged … **no advice**".
-  Counting is fine; ranking with an interpretive gloss is not.
+**KINDS, NEVER STAGES.** Transitions run every direction (name-then-find 3→1,
+unfile 1→3, find-again 2→1), so no numbering, no counting one against another,
+and no "yet" in a heading.
 
-Phase 0 of that plan is four defects that need no ruling: the trim bug, merge
-picking among homonyms by label, `getUserLoomDataAsAdmin` not checking the
-target's membership, and the mapKit copy.
+That came out of TJ's larger stance, which is worth ratifying into the model:
+**the tool helps students build concepts, not document complete ones.** The word
+to avoid is *incomplete* — the model's own 08-08 ruling says zero Passages is
+reached three ways, *"all legal and indistinguishable in the data"*, and
+"incomplete" is true of only one of them. **"Never" is a conclusion, not an
+unfinished state.**
 
-### 7. Traps this session
+**Proposed and not built:** let the student designate *"looked, not here"* per
+(concept, reading). Record **conclusions, never intentions** — "still looking"
+is the default and needs no storage — which takes it from N×M cells to the few
+rows where a judgement was actually formed. Guards: never counted, aggregated,
+or sorted by; never in the overlays.
 
-- **`overflow: hidden` vs `overflow: clip` on `.pdf-body`.** Clip makes no
-  scroll container, so the parked card cannot be scrolled into view by a stray
-  `focus()`. But **`scrollWidth` still reports the overflow either way** — the
-  scrolling *area* is not the same question as whether the box scrolls. That is
-  why `tests/pdf-fit.spec.ts` now measures `.pdf-stage` by name instead of
-  walking two `parentElement`s up from `.react-pdf__Document`.
-- **Do not edit source while the Playwright suite is running** against the
-  hot-reloading dev server. Cost one confusing mid-run failure.
-- A `const` used in a `useEffect` dep array must be declared **above** that
-  effect — the design spec sited `requestToggleWork` below it, which is a
-  temporal-dead-zone crash on first render.
-- The CSS in `PdfViewer` lives in a **JSX template literal**: a backtick inside
-  a comment there closes the string and the whole reading fails to parse.
+---
 
-### 8. Still open
+### 9. Traps this session
 
-- **The screen snip** — [docs/screen-snip.md](docs/screen-snip.md), rewritten
-  this session. It is **much smaller than the old handoff claimed**: a snip of a
-  library PDF needs no image storage at all (rect + `sourceId` + page, rendered
-  on demand, exactly as `sourceRepairs.region` and the crop route already do).
-  TJ settled the export question — *"the snips will be small, i'm not worried
-  about the copyright"* — so the image embeds. One number left open: the size
-  cap, worth measuring against p56 rather than guessing.
-- **Cloth co-authorship**, **05 Weave**, **the Faculty Section in the section
-  picker**, **several modes of reading** — all carried over unchanged from
-  08-08 §5.
+- **Never edit source while the Playwright suite is running** — the dev server
+  hot-reloads and you get a confusing mid-run failure.
+- **A `const` used in a `useEffect` dep array must be declared above it** —
+  siting it below is a temporal-dead-zone crash on first render.
+- **The CSS in `PdfViewer` is a JSX template literal**: a backtick in a comment
+  closes the string and the whole reading fails to parse.
+- **`overflow: clip` vs `hidden`**: clip makes no scroll container, but
+  **`scrollWidth` reports the overflow either way** — the scrolling *area* is a
+  different question from whether the box scrolls.
+- **`useSearchParams` forces a Suspense boundary** or it takes the whole route
+  client-side; inline in `JourneyNav` it broke the build on the prerendered
+  `/keep`.
+- **`next/headers` cannot be imported into a client bundle** — hence
+  `viewAs.ts` (the cookie name) and `viewAsServer.ts` (the read).
+- **A migration's `when` must be a real clock reading after the last applied
+  one**, or the migrator silently skips it. A hand-written migration needs a
+  hand-derived snapshot, verified by `drizzle-kit generate` reporting no drift.
+- **`drizzle-kit generate` cannot see a rename** — it diffs and emits DROP +
+  CREATE. Write renames by hand.
+
+### 10. Where to start
+
+**[docs/open-work.md](docs/open-work.md) is the ordered plan.** Phase 0 is done.
+
+**Next is Phase 1 — the 05 Weave ruling**, and it gates the most: the
+whole-weave Cloth, the whole-weave Projections and `ShelfSearch`'s three
+`/weave` links are all stranded, and **if Weave comes back as a station they
+un-strand themselves.** Building homes for them first means building twice.
+
+Then Phase 2 (capture provenance and naming — the offer-not-assertion change and
+the Source override, one sitting), Phase 3 (the two access decisions), Phase 4
+(the model doc's drift, now demonstrable), Phase 5 (Link-as-object, the snip,
+cloth co-authorship), Phase 6 (CI — the `e2e` gate has never run, and every push
+to `dev` reports *"Bypassed rule violations — 2 of 2 required status checks"*,
+so the protection is decorative).
+
+**Still true and still untested by a human:** the fresh-GitHub-account sign-in.
 
 ---
 
@@ -580,7 +365,7 @@ Two items TJ raised and asked for, in size order:
    TJ: the concept maps in *Learning How to Learn* (p56 is the known-damaged
    sideways one) have no selectable text, so highlighting cannot reach them —
    which is a better justification for by-hand capture than the copy currently
-   in the fold. **A snip is a bigger feature**: `byte` has no image column and
+   in the fold. **A snip is a bigger feature**: `passage` has no image column and
    the blob store would need a path for it, so scope it separately.
 
 ### 7. Carried over, still true
@@ -872,7 +657,7 @@ authority, the work order is `docs/loom-refactor-spec.md`, superseded specs are
 stamped in `docs/archive/`), `38a8298` (P0 — migration 0021: `byte_concept`
 pointers, Unlabeled Passages legal, passage margin fields, `edges.sentence`
 optional, `cloth` table absorbing `read`, mirror dropped, `byte.capture` +
-`unfileByte`), `ca97b4a` (P1 — `mergeConcepts` + homonyms warned-never-forbidden,
+`unfilePassage`), `ca97b4a` (P1 — `mergeConcepts` + homonyms warned-never-forbidden,
 unified search over own concepts/links/passages with migration 0022, the
 unattached Unlabeled-Passages group in the projection view), `f647b82` (P2 —
 the naming sweep: projection / passage / label / description / one-line /

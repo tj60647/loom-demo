@@ -19,7 +19,7 @@ export type Passage = {
   courseId: string | null
   userId: string
   /**
-   * The concepts this passage evidences (byte_concept join, capture order).
+   * The concepts this passage evidences (passage_concept join, capture order).
    * Empty = an Unlabeled Passage — a legal, first-class state.
    */
   conceptIds: string[]
@@ -269,7 +269,7 @@ export type GraphEvent = {
   courseId: string | null
   userId: string
   kind: string
-  entityType: "concept" | "byte" | "edge" | "graph" | "map" | "cloth"
+  entityType: "concept" | "passage" | "edge" | "graph" | "map" | "cloth"
   entityId: string | null
   payload: Record<string, unknown> | null
   at: Date

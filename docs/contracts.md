@@ -2,7 +2,7 @@
 
 > DESCRIBES THE CODE AS BUILT, not the target. Where this file conflicts with
 > docs/loom-model-build.md, the model wins. **P0 landed (migration 0021)**:
-> `byte_concept` join (Unlabeled Passages legal; concept delete never deletes bytes),
+> `passage_concept` join (Unlabeled Passages legal; concept delete never deletes passages),
 > passage note/question/isPullQuote/tier, `edge.sentence` optional, the `cloth` table
 > (absorbing `read`), and the mirror drop (`concept.tier` gone; tiers per-map only).
 > **P1 landed**: the label clash-check is gone (ruling 36 — homonyms are warned
@@ -76,7 +76,7 @@
 > chooses between "new cloth" and "new projection": a second cloth on a reading
 > arises only through co-creation, because a projection already carries more
 > interpretive apparatus than a cloth does. Because `(user, reading)` still
-> identifies the cloth, **`byte` needs no `clothId`**. See
+> identifies the cloth, **`passage` needs no `clothId`**. See
 > [cloth-cardinality.md](cloth-cardinality.md) and the model doc §2.
 > **The tab list is settled** (2026-08-08, TJ): 00 Reading and 01 Open merged
 > into one **Reading** station (text + capture rail); **05 Weave is hidden**
@@ -97,7 +97,7 @@ Conventions used below:
 
 - All ids are `text` primary keys defaulting to `crypto.randomUUID()` unless noted.
 - `Tier` = `'' | 'p' | 's' | 't' | 'x'` (unsorted · primary · secondary · tertiary · set
-  aside), per-map only. `PassageTier` = `'' | 'p' | 's' | 't'`, on the byte itself.
+  aside), per-map only. `PassageTier` = `'' | 'p' | 's' | 't'`, on the passage itself.
 - The "Mirror" (expand-phase dual-write of `concept.tier` + the `read` row from the
   oldest whole-weave map) was RETIRED by migration 0021 — `concept.tier` and the `read`
   table no longer exist; the whole-weave paragraph lives on the whole-weave `cloth` row.
@@ -120,7 +120,7 @@ Migrations `drizzle/0000`–`0016`, applied via `drizzle-kit migrate`.
 as what the database is *shaped* like: `scripts/apply-db-compat.ts` bootstraps tables
 directly, and the `source_page` it creates has never carried the foreign key
 `schema.ts` declared from 0000. That is what 0016 is for — it adds that key and
-`byte`'s, after deleting the orphans the missing constraint had been accumulating.
+`passage`'s, after deleting the orphans the missing constraint had been accumulating.
 
 ### 1a. Auth (NextAuth v4, database sessions)
 
@@ -148,7 +148,7 @@ directly, and the `source_page` it creates has never carried the foreign key
 | `source` | id · title · author `''` · sourceReference `''` · description `''` · isDescriptionVisible true · metadataProvenance `''` · isArchived false · **storageKey nullable** · **isOwn false** · createdByUserId SET NULL · createdAt | `storageKey NULL` = reference-only card (no PDF). `isOwn` = student-minted, visible on that student's shelf only |
 | `course_source` | courseId CASCADE · sourceId CASCADE · isVisible true · week nullable · isCore true · position 0 · createdAt | PK (courseId, sourceId). Week/visibility/core are per-course facts on the join, never on the reading |
 | `source_page` | id · sourceId CASCADE · pageNumber · textContent · contentHash · createdAt | Extracted text per page; anchor reconciliation and search read it. `textContent` carries pdf.js's line boundaries — a `
-` after each `hasEOL` item — except on a page whose own items already contain a newline, which keeps the old separator-free join because the newline could not then be taken back out. `contentHash` is therefore **not** a hash of this column: every writer stores `hashText(textLayerProjection(textContent))`, the browser's text-layer string, which is what `byte.pageContentHash` is compared against. 0016 gives the CASCADE its actual constraint and indexes (sourceId, pageNumber). No unique on (sourceId, pageNumber). GIN index `source_page_search_idx` on `to_tsvector('english', textContent)`; `source` carries the weighted `source_search_idx` twin (title A · author B · reference/description C) — the search queries must repeat these expressions verbatim |
+` after each `hasEOL` item — except on a page whose own items already contain a newline, which keeps the old separator-free join because the newline could not then be taken back out. `contentHash` is therefore **not** a hash of this column: every writer stores `hashText(textLayerProjection(textContent))`, the browser's text-layer string, which is what `passage.pageContentHash` is compared against. 0016 gives the CASCADE its actual constraint and indexes (sourceId, pageNumber). No unique on (sourceId, pageNumber). GIN index `source_page_search_idx` on `to_tsvector('english', textContent)`; `source` carries the weighted `source_search_idx` twin (title A · author B · reference/description C) — the search queries must repeat these expressions verbatim |
 | `source_score` | sourceId PK/CASCADE · status `'heuristic'\|'judged'\|'unscorable'` · coverage/legibility/anchorability/structure int nullable · overall real · pass bool nullable · notes · judgeNotes · judgeModel · metrics jsonb · scoredAt | 1:1 with source. Unscored dimension = NULL (abstention, never a default). `pass` requires every scored dimension ≥ 3 — not compensatory — **and** non-null `coverage` and `legibility`, since "can a student quote this?" has no answer without them. `legibility` abstains when there is too little text to confirm the characters read as language; it used to be granted a 5, which is how 693 characters of OCR noise scored 5/5/5 and passed. `pass NULL` is a third verdict, rendered **Unverified**. `metrics` carries the structural probe only when the scorer held the PDF bytes |
 
 ### 1d. The graph (the artifact — archived spec §6 `graph`)
@@ -156,8 +156,8 @@ directly, and the `source_page` it creates has never carried the foreign key
 | Table | Columns | Keys / notes |
 | --- | --- | --- |
 | `concept` | id · courseId SET NULL · userId CASCADE · label · def `''` · note `''` · createdAt | No tier (0021 dropped the mirror column — tiers live on `map.tiers`). One-label-one-concept is enforced in code (`updateConcept` clash check), **not** by a DB unique — ruled for replacement by warn-don't-forbid (P1.7) |
-| `byte` | id · courseId SET NULL · userId CASCADE · source `''` (free-text citation) · **sourceId SET NULL** (the reading it belongs to) · location `''` · content · pageNumber/startOffset/endOffset/pageContentHash nullable (anchor) · **note `''` · question `''` · isPullQuote false · tier `PassageTier` `''`** · createdAt | A byte belongs to a reading; a concept does not. Concepts attach via `byte_concept` (0..n) — zero rows = an Unlabeled Passage, a legal state. Export field is `text`, column is `content` |
-| `byte_concept` | byteId CASCADE · conceptId CASCADE · createdAt | PK (byteId, conceptId); index on conceptId. The passage↔concept pointers of ruling 37 — refile adds a row, never copies a byte; deleting either end removes pointers only |
+| `passage` | id · courseId SET NULL · userId CASCADE · source `''` (free-text citation) · **sourceId SET NULL** (the reading it belongs to) · location `''` · content · pageNumber/startOffset/endOffset/pageContentHash nullable (anchor) · **note `''` · question `''` · isPullQuote false · tier `PassageTier` `''`** · createdAt | A passage belongs to a reading; a concept does not. Concepts attach via `passage_concept` (0..n) — zero rows = an Unlabeled Passage, a legal state. Export field is `text`, column is `content` |
+| `passage_concept` | passageId CASCADE · conceptId CASCADE · createdAt | PK (passageId, conceptId); index on conceptId. The passage↔concept pointers of ruling 37 — refile adds a row, never copies a passage; deleting either end removes pointers only |
 | `edge` | id · courseId SET NULL · userId CASCADE · fromId CASCADE · toId CASCADE · handle `''` · sentence `''` NOT NULL default `''` · createdAt | Directed. Sentence optional at throw (P0.3 golden path); handle is the coined term |
 | `cloth` | id · courseId SET NULL · userId CASCADE · scopeKey `''` · title `''` · description `''` · createdAt · updatedAt | UNIQUE NULLS NOT DISTINCT (userId, courseId, scopeKey). The per-scope workspace identity (P0.4); absorbed the `read` table in 0021 (whole-weave row's text → whole-weave cloth's description) |
 | `map` | id · courseId SET NULL · userId CASCADE · **scopeKey `''`** · name · read `''` · essence `''` · **tiers jsonb `Record<conceptId, 'p'\|'s'\|'t'\|'x'>`** default `{}` · createdAt · updatedAt | scopeKey `''` = whole weave, else sorted comma-joined sourceIds. Absent tier key = unsorted. Non-unique index (userId, courseId, scopeKey) — plural siblings are the point |
@@ -167,7 +167,7 @@ directly, and the `source_page` it creates has never carried the foreign key
 | Table | Columns | Keys / notes |
 | --- | --- | --- |
 | `view` | id · courseId SET NULL · userId CASCADE · key (`'cardTable'` \| `'map:<mapId>'`) · **data jsonb** `{positions:{conceptId:{x,y}}, bends:{edgeId:{dx,dy}}, order?:string[], pins?:string[]}` · updatedAt | UNIQUE NULLS NOT DISTINCT (userId, courseId, key). Only student gestures write here (red line #7). `x` is proportional 0..1 (>1.5 read as legacy pixels) |
-| `graph_event` | id · courseId SET NULL · userId CASCADE · kind · entityType `'concept'\|'byte'\|'edge'\|'graph'\|'map'\|'cloth'` · entityId nullable · payload jsonb · at | Append-only. Survives reset and import. Kinds: `concept.create/rename/update/merge/delete`, `byte.capture/refile/unfile/attribute/delete`, `edge.throw/coin/update/delete`, `cloth.update`, `map.create/retier/rename/update/delete/import`, `graph.reset/import/example`. Historical kinds still in the record: `byte.create`, `concept.retier`, `read.update` |
+| `graph_event` | id · courseId SET NULL · userId CASCADE · kind · entityType `'concept'\|'passage'\|'edge'\|'graph'\|'map'\|'cloth'` · entityId nullable · payload jsonb · at | Append-only. Survives reset and import. Kinds: `concept.create/rename/update/merge/delete`, `passage.capture/refile/unfile/attribute/delete`, `edge.throw/coin/update/delete`, `cloth.update`, `map.create/retier/rename/update/delete/import`, `graph.reset/import/example`. Historical kinds still in the record: `passage.create`, `concept.retier`, `read.update`. Migration **0023** renamed the `byte.*` kinds already written, so no row spells it the old way |
 
 ---
 
@@ -187,16 +187,16 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 
 | Action | Params | Returns | Writes / events |
 | --- | --- | --- | --- |
-| `getUserLoomData()` | — | `{concepts, bytes, edges, maps, cloths, views}` — rows ordered `createdAt, id` (capture order is meaning); each byte carries `conceptIds` folded from `byte_concept` in filing order | read-only; drops orphaned `map:<id>` view rows from the response |
+| `getUserLoomData()` | — | `{concepts, passages, edges, maps, cloths, views}` — rows ordered `createdAt, id` (capture order is meaning); each passage carries `conceptIds` folded from `passage_concept` in filing order | read-only; drops orphaned `map:<id>` view rows from the response |
 | `createConcept` | `{label, def?, note?}` | inserted `Concept` | `concept.create` |
 | `updateConcept` | `id, Partial<{label,def,note}>` | void | no clash check (ruling 36 — homonyms legal; the client warns at coin-time); `concept.rename/update` |
 | `mergeConcepts` | `sourceId, targetId` | fresh `getUserLoomData()` | one batch: pointers repoint (collisions dropped), edges repoint, target inherits missing def/note, source deleted; prunes views/tiers; `concept.merge` {fromId, fromLabel, intoLabel, pointersMoved} |
-| `deleteConcept` | `id` | void | refuses while an edge endpoint; **bytes survive** — join rows cascade, passages become Unlabeled; prunes views + map tiers; `concept.delete` |
-| `createByte` | `{conceptIds?, source, sourceId?, location, content, anchor fields?, note?, question?, isPullQuote?, tier?}` | inserted `Byte` (+`conceptIds`) | zero conceptIds = Unlabeled Passage; byte + pointers land in one `db.batch`; verifies concept ownership; reconciles offsets against `source_page` when hashes agree; `byte.capture` (fires for every capture, named or not — `byte.create` is a historical kind) |
-| `refileByte` | `byteId, conceptId` | the same `Byte` with the pointer added | inserts one `byte_concept` row (ruling 37 — never copies); throws if already filed; `byte.refile` |
-| `unfileByte` | `byteId, conceptId` | void | removes one pointer — refileByte's inverse; the byte survives (possibly as an Unlabeled Passage); OpenTab shows this instead of "remove byte" when a passage has >1 filing; `byte.unfile` |
-| `attributeBytes` | `byteIds[], sourceId` | count updated | fills `sourceId` **only where NULL**, only by student act, and only to a reading the student may see — `authorizeSourceAccess`. Until 0016-era it checked merely that the id existed, which admitted another student's private upload; `byte.attribute` |
-| `deleteByte` | `id` | void | `byte.delete` |
+| `deleteConcept` | `id` | void | refuses while an edge endpoint; **passages survive** — join rows cascade, they become Unlabeled; prunes views + map tiers; `concept.delete` |
+| `createPassage` | `{conceptIds?, source, sourceId?, location, content, anchor fields?, note?, question?, isPullQuote?, tier?}` | inserted `Passage` (+`conceptIds`) | zero conceptIds = Unlabeled Passage; passage + pointers land in one `db.batch`; verifies concept ownership; reconciles offsets against `source_page` when hashes agree; `passage.capture` (fires for every capture, named or not — `passage.create` is a historical kind) |
+| `refilePassage` | `passageId, conceptId` | the same `Passage` with the pointer added | inserts one `passage_concept` row (ruling 37 — never copies); throws if already filed; `passage.refile` |
+| `unfilePassage` | `passageId, conceptId` | void | removes one pointer — refilePassage's inverse; the passage survives (possibly as an Unlabeled Passage); OpenTab shows this instead of "remove passage" when a passage has >1 filing; `passage.unfile` |
+| `attributePassages` | `passageIds[], sourceId` | count updated | fills `sourceId` **only where NULL**, only by student act, and only to a reading the student may see — `authorizeSourceAccess`. Until 0016-era it checked merely that the id existed, which admitted another student's private upload; `passage.attribute` |
+| `deletePassage` | `id` | void | `passage.delete` |
 | `createEdge` | `{fromId, toId, sentence?}` | inserted `Edge` | sentence defaults `''` (P0.3 — connect first, describe when ready); `edge.throw` |
 | `updateEdge` | `id, Partial<{handle, sentence}>` | void | `edge.coin` when handle present, else `edge.update` |
 | `deleteEdge` | `id` | void | prunes bends; `edge.delete` |
@@ -206,8 +206,8 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | `deleteMap` | `id` | void | batch: map + its `map:<id>` view; `map.delete` |
 | `saveView` | `key, CardTableView` | void | key must be `cardTable` or an owned `map:<id>` else throws; **no event** (projections) |
 | `getGraphEvents()` | — | events oldest-first, with synthesized `synth-*` creates for pre-history rows | read-only |
-| `resetGraph()` | — | void | `graph.reset` event first (with counts), then batch-delete edges/bytes/concepts/maps/cloths/views (byte_concept cascades). **History survives** |
-| `importGraph` | `ParsedImport` (client-parsed) | fresh `getUserLoomData()` | limits `{concepts:400, bytes:2000, edges:2000, maps:40, cloths:40}`; whole-graph replace in one batch; see §4e |
+| `resetGraph()` | — | void | `graph.reset` event first (with counts), then batch-delete edges/passages/concepts/maps/cloths/views (passage_concept cascades). **History survives** |
+| `importGraph` | `ParsedImport` (client-parsed) | fresh `getUserLoomData()` | limits `{concepts:400, passages:2000, edges:2000, maps:40, cloths:40}`; whole-graph replace in one batch; see §4e |
 | `importMapArrangement` | `ParsedMapImport` | `{data, mapId, scopeKey, skipped}` | additive sibling only; see §4f |
 | `loadWorkedExample()` | — | fresh `getUserLoomData()` | refuses unless the loom is empty; mirror-consistent by construction; `graph.example` |
 
@@ -306,8 +306,8 @@ are absent, and their own learner workspace still works.
 | `inviteLearners` | `(prev, FormData{courseId, emails, sectionId})` | `InviteResult {added, already, invalid, unknownSections}` — one address per line, optional `email, Section name`; section matched by name or slug, case-insensitive; no size cap |
 | `removeAllowedEmail` | FormData | void — hard-deletes the invitation |
 | `removeFromRoster` | FormData `{courseId, userId}` | void — sets `removedAt`, deletes invite, revokes sessions **only** when no app access remains |
-| `getUserLoomDataAsAdmin` | `targetUserId, courseId?` | `{concepts, bytes, edges}` (no maps/read/views) |
-| `getAggregateLoomData` | `courseId?, sectionId?` | cohort `{concepts, bytes, edges, bytesUnavailable}` — bytes fail soft |
+| `getUserLoomDataAsAdmin` | `targetUserId, courseId?` | `{concepts, passages, edges}` (no maps/read/views) |
+| `getAggregateLoomData` | `courseId?, sectionId?` | cohort `{concepts, passages, edges, passagesUnavailable}` — passages fail soft |
 
 ### 2c-bis. Student Overlays — [src/actions/overlays.ts](../src/actions/overlays.ts)
 
@@ -340,17 +340,17 @@ An admin walking the learner surfaces without a membership gets `not-enrolled`.
 
 | Action | Params | Returns |
 | --- | --- | --- |
-| `getPassagesOverlay` | `sourceId, band = "section"` | `PassagesOverlay` — `{band, blocked, peers, contributors, passages, pages[], unanchored, droppedSpans}`. Each `pages[]` entry is `{pageNumber, count, contentHash, spans[]}`; a span is `{start, end, count}`, disjoint runs with overlap depth from a sweep line (`heatSpans`). Peer bytes count toward `passages`/`count` always, but only contribute a span when their `pageContentHash` equals the reading's canonical `source_page.contentHash`; the rest are `unanchored`. `MAX_SPANS` = 4000, overflow reported as `droppedSpans` |
-| `getVocabularyOverlay` | `sourceId \| null, band = "section"` | `VocabularyOverlay` — `{band, blocked, peers, contributors, readings, concepts[], moreConcepts, links[], moreLinks, unlabeledLinks}`. A term is `{label, count, descriptions[], moreDescriptions}`; `count` is **distinct people**. Concepts are scoped through their passages (`byte.sourceId ∈ scope`), exactly as `scopedGraph` does; links need both ends in scope. Caps: 40 terms, 3 descriptions of ≤240 chars each, all overflow reported |
+| `getPassagesOverlay` | `sourceId, band = "section"` | `PassagesOverlay` — `{band, blocked, peers, contributors, passages, pages[], unanchored, droppedSpans}`. Each `pages[]` entry is `{pageNumber, count, contentHash, spans[]}`; a span is `{start, end, count}`, disjoint runs with overlap depth from a sweep line (`heatSpans`). Peer passages count toward `passages`/`count` always, but only contribute a span when their `pageContentHash` equals the reading's canonical `source_page.contentHash`; the rest are `unanchored`. `MAX_SPANS` = 4000, overflow reported as `droppedSpans` |
+| `getVocabularyOverlay` | `sourceId \| null, band = "section"` | `VocabularyOverlay` — `{band, blocked, peers, contributors, readings, concepts[], moreConcepts, links[], moreLinks, unlabeledLinks}`. A term is `{label, count, descriptions[], moreDescriptions}`; `count` is **distinct people**. Concepts are scoped through their passages (`passage.sourceId ∈ scope`), exactly as `scopedGraph` does; links need both ends in scope. Caps: 40 terms, 3 descriptions of ≤240 chars each, all overflow reported |
 
 `blocked` is one of `signed-out · not-enrolled · not-coded · no-section ·
 no-peers`, or null. Every one is a sentence the UI prints
 (`overlayBlockMessage`): an empty comparison that does not say why reads as a
 bug, and "code this reading yourself first" is the point of the gate.
 
-Client: **PdfViewer** shades in the same `Mark` pass as byte highlights —
+Client: **PdfViewer** shades in the same `Mark` pass as passage highlights —
 overlay first so a student's own yellow nests inside and paints over it, then
-bytes, then search terms (one `unmark`; competing passes would strip each
+passages, then search terms (one `unmark`; competing passes would strip each
 other). Marks are `aria-hidden`, carry `data-heat` 1–5, and shade in five steps
 with a slate rule above the words so the section's mark survives under your own
 yellow. The client re-checks the hash against the live text layer and refuses to
@@ -369,7 +369,7 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | 00 Library | — (`/`) | the course's readings; always a link, never a workbench tab |
 | — | `JourneyNav` | **02/03/04 render greyed and inert outside a reading** (TJ, 2026-08-09): their `DEFAULT_HREF` is `/weave`, and the whole-weave workbench is not supported in v1. Keyed off "is this a tab you can work at here", not off a route list. `04 Vocabulary` is UNSCOPED in the model and is the one that would be legitimate outside a text — greyed anyway, because `/weave` is its only surface |
 | — | **`/access`** · `MetaPage` | **Access — the role matrix, its own tab** (TJ, 2026-08-09), staff only: each row cites the file and line that enforces it. `MetaPage` is the shared frame for a reference page — `/workflows` and `/access` keep the scopebar, journey and footer instead of replacing them, with no station active. The `/access` gate ignores the student lens, as `/admin` does: the lens hides the tab, it is not a lock |
-| — | **`src/lib/capabilities.ts`** | **the role/capability matrix** (TJ, 2026-08-09), rendered on `/workflows` under the flows. The file IS the matrix: every row names the **server gate that refuses**, and `check-workflows.ts` asserts the file exists and the symbol is still in it — a rename fails the build rather than leaving a confident, wrong table. `gate.line` deliberately unasserted. Deriving it found and fixed two holes: `peersOf` excluded `FACULTY` but not `INSTRUCTOR` (an admin's captures counted as a peer), and `createByte` never authorized its `sourceId` while `attributeBytes` did |
+| — | **`src/lib/capabilities.ts`** | **the role/capability matrix** (TJ, 2026-08-09), rendered on `/workflows` under the flows. The file IS the matrix: every row names the **server gate that refuses**, and `check-workflows.ts` asserts the file exists and the symbol is still in it — a rename fails the build rather than leaving a confident, wrong table. `gate.line` deliberately unasserted. Deriving it found and fixed two holes: `peersOf` excluded `FACULTY` but not `INSTRUCTOR` (an admin's captures counted as a peer), and `createPassage` never authorized its `sourceId` while `attributePassages` did |
 | — | **`src/lib/viewAs.ts`** · `viewAsServer.ts` | **View as student** (TJ, 2026-08-09) — a lens beside the header pill. A **cookie**, because three differences are decided server-side and a client flag could not reach them: `/workflows` (three flows vs one), the Library query (an admin's shelf carries `isVisible=false` rows), and `getActiveCourse` itself. Masked **once**, in `getActiveCourse`, so every `isStaff`/`isAdmin` consumer goes quiet together; `staffTruly` rides along **unmasked for one purpose only** — drawing the control that takes the lens off. **Withholds, never grants**: every use hides a control or NARROWS a query, and no authorization path consults it (`authorizeSourceAccess` deliberately untouched). Not a security boundary |
 | — | `JourneyNav` · `.staffgroup` | **the staff group, right of the journey, in sage** (TJ, 2026-08-09) — Roster · Cohort Graph for FACULTY, plus Readings · Courses for site ADMIN, on **every** surface including `/admin`. Unnumbered: they are not steps on the student's arc. Replaces `AdminNav`'s tab row, which now holds only the course/section pickers. Drawn from `course.isStaff` / `course.isAdmin`; decides what is drawn, never what may be read |
 | **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** as **Your work** (`#yourwork`), a sheet that slides over the text — closed by default, toggled from the viewer toolbar, and mounted *inside* `.pdf-shell` so it survives fullscreen; and the **Cloth Title/Description** at the head of that sheet |
@@ -503,7 +503,10 @@ The archived spec's §6 contract, exactly:
   "graph": {
     "student": "Display Name",
     "concepts": [{ "id", "label", "def", "note" }],            // no tier — tiers are per-map (0021)
-    "bytes":    [{ "id", "conceptIds": [],                     // [] = an Unlabeled Passage
+    // `passages` since 2026-08-09; every file exported before that says
+    // `bytes`, and `parseImport` reads BOTH (red line #5 — nothing a student
+    // already downloaded stops opening). Guarded by scripts/check-import-compat.ts.
+    "passages": [{ "id", "conceptIds": [],                     // [] = an Unlabeled Passage
                    "source", "location", "text",
                    "note?", "question?", "isPullQuote?", "tier?",  // the margin, emitted when set
                    "anchor?": { "sourceId", "pageNumber", "startOffset", "endOffset", "pageContentHash" } }],
@@ -531,7 +534,7 @@ whole-artifact form and the complete backup behind every map.
   "map":   { "id", "scopeKey", "scopeLabel", "name", "essence", "read", "tiers": {} },
   "graph": {
     "concepts": [{ ..., "tier": mapTier }],   // THIS map's tier — the file is sorted on its own
-    "bytes":    [ /* every byte of every in-scope concept, plus the scope's own
+    "passages": [ /* every passage of every in-scope concept, plus the scope's own
                      unlabeled passages — the file stands alone */ ],
     "edges":    [ /* scoped edges only */ ]
   },
@@ -540,15 +543,15 @@ whole-artifact form and the complete backup behind every map.
 ```
 
 Scope membership: whole weave = everything; otherwise a concept is in scope when one
-of its bytes has `sourceId ∈ scope` **or it has no bytes at all**
+of its passages has `sourceId ∈ scope` **or it has no passages at all**
 ([src/lib/scope.ts](../src/lib/scope.ts)).
 
 ### 4c. Markdown outlines (readable, never re-importable)
 
 Whole cloth: `# Loom — <student>` → My read (whole-weave cloth description) → My
 readings (per-reading cloth titles/descriptions) → Maps (per map: name — scope,
-essence, paragraph, tier lines) → Concepts (flat, with bytes as quotes) → Unfiled
-passages (unlabeled bytes — red line #4 keeps them visible) → Propositions
+essence, paragraph, tier lines) → Concepts (flat, with passages as quotes) → Unfiled
+passages (unlabeled ones — red line #4 keeps them visible) → Propositions
 (`A —[handle]→ B` + sentence when present). Per map: same shape scoped to the map,
 plus its unfiled passages. Map kit (clipboard): name/essence/tier groups/
 propositions/armature/loose; with no map, everything is unsorted (degree order).
@@ -562,10 +565,10 @@ map can never reach the replace path.**
 ### 4e. Whole-cloth import (replace)
 
 Client parse: flattens `{graph, views}`; validates tiers; drops blank-label concepts
-and text-less bytes — but a byte whose concepts don't resolve now SURVIVES as an
+and text-less passages — but a passage whose concepts don't resolve now SURVIVES as an
 Unlabeled Passage (red line #5), where it used to be dropped as an orphan; accepts
 `conceptIds` (new) or `conceptId` (legacy), `text` or `content`; folds legacy v2/v3
-shapes (legacy byte notes onto the concept — a new-shape byte's `note` stays on the
+shapes (legacy passage notes onto the concept — a new-shape passage's `note` stays on the
 passage; `triples` → edges); a legacy `read` string becomes the whole-weave cloth's
 description; a pre-maps file **synthesizes "Map 1"** from the legacy concept
 `tier`/`read`/`cardTable` (the 0012 backfill rule).
@@ -574,9 +577,9 @@ remap view keys → **re-scope** each map and cloth (scopeKey filtered to known
 sources; resolves to nothing → whole weave, never dropped — red line #5; for
 cloths, exact scopes claim their slots FIRST and a scope-degraded cloth is
 dropped on collision, never the genuine one) → **remint tier keys**
-(`byte_concept` createdAt staggered per row — filing order is meaning) →
+(`passage_concept` createdAt staggered per row — filing order is meaning) →
 `graph.import` event with snapshot → one atomic batch: delete everything (incl.
-cloths), insert everything (incl. `byte_concept` pointers). Replace, never merge.
+cloths), insert everything (incl. `passage_concept` pointers). Replace, never merge.
 
 ### 4f. Per-map import (additive)
 
@@ -590,8 +593,8 @@ delete or replace anything.
 ## 5. Invariants the code enforces
 
 1. **Passages survive their labels** (0021). Deleting a concept removes
-   `byte_concept` pointers, never bytes; a byte with zero pointers is an Unlabeled
-   Passage, legal everywhere. `createByte` writes the byte and its pointers in one
+   `passage_concept` pointers, never passages; a passage with zero pointers is an Unlabeled
+   Passage, legal everywhere. `createPassage` writes the passage and its pointers in one
    `db.batch`. (The old invariant here — the mirror dual-write — was retired by
    0021; `map.tiers` is the only tier store and the cloth carries the paragraph.)
 2. **`ensureActiveMap`** (client-only, LoomProvider): first sorting gesture in a fresh
@@ -605,9 +608,9 @@ delete or replace anything.
 5. **Orphan adoption.** Every loom action adopts `courseId IS NULL` rows into the
    active course; for `cloth`/`view` (unique-constrained) it deletes the null-course
    leftover first so the unique can't wedge the student.
-6. **A byte belongs to a reading; a concept does not.** Membership is derived from
-   `byte.sourceId` + its `byte_concept` pointers per render and discarded.
-   `attributeBytes` fills NULL only, by student act. A byte-less concept appears in
+6. **A passage belongs to a reading; a concept does not.** Membership is derived from
+   `passage.sourceId` + its `passage_concept` pointers per render and discarded.
+   `attributePassages` fills NULL only, by student act. A passage-less concept appears in
    every scope (red line #4 visibility).
 7. **Identity by object, not label** (ruling 36, landed with P1). Homonyms are
    legal everywhere; the client warns at coin-time (create, rename) and offers
@@ -617,9 +620,9 @@ delete or replace anything.
 9. **History survives everything** — `graph_event` outlives reset and import;
    event writes are best-effort (neon-http has no cross-call transactions), graph
    tables stay the source of truth.
-10. **Atomicity via `db.batch`** for: whole-graph replace, reset, byte + its
+10. **Atomicity via `db.batch`** for: whole-graph replace, reset, passage + its
     concept pointers, worked example, map delete.
-11. **Anchor canonicality.** `createByte` prefers server page offsets when content
+11. **Anchor canonicality.** `createPassage` prefers server page offsets when content
     hashes agree; otherwise preserves the client's offsets and hash.
 12. **Replace-race protection.** The client cancels debounced view (500 ms) and
     map-text (700 ms) saves before import/reset; `flushMapText` also fires on
@@ -637,7 +640,7 @@ delete or replace anything.
   server re-validates sizes, source existence, and ownership only.
 - `createSource` is exported but has no callers — dead-but-live (see audit).
   (`saveRead` was removed with the mirror in 0021.)
-- The new `bytes` margin fields (note/question/isPullQuote/tier) are contract-level
+- The new `passages` margin fields (note/question/isPullQuote/tier) are contract-level
   only — no capture UI writes them yet (arrives with the P2/P3 Reading tab work).
 - ~~A Server Function called from a reading entered by clicking its shelf card
   POSTs to `/` about half the time~~ — **fixed 2026-08-07** by taking client

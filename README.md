@@ -9,7 +9,7 @@ Loom is a tool for emergent sense-making and collaborative synthesis. It provide
 Loom was born from the intersection of ethnographic research, theory, and practice. It is designed to help individuals and cross-disciplinary teams build shared understanding not by enforcing uniformity, but by negotiating differences.
 
 The core workflow is simple:
-1. **Read & Capture:** Keep passages worth keeping as short "bytes"—the author's words, verbatim, with citation. Name the concept each passage evidences (a short noun phrase, often the author's own term), and gloss it in your own words in the working definition.
+1. **Read & Capture:** Keep the passages worth keeping — the author's words, verbatim, with citation. Name the concept each passage evidences (a short noun phrase, often the author's own term), and gloss it in your own words in the working definition.
 2. **Throw:** Pick two concepts and connect them.
 3. **Name the Relation:** Define the "edge" between these ideas yourself, using your own phrasing or pulling a verb from one of the "tongues" (disciplinary thought styles).
 
@@ -17,7 +17,7 @@ Nothing is auto-generated. The tool only counts your own throws. The structure e
 
 ## Features
 
-- **Bite-Sized Capture:** Keep the passages that matter as discrete "bytes"—the author's words, verbatim, with their citation—each filed under a concept you name.
+- **Bite-Sized Capture:** Keep the passages that matter as discrete units — the author's words, verbatim, with their citation — each filed under a concept you name.
 - **Intentional Connections ("Throws"):** The power of Loom lies in the edges. You decide exactly how two concepts relate. 
 - **Disciplinary "Tongues":** The verbs we reach for to name a relation (e.g., *constrains*, *refutes*, *betrays*) aren't neutral; each belongs to a specific way of seeing the world. When you coin a term, Loom offers registers from several fields—"Cause & system", "Stance & value"—as suggestions to tap or ignore. You pick the word, or write your own; the machine never names the relation.
 - **The Woven Graph:** View your interconnected graph ("Read"), then write your own "axial read" across texts. Loom lays your threads out as material and counts what it sees; you write the reading, and copy it out as a draft.
@@ -111,7 +111,7 @@ The knowledge graph is kept strictly apart from its projections:
 
 | Table | Holds | §6 role |
 | --- | --- | --- |
-| `concept`, `byte`, `edge` | The student's graph, including `concept.tier` (placement's *meaning*). | `graph` — the artifact |
+| `concept`, `passage`, `edge` | The student's graph, including `concept.tier` (placement's *meaning*). | `graph` — the artifact |
 | `read` | "Your read", one row per student × course. | `graph.read` |
 | `view` | Student-authored geometry per view key (`cardTable`: positions, bends). A new view adds a row, never a column on a concept or edge. Only student gestures write here — derived layout is computed for display and discarded. | `views` — projections |
 | `graph_event` | Append-only history of the student's own acts. Survives reset and import; rendered only as exploratory counts/replay ("the cloth, over time"), never judgment. | development history |
@@ -120,7 +120,7 @@ The knowledge graph is kept strictly apart from its projections:
 
 **The reading is the entry point.** The course's chain of transformations — text → notes → concepts → weave → map → chalk talk — runs per text, twice a week, twenty-six times, so `/` is a shelf of readings grouped by course week and each one opens its own workbench at `/reading/[sourceId]`: the text, the coding log, Throw and Read, scoped to that reading. `/weave` is every reading at once; `/keep` is always the whole artifact.
 
-**A concept does not belong to a reading — a byte does.** A concept emerges from a reading and may then be evidenced in several; spec §2 makes one label one concept, reused across readings and weeks, and that reuse is the island-bridging the course is for. So scope is read off the route, and which readings a concept is *evidenced in* is **derived** from its bytes (`src/lib/scope.ts`), computed per render and discarded. Nothing owns a concept and nothing re-homes it: a reading is a door into one graph, never one of twenty-six graphs, and meeting the same idea in a second text joins its evidence and says so.
+**A concept does not belong to a reading — a passage does.** A concept emerges from a reading and may then be evidenced in several; spec §2 makes one label one concept, reused across readings and weeks, and that reuse is the island-bridging the course is for. So scope is read off the route, and which readings a concept is *evidenced in* is **derived** from its passages (`src/lib/scope.ts`), computed per render and discarded. Nothing owns a concept and nothing re-homes it: a reading is a door into one graph, never one of twenty-six graphs, and meeting the same idea in a second text joins its evidence and says so.
 
 Threads that run out of a reading are the payoff, not the leftovers: an edge belongs to every scope containing either endpoint, so a bridge appears in both readings and in the whole weave, with its own counted band. Concepts from other readings stay reachable in Throw behind a disclosure — never removed, because threading this week's text to an earlier one is what weeks 6–13 are for.
 
@@ -130,7 +130,7 @@ Threads that run out of a reading are the payoff, not the leftovers: an edge bel
 
 PDFs are uploaded once into a shared, course-agnostic library, then included in any number of courses. Per-course facts (week, visibility, core vs. supplemental) live on the `course_source` join, not on the reading — so the same PDF is never uploaded twice, and hiding it in one course leaves the others alone.
 
-A reading may also be **reference-only**: a card with a title and author and no PDF, added by a student for something they are coding that the library does not hold (`source.isOwn`, `storageKey` null). It sits on their shelf and nobody else's. This exists because reading-first needs every byte to have a door — otherwise a self-found paper's passages fall out of every lens.
+A reading may also be **reference-only**: a card with a title and author and no PDF, added by a student for something they are coding that the library does not hold (`source.isOwn`, `storageKey` null). It sits on their shelf and nobody else's. This exists because reading-first needs every passage to have a door — otherwise a self-found paper's passages fall out of every lens.
 
 - **Readings tab** (`/admin/library`) — the whole library. Upload one or many PDFs at a time, edit shared metadata, and add a reading to a course. Badges show which courses currently include it.
 - **Courses tab** (`/admin/courses`) — each course's full reading list, with the per-course placement, visibility, and removal controls.

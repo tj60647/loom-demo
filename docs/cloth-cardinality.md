@@ -32,7 +32,7 @@ free and one is a re-keying of the whole graph**. Sections 1–8 work that out;
 | A Cloth is | a Title + a Description, addressed **by scope**, not by id |
 | `scope.key` is | `''` (the whole weave) or one Reading id |
 | The DB allows | exactly one: `unique(userId, courseId, scopeKey)`, named `onePerScope` |
-| A Passage belongs to | a **User** and a **Reading** (`byte.userId`, `byte.sourceId`) — **there is no `clothId` on `byte`, `edge` or `map`** |
+| A Passage belongs to | a **User** and a **Reading** (`passage.userId`, `passage.sourceId`) — **there is no `clothId` on `passage`, `edge` or `map`** |
 | Authorship is | row ownership: **84** `eq(row.userId, session.user.id)` filters across `src/actions` and `src/lib` |
 | Scope is | reading-keyed: **99** `scopeKey` sites across **25** files, plus `scoped()` in `src/lib/scope.ts`, which every tab consumes |
 
@@ -56,7 +56,7 @@ Title, Description and Projections. A second Cloth is a second *interpretation
 of the same evidence* — the materials reading and the negotiation reading of
 Bucciarelli, over one set of captures.
 
-- `byte` / `edge` / `map` are untouched. No `clothId`.
+- `passage` / `edge` / `map` are untouched. No `clothId`.
 - A Cloth gains a **set of Readings** (`cloth_reading`) and a **set of Members**
   (`cloth_member`). `scopeKey` generalises from "one or all" to "these".
 - The graph stays owned by `(user, reading)`, exactly as now.
@@ -68,7 +68,7 @@ What the model currently says: *Cloth = Title + Description + one Reading +
 Reading are two separate bodies of work; a Passage captured in one is not in
 the other.
 
-- `byte`, `edge` and `map` each need a `clothId`, backfilled.
+- `passage`, `edge` and `map` each need a `clothId`, backfilled.
 - `scoped()` re-keys from Reading to Cloth — the primitive 25 files read.
 - Every capture path must decide *which Cloth* it is capturing into.
 
@@ -99,10 +99,10 @@ This is where **many Users per Cloth** bites, and it bites the same way under A
 and B.
 
 **Ruling 2 — "counts are of PEOPLE, never of rows that carry an author."** The
-overlay arithmetic counts distinct `byte.userId`. If a Cloth has several
+overlay arithmetic counts distinct `passage.userId`. If a Cloth has several
 members, a capture still needs a *person* on it, or "eleven people marked this
 sentence" becomes "eleven cloths did". **Per-row authorship must survive
-co-authorship.** Cloth membership can never replace `byte.userId`; it can only
+co-authorship.** Cloth membership can never replace `passage.userId`; it can only
 sit beside it.
 
 **Ruling 1 — the gate, per Reading.** An overlay opens on a Reading only once
@@ -139,7 +139,7 @@ Cloths.
 
 | Axis | Under A (share) | Under B (partition) |
 | --- | --- | --- |
-| **Reading → many Cloths** | join table + a cloth id in scope; UI picks which lens | `clothId` on `byte`/`edge`/`map`, `scoped()` re-keyed, every capture path chooses a Cloth |
+| **Reading → many Cloths** | join table + a cloth id in scope; UI picks which lens | `clothId` on `passage`/`edge`/`map`, `scoped()` re-keyed, every capture path chooses a Cloth |
 | **Cloth → many Readings** | generalises the whole-weave Cloth that already exists — `cloth_reading` replaces the `''`-means-all special case | same, plus the above |
 | **Cloth → many Users** | `cloth_member`; authorship stays on the row; overlay gate stays per-person; export gains authors | identical work — this axis is orthogonal to A/B |
 
@@ -283,7 +283,7 @@ Three consequences, and the third is the reason to prefer it:
   *co-creates*, never as a lens.
 - The vocabulary comes clean: **a Cloth is whose work this is; a Projection is
   what it says.**
-- **`byte` still needs no `clothId`.** Because a User has exactly one Cloth per
+- **`passage` still needs no `clothId`.** Because a User has exactly one Cloth per
   Reading, `(user, reading)` still identifies the Cloth; membership on the
   Cloth decides who may see the evidence. Co-authorship therefore costs join
   tables and an authorization change — **not** the graph re-keying of §2 B.
@@ -297,5 +297,5 @@ model's **Join**, which is already defined and deferred — so Join is where tha
 case belongs, not here.
 
 Allow a User two Cloths on one Reading and `(user, reading)` stops identifying
-the Cloth — at which point `byte.clothId` is required and you are back in §2 B's
+the Cloth — at which point `passage.clothId` is required and you are back in §2 B's
 migration. **The one-per-User rule is exactly what keeps co-authorship cheap.**

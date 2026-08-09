@@ -100,7 +100,7 @@ that instruction rather than letting it surface as an opaque driver error.
      on `/admin` — it must enrol and land on Readings. This is the
      `events.signIn` path Playwright can never cover; if it is wrong, every
      tester is locked out and nothing else matters.
-   - Open a reading (blob auth + streaming), capture a byte, sort a tier,
+   - Open a reading (blob auth + streaming), capture a passage, sort a tier,
      export from Keep.
    - Confirm `/api/auth/test-login` returns 403.
 

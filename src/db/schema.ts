@@ -464,25 +464,16 @@ export const concepts = pgTable(
 /**
  * Passages.
  *
- * THE TABLE IS STILL CALLED `byte`, AND THAT IS DELIBERATE. "Byte" was this
- * object's July name; the model calls it a Passage and, since 2026-08-09, so
- * does every identifier in the codebase. What did not move is anything that is
- * a STRING IN THE DATABASE — this table, `byte_concept`, the `byteId` column,
- * the index names, the raw SQL in `src/actions/search.ts`, and the
- * `graph_event.kind` values ("byte.capture", "byte.refile", …) which are
- * already written to rows.
+ * Called `byte` until migration 0023 (2026-08-09), which renamed the table,
+ * its join, their indexes and constraints, and the `graph_event.kind` values
+ * that had already been written as "passage.capture" and friends. Nothing in this
+ * repo calls a Passage a byte any more.
  *
- * Renaming those buys nothing a reader of the app can see, and costs a
- * migration plus a rewrite of history: the Capture Log replays by matching
- * `kind`, so renaming those values would silently blank every student's
- * existing history. AGENTS.md §F has always had DB renames as optional.
- *
- * So: if you are reading the code and see "byte", it is one of exactly two
- * things — a database name kept for compatibility (here and the places listed
- * above), or genuine FILE DATA (`formatBytes`, `byteLength`, textLayerRepair's
- * `bytes: Buffer`, storage.ts). It is never a Passage.
+ * Where you still meet the word, it is FILE DATA and never a Passage:
+ * `formatBytes`, `byteLength`, `maximumSizeInBytes`, textLayerRepair's
+ * `bytes: Buffer`, `src/lib/storage.ts`. Those are octets.
  */
-export const passages = pgTable("byte", {
+export const passages = pgTable("passage", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -520,7 +511,7 @@ export const passages = pgTable("byte", {
 (passage) => ({
   // Unified search over the student's own captures: the passage text
   // outranks their margin. Query side repeats this expression verbatim.
-  searchIdx: index("byte_search_idx").using(
+  searchIdx: index("passage_search_idx").using(
     "gin",
     sql`(setweight(to_tsvector('english', ${passage.content}), 'B') || setweight(to_tsvector('english', coalesce(${passage.note}, '')), 'C') || setweight(to_tsvector('english', coalesce(${passage.question}, '')), 'C'))`
   ),
@@ -531,9 +522,9 @@ export const passages = pgTable("byte", {
 // several concepts (refile adds a pointer, never copies the passage). Cascades
 // both ways: losing either end removes the pointer, never the other end.
 export const passageConcepts = pgTable(
-  "byte_concept",
+  "passage_concept",
   {
-    passageId: text("byteId")
+    passageId: text("passageId")
       .notNull()
       .references(() => passages.id, { onDelete: "cascade" }),
     conceptId: text("conceptId")
@@ -543,7 +534,7 @@ export const passageConcepts = pgTable(
   },
   (row) => ({
     pk: primaryKey({ columns: [row.passageId, row.conceptId] }),
-    byConcept: index("byte_concept_concept_idx").on(row.conceptId),
+    byConcept: index("passage_concept_concept_idx").on(row.conceptId),
   })
 )
 
@@ -670,7 +661,7 @@ export const graphEvents = pgTable("graph_event", {
   // 'graph.example'.
   kind: text("kind").notNull(),
   entityType: text("entityType")
-    .$type<"concept" | "byte" | "edge" | "graph" | "map" | "cloth">()
+    .$type<"concept" | "passage" | "edge" | "graph" | "map" | "cloth">()
     .notNull(),
   entityId: text("entityId"),
   // Enough of the entity to replay the graph at any point in the timeline.

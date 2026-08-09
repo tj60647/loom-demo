@@ -4,7 +4,7 @@ import fs from 'fs';
 
 // Three storage states, three identities (see /api/auth/test-login):
 // - user.json    → the admin, for /admin surfaces (library-verify).
-// - testa.json   → "Test User A", the account that owns every concept, byte and
+// - testa.json   → "Test User A", the account that owns every concept, passage and
 //   map the suite creates, so test data never pollutes a real person's loom.
 // - faculty.json → "Test Faculty", FACULTY on the course membership only. The
 //   admin state cannot stand in for this: an ADMIN passes every gate, so it

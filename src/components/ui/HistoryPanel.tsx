@@ -149,18 +149,18 @@ function foldEvents(events: GraphEvent[], upTo: number) {
         }
         break
       }
-      case "byte.create":
-      case "byte.capture": {
+      case "passage.create":
+      case "passage.capture": {
         if (e.entityId) {
           passages.set(e.entityId, makePassage(e.entityId, pointerIds(p), at))
           // Recorded passage.create = the pre-0021 cascade era. Synthesized
           // creates are minted from rows alive TODAY, so they demonstrably
           // survived — replay them with survive semantics.
-          if (e.kind === "byte.create" && p.synthesized !== true) cascadeEraPassages.add(e.entityId)
+          if (e.kind === "passage.create" && p.synthesized !== true) cascadeEraPassages.add(e.entityId)
         }
         break
       }
-      case "byte.refile": {
+      case "passage.refile": {
         if (e.entityId && typeof p.conceptId === "string") {
           const b = passages.get(e.entityId)
           if (b && !b.conceptIds.includes(p.conceptId)) {
@@ -174,14 +174,14 @@ function foldEvents(events: GraphEvent[], upTo: number) {
         }
         break
       }
-      case "byte.unfile": {
+      case "passage.unfile": {
         if (e.entityId && typeof p.conceptId === "string") {
           const b = passages.get(e.entityId)
           if (b) b.conceptIds = b.conceptIds.filter((cid) => cid !== p.conceptId)
         }
         break
       }
-      case "byte.delete": {
+      case "passage.delete": {
         if (e.entityId) passages.delete(e.entityId)
         break
       }
@@ -262,15 +262,15 @@ function describeEvent(e: GraphEvent): string {
         ? `merged "${p.fromLabel}" into "${p.intoLabel}"`
         : "merged two concepts"
     case "concept.delete": return "removed a concept"
-    case "byte.create": return "captured a passage"
-    case "byte.capture":
+    case "passage.create": return "captured a passage"
+    case "passage.capture":
       return Array.isArray(p.conceptIds) && p.conceptIds.length === 0
         ? "captured an unlabeled passage"
         : "captured a passage"
-    case "byte.refile": return "filed a passage under a second concept"
-    case "byte.unfile": return "unfiled a passage from a concept"
-    case "byte.attribute": return "placed passages in their reading"
-    case "byte.delete": return "removed a passage"
+    case "passage.refile": return "filed a passage under a second concept"
+    case "passage.unfile": return "unfiled a passage from a concept"
+    case "passage.attribute": return "placed passages in their reading"
+    case "passage.delete": return "removed a passage"
     case "edge.throw": return "threw a thread"
     case "edge.coin": return typeof p.handle === "string" && p.handle ? `coined "${p.handle}"` : "cleared a coined label"
     case "edge.update": return "reworded a thread"

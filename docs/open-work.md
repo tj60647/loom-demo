@@ -89,9 +89,9 @@ would mean touching the capture path three times. Full analysis:
   it is a behaviour change on the busiest path in the app.
 - **2.2 The Source field promises an override it does not have.** The label says
   *"this reading, unless you say otherwise"*, but saying otherwise sets
-  `byte.source` (a string) while `byte.sourceId` — what `scopedGraph`, the
+  `passage.source` (a string) while `passage.sourceId` — what `scopedGraph`, the
   tallies, the overlays and the export anchors all read — is stamped from the
-  open reading. `attributeBytes` is guarded by `isNull(sourceId)`, so it can
+  open reading. `attributePassages` is guarded by `isNull(sourceId)`, so it can
   never be re-attributed afterwards. **Honour the override, or stop offering
   it.** The second is one string. **TJ's call.**
 - **2.3 The unverified leads**, which should be checked before either of the
@@ -183,7 +183,11 @@ Not features, but the reason to believe any of the above.
 
 ## Where I would start
 
-~~Phase 0~~ **done 2026-08-09** — five fixes, no rulings spent.
+~~Phase 0~~ **done 2026-08-09** — five fixes, no rulings spent. Since then, and
+also unblocked by no ruling: the **bytes → Passages** rename through code, docs
+and the database (migration 0023), the **three kinds** a Concept can be relative
+to a reading, and two guards that did not exist —
+`scripts/check-import-compat.ts` and `scripts/check-vocabulary.ts`.
 
 **Next: the 05 Weave ruling** (Phase 1). It is the one answer that changes how
 much of Phase 2 exists at all, and nothing below it should be built first.

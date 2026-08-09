@@ -239,8 +239,8 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
     ? sql`("edge"."courseId" = ${courseId} OR "edge"."courseId" IS NULL)`
     : sql`"edge"."courseId" IS NULL`
   const passageScope = courseId
-    ? sql`("byte"."courseId" = ${courseId} OR "byte"."courseId" IS NULL)`
-    : sql`"byte"."courseId" IS NULL`
+    ? sql`("passage"."courseId" = ${courseId} OR "passage"."courseId" IS NULL)`
+    : sql`"passage"."courseId" IS NULL`
 
   // Each vector repeats its index expression from src/db/schema.ts verbatim.
   const conceptResult = await db.execute(sql`
@@ -284,20 +284,20 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
 
   const passageResult = await db.execute(sql`
     WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
-    SELECT "byte"."id", "byte"."sourceId", "byte"."source",
-           ts_headline('english', "byte"."content", q.query, ${HEADLINE_OPTIONS}) AS snippet,
+    SELECT "passage"."id", "passage"."sourceId", "passage"."source",
+           ts_headline('english', "passage"."content", q.query, ${HEADLINE_OPTIONS}) AS snippet,
            ts_rank(
-             (setweight(to_tsvector('english', "byte"."content"), 'B') ||
-              setweight(to_tsvector('english', coalesce("byte"."note", '')), 'C') ||
-              setweight(to_tsvector('english', coalesce("byte"."question", '')), 'C')),
+             (setweight(to_tsvector('english', "passage"."content"), 'B') ||
+              setweight(to_tsvector('english', coalesce("passage"."note", '')), 'C') ||
+              setweight(to_tsvector('english', coalesce("passage"."question", '')), 'C')),
              q.query
            ) AS rank
-    FROM "byte", q
-    WHERE "byte"."userId" = ${userId} AND ${passageScope}
-      AND (setweight(to_tsvector('english', "byte"."content"), 'B') ||
-           setweight(to_tsvector('english', coalesce("byte"."note", '')), 'C') ||
-           setweight(to_tsvector('english', coalesce("byte"."question", '')), 'C')) @@ q.query
-    ORDER BY rank DESC, "byte"."createdAt"
+    FROM "passage", q
+    WHERE "passage"."userId" = ${userId} AND ${passageScope}
+      AND (setweight(to_tsvector('english', "passage"."content"), 'B') ||
+           setweight(to_tsvector('english', coalesce("passage"."note", '')), 'C') ||
+           setweight(to_tsvector('english', coalesce("passage"."question", '')), 'C')) @@ q.query
+    ORDER BY rank DESC, "passage"."createdAt"
     LIMIT ${MAX_LOOM_HITS}
   `)
 

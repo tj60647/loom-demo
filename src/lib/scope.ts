@@ -1,10 +1,10 @@
 // The reading lens (docs/archive/reading-scope-and-map-passes.md §A.3).
 //
-// A CONCEPT DOES NOT BELONG TO A READING — A BYTE DOES. A concept emerges from
+// A CONCEPT DOES NOT BELONG TO A READING — A PASSAGE DOES. A concept emerges from
 // a reading and may then be evidenced in several: one User-level object,
 // referenced by passages across readings (identity by object, not label —
 // ruling 36). The stored relations are the passage's `sourceId` and its concept
-// pointers (`byte_concept`), and everything below derives from them per render
+// pointers (`passage_concept`), and everything below derives from them per render
 // and throws the result away. Nothing here owns a concept, re-homes one, or
 // writes.
 //

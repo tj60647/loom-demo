@@ -7,7 +7,7 @@ Learn* carry no text layer, so selection cannot reach them, and typing out a
 hand-drawn diagram is not a faithful capture of it. The wanted gesture is
 **drag a box on the page and keep what is inside it**.
 
-This note exists because the handoff scoped it as "a bigger feature: `byte` has
+This note exists because the handoff scoped it as "a bigger feature: `byte` (now `passage`) has
 no image column and the blob store would need a path for it". That framing is
 half right, and the half that is wrong makes the feature much smaller than it
 looks. What follows is what it would actually cost. The question that used to
@@ -23,7 +23,7 @@ stored and served. For a reading in the Library it is none of those things.
 A snip of a library PDF is **fully described by the reading it came from, the
 page, and a rectangle**. The PDF is already in the blob store, already shared by
 every reader of the course, already served through an authenticated route. The
-snip is a *view* of bytes we hold, not new bytes.
+snip is a *view* of file bytes we already hold, not new ones.
 
 So: **store four numbers, render on demand.** No image is written anywhere.
 
@@ -66,7 +66,7 @@ Modest, and mostly UI:
 | Piece | Work |
 |---|---|
 | **The gesture** | A "snip" mode in the PDF toolbar; drag a rect over the page. The viewer already tracks stage geometry and page scale for the capture button, so the page↔PDF coordinate transform exists. |
-| **The columns** | `byte.snipPage` + `byte.snipRect` (one `jsonb`, mirroring `sourceRepairs.region`). Nullable — a snip is a Passage whose evidence is a region rather than a character range. One migration, additive, no backfill. |
+| **The columns** | `passage.snipPage` + `passage.snipRect` (one `jsonb`, mirroring `sourceRepairs.region`). Nullable — a snip is a Passage whose evidence is a region rather than a character range. One migration, additive, no backfill. |
 | **The route** | `/api/readings/[sourceId]/snip?page=&rect=` — the crop route with a *member* gate rather than an admin one. Same rasteriser, same private-store reasoning, same hard cache (a rect never changes). |
 | **The surfaces** | An `<img>` in the Capture Log row, the projection card, and Keep. Everywhere a passage's `content` renders today. |
 

@@ -271,7 +271,7 @@ test("06 · keep lists every map, and the whole-cloth export carries them all", 
   expect(data.graph.maps.length).toBeGreaterThanOrEqual(3)
   const names = data.graph.maps.map((m: { name: string }) => m.name)
   expect(names).toEqual(expect.arrayContaining(["The whole cloth", "Object worlds, sorted", "A practice lens"]))
-  // Bytes carry their reading (anchor provenance survives the export contract).
+  // Passages carry their reading (anchor provenance survives the export contract).
   const anchored = data.graph.passages.filter((b: { anchor?: { sourceId?: string } }) => b.anchor?.sourceId)
   expect(anchored.length).toBeGreaterThanOrEqual(10)
   // The P0 contract: every passage carries its concept pointers as an array.

@@ -87,7 +87,7 @@ async function recordEvent(
   userId: string,
   courseId: string | null,
   kind: string,
-  entityType: "concept" | "byte" | "edge" | "graph" | "map" | "cloth",
+  entityType: "concept" | "passage" | "edge" | "graph" | "map" | "cloth",
   entityId: string | null,
   payload?: Record<string, unknown>
 ) {
@@ -425,7 +425,7 @@ export async function createPassage(data: { conceptIds?: string[], source: strin
 
   // passage.capture fires for every capture, named or not — the Log is complete
   // (JC Aug 7 / P0.6). passage.create remains only as a historical kind.
-  await recordEvent(userId, courseId, "byte.capture", "byte", passageId, {
+  await recordEvent(userId, courseId, "passage.capture", "passage", passageId, {
     conceptIds,
     source: data.source,
     location: data.location,
@@ -463,7 +463,7 @@ export async function refilePassage(passageId: string, conceptId: string) {
 
   await db.insert(passageConcepts).values({ passageId, conceptId })
 
-  await recordEvent(userId, courseId, "byte.refile", "byte", passageId, {
+  await recordEvent(userId, courseId, "passage.refile", "passage", passageId, {
     conceptId,
     source: src.source,
   })
@@ -539,7 +539,7 @@ export async function unfilePassage(passageId: string, conceptId: string) {
     .where(and(eq(passageConcepts.passageId, passageId), eq(passageConcepts.conceptId, conceptId)))
     .returning({ conceptId: passageConcepts.conceptId })
   if (removed.length > 0) {
-    await recordEvent(userId, courseId, "byte.unfile", "byte", passageId, { conceptId })
+    await recordEvent(userId, courseId, "passage.unfile", "passage", passageId, { conceptId })
   }
 }
 
@@ -575,7 +575,7 @@ export async function attributePassages(passageIds: string[], sourceId: string) 
     .returning({ id: passages.id })
 
   if (updated.length) {
-    await recordEvent(userId, courseId, "byte.attribute", "byte", null, {
+    await recordEvent(userId, courseId, "passage.attribute", "passage", null, {
       sourceId,
       count: updated.length,
     })
@@ -595,7 +595,7 @@ export async function deletePassage(id: string) {
     .where(and(eq(passages.id, id), eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
     .returning({ id: passages.id })
   if (removed.length > 0) {
-    await recordEvent(userId, courseId, "byte.delete", "byte", id, {
+    await recordEvent(userId, courseId, "passage.delete", "passage", id, {
       conceptIds: pointers.map((r) => r.conceptId),
     })
   }
@@ -845,7 +845,7 @@ export async function getGraphEvents(): Promise<GraphEvent[]> {
 
   const covered = new Set(
     recorded
-      .filter((e) => e.kind.endsWith(".create") || e.kind === "byte.capture" || e.kind === "edge.throw" || e.kind === "byte.refile")
+      .filter((e) => e.kind.endsWith(".create") || e.kind === "passage.capture" || e.kind === "edge.throw" || e.kind === "passage.refile")
       .map((e) => e.entityId)
   )
   // Rows born inside an import/example land in that event's snapshot; don't
@@ -875,7 +875,7 @@ export async function getGraphEvents(): Promise<GraphEvent[]> {
   )
   userPassages.filter((b) => !covered.has(b.id)).forEach((b) =>
     synthesized.push({
-      id: `synth-b-${b.id}`, userId, courseId, kind: "byte.create", entityType: "byte",
+      id: `synth-b-${b.id}`, userId, courseId, kind: "passage.create", entityType: "passage",
       entityId: b.id, payload: { source: b.source, synthesized: true }, at: b.createdAt,
     })
   )
