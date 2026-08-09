@@ -130,7 +130,15 @@ async function peersOf(
         eq(courseMemberships.courseId, viewer.courseId),
         isNull(courseMemberships.removedAt),
         ne(courseMemberships.userId, viewer.userId),
-        ne(courseMemberships.role, "FACULTY"),
+        // Peers are LEARNERS — stated positively, because stating it as
+        // "not FACULTY" left a hole. `enrolInvitedCourses` writes
+        // `INSTRUCTOR` for an admin who joins by invitation (auth.ts), and
+        // INSTRUCTOR is not FACULTY, so an admin's own captures were being
+        // counted as a peer in both bands — which is exactly decision 4 above,
+        // in the words of the comment: "an exemplar cloth read as 'your
+        // cohort' would be the instructor pre-coding the text". A positive
+        // match cannot rot the same way when another role string appears.
+        eq(courseMemberships.role, "LEARNER"),
         ...(band === "section" ? [eq(courseMemberships.sectionId, section!)] : [])
       )
     )

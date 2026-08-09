@@ -320,6 +320,17 @@ export async function createByte(data: { conceptIds?: string[], source: string, 
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
+  // The same check `attributeBytes` makes below, for the same reason — this is
+  // the door it was left open beside. `sourceId` arrives from the client, and
+  // the only thing that stopped it naming a reading the student was never
+  // entitled to see (a staged one, or another student's private upload) was
+  // that the UI offers nothing else. A Server Function is callable directly, so
+  // "the UI would not do that" is not a gate: without this, a passage could be
+  // filed against such a reading and pull its title into the graph and the
+  // export. Only when a sourceId is claimed — a hand capture with none is a
+  // legal, unattributed passage (P0.1).
+  if (data.sourceId) await authorizeSourceAccess(data.sourceId)
+
   let startOffset = data.startOffset
   let endOffset = data.endOffset
   let pageContentHash = data.pageContentHash
