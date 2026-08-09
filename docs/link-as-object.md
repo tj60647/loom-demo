@@ -54,6 +54,41 @@ the pair it joins — because a Label with no Link has nowhere to live.
 objects**) and Link Labels". Concepts are full objects. Link Labels are grouped
 strings.
 
+## 2b. The UI already has pre-existing Links — it just cannot store them
+
+TJ, 2026-08-09: *"the UI includes sample links that don't know what the
+concepts to be linked are, correct? The idea of pre-existing links is there."*
+
+Correct, and it predates this discussion. Coining a label offers **two rows of
+links with no Concepts attached**:
+
+- `PLAIN_VERBS` (`ThrowTab.tsx:11`) — six app-supplied verbs: *leads to ·
+  depends on · is part of · goes against · is the same as · sets up*.
+- **"Labels you have coined before"** — the student's own, added 2026-08-09.
+
+Both are presented as *a vocabulary you pick from before any pair is settled*,
+which is the Link-as-object affordance exactly. But tapping one runs
+`pickWord(word)` → `setNameDraft(word)`: it **copies a string into a text
+field**. There is no identity behind the chip, and `handleSaveName` writes that
+text into `edge.handle`.
+
+Three consequences, and they are the strongest part of the argument:
+
+1. **This makes the change a formalisation, not a new abstraction.** The main
+   risk in a model change is inventing a concept the users do not have. This one
+   is already on screen — a pre-existing link, unattached to Concepts, that you
+   reach for and apply. Only the storage is missing.
+2. **What is missing today is precisely the Link Description.** Six verbs
+   offered with no gloss anywhere. A student taps "leads to" with no account of
+   what it means — and "leads to" is the exact verb that gets used for both
+   causation and mere sequence. The field §3 proposes is the hole in what has
+   already shipped.
+3. **Copy-by-string is why the vocabulary cannot be trusted.** Two uses of
+   "leads to" are unrelated rows coinciding only by a `lower(handle)` match, so
+   *"leads to"*, *"lead to"* and *"leads to "* are three separate entries in the
+   Link List, silently. That is the same failure `mergeConcepts` repairs on the
+   noun side, happening today on the verb side with nothing to repair it.
+
 ## 3. The proposal (TJ, 2026-08-09)
 
 > *"A Thread is Concept–Link–Concept, and it contains the references, correct?
@@ -186,10 +221,15 @@ on 2026-08-09 is correct under the current model.
 
 ## 8. Open
 
-- **Does a Link belong to the User or to the Course?** Concepts are User-level.
-  A course-supplied starter vocabulary (the six `PLAIN_VERBS` in `ThrowTab`
-  today) would argue for a course-level or seeded tier. Out of scope until
-  asked for, but it is the obvious next question.
+- **Does a Link belong to the User, the Course, or the app?** Concepts are
+  User-level. `PLAIN_VERBS` is none of those three today — it is **hardcoded in
+  a component** (§2b), which is why the question has never had to be answered.
+  Under the object model it does: the six starters become seeded Links, and the
+  choice is between a shared read-only tier and **a per-user copy at first
+  use**. Per-user fits everything else — Concepts are User-level, merge operates
+  at user level, and a student who can write their own gloss on "leads to" is
+  doing the exact work this change exists to enable. A read-only tier cannot be
+  glossed, which forfeits most of the value.
 - **Do Links get recurrence designations** the way Concepts do (distinct
   Readings evidencing it)? A Link's Threads span Cloths, so the number exists.
   Whether it is worth showing is a judgement about what it would teach.
