@@ -500,6 +500,32 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
     </>
   )
 
+  /**
+   * The three kinds a Concept can be, relative to THIS reading (TJ,
+   * 2026-08-09). `scope.ts` already computes them — `evidenced` (a passage
+   * here) and `hasByte` (a passage anywhere) — but `isIn` buckets the first
+   * and third together, because both belong in this reading's warp and both
+   * are linkable here. That is right for scoping and under-drawn for reading:
+   * one is evidence you hold, the other is a name you are carrying.
+   *
+   * KINDS, NEVER STAGES. Nothing here is further along than anything else, and
+   * the transitions run every direction: name-then-find is 3→1, unfiling the
+   * only passage is 1→3, finding it in a second text is 2→1, unfiling it here
+   * while it survives elsewhere is 1→2. So: no order implied, no counting of
+   * one against another, no "yet" in a heading. "No evidence" is the model's
+   * own word for the third, and it is "a designation, never a warning".
+   *
+   * A concept in `scoped.concepts` with no passage HERE can only be one with
+   * no passage anywhere — anything evidenced elsewhere is in `scoped.outside`
+   * by construction — so the split below needs no extra query.
+   */
+  const here = sortedByLabel(scoped.concepts).filter(c =>
+    scoped.bytes.some(b => b.conceptIds.includes(c.id))
+  )
+  const namedOnly = sortedByLabel(scoped.concepts).filter(c =>
+    !scoped.bytes.some(b => b.conceptIds.includes(c.id))
+  )
+
   const logCard = (
       <div className="card">
         {/* In the sheet, the panel's own head bar IS this heading — see
@@ -528,7 +554,19 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
               <span className="cap">your work fills as you lay warp</span>
             </div>
           )}
-          {sortedByLabel(scoped.concepts).map(concept => {
+          {/* Three kinds, never three steps (TJ, 2026-08-09). Headings say what
+              a concept IS relative to this reading, not how far along it is —
+              see the note above `here`. A group with nothing in it is not
+              drawn, so an empty heading never implies a gap to fill. */}
+          {([
+            ["here", "In this reading", here],
+            // The model's own word for the third, and its own ruling about it:
+            // "No evidence is a designation, never a warning to act on."
+            ["named", "No evidence", namedOnly],
+          ] as const).map(([key, heading, group]) => group.length === 0 ? null : (
+          <div key={key}>
+          <div className="lgroup">{heading}</div>
+          {group.map(concept => {
             const isOpen = openLogRows[concept.id]
             // This reading's evidence for the concept. A concept met in an
             // earlier text keeps that evidence — it is counted below rather
@@ -545,10 +583,16 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
                     opened row next to "remove byte", labelled, as in v14. */}
                 <div className="lhead" onClick={() => toggleRow(concept.id)} style={{ display: "flex", alignItems: "center" }}>
                   <div className="lconcept" style={{flex: 1}}>{concept.label}</div>
-                  <div className="lsrc">
-                    {conceptBytes.length} passage{conceptBytes.length !== 1 ? "s" : ""}
-                    {elsewhere ? ` · ${elsewhere} elsewhere` : ""}
-                  </div>
+                  {/* No "0 passages" under a heading that already reads NO
+                      EVIDENCE: it says the same thing twice, and the zero is
+                      the more judgemental of the two. A count belongs where
+                      there is something to count. */}
+                  {(conceptBytes.length > 0 || elsewhere > 0) && (
+                    <div className="lsrc">
+                      {conceptBytes.length} passage{conceptBytes.length !== 1 ? "s" : ""}
+                      {elsewhere ? ` · ${elsewhere} elsewhere` : ""}
+                    </div>
+                  )}
                 </div>
                 {isOpen && (
                   <div className="lbody">
@@ -668,22 +712,34 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled, compa
               </div>
             )
           })}
+          </div>
+          ))}
+
+          {/* The third kind. Lighter than the other two on purpose: these are
+              not in this reading's warp — you cannot link them here until a
+              passage brings them in — so they are context rather than work.
+              But they are NAMED now, where this used to be a bare count: the
+              whole point of the group is scanning what you are looking for
+              while you read. */}
+          {scoped.outside.length > 0 && (
+            <>
+              <div className="lgroup">In your other readings</div>
+              {sortedByLabel(scoped.outside).map(c => (
+                <div key={c.id} className="lrow elsewhere">
+                  <div className="lhead" style={{ display: "flex", alignItems: "center" }}>
+                    <div className="lconcept" style={{ flex: 1 }}>{c.label}</div>
+                    <div className="lsrc">{readingsOf(c.id, state.bytes).map(titleOf).join(" · ")}</div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         {scoped.outside.length > 0 && (
           <p className="ghostnote" style={{ marginTop: "10px" }}>
-            {/* Explicit {" "}: JSX drops the literal space that follows an
-                expression at a line end, which read as "7 conceptsfrom". */}
-            {scoped.outside.length} concept{scoped.outside.length !== 1 ? "s" : ""}{" "}
-            from your other readings —
-            not hidden, just not evidenced here. Type one&apos;s name above to file a passage from this
-            reading under it{onGotoVocabulary ? <>, or <button type="button" className="linkish" onClick={onGotoVocabulary}>see them all in Vocabulary</button></> : null}.
-            {/* Vocabulary, not "your whole weave" (TJ, 2026-08-09): that link
-                went to /weave, which v1 does not support. Vocabulary is the
-                right home anyway — the model has it UNSCOPED, "the User's
-                holdings ... every Concept and Link Label across all readings",
-                so it answers "show me the others" exactly, and it is reachable
-                without leaving this text. */}
+            Not hidden, just not evidenced here. Type one&apos;s name above to file a
+            passage from this reading under it{onGotoVocabulary ? <>, or <button type="button" className="linkish" onClick={onGotoVocabulary}>see them all in Vocabulary</button></> : null}.
           </p>
         )}
 

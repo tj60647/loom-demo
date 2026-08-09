@@ -60,8 +60,16 @@ export default function CardMenu({
         the passages behind it{bytes.length ? ` (${bytes.length})` : ""}
       </span>
       {bytes.length === 0 ? (
-        <p className="ghostnote" style={{ color: "var(--red)" }}>
-          No evidence — every concept should trace to a passage.
+        /* The twin of the string fixed in VocabularyTab on 2026-08-09, and it
+           was still shipping here — on every card whose concept has no passage.
+           Two rules, not one: "no evidence" is a designation and never a
+           warning (red line 4; a Concept may precede its evidence, TJ
+           2026-08-08), AND var(--red) is declared RESERVED for "the one
+           selected thing" in globals.css, so using it as an alarm overloads
+           the single hue this design system keeps for selection. */
+        <p className="ghostnote">
+          No passage evidences this yet — you may have named it ahead of its
+          evidence, or its passages may have moved on.
         </p>
       ) : (
         bytes.slice(0, SHOWN).map((b) => (
