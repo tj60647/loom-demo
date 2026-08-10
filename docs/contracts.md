@@ -17,7 +17,7 @@
 > invitations enrolling as FACULTY. **P3.13 landed**: reading cards carry the
 > cloth badge + Create/Open Cloth; Cloth Title/Description edit on 02 · Linking.
 > **P3.14 landed** (ruling 28): student Overlays — the Passages heatmap in the
-> Reading tab and the Concepts/Links comparison on 03 · Vocabulary, at Section
+> Reading tab and the Concepts/Links comparison on 04 · Vocabulary, at Section
 > and Cohort only, gated per reading on having coded it yourself.
 > **P3 is complete.** Update the invariant, then this file, as each phase lands.
 > **Shelf bounce fixed** (2026-08-07 late): client components no longer invoke
@@ -27,10 +27,13 @@
 > **Faculty walked through a browser** (2026-08-08): `tests/faculty.spec.ts` signs
 > in as a FACULTY membership for the first time; `/admin/library` gained the
 > `checkAdmin()` redirect it had been missing (§2c).
-> **Station 03 reconciled to the model** (2026-08-08, TJ): 03 · Vocabulary is now
+> **The Vocabulary station reconciled to the model** (2026-08-08, TJ): it is now
 > the User's holdings (`VocabularyTab` — concepts, link labels, merge); the cloth
-> prompts and the duplicate read editor moved to 04 (`ClothReflection`). See
-> §2b-ii.
+> prompts and the duplicate read editor moved to the Knowledge Graph
+> (`ClothReflection`). See §2b-ii. *(This landed as "03 Vocabulary / 04 Knowledge
+> Graph" and the two were **swapped later the same day** — see the 03/04 entry
+> below. Named rather than numbered here, because that is the pair of numbers
+> that moved.)*
 > **Workflows tab** (2026-08-08): `/admin/workflows` draws the student, faculty
 > and admin flows from `src/lib/workflows.ts`. **Refactor a workflow, update that
 > file** — §2c-ii, enforced by `npm run check`.
@@ -374,8 +377,8 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | — | `JourneyNav` · `.staffgroup` | **the staff group, right of the journey, in sage** (TJ, 2026-08-09) — Roster · Cohort Graph for FACULTY, plus Readings · Courses for site ADMIN, on **every** surface including `/admin`. Unnumbered: they are not steps on the student's arc. Replaces `AdminNav`'s tab row, which now holds only the course/section pickers. Drawn from `course.isStaff` / `course.isAdmin`; decides what is drawn, never what may be read |
 | **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** as **Your work** (`#yourwork`), a sheet that slides over the text — closed by default, toggled from the viewer toolbar, and mounted *inside* `.pdf-shell` so it survives fullscreen; and the **Cloth Title/Description** at the head of that sheet |
 | 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Carries `ClothFold` **only at the whole weave**, which has no Reading station — and, since nothing links to `/weave`, **no student can reach that branch**, so the whole-weave Cloth's only editor is currently unreachable |
-| **03 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); **merge Concepts — its only home**; Concepts/Links Overlays |
-| 04 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, card table; the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); the Capture Log history at the whole weave (`HistoryPanel` — since 2026-08-09 the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**) |
+| 03 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, card table; the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); the Capture Log history at the whole weave (`HistoryPanel` — since 2026-08-09 the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**) |
+| **04 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); **merge Concepts — its only home**; Concepts/Links Overlays |
 | ~~05 Weave~~ | `/weave` | **hidden from the journey, and with no door at all.** The 08-08 row here said "The route still works and Keep links to it, so whole-weave projections are not stranded" — **the second clause was false.** Keep never linked to it; verified 2026-08-09 by grepping every `/weave` in the repo. The only remaining references are `JourneyNav`'s three dead `DEFAULT_HREF`s (their stations are greyed, so never read) and `ShelfSearch`'s three hits. So the whole-weave Cloth, the whole-weave Projections, and the last route to an untethered Passage have all been unreachable since the station was hidden. **TJ, 2026-08-09: the whole-weave path is unresolved** — cloth collaboration and the Quilt are both wanted, but "the ambiguity about how they manifest should not inform the current design", and "the whole weave will only confuse things in this moment". Nothing is to be built for it on a guess |
 | 05 Keep | `KeepTab` (`/keep`) | export/import/reset — ratified as a deviation from the model's five (D4) — **and the Capture Log** (`HistoryPanel`), moved here from the whole weave because that was its only render AND no export contains `graphEvents`, so withdrawing `/weave` would have made it unreachable and unkeepable at once (red line 5). **TJ, 2026-08-09: Keep is "more about the student library or cloth collection" than a whole weave** — so it is not the whole weave's home, and the "every reading at once" framing is what that ruling narrows |
 
@@ -392,7 +395,7 @@ foot of Your work — label **and** optional gloss — and flagged "no
 evidence" there, in the Linking warp, and in the cloth prompts.
 
 Scoping is the load-bearing distinction: **01 Reading's Your work is this
-reading's captures; 03 Vocabulary is everything you own.** A concept does not
+reading's captures; 04 Vocabulary is everything you own.** A concept does not
 belong to a reading — a passage does — so the holdings render identically
 inside a reading and at the whole weave. The Overlay alone stays reading-gated.
 

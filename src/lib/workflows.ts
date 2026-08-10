@@ -79,10 +79,17 @@ const student: Flow = {
     { id: "capture", label: "Highlight a passage", where: "01 · Reading" },
     { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — Your work, slid out over the text" },
     { id: "link", label: "Pick two concepts, say the sentence, coin a label", where: "02 · Linking" },
-    { id: "vocab", label: "Sharpen descriptions, merge duplicates", where: "04 · Vocabulary" },
-    { id: "overlay", label: "Compare a section, or all of them", where: "Overlays — faculty and admins only" },
+    // 03 before 04, in the array and in the edges below. Stations 03 and 04
+    // were swapped on 2026-08-08 (TJ) — "you lay the graph out and read it, and
+    // the vocabulary you have collected is what you check afterwards" — and the
+    // rule that came with it is that student copy FOLLOWS THE BAR, which
+    // numbers itself. This flow did not: it ran link → vocab → sort, so the
+    // picture drew an arrow from a node labelled "04 · Vocabulary" into one
+    // labelled "03 · Knowledge Graph" and the numbers ran backwards on screen.
     { id: "sort", label: "Sort into tiers, arrange the cards", where: "03 · Knowledge Graph" },
     { id: "write", label: "Trace the prompts, write the one-line and the read", where: "03 · Knowledge Graph" },
+    { id: "vocab", label: "Sharpen descriptions, merge duplicates", where: "04 · Vocabulary" },
+    { id: "overlay", label: "Compare a section, or all of them", where: "Overlays — faculty and admins only" },
     // There used to be a "weave" node here, labelled "Every reading at once"
     // and sited at "/weave — station hidden, reached from Keep". Both halves of
     // that were wrong: the station is hidden AND nothing links to `/weave`, from
@@ -105,12 +112,14 @@ const student: Flow = {
     { from: "capture", to: "file" },
     { from: "file", to: "capture", label: "another passage", back: true },
     { from: "file", to: "link" },
-    { from: "link", to: "vocab" },
-    { from: "vocab", to: "overlay" },
-    { from: "vocab", to: "sort" },
+    { from: "link", to: "sort" },
     { from: "sort", to: "write" },
-    { from: "write", to: "library", label: "next reading", back: true },
-    { from: "write", to: "keep" },
+    { from: "write", to: "vocab" },
+    { from: "vocab", to: "overlay" },
+    // The loop lives at the END of the arc now, not in the middle of it: you go
+    // back to the Library for the next text once this one's work is done.
+    { from: "vocab", to: "library", label: "next reading", back: true },
+    { from: "vocab", to: "keep" },
   ],
 }
 
