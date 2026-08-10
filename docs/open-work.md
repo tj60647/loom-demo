@@ -235,7 +235,50 @@ gaps are now demonstrable rather than suspected:
   row-ownership checks, and an export contract that can name more than one
   author. Ratified, not built, not urgent.
 - **5.4 Several modes of reading** inside 01 · Reading. Wanted (TJ), nothing
-  specified.
+  specified. **The first of the family landed 2026-08-09**: the margin cards —
+  page mode's "Cards" toggle draws every passage whose highlight is drawn on
+  the open spread as a read-only card beside its page (`ConceptRail.tsx`,
+  layout ported from the spread canvas the revert 41d5b50 took off master;
+  anchors come off the mark.js layer, so an unanchorable passage has no card
+  by design) — a mode of annotation
+  display rather than of page layout, recorded here so this item is not
+  re-scoped blind. The same pass gave the matrix a zoom that re-renders no
+  text layer (`PageRaster.tsx`). Ground rule for anything else from those
+  branches (TJ, 2026-08-09): **integrations honor the existing data structures
+  and workflows** — display-layer only; what would bend either goes here
+  instead of being built.
+- **5.5 "Spatial" — a prototype view of one reading's graph** (TJ, 2026-08-09:
+  *"put the spatial graph view on the pipeline, make it a prototype view"*).
+  From `origin/weekly-concept-map:weekly-concept-map/index.html` (the force
+  sim is lines 145-186). Settled now so the building session does not
+  re-litigate: read-only, **topology-only** force layout of the reading's own
+  concepts and links, a toggle beside the arc cloth in `ClothReflection.tsx`,
+  same props as `ClothMap` (`{state, readSel, setReadSel}`) so it drops in as
+  a sibling; port the sim into a pure, deterministic `src/lib/graphLayout.ts`
+  (`flowLayout.ts` is the hydration/determinism precedent), with edge-of-box
+  line trimming and a label declutter pass; geometry computed per render,
+  never persisted (red line #7). **The name is ratified: "Spatial"** — the
+  model doc reserves "Concept Map" for the external Figma artifact, so no
+  model change. `MapTab`'s "draw the real concept map (paper or Figma)" copy
+  retires only when this ships, and the replacement wording is TJ's. After it
+  ships: the same toggle on the faculty `CohortClothPanel` (attribution is
+  already legal there), no per-student pill coloring in v1.
+  **Still gated, recorded so nobody reopens them by accident:** the
+  class-quilt shared graphing
+  (`origin/weekly-concept-map:class-quilt/dist/index.html` — Rise up /
+  Connect up / shared layer / discussion) is the Quilt and co-authorship,
+  gated by Phase 1's ruling and `overlays.ts` decisions 0/2/3;
+  embedding-based placement is red line #6 territory (the prototypes
+  themselves shipped topology stand-ins); the spread canvas's inline
+  draft-card capture conflicts with the 2.1 invariant (one shared ReuseOffer
+  on all three capture paths); its freeform transform canvas and
+  counter-scaling zoom-out need the matrix rebuilt as a single-transform
+  canvas plus d3-zoom/d3-selection back in `package.json`; a weekly
+  multi-reading scope is representable today (`scopeOf(sourceIds[])`,
+  `source.week` exists) but is a new surface and needs its `workflows.ts` row
+  when designed. Recovery for all of it:
+  `git show origin/spread-canvas-reading:src/components/pdf/SpreadCanvas.tsx`
+  and the two `origin/weekly-concept-map` paths above.
 
 ---
 

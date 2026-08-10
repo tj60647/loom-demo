@@ -85,6 +85,25 @@
 > into one **Reading** station (text + capture rail); **05 Weave is hidden**
 > pending a decision, its route intact and linked from Keep; **Keep stays** as a
 > ratified deviation (D4). Six visible stations, numbered 00–05. See §2b-ii.
+> **The rocketcrane branches incorporated as display work** (2026-08-09, TJ:
+> "all integrations from rocketcrane need to honor the existing data structures
+> and workflows"). Two ideas from the reverted spread canvas (41d5b50) landed
+> inside the existing modes — no schema change, no new write path, no new
+> capture path. **Margin cards**: page mode's "Cards" toggle draws every
+> passage **whose highlight is drawn** on the open spread as a read-only card
+> beside its page — the rail reads the mark.js layer and never re-resolves
+> offsets, so a passage whose anchor is lost (fuzzy-match failure, cross-page
+> capture) has no mark and correctly gets no card; leader-lined to the span,
+> clicking through to Your work (closing Find on the way, the
+> shared-right-edge rule); geometry is derived per render and discarded (red
+> line #7; `src/lib/railLayout.ts`, asserted by `check:rail`). **Matrix zoom re-renders
+> nothing**: text layers render once at a zoom-independent base width
+> (`renderMode="none"` with our own `PageRaster` canvas beneath), the slider
+> is pure CSS transform, and visible pages re-raster sharper 200ms after the
+> gesture settles. The spread canvas itself stays retired — "two answers to
+> one question" was the objection, so its ideas joined the existing answer.
+> The weekly-concept-map branch's spatial view is **pipeline, not built**:
+> open-work.md 5.5.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
@@ -375,7 +394,7 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | — | **`src/lib/capabilities.ts`** | **the role/capability matrix** (TJ, 2026-08-09), rendered on `/workflows` under the flows. The file IS the matrix: every row names the **server gate that refuses**, and `check-workflows.ts` asserts the file exists and the symbol is still in it — a rename fails the build rather than leaving a confident, wrong table. `gate.line` deliberately unasserted. Deriving it found and fixed two holes: `peersOf` excluded `FACULTY` but not `INSTRUCTOR` (an admin's captures counted as a peer), and `createPassage` never authorized its `sourceId` while `attributePassages` did |
 | — | **`src/lib/viewAs.ts`** · `viewAsServer.ts` | **View as student** (TJ, 2026-08-09) — a lens beside the header pill. A **cookie**, because three differences are decided server-side and a client flag could not reach them: `/workflows` (three flows vs one), the Library query (an admin's shelf carries `isVisible=false` rows), and `getActiveCourse` itself. Masked **once**, in `getActiveCourse`, so every `isStaff`/`isAdmin` consumer goes quiet together; `staffTruly` rides along **unmasked for one purpose only** — drawing the control that takes the lens off. **Withholds, never grants**: every use hides a control or NARROWS a query, and no authorization path consults it (`authorizeSourceAccess` deliberately untouched). Not a security boundary |
 | — | `JourneyNav` · `.staffgroup` | **the staff group, right of the journey, in sage** (TJ, 2026-08-09) — Roster · Cohort Graph for FACULTY, plus Readings · Courses for site ADMIN, on **every** surface including `/admin`. Unnumbered: they are not steps on the student's arc. Replaces `AdminNav`'s tab row, which now holds only the course/section pickers. Drawn from `course.isStaff` / `course.isAdmin`; decides what is drawn, never what may be read |
-| **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** as **Your work** (`#yourwork`), a sheet that slides over the text — closed by default, toggled from the viewer toolbar, and mounted *inside* `.pdf-shell` so it survives fullscreen; and the **Cloth Title/Description** at the head of that sheet |
+| **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** as **Your work** (`#yourwork`), a sheet that slides over the text — closed by default, toggled from the viewer toolbar, and mounted *inside* `.pdf-shell` so it survives fullscreen; the **Cloth Title/Description** at the head of that sheet; **the margin cards** (2026-08-09, from the reverted spread canvas) — page mode's "Cards" toggle, `ConceptRails`: read-only cards beside each page, leader-lined to their highlights, a door to Your work and never an editor, rails and cards `user-select:none` so a stray drag cannot file text to the wrong page; and **a matrix that zooms as pure transform** (`PageRaster` under a once-rendered text layer), visible pages re-rastering after the gesture settles |
 | 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Carries `ClothFold` **only at the whole weave**, which has no Reading station — and, since nothing links to `/weave`, **no student can reach that branch**, so the whole-weave Cloth's only editor is currently unreachable |
 | 03 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, card table; the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); the Capture Log history at the whole weave (`HistoryPanel` — since 2026-08-09 the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**) |
 | **04 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); **merge Concepts — its only home**; Concepts/Links Overlays |

@@ -5,6 +5,8 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import CaptureModal, { type CaptureReuse } from './CaptureModal';
 import PageSlot from './PageSlot';
+import { type PdfDoc } from './PageRaster';
+import ConceptRails, { RAIL_W } from './ConceptRail';
 import ReuseOffer from '@/components/ui/ReuseOffer';
 import { useLoom } from '@/components/providers/LoomProvider';
 import { useReadings } from '@/components/providers/ReadingsProvider';
@@ -101,10 +103,21 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * passage can be selected and captured in any of them.
    */
   const [viewMode, setViewMode] = useState<"page" | "strip" | "matrix">("page");
+  /**
+   * Margin cards (the spread canvas's rail, page mode only): each passage on
+   * the open spread drawn as a card beside its page. Off by default and not
+   * persisted — the same standing as viewMode itself.
+   */
+  const [railsOn, setRailsOn] = useState(false);
   // Covers the whole window, chrome included — the reading takes the screen.
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Matrix zoom, as a multiple of the base thumbnail width.
   const [zoom, setZoom] = useState(1);
+  // The pdf.js document proxy (set on load) and each matrix page's raster
+  // resolution target. Pages absent from the map sit at base resolution;
+  // targets are recomputed only when a zoom or scroll gesture settles.
+  const [pdfProxy, setPdfProxy] = useState<PdfDoc | null>(null);
+  const [pageRes, setPageRes] = useState<Record<number, number>>({});
   // The document's height/width, measured off the first page that renders, so
   // the many-page views can reserve honest space before a page has drawn.
   const [aspect, setAspect] = useState(11 / 8.5);
@@ -496,8 +509,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [hideHighlightTooltip]);
 
-  function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
-    setNumPages(numPages);
+  function onDocumentLoadSuccess(pdf: PdfDoc): void {
+    setNumPages(pdf.numPages);
+    // The proxy itself, kept for the matrix's raster path: PageRaster renders
+    // straight off pdf.js, so zooming re-rasters pages without touching the
+    // react-pdf tree that owns the text layers.
+    setPdfProxy(pdf);
   }
 
   // Keep passagesRef current (declared above, next to conceptsRef) so the
@@ -590,6 +607,18 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     setSearchQuery("");
     resetSearchResults();
   }, [resetSearchResults]);
+
+  /**
+   * The doors that jump straight to a passage's row in Your work — the margin
+   * cards and the capture toast. They must close Find on the way, the same
+   * rule requestToggleWork enforces: the sheet and the search panel share the
+   * right edge, and whichever sits underneath is open, invisible, and eats
+   * the first Escape.
+   */
+  const gotoOpenPassage = useCallback((passageId: string) => {
+    if (searchOpen) closeSearch();
+    onGotoOpenPassage?.(passageId);
+  }, [searchOpen, closeSearch, onGotoOpenPassage]);
 
   /**
    * Every way of opening or closing Your work goes through here: the toolbar
@@ -990,17 +1019,91 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     Math.max(((stage.w - 36) / matrixColumns - 18) * zoom, 90),
     Math.max(stage.w * 2, 300)
   );
+  // The zoom-independent width the matrix text layers render at — the same
+  // formula at zoom 1. The slider then only changes the slot's footprint and
+  // a CSS transform (footprint ÷ base), so dragging it re-renders nothing;
+  // sharpness comes back through the raster below, after the gesture settles.
+  const matrixBaseWidth = Math.min(
+    Math.max((stage.w - 36) / matrixColumns - 18, 90),
+    Math.max(stage.w * 2, 300)
+  );
+
+  /**
+   * Re-target raster resolutions once the matrix stops moving (zoom drag or
+   * scroll), the spread canvas's settle pattern: pages intersecting the stage
+   * plus half a page of margin get resolution matching the zoom; everything
+   * else drops back to base and its raster CSS-stretches in the interim.
+   * Cap 8, not the branch's 12 — this zoom tops out at 4× and dpr at ~2.
+   */
+  useEffect(() => {
+    // Only the matrix reads pageRes; a stale map from the last visit costs
+    // nothing and the first settle below replaces it anyway.
+    if (viewMode !== "matrix") return;
+    const stageNode = stageRef.current;
+    if (!stageNode) return;
+    let timer: number | undefined;
+    const retarget = () => {
+      const box = stageNode.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const target = Math.max(1, Math.min(8, Math.ceil(zoom * dpr * 2) / 2));
+      const margin = matrixPageWidth / 2;
+      const next: Record<number, number> = {};
+      if (target > 1) {
+        stageNode.querySelectorAll<HTMLElement>("[data-slot-page]").forEach((el) => {
+          const r = el.getBoundingClientRect();
+          const inView =
+            r.left < box.right + margin && r.right > box.left - margin &&
+            r.top < box.bottom + margin && r.bottom > box.top - margin;
+          if (inView) next[Number(el.dataset.slotPage)] = target;
+        });
+      }
+      setPageRes((prev) => {
+        const nk = Object.keys(next);
+        if (Object.keys(prev).length === nk.length && nk.every((k) => prev[+k] === next[+k])) return prev;
+        return next;
+      });
+    };
+    const schedule = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(retarget, 200);
+    };
+    schedule();
+    stageNode.addEventListener("scroll", schedule, { passive: true });
+    return () => {
+      window.clearTimeout(timer);
+      stageNode.removeEventListener("scroll", schedule);
+    };
+  }, [viewMode, zoom, matrixPageWidth, stageEl]);
 
   // Calculate page dimensions based on fit mode
   // What the toggle carries when the sheet is shut. Cheap and permanent, and
   // it answers "did that save?" without opening anything.
   const workCount = scoped.passages.length;
 
+  // The margin cards take real width beside the pages; fit-to-width hands it
+  // to them here so the spread still fits without a sideways scroll. Fit-page
+  // is left alone — height is unaffected, and "safe center" already lets an
+  // overflowing spread scroll rather than clipping its start edge.
+  const railSpace = railsOn && !isNarrow && viewMode === "page"
+    ? (isTwoPage ? 2 : 1) * (RAIL_W + 12)
+    : 0;
+
   const calcPageProps = () => {
     if (fitMode === "height") {
       // The stage is the real estate; the padding around the pages is the only
       // thing taken off it, so "fit page" genuinely fills the height available.
-      return { height: Math.max(320, stage.h - (isNarrow ? 24 : 48)) };
+      const fitH = Math.max(320, stage.h - (isNarrow ? 24 : 48));
+      if (railSpace > 0) {
+        // With the cards out, width binds too: a height-fit spread plus two
+        // rails would hang the right rail past the stage edge — reachable by
+        // scroll, but reading as clipped. Smaller pages beside visible cards
+        // beat full pages beside a card you have to go looking for.
+        const perPage = isTwoPage
+          ? (containerWidth - 248 - railSpace) / 2
+          : containerWidth - (isNarrow ? 56 : 228) - railSpace;
+        return { height: Math.max(320, Math.min(fitH, perPage * aspect)) };
+      }
+      return { height: fitH };
     } else {
       // fit to width
       // Non-page horizontal space:
@@ -1008,10 +1111,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       const nonPageSpace = isNarrow ? 56 : 228;
       if (isTwoPage) {
         // Plus 20px gap between the two pages = 248px total non-page space
-        const targetWidth = (containerWidth - 248) / 2;
+        const targetWidth = (containerWidth - 248 - railSpace) / 2;
         return { width: Math.max(targetWidth, 200) };
       } else {
-        const targetWidth = containerWidth - nonPageSpace;
+        const targetWidth = containerWidth - nonPageSpace - railSpace;
         return { width: Math.max(targetWidth, 200) };
       }
     }
@@ -1335,6 +1438,19 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           gap: 18px;
           padding: 18px;
         }
+        /* The matrix raster path: our canvas below, react-pdf's text layer
+           laid absolutely over it — the Page div itself paints nothing. The
+           scale wrapper clips to the slot's zoomed footprint so the transform
+           never bleeds into a neighbouring cell. */
+        .pdf-slot-scale { overflow: hidden; }
+        .pdf-slot-inner { position: relative; background: #fff; }
+        .pdf-raster { display: block; height: auto; }
+        .pdf-slot-inner .react-pdf__Page {
+          position: absolute;
+          inset: 0;
+          background: transparent;
+        }
+
         /* Reserved space for a page that has not drawn yet: the same footprint
            the page will take, so the scrollbar never lies and nothing jumps. */
         .pdf-slot-holder {
@@ -1387,6 +1503,69 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           .pdf-toolbar > div { flex: 0 0 auto; }
           .pdf-toolbar .btn.mini { padding: 6px 8px; min-height: 34px; font-size: 10px; }
           .pdf-modes button { padding: 6px 8px; min-height: 34px; }
+        }
+
+        /* The margin cards (page mode). The wrapper is the spread plus its
+           rails: rails sit IN FLOW beside the pages — absolute children off a
+           scroll container's start edge can never be scrolled to — and the
+           leader lines paint over the whole group from one absolute SVG. */
+        .pdf-spread-wrap {
+          display: flex;
+          align-items: stretch;
+          gap: 12px;
+          position: relative;
+        }
+        .pdf-rail {
+          position: relative;
+          width: 220px;
+          flex: 0 0 220px;
+          /* Not selectable: it sits beside the page, so a drag that starts
+             here anchors outside every page — same hazard as .pdf-slot-label,
+             and the card text would land inside the captured passage. */
+          user-select: none;
+          -webkit-user-select: none;
+        }
+        .pdf-rail-leaders {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          overflow: visible;
+        }
+        .pdf-rail-leaders path {
+          stroke: rgba(255, 204, 0, 0.8);
+          stroke-width: 1.5;
+          fill: none;
+        }
+        .pdf-railcard {
+          position: absolute;
+          left: 0;
+          right: 0;
+          background: var(--paper);
+          border: 1px solid var(--rule);
+          border-left: 3px solid rgba(255, 204, 0, 0.8);
+          border-radius: 4px;
+          padding: 8px 10px;
+          cursor: pointer;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        .pdf-railcard:hover, .pdf-railcard:focus-visible {
+          border-color: var(--ink-soft);
+        }
+        .pdf-railcard-label { font-weight: 600; font-size: 13px; }
+        .pdf-railcard-label.unlabeled {
+          font-style: italic;
+          font-weight: 400;
+          color: var(--ink-soft);
+        }
+        .pdf-railcard-def { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+        .pdf-railcard-note { font-size: 11px; font-style: italic; color: var(--ink-soft); margin-top: 4px; }
+        .pdf-railcard-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+        .pdf-railcard-chip {
+          font-family: var(--mono);
+          font-size: 10px;
+          border: 1px solid var(--rule);
+          border-radius: 999px;
+          padding: 1px 7px;
         }
 
         .pdf-side-nav {
@@ -1534,6 +1713,18 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               />
               2-Page Spread
             </label>
+          )}
+
+          {/* The margin cards. A display toggle, not a mode: the pages, the
+              capture flow and the keyboard are exactly the paged view's. */}
+          {viewMode === "page" && !isNarrow && (
+            <button
+              className={`btn mini ${railsOn ? "" : "ghost"}`}
+              onClick={() => setRailsOn((on) => !on)}
+              aria-pressed={railsOn}
+              aria-label="Cards in the margin"
+              data-tip="your concepts beside the passages they came from"
+            >Cards</button>
           )}
 
           {/* Overlay (ruling 28) — a read-only comparison with a discussion
@@ -1748,25 +1939,33 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 </svg>
               </button>}
 
-              <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
-                <Page
-                  pageNumber={pageNumber}
-                  {...calcPageProps()}
-                  renderTextLayer={true}
-                  renderAnnotationLayer={true}
-                  className="pdf-page-shadow"
-                  onLoadSuccess={(page) => { if (page.originalWidth) setAspect(page.originalHeight / page.originalWidth) }}
-                />
-                {isTwoPage && pageNumber + 1 <= (numPages || 1) && (
+              <ConceptRails
+                enabled={railsOn && !isNarrow}
+                twoPage={isTwoPage && pageNumber + 1 <= (numPages || 1)}
+                passages={scoped.passages}
+                concepts={state.concepts}
+                onOpenPassage={gotoOpenPassage}
+              >
+                <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
                   <Page
-                    pageNumber={pageNumber + 1}
+                    pageNumber={pageNumber}
                     {...calcPageProps()}
                     renderTextLayer={true}
                     renderAnnotationLayer={true}
                     className="pdf-page-shadow"
+                    onLoadSuccess={(page) => { if (page.originalWidth) setAspect(page.originalHeight / page.originalWidth) }}
                   />
-                )}
-              </div>
+                  {isTwoPage && pageNumber + 1 <= (numPages || 1) && (
+                    <Page
+                      pageNumber={pageNumber + 1}
+                      {...calcPageProps()}
+                      renderTextLayer={true}
+                      renderAnnotationLayer={true}
+                      className="pdf-page-shadow"
+                    />
+                  )}
+                </div>
+              </ConceptRails>
 
               {!isNarrow && <button
                 className="pdf-side-nav"
@@ -1815,6 +2014,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   eager={i === 0}
                   onAspect={setAspect}
                   label
+                  pdf={pdfProxy}
+                  baseWidth={matrixBaseWidth}
+                  res={pageRes[i + 1] ?? 1}
                 />
               ))}
             </div>
@@ -1901,7 +2103,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               const target = captureToast.passageId;
               setCaptureToast(null);
               holdToast();
-              onGotoOpenPassage?.(target);
+              gotoOpenPassage(target);
             }}
           >
             In your work ›
