@@ -157,17 +157,49 @@ test("the student lens hides every staff surface, and gives a way back", async (
   await expect(staff).toHaveCount(4)
 })
 
-test("Workflows and Access keep the frame, and Access is staff only", async ({ page }) => {
+test("Workflows and Access wear Courses' shape, and Access is staff only", async ({ page }) => {
   // TJ, 2026-08-09: "the workflows tab should behave like the others, change
   // what is below, not replacing the frame." These used to be a bare <main>,
   // so reaching one from the bar made the bar itself disappear.
-  for (const route of ["/workflows", "/access"]) {
+  //
+  // The first fix over-corrected and this test held the over-correction in
+  // place: it required a `.scopebar` — a titled strip ABOVE the journey that no
+  // other staff surface has, so arriving at Workflows pushed the row you had
+  // just clicked in down the page. TJ, later the same day: "workflows and
+  // access tabs should not spawn a header above their row, they should behave
+  // more like courses and readings, but without a specific course."
+  //
+  // So the assertion is now the shape rather than the furniture: the journey
+  // survives, nothing sits above it, and the page names itself in the body the
+  // way `/admin/courses` does.
+  // The reference: where the journey sits on a staff page that has no header
+  // above it. Faculty cannot reach /admin/courses, so this reads Roster —
+  // same shell, same AdminLayout.
+  await page.goto("/admin")
+  const staffJourneyTop = (await page
+    .locator('nav[aria-label="The journey"]')
+    .boundingBox())!.y
+
+  for (const [route, heading] of [["/workflows", "Workflows"], ["/access", "Access"]]) {
     await page.goto(route)
-    await expect(page.locator('nav[aria-label="The journey"]'), `${route} keeps the journey`)
-      .toBeVisible({ timeout: 15_000 })
-    await expect(page.locator(".scopebar"), `${route} keeps the scopebar`).toBeVisible()
-    await expect(page.locator("footer"), `${route} keeps the footer`).toBeVisible()
+    const journey = page.locator('nav[aria-label="The journey"]')
+    await expect(journey, `${route} keeps the journey`).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator(".scopebar"), `${route} spawns no header above the journey`)
+      .toHaveCount(0)
+    await expect(
+      page.locator("main").getByRole("heading", { name: heading, level: 1 }),
+      `${route} names itself in the body, as Courses does`
+    ).toBeVisible()
+    // And nothing sits above it: the row lands at the same y as it does on
+    // Courses, so clicking Workflows does not push the row you clicked in down
+    // the page. Measured rather than counted — `.scopebar` is gone, but any
+    // future strip would show up here too. Tolerance of 1px for sub-pixel
+    // layout, not for a missing element: the old scopebar was ~50px tall.
+    const top = (await journey.boundingBox())!.y
+    expect(Math.abs(top - staffJourneyTop), `${route} puts nothing above the journey`)
+      .toBeLessThanOrEqual(1)
   }
+  await page.goto("/access")
   await expect(page.locator(".mtable")).toBeVisible()
   // The matrix left the workflows page when it became its own tab.
   await page.goto("/workflows")

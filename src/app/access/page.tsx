@@ -52,7 +52,6 @@ export default async function Page() {
     <MetaPage
       title="Access"
       meta="who can reach what, read off the code that enforces it"
-      foot="ASSERTED BY NPM RUN CHECK"
     >
       <RoleMatrix />
     </MetaPage>

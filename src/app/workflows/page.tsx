@@ -56,13 +56,18 @@ export default async function WorkflowsPage() {
     // briefly lived under these diagrams is its own tab now — Access.
     <MetaPage
       title="Workflows"
-      meta={isStaff ? "how each person moves through Loom" : "how you move through Loom"}
-      foot="GENERATED FROM THE CODE"
+      // The subtitle carries the specific line now. It used to sit in a
+      // scopebar above the journey and the paragraph below restated it; with
+      // the header gone (TJ, 2026-08-09) the two became adjacent and the
+      // repetition showed. The paragraph keeps only what the subtitle cannot.
+      meta={isStaff
+        ? "what each person does, in order, and where each step happens"
+        : "what you do in Loom, in order, and where each step happens"}
     >
       <p style={{ marginBottom: "20px" }}>
         {isStaff
-          ? "What each person does, in order, and where each step happens. Kept beside the code rather than in a drawing tool, so it can be corrected in the same commit that changes the thing."
-          : "What you do in Loom, in order, and where each step happens. Kept beside the code rather than in a drawing tool, so it stays true as the tool changes."}
+          ? "Kept beside the code rather than in a drawing tool, so it can be corrected in the same commit that changes the thing."
+          : "Kept beside the code rather than in a drawing tool, so it stays true as the tool changes."}
       </p>
       <WorkflowsBoard showAll={isStaff} />
     </MetaPage>
