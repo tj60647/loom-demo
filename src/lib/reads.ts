@@ -81,14 +81,18 @@ export function getActiveCourse(): Promise<ActiveCourse | null> {
   return readJson<ActiveCourse | null>("/api/course")
 }
 
-/** Search the shelf's readings — see searchReadings in src/actions/search.ts. */
-export function searchReadings(rawQuery: string): Promise<ReadingSearchHit[]> {
-  return readJson<ReadingSearchHit[]>(`/api/search/readings?q=${encodeURIComponent(rawQuery)}`)
+/** Search the shelf's readings — see searchReadings in src/actions/search.ts.
+    A sourceId narrows to that one reading (contextual scope, TJ 2026-08-10). */
+export function searchReadings(rawQuery: string, sourceId?: string): Promise<ReadingSearchHit[]> {
+  const scope = sourceId ? `&sourceId=${encodeURIComponent(sourceId)}` : ""
+  return readJson<ReadingSearchHit[]>(`/api/search/readings?q=${encodeURIComponent(rawQuery)}${scope}`)
 }
 
-/** Search the student's own holdings — see searchLoom in src/actions/search.ts. */
-export function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
-  return readJson<LoomSearchResult>(`/api/search/loom?q=${encodeURIComponent(rawQuery)}`)
+/** Search the student's own holdings — see searchLoom in src/actions/search.ts.
+    A sourceId narrows every group to that reading's slice. */
+export function searchLoom(rawQuery: string, sourceId?: string): Promise<LoomSearchResult> {
+  const scope = sourceId ? `&sourceId=${encodeURIComponent(sourceId)}` : ""
+  return readJson<LoomSearchResult>(`/api/search/loom?q=${encodeURIComponent(rawQuery)}${scope}`)
 }
 
 /** Search inside one reading — see searchReading in src/actions/search.ts. */

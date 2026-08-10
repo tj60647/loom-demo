@@ -49,6 +49,21 @@ the rule is the point, not the wording.
 
 ## Phase 1 — **05 Weave: ruled 2026-08-09, and the answer is "not now"**
 
+> **TJ, 2026-08-10 — the priority above this whole phase:** *"projections are
+> more urgent than weave. weave is only useful when we have many examples of
+> cloths and projections to work with. we have cloths. we need to work on
+> projections."* And on scope: *"spatial is not a centerpiece. there is a set
+> of basic projections, spatial is experimental and fairly unresolved, not
+> sure it will be useful."*
+>
+> So the weave decision is not merely "not now" — it is **behind the
+> projection work** in line: the basic projection views the model already
+> names (List · Hierarchical · Cards, of which only Cards is built) come
+> first, because the weave aggregates cloths and projections and there is
+> nothing to aggregate until projections exist in numbers. Weave-independent
+> projection fixes (the worked example minting its projection at scopeKey '')
+> are unblocked by this ruling.
+
 > **TJ, 2026-08-09:** *"the whole weave path is unresolved. i know we will want a
 > way for students to collaborate on a cloth, and there is an idea about a
 > quilt. **the ambiguity about how they manifest should not inform the current
@@ -256,8 +271,15 @@ gaps are now demonstrable rather than suspected:
   below. What remains unported from the spread canvas: the single/spread
   reading sub-modes with masks and snap (page mode already is the focused
   spread) and the inline draft-card capture (2.1 invariant).
-- **5.5 "Spatial" — a prototype view of one reading's graph** (TJ, 2026-08-09:
-  *"put the spatial graph view on the pipeline, make it a prototype view"*).
+- **5.5 "Spatial" — an EXPERIMENTAL projection view** (TJ, 2026-08-09: *"put
+  the spatial graph view on the pipeline, make it a prototype view"*;
+  reframed 2026-08-10: Spatial is a **view of a Projection** — the model's
+  "Views: List · Hierarchical · Cards · other" is the open set it joins —
+  but *"spatial is not a centerpiece … experimental and fairly unresolved,
+  not sure it will be useful."* The basic views come first; when Spatial is
+  built it is prototype-grade, per projection, behind the same view switcher.
+  The original cloth-side-toggle plan below is superseded on placement but
+  its technical notes stand.)
   From `origin/weekly-concept-map:weekly-concept-map/index.html` (the force
   sim is lines 145-186). Settled now so the building session does not
   re-litigate: read-only, **topology-only** force layout of the reading's own

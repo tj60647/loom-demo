@@ -18,11 +18,18 @@ import Snippet from "@/components/ui/Snippet"
 export default function ShelfSearch({
   onActiveChange,
   onClose,
+  sourceId,
 }: {
   /** True while a query is live and the results own the page. */
   onActiveChange: (active: boolean) => void
   /** Fold the search away — wired to Escape, mirroring the reading's panel. */
   onClose: () => void
+  /**
+   * Contextual scope (TJ, 2026-08-10): absent, this is the Library's search
+   * — the whole loom. Present, it is a reading's search — that reading's
+   * pages, cloth, projections, and the concepts, links and passages here.
+   */
+  sourceId?: string
 }) {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<ReadingSearchHit[] | null>(null)
@@ -58,7 +65,7 @@ export default function ShelfSearch({
       setBusy(true)
       // Readings and the student's own holdings, in parallel — one field,
       // results grouped by kind.
-      Promise.all([searchReadings(trimmed), searchLoom(trimmed)])
+      Promise.all([searchReadings(trimmed, sourceId), searchLoom(trimmed, sourceId)])
         .then(([hits, loom]) => {
           if (requestRef.current !== requestId) return
           setResults(hits)
@@ -74,7 +81,7 @@ export default function ShelfSearch({
         })
     }, 300)
     return () => window.clearTimeout(timer)
-  }, [query])
+  }, [query, sourceId])
 
   const active = query.trim().length >= 2
 
@@ -98,8 +105,10 @@ export default function ShelfSearch({
               onClose()
             }
           }}
-          placeholder='search your loom…'
-          aria-label="Search your loom — readings, cloths, concepts, link labels and passages"
+          placeholder={sourceId ? "search this reading…" : "search your loom…"}
+          aria-label={sourceId
+            ? "Search this reading — its pages, cloth, projections, concepts, links and passages"
+            : "Search your loom — readings, cloths, projections, concepts, link labels and passages"}
         />
       </div>
 
@@ -109,9 +118,14 @@ export default function ShelfSearch({
 
           {!error && results && results.length === 0 && !busy &&
             !loomResults?.concepts.length && !loomResults?.links.length &&
-            !loomResults?.passages.length && !loomResults?.cloths.length && (
+            !loomResults?.passages.length && !loomResults?.cloths.length &&
+            !loomResults?.projections.length && (
             <div className="empty">
-              <span className="cap">nothing in your loom matches that — readings, cloths, concepts, links or passages</span>
+              <span className="cap">
+                {sourceId
+                  ? "nothing in this reading matches that — pages, cloth, projections, concepts, links or passages"
+                  : "nothing in your loom matches that — readings, cloths, projections, concepts, links or passages"}
+              </span>
             </div>
           )}
 
@@ -177,11 +191,26 @@ export default function ShelfSearch({
               ))}
             </>
           )}
+          {!error && loomResults && loomResults.projections.length > 0 && (
+            <>
+              <span className="cap searchtally">your projections</span>
+              {loomResults.projections.map((hit) => (
+                // A projection lives on the Knowledge Graph of its reading.
+                <Link key={hit.id} href={`/reading/${hit.sourceId}?tab=map`} className="searchhit">
+                  <div className="searchhithead"><h3>{hit.name}</h3></div>
+                  <p className="searchsnip"><Snippet text={hit.snippet} /></p>
+                </Link>
+              ))}
+            </>
+          )}
           {!error && loomResults && loomResults.concepts.length > 0 && (
             <>
               <span className="cap searchtally">your concepts</span>
               {loomResults.concepts.map((hit) => (
-                <Link key={hit.id} href="/weave?tab=open" className="searchhit">
+                // In a reading, a concept hit stays in this workbench — the
+                // Vocabulary station. (The library-scope /weave door is a
+                // standing audit item, awaiting the weave ruling.)
+                <Link key={hit.id} href={sourceId ? `/reading/${sourceId}?tab=read` : "/weave?tab=open"} className="searchhit">
                   <div className="searchhithead"><h3>{hit.label}</h3></div>
                   <p className="searchsnip"><Snippet text={hit.snippet} /></p>
                 </Link>
@@ -192,7 +221,7 @@ export default function ShelfSearch({
             <>
               <span className="cap searchtally">your links</span>
               {loomResults.links.map((hit) => (
-                <Link key={hit.id} href="/weave?tab=throw" className="searchhit">
+                <Link key={hit.id} href={sourceId ? `/reading/${sourceId}?tab=throw` : "/weave?tab=throw"} className="searchhit">
                   <div className="searchhithead">
                     <h3>
                       {hit.fromLabel} —[{hit.handle || "…"}]→ {hit.toLabel}

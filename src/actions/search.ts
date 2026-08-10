@@ -83,7 +83,7 @@ function idList(ids: string[]): SQL {
  * that merely mentions the words, and among texts the best page wins, with a
  * small nudge for matching in many places.
  */
-export async function searchReadings(rawQuery: string): Promise<ReadingSearchHit[]> {
+export async function searchReadings(rawQuery: string, sourceId?: string | null): Promise<ReadingSearchHit[]> {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return []
 
@@ -96,7 +96,12 @@ export async function searchReadings(rawQuery: string): Promise<ReadingSearchHit
   // rows are visible-only already, so this narrows only the admin's view;
   // in-document search (below) keeps the wider gate, since an admin can
   // legitimately open a staged reading and find within it.
-  const shelf = (await getSources()).filter((source) => source.isVisible)
+  // Contextual scope (TJ, 2026-08-10): the Library searches the loom; a
+  // reading searches itself. With a sourceId the shelf narrows to that one
+  // reading — same gates, smaller room.
+  const shelf = (await getSources())
+    .filter((source) => source.isVisible)
+    .filter((source) => !sourceId || source.id === sourceId)
   if (shelf.length === 0) return []
   const shelfOrder = new Map(shelf.map((source, index) => [source.id, index]))
   const ids = shelf.map((source) => source.id)
@@ -218,10 +223,18 @@ export type LoomSearchResult = {
   passages: { id: string; sourceId: string | null; source: string; snippet: string }[]
   /** Single-reading cloths only — scopeKey IS the sourceId for those. */
   cloths: { sourceId: string; title: string; snippet: string }[]
+  /** Single-reading projections only, for the same reason as cloths. */
+  projections: { id: string; sourceId: string; name: string; snippet: string }[]
 }
 
-export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
-  const empty: LoomSearchResult = { concepts: [], links: [], passages: [], cloths: [] }
+/**
+ * Search the student's own holdings. Contextual scope (TJ, 2026-08-10):
+ * without a sourceId this is the whole loom (the Library's search); with one
+ * it is that reading's slice — its passages, its cloth and projections, the
+ * concepts evidenced there and the links between them.
+ */
+export async function searchLoom(rawQuery: string, sourceId?: string | null): Promise<LoomSearchResult> {
+  const empty: LoomSearchResult = { concepts: [], links: [], passages: [], cloths: [], projections: [] }
 
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return empty
@@ -229,6 +242,15 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
 
   const query = normalizeQuery(rawQuery)
   if (query.length < 2) return empty
+
+  // "This reading's concepts" is the scope the workbench draws: the concepts
+  // a passage of this reading evidences. Links follow ThrowTab's rule —
+  // this reading's threads only, both ends evidenced here.
+  const conceptsHere = sourceId
+    ? sql`(SELECT pc."conceptId" FROM "passage_concept" pc
+           JOIN "passage" p ON p."id" = pc."passageId"
+           WHERE p."userId" = ${userId} AND p."sourceId" = ${sourceId})`
+    : null
 
   // Same course lens the loom actions resolve — plus the not-yet-adopted
   // null-course rows, which belong to this student all the same. Read-only:
@@ -257,6 +279,7 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
            ) AS rank
     FROM "concept", q
     WHERE "concept"."userId" = ${userId} AND ${conceptScope}
+      ${conceptsHere ? sql`AND "concept"."id" IN ${conceptsHere}` : sql.raw("")}
       AND (setweight(to_tsvector('english', coalesce("concept"."label", '')), 'A') ||
            setweight(to_tsvector('english', coalesce("concept"."def", '')), 'B') ||
            setweight(to_tsvector('english', coalesce("concept"."note", '')), 'C')) @@ q.query
@@ -278,6 +301,7 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
     JOIN "concept" f ON f."id" = "edge"."fromId"
     JOIN "concept" t ON t."id" = "edge"."toId", q
     WHERE "edge"."userId" = ${userId} AND ${edgeScope}
+      ${conceptsHere ? sql`AND "edge"."fromId" IN ${conceptsHere} AND "edge"."toId" IN ${conceptsHere}` : sql.raw("")}
       AND (setweight(to_tsvector('english', coalesce("edge"."handle", '')), 'A') ||
            setweight(to_tsvector('english', coalesce("edge"."sentence", '')), 'B')) @@ q.query
     ORDER BY rank DESC, "edge"."createdAt"
@@ -296,6 +320,7 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
            ) AS rank
     FROM "passage", q
     WHERE "passage"."userId" = ${userId} AND ${passageScope}
+      ${sourceId ? sql`AND "passage"."sourceId" = ${sourceId}` : sql.raw("")}
       AND (setweight(to_tsvector('english', "passage"."content"), 'B') ||
            setweight(to_tsvector('english', coalesce("passage"."note", '')), 'C') ||
            setweight(to_tsvector('english', coalesce("passage"."question", '')), 'C')) @@ q.query
@@ -324,10 +349,41 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
            ) AS rank
     FROM "cloth", q
     WHERE "cloth"."userId" = ${userId} AND ${clothScope}
-      AND "cloth"."scopeKey" <> '' AND position(',' IN "cloth"."scopeKey") = 0
+      ${sourceId
+        ? sql`AND "cloth"."scopeKey" = ${sourceId}`
+        : sql`AND "cloth"."scopeKey" <> '' AND position(',' IN "cloth"."scopeKey") = 0`}
       AND (setweight(to_tsvector('english', coalesce("cloth"."title", '')), 'A') ||
            setweight(to_tsvector('english', coalesce("cloth"."description", '')), 'B')) @@ q.query
     ORDER BY rank DESC, "cloth"."updatedAt" DESC
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
+  // Projections — Title, One-line, Description — under the same rules as
+  // cloths: unindexed on purpose (a handful of rows per user; an index would
+  // be a migration), and single-reading scopeKeys only, because a whole-weave
+  // projection has no reachable surface until the weave is ruled.
+  const mapScope = courseId
+    ? sql`("map"."courseId" = ${courseId} OR "map"."courseId" IS NULL)`
+    : sql`"map"."courseId" IS NULL`
+  const mapResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "map"."id", "map"."scopeKey" AS "sourceId", "map"."name",
+           ts_headline('english', coalesce(nullif("map"."read", ''), nullif("map"."essence", ''), "map"."name"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           ts_rank(
+             (setweight(to_tsvector('english', coalesce("map"."name", '')), 'A') ||
+              setweight(to_tsvector('english', coalesce("map"."essence", '')), 'B') ||
+              setweight(to_tsvector('english', coalesce("map"."read", '')), 'C')),
+             q.query
+           ) AS rank
+    FROM "map", q
+    WHERE "map"."userId" = ${userId} AND ${mapScope}
+      ${sourceId
+        ? sql`AND "map"."scopeKey" = ${sourceId}`
+        : sql`AND "map"."scopeKey" <> '' AND position(',' IN "map"."scopeKey") = 0`}
+      AND (setweight(to_tsvector('english', coalesce("map"."name", '')), 'A') ||
+           setweight(to_tsvector('english', coalesce("map"."essence", '')), 'B') ||
+           setweight(to_tsvector('english', coalesce("map"."read", '')), 'C')) @@ q.query
+    ORDER BY rank DESC, "map"."updatedAt" DESC
     LIMIT ${MAX_LOOM_HITS}
   `)
 
@@ -343,6 +399,9 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
     })),
     cloths: (clothResult.rows as { sourceId: string; title: string; snippet: string }[]).map((r) => ({
       sourceId: r.sourceId, title: r.title, snippet: r.snippet,
+    })),
+    projections: (mapResult.rows as { id: string; sourceId: string; name: string; snippet: string }[]).map((r) => ({
+      id: r.id, sourceId: r.sourceId, name: r.name, snippet: r.snippet,
     })),
   }
 }

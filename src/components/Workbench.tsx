@@ -252,7 +252,15 @@ export default function Workbench({
       </div>
 
       <div className={`searchhost${searchOpen ? " open" : ""}`} style={{ padding: "0 24px" }}>
-        <ShelfSearch onActiveChange={() => {}} onClose={() => setSearchOpen(false)} />
+        {/* Contextual scope (TJ, 2026-08-10): inside a reading this field
+            searches THE READING — its pages and your work here. The whole
+            loom is one station away, on the Library. At the whole weave
+            (source null) it stays loom-wide. */}
+        <ShelfSearch
+          onActiveChange={() => {}}
+          onClose={() => setSearchOpen(false)}
+          sourceId={source?.id}
+        />
       </div>
 
       <JourneyNav

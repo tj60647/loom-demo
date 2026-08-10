@@ -149,12 +149,24 @@
 > your loom…", not an enumeration). Reach as built: reading cards
 > (title A > author B > citation/description C) and every page of text;
 > your concepts (label > description > note); your link labels (label >
-> sentence); your passages (content > note > question); and — new —
-> **your cloths** (title > description), single-reading cloths only, because
-> the whole-weave cloth has no reachable surface and a hit must never be a
-> door to a room that does not exist. The cloth query is deliberately
-> unindexed: tens of rows per user, and an index would be a migration.
-> A cloth hit lands on 01 · Reading, where the cloth's name lives.
+> sentence); your passages (content > note > question); **your cloths**
+> (title > description); and **your projections** (Title > One-line > read
+> Description) — cloths and projections single-reading only, because the
+> whole weave has no reachable surface and a hit must never be a door to a
+> room that does not exist. Both queries deliberately unindexed: a handful
+> of rows per user, and an index would be a migration. A cloth hit lands on
+> 01 · Reading; a projection hit on 03 · Knowledge Graph.
+> **Search is contextual** (2026-08-10, TJ: "the search in the library
+> should have a different scope than search in a reading"): the Library's
+> field is the whole loom; a reading's field is THAT READING — its card and
+> pages, its cloth and projections, and the concepts, links and passages
+> evidenced here (concepts here = evidenced by a passage of this reading;
+> links here = both ends evidenced here, ThrowTab's rule). `searchLoom` /
+> `searchReadings` take an optional sourceId that narrows the caller's OWN
+> rows — a forged sourceId narrows, never widens. In reading scope, concept
+> and link hits land in this workbench (04 / 02), not on the /weave doors.
+> Placeholder follows: "search this reading…". At the whole weave (source
+> null) the field stays loom-wide.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
