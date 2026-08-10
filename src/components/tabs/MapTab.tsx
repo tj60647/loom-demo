@@ -568,7 +568,7 @@ export default function MapTab() {
   return (
     <>
       <p className="tasktitle">Lay out your projection.</p>
-      <p className="tasksub">Your projection, laid out like cards on a table (Novak &amp; Gowin&apos;s own method): sort your concepts into tiers, then arrange them by hand. The tool draws the lines you already threw and counts what it sees — it never sorts, places, or links for you. Keep more than one projection: each is its own reading of the material, with its own tiers, its own one-line and its own paragraph. When a projection reads right here, draw the real concept map (paper or Figma) and build your chalk talk from it.</p>
+      <p className="tasksub">Your data, projected to be read: sort your concepts into tiers on the list, then arrange them by hand as cards on the board (Novak &amp; Gowin, <i>Learning How to Learn</i>, 1984). The tool draws the lines you already threw and counts what it sees — it never sorts, places, or links for you. Keep more than one projection: each is its own reading of the material, with its own tiers, its own one-line and its own paragraph. When a projection reads right here, draw the real concept map (paper or Figma) and build your chalk talk from it.</p>
 
       <div className="rail" id="mapRail">
         <span className={`rstep${done1 ? " done" : ""}${!done1 ? " now" : ""}`}>sort</span>
@@ -580,7 +580,7 @@ export default function MapTab() {
 
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="heading-with-info">
-          <h2>Sort <span className="n" id="triageCount">{scopedState.concepts.length ? `(${onCount} of ${scopedState.concepts.length} on the table)` : ""}</span></h2>
+          <h2>Sort <span className="n" id="triageCount">{scopedState.concepts.length ? `(${onCount} of ${scopedState.concepts.length} on the board)` : ""}</span></h2>
           <button
             className="btn ghost mini compact"
             id="makeAllPrimary"
@@ -589,8 +589,8 @@ export default function MapTab() {
             onClick={makeAllPrimary}
           >make all primary</button>
         </div>
-        <p className="do">Give each concept a tier: <b>P</b>rimary (the projection hangs on it) · <b>S</b>econdary · <b>T</b>ertiary (example / detail) · <b>–</b> set aside. Sorted concepts land on the table below.</p>
-        <p className="hint">A–Z until you say otherwise: drag a row by its handle — or focus the handle and press ↑ / ↓ — to re-order this list, and your sequence sticks. That re-sequences the list only; the table, the counts and the concept-map kit are untouched. <b>Make all primary</b> is a starting point, not a recommendation: it puts everything on the top tier in one move so you can demote from there.</p>
+        <p className="do">Give each concept a tier: <b>P</b>rimary (the projection hangs on it) · <b>S</b>econdary · <b>T</b>ertiary (example / detail) · <b>–</b> set aside. Sorted concepts land on the board below.</p>
+        <p className="hint">A–Z until you say otherwise: drag a row by its handle — or focus the handle and press ↑ / ↓ — to re-order this list, and your sequence sticks. That re-sequences the list only; the board, the counts and the concept-map kit are untouched. <b>Make all primary</b> is a starting point, not a recommendation: it puts everything on the top tier in one move so you can demote from there.</p>
         <div id="triageList" onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropAt(null) }}>
           {!scopedState.concepts.length ? (
             <div className="empty">
@@ -693,7 +693,7 @@ export default function MapTab() {
         )}
       </div>
       <div className="mapbar">
-        <span className="label">The projection</span>
+        <span className="label">The board</span>
         <span style={{ color: "var(--ink-soft)", fontSize: 13 }}>Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋯</b> — its description, the passages behind it, and where else you met it.</span>
       </div>
 
@@ -879,7 +879,7 @@ export default function MapTab() {
 
       <div className="ghostnote" id="mapMirror" style={{ marginTop: 8 }}>
         {scopedState.concepts.length > 0 && (
-          <>On the table: <b>{n.p}</b> primary · <b>{n.s}</b> secondary · <b>{n.t}</b> tertiary{off ? ` · ${off} set aside` : ""}{unsorted ? ` · ${unsorted} unsorted` : ""} — {onTable.length} proposition{onTable.length !== 1 ? "s" : ""} drawn, <b>{cross}</b> running level-to-level or sideways (possible cross-links — the level-3 move; you decide if they&apos;re real). Right now this reads as: <b>{level}</b>. Counted, not judged.</>
+          <>On the board: <b>{n.p}</b> primary · <b>{n.s}</b> secondary · <b>{n.t}</b> tertiary{off ? ` · ${off} set aside` : ""}{unsorted ? ` · ${unsorted} unsorted` : ""} — {onTable.length} proposition{onTable.length !== 1 ? "s" : ""} drawn, <b>{cross}</b> running level-to-level or sideways (possible cross-links — the level-3 move; you decide if they&apos;re real). Right now this reads as: <b>{level}</b>. Counted, not judged.</>
         )}
       </div>
 

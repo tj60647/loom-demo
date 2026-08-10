@@ -57,12 +57,19 @@ the rule is the point, not the wording.
 > sure it will be useful."*
 >
 > So the weave decision is not merely "not now" — it is **behind the
-> projection work** in line: the basic projection views the model already
-> names (List · Hierarchical · Cards, of which only Cards is built) come
-> first, because the weave aggregates cloths and projections and there is
-> nothing to aggregate until projections exist in numbers. Weave-independent
-> projection fixes (the worked example minting its projection at scopeKey '')
-> are unblocked by this ruling.
+> projection work** in line, because the weave aggregates cloths and
+> projections and there is nothing to aggregate until projections exist in
+> numbers. Weave-independent projection fixes (the worked example minting
+> its projection at scopeKey '') are unblocked by this ruling.
+>
+> **Corrected the same day:** an earlier version of this note claimed "the
+> basic projection views (List · Hierarchical · Cards, of which only Cards
+> is built) come first" — wrong frame, mine. TJ's ruling that followed:
+> the Cloth is the data; a Projection is one way of projecting it; **each
+> Projection IS a kind** — a list (an ordering) or a board (a layout) —
+> separately titled. Both kinds already exist on 03 as the list and the
+> board; what is NOT built is kind-per-projection (today's map row bundles
+> one ordering + tiers + one layout). See 5.6.
 
 > **TJ, 2026-08-09:** *"the whole weave path is unresolved. i know we will want a
 > way for students to collaborate on a cloth, and there is an idea about a
@@ -271,13 +278,13 @@ gaps are now demonstrable rather than suspected:
   below. What remains unported from the spread canvas: the single/spread
   reading sub-modes with masks and snap (page mode already is the focused
   spread) and the inline draft-card capture (2.1 invariant).
-- **5.5 "Spatial" — an EXPERIMENTAL projection view** (TJ, 2026-08-09: *"put
+- **5.5 "Spatial" — an EXPERIMENTAL projection kind** (TJ, 2026-08-09: *"put
   the spatial graph view on the pipeline, make it a prototype view"*;
-  reframed 2026-08-10: Spatial is a **view of a Projection** — the model's
-  "Views: List · Hierarchical · Cards · other" is the open set it joins —
-  but *"spatial is not a centerpiece … experimental and fairly unresolved,
-  not sure it will be useful."* The basic views come first; when Spatial is
-  built it is prototype-grade, per projection, behind the same view switcher.
+  re-framed under the 2026-08-10 kind-per-projection ruling: Spatial would
+  be a **third kind of projection** of the cloth — beside the list and the
+  board — laid out by connection density instead of by hand. TJ: *"spatial
+  is not a centerpiece … experimental and fairly unresolved, not sure it
+  will be useful."* Prototype-grade if and when built, never the lead item.
   The original cloth-side-toggle plan below is superseded on placement but
   its technical notes stand.)
   From `origin/weekly-concept-map:weekly-concept-map/index.html` (the force
@@ -310,6 +317,19 @@ gaps are now demonstrable rather than suspected:
   when designed. Recovery for all of it:
   `git show origin/spread-canvas-reading:src/components/pdf/SpreadCanvas.tsx`
   and the two `origin/weekly-concept-map` paths above.
+- **5.6 Kind per Projection — ratified 2026-08-10, not built.** The model now
+  says each Projection IS a list (an ordering of the cloth) or a board (a
+  layout), separately titled — *"i might have 2 orderings of the list, 3
+  boards with different layouts. each with a title, line, and description"*
+  (TJ). As built, one map row bundles ordering + tiers + layout and 03 shows
+  list and board together for the selected projection. The unbundling is
+  UI-and-data-shape work: creating a projection asks its kind; the picker
+  holds lists and boards side by side; no migration expected (kind can live
+  in the existing per-map view row — the `view` table's own header invites
+  it). **Plan first, TJ reviews, then build** — this is exactly the change
+  that went off the rails once when approached as "views inside a
+  projection"; the ratified frame is kinds OF projections, never a switcher
+  within one.
 
 ---
 

@@ -43,7 +43,7 @@ export type Tab = "reading" | "throw" | "read" | "map"
 const FOOT: Record<Tab, [string, string]> = {
   reading: ["READING", "THE TEXT AND YOUR CAPTURES"],
   throw: ["LINKING", "ONE THREAD AT A TIME"],
-  map: ["KNOWLEDGE GRAPH", "THE CARD TABLE"],
+  map: ["KNOWLEDGE GRAPH", "THE LIST AND THE BOARD"],
   read: ["VOCABULARY", "THE WORDS YOU OWN"],
 }
 

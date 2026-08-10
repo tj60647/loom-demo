@@ -156,6 +156,20 @@
 > room that does not exist. Both queries deliberately unindexed: a handful
 > of rows per user, and an index would be a migration. A cloth hit lands on
 > 01 · Reading; a projection hit on 03 · Knowledge Graph.
+> **Projections have kinds — ratified, not built** (2026-08-10, TJ): the
+> Cloth is the data; a Projection is one way of projecting it, and each
+> Projection IS a kind — a **list** (an ordering) or a **board** (a layout;
+> cards in tier bands, threads drawn) — separately titled, with One-line and
+> Description. Two orderings and three layouts are five Projections. The
+> model doc §Projection now says this and retires "Views: List ·
+> Hierarchical · Cards", which twice misled builds toward view-switchers. AS
+> BUILT the map row still bundles one ordering + tiers + one layout, and 03
+> always shows the list and the board together — the unbundling is future
+> work (open-work Phase 5), planned-first when scheduled. Language aligned
+> the same day: "the board", never "the table" (spreadsheet reading), with
+> Novak & Gowin citations added to the model doc and the tab copy — the
+> board digitizes their cards-and-arranging practice, and the tiers are
+> their rank-ordering.
 > **Search is contextual** (2026-08-10, TJ: "the search in the library
 > should have a different scope than search in a reading"): the Library's
 > field is the whole loom; a reading's field is THAT READING — its card and
@@ -459,7 +473,7 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | — | `JourneyNav` · `.staffgroup` | **the staff group, right of the journey, in sage** (TJ, 2026-08-09) — Roster · Cohort Graph for FACULTY, plus Readings · Courses for site ADMIN, on **every** surface including `/admin`. Unnumbered: they are not steps on the student's arc. Replaces `AdminNav`'s tab row, which now holds only the course/section pickers. Drawn from `course.isStaff` / `course.isAdmin`; decides what is drawn, never what may be read |
 | **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** as **Your work** (`#yourwork`), a sheet that slides over the text — closed by default, toggled from the viewer toolbar, and mounted *inside* `.pdf-shell` so it survives fullscreen; the **Cloth Title/Description** at the head of that sheet; **the margin cards** (2026-08-09, from the reverted spread canvas) — page mode's "Cards" toggle, `ConceptRails`: read-only cards beside each page, leader-lined to their highlights, a door to Your work and never an editor, rails and cards `user-select:none` so a stray drag cannot file text to the wrong page; and **a matrix that zooms as pure transform** (`PageRaster` under a once-rendered text layer), visible pages re-rastering after the gesture settles |
 | 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Carries `ClothFold` **only at the whole weave**, which has no Reading station — and, since nothing links to `/weave`, **no student can reach that branch**, so the whole-weave Cloth's only editor is currently unreachable |
-| 03 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, card table; the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); the Capture Log history at the whole weave (`HistoryPanel` — since 2026-08-09 the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**) |
+| 03 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, **the list and the board** (the sorted rows and the tiered card-and-thread surface — "board", never "table", which reads as a spreadsheet on a screen; TJ 2026-08-10); the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); the Capture Log history at the whole weave (`HistoryPanel` — since 2026-08-09 the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**) |
 | **04 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); **merge Concepts — its only home**; Concepts/Links Overlays |
 | ~~05 Weave~~ | `/weave` | **hidden from the journey, and with no door at all.** The 08-08 row here said "The route still works and Keep links to it, so whole-weave projections are not stranded" — **the second clause was false.** Keep never linked to it; verified 2026-08-09 by grepping every `/weave` in the repo. The only remaining references are `JourneyNav`'s three dead `DEFAULT_HREF`s (their stations are greyed, so never read) and `ShelfSearch`'s three hits. So the whole-weave Cloth, the whole-weave Projections, and the last route to an untethered Passage have all been unreachable since the station was hidden. **TJ, 2026-08-09: the whole-weave path is unresolved** — cloth collaboration and the Quilt are both wanted, but "the ambiguity about how they manifest should not inform the current design", and "the whole weave will only confuse things in this moment". Nothing is to be built for it on a guess |
 | 05 Keep | `KeepTab` (`/keep`) | export/import/reset — ratified as a deviation from the model's five (D4) — **and the Capture Log** (`HistoryPanel`), moved here from the whole weave because that was its only render AND no export contains `graphEvents`, so withdrawing `/weave` would have made it unreachable and unkeepable at once (red line 5). **TJ, 2026-08-09: Keep is "more about the student library or cloth collection" than a whole weave** — so it is not the whole weave's home, and the "every reading at once" framing is what that ruling narrows |
