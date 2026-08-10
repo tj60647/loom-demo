@@ -185,6 +185,14 @@ export default function SpreadCanvasView({
   // --- the zoom behaviour: always freeform ---
   useEffect(() => {
     zbRef.current = zoom<HTMLDivElement, unknown>()
+      // will-change lives only inside a gesture: standing, it makes Chrome
+      // scale a once-rasterized bitmap of the whole canvas (pixelated cards
+      // and pages); absent, every pan frame re-rasters (jank). During = the
+      // cheap path while moving; the "end" removal is what lets the settled
+      // frame re-rasterize sharp. Programmatic transforms (slider, Fit,
+      // focusPage) emit the same start/end pair, so they get the hint too.
+      .on("start.raster", () => canvasRef.current?.style.setProperty("will-change", "transform"))
+      .on("end.raster", () => canvasRef.current?.style.removeProperty("will-change"))
       .filter((e: Event & { button?: number }) => {
         // A MOUSE drag that starts on page text selects text — but only a
         // mouse drag: on touch, selection is long-press, not drag, so

@@ -1425,12 +1425,17 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           cursor: grab;
         }
         .pdf-spread-viewport:active { cursor: grabbing; }
+        /* NO standing will-change: it caches the whole canvas as one GPU
+           layer rasterized once, so every zoom scales a stale bitmap and the
+           cards and pages go pixelated no matter how sharp their own pixels
+           are. SpreadCanvasView sets the hint imperatively for the duration
+           of a gesture only — soft while moving, re-rasterized crisp the
+           moment it settles. */
         .pdf-spread-canvas {
           position: absolute;
           top: 0;
           left: 0;
           transform-origin: 0 0;
-          will-change: transform;
         }
         .pdf-spread-canvas .react-pdf__Page__textContent { cursor: text; }
         .pdf-spread-rails {
