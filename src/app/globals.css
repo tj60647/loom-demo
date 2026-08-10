@@ -430,6 +430,16 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    shaped like a shelf card; the marked words are Postgres's, not ours. */
 .searchwrap{margin:0 0 18px}
 .searchbar{display:flex;align-items:center;gap:10px}
+/* The search input is PERSISTENT on wide screens (TJ, 2026-08-10) — a
+   visible field is the discoverable form of search. The toggle button is the
+   compact form: it exists only below 900px, where a standing input row would
+   cost reading space. */
+.searchtoggle{display:none}
+@media (max-width:900px){
+  .searchtoggle{display:inline-block}
+  .searchhost{display:none}
+  .searchhost.open{display:block}
+}
 .searchinput{max-width:520px}
 .searchresults{margin-top:12px;display:flex;flex-direction:column;gap:10px}
 .searchtally{display:block}

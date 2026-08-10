@@ -137,21 +137,29 @@ export default function PageSlot({
                 cssH={baseWidth * (ownAspect ?? aspect)}
                 res={res ?? 1}
               />
-              <Page
-                pageNumber={pageNumber}
-                width={baseWidth}
-                renderMode="none"
-                renderTextLayer
-                renderAnnotationLayer={false}
-                onLoadSuccess={(page) => {
-                  if (page.originalWidth) {
-                    const a = page.originalHeight / page.originalWidth
-                    setOwnAspect(a)
-                    onAspect?.(a)
-                  }
-                }}
-                loading={null}
-              />
+              {/* Our own positioned box, NOT a stylesheet rule on the Page
+                  div: react-pdf sets `position: relative` INLINE there, which
+                  beats any selector — with renderMode="none" the Page has no
+                  in-flow content, so it sat BELOW the raster at height 0 and
+                  the whole text layer (selection, highlights, heat) painted
+                  one page-height too low and clipped to invisibility. */}
+              <div className="pdf-slot-text" style={{ position: "absolute", inset: 0 }}>
+                <Page
+                  pageNumber={pageNumber}
+                  width={baseWidth}
+                  renderMode="none"
+                  renderTextLayer
+                  renderAnnotationLayer={false}
+                  onLoadSuccess={(page) => {
+                    if (page.originalWidth) {
+                      const a = page.originalHeight / page.originalWidth
+                      setOwnAspect(a)
+                      onAspect?.(a)
+                    }
+                  }}
+                  loading={null}
+                />
+              </div>
             </div>
           </div>
         ) : (

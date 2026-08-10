@@ -206,7 +206,7 @@ export default function Shelf() {
         <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", margin: "0 0 3px" }}>
           <p className="tasktitle" style={{ margin: 0 }}>Pick a reading.</p>
           <button
-            className={`btn mini ${searchOpen ? "" : "ghost"}`}
+            className={`btn mini searchtoggle ${searchOpen ? "" : "ghost"}`}
             onClick={() => {
               if (searchOpen) {
                 setSearchOpen(false)
@@ -232,8 +232,10 @@ export default function Shelf() {
         {/* Which reading says this? Words, or a "quoted phrase" — matched
             against every card and every page on your reading list, never
             anyone else's. While a query is live the results stand in for the
-            shelf; unmounting on close is what resets the box. */}
-        {searchOpen && (
+            shelf. Persistent on wide screens (TJ, 2026-08-10): the input is
+            always here, Escape clears it; below 900px the button above
+            toggles it instead. */}
+        <div className={`searchhost${searchOpen ? " open" : ""}`}>
           <ShelfSearch
             onActiveChange={setSearchActive}
             onClose={() => {
@@ -241,7 +243,7 @@ export default function Shelf() {
               setSearchActive(false)
             }}
           />
-        )}
+        </div>
 
         {!searchActive && (<>
         {/* The whole weave and Keep were quick links here; they are journey

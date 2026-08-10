@@ -107,9 +107,11 @@
 > **The matrix IS the spread canvas now** (2026-08-10, TJ: "rebuild Matrix as
 > the canvas"): every 2-page spread on one near-square plane
 > (`src/lib/spreadLayout.ts`, asserted by `check:spread`) under ONE transform
-> (`SpreadCanvasView`, d3-zoom back in package.json) — drag or two-finger
-> scroll pans, pinch/ctrl+wheel zooms, and the toolbar slider drives the same
-> transform (1 = everything in view, synced back after a gesture settles).
+> (`SpreadCanvasView`, d3-zoom back in package.json) — the wheel zooms at the
+> cursor and drag pans (the map idiom; TJ 2026-08-10, replacing first the
+> branch's scroll-pans scheme and then the slider), pinch zooms, and
+> **− / + / Fit** buttons drive the same transform (Fit = everything in view,
+> recentred; a settled gesture syncs the multiplier back).
 > Pages are the raster/text-layer split from the stamp above, retargeted
 > analytically off the layout. **Cards follow the toggle into the matrix**:
 > rails flank every spread, and `--invk` counter-scales card text against the
@@ -128,6 +130,21 @@
 > exactly (a wider extent let a deep pinch rest where the settle sync would
 > yank it back); and the floating capture button re-seats on every transform
 > write, as it always did on scroll.
+> **The canvas polish pass** (2026-08-10, TJ): rails are ALWAYS reserved —
+> hiding Cards draws into standing margins instead of re-laying the grid
+> under the reader's eye; and the raster path's text layer now rides an
+> absolutely positioned `.pdf-slot-text` wrapper, because react-pdf pins
+> `position:relative` INLINE on its Page div, which beat the stylesheet and
+> painted every matrix text layer — highlights, heat, real mouse selection —
+> one page-height too low and clipped to invisibility. Found by TJ asking
+> where the highlights went; every DOM-level test had passed over it.
+> **Search is a field, not a button, where there is room** (2026-08-10, TJ):
+> the scopebar/shelf search input is persistent on wide screens (`.searchhost`
+> / `.searchtoggle`, globals.css — the button form survives below 900px),
+> never autofocuses, Escape clears it, and its placeholder names what it
+> reaches: "a word from a reading, a concept, a link label…". The in-reading
+> toolbar search keeps its compact button and its text-only wording — it
+> searches the reading's pages, not the loom.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.

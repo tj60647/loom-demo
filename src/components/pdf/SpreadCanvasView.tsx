@@ -25,7 +25,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { select, pointer } from "d3-selection";
+import { select } from "d3-selection";
 import { zoom, zoomIdentity, type ZoomBehavior, type D3ZoomEvent, type ZoomTransform } from "d3-zoom";
 import PageSlot from "./PageSlot";
 import { type PdfDoc } from "./PageRaster";
@@ -63,6 +63,7 @@ export default function SpreadCanvasView({
   zoomMultiplier,
   onZoomMultiplier,
   focusPage,
+  fitNonce,
   onTransform,
 }: {
   pdf: PdfDoc | null;
@@ -85,6 +86,11 @@ export default function SpreadCanvasView({
    *  canvas — its scrollIntoView would shift a hidden-overflow box by an
    *  offset the transform never learns about. */
   focusPage?: number;
+  /** Fit, unconditionally: a CHANGE here refits and recenters even when the
+   *  multiplier already reads 1 — the state can be stale mid-gesture (the
+   *  settle sync is 200ms behind), and a panned-but-unzoomed view has
+   *  nothing else to recenter it. */
+  fitNonce?: number;
   /** Fires on every transform write — the viewer re-seats anything it
    *  positioned in viewport coordinates (the floating capture button). */
   onTransform?: () => void;
@@ -100,9 +106,12 @@ export default function SpreadCanvasView({
   const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
 
   const basePageHeight = basePageWidth * aspect;
+  // Rails are ALWAYS reserved, cards on or off (TJ, 2026-08-10: hiding cards
+  // must not change the matrix layout) — toggling draws into standing margins
+  // instead of re-laying the grid and re-centering under the reader's eye.
   const layout = useMemo(
-    () => (numPages > 0 && basePageWidth > 0 ? spreadLayout(numPages, basePageWidth, basePageHeight, cardsOn) : null),
-    [numPages, basePageWidth, basePageHeight, cardsOn]
+    () => (numPages > 0 && basePageWidth > 0 ? spreadLayout(numPages, basePageWidth, basePageHeight, true) : null),
+    [numPages, basePageWidth, basePageHeight]
   );
 
   // 1 on the slider = the whole canvas in view; the counter-scale reference is
@@ -210,24 +219,13 @@ export default function SpreadCanvasView({
     const sel = select(el);
     sel.call(zb);
     sel.on("dblclick.zoom", null); // double-click zoom jumps are hostile mid-reading
-    // Figma-style trackpad: two-finger scroll pans, pinch zooms. d3-zoom's
-    // default treats every wheel event as zoom, so replace its wheel handler.
-    // A trackpad pinch reaches the browser as a wheel event with ctrlKey set
-    // (macOS convention); everything else is a scroll and becomes a pan.
-    sel.on("wheel.zoom", null);
-    sel.on("wheel.figma", (e: WheelEvent) => {
-      e.preventDefault();
-      const scale = e.deltaMode === 1 ? 16 : 1; // line-scrolling mice report lines, not pixels
-      if (e.ctrlKey || e.metaKey) {
-        zb.scaleBy(sel, Math.pow(2, -e.deltaY * scale * 0.01), pointer(e, el));
-      } else {
-        const k = tref.current.k;
-        zb.translateBy(sel, (-e.deltaX * scale) / k, (-e.deltaY * scale) / k);
-      }
-    });
+    // Wheel = zoom at the cursor, drag = pan — the map-canvas idiom (TJ,
+    // 2026-08-10, replacing the branch's Figma scheme where scroll panned).
+    // d3-zoom's default wheel handler IS that idiom, pinch included: a
+    // trackpad pinch arrives as ctrl+wheel and d3's default wheelDelta gives
+    // it the 10x factor that makes pinching feel 1:1 rather than glacial.
     return () => {
       sel.on(".zoom", null);
-      sel.on("wheel.figma", null);
     };
   }, [layout != null]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -252,8 +250,9 @@ export default function SpreadCanvasView({
     zb.transform(select(el), t2);
   }, []);
 
-  // First fit, and the slider. The 0.05 tolerance breaks the loop with the
-  // settle-time slider sync above.
+  // First fit, and the toolbar's − / + / Fit. The 0.05 tolerance breaks the
+  // loop with the settle-time sync above. Fit (exactly 1) recenters: "1 =
+  // everything in view" means centered, not wherever the zoom-out landed.
   useEffect(() => {
     if (!layout || stage.w === 0) return;
     if (!initedRef.current) {
@@ -262,7 +261,7 @@ export default function SpreadCanvasView({
       return;
     }
     if (Math.abs(zoomMultiplier - tref.current.k / fitAllK) > 0.05) {
-      applyMultiplier(zoomMultiplier);
+      applyMultiplier(zoomMultiplier, zoomMultiplier === 1);
     }
   }, [zoomMultiplier, layout, stage.w, fitAllK, applyMultiplier]);
 
@@ -277,6 +276,15 @@ export default function SpreadCanvasView({
   }, [geomKey, applyMultiplier]);
 
   useEffect(() => () => window.clearTimeout(settleTimer.current), []);
+
+  // Fit, driven by its own nonce so it can never be a no-op against stale
+  // state (see the prop's comment).
+  const prevFit = useRef(fitNonce);
+  useEffect(() => {
+    if (prevFit.current === fitNonce) return;
+    prevFit.current = fitNonce;
+    if (initedRef.current) applyMultiplier(1, true);
+  }, [fitNonce, applyMultiplier]);
 
   // "Go to this page" — a CHANGE in focusPage (a Find hit, a passage's goto)
   // centers that page's spot at the current zoom. Entering the matrix does

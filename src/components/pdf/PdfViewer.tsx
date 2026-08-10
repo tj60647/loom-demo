@@ -115,9 +115,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // Covers the whole window, chrome included — the reading takes the screen.
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Matrix zoom, as a multiple of the whole-canvas fit: 1 = every spread in
-  // view. The slider and the canvas's own pan/zoom gestures drive the SAME
+  // view. The − / + buttons and the canvas's own wheel/pinch drive the SAME
   // transform — SpreadCanvasView syncs this back when a gesture settles.
+  // Fit has its own nonce: state alone can be stale mid-gesture, and a
+  // panned view at multiplier 1 still needs recentring.
   const [zoom, setZoom] = useState(1);
+  const [fitNonce, setFitNonce] = useState(0);
   // The pdf.js document proxy, kept for the matrix canvas's raster path.
   const [pdfProxy, setPdfProxy] = useState<PdfDoc | null>(null);
   // The document's height/width, measured off the first page that renders, so
@@ -1436,6 +1439,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           user-select: none;
           -webkit-user-select: none;
         }
+        /* Above the text layers: pdf.js gives .textLayer z-index 2, and a
+           card growing inward over its own page must cover the page's marks,
+           not wear them. */
+        .pdf-spread-canvas .pdf-rail-leaders { z-index: 3; }
+        .pdf-spread-canvas .pdf-railcard { z-index: 3; }
         /* Counter-scaling: card text never shrinks below its reading size as
            the canvas zooms out. Done via font-size — real layout, not a
            transform — so the card grows to hold it and the rail re-stacks. */
@@ -1450,11 +1458,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         .pdf-slot-scale { overflow: hidden; }
         .pdf-slot-inner { position: relative; background: #fff; }
         .pdf-raster { display: block; height: auto; }
-        .pdf-slot-inner .react-pdf__Page {
-          position: absolute;
-          inset: 0;
-          background: transparent;
-        }
+        /* The Page div itself paints nothing; positioning lives on the
+           .pdf-slot-text wrapper (inline, in PageSlot) because react-pdf
+           puts position:relative INLINE on this div and no selector wins
+           against that. */
+        .pdf-slot-inner .react-pdf__Page { background: transparent; }
 
         /* Reserved space for a page that has not drawn yet: the same footprint
            the page will take, so the scrollbar never lies and nothing jumps. */
@@ -1690,20 +1698,31 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </div>
           )}
 
+          {/* Map-canvas zoom controls (TJ, 2026-08-10, replacing the slider):
+              − / + step multiplicatively about the view centre, Fit returns
+              to everything-in-view. The wheel and pinch drive the same
+              transform; these are the keyboard-and-tap path. */}
           {viewMode === "matrix" && (
-            <label className="label" style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-              Zoom
-              <input
-                type="range"
-                min={0.5}
-                max={8}
-                step={0.1}
-                value={zoom}
-                onChange={(e) => setZoom(parseFloat(e.target.value))}
-                aria-label="Zoom the page matrix"
-                style={{ width: isNarrow ? 90 : 130 }}
-              />
-            </label>
+            <div className="pdf-modes" role="group" aria-label="Canvas zoom">
+              <button
+                className="btn mini ghost"
+                onClick={() => setZoom((z) => Math.max(0.5, Math.round((z / 1.4) * 100) / 100))}
+                aria-label="Zoom out"
+                data-tip="zoom out"
+              >−</button>
+              <button
+                className="btn mini ghost"
+                onClick={() => setZoom((z) => Math.min(8, Math.round((z * 1.4) * 100) / 100))}
+                aria-label="Zoom in"
+                data-tip="zoom in"
+              >+</button>
+              <button
+                className="btn mini ghost"
+                onClick={() => { setZoom(1); setFitNonce((n) => n + 1); }}
+                aria-label="Fit the whole reading"
+                data-tip="everything in view"
+              >Fit</button>
+            </div>
           )}
 
           {viewMode === "page" && !isNarrow && (
@@ -2027,6 +2046,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               zoomMultiplier={zoom}
               onZoomMultiplier={setZoom}
               focusPage={pageNumber}
+              fitNonce={fitNonce}
               onTransform={handleCanvasTransform}
             />
           )}

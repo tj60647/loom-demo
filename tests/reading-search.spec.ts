@@ -17,10 +17,10 @@ test("the shelf search finds a reading and stands in for the shelf while live", 
   await page.goto("/")
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
 
-  // The search sits behind the same ⌕ toggle the reading uses, up by the
-  // title; opening it reveals a labelled bar.
-  await page.getByRole("button", { name: "Search your readings" }).click()
-  const box = page.getByRole("searchbox", { name: "Search your readings for a word or phrase" })
+  // The search field is PERSISTENT on wide screens (TJ, 2026-08-10) — no
+  // toggle to click; the labelled bar simply sits under the title, and its
+  // name says how far it reaches.
+  const box = page.getByRole("searchbox", { name: "Search your readings, concepts, link labels and passages" })
   await expect(box).toBeVisible()
   await expect(page.locator(".searchbar label", { hasText: "Search" })).toBeVisible()
   await box.fill("object worlds")

@@ -2,9 +2,10 @@
  * Geometry for the matrix's spread canvas: the whole document as 2-page
  * spreads on a near-square grid, in canvas units. Ported from the spread
  * canvas (origin/spread-canvas-reading, reverted by 41d5b50) with one
- * deviation: `withRails` — the original always reserved card rails beside
- * every spread; here the rails exist only while the Cards toggle is on, so
- * a rail-less matrix wastes no width on empty margins.
+ * deviation: `withRails` can lay out without card rails. The matrix always
+ * passes true — like the original — because hiding the cards must not
+ * re-lay the grid under the reader's eye (TJ, 2026-08-10); the parameter
+ * stays for any future surface that wants the tighter geometry.
  *
  * Pure math, no DOM: derived for display and discarded (red line #7).
  */

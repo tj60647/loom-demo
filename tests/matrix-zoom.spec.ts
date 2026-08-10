@@ -52,13 +52,12 @@ test.describe('Matrix zoom', () => {
     await page.waitForTimeout(400);
     const before = await maxBacking();
 
-    // Drive the slider to 3× the React-controlled way: native setter + input.
-    await page.locator('input[aria-label="Zoom the page matrix"]').evaluate((el) => {
-      const input = el as HTMLInputElement;
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
-      setter.call(input, '3');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+    // Step the zoom in three times (1 → 1.4 → 1.96 → 2.74× fit) with the
+    // toolbar's + button — the keyboard-and-tap path onto the same transform.
+    const zoomIn = page.getByRole('button', { name: 'Zoom in' });
+    await zoomIn.click();
+    await zoomIn.click();
+    await zoomIn.click();
 
     // (a) The text layer never re-rendered: the probed span and the probed
     // mark are the same attached DOM nodes they were before the zoom.
@@ -112,7 +111,7 @@ test.describe('Matrix zoom', () => {
     await expect(page.locator('button:has-text("Capture as Passage")')).toBeVisible({ timeout: 5000 });
   });
 
-  test('pinch drives the same transform, and Cards flank the spreads', async ({ page }) => {
+  test('wheel and pinch drive the transform, Fit restores it, Cards flank the spreads', async ({ page }) => {
     test.setTimeout(90_000);
     await page.addInitScript(() => {
       localStorage.setItem("loom_has_seen_walkthrough", "true");
@@ -122,21 +121,36 @@ test.describe('Matrix zoom', () => {
     await page.getByRole('button', { name: 'Matrix' }).click();
     await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
 
-    // A trackpad pinch reaches the browser as ctrl+wheel; d3 scales the
-    // canvas and, on settle, the toolbar slider syncs to where the gesture
-    // left the zoom — one transform, two controls.
-    const slider = page.locator('input[aria-label="Zoom the page matrix"]');
-    const before = parseFloat(await slider.inputValue());
-    await page.locator('.pdf-spread-viewport').evaluate((el) => {
-      el.dispatchEvent(new WheelEvent('wheel', {
-        deltaY: -240, ctrlKey: true, bubbles: true, cancelable: true,
-        clientX: el.getBoundingClientRect().left + el.clientWidth / 2,
-        clientY: el.getBoundingClientRect().top + el.clientHeight / 2,
-      }));
-    });
+    const canvasK = () =>
+      page.locator('.pdf-spread-canvas').evaluate((el) => {
+        const m = /scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform ?? '');
+        return m ? parseFloat(m[1]) : 0;
+      });
+    await expect.poll(canvasK, { timeout: 5000 }).toBeGreaterThan(0);
+    const atFit = await canvasK();
+
+    // The wheel zooms at the cursor — the map idiom (TJ, 2026-08-10) — and a
+    // trackpad pinch arrives as ctrl+wheel and zooms too.
+    const wheelAtCenter = (opts: { ctrlKey?: boolean; deltaY: number }) =>
+      page.locator('.pdf-spread-viewport').evaluate((el, o) => {
+        const b = el.getBoundingClientRect();
+        el.dispatchEvent(new WheelEvent('wheel', {
+          deltaY: o.deltaY, ctrlKey: !!o.ctrlKey, bubbles: true, cancelable: true,
+          clientX: b.left + el.clientWidth / 2,
+          clientY: b.top + el.clientHeight / 2,
+        }));
+      }, opts);
+    await wheelAtCenter({ deltaY: -240 });
+    await expect.poll(canvasK, { timeout: 5000 }).toBeGreaterThan(atFit);
+    const afterWheel = await canvasK();
+    await wheelAtCenter({ deltaY: -240, ctrlKey: true });
+    await expect.poll(canvasK, { timeout: 5000 }).toBeGreaterThan(afterWheel);
+
+    // Fit takes it back to everything-in-view.
+    await page.getByRole('button', { name: 'Fit the whole reading' }).click();
     await expect
-      .poll(async () => parseFloat(await slider.inputValue()), { timeout: 5000 })
-      .toBeGreaterThan(before);
+      .poll(async () => Math.abs((await canvasK()) - atFit), { timeout: 5000 })
+      .toBeLessThan(atFit * 0.06);
 
     // Cards in the matrix: every spread grows its rails, and a seeded
     // passage's card appears beside the page that holds its highlight.

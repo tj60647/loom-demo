@@ -87,13 +87,19 @@ export default function ShelfSearch({
           type="search"
           className="tinput searchinput"
           value={query}
-          autoFocus
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Escape") onClose()
+            // Clear as well as close: on wide screens the field is permanent
+            // (no autoFocus for the same reason — a persistent input must
+            // never steal focus on mount), so Escape's visible effect is the
+            // query going, not the box.
+            if (e.key === "Escape") {
+              handleChange("")
+              onClose()
+            }
           }}
-          placeholder='a word, or a "phrase"'
-          aria-label="Search your readings for a word or phrase"
+          placeholder='a word from a reading, a concept, a link label…'
+          aria-label="Search your readings, concepts, link labels and passages"
         />
       </div>
 

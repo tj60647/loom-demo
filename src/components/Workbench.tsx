@@ -236,9 +236,12 @@ export default function Workbench({
           </>
         )}
         {/* The one search field, present on every tab (ruling 34): readings,
-            concepts, links and your own passages, grouped by kind. */}
+            concepts, links and your own passages, grouped by kind. On wide
+            screens the field itself is persistent below the bar (TJ,
+            2026-08-10 — a visible input is the discoverable form); this
+            button is the compact form, shown only under 900px. */}
         <button
-          className={`btn mini ${searchOpen ? "" : "ghost"}`}
+          className={`btn mini searchtoggle ${searchOpen ? "" : "ghost"}`}
           onClick={() => setSearchOpen((v) => !v)}
           aria-pressed={searchOpen}
           aria-label="Search everything"
@@ -248,11 +251,9 @@ export default function Workbench({
         </button>
       </div>
 
-      {searchOpen && (
-        <div style={{ padding: "0 24px" }}>
-          <ShelfSearch onActiveChange={() => {}} onClose={() => setSearchOpen(false)} />
-        </div>
-      )}
+      <div className={`searchhost${searchOpen ? " open" : ""}`} style={{ padding: "0 24px" }}>
+        <ShelfSearch onActiveChange={() => {}} onClose={() => setSearchOpen(false)} />
+      </div>
 
       <JourneyNav
         // Inside a reading the underline follows the tab; at the whole weave
