@@ -98,8 +98,8 @@ export default function ShelfSearch({
               onClose()
             }
           }}
-          placeholder='a word from a reading, a concept, a link label…'
-          aria-label="Search your readings, concepts, link labels and passages"
+          placeholder='search your loom…'
+          aria-label="Search your loom — readings, cloths, concepts, link labels and passages"
         />
       </div>
 
@@ -108,9 +108,10 @@ export default function ShelfSearch({
           {error && <p className="hint" style={{ color: "var(--red)" }}>{error}</p>}
 
           {!error && results && results.length === 0 && !busy &&
-            !loomResults?.concepts.length && !loomResults?.links.length && !loomResults?.passages.length && (
+            !loomResults?.concepts.length && !loomResults?.links.length &&
+            !loomResults?.passages.length && !loomResults?.cloths.length && (
             <div className="empty">
-              <span className="cap">nothing of yours matches that — readings, concepts, links or passages</span>
+              <span className="cap">nothing in your loom matches that — readings, cloths, concepts, links or passages</span>
             </div>
           )}
 
@@ -160,9 +161,22 @@ export default function ShelfSearch({
             </>
           )}
 
-          {/* The student's own holdings, grouped by kind — scope 3/4 of the
-              one search field (ruling 34). Each hit is a door to where that
-              kind of work lives. */}
+          {/* The student's own holdings, grouped by kind — the loom half of
+              the one search field (ruling 34). Each hit is a door to where
+              that kind of work lives. */}
+          {!error && loomResults && loomResults.cloths.length > 0 && (
+            <>
+              <span className="cap searchtally">your cloths</span>
+              {loomResults.cloths.map((hit) => (
+                // A cloth lives where its evidence is gathered: 01 · Reading,
+                // where its Title and Description sit at the head of Your work.
+                <Link key={hit.sourceId} href={`/reading/${hit.sourceId}?tab=reading`} className="searchhit">
+                  <div className="searchhithead"><h3>{hit.title || "Base cloth"}</h3></div>
+                  <p className="searchsnip"><Snippet text={hit.snippet} /></p>
+                </Link>
+              ))}
+            </>
+          )}
           {!error && loomResults && loomResults.concepts.length > 0 && (
             <>
               <span className="cap searchtally">your concepts</span>

@@ -141,10 +141,20 @@
 > **Search is a field, not a button, where there is room** (2026-08-10, TJ):
 > the scopebar/shelf search input is persistent on wide screens (`.searchhost`
 > / `.searchtoggle`, globals.css — the button form survives below 900px),
-> never autofocuses, Escape clears it, and its placeholder names what it
-> reaches: "a word from a reading, a concept, a link label…". The in-reading
-> toolbar search keeps its compact button and its text-only wording — it
-> searches the reading's pages, not the loom.
+> never autofocuses, and Escape clears it. The in-reading toolbar search
+> keeps its compact button and its text-only wording — it searches the
+> reading's pages, not the loom.
+> **The field searches the loom, and says so** (2026-08-10, TJ: "it is really
+> about searching the 'loom' scoped by role" — the placeholder is "search
+> your loom…", not an enumeration). Reach as built: reading cards
+> (title A > author B > citation/description C) and every page of text;
+> your concepts (label > description > note); your link labels (label >
+> sentence); your passages (content > note > question); and — new —
+> **your cloths** (title > description), single-reading cloths only, because
+> the whole-weave cloth has no reachable surface and a hit must never be a
+> door to a room that does not exist. The cloth query is deliberately
+> unindexed: tens of rows per user, and an index would be a migration.
+> A cloth hit lands on 01 · Reading, where the cloth's name lives.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.

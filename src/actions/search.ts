@@ -216,10 +216,12 @@ export type LoomSearchResult = {
   concepts: { id: string; label: string; snippet: string }[]
   links: { id: string; handle: string; fromLabel: string; toLabel: string; snippet: string }[]
   passages: { id: string; sourceId: string | null; source: string; snippet: string }[]
+  /** Single-reading cloths only — scopeKey IS the sourceId for those. */
+  cloths: { sourceId: string; title: string; snippet: string }[]
 }
 
 export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
-  const empty: LoomSearchResult = { concepts: [], links: [], passages: [] }
+  const empty: LoomSearchResult = { concepts: [], links: [], passages: [], cloths: [] }
 
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return empty
@@ -301,6 +303,34 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
     LIMIT ${MAX_LOOM_HITS}
   `)
 
+  // The cloth — the reading's own interpretation — searches by title and
+  // description. No GIN index, deliberately: one cloth per reading per user
+  // is tens of rows, the expression scan costs nothing, and an index would
+  // mean a migration production has not got. Single-reading cloths only
+  // (scopeKey = the sourceId, no comma, not ''): the whole-weave cloth has no
+  // reachable surface (the Weave ruling), and a search hit must never be a
+  // door to a room that does not exist.
+  const clothScope = courseId
+    ? sql`("cloth"."courseId" = ${courseId} OR "cloth"."courseId" IS NULL)`
+    : sql`"cloth"."courseId" IS NULL`
+  const clothResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "cloth"."scopeKey" AS "sourceId", "cloth"."title",
+           ts_headline('english', coalesce(nullif("cloth"."description", ''), "cloth"."title"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           ts_rank(
+             (setweight(to_tsvector('english', coalesce("cloth"."title", '')), 'A') ||
+              setweight(to_tsvector('english', coalesce("cloth"."description", '')), 'B')),
+             q.query
+           ) AS rank
+    FROM "cloth", q
+    WHERE "cloth"."userId" = ${userId} AND ${clothScope}
+      AND "cloth"."scopeKey" <> '' AND position(',' IN "cloth"."scopeKey") = 0
+      AND (setweight(to_tsvector('english', coalesce("cloth"."title", '')), 'A') ||
+           setweight(to_tsvector('english', coalesce("cloth"."description", '')), 'B')) @@ q.query
+    ORDER BY rank DESC, "cloth"."updatedAt" DESC
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
   return {
     concepts: (conceptResult.rows as { id: string; label: string; snippet: string }[]).map((r) => ({
       id: r.id, label: r.label, snippet: r.snippet,
@@ -310,6 +340,9 @@ export async function searchLoom(rawQuery: string): Promise<LoomSearchResult> {
     })),
     passages: (passageResult.rows as { id: string; sourceId: string | null; source: string | null; snippet: string }[]).map((r) => ({
       id: r.id, sourceId: r.sourceId, source: r.source ?? "", snippet: r.snippet,
+    })),
+    cloths: (clothResult.rows as { sourceId: string; title: string; snippet: string }[]).map((r) => ({
+      sourceId: r.sourceId, title: r.title, snippet: r.snippet,
     })),
   }
 }

@@ -20,7 +20,7 @@ test("the shelf search finds a reading and stands in for the shelf while live", 
   // The search field is PERSISTENT on wide screens (TJ, 2026-08-10) — no
   // toggle to click; the labelled bar simply sits under the title, and its
   // name says how far it reaches.
-  const box = page.getByRole("searchbox", { name: "Search your readings, concepts, link labels and passages" })
+  const box = page.getByRole("searchbox", { name: "Search your loom — readings, cloths, concepts, link labels and passages" })
   await expect(box).toBeVisible()
   await expect(page.locator(".searchbar label", { hasText: "Search" })).toBeVisible()
   await box.fill("object worlds")
