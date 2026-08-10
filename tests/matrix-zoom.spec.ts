@@ -5,12 +5,13 @@ import { openReading } from './helpers';
 test.use({ storageState: 'playwright/.auth/testa.json' });
 
 /**
- * The matrix's zoom is a CSS transform over a raster/text-layer split: the
+ * The matrix is a spread canvas: every 2-page spread on one transformed
+ * plane, panned and zoomed as pure CSS over a raster/text-layer split. The
  * text layer renders once at a zoom-independent base width and is NEVER
- * rebuilt by the slider; sharpness returns through our own pdf.js canvas,
- * re-rastered only after the gesture settles. The defect this replaces —
- * named in 9abbdd7's own commit message — re-rendered every page, canvas and
- * text layer both, on every 0.1 step of the slider.
+ * rebuilt by the slider or a pinch; sharpness returns through our own pdf.js
+ * canvas, re-rastered only after the gesture settles. The defect this
+ * replaces — named in 9abbdd7's own commit message — re-rendered every page,
+ * canvas and text layer both, on every 0.1 step of the slider.
  */
 test.describe('Matrix zoom', () => {
   test('zoom re-rasters the canvas without rebuilding the text layer', async ({ page }) => {
@@ -23,7 +24,9 @@ test.describe('Matrix zoom', () => {
 
     await page.getByRole('button', { name: 'Matrix' }).click();
 
-    // The raster path is live: our canvas under react-pdf's text layer.
+    // The spread canvas is live: one transformed plane of spreads, our
+    // raster under react-pdf's text layer in every slot.
+    await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
     const raster = page.locator('.pdf-raster').first();
     await expect(raster).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.pdf-slot-inner .react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
@@ -39,9 +42,15 @@ test.describe('Matrix zoom', () => {
     });
     await expect(page.locator('[data-probe="1"]')).toBeAttached();
 
-    // Let the initial settle pass, then record page 1's canvas backing width.
+    // Let the initial settle pass, then record the sharpest backing anywhere.
+    // (Anywhere, not page 1: the slider zooms about the canvas CENTRE, so the
+    // corner page correctly leaves the view and keeps its base raster.)
+    const maxBacking = () =>
+      page.evaluate(() =>
+        Math.max(...Array.from(document.querySelectorAll<HTMLCanvasElement>('.pdf-raster')).map((c) => c.width))
+      );
     await page.waitForTimeout(400);
-    const before = await raster.evaluate((c) => (c as HTMLCanvasElement).width);
+    const before = await maxBacking();
 
     // Drive the slider to 3× the React-controlled way: native setter + input.
     await page.locator('input[aria-label="Zoom the page matrix"]').evaluate((el) => {
@@ -56,11 +65,9 @@ test.describe('Matrix zoom', () => {
     await expect(page.locator('[data-probe="1"]')).toBeAttached();
     await expect(page.locator('[data-probe="2"]')).toBeAttached();
 
-    // (b) After the settle, the visible page re-rastered sharper: the canvas
-    // backing outgrew what it was at 1×.
-    await expect
-      .poll(async () => raster.evaluate((c) => (c as HTMLCanvasElement).width), { timeout: 10_000 })
-      .toBeGreaterThan(before);
+    // (b) After the settle, whatever is in view re-rastered sharper: the
+    // sharpest backing anywhere outgrew what it was at 1×.
+    await expect.poll(maxBacking, { timeout: 10_000 }).toBeGreaterThan(before);
 
     // (c) Still exactly the marks the loom holds — none lost, none doubled.
     await expect(page.locator('[data-probe="2"]')).toBeVisible();
@@ -103,5 +110,39 @@ test.describe('Matrix zoom', () => {
     });
     expect(selected.trim().length).toBeGreaterThanOrEqual(40);
     await expect(page.locator('button:has-text("Capture as Passage")')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('pinch drives the same transform, and Cards flank the spreads', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.addInitScript(() => {
+      localStorage.setItem("loom_has_seen_walkthrough", "true");
+    });
+    await openReading(page, 'Object Worlds');
+    await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Matrix' }).click();
+    await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
+
+    // A trackpad pinch reaches the browser as ctrl+wheel; d3 scales the
+    // canvas and, on settle, the toolbar slider syncs to where the gesture
+    // left the zoom — one transform, two controls.
+    const slider = page.locator('input[aria-label="Zoom the page matrix"]');
+    const before = parseFloat(await slider.inputValue());
+    await page.locator('.pdf-spread-viewport').evaluate((el) => {
+      el.dispatchEvent(new WheelEvent('wheel', {
+        deltaY: -240, ctrlKey: true, bubbles: true, cancelable: true,
+        clientX: el.getBoundingClientRect().left + el.clientWidth / 2,
+        clientY: el.getBoundingClientRect().top + el.clientHeight / 2,
+      }));
+    });
+    await expect
+      .poll(async () => parseFloat(await slider.inputValue()), { timeout: 5000 })
+      .toBeGreaterThan(before);
+
+    // Cards in the matrix: every spread grows its rails, and a seeded
+    // passage's card appears beside the page that holds its highlight.
+    await expect(page.locator('.loom-passage-highlight').first()).toBeAttached({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Cards in the margin' }).click();
+    await expect(page.locator('.pdf-spread-canvas .pdf-railcard').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.pdf-spread-canvas .pdf-rail-leaders path').first()).toBeAttached();
   });
 });

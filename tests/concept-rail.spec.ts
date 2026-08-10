@@ -77,9 +77,12 @@ test.describe('Concept rail', () => {
     await expect(page.locator('.pdf-rail')).toHaveCount(1, { timeout: 5000 });
     await expect(page.locator('.pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 5000 });
 
-    // Strip has no "beside the page" — the rails go, nothing else changes.
-    await page.getByRole('button', { name: 'Strip' }).click();
-    await expect(page.locator('.pdf-rail')).toHaveCount(0);
+    // The toggle follows the mode: in the matrix the same capture's card
+    // flanks its spread on the canvas (Strip is hidden — TJ 2026-08-10, the
+    // canvas supersedes it — so there is no third mode to check).
+    await page.getByRole('button', { name: 'Matrix' }).click();
+    await expect(page.locator('.pdf-spread-canvas .pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Strip' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Page', exact: true }).click();
     await expect(page.locator('.pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 10_000 });
 

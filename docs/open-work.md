@@ -247,6 +247,15 @@ gaps are now demonstrable rather than suspected:
   branches (TJ, 2026-08-09): **integrations honor the existing data structures
   and workflows** — display-layer only; what would bend either goes here
   instead of being built.
+  **2026-08-10, TJ: "rebuild Matrix as the canvas" — done.** The matrix is
+  the branch's zoomable spread grid now (`spreadLayout.ts` +
+  `SpreadCanvasView.tsx`, d3-zoom restored): one transform, Figma-style
+  trackpad, slider on the same transform, cards flanking every spread with
+  `--invk` counter-scaling. That closes the "freeform transform canvas +
+  counter-scaling" item that 5.5 listed as gated — struck from its list
+  below. What remains unported from the spread canvas: the single/spread
+  reading sub-modes with masks and snap (page mode already is the focused
+  spread) and the inline draft-card capture (2.1 invariant).
 - **5.5 "Spatial" — a prototype view of one reading's graph** (TJ, 2026-08-09:
   *"put the spatial graph view on the pipeline, make it a prototype view"*).
   From `origin/weekly-concept-map:weekly-concept-map/index.html` (the force
@@ -271,9 +280,9 @@ gaps are now demonstrable rather than suspected:
   embedding-based placement is red line #6 territory (the prototypes
   themselves shipped topology stand-ins); the spread canvas's inline
   draft-card capture conflicts with the 2.1 invariant (one shared ReuseOffer
-  on all three capture paths); its freeform transform canvas and
-  counter-scaling zoom-out need the matrix rebuilt as a single-transform
-  canvas plus d3-zoom/d3-selection back in `package.json`; a weekly
+  on all three capture paths); ~~its freeform transform canvas and
+  counter-scaling zoom-out~~ **built 2026-08-10** — the matrix is that canvas
+  now (see 5.4's note); a weekly
   multi-reading scope is representable today (`scopeOf(sourceIds[])`,
   `source.week` exists) but is a new surface and needs its `workflows.ts` row
   when designed. Recovery for all of it:

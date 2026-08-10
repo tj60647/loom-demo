@@ -104,6 +104,30 @@
 > one question" was the objection, so its ideas joined the existing answer.
 > The weekly-concept-map branch's spatial view is **pipeline, not built**:
 > open-work.md 5.5.
+> **The matrix IS the spread canvas now** (2026-08-10, TJ: "rebuild Matrix as
+> the canvas"): every 2-page spread on one near-square plane
+> (`src/lib/spreadLayout.ts`, asserted by `check:spread`) under ONE transform
+> (`SpreadCanvasView`, d3-zoom back in package.json) — drag or two-finger
+> scroll pans, pinch/ctrl+wheel zooms, and the toolbar slider drives the same
+> transform (1 = everything in view, synced back after a gesture settles).
+> Pages are the raster/text-layer split from the stamp above, retargeted
+> analytically off the layout. **Cards follow the toggle into the matrix**:
+> rails flank every spread, and `--invk` counter-scales card text against the
+> two-page fit while cards grow inward over their own pages — at full
+> zoom-out you are reading concepts, not the shrunken text. **Strip is
+> hidden** (TJ, 2026-08-10: "the new view supercedes it") — no button sets
+> it; the render branch stays for cheap restoration; page mode holds the
+> phone. Same ground rules: one capture path, display-only, nothing
+> persisted. Reviewed adversarially before landing; the fixes that came out
+> of it: matrix boxes are `overflow: clip` (a hidden box is still
+> programmatically scrollable, and a Tab-focus or the old scrollIntoView
+> effect would shift pixels the transform never learns about — that effect
+> is strip-gated now, and `focusPage` centers a page by transform instead);
+> touch pans everywhere (the drag-selects-text exclusion is mouse-only —
+> touch selection is long-press); the gesture range equals the slider range
+> exactly (a wider extent let a deep pinch rest where the settle sync would
+> yank it back); and the floating capture button re-seats on every transform
+> write, as it always did on scroll.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.

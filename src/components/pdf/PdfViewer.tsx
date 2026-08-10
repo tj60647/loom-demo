@@ -6,6 +6,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import CaptureModal, { type CaptureReuse } from './CaptureModal';
 import PageSlot from './PageSlot';
 import { type PdfDoc } from './PageRaster';
+import SpreadCanvasView from './SpreadCanvasView';
 import ConceptRails, { RAIL_W } from './ConceptRail';
 import ReuseOffer from '@/components/ui/ReuseOffer';
 import { useLoom } from '@/components/providers/LoomProvider';
@@ -97,9 +98,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   /**
    * How the pages are laid out.
    *  - `page`   one spread at a time, turned with the arrows (what this was)
-   *  - `strip`  every page in one horizontal run, scrolled sideways
-   *  - `matrix` every page on a grid you can zoom into and pan
-   * All three render ordinary react-pdf pages with their text layers, so a
+   *  - `strip`  every page in one horizontal run — HIDDEN since 2026-08-10
+   *             (TJ: the canvas matrix supersedes it); no button sets it, the
+   *             render branch stays for cheap restoration
+   *  - `matrix` the whole document as 2-page spreads on one zoomable canvas
+   * All of them render ordinary react-pdf pages with their text layers, so a
    * passage can be selected and captured in any of them.
    */
   const [viewMode, setViewMode] = useState<"page" | "strip" | "matrix">("page");
@@ -111,13 +114,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   const [railsOn, setRailsOn] = useState(false);
   // Covers the whole window, chrome included — the reading takes the screen.
   const [isFullscreen, setIsFullscreen] = useState(false);
-  // Matrix zoom, as a multiple of the base thumbnail width.
+  // Matrix zoom, as a multiple of the whole-canvas fit: 1 = every spread in
+  // view. The slider and the canvas's own pan/zoom gestures drive the SAME
+  // transform — SpreadCanvasView syncs this back when a gesture settles.
   const [zoom, setZoom] = useState(1);
-  // The pdf.js document proxy (set on load) and each matrix page's raster
-  // resolution target. Pages absent from the map sit at base resolution;
-  // targets are recomputed only when a zoom or scroll gesture settles.
+  // The pdf.js document proxy, kept for the matrix canvas's raster path.
   const [pdfProxy, setPdfProxy] = useState<PdfDoc | null>(null);
-  const [pageRes, setPageRes] = useState<Record<number, number>>({});
   // The document's height/width, measured off the first page that renders, so
   // the many-page views can reserve honest space before a page has drawn.
   const [aspect, setAspect] = useState(11 / 8.5);
@@ -471,6 +473,15 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * continuous views scroll constantly, so it has to keep up: re-read the live
    * selection's rectangle, and stand down once the selection is gone.
    */
+  // The matrix's canvas calls this on every transform write, so the button
+  // follows a wheel-pan the same way it follows a strip scroll. Held in a
+  // ref: the transform callback must stay identity-stable while the effect
+  // below re-registers per selection.
+  const repositionRef = useRef<(() => void) | null>(null);
+  const handleCanvasTransform = useCallback(() => {
+    repositionRef.current?.();
+  }, []);
+
   useEffect(() => {
     if (!highlightRect) return;
     const stageEl2 = stageRef.current;
@@ -488,10 +499,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     };
     stageEl2?.addEventListener("scroll", reposition, { passive: true });
     window.addEventListener("resize", reposition);
+    repositionRef.current = reposition;
     return () => {
       cancelAnimationFrame(frame);
       stageEl2?.removeEventListener("scroll", reposition);
       window.removeEventListener("resize", reposition);
+      repositionRef.current = null;
     };
   }, [highlightRect]);
 
@@ -901,12 +914,16 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   }, [advance, numPages]);
 
   /**
-   * In the continuous views a page is somewhere to scroll to, not something to
-   * turn to — so "go to this passage's page" (and the initial page) brings the
-   * page into view instead of swapping what is rendered.
+   * In the strip a page is somewhere to scroll to, not something to turn to —
+   * so "go to this passage's page" (and the initial page) brings the page
+   * into view instead of swapping what is rendered. STRIP ONLY: the matrix
+   * pans by transform inside clip-overflow boxes, so this scrollIntoView
+   * would either no-op or (in a merely-hidden box) shift pixels the d3
+   * transform never learns about; SpreadCanvasView's focusPage prop is the
+   * matrix's version of this effect.
    */
   useEffect(() => {
-    if (viewMode === "page") return;
+    if (viewMode !== "strip") return;
     const stageEl = stageRef.current;
     if (!stageEl) return;
     const timer = window.setTimeout(() => {
@@ -1015,65 +1032,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * wide the grid can no longer be panned sensibly.
    */
   const matrixColumns = isNarrow ? 2 : 4;
-  const matrixPageWidth = Math.min(
-    Math.max(((stage.w - 36) / matrixColumns - 18) * zoom, 90),
-    Math.max(stage.w * 2, 300)
-  );
-  // The zoom-independent width the matrix text layers render at — the same
-  // formula at zoom 1. The slider then only changes the slot's footprint and
-  // a CSS transform (footprint ÷ base), so dragging it re-renders nothing;
-  // sharpness comes back through the raster below, after the gesture settles.
+  // The width matrix text layers render at, once, in canvas units — sized so
+  // a spread-fit zoom reads like page mode. Zoom is a transform on the whole
+  // canvas (SpreadCanvasView owns it); this number never moves with it, which
+  // is what keeps the slider from re-rendering forty pages.
   const matrixBaseWidth = Math.min(
     Math.max((stage.w - 36) / matrixColumns - 18, 90),
     Math.max(stage.w * 2, 300)
   );
-
-  /**
-   * Re-target raster resolutions once the matrix stops moving (zoom drag or
-   * scroll), the spread canvas's settle pattern: pages intersecting the stage
-   * plus half a page of margin get resolution matching the zoom; everything
-   * else drops back to base and its raster CSS-stretches in the interim.
-   * Cap 8, not the branch's 12 — this zoom tops out at 4× and dpr at ~2.
-   */
-  useEffect(() => {
-    // Only the matrix reads pageRes; a stale map from the last visit costs
-    // nothing and the first settle below replaces it anyway.
-    if (viewMode !== "matrix") return;
-    const stageNode = stageRef.current;
-    if (!stageNode) return;
-    let timer: number | undefined;
-    const retarget = () => {
-      const box = stageNode.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      const target = Math.max(1, Math.min(8, Math.ceil(zoom * dpr * 2) / 2));
-      const margin = matrixPageWidth / 2;
-      const next: Record<number, number> = {};
-      if (target > 1) {
-        stageNode.querySelectorAll<HTMLElement>("[data-slot-page]").forEach((el) => {
-          const r = el.getBoundingClientRect();
-          const inView =
-            r.left < box.right + margin && r.right > box.left - margin &&
-            r.top < box.bottom + margin && r.bottom > box.top - margin;
-          if (inView) next[Number(el.dataset.slotPage)] = target;
-        });
-      }
-      setPageRes((prev) => {
-        const nk = Object.keys(next);
-        if (Object.keys(prev).length === nk.length && nk.every((k) => prev[+k] === next[+k])) return prev;
-        return next;
-      });
-    };
-    const schedule = () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(retarget, 200);
-    };
-    schedule();
-    stageNode.addEventListener("scroll", schedule, { passive: true });
-    return () => {
-      window.clearTimeout(timer);
-      stageNode.removeEventListener("scroll", schedule);
-    };
-  }, [viewMode, zoom, matrixPageWidth, stageEl]);
 
   // Calculate page dimensions based on fit mode
   // What the toggle carries when the sheet is shut. Cheap and permanent, and
@@ -1391,7 +1357,19 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            be scrolled to. */
         .pdf-stage.mode-page { overflow: auto; display: flex; justify-content: safe center; }
         .pdf-stage.mode-strip { overflow-x: auto; overflow-y: hidden; }
-        .pdf-stage.mode-matrix { overflow: auto; }
+        /* The matrix pans by TRANSFORM, not by scroll — clip, not hidden,
+           and the difference is the same one .pdf-body documents: "hidden"
+           is still a scroll container, so a scrollIntoView or a Tab-focus
+           onto an off-view highlight would scroll it by an offset the d3
+           transform never learns about, permanently desyncing rastering,
+           pinch anchoring and the slider's recenter. "clip" cannot scroll.
+           PageSlot's IntersectionObserver still uses the stage as its root:
+           an IO root clips without needing to scroll, and transforms move
+           slots in and out of it just fine. position: relative because the
+           spread viewport fills it with position:absolute/inset:0 — NOT
+           height:100%, which resolves to 0 against a flex-stretched stage
+           and silently clips every page. */
+        .pdf-stage.mode-matrix { overflow: clip; position: relative; }
 
         /* The pages, and the sheet over them. No size of its own: it is the
            stage's old box, split off only so Your work has something to be
@@ -1430,14 +1408,41 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           padding: 12px 18px;
           width: max-content;
         }
-        .pdf-matrix-grid {
-          display: flex;
-          flex-wrap: wrap;
-          align-content: flex-start;
-          justify-content: safe center;
-          gap: 18px;
-          padding: 18px;
+        /* The matrix's spread canvas: one transformed plane holding every
+           spread. The transform is written imperatively (SpreadCanvasView),
+           so pan/zoom never re-renders a page. */
+        .pdf-spread-viewport {
+          position: absolute;
+          inset: 0;
+          /* clip, never hidden — same reason as the stage above. */
+          overflow: clip;
+          /* d3 owns every gesture here; without this, a touch pan scrolls
+             the document instead of the canvas. */
+          touch-action: none;
+          cursor: grab;
         }
+        .pdf-spread-viewport:active { cursor: grabbing; }
+        .pdf-spread-canvas {
+          position: absolute;
+          top: 0;
+          left: 0;
+          transform-origin: 0 0;
+          will-change: transform;
+        }
+        .pdf-spread-canvas .react-pdf__Page__textContent { cursor: text; }
+        .pdf-spread-rails {
+          /* Not selectable: a drag that starts on a card anchors outside
+             every page — same hazard as .pdf-slot-label. */
+          user-select: none;
+          -webkit-user-select: none;
+        }
+        /* Counter-scaling: card text never shrinks below its reading size as
+           the canvas zooms out. Done via font-size — real layout, not a
+           transform — so the card grows to hold it and the rail re-stacks. */
+        .pdf-spread-canvas .pdf-railcard-label { font-size: calc(13px * var(--invk, 1)); }
+        .pdf-spread-canvas .pdf-railcard-def { font-size: calc(12px * var(--invk, 1)); }
+        .pdf-spread-canvas .pdf-railcard-note { font-size: calc(11px * var(--invk, 1)); }
+        .pdf-spread-canvas .pdf-railcard-chip { font-size: calc(10px * var(--invk, 1)); }
         /* The matrix raster path: our canvas below, react-pdf's text layer
            laid absolutely over it — the Page div itself paints nothing. The
            scale wrapper clips to the slot's zoomed footprint so the transform
@@ -1489,7 +1494,6 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
         @media (max-width: 900px) {
           .pdf-strip-run { gap: 10px; padding: 8px 10px; }
-          .pdf-matrix-grid { gap: 10px; padding: 10px; }
           /* One row, no wrapping: the toolbar is a strip of controls the width
              of the screen, not a block that grows downward into the reading. */
           .pdf-toolbar {
@@ -1652,12 +1656,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               data-tip="one spread at a time"
               aria-pressed={viewMode === "page"}
             >Page</button>
-            <button
-              className={`btn mini ${viewMode === "strip" ? "" : "ghost"}`}
-              onClick={() => setViewMode("strip")}
-              data-tip="every page in one run — scroll sideways"
-              aria-pressed={viewMode === "strip"}
-            >Strip</button>
+            {/* Strip is HIDDEN, not deleted (TJ, 2026-08-10: "the new view
+                supercedes it") — the matrix canvas is the continuous view
+                now, and page mode holds the phone. The render branch and CSS
+                stay, so restoring the button restores the mode. */}
             <button
               className={`btn mini ${viewMode === "matrix" ? "" : "ghost"}`}
               onClick={() => setViewMode("matrix")}
@@ -1694,7 +1696,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               <input
                 type="range"
                 min={0.5}
-                max={4}
+                max={8}
                 step={0.1}
                 value={zoom}
                 onChange={(e) => setZoom(parseFloat(e.target.value))}
@@ -1716,8 +1718,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           )}
 
           {/* The margin cards. A display toggle, not a mode: the pages, the
-              capture flow and the keyboard are exactly the paged view's. */}
-          {viewMode === "page" && !isNarrow && (
+              capture flow and the keyboard are exactly the host view's. In
+              page mode they flank the open spread; in the matrix they flank
+              every spread and counter-scale, so zooming out reads as a
+              concept map. */}
+          {(viewMode === "page" || viewMode === "matrix") && !isNarrow && (
             <button
               className={`btn mini ${railsOn ? "" : "ghost"}`}
               onClick={() => setRailsOn((on) => !on)}
@@ -1999,27 +2004,31 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </div>
           )}
 
-          {/* Matrix: every page at once, zoomable. At the low end it is a
-              contact sheet for finding your way; wind the zoom up and the same
-              grid becomes readable, and a passage can be taken from it. */}
+          {/* Matrix: the whole document as 2-page spreads on one zoomable
+              canvas. At the low end it is a contact sheet for finding your
+              way — and, with Cards on, a concept map, because the cards
+              counter-scale while the pages shrink; wind the zoom in and the
+              same canvas becomes readable, and a passage can be taken from
+              it. Pan by dragging or two-finger scroll; pinch or ctrl+wheel
+              zooms; the toolbar slider drives the same transform. */}
           {viewMode === "matrix" && (
-            <div className="pdf-matrix-grid">
-              {Array.from({ length: numPages ?? 0 }, (_, i) => (
-                <PageSlot
-                  key={i + 1}
-                  pageNumber={i + 1}
-                  width={matrixPageWidth}
-                  aspect={aspect}
-                  root={stageEl}
-                  eager={i === 0}
-                  onAspect={setAspect}
-                  label
-                  pdf={pdfProxy}
-                  baseWidth={matrixBaseWidth}
-                  res={pageRes[i + 1] ?? 1}
-                />
-              ))}
-            </div>
+            <SpreadCanvasView
+              pdf={pdfProxy}
+              numPages={numPages ?? 0}
+              basePageWidth={matrixBaseWidth}
+              aspect={aspect}
+              stage={stage}
+              stageEl={stageEl}
+              cardsOn={railsOn && !isNarrow}
+              passages={scoped.passages}
+              concepts={state.concepts}
+              onOpenPassage={gotoOpenPassage}
+              onAspect={setAspect}
+              zoomMultiplier={zoom}
+              onZoomMultiplier={setZoom}
+              focusPage={pageNumber}
+              onTransform={handleCanvasTransform}
+            />
           )}
         </Document>
       </div>
