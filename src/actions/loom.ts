@@ -1294,6 +1294,13 @@ export async function loadWorkedExample() {
       sentence: e.sentence, handle: e.handle,
     }))
 
+  // The example's projection lives with the example READING, not at the
+  // whole weave: scopeKey "" put it on a surface no student can reach (the
+  // hidden weave), so the example taught everything except the thing
+  // projections are for. Projections-before-weave (TJ, 2026-08-10) unblocked
+  // this — it opens on the example reading's own Knowledge Graph now.
+  const exampleScopeKey = scopeOf([exampleSourceId]).key
+
   const passageConceptIds = new Map(passageConceptRows.map((r) => [r.passageId, [r.conceptId]]))
   const snapshot: GraphSnapshot = {
     concepts: conceptRows.map((c) => ({ id: c.id, label: c.label })),
@@ -1317,7 +1324,7 @@ export async function loadWorkedExample() {
     db.insert(passages).values(passageRows),
     db.insert(passageConcepts).values(passageConceptRows),
     db.insert(edges).values(edgeRows),
-    db.insert(maps).values({ courseId, userId, scopeKey: "", name: "Projection 1", read: WORKED_EXAMPLE.read, essence: "", tiers: exampleTiers }),
+    db.insert(maps).values({ courseId, userId, scopeKey: exampleScopeKey, name: "Projection 1", read: WORKED_EXAMPLE.read, essence: "", tiers: exampleTiers }),
   ])
 
   return getUserLoomData()
