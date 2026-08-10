@@ -25,7 +25,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { select } from "d3-selection";
+import { select, pointer } from "d3-selection";
 import { zoom, zoomIdentity, type ZoomBehavior, type D3ZoomEvent, type ZoomTransform } from "d3-zoom";
 import PageSlot from "./PageSlot";
 import { type PdfDoc } from "./PageRaster";
@@ -100,6 +100,10 @@ export default function SpreadCanvasView({
   const tref = useRef<ZoomTransform>(zoomIdentity);
   const zbRef = useRef<ZoomBehavior<HTMLDivElement, unknown> | null>(null);
   const settleTimer = useRef<number | undefined>(undefined);
+  // The smoothed wheel: notches move the target, the rAF loop chases it.
+  const wheelTarget = useRef(1);
+  const wheelAnchor = useRef<[number, number]>([0, 0]);
+  const wheelFrame = useRef(0);
   const initedRef = useRef(false);
   const [pageRes, setPageRes] = useState<Record<number, number>>({});
   const [anchors, setAnchors] = useState<Record<string, Anchor>>({});
@@ -183,16 +187,32 @@ export default function SpreadCanvasView({
   }, [retargetRes]);
 
   // --- the zoom behaviour: always freeform ---
+  // will-change lives only around movement: standing, it makes Chrome scale
+  // a once-rasterized bitmap of the whole canvas (pixelated cards and
+  // pages); absent, every pan frame re-rasters (jank). The release is
+  // DELAYED, not immediate: d3 ends a wheel gesture 150ms after the last
+  // notch, and zb.transform emits a start/end pair per call, so an eager
+  // removal made every scroll burst de-promote and re-rasterize the whole
+  // canvas between notches — the jerk TJ felt. The hint now survives a
+  // burst and lets go 300ms after the last write.
+  const hintTimer = useRef<number | undefined>(undefined);
+  const hintOn = useCallback(() => {
+    window.clearTimeout(hintTimer.current);
+    canvasRef.current?.style.setProperty("will-change", "transform");
+  }, []);
+  const hintRelease = useCallback(() => {
+    window.clearTimeout(hintTimer.current);
+    hintTimer.current = window.setTimeout(
+      () => canvasRef.current?.style.removeProperty("will-change"),
+      300
+    );
+  }, []);
+  useEffect(() => () => window.clearTimeout(hintTimer.current), []);
+
   useEffect(() => {
     zbRef.current = zoom<HTMLDivElement, unknown>()
-      // will-change lives only inside a gesture: standing, it makes Chrome
-      // scale a once-rasterized bitmap of the whole canvas (pixelated cards
-      // and pages); absent, every pan frame re-rasters (jank). During = the
-      // cheap path while moving; the "end" removal is what lets the settled
-      // frame re-rasterize sharp. Programmatic transforms (slider, Fit,
-      // focusPage) emit the same start/end pair, so they get the hint too.
-      .on("start.raster", () => canvasRef.current?.style.setProperty("will-change", "transform"))
-      .on("end.raster", () => canvasRef.current?.style.removeProperty("will-change"))
+      .on("start.raster", hintOn)
+      .on("end.raster", hintRelease)
       .filter((e: Event & { button?: number }) => {
         // A MOUSE drag that starts on page text selects text — but only a
         // mouse drag: on touch, selection is long-press, not drag, so
@@ -205,7 +225,7 @@ export default function SpreadCanvasView({
         return !e.button;
       })
       .on("zoom", (e: D3ZoomEvent<HTMLDivElement, unknown>) => applyTransform(e.transform));
-  }, [applyTransform]);
+  }, [applyTransform, hintOn, hintRelease]);
 
   useEffect(() => {
     const zb = zbRef.current;
@@ -228,17 +248,66 @@ export default function SpreadCanvasView({
     sel.call(zb);
     sel.on("dblclick.zoom", null); // double-click zoom jumps are hostile mid-reading
     // Wheel = zoom at the cursor, drag = pan — the map-canvas idiom (TJ,
-    // 2026-08-10, replacing the branch's Figma scheme where scroll panned).
-    // d3-zoom's default wheel handler IS that idiom, pinch included: a
-    // trackpad pinch arrives as ctrl+wheel and d3's default wheelDelta gives
-    // it the 10x factor that makes pinching feel 1:1 rather than glacial.
+    // 2026-08-10). But NOT d3's default wheel handler: that one applies each
+    // wheel notch instantly, a ~15% scale snap per click of the wheel, which
+    // reads as jerky. Each notch here moves a TARGET; a rAF loop eases the
+    // real transform toward it, anchored at the cursor — the Google-Maps
+    // feel. A trackpad pinch (ctrl+wheel by convention) rides the same path
+    // with d3's own 10x factor so pinching stays 1:1 rather than glacial.
+    sel.on("wheel.zoom", null);
+    sel.on("wheel.smooth", (e: WheelEvent) => {
+      e.preventDefault();
+      const { fitAllK } = live.current;
+      const mult = e.deltaMode === 1 ? 0.05 : 0.002; // line-scrolling mice report lines
+      const factor = Math.pow(2, -e.deltaY * mult * (e.ctrlKey || e.metaKey ? 10 : 1));
+      if (!wheelFrame.current) wheelTarget.current = tref.current.k;
+      wheelTarget.current = Math.max(
+        fitAllK * 0.5,
+        Math.min(fitAllK * 8, wheelTarget.current * factor)
+      );
+      wheelAnchor.current = pointer(e, el);
+      hintOn();
+      if (!wheelFrame.current) {
+        const tick = () => {
+          const zbNow = zbRef.current;
+          const elNow = viewportRef.current;
+          if (!zbNow || !elNow) { wheelFrame.current = 0; return; }
+          const t = tref.current;
+          const target = wheelTarget.current;
+          // Exponential chase: ~4 frames to close most of the gap.
+          const next = t.k + (target - t.k) * 0.35;
+          const done = Math.abs(target - next) / target < 0.002;
+          const k = done ? target : next;
+          const [px, py] = wheelAnchor.current;
+          // The canvas point under the cursor stays under the cursor.
+          zbNow.transform(select(elNow), zoomIdentity
+            .translate(px - (px - t.x) * (k / t.k), py - (py - t.y) * (k / t.k))
+            .scale(k));
+          wheelFrame.current = done ? 0 : requestAnimationFrame(tick);
+          if (done) hintRelease();
+        };
+        wheelFrame.current = requestAnimationFrame(tick);
+      }
+    });
     return () => {
       sel.on(".zoom", null);
+      sel.on("wheel.smooth", null);
+      cancelAnimationFrame(wheelFrame.current);
+      wheelFrame.current = 0;
     };
   }, [layout != null]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** A programmatic transform owns the canvas: the wheel's chase loop must
+   *  stand down first, or it keeps steering toward its stale target and
+   *  Fit/goto lose the race one frame later. */
+  const cancelWheel = useCallback(() => {
+    cancelAnimationFrame(wheelFrame.current);
+    wheelFrame.current = 0;
+  }, []);
+
   /** Set k = m·fitAllK, keeping the canvas point at the stage centre fixed. */
   const applyMultiplier = useCallback((m: number, recenter = false) => {
+    cancelWheel();
     const el = viewportRef.current;
     const zb = zbRef.current;
     const { layout, stage, fitAllK } = live.current;
@@ -256,7 +325,7 @@ export default function SpreadCanvasView({
       t2 = zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k);
     }
     zb.transform(select(el), t2);
-  }, []);
+  }, [cancelWheel]);
 
   // First fit, and the toolbar's − / + / Fit. The 0.05 tolerance breaks the
   // loop with the settle-time sync above. Fit (exactly 1) recenters: "1 =
@@ -311,8 +380,9 @@ export default function SpreadCanvasView({
     const k = tref.current.k;
     const cx = pageX(layout, s, focusPage, basePageWidth) + basePageWidth / 2;
     const cy = s.y + layout.unitH / 2;
+    cancelWheel();
     zb.transform(select(el), zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k));
-  }, [focusPage, layout]);
+  }, [focusPage, layout, cancelWheel]);
 
   // --- pages ---
   const pagesEl = useMemo(() => {

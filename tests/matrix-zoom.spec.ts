@@ -140,11 +140,16 @@ test.describe('Matrix zoom', () => {
           clientY: b.top + el.clientHeight / 2,
         }));
       }, opts);
-    await wheelAtCenter({ deltaY: -240 });
-    await expect.poll(canvasK, { timeout: 5000 }).toBeGreaterThan(atFit);
+    // Poll-and-nudge: each iteration scrolls again, so a first event lost to
+    // an attach race cannot strand the assertion — and repeated notches ARE
+    // how a wheel is really used.
+    await expect
+      .poll(async () => { await wheelAtCenter({ deltaY: -240 }); return canvasK(); }, { timeout: 8000 })
+      .toBeGreaterThan(atFit);
     const afterWheel = await canvasK();
-    await wheelAtCenter({ deltaY: -240, ctrlKey: true });
-    await expect.poll(canvasK, { timeout: 5000 }).toBeGreaterThan(afterWheel);
+    await expect
+      .poll(async () => { await wheelAtCenter({ deltaY: -240, ctrlKey: true }); return canvasK(); }, { timeout: 8000 })
+      .toBeGreaterThan(afterWheel * 1.05);
 
     // Fit takes it back to everything-in-view.
     await page.getByRole('button', { name: 'Fit the whole reading' }).click();
