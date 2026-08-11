@@ -176,13 +176,40 @@ export type CourseSourceLink = {
   createdAt: Date
 }
 
+/**
+ * A Link — the reusable relationship the student owns (5.1, migration 0024).
+ * USER-LEVEL, like a Concept (TJ, 2026-08-10: "links are user-level"), so the
+ * student can gloss "leads to" in their own words.
+ *
+ * It exists independently of any Thread that uses it, which is the point:
+ * naming a relationship you expect to need, before you have a pair to hang it
+ * on, is a legal act — the same shape as naming a Concept before its evidence.
+ */
+export type Link = {
+  id: string
+  courseId: string | null
+  userId: string
+  label: string
+  /** The Link's own gloss — one meaning, shared by every Thread using it. */
+  description: string
+  createdAt: Date
+}
+
 export type Edge = {
   id: string
   courseId: string | null
   userId: string
   fromId: string
   toId: string
+  /**
+   * LEGACY string copy of the Link Label, still dual-written through 5.1's
+   * expand phase so nothing breaks mid-changeover. Read `linkId` first and
+   * fall back to this; the column's drop is a later migration.
+   */
   handle: string | null
+  /** The Link this Thread uses. Null = thrown but not yet labelled (P0.3). */
+  linkId: string | null
+  /** The per-pair sentence — the Thread's own description, not the Link's. */
   sentence: string
   createdAt: Date
 }
@@ -269,7 +296,7 @@ export type GraphEvent = {
   courseId: string | null
   userId: string
   kind: string
-  entityType: "concept" | "passage" | "edge" | "graph" | "map" | "cloth"
+  entityType: "concept" | "passage" | "edge" | "link" | "graph" | "map" | "cloth"
   entityId: string | null
   payload: Record<string, unknown> | null
   at: Date
@@ -279,6 +306,12 @@ export type LoomState = {
   concepts: Concept[]
   passages: Passage[]
   edges: Edge[]
+  /**
+   * The student's Link vocabulary — UNSCOPED, like concepts. Holds labels
+   * that no Thread uses yet, which is why it is a list of its own rather
+   * than something derived from `edges`.
+   */
+  links: Link[]
   maps: LoomMap[]
   /** One per scope the student has titled or described ('' = whole weave). */
   cloths: Cloth[]

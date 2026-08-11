@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/db"
-import { concepts, passages, passageConcepts, edges, users, sourcePages, sources, cloths, views, graphEvents, maps } from "@/db/schema"
+import { concepts, passages, passageConcepts, edges, links, users, sourcePages, sources, cloths, views, graphEvents, maps } from "@/db/schema"
 import { and, asc, eq, inArray, isNull, like, or, sql, type SQL } from "drizzle-orm"
 import type { PgColumn } from "drizzle-orm/pg-core"
 import { getServerSession } from "next-auth/next"
@@ -87,7 +87,7 @@ async function recordEvent(
   userId: string,
   courseId: string | null,
   kind: string,
-  entityType: "concept" | "passage" | "edge" | "graph" | "map" | "cloth",
+  entityType: "concept" | "passage" | "edge" | "link" | "graph" | "map" | "cloth",
   entityId: string | null,
   payload?: Record<string, unknown>
 ) {
@@ -200,6 +200,12 @@ export async function getUserLoomData() {
   const userEdges = await db.select().from(edges)
     .where(and(eq(edges.userId, userId), inCourse(edges.courseId, courseId)))
     .orderBy(asc(edges.createdAt), asc(edges.id))
+  // The Link vocabulary (5.1). Read as its own list, not derived from edges:
+  // a Link the student coined but has not used yet exists only here, and that
+  // state is the point of the object (TJ, 2026-08-10).
+  const userLinks = await db.select().from(links)
+    .where(and(eq(links.userId, userId), inCourse(links.courseId, courseId)))
+    .orderBy(asc(links.createdAt), asc(links.id))
   const clothRows = await db.select().from(cloths)
     .where(and(eq(cloths.userId, userId), inCourse(cloths.courseId, courseId)))
     .orderBy(asc(cloths.createdAt), asc(cloths.id))
@@ -232,6 +238,7 @@ export async function getUserLoomData() {
     concepts: userConcepts,
     passages: userPassages,
     edges: userEdges,
+    links: userLinks,
     maps: userMaps as LoomMap[],
     cloths: clothRows,
     views: loomViews,
@@ -640,6 +647,8 @@ export async function createEdge(data: { fromId: string, toId: string, sentence?
   const sentence = data.sentence ?? ""
   const newEdge = await db.insert(edges).values({
     courseId,
+    // A thread may be thrown before it is labelled (P0.3), so linkId stays
+    // null here and is attached when the label is coined (updateEdge).
     userId,
     fromId: data.fromId,
     toId: data.toId,
@@ -655,17 +664,91 @@ export async function createEdge(data: { fromId: string, toId: string, sentence?
   return newEdge[0]
 }
 
+/**
+ * The student's Link for this label — found, or coined now (5.1).
+ *
+ * Case-insensitive, matching how the derived Link List always grouped
+ * handles: "Leads to" and "leads to" were one row on screen, and the object
+ * must not quietly become two. Reuse rather than mint is the whole point —
+ * the design note's warning is that Links-as-objects WITHOUT attachment keep
+ * making near-duplicates by string copy, and a vocabulary nobody trusts is
+ * worse than the derived list it replaced.
+ *
+ * Homonyms stay legal (ruling 36): this reuses an exact-label match, it never
+ * refuses a new label that merely resembles one.
+ */
+async function resolveLink(userId: string, courseId: string | null, rawLabel: string): Promise<string | null> {
+  const label = rawLabel.trim()
+  if (!label) return null
+
+  const existing = await db.select({ id: links.id }).from(links)
+    .where(and(
+      eq(links.userId, userId),
+      inCourse(links.courseId, courseId),
+      sql`lower(btrim(${links.label})) = ${label.toLowerCase()}`
+    ))
+    .limit(1)
+  if (existing.length) return existing[0].id
+
+  const made = await db.insert(links).values({ courseId, userId, label, description: "" }).returning({ id: links.id })
+  return made[0].id
+}
+
 export async function updateEdge(id: string, data: Partial<{ handle: string, sentence: string }>) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
-  const updated = await db.update(edges).set(data)
+  // Coining a label attaches the Link OBJECT as well as writing the string.
+  // Dual-write through 5.1's expand phase: `handle` stays until its column is
+  // dropped, so an unmigrated reader and this one agree.
+  const linkId = data.handle !== undefined ? await resolveLink(userId, courseId, data.handle) : undefined
+  const patch = linkId !== undefined ? { ...data, linkId } : data
+
+  const updated = await db.update(edges).set(patch)
     .where(and(eq(edges.id, id), eq(edges.userId, userId), inCourse(edges.courseId, courseId)))
     .returning({ id: edges.id })
 
   if (updated.length > 0) {
     const kind = data.handle !== undefined ? "edge.coin" : "edge.update"
-    await recordEvent(userId, courseId, kind, "edge", id, { ...data })
+    await recordEvent(userId, courseId, kind, "edge", id, { ...data, ...(linkId !== undefined ? { linkId } : {}) })
+  }
+}
+
+/**
+ * Coin a Link with no Thread using it yet — TJ's case, 2026-08-10: "it is
+ * possible to have a link with label and definition without it being used in
+ * a thread". Unrepresentable before 5.1, because a label was a column on the
+ * thread that would have had to exist first.
+ */
+export async function createLink(data: { label: string; description?: string }) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+  const made = await db.insert(links).values({
+    courseId,
+    userId,
+    label: data.label.trim(),
+    description: data.description ?? "",
+  }).returning()
+  await recordEvent(userId, courseId, "link.coin", "link", made[0].id, { label: made[0].label })
+  return made[0]
+}
+
+/** Sharpen a Link's label or its gloss — one meaning, shared by every Thread. */
+export async function updateLink(id: string, data: Partial<{ label: string; description: string }>) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+  const updated = await db.update(links).set(data)
+    .where(and(eq(links.id, id), eq(links.userId, userId), inCourse(links.courseId, courseId)))
+    .returning({ id: links.id })
+  if (updated.length > 0) {
+    // The label lives on the Link now, but `handle` is still dual-written
+    // until its column goes — so a rename has to reach the threads too, or
+    // the two disagree for every reader still falling back to the string.
+    if (typeof data.label === "string") {
+      await db.update(edges).set({ handle: data.label })
+        .where(and(eq(edges.linkId, id), eq(edges.userId, userId)))
+    }
+    await recordEvent(userId, courseId, "link.update", "link", id, { ...data })
   }
 }
 

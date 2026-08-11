@@ -115,7 +115,7 @@ export interface LoomContextType {
 
 export const LoomContext = createContext<LoomContextType | null>(null)
 
-const blankState = (): LoomState => ({ concepts: [], passages: [], edges: [], maps: [], cloths: [], views: emptyViews() })
+const blankState = (): LoomState => ({ concepts: [], passages: [], edges: [], links: [], maps: [], cloths: [], views: emptyViews() })
 
 export function LoomProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession()
@@ -476,7 +476,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const addEdge = async (fromId: string, toId: string, sentence: string) => {
     const tempId = crypto.randomUUID()
-    const tempEdge: Edge = { id: tempId, courseId: null, userId: session!.user!.id, fromId, toId, handle: "", sentence, createdAt: new Date() }
+    const tempEdge: Edge = { id: tempId, courseId: null, userId: session!.user!.id, fromId, toId, handle: "", linkId: null, sentence, createdAt: new Date() }
     applyLocal(s => ({ ...s, edges: [...s.edges, tempEdge] }))
     const creating = (async () => {
       try {

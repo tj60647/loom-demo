@@ -52,10 +52,10 @@ const state: LoomState = {
     passage("p-loose", [], HERE),
   ],
   edges: [
-    { id: "e-here", courseId: null, userId: "u", fromId: "c-here", toId: "c-both", handle: "", sentence: "", createdAt: at },
-    { id: "e-cross", courseId: null, userId: "u", fromId: "c-here", toId: "c-there", handle: "", sentence: "", createdAt: at },
+    { id: "e-here", courseId: null, userId: "u", fromId: "c-here", toId: "c-both", handle: "", linkId: null, sentence: "", createdAt: at },
+    { id: "e-cross", courseId: null, userId: "u", fromId: "c-here", toId: "c-there", handle: "", linkId: null, sentence: "", createdAt: at },
   ],
-  maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } },
+  links: [], maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } },
 }
 
 const ev = (kind: string, entityType: GraphEvent["entityType"], entityId: string | null, payload: Record<string, unknown> | null): GraphEvent => ({

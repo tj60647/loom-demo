@@ -55,7 +55,7 @@ import type {
 
 const emptyView = (): CardTableView => ({ positions: {}, bends: {} })
 const blank = (): LoomState => ({
-  concepts: [], passages: [], edges: [], maps: [], cloths: [],
+  concepts: [], passages: [], edges: [], links: [], maps: [], cloths: [],
   views: { cardTable: emptyView() },
 })
 
@@ -243,7 +243,7 @@ export default function SandboxLoomProvider({
   // --- threads ---
 
   const addEdge = useCallback(async (fromId: string, toId: string, sentence: string) => {
-    const e: Edge = { id: newId(), courseId: null, userId: uid, fromId, toId, handle: "", sentence, createdAt: now() }
+    const e: Edge = { id: newId(), courseId: null, userId: uid, fromId, toId, handle: "", linkId: null, sentence, createdAt: now() }
     setState((s) => ({ ...s, edges: [...s.edges, e] }))
     noted()
     return e

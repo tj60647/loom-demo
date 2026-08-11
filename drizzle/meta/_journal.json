@@ -169,6 +169,13 @@
       "when": 1786305972287,
       "tag": "0023_passages_not_bytes",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786480250015,
+      "tag": "0024_link_as_object",
+      "breakpoints": true
     }
   ]
 }

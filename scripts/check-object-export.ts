@@ -55,7 +55,7 @@ const passage = (id: string, conceptIds: string[], sourceId: string | null, cont
   note: "", question: "", isPullQuote: false, tier: "", createdAt: at,
 })
 const edge = (id: string, fromId: string, toId: string, handle: string): Edge => ({
-  id, courseId: null, userId: "u", fromId, toId, handle, sentence: "one holds the other", createdAt: at,
+  id, courseId: null, userId: "u", fromId, toId, handle, linkId: null, sentence: "one holds the other", createdAt: at,
 })
 const cloth = (key: string, title: string): Cloth => ({
   id: `cl-${key}`, courseId: null, userId: "u", scopeKey: key, title,
@@ -75,6 +75,7 @@ const state: LoomState = {
     passage("p4", ["c1"], OTHER, "the same concept, met again"),
   ],
   edges: [edge("e1", "c1", "c2", "constrains")],
+  links: [],
   maps: [map("m1", scopeKey, "Object worlds, sorted"), map("m2", "", "whole weave one")],
   cloths: [cloth(scopeKey, "My reading of it")],
   views: { cardTable: { positions: {}, bends: {} } },
@@ -145,7 +146,7 @@ console.log("\nobject export — each object leaves whole")
 
 // --- degenerate ---
 {
-  const blank: LoomState = { concepts: [], passages: [], edges: [], maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
+  const blank: LoomState = { concepts: [], passages: [], edges: [], links: [], maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
   const c = buildClothExport(blank, scopeKey, prov)
   assert(c.graph.concepts.length === 0 && c.projections.length === 0, "an empty cloth exports empty, not broken", JSON.stringify(c.graph))
   assert(typeof buildVocabularyMarkdown(blank, prov) === "string", "an empty vocabulary still renders", "threw")

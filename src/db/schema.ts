@@ -661,13 +661,55 @@ export const graphEvents = pgTable("graph_event", {
   // 'graph.example'.
   kind: text("kind").notNull(),
   entityType: text("entityType")
-    .$type<"concept" | "passage" | "edge" | "graph" | "map" | "cloth">()
+    .$type<"concept" | "passage" | "edge" | "link" | "graph" | "map" | "cloth">()
     .notNull(),
   entityId: text("entityId"),
   // Enough of the entity to replay the graph at any point in the timeline.
   payload: jsonb("payload").$type<Record<string, unknown>>(),
   at: timestamp("at").defaultNow().notNull(),
 })
+
+/**
+ * A Link — the reusable relationship the student owns (5.1, migration 0024;
+ * "links are user-level", TJ 2026-08-10).
+ *
+ * USER-LEVEL, like a Concept: the student can write their own gloss on "leads
+ * to", which a shared read-only vocabulary could not offer. The Link holds the
+ * Label and its Description; a Thread (`edge`) holds the two Concepts and its
+ * own per-pair sentence. That split is what lets a Link exist BEFORE any
+ * thread uses it — TJ's case, and unrepresentable while the label was a
+ * string on the edge.
+ *
+ * No unique on label: homonyms are warned, never forbidden (ruling 36), the
+ * same rule Concepts live under. `mergeLinks` is the repair, and is still to
+ * come.
+ */
+export const links = pgTable(
+  "link",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    courseId: text("courseId").references(() => courses.id, {
+      onDelete: "set null",
+    }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    label: text("label").default("").notNull(),
+    /** The Link's own gloss — one meaning, shared by every thread using it. */
+    description: text("description").default("").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (link) => ({
+    byUser: index("link_user_course_idx").on(link.userId, link.courseId),
+    // Label outranks gloss, as the handle did. Query side repeats verbatim.
+    searchIdx: index("link_search_idx").using(
+      "gin",
+      sql`(setweight(to_tsvector('english', coalesce(${link.label}, '')), 'A') || setweight(to_tsvector('english', coalesce(${link.description}, '')), 'B'))`
+    ),
+  })
+)
 
 export const edges = pgTable(
   "edge",
@@ -687,7 +729,15 @@ export const edges = pgTable(
     toId: text("toId")
       .notNull()
       .references(() => concepts.id, { onDelete: "cascade" }),
+    /**
+     * LEGACY, kept through the expand phase of 5.1 (migration 0024). The Link
+     * Label lives on `link` now; this column is still written and still read
+     * as a fallback so that nothing breaks while the code changes over, and
+     * so an unmigrated reader keeps working. Its drop is a later migration.
+     */
     handle: text("handle").default(""),
+    /** The Link this thread uses. Null = thrown but not yet labelled (P0.3). */
+    linkId: text("linkId").references(() => links.id, { onDelete: "set null" }),
     // The link description — optional at throw (golden path: connect first,
     // describe when ready). Default '' rather than nullable so render code
     // never branches (P0.3).

@@ -49,7 +49,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     aggregateUnavailable = true
   }
 
-  const state: LoomState = { concepts, passages, edges, maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
+  const state: LoomState = { concepts, passages, edges, links: [], maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
   const names = Object.fromEntries(members.map((member) => [member.id, member.name]))
 
   return (
