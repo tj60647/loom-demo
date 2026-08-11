@@ -17,7 +17,7 @@ const GUIDE = [
   p:'Tap two of your concepts, then say — however awkwardly — how they hang together. That sentence IS the connection. Later, coin a short label for it so a kind of link can recur; the machine never names it for you.',
   loom:'Weft = the relations thrown across to bind the warp. Pick · pick · say · throw.'},
  {k:'03 — knowledge graph', h:'③ Sort, arrange, and read the cloth',
-  p:'Sort your concepts into tiers (primary / secondary / tertiary), then drag the cards to arrange them — general above, specific below. Below the table the cloth shows you what it counts — the spine, the centre, the gap — as questions, and you write the read.',
+  p:'Sort your concepts into tiers (primary / secondary / tertiary) on the list, then drag the cards to arrange them on the board — general above, specific below. Below the board the cloth shows you what it counts — the spine, the centre, the gap — as questions, and you write the read.',
   loom:'Sort · arrange · check, then look · trace · question · write. Placement and reading are both yours.'},
  {k:'04 — vocabulary', h:'④ The words you own',
   p:'Every concept you have named and every label you have coined, across all your readings — not just this one. Sharpen a description, see which words are recurring, and merge two entries if you named the same idea twice.',
