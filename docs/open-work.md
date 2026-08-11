@@ -317,6 +317,21 @@ gaps are now demonstrable rather than suspected:
   when designed. Recovery for all of it:
   `git show origin/spread-canvas-reading:src/components/pdf/SpreadCanvas.tsx`
   and the two `origin/weekly-concept-map` paths above.
+- **5.7 Keep dissolves; downloads happen at the object — ruled 2026-08-10,
+  not built.** Full analysis: **[keep-at-the-object.md](keep-at-the-object.md)**.
+  TJ: Keep is hidden; export/import/reset go away; a Projection downloads at
+  the projections row (already built); the Capture Log moves to 03 · Knowledge
+  Graph **scoped to one Reading**; and red line 5's "whole-artifact export" is
+  read as **by object** — each object exports whole, not everything in one
+  click. This re-takes a fork the refactor spec already wrote down
+  ([loom-refactor-spec.md:39](loom-refactor-spec.md)) and restores the model,
+  which already sites export at the Cloth and the Projection
+  ([loom-model-build.md:139](loom-model-build.md)). **Build order is the safety
+  rule** — the Cloth, thread and Vocabulary downloads must exist BEFORE Keep
+  hides, or a Reading with captures and no Projection has no file at all.
+  Groundwork landed: passage events now stamp `sourceId` (`f78fdf0`). Four
+  calls remain TJ's, listed in the doc's §8 — the worked example's exit once
+  reset is gone is the one that gates hiding Keep.
 - **5.6 Kind per Projection — ratified 2026-08-10, not built.** The model now
   says each Projection IS a list (an ordering of the cloth) or a board (a
   layout), separately titled — *"i might have 2 orderings of the list, 3
