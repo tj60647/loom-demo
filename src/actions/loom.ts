@@ -238,7 +238,18 @@ export async function getUserLoomData() {
   }
 }
 
-export async function createConcept(data: { label: string, def?: string, note?: string }) {
+/**
+ * `atSourceId` records WHERE THE ACT HAPPENED, not where the concept lives.
+ * A Concept belongs to the User and to no reading (a Passage does) — that is
+ * the model and it does not change here. But naming one is something you do
+ * while reading something, and the Capture Log is read per reading, so an
+ * event that cannot say where it happened is an act the log must drop. This
+ * matters most for the legal state of naming a concept BEFORE finding
+ * evidence (TJ, 2026-08-10): evidence-derived placement has nothing to work
+ * with until a passage arrives, and without this stamp that act would appear
+ * in no reading's log at all.
+ */
+export async function createConcept(data: { label: string, def?: string, note?: string, atSourceId?: string | null }) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
@@ -253,6 +264,7 @@ export async function createConcept(data: { label: string, def?: string, note?: 
   await recordEvent(userId, courseId, "concept.create", "concept", newConcept[0].id, {
     label: data.label,
     def: data.def || "",
+    sourceId: data.atSourceId ?? null,
   })
   return newConcept[0]
 }
@@ -617,7 +629,9 @@ export async function deletePassage(id: string) {
   }
 }
 
-export async function createEdge(data: { fromId: string, toId: string, sentence?: string }) {
+/** `atSourceId` as in createConcept: where the act happened, not where the
+ *  thread lives. A Thread joins two Concepts and belongs to no reading. */
+export async function createEdge(data: { fromId: string, toId: string, sentence?: string, atSourceId?: string | null }) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
@@ -636,6 +650,7 @@ export async function createEdge(data: { fromId: string, toId: string, sentence?
     fromId: data.fromId,
     toId: data.toId,
     sentence,
+    sourceId: data.atSourceId ?? null,
   })
   return newEdge[0]
 }

@@ -156,6 +156,28 @@
 > room that does not exist. Both queries deliberately unindexed: a handful
 > of rows per user, and an index would be a migration. A cloth hit lands on
 > 01 · Reading; a projection hit on 03 · Knowledge Graph.
+> **The Capture Log moves to 03, scoped to the reading** (2026-08-10, TJ:
+> *"we are keeping the capture log, i think this goes in the knowledge graph.
+> and is specific to that reading, not all readings"* — and it downloads).
+> It rendered on the Knowledge Graph before, but only at the **whole weave**,
+> a surface nothing links to; inverting the scope is what makes it reachable.
+> The hard part is `src/lib/logScope.ts`: a Passage belongs to a reading but a
+> **Concept belongs to the User and a Thread to two Concepts**, so "what I did
+> in this reading" cannot be read off the rows. Three rules, in order — the
+> act said so (every event now carries the reading it happened in: passages
+> from their row, concepts and threads from the route, so **naming a concept
+> before any evidence still appears**, TJ's case); its scope said so (cloth
+> and projection events carry `scopeKey`); or **the evidence says so** (TJ's
+> ruling for pre-stamp acts — a concept places where it has a passage, a
+> thread where both ends do, the same rule contextual search uses). Honest
+> cost, recorded rather than hidden: an OLD entry can surface in a reading
+> later, when evidence arrives — nothing is ever rewritten, but what a reading
+> shows of the record can grow; new acts never drift, since the stamp settles
+> them as they happen. The Log now downloads too — it was the one object in no
+> file at all. **Not rendered in the practice loom**: it reads the real record
+> over its own route. Guarded by `check:logscope` (21 assertions) and
+> `tests/object-download.spec.ts`. Keep still shows the whole record until it
+> dissolves.
 > **Download at the object — the three that had none** (2026-08-10, TJ):
 > `src/lib/objectExport.ts` adds the **cloth** (on its own card at the head of
 > Your work, 01), the **threads** (02 · Linking, where they are thrown) and

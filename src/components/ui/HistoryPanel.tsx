@@ -7,7 +7,11 @@
 
 import { useMemo, useState, type SyntheticEvent } from "react"
 import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
+import ObjectDownload from "@/components/ui/ObjectDownload"
+import { useLoom } from "@/components/providers/LoomProvider"
 import { getGraphEvents } from "@/lib/reads"
+import { eventsForReading } from "@/lib/logScope"
+import { buildLogExport, buildLogMarkdown } from "@/lib/objectExport"
 import type { Passage, Concept, Edge, GraphEvent, LoomState } from "@/lib/types"
 
 // Events arrive through a server-action boundary; be tolerant of a Date that
@@ -291,7 +295,19 @@ function describeEvent(e: GraphEvent): string {
   }
 }
 
-export default function HistoryPanel() {
+export default function HistoryPanel({ sourceId, scopeLabel }: {
+  /**
+   * Read this reading's acts only (TJ, 2026-08-10 — the Log lives on 03 now,
+   * "specific to that reading, not all readings"). Absent = the whole record.
+   * Placement is `src/lib/logScope.ts`, which is where the hard part lives:
+   * a Concept belongs to the User and a Thread to two Concepts, so neither
+   * has a reading of its own to read off.
+   */
+  sourceId?: string
+  /** Readable name for the scope, for the download's filename and heading. */
+  scopeLabel?: string
+} = {}) {
+  const { state } = useLoom()
   const [events, setEvents] = useState<GraphEvent[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -303,7 +319,7 @@ export default function HistoryPanel() {
     setFailed(false)
     getGraphEvents()
       .then((rows) => {
-        setEvents(rows)
+        setEvents(sourceId ? eventsForReading(rows, sourceId, state) : rows)
         setPos(null)
       })
       .catch((err) => {
@@ -345,6 +361,22 @@ export default function HistoryPanel() {
           replay how your weave grew — counted from your own acts, never judged
         </span>
       </summary>
+
+      {/* The Log downloads too (TJ, 2026-08-10) — it is the one object that
+          has never been in any file, so without this it would be the only
+          work a student cannot take with them. Only once the record is
+          loaded: there is nothing to hand over before that. */}
+      {events !== null && events.length > 0 && (
+        <div style={{ margin: "6px 0 10px" }}>
+          <ObjectDownload
+            kind="capture-log"
+            slug={scopeLabel ?? "capture-log"}
+            tip="your acts, in order — the record of how this grew"
+            json={(p) => JSON.stringify(buildLogExport(events, p, scopeLabel), null, 2)}
+            markdown={(p) => buildLogMarkdown(events, p, scopeLabel)}
+          />
+        </div>
+      )}
 
       {loading && <p className="ghostnote">reading the record…</p>}
 

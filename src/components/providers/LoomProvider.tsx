@@ -256,7 +256,9 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     const tempConcept: Concept = { id: tempId, courseId: null, userId: session!.user!.id, label, def: def || "", note: note || "", createdAt: new Date() }
     applyLocal(s => ({ ...s, concepts: [...s.concepts, tempConcept] }))
     try {
-      const saved = await createConcept({ label, def, note })
+      // The reading you were in when you named it — the act's context, which
+      // the provider already knows from the route, so no caller changes.
+      const saved = await createConcept({ label, def, note, atSourceId: soleSourceId(scope) })
       applyLocal(s => ({ ...s, concepts: s.concepts.map(c => c.id === tempId ? saved : c) }))
       savedOk()
       return saved
@@ -478,7 +480,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     applyLocal(s => ({ ...s, edges: [...s.edges, tempEdge] }))
     const creating = (async () => {
       try {
-        const saved = await createEdge({ fromId, toId, sentence })
+        const saved = await createEdge({ fromId, toId, sentence, atSourceId: soleSourceId(scope) })
         edgeAlias.current.set(tempId, saved.id)
         // Identity from the server, fields from the local row — a handle
         // coined mid-flight must not be wiped by the just-born server copy.

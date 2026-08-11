@@ -73,4 +73,54 @@ test.describe('Download at the object', () => {
     expect(vocabData.concepts[0]).toHaveProperty('readings');
     expect(vocabData.concepts[0]).toHaveProperty('passages');
   });
+
+  test('the Capture Log lives on the Knowledge Graph, scoped to the reading, and downloads', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.addInitScript(() => {
+      localStorage.setItem("loom_has_seen_walkthrough", "true");
+    });
+    await openReading(page, 'Object Worlds');
+    await page.locator('nav[aria-label="The journey"] button', { hasText: 'Knowledge Graph' }).click();
+
+    // It used to render here only at the whole weave — a surface nothing
+    // links to, which is how it came to be stranded on Keep.
+    const log = page.locator('details').filter({ hasText: 'Capture Log' }).first();
+    await expect(log).toBeVisible({ timeout: 15_000 });
+    await log.evaluate((d) => { (d as HTMLDetailsElement).open = true; });
+
+    const button = page.locator('.objdl button:visible', { hasText: 'keep .json' });
+    await expect(button).toHaveCount(1, { timeout: 20_000 });
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 20_000 }),
+      button.first().click(),
+    ]);
+    const stream = await download.createReadStream();
+    let text = '';
+    for await (const chunk of stream) text += chunk;
+    const data = JSON.parse(text);
+
+    expect(download.suggestedFilename()).toContain('.capture-log.json');
+    expect(data.format).toBe('loom-capture-log');
+    // Scoped: the file names the reading and holds only its acts.
+    expect(data.scopeLabel).toContain('Object Worlds');
+    expect(data.entries.length).toBeGreaterThan(0);
+    // Evidence-derived placement is doing its job: acts on objects that have
+    // no reading of their own — concepts and threads — still appear here.
+    const kinds = new Set(data.entries.map((e: { kind: string }) => e.kind));
+    expect(kinds.has('concept.create')).toBe(true);
+    expect(kinds.has('edge.throw')).toBe(true);
+  });
+
+  test('the practice loom shows no Capture Log', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.addInitScript(() => {
+      localStorage.setItem("loom_has_seen_walkthrough", "true");
+    });
+    await page.goto('/sandbox');
+    await expect(page.locator('.practiceband')).toBeVisible({ timeout: 30_000 });
+    await page.locator('nav[aria-label="The journey"] button', { hasText: 'Knowledge Graph' }).click();
+    // It reads the student's REAL record over its own route, bypassing the
+    // provider — it must not appear inside a space that keeps nothing.
+    await expect(page.locator('details').filter({ hasText: 'Capture Log' })).toHaveCount(0);
+  });
 });

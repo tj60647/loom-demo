@@ -16,12 +16,12 @@ import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import type { CardTableView, Concept, Tier } from "@/lib/types"
-import { isWholeWeave, readingsOf } from "@/lib/scope"
+import { isWholeWeave, readingsOf, soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import { buildMapKit } from "@/lib/mapKit"
 import { copyText } from "@/lib/clipboard"
-import { buildMapExport, buildMapMarkdown, mapExportFilename } from "@/lib/graphExport"
+import { buildMapExport, buildMapMarkdown, mapExportFilename, scopeLabelOf } from "@/lib/graphExport"
 import { downloadText } from "@/lib/download"
 import CardMenu from "@/components/map/CardMenu"
 import ClothReflection from "@/components/tabs/ClothReflection"
@@ -62,7 +62,11 @@ const sortOrder = (concepts: Concept[], order?: string[]): Concept[] => {
   return out
 }
 
-export default function MapTab() {
+export default function MapTab({ practice = false }: {
+  /** The practice loom: no Capture Log, which reads the student's real
+   *  record over its own route rather than through the provider. */
+  practice?: boolean
+} = {}) {
   const {
     state, scopedState, scope,
     activeMap, scopeMaps, selectMap, addMap, renameMap, removeMap,
@@ -917,9 +921,20 @@ export default function MapTab() {
       {/* The record is of the whole weaving, not one reading's share of it, so
           it belongs where the whole weave does rather than repeating itself
           identically inside all twenty-six readings. */}
-      {wholeWeave && (
+      {/* The Capture Log, on the Knowledge Graph and scoped to THIS reading
+          (TJ, 2026-08-10). It used to render here only at the whole weave —
+          a surface nothing links to — which is how it came to be stranded on
+          Keep. Inverting the scope is what makes it reachable.
+
+          Not in the practice loom: it reads the student's REAL record over
+          its own route, bypassing the provider, so it would show their
+          actual work inside a space that keeps nothing. */}
+      {!practice && (
         <div style={{ marginTop: "22px" }}>
-          <HistoryPanel />
+          <HistoryPanel
+            sourceId={wholeWeave ? undefined : (soleSourceId(scope) ?? undefined)}
+            scopeLabel={wholeWeave ? undefined : scopeLabelOf(scope.key, titleOf)}
+          />
         </div>
       )}
     </>

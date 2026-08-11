@@ -363,7 +363,7 @@ export default function Workbench({
           {shouldRender("read") && <VocabularyTab />}
         </div>
         <div className={`panel ${activeTab === "map" ? "active" : ""}`}>
-          {shouldRender("map") && <MapTab />}
+          {shouldRender("map") && <MapTab practice={practice} />}
         </div>
       </main>
 

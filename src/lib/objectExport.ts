@@ -21,7 +21,7 @@
 
 import { scopeFromKey, scopedGraph } from "./scope"
 import { scopeLabelOf } from "./graphExport"
-import type { LoomExport, LoomState, Tier } from "./types"
+import type { GraphEvent, LoomExport, LoomState, Tier } from "./types"
 
 export const LOOM_CLOTH_FORMAT = "loom-cloth"
 export const LOOM_THREADS_FORMAT = "loom-threads"
@@ -303,6 +303,63 @@ export function buildVocabularyMarkdown(state: LoomState, provenance: ExportProv
   out.push("", `## Link labels (${data.linkLabels.length})`, "")
   if (!data.linkLabels.length) out.push("_None coined yet._")
   for (const l of data.linkLabels) out.push(`- **${l.handle}** (${l.uses})`)
+  return out.join("\n")
+}
+
+// --- the capture log ---
+//
+// The Log has never been in any file: no builder emitted graphEvents, which
+// is why hiding its surface would have made it unreachable AND unkeepable at
+// once. TJ ruled 2026-08-10 that it downloads, so it does — an object like
+// the others. Append-only and read-only: this is a record of acts, not a
+// re-importable artifact.
+
+export const LOOM_LOG_FORMAT = "loom-capture-log"
+
+export type LoomLogExport = {
+  format: typeof LOOM_LOG_FORMAT
+  provenance: ExportProvenance
+  /** Absent = the whole record; present = one reading's acts. */
+  scopeLabel?: string
+  entries: { at: string; kind: string; entityType: string; entityId: string | null; payload: Record<string, unknown> | null }[]
+}
+
+export function buildLogExport(
+  events: GraphEvent[],
+  provenance: ExportProvenance,
+  scopeLabel?: string
+): LoomLogExport {
+  return {
+    format: LOOM_LOG_FORMAT,
+    provenance,
+    ...(scopeLabel ? { scopeLabel } : {}),
+    entries: events.map((e) => ({
+      at: (e.at instanceof Date ? e.at : new Date(e.at)).toISOString(),
+      kind: e.kind,
+      entityType: e.entityType,
+      entityId: e.entityId,
+      payload: e.payload ?? null,
+    })),
+  }
+}
+
+export function buildLogMarkdown(
+  events: GraphEvent[],
+  provenance: ExportProvenance,
+  scopeLabel?: string
+): string {
+  const out: string[] = []
+  out.push(`# Capture Log${scopeLabel ? ` — ${scopeLabel}` : ""}`, "")
+  out.push(`_${provenance.student}${provenance.course ? ` · ${provenance.course}` : ""} · ${events.length} act${events.length !== 1 ? "s" : ""}_`, "")
+  if (!events.length) {
+    out.push("_Nothing recorded here yet._")
+    return out.join("\n")
+  }
+  for (const e of events) {
+    const when = (e.at instanceof Date ? e.at : new Date(e.at)).toISOString().slice(0, 16).replace("T", " ")
+    const label = typeof e.payload?.label === "string" ? ` — ${e.payload.label}` : ""
+    out.push(`- \`${when}\` **${e.kind}**${label}`)
+  }
   return out.join("\n")
 }
 
