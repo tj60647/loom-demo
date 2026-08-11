@@ -156,6 +156,26 @@
 > room that does not exist. Both queries deliberately unindexed: a handful
 > of rows per user, and an index would be a migration. A cloth hit lands on
 > 01 · Reading; a projection hit on 03 · Knowledge Graph.
+> **The practice loom** (`/sandbox`, 2026-08-10, TJ: *"in many games the
+> actual interface is used for the tutorial, not screenshots, is that
+> possible?"*): the REAL workbench on a REAL reading — it prefers *Learning
+> How to Learn* (TJ's pick; Novak & Gowin is the book the board's method comes
+> from) and falls back to the first reading with a file. A student really
+> drag-selects, really names a concept, really threads, really drags a card —
+> and **nothing is written**. `SandboxLoomProvider` supplies the same context
+> `LoomProvider` does, so React resolves `useContext` to it and **no tab
+> changes at all**; it never imports `@/actions/*`, so a write is impossible
+> by construction rather than by discipline. Two things differ, both about
+> honesty: a standing `.practiceband` (never a toast — `flash` self-clears in
+> 1500ms and a missed notice is indistinguishable from data loss), and no
+> search field, because that control reads the student's real rows over its
+> own route. Guarded twice: `check:sandbox` fails the build if the provider
+> ever gains an action import, a `fetch`, or if the seam stops being exported;
+> `tests/sandbox.spec.ts` captures a passage for real and asserts **zero POSTs
+> leave the browser** and the student's own loom is byte-identical after.
+> Deliberately absent: import and the worked example, which would bring in
+> content a student might want to keep. Reset stays — clearing your own
+> practice costs nothing.
 > **Projections have kinds — ratified, not built** (2026-08-10, TJ): the
 > Cloth is the data; a Projection is one way of projecting it, and each
 > Projection IS a kind — a **list** (an ordering) or a **board** (a layout;

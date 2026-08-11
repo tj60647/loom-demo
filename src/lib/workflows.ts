@@ -73,6 +73,12 @@ const student: Flow = {
     { id: "refused", label: "Turned away, and told why", where: "/auth/error", kind: "denied" },
     { id: "enrol", label: "Enrolled into the course and section", where: "events.signIn" },
     { id: "library", label: "The course's readings, by week", where: "00 · Library" },
+    // The practice loom is a real path a student can take, so it is drawn
+    // (AGENTS.md). It is a side trip, not a step: the same workbench on a real
+    // reading, wrapped in a provider that writes nothing, so nothing done here
+    // reaches the arc below. It returns to the Library because that is where
+    // the real work starts.
+    { id: "practice", label: "Try the moves first — nothing is kept", where: "/sandbox — the real interface over a practice loom" },
     { id: "open", label: "Open a reading — the card is the door", where: "reading card → /reading/[id]; it opens your Cloth for that reading" },
     { id: "read", label: "Read the text", where: "01 · Reading" },
     { id: "ahead", label: "Or name a concept you expect, and gloss it — then read for support", where: "01 · Reading — shows as “no evidence” until a passage backs it" },
@@ -105,6 +111,8 @@ const student: Flow = {
     { from: "gate", to: "enrol", label: "admitted" },
     { from: "enrol", to: "library" },
     { from: "library", to: "open" },
+    { from: "library", to: "practice", label: "practise" },
+    { from: "practice", to: "library", label: "nothing kept", back: true },
     { from: "open", to: "read" },
     { from: "read", to: "ahead" },
     { from: "read", to: "capture" },

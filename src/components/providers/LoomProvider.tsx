@@ -16,7 +16,15 @@ import {
   importGraph, importMapArrangement, resetGraph, loadWorkedExample,
 } from "@/actions/loom"
 
-interface LoomContextType {
+/**
+ * Exported so the practice sandbox can supply this same context from its own
+ * provider (src/components/providers/SandboxLoomProvider.tsx). React resolves
+ * useContext to the NEAREST provider, so nesting one inside the sandbox
+ * subtree overrides this one with no change to any tab — and because that
+ * provider never imports `@/actions/loom`, a write escaping into a real loom
+ * is impossible by construction rather than by discipline.
+ */
+export interface LoomContextType {
   /**
    * The WHOLE graph, always. Export, import and reset work on this — the
    * artifact is never a slice (red line #5).
@@ -105,7 +113,7 @@ interface LoomContextType {
   setRedoStack: React.Dispatch<React.SetStateAction<{edgeId: string, from: string | null, to: string | null}[]>>
 }
 
-const LoomContext = createContext<LoomContextType | null>(null)
+export const LoomContext = createContext<LoomContextType | null>(null)
 
 const blankState = (): LoomState => ({ concepts: [], passages: [], edges: [], maps: [], cloths: [], views: emptyViews() })
 

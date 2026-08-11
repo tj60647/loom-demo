@@ -1,0 +1,358 @@
+"use client"
+
+/**
+ * The practice loom: the real interface, real gestures, nothing kept.
+ *
+ * TJ, 2026-08-10 — "in many games the actual interface is used for the
+ * tutorial, not screenshots, is that possible?" This is the answer. It
+ * supplies the SAME context `LoomProvider` does, so every tab, the PDF
+ * viewer, the capture modal and the board work exactly as they really do:
+ * a student really drag-selects, really names a concept, really throws a
+ * thread, really drags a card. None of it is written anywhere.
+ *
+ * WHY A SECOND PROVIDER RATHER THAN A FLAG IN THE REAL ONE. `LoomProvider`
+ * calls the server from 22 separate places, one per mutation; a flag would
+ * have to be honoured at every one of them, and the failure mode of
+ * forgetting is a silent write into a real student's loom. This file
+ * **never imports `@/actions/loom`**, so that write cannot happen — there is
+ * nothing here to call. `scripts/check-sandbox.ts` fails the build if the
+ * import ever appears, and `tests/sandbox.spec.ts` asserts no write request
+ * leaves the browser while a student works here.
+ *
+ * WHAT IS SHARED WITH PRODUCTION, DELIBERATELY. Every derivation comes from
+ * `@/lib/scope` — `scopedGraph`, `asLoomState`, `scopeOf` — the same
+ * functions the real provider uses. Only the transport differs: writes stop
+ * at local state instead of continuing to a server. That is the whole
+ * difference, and keeping it that narrow is what stops this file rotting
+ * into a second, subtly different Loom.
+ *
+ * WHAT IS DELIBERATELY MISSING. No import, no worked example: both would
+ * bring in content the student might want to keep, and nothing here can be
+ * kept (see the band in `SandboxWorkbench`). `resetAll` stays — clearing your
+ * own practice is a reasonable thing to want, and here it costs nothing.
+ */
+
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react"
+import { useSession } from "next-auth/react"
+import { LoomContext, type LoomContextType } from "@/components/providers/LoomProvider"
+import {
+  scopeOf,
+  scopedGraph,
+  asLoomState,
+  type Scope,
+} from "@/lib/scope"
+import type {
+  CardTableView,
+  Cloth,
+  Concept,
+  Edge,
+  LoomMap,
+  LoomState,
+  Passage,
+  PassageTier,
+  Tier,
+} from "@/lib/types"
+
+const emptyView = (): CardTableView => ({ positions: {}, bends: {} })
+const blank = (): LoomState => ({
+  concepts: [], passages: [], edges: [], maps: [], cloths: [],
+  views: { cardTable: emptyView() },
+})
+
+const now = () => new Date()
+const newId = () => crypto.randomUUID()
+
+export default function SandboxLoomProvider({
+  sourceId,
+  children,
+}: {
+  /** The reading being practised on — gives the sandbox a real scope, so the
+   *  tabs behave exactly as they do in a real reading rather than falling
+   *  through to the whole weave. */
+  sourceId: string
+  children: ReactNode
+}) {
+  const { data: session } = useSession()
+  const [state, setState] = useState<LoomState>(blank())
+  const [flashMsg, setFlashMsg] = useState<string | null>(null)
+  const [selectedMapId, setSelectedMapId] = useState<string | null>(null)
+  const [undoStack, setUndoStack] = useState<{ edgeId: string; from: string | null; to: string | null }[]>([])
+  const [redoStack, setRedoStack] = useState<{ edgeId: string; from: string | null; to: string | null }[]>([])
+
+  const scope: Scope = useMemo(() => scopeOf([sourceId]), [sourceId])
+  const scoped = useMemo(() => scopedGraph(state, scope), [state, scope])
+  const scopedState = useMemo(() => asLoomState(state, scoped), [state, scoped])
+
+  const flashTimer = useRef<number | undefined>(undefined)
+  const flash = useCallback((msg: string) => {
+    setFlashMsg(msg)
+    window.clearTimeout(flashTimer.current)
+    flashTimer.current = window.setTimeout(() => setFlashMsg(null), 1500)
+  }, [])
+  /** The real provider flashes "· saved ·" here. Nothing is saved in the
+   *  practice loom, and saying so would be the one lie that matters — it is
+   *  the same pixel the real app uses to promise persistence. */
+  const noted = useCallback(() => flash("· practice ·"), [flash])
+
+  const scopeKey = scope.key
+  const uid = session?.user?.id ?? "practice"
+
+  // --- concepts ---
+
+  const addConcept = useCallback(async (label: string, def = "", note = "") => {
+    const c: Concept = { id: newId(), courseId: null, userId: uid, label, def, note, createdAt: now() }
+    setState((s) => ({ ...s, concepts: [...s.concepts, c] }))
+    noted()
+    return c
+  }, [uid, noted])
+
+  const editConcept = useCallback(async (id: string, data: Partial<{ label: string; def: string; note: string }>) => {
+    setState((s) => ({ ...s, concepts: s.concepts.map((c) => (c.id === id ? { ...c, ...data } : c)) }))
+    noted()
+  }, [noted])
+
+  /** Mirrors the real reducer: the concept goes, its passages survive with the
+   *  pointer removed (a passage outliving its concept is legal — P0.1), and
+   *  its threads and tiers go with it. */
+  const removeConcept = useCallback(async (id: string) => {
+    setState((s) => ({
+      ...s,
+      concepts: s.concepts.filter((c) => c.id !== id),
+      passages: s.passages.map((p) => ({ ...p, conceptIds: p.conceptIds.filter((cid) => cid !== id) })),
+      edges: s.edges.filter((e) => e.fromId !== id && e.toId !== id),
+      maps: s.maps.map((m) => {
+        if (!(id in m.tiers)) return m
+        const tiers = { ...m.tiers }
+        delete tiers[id]
+        return { ...m, tiers }
+      }),
+    }))
+    noted()
+  }, [noted])
+
+  const mergeConcepts = useCallback(async (sourceConceptId: string, targetId: string) => {
+    setState((s) => ({
+      ...s,
+      concepts: s.concepts.filter((c) => c.id !== sourceConceptId),
+      passages: s.passages.map((p) => (
+        p.conceptIds.includes(sourceConceptId)
+          ? { ...p, conceptIds: Array.from(new Set(p.conceptIds.map((cid) => (cid === sourceConceptId ? targetId : cid)))) }
+          : p
+      )),
+      edges: s.edges
+        .map((e) => ({
+          ...e,
+          fromId: e.fromId === sourceConceptId ? targetId : e.fromId,
+          toId: e.toId === sourceConceptId ? targetId : e.toId,
+        }))
+        .filter((e) => e.fromId !== e.toId),
+    }))
+    noted()
+  }, [noted])
+
+  // --- passages ---
+
+  const addPassage = useCallback(async (
+    conceptIds: string[], source: string, location: string, content: string,
+    pageNumber?: number, startOffset?: number, endOffset?: number,
+    passageSourceId?: string, pageContentHash?: string
+  ) => {
+    const p: Passage = {
+      id: newId(), courseId: null, userId: uid,
+      conceptIds, source, sourceId: passageSourceId ?? sourceId, location, content,
+      pageNumber: pageNumber ?? null,
+      startOffset: startOffset ?? null,
+      endOffset: endOffset ?? null,
+      pageContentHash: pageContentHash ?? null,
+      note: "", question: "", isPullQuote: false, tier: "" as PassageTier,
+      createdAt: now(),
+    }
+    setState((s) => ({ ...s, passages: [...s.passages, p] }))
+    noted()
+    return p
+  }, [uid, sourceId, noted])
+
+  const removePassage = useCallback(async (id: string) => {
+    setState((s) => ({ ...s, passages: s.passages.filter((p) => p.id !== id) }))
+    noted()
+  }, [noted])
+
+  const attributePassages = useCallback(async (passageIds: string[], toSourceId: string) => {
+    let n = 0
+    setState((s) => ({
+      ...s,
+      passages: s.passages.map((p) => {
+        if (!passageIds.includes(p.id) || p.sourceId) return p
+        n += 1
+        return { ...p, sourceId: toSourceId }
+      }),
+    }))
+    noted()
+    return n
+  }, [noted])
+
+  const refilePassage = useCallback(async (passageId: string, conceptId: string) => {
+    let out: Passage | null = null
+    setState((s) => ({
+      ...s,
+      passages: s.passages.map((p) => {
+        if (p.id !== passageId) return p
+        out = p.conceptIds.includes(conceptId) ? p : { ...p, conceptIds: [...p.conceptIds, conceptId] }
+        return out
+      }),
+    }))
+    noted()
+    return out ?? { ...blank().passages[0] } as Passage
+  }, [noted])
+
+  const unfilePassage = useCallback(async (passageId: string, conceptId: string) => {
+    setState((s) => ({
+      ...s,
+      passages: s.passages.map((p) => (
+        p.id === passageId ? { ...p, conceptIds: p.conceptIds.filter((c) => c !== conceptId) } : p
+      )),
+    }))
+    noted()
+  }, [noted])
+
+  // --- cloth ---
+
+  const activeCloth = useMemo(
+    () => state.cloths.find((c) => c.scopeKey === scopeKey) ?? null,
+    [state.cloths, scopeKey]
+  )
+
+  const updateCloth = useCallback(async (data: Partial<{ title: string; description: string }>, key?: string) => {
+    const k = key ?? scopeKey
+    setState((s) => {
+      const existing = s.cloths.find((c) => c.scopeKey === k)
+      if (existing) {
+        return { ...s, cloths: s.cloths.map((c) => (c.scopeKey === k ? { ...c, ...data, updatedAt: now() } : c)) }
+      }
+      const c: Cloth = {
+        id: newId(), courseId: null, userId: uid, scopeKey: k,
+        title: data.title ?? "", description: data.description ?? "",
+        createdAt: now(), updatedAt: now(),
+      }
+      return { ...s, cloths: [...s.cloths, c] }
+    })
+    noted()
+    return true
+  }, [scopeKey, uid, noted])
+
+  // --- threads ---
+
+  const addEdge = useCallback(async (fromId: string, toId: string, sentence: string) => {
+    const e: Edge = { id: newId(), courseId: null, userId: uid, fromId, toId, handle: "", sentence, createdAt: now() }
+    setState((s) => ({ ...s, edges: [...s.edges, e] }))
+    noted()
+    return e
+  }, [uid, noted])
+
+  const editEdge = useCallback(async (id: string, data: Partial<{ handle: string; sentence: string }>) => {
+    setState((s) => ({ ...s, edges: s.edges.map((e) => (e.id === id ? { ...e, ...data } : e)) }))
+    noted()
+  }, [noted])
+
+  const removeEdge = useCallback(async (id: string) => {
+    setState((s) => ({ ...s, edges: s.edges.filter((e) => e.id !== id) }))
+    noted()
+  }, [noted])
+
+  // --- projections ---
+
+  const scopeMaps = useMemo(() => state.maps.filter((m) => m.scopeKey === scopeKey), [state.maps, scopeKey])
+  const activeMap = useMemo(() => {
+    const chosen = scopeMaps.find((m) => m.id === selectedMapId)
+    if (chosen) return chosen
+    if (!scopeMaps.length) return null
+    return [...scopeMaps].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0]
+  }, [scopeMaps, selectedMapId])
+
+  const addMap = useCallback(async (name?: string) => {
+    const m: LoomMap = {
+      id: newId(), courseId: null, userId: uid, scopeKey,
+      name: name ?? `Projection ${scopeMaps.length + 1}`,
+      read: "", essence: "", tiers: {}, createdAt: now(), updatedAt: now(),
+    }
+    setState((s) => ({ ...s, maps: [...s.maps, m] }))
+    setSelectedMapId(m.id)
+    noted()
+    return m
+  }, [uid, scopeKey, scopeMaps.length, noted])
+
+  const patchMap = useCallback((id: string, data: Partial<LoomMap>) => {
+    setState((s) => ({ ...s, maps: s.maps.map((m) => (m.id === id ? { ...m, ...data, updatedAt: now() } : m)) }))
+  }, [])
+
+  const removeMap = useCallback(async (id: string) => {
+    setState((s) => {
+      const views = { ...s.views }
+      delete views[`map:${id}`]
+      return { ...s, maps: s.maps.filter((m) => m.id !== id), views }
+    })
+    noted()
+  }, [noted])
+
+  const ensureActiveMap = useCallback(async () => {
+    if (activeMap) return activeMap
+    return addMap()
+  }, [activeMap, addMap])
+
+  const setView = useCallback((key: string, next: CardTableView) => {
+    setState((s) => ({ ...s, views: { ...s.views, [key]: next } }))
+  }, [])
+
+  const value: LoomContextType = {
+    state,
+    scope,
+    scoped,
+    scopedState,
+    isLoading: false,
+    studentName: session?.user?.name ?? "you",
+    addConcept,
+    editConcept,
+    removeConcept,
+    mergeConcepts,
+    addPassage,
+    removePassage,
+    attributePassages,
+    refilePassage,
+    unfilePassage,
+    activeCloth,
+    updateCloth,
+    addEdge,
+    editEdge,
+    removeEdge,
+    maps: state.maps,
+    scopeMaps,
+    activeMap,
+    selectMap: setSelectedMapId,
+    addMap,
+    renameMap: (id, name) => patchMap(id, { name }),
+    removeMap,
+    setMapTiers: async (id, tiers: Record<string, Tier>) => { patchMap(id, { tiers }); noted() },
+    setMapRead: (id, read) => patchMap(id, { read }),
+    setMapEssence: (id, essence) => patchMap(id, { essence }),
+    // Nothing is debounced here because nothing is being sent anywhere; the
+    // local write already happened on the keystroke.
+    flushMapText: () => {},
+    setView,
+    ensureActiveMap,
+    // Refused on purpose: both bring in content a student might want to keep,
+    // and the practice loom keeps nothing.
+    importFromText: async () => { flash("not in practice") },
+    importMapFile: async () => { flash("not in practice"); return { skipped: 0 } },
+    loadExample: async () => { flash("not in practice") },
+    // Clearing your own practice is free and reasonable.
+    resetAll: async () => { setState(blank()); setSelectedMapId(null); flash("· cleared ·") },
+    flashMsg,
+    flash,
+    undoStack,
+    setUndoStack,
+    redoStack,
+    setRedoStack,
+  }
+
+  return <LoomContext.Provider value={value}>{children}</LoomContext.Provider>
+}

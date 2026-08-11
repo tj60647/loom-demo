@@ -72,12 +72,22 @@ export default function Workbench({
   source,
   initialTab,
   initialSearch,
+  practice = false,
 }: {
   source: WorkbenchSource | null
   /** Landing tab for journey deep links (`/weave?tab=map`); validated below. */
   initialTab?: Tab
   /** A shelf-search hit's query, carried into the reading's own search. */
   initialSearch?: string
+  /**
+   * The practice loom (`/sandbox`): the same workbench, wrapped in
+   * `SandboxLoomProvider` so nothing is written. Two things must change here,
+   * and both are about honesty rather than capability — a standing band that
+   * says nothing is kept, and no search field, because search is the one
+   * control on this page that reads the student's REAL loom straight from the
+   * server and would show their actual work inside a practice space.
+   */
+  practice?: boolean
 }) {
   // `status`, not just `session`: next-auth reports "loading" on every hard
   // load while it fetches /api/auth/session, and during that window `session`
@@ -240,28 +250,47 @@ export default function Workbench({
             screens the field itself is persistent below the bar (TJ,
             2026-08-10 — a visible input is the discoverable form); this
             button is the compact form, shown only under 900px. */}
-        <button
-          className={`btn mini searchtoggle ${searchOpen ? "" : "ghost"}`}
-          onClick={() => setSearchOpen((v) => !v)}
-          aria-pressed={searchOpen}
-          aria-label="Search everything"
-          style={{ marginLeft: "auto" }}
-        >
-          ⌕ Search
-        </button>
+        {!practice && (
+          <button
+            className={`btn mini searchtoggle ${searchOpen ? "" : "ghost"}`}
+            onClick={() => setSearchOpen((v) => !v)}
+            aria-pressed={searchOpen}
+            aria-label="Search everything"
+            style={{ marginLeft: "auto" }}
+          >
+            ⌕ Search
+          </button>
+        )}
       </div>
 
-      <div className={`searchhost${searchOpen ? " open" : ""}`} style={{ padding: "0 24px" }}>
-        {/* Contextual scope (TJ, 2026-08-10): inside a reading this field
-            searches THE READING — its pages and your work here. The whole
-            loom is one station away, on the Library. At the whole weave
-            (source null) it stays loom-wide. */}
-        <ShelfSearch
-          onActiveChange={() => {}}
-          onClose={() => setSearchOpen(false)}
-          sourceId={source?.id}
-        />
-      </div>
+      {practice && (
+        /* Persistent, not a toast: `flash` self-clears after 1500ms, and a
+           student who missed a disappearing notice cannot tell a practice
+           loom from data loss. This band IS the safety argument. */
+        <div className="practiceband" role="status">
+          <b>Practice loom.</b> Everything here is real — the text, the
+          highlighting, naming, threading, the board. <b>Nothing is kept.</b>{" "}
+          Close this and it is gone; your own work is untouched.
+        </div>
+      )}
+
+      {/* Not rendered in the practice loom: ShelfSearch reads the student's
+          REAL loom over its own GET route, bypassing the provider entirely —
+          the one control here that would show their actual work inside a
+          space that keeps nothing. */}
+      {!practice && (
+        <div className={`searchhost${searchOpen ? " open" : ""}`} style={{ padding: "0 24px" }}>
+          {/* Contextual scope (TJ, 2026-08-10): inside a reading this field
+              searches THE READING — its pages and your work here. The whole
+              loom is one station away, on the Library. At the whole weave
+              (source null) it stays loom-wide. */}
+          <ShelfSearch
+            onActiveChange={() => {}}
+            onClose={() => setSearchOpen(false)}
+            sourceId={source?.id}
+          />
+        </div>
+      )}
 
       <JourneyNav
         // Inside a reading the underline follows the tab; at the whole weave
