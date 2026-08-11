@@ -22,6 +22,8 @@ import { useDialog } from "@/components/providers/DialogProvider"
 import type { Concept, Edge } from "@/lib/types"
 import { soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
+import ObjectDownload from "@/components/ui/ObjectDownload"
+import { buildVocabularyExport, buildVocabularyMarkdown } from "@/lib/objectExport"
 import VocabularyOverlay from "@/components/tabs/VocabularyOverlay"
 
 /** Case- and space-insensitive contains, so "object worlds" finds "Object  Worlds". */
@@ -188,7 +190,19 @@ export default function VocabularyTab() {
 
   return (
     <>
-      <p className="tasktitle">Your vocabulary.</p>
+      <div style={{ display: "flex", alignItems: "baseline", gap: "14px", flexWrap: "wrap" }}>
+        <p className="tasktitle" style={{ margin: 0 }}>Your vocabulary.</p>
+        {/* The holdings download where they live (TJ, 2026-08-10). Unscoped,
+            like the tab: every concept and label you own, whatever reading
+            evidenced it. */}
+        <ObjectDownload
+          kind="vocabulary"
+          slug="vocabulary"
+          tip="every concept and link label you own, with what evidences them"
+          json={(p) => JSON.stringify(buildVocabularyExport(state, p), null, 2)}
+          markdown={(p) => buildVocabularyMarkdown(state, p)}
+        />
+      </div>
       <p className="tasksub">
         Every concept you have named and every label you have coined — across all your
         readings, not just this one. A concept does not belong to a text; it emerges from

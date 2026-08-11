@@ -156,6 +156,26 @@
 > room that does not exist. Both queries deliberately unindexed: a handful
 > of rows per user, and an index would be a migration. A cloth hit lands on
 > 01 · Reading; a projection hit on 03 · Knowledge Graph.
+> **Download at the object — the three that had none** (2026-08-10, TJ):
+> `src/lib/objectExport.ts` adds the **cloth** (on its own card at the head of
+> Your work, 01), the **threads** (02 · Linking, where they are thrown) and
+> the **vocabulary** (04, unscoped like the tab). A Projection already had its
+> file. Each is WHOLE, never a slice: the cloth file carries its passages —
+> unlabeled ones included — the concepts they evidence, the threads between
+> those, **and its own projections**; a threads file NAMES both ends, since an
+> id says nothing away from Loom; the vocabulary carries every concept and
+> label with its counted recurrence. Every file now has a **provenance
+> header** — student · course · when — where the old whole-cloth export had
+> one field, `student`. **Section is deliberately absent**: it is a fact about
+> a membership rather than about any act, `course.sections` is empty for a
+> learner by design, and a guessed section is worse than none — stamping it
+> needs a server read (keep-at-the-object.md). None is re-importable: import
+> goes away with Keep, so these are outbound artifacts. Guarded by
+> `check:objexport` (29 assertions, incl. that unlabeled passages travel and
+> that no advice reaches the file — red line 3) and `tests/object-download.spec.ts`,
+> which downloads all three and reads what is inside them. **This is the
+> prerequisite for hiding Keep**: a reading with captures but no projection
+> now has a file.
 > **The practice loom** (`/sandbox`, 2026-08-10, TJ: *"in many games the
 > actual interface is used for the tutorial, not screenshots, is that
 > possible?"*): the REAL workbench on a REAL reading — it prefers *Learning

@@ -3,6 +3,10 @@
 import { useState, useEffect, useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
+import { useReadings } from "@/components/providers/ReadingsProvider"
+import ObjectDownload from "@/components/ui/ObjectDownload"
+import { buildThreadsExport, buildThreadsMarkdown } from "@/lib/objectExport"
+import { scopeLabelOf } from "@/lib/graphExport"
 import { isWholeWeave } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
@@ -65,6 +69,8 @@ export default function ThrowTab() {
   // and the coined-label vocabulary all read the whole graph, because those
   // are facts about the student rather than about this bench.
   const { state, scoped, scope, addEdge, editEdge, removeEdge, flash, setUndoStack, setRedoStack } = useLoom()
+  const { byId: readingsById } = useReadings()
+  const titleOf = (id: string) => readingsById.get(id)?.title ?? id
   const { confirm, notify } = useDialog()
   const [pairA, setPairA] = useState<string | null>(null)
   const [pairB, setPairB] = useState<string | null>(null)
@@ -513,10 +519,23 @@ export default function ThrowTab() {
             </p>
           </div>
 
-          <h3 style={{fontFamily: "var(--display)", fontSize: "17px", borderBottom: "1px solid var(--rule)", paddingBottom: "5px", margin: "18px 0 6px"}}>
+          <h3 style={{fontFamily: "var(--display)", fontSize: "17px", borderBottom: "1px solid var(--rule)", paddingBottom: "5px", margin: "18px 0 6px", display: "flex", alignItems: "baseline", gap: "10px"}}>
             {wholeWeave ? "Threads thrown" : "Threads in this reading"}
             {' '}
             <span className="n" style={{fontFamily: "var(--mono)", fontSize: "11px", color: "var(--grey)"}}>{orderedEdges.length ? `(${orderedEdges.length})` : ''}</span>
+            {/* Threads download where they are thrown (TJ, 2026-08-10). Both
+                ends are named in the file: an id says nothing away from Loom. */}
+            {orderedEdges.length > 0 && (
+              <span style={{marginLeft: "auto"}}>
+                <ObjectDownload
+                  kind="threads"
+                  slug={wholeWeave ? "all-threads" : scopeLabelOf(scope.key, titleOf)}
+                  tip="these threads, each naming both of its concepts"
+                  json={(p) => JSON.stringify(buildThreadsExport(state, scope.key, p, titleOf), null, 2)}
+                  markdown={(p) => buildThreadsMarkdown(state, scope.key, p, titleOf)}
+                />
+              </span>
+            )}
           </h3>
 
           <div className="scrollbox">

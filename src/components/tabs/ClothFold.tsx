@@ -14,8 +14,12 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
+import { useReadings } from "@/components/providers/ReadingsProvider"
+import ObjectDownload from "@/components/ui/ObjectDownload"
 import { isWholeWeave } from "@/lib/scope"
 import { short } from "@/lib/clothMath"
+import { buildClothExport, buildClothMarkdown } from "@/lib/objectExport"
+import { scopeLabelOf } from "@/lib/graphExport"
 
 /**
  * The cloth's own card — Cloth Title and Cloth Description, edited where the
@@ -24,8 +28,11 @@ import { short } from "@/lib/clothMath"
  * Cloth button gets its title — the shelf card shows both.
  */
 export default function ClothFold() {
-  const { activeCloth, updateCloth, isLoading, scope, flash } = useLoom()
+  const { activeCloth, updateCloth, isLoading, scope, flash, state } = useLoom()
+  const { byId } = useReadings()
   const wholeWeave = isWholeWeave(scope)
+  const titleOf = (id: string) => byId.get(id)?.title ?? id
+  const scopeLabel = scopeLabelOf(scope.key, titleOf)
   // Controlled so the fold can be opened from elsewhere later; today it simply
   // starts closed. A cloth starts in READING, not here (TJ, 2026-08-08), so
   // nothing routes a student straight at the title field any more.
@@ -110,9 +117,21 @@ export default function ClothFold() {
           placeholder={wholeWeave ? "your short interpretation, across the readings" : "your short interpretation of the reading"}
         />
       </div>
-      <button className="btn mini" onClick={save} disabled={busy || !dirty}>
-        {busy ? "Saving…" : "Save cloth"}
-      </button>
+      <div className="clothfoot">
+        <button className="btn mini" onClick={save} disabled={busy || !dirty}>
+          {busy ? "Saving…" : "Save cloth"}
+        </button>
+        {/* The cloth downloads on the cloth's own card (TJ, 2026-08-10) —
+            whole: its passages, the concepts they evidence, the threads
+            between those, and its projections. */}
+        <ObjectDownload
+          kind="cloth"
+          slug={activeCloth?.title || scopeLabel}
+          tip="this cloth, whole — its passages, concepts, threads and projections"
+          json={(p) => JSON.stringify(buildClothExport(state, scope.key, p, titleOf), null, 2)}
+          markdown={(p) => buildClothMarkdown(state, scope.key, p, titleOf)}
+        />
+      </div>
     </details>
   )
 }

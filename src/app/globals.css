@@ -449,6 +449,11 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 }
 .practiceband b{font-weight:600}
 
+/* The download that lives at its object (TJ, 2026-08-10) — the same pair of
+   buttons a Projection has always had, so the gesture is learned once. */
+.objdl{display:inline-flex;gap:6px;align-items:center}
+.clothfoot{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
 .searchtoggle{display:none}
 @media (max-width:900px){
   .searchtoggle{display:inline-block}
