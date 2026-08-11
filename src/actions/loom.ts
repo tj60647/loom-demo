@@ -425,8 +425,17 @@ export async function createPassage(data: { conceptIds?: string[], source: strin
 
   // passage.capture fires for every capture, named or not — the Log is complete
   // (JC Aug 7 / P0.6). passage.create remains only as a historical kind.
+  //
+  // sourceId is stamped here and on every passage event below (TJ,
+  // 2026-08-10) so the Capture Log can be read per reading. An event has to
+  // carry it: the row it points at can be deleted, and an append-only log
+  // outliving its rows is the whole point. Null is meaningful — an untethered
+  // passage belongs to no reading. Costs no migration; the payload is jsonb.
+  // Concept and thread events carry none: by the model a concept does not
+  // belong to a reading, and nothing server-side knows which one was open.
   await recordEvent(userId, courseId, "passage.capture", "passage", passageId, {
     conceptIds,
+    sourceId: data.sourceId ?? null,
     source: data.source,
     location: data.location,
   })
@@ -465,6 +474,7 @@ export async function refilePassage(passageId: string, conceptId: string) {
 
   await recordEvent(userId, courseId, "passage.refile", "passage", passageId, {
     conceptId,
+    sourceId: src.sourceId,
     source: src.source,
   })
   return { ...src, conceptIds: [...existing.map((r) => r.conceptId), conceptId] }
@@ -530,7 +540,8 @@ export async function unfilePassage(passageId: string, conceptId: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
-  const rows = await db.select({ id: passages.id }).from(passages)
+  // sourceId comes along for the Log's per-reading read (see passage.capture).
+  const rows = await db.select({ id: passages.id, sourceId: passages.sourceId }).from(passages)
     .where(and(eq(passages.id, passageId), eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
     .limit(1)
   if (!rows.length) throw new Error("Passage not found.")
@@ -539,7 +550,10 @@ export async function unfilePassage(passageId: string, conceptId: string) {
     .where(and(eq(passageConcepts.passageId, passageId), eq(passageConcepts.conceptId, conceptId)))
     .returning({ conceptId: passageConcepts.conceptId })
   if (removed.length > 0) {
-    await recordEvent(userId, courseId, "passage.unfile", "passage", passageId, { conceptId })
+    await recordEvent(userId, courseId, "passage.unfile", "passage", passageId, {
+      conceptId,
+      sourceId: rows[0].sourceId,
+    })
   }
 }
 
@@ -593,10 +607,12 @@ export async function deletePassage(id: string) {
     .where(eq(passageConcepts.passageId, id))
   const removed = await db.delete(passages)
     .where(and(eq(passages.id, id), eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
-    .returning({ id: passages.id })
+    .returning({ id: passages.id, sourceId: passages.sourceId })
   if (removed.length > 0) {
     await recordEvent(userId, courseId, "passage.delete", "passage", id, {
       conceptIds: pointers.map((r) => r.conceptId),
+      // The row is gone; only the event can say which reading lost it.
+      sourceId: removed[0].sourceId,
     })
   }
 }
