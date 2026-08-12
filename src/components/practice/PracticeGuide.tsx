@@ -66,22 +66,45 @@ const near = (a: Rect | null, b: Rect | null) =>
   Math.abs(a.width - b.width) < 1 && Math.abs(a.height - b.height) < 1
 
 /**
- * The rect of the first target on the page — and a target is "on the page"
- * only if it is actually IN the viewport.
+ * The area this beat works in: the UNION of every target in its chain that is
+ * currently on the page.
  *
- * Size alone is not enough: the Your-work sheet is always mounted, parked at
- * `translateX(100% + 12px)`, so a closed sheet has a perfectly real rect
- * sitting off the right edge. A cutout there is a black screen with no hole.
+ * Not the first match — that was a bug with teeth. A beat's chain lists the
+ * controls the move passes through, and several of them are on screen at
+ * once: the throw beat names the warp, the bench and the Throw button, all
+ * three always present. Cutting a hole over only the first would have masked
+ * the sentence box the same beat tells you to type in, so the mask would have
+ * made its own instruction impossible to follow.
+ *
+ * The union also walks the move by itself: the cloth beat's chain is the Your
+ * work button, the fold, the title and Save, and the last three do not exist
+ * until the ones before them are pressed — so the hole grows as the student
+ * goes.
+ *
+ * A target counts only if it is IN the viewport. Size alone is not enough:
+ * the Your-work sheet is always mounted, parked at `translateX(100% + 12px)`,
+ * so a closed sheet has a perfectly real rect off the right edge — and a
+ * cutout there is a dark screen with no hole in it.
  */
 function resolveTarget(selectors: string[]): Rect | null {
+  let top = Infinity
+  let left = Infinity
+  let right = -Infinity
+  let bottom = -Infinity
+
   for (const selector of selectors) {
     const box = document.querySelector(selector)?.getBoundingClientRect()
     if (!box || box.width === 0 || box.height === 0) continue
     if (box.bottom < 0 || box.top > window.innerHeight) continue
     if (box.right < 0 || box.left > window.innerWidth) continue
-    return { top: box.top, left: box.left, width: box.width, height: box.height }
+    top = Math.min(top, box.top)
+    left = Math.min(left, box.left)
+    right = Math.max(right, box.right)
+    bottom = Math.max(bottom, box.bottom)
   }
-  return null
+
+  if (top === Infinity) return null
+  return { top, left, width: right - left, height: bottom - top }
 }
 
 /**
@@ -146,6 +169,8 @@ export default function PracticeGuide() {
   const [spot, setSpot] = useState<{ side: Side; top: number; left: number; beak: number } | null>(null)
   /** True while a drag that began inside the cutout is still in flight. */
   const [dragging, setDragging] = useState(false)
+  /** True while one of the app's own modal scrims is on screen. */
+  const [overScrim, setOverScrim] = useState(false)
 
   const cardRef = useRef<HTMLDivElement | null>(null)
 
@@ -252,11 +277,27 @@ export default function PracticeGuide() {
       } else if (!padded) {
         setSpot((was) => (was === null ? was : null))
       }
+      // The app's own dialogs sit at z 10000 and would bury the guide. When
+      // one is up the popover goes above it — a beat about a field inside
+      // that dialog is unreadable underneath it — and the mask goes away,
+      // because the scrim is already the constraint.
+      const scrim = !!document.querySelector(".info-scrim")
+      setOverScrim((was) => (was === scrim ? was : scrim))
+
       frame = window.requestAnimationFrame(measure)
     }
     frame = window.requestAnimationFrame(measure)
     return () => window.cancelAnimationFrame(frame)
   }, [open, step.targets])
+
+  // The one hand-off: highlighting finishes when the capture dialog opens,
+  // and the next beat is about that dialog. Asking for a press in between is
+  // asking twice for the same move.
+  useEffect(() => {
+    if (!open || !step.handOff || !ready || last) return
+    const timer = window.setTimeout(() => setAt((cur) => (cur === at ? at + 1 : cur)), 450)
+    return () => window.clearTimeout(timer)
+  }, [open, step.handOff, ready, last, at])
 
   /**
    * A drag that starts in the cutout must be allowed to leave it. Once the
@@ -297,7 +338,7 @@ export default function PracticeGuide() {
 
   // Never dim without a hole: a dark screen with nothing lit is the one
   // failure worse than not dimming at all.
-  const masked = step.overlay === "mask" && !!hole && !dragging
+  const masked = step.overlay === "mask" && !!hole && !dragging && !overScrim
   const vw = typeof window === "undefined" ? 0 : window.innerWidth
   const vh = typeof window === "undefined" ? 0 : window.innerHeight
 
@@ -326,7 +367,7 @@ export default function PracticeGuide() {
 
       <div
         ref={cardRef}
-        className={`guidepop ${spot ? `at-${spot.side}` : "adrift"}`}
+        className={`guidepop ${spot ? `at-${spot.side}` : "adrift"}${overScrim ? " overscrim" : ""}`}
         role="region"
         aria-label="The guide"
         style={

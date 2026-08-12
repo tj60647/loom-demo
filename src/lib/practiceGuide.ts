@@ -63,6 +63,18 @@ export type GuideStep = {
    */
   overlay: "mask" | "none"
   /**
+   * Move on the instant this beat completes, rather than waiting for the
+   * primary to be pressed.
+   *
+   * One beat wants it and only one: highlighting is finished by the capture
+   * dialog OPENING, and the next beat is about that same dialog. Making the
+   * student press "next" inside a modal that has just taken the screen is a
+   * hand-off asked for twice. This is deliberately not the old blanket
+   * auto-advance, which re-armed on any state change and threw you forward
+   * again whenever you pressed Back.
+   */
+  handOff?: boolean
+  /**
    * True when the beat is about the words on the page, so the viewer must be
    * showing a page that HAS words. `Oh, the Places You'll Go!` opens on two
    * covers, where "drag across a line or two" points at a picture.
@@ -91,6 +103,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     // across the spread would start lit and end in the dark.
     targets: [".pdf-stage", "#captureNow"],
     overlay: "mask",
+    handOff: true,
     needsText: true,
     say:
       "Drag across a line or two of the text. When you let go, a “Capture as Passage” button appears at your cursor — press it.",

@@ -502,6 +502,10 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
   box-shadow:0 14px 40px rgba(0,0,0,.28);padding:10px 12px 8px}
 /* Adrift: no target on screen. Parked, beakless, and honest about it. */
 .guidepop.adrift{right:18px;bottom:14px;left:auto;top:auto}
+/* Over one of the app's own dialogs. 10001 is the only rung above .info-scrim
+   the guide ever takes, and only while a scrim is actually up: a beat about a
+   field inside that dialog cannot be read from underneath it. */
+.guidepop.overscrim{z-index:10001}
 
 /* The beak. `--beak` is the offset along the card's edge where the target's
    centre is, so it still points true after the card has been clamped on
