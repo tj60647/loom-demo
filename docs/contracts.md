@@ -327,6 +327,27 @@
 > `library → practice` edge since the practice loom was built, and nothing
 > took it until now. Still open, and TJ's: the practice loom starts EMPTY, so
 > it teaches the gestures but shows no finished cloth (open-work).
+>
+> **The practice loom becomes the guide** (2026-08-11, TJ: *"the guide should
+> always be available, like the tutorials in any game. if the sandbox is the
+> guide, then it should be clearly accessible. it is the instructions,
+> right?"*). Two changes. A **permanent door in the header**, beside the
+> walkthrough, on every page — `/sandbox` had been reachable only by typing
+> the URL. And a **worked cloth** it opens with, on *Oh, the Places You'll
+> Go!* (TJ's pick): four passages, three concepts, two threads, a Link with a
+> gloss, a cloth and a projection with tiers.
+>
+> The passages are REAL substrings of that reading's text layer, located at
+> their true offsets by `buildPracticeCloth`
+> ([practiceCloth.ts](../src/lib/practiceCloth.ts)), so they highlight in the
+> actual PDF — the practice loom's whole argument is that the capture path is
+> the genuine one. It is built on the SERVER in `/sandbox/page.tsx` and handed
+> down as a prop: `SandboxLoomProvider` must never read a database, and
+> `check-sandbox.ts` asserts both that seam and the header door. A quotation
+> that stops matching is dropped and the example thins; under two passages the
+> loom opens empty, as it did before. Nothing is persisted, so a reload
+> restores the example — which is the "start over" this place would otherwise
+> need a button for.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.

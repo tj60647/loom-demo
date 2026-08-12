@@ -89,5 +89,33 @@ assert(
   "Workbench renders ShelfSearch in the practice loom — it reads the student's real rows"
 )
 
+// 6. The worked cloth arrives as a PROP, built on the server (2026-08-11).
+//    This is the seam most likely to be "simplified" by someone who notices
+//    the provider could just read the pages itself — which would put a
+//    database read inside the one file whose whole guarantee is that it has
+//    none. The build must fail on that, not the code review.
+const practice = readFileSync("src/lib/practiceCloth.ts", "utf8")
+assert(
+  !/from\s+["']@\/db["']/.test(practice) && !/from\s+["']@\/actions\//.test(practice),
+  "the practice cloth is built from pages handed to it, not fetched",
+  "src/lib/practiceCloth.ts reads the database — it is imported across a client boundary and must stay pure"
+)
+assert(
+  /initial\?: LoomState/.test(src) && /useState<LoomState>\(\(\) => initial \?\? blank\(\)\)/.test(src),
+  "the sandbox seeds its state from that prop, once",
+  `${PROVIDER} no longer takes the worked cloth as a prop — either the example is gone, or it is being fetched somewhere it must not be`
+)
+
+// 7. The practice loom must be reachable from anywhere (TJ, 2026-08-11: "the
+//    guide should always be available, like the tutorials in any game").
+//    Without the header link it is reachable only by typing the URL, which is
+//    how it sat unvisited from the day it was built.
+const header = readFileSync("src/components/ui/Header.tsx", "utf8")
+assert(
+  /href="\/sandbox"/.test(header),
+  "the header carries a door to the practice loom, on every page",
+  "src/components/ui/Header.tsx no longer links to /sandbox — the guide would be reachable only by typing the URL"
+)
+
 console.log(`\n${checks} checks, ${failures} failing\n`)
 if (failures > 0) process.exit(1)

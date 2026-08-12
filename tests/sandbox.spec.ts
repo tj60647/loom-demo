@@ -44,6 +44,30 @@ test.describe('Practice loom', () => {
     // A REAL reading, with a real text layer to drag-select — not a mock.
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 40_000 });
 
+    // The worked cloth is already here (TJ, 2026-08-11: the sandbox IS the
+    // guide, so it has to SHOW something). Its passages are real substrings of
+    // this PDF found at their true offsets, so the count in Your work is the
+    // proof they resolved — a quotation that stopped matching would silently
+    // drop out and leave a thinner example that still looks deliberate.
+    // Exact counts on purpose: these ARE the example, and a quotation that
+    // stopped matching the page text would thin it silently — the loom would
+    // still open, still look deliberate, and teach less than it claims to.
+    await page.locator('nav button', { hasText: 'Linking' }).click();
+    await expect(page.locator('.crow')).toHaveCount(3);
+    await expect(page.locator('.thread')).toHaveCount(2);
+    await page.locator('nav button', { hasText: 'Reading' }).click();
+
+    // What the example puts on the page, so everything below asserts the
+    // CHANGE a student makes rather than a number the example could alter.
+    const workCount = async () => {
+      const label = (await page.locator('#yourwork-toggle').textContent()) ?? '';
+      const found = label.match(/·\s*(\d+)/);
+      return found ? Number(found[1]) : 0;
+    };
+    const exampleWork = await workCount();
+    expect(exampleWork, 'the worked example put no passages on the page').toBeGreaterThan(0);
+    const exampleScope = await page.locator('.scopemeta').nth(1).textContent();
+
     // Search is withheld here: it reads the student's real rows over its own
     // route, bypassing the provider entirely.
     await expect(page.getByRole('button', { name: 'Search everything' })).toHaveCount(0);
@@ -81,7 +105,7 @@ test.describe('Practice loom', () => {
     // It really landed: the mark is drawn on the page and the capture is in
     // Your work, exactly as in the real app.
     await expect(page.locator('.loom-passage-highlight').first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('#yourwork-toggle')).toContainText('1');
+    await expect.poll(workCount, { timeout: 10_000 }).toBe(exampleWork + 1);
 
     // The whole point.
     expect(writes, `the practice loom wrote to the server: ${writes.join(', ')}`).toHaveLength(0);
@@ -95,11 +119,14 @@ test.describe('Practice loom', () => {
     // Nothing survives the reload, by design. Asserted on the counts the
     // provider drives rather than on the highlights: a mark is absent while
     // the PDF is still rendering too, which would pass for the wrong reason.
+    // Nothing the student did survives, and the example comes back exactly as
+    // it was — which is also the "start over" this place would otherwise need
+    // a button for.
     await page.reload();
     await expect(page.locator('.practiceband')).toBeVisible({ timeout: 30_000 });
-    // The toggle carries "· N" only when there IS work, so a bare "Your work"
-    // is the count being zero — it read "Your work · 1" a moment ago.
-    await expect(page.locator('#yourwork-toggle')).toHaveText('Your work', { timeout: 15_000 });
-    await expect(page.locator('.scopemeta').nth(1)).toContainText('0 concepts');
+    await expect.poll(workCount, { timeout: 20_000 }).toBe(exampleWork);
+    await expect(page.locator('.scopemeta').nth(1)).toHaveText(exampleScope ?? '');
+    await page.locator('nav button', { hasText: 'Vocabulary' }).click();
+    await expect(page.locator('.lrow', { hasText: 'practice concept' })).toHaveCount(0);
   });
 });

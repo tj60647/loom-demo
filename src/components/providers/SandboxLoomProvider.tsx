@@ -76,16 +76,27 @@ const newId = () => crypto.randomUUID()
 
 export default function SandboxLoomProvider({
   sourceId,
+  initial,
   children,
 }: {
   /** The reading being practised on — gives the sandbox a real scope, so the
-   *  tabs behave exactly as they do in a real reading rather than falling
-   *  through to the whole weave. */
+   *  tabs behave exactly as they do in a real reading. */
   sourceId: string
+  /**
+   * The worked cloth to open with, built on the SERVER from this reading's
+   * own pages (src/lib/practiceCloth.ts) and handed down as a prop — this
+   * file must never read a database, which is the guarantee
+   * `scripts/check-sandbox.ts` enforces. Absent, the loom opens empty.
+   *
+   * Seeded once, into initial state: after that it is the student's to take
+   * apart. Nothing is persisted, so a refresh puts the example back — which
+   * is also the "start over" this place would otherwise need a button for.
+   */
+  initial?: LoomState
   children: ReactNode
 }) {
   const { data: session } = useSession()
-  const [state, setState] = useState<LoomState>(blank())
+  const [state, setState] = useState<LoomState>(() => initial ?? blank())
   const [flashMsg, setFlashMsg] = useState<string | null>(null)
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null)
   const [undoStack, setUndoStack] = useState<{ edgeId: string; from: string | null; to: string | null }[]>([])

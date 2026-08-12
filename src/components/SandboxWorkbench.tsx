@@ -12,11 +12,19 @@
 
 import SandboxLoomProvider from "@/components/providers/SandboxLoomProvider"
 import Workbench, { type WorkbenchSource } from "@/components/Workbench"
+import type { LoomState } from "@/lib/types"
 
 export default function SandboxWorkbench({
   sourceId,
   source,
+  practiceCloth,
 }: {
+  /**
+   * The worked cloth the practice loom opens with, read on the server from
+   * this reading's own pages. Null when the reading cannot carry it, and the
+   * loom opens empty — which is what it did before 2026-08-11.
+   */
+  practiceCloth?: LoomState | null
   sourceId: string
   source: {
     id: string
@@ -38,7 +46,7 @@ export default function SandboxWorkbench({
   }
 
   return (
-    <SandboxLoomProvider sourceId={sourceId}>
+    <SandboxLoomProvider sourceId={sourceId} initial={practiceCloth ?? undefined}>
       <Workbench source={workbenchSource} practice />
     </SandboxLoomProvider>
   )

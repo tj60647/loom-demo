@@ -263,9 +263,12 @@ export default function Workbench({
            student who missed a disappearing notice cannot tell a practice
            loom from data loss. This band IS the safety argument. */
         <div className="practiceband" role="status">
-          <b>Practice loom.</b> Everything here is real — the text, the
-          highlighting, naming, threading, the board. <b>Nothing is kept.</b>{" "}
-          Close this and it is gone; your own work is untouched.
+          <b>Practice loom.</b> A finished piece of work is already here — four
+          passages, three concepts, two threads and a projection — so you can
+          see where the moves lead before making any. Everything works: capture
+          a passage, name a concept, throw a thread, lay out the board, take
+          the example apart. <b>Nothing is kept.</b> Reload to put it back;
+          your own work is untouched.
         </div>
       )}
 

@@ -67,6 +67,22 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
             workflows
           </Link>
         )}
+        {/* The practice loom, on every page (TJ, 2026-08-11: "the guide should
+            always be available, like the tutorials in any game. if the sandbox
+            is the guide, then it should be clearly accessible"). It was
+            reachable only by typing the URL until this week, and then only
+            from a Library card that shows on an empty loom — so the one
+            student who could find it was the one who had not started. A
+            tutorial you can only reach before you need it is not a tutorial. */}
+        {session && (
+          <Link
+            href="/sandbox"
+            className="btn ghost mini"
+            data-tip="the practice loom — try any move on a real reading, nothing is kept"
+          >
+            practice
+          </Link>
+        )}
         <button
           onClick={() => window.dispatchEvent(new Event("loom:walkthrough"))}
           className="helpbtn"

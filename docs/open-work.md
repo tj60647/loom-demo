@@ -297,28 +297,30 @@ gaps are now demonstrable rather than suspected:
     up rather than building a fixer for a mess nobody has made. Delete needs a
     rule for a Link that Threads still use (refuse, or detach them and say how
     many), and that rule is TJ's, not mine.
-- **The practice loom shows no worked cloth** — TJ, 2026-08-11: *"i have yet
-  to see the practice loom, but i imagine we can use the worked example content
-  in it? or it already has something similar?"* It does not: `/sandbox` starts
-  **empty** by design, so a student practises the gestures but never sees a
-  finished cloth to poke at. That was the worked example's job, and the worked
-  example is gone (its only exit was a reset that also went).
-  **Not a straight port.** The deleted content was Star & Griesemer's boundary
-  objects; the practice loom runs on *Learning How to Learn*, so salting one
-  book's text with another's passages would teach the wrong thing about what a
-  passage IS — the whole point of the sandbox is that the capture path is
-  genuine. What it wants instead is a small worked cloth built **from the
-  practice reading's own pages**: two or three real sentences with their true
-  offsets, the concepts they evidence, one thread with a coined label, and one
-  projection with a tier or two. The shape is already in
-  `scripts/seed-demo.ts` — `pickPassage()` finds a real sentence with usable
-  offsets — and `/sandbox/page.tsx` is a server component, so it can read
-  `source_page` and hand the content down as props to `SandboxLoomProvider`,
-  which stays client-only and still writes nothing.
-  Worth pairing with a **"start over"** control: the sandbox had a local
-  `resetAll` and only Keep ever rendered it, so it went unused and was deleted
-  with the rest. In a practice loom, clearing your practice costs nothing and
-  is the obvious thing to want after poking at a worked example.
+- ~~**The practice loom shows no worked cloth**~~ — **built 2026-08-11.** TJ:
+  *"the guide should always be available, like the tutorials in any game. if
+  the sandbox is the guide, then it should be clearly accessible. it is the
+  instructions, right? … include a worked example … lets use Oh, the Places
+  You'll Go!"* Both halves shipped: a **permanent door in the header**, on
+  every page (it was reachable only by typing the URL, and then only from a
+  Library card that shows on an empty loom — so the one student who could
+  find it was the one who had not started), and a **worked cloth**
+  ([practiceCloth.ts](../src/lib/practiceCloth.ts)) built from real
+  substrings of that reading's own text layer at their true offsets: four
+  passages (one unlabeled), three concepts, two threads (one labelled, one
+  left as a description), a Link with its own gloss, a cloth, and a
+  projection with tiers and a board.
+  It is built on the SERVER and handed down as a prop, because
+  `SandboxLoomProvider` must never read a database — `check-sandbox.ts` now
+  asserts that seam too, along with the header door. Quotations that stop
+  matching are dropped and the example thins; below two passages the loom
+  opens empty, as before. `tests/sandbox.spec.ts` asserts the exact shape, so
+  a thinning is a failure rather than a quiet downgrade.
+  **Still open:** whether the example should be swappable per course (TJ: "we
+  can change it out later if it seems to conflict with the intention"), and
+  whether the guide wants a *sequence* on top of the example — TJ's original
+  option was "supplemental slides/overlay guides", and what shipped shows the
+  end state without walking anyone to it.
 - **5.2 The screen snip** — [screen-snip.md](screen-snip.md). Much smaller than
   it looks: a snip of a library PDF needs **no image storage**, only a rect.
   TJ settled export (the image embeds). One number open: the size cap, worth
