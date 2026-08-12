@@ -297,12 +297,11 @@ export default function Shelf() {
           <div className="card" style={{ marginTop: 8 }}>
             <h2>New to this?</h2>
             <p className="hint">
-              Try the moves first on the practice loom — the real interface on a real
-              reading. Highlight a passage, name what it evidences, thread two concepts
-              together, lay out a board. <b>Nothing there is kept</b>, so nothing you do
-              can go wrong.
+              The guide walks you through it on a real reading: highlight a passage,
+              name what it evidences, thread two concepts together, lay out a board.
+              <b>Nothing there is kept</b>, so nothing you do can go wrong.
             </p>
-            <Link className="btn ghost mini" href="/sandbox">open the practice loom</Link>
+            <Link className="btn ghost mini" href="/sandbox">open the guide</Link>
           </div>
         )}
         </>)}

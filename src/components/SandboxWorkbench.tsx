@@ -85,12 +85,14 @@ export default function SandboxWorkbench({
       {/* The standing notice, over BOTH stages. Persistent rather than a
           toast: `flash` self-clears after 1500ms, and someone who missed a
           disappearing notice cannot tell a practice space from data loss.
-          This is the safety argument, so it stays on screen — as a floater,
-          because the practice loom should look like the loom. Takes no
-          pointer events: it is prose, and prose must never eat a control. */}
+          So it stays on screen — but it says two things and stops (TJ,
+          2026-08-12: "letting folks know they are in the guide is good, but we
+          dont have to say much else"). It said "Practice loom" and explained
+          reloading, which named the machinery rather than the place the
+          student is in, and described a recovery from a loss they had not had.
+          Takes no pointer events: prose must never eat a control. */}
       <div className="practiceband" role="status">
-        <b>Practice loom.</b> Everything here works and <b>nothing is kept</b>.
-        Reload to put the example back; your own work is untouched.
+        <b>You are in the guide.</b> Everything works and <b>nothing is kept</b>.
       </div>
       <PracticeGuide />
       {opened ? (

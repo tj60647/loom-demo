@@ -55,8 +55,8 @@ export default function PracticeShelf({
       <p className="tasktitle">Pick a reading.</p>
       <p className="tasksub">
         This is the Library as a student meets it: every reading on the course, each
-        card a door into your work on that text. In the practice loom only one of them
-        opens — the rest are here so the shelf looks like the shelf.
+        card a door into your work on that text. In the guide only one of them opens —
+        the rest are here so the shelf looks like the shelf.
       </p>
 
       <div className="shelfgrid" style={{ marginTop: 14 }}>
@@ -103,7 +103,7 @@ export default function PracticeShelf({
                   id="practiceOpen"
                   className="shelfmain"
                   onClick={onOpen}
-                  data-tip="open this reading in the practice loom"
+                  data-tip="open this reading in the guide"
                 >
                   {body}
                 </button>
@@ -121,7 +121,7 @@ export default function PracticeShelf({
                     {openable ? tally?.clothTitle || "Base cloth" : "Base cloth"}
                   </span>
                   <span className="clothmeta">
-                    {openable ? "a worked cloth is waiting here" : "not in the practice loom"}
+                    {openable ? "a worked cloth is waiting here" : "not in the guide"}
                   </span>
                 </span>
               </div>

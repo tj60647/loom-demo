@@ -534,6 +534,9 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .gstep.done.now{color:var(--paper);background:var(--ochre)}
 .gcount{margin-left:auto}
 .guidepop .gsay{margin:0;font-size:13px;line-height:1.42}
+/* A finished beat says so instead of repeating an instruction the student has
+   already carried out. */
+.guidepop .gdone{color:var(--sage,#5d6b52);font-weight:600}
 .guidepop .gwhy{margin:5px 0 0;font-size:12px;line-height:1.4;color:var(--ink-soft);font-style:italic}
 .guidefoot{display:flex;align-items:center;gap:5px;margin-top:8px;border-top:1px solid var(--rule);padding-top:7px}
 .guidefoot .gwhybtn{margin-left:auto}
@@ -542,10 +545,17 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .btn.gnext:hover:not(:disabled){background:var(--ochre);border-color:var(--ochre)}
 /* "Hit this button now": the gesture landed and going on is the move. Slow and
    small — this app does not flash. */
-@keyframes gpulse{0%,100%{box-shadow:0 0 0 0 rgba(168,132,63,0)}
-  50%{box-shadow:0 0 0 5px rgba(168,132,63,.38)}}
-.btn.gpulse{animation:gpulse 1.7s ease-in-out infinite}
-@media(prefers-reduced-motion:reduce){.btn.gpulse{animation:none}}
+/* Light only, never movement. A `transform: scale()` in here made the button
+   a target that never stops moving: Playwright refuses to click an unstable
+   element, and a person chasing a button that breathes is the same problem
+   with better manners. The halo does all the work. */
+@keyframes gpulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(168,132,63,.55),0 0 10px 2px rgba(168,132,63,.35)}
+  50%{box-shadow:0 0 0 8px rgba(168,132,63,.22),0 0 26px 8px rgba(168,132,63,.65)}}
+.btn.gpulse{animation:gpulse 1.25s ease-in-out infinite;background:var(--ochre);
+  border-color:var(--ochre);color:#241f14;font-weight:600}
+@media(prefers-reduced-motion:reduce){
+  .btn.gpulse{animation:none;box-shadow:0 0 0 4px rgba(168,132,63,.45)}}
 @media(max-width:640px){
   .guidepop{left:12px !important;right:12px;top:auto !important;bottom:14px;width:auto}
   .guidepop::before,.guidepop::after{display:none}

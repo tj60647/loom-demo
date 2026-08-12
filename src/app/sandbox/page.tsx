@@ -44,7 +44,7 @@ export default async function SandboxPage() {
       <main>
         <div className="empty" style={{ marginTop: "100px" }}>
           <h2>Nothing to practise on yet.</h2>
-          <span className="cap">the practice loom borrows a reading from your list</span>
+          <span className="cap">the guide borrows a reading from your list</span>
           <p style={{ marginTop: 18 }}>
             <Link className="btn ghost mini" href="/">‹ back to your readings</Link>
           </p>

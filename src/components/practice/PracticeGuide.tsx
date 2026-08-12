@@ -393,7 +393,8 @@ export default function PracticeGuide() {
         </div>
 
         <p className="gsay">
-          <b>{step.label}.</b> {step.say}
+          <b>{step.label}.</b>{" "}
+          {ready ? <span className="gdone">Done. Press next.</span> : step.say}
         </p>
         {showWhy && <p className="gwhy">{step.why}</p>}
 
