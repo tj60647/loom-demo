@@ -57,7 +57,7 @@ const STEPS: { label: string; says: string }[] = [
   },
   {
     label: "Throw the thread",
-    says: "Throw it, and the pair is joined. Afterwards you can coin a short label for the kind of link, so a word of yours can recur.",
+    says: "Throw it, and the pair is joined. Afterwards you can label the link with a short word, so a word of yours can recur.",
   },
 ]
 
@@ -211,7 +211,7 @@ export default function ThrowTab() {
     setPairB(null)
     setDrawn(false)
     setSentence("")
-    flash('thread thrown — coin a label for it below, when you like')
+    flash('thread thrown — label the link below, when you like')
   }
 
   const handleOpenerClick = (opener: string) => {
@@ -260,7 +260,7 @@ export default function ThrowTab() {
       editEdge(edgeId, { handle: h });
     }
     setNamingFor(null);
-    flash(h ? 'label coined' : 'left as a description');
+    flash(h ? 'link labelled' : 'left as a description');
   }
 
   const c1 = conceptById(pairA ?? "")
@@ -349,8 +349,11 @@ export default function ThrowTab() {
           {e.handle
             ? <span className="pill beaten">label</span>
             : <span className="pill loose">description</span>}
+          {/* One word for one control (TJ, 2026-08-12). It read "coin a label"
+              on a thread with none and "edit label" on one with a label — the
+              pill beside it already says which of the two this thread is. */}
           <span className="act" onClick={() => toggleNamer(e.id, e.handle)}>
-            {sel ? 'close' : (e.handle ? 'edit label' : 'coin a label')}
+            {sel ? 'close' : 'edit label'}
           </span>
           <span
             className="rm"
@@ -369,7 +372,7 @@ export default function ThrowTab() {
         </div>
         {sel && (
           <div className="distill">
-            <div className="rnote"><b>Coin a label</b> (optional) — you&apos;ve already said how they relate; a short word lets this <i>kind</i> of link recur across your weave.</div>
+            <div className="rnote"><b>Label the link</b> (optional) — you&apos;ve already said how they relate; a short word lets this <i>kind</i> of link recur across your weave.</div>
             <div className="form-row" style={{ margin: "6px 0 8px" }}>
               <input
                 ref={nameInputRef}
@@ -392,7 +395,7 @@ export default function ThrowTab() {
             {ownLabels.shown.length > 0 && (
               <>
                 <div className="rnote">
-                  Labels you have coined before
+                  Labels you have used before
                   {ownLabels.rest > 0 && <> — the {ownLabels.shown.length} you reach for most, of {ownLabels.shown.length + ownLabels.rest}</>}:
                 </div>
                 <div className="chips">
@@ -537,7 +540,7 @@ export default function ThrowTab() {
                 coaches toward it instead of the button withholding the throw. */}
             <p className="ghostnote" style={{marginTop: "7px"}}>
               {sent
-                ? "Thrown threads land below. When a relationship recurs, coin a short label for it (optional) — that's how your vocabulary grows."
+                ? "Thrown threads land below. When a relationship recurs, label the link with a short word (optional) — that's how your vocabulary grows."
                 : "Say how they hang together — however awkwardly. The description is the thread, and you can throw now and write it later."}
             </p>
           </div>
@@ -560,6 +563,22 @@ export default function ThrowTab() {
               </span>
             )}
           </h3>
+
+          {/* What "edit label" is FOR (TJ, 2026-08-12). The control sits on
+              every row with no account of why anyone would press it, and the
+              answer is a movement rather than a field: the sentence comes
+              first and stays the thread, and a label is what you distil out of
+              it once you have written the same relation a few times. Shown
+              only with threads on screen — with none, it explains a control
+              nobody can see. */}
+          {orderedEdges.length > 0 && (
+            <p className="ghostnote" style={{ margin: "0 0 9px" }}>
+              As a thread matures you can promote its description to a <b>label</b> — one
+              short word for the relation, chosen because it captures the essence of what
+              you already said. That is what <i>edit label</i> on a row is for. A thread
+              that stays a description is finished work, not a draft.
+            </p>
+          )}
 
           <div className="scrollbox">
             {orderedEdges.length === 0 ? (

@@ -276,12 +276,15 @@ function describeEvent(e: GraphEvent): string {
     case "passage.attribute": return "placed passages in their reading"
     case "passage.delete": return "removed a passage"
     case "edge.throw": return "threw a thread"
-    case "edge.coin": return typeof p.handle === "string" && p.handle ? `coined "${p.handle}"` : "cleared a coined label"
+    // The KIND keeps its name — `edge.coin` and `link.coin` are written into
+    // graph_event and a log is history — but what the log SAYS follows the
+    // student's language, which stopped being "coin" on 2026-08-12.
+    case "edge.coin": return typeof p.handle === "string" && p.handle ? `labelled a link "${p.handle}"` : "cleared a link's label"
     case "edge.update": return "reworded a thread"
     case "edge.delete": return "removed a thread"
-    // 5.1: a Link is an object now, so coining one is its own act — it can
+    // 5.1: a Link is an object now, so making one is its own act — it can
     // happen with no thread using it yet.
-    case "link.coin": return typeof p.label === "string" && p.label ? `coined the link "${p.label}"` : "coined a link"
+    case "link.coin": return typeof p.label === "string" && p.label ? `added the link label "${p.label}"` : "added a link label"
     case "link.update": return typeof p.label === "string" ? `renamed a link to "${p.label}"` : "glossed a link"
     case "read.update": return "revised the read"
     case "map.create": return typeof p.name === "string" && p.name ? `started a new projection — "${p.name}"` : "started a new projection"

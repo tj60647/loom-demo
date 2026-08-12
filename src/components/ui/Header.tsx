@@ -104,7 +104,7 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
               <li><b>01 Reading</b> — the text and your captures in one place. Highlight a passage, name the concept it evidences, and title your cloth: your own reading of the text as a whole.</li>
               <li><b>02 Linking</b> — pick two concepts and say how they hang together. That sentence IS the thread; a short label is a convenience that lets one of your words recur.</li>
               <li><b>03 Knowledge Graph</b> — sort your concepts into tiers and arrange them as cards on a board. Each arrangement is a projection: keep several, and each can say something different about the same cloth.</li>
-              <li><b>04 Vocabulary</b> — every concept you have named and every label you have coined, across all your readings. A concept does not belong to a text; a passage does.</li>
+              <li><b>04 Vocabulary</b> — every concept you have named and every label you have given a link, across all your readings. A concept does not belong to a text; a passage does.</li>
             </ul>
 
             <h3>What Loom will not do</h3>

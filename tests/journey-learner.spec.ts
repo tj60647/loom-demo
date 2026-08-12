@@ -144,7 +144,7 @@ test("01 · a passage captured by hand lands in the coding log — and cleans up
   await expect(page.locator(".lrow", { hasText: "journey test concept" })).toHaveCount(0, { timeout: 15_000 })
 })
 
-test("02 · pick two, say the sentence, throw the thread, coin a term — then unpick it all", async ({ page }) => {
+test("02 · pick two, say the sentence, throw the thread, label the link — then unpick it all", async ({ page }) => {
   // Inside the reading, because linking works on the concepts a reading
   // evidences (TJ, 2026-08-08) — and since 2026-08-11 a reading is the only
   // scope there is. Both ends are Object Worlds' own, and the pair is one the
@@ -170,8 +170,9 @@ test("02 · pick two, say the sentence, throw the thread, coin a term — then u
   const thread = sent.locator("..")
   await expect(thread.locator(".pill", { hasText: "description" })).toBeVisible()
 
-  // Coin a label on the new thread.
-  await thread.locator(".act", { hasText: "coin a label" }).click()
+  // Coin a label on the new thread. The control says "edit label" either way
+  // since 2026-08-12; the pill beside it is what says which state this is.
+  await thread.locator(".act", { hasText: "edit label" }).click()
   await page.getByPlaceholder("your word… e.g. leads to · contradicts · is part of").fill("journey-term")
   await thread.getByRole("button", { name: "Save label" }).click()
   await expect(thread.locator(".pill", { hasText: "label" }).first()).toBeVisible({ timeout: 15_000 })
@@ -216,11 +217,14 @@ test("03 · vocabulary is every word you own, across all your readings", async (
   await page.locator("#conceptFilter").fill("")
   await expect(conceptRows).toHaveCount(8)
 
-  // A concept opens to its description and its merge control — the two
-  // affordances the model puts here (merge lives ONLY here now).
+  // A concept opens to its description. It opened to a MERGE control too
+  // until 2026-08-12, when TJ hid that pending what merge means and what it
+  // costs (`MERGE_VISIBLE` in VocabularyTab). Asserted absent rather than
+  // deleted from the spec: the control is one flag away from returning, and
+  // the flag flipping by accident should turn this suite red.
   await page.locator(".lrow[data-concept-id]", { hasText: "object worlds" }).first().locator(".lhead").click()
   await expect(page.locator(".conceptDescription").first()).toBeVisible()
-  await expect(page.getByRole("button", { name: "Merge" }).first()).toBeVisible()
+  await expect(page.getByRole("button", { name: "Merge" })).toHaveCount(0)
 
   // The read editor and the cloth prompts moved to 04 — they must not be here.
   await expect(page.locator("#yourRead, #readEssence")).toHaveCount(0)

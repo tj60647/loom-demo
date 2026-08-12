@@ -125,20 +125,24 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .ladder summary{cursor:pointer;color:var(--ochre);font-family:var(--mono);font-size:11px;letter-spacing:.04em}
 .ladder ul{margin:7px 0 0;padding-left:18px} .ladder li{margin-bottom:3px}
 .ladder .eg{font-style:italic}
-/* The three kinds a concept can be, relative to this reading (TJ, 2026-08-09):
-   in this reading · no evidence · in your other readings. Headings, not steps —
-   the same weight for each, no numbering, no counts of one against another,
-   nothing that would read as an order to work through. */
+/* What Your work is made of (TJ, 2026-08-09, amended 2026-08-12): concepts in
+   this reading · concepts with no evidence · your passages with no label yet.
+   Headings, not steps — the same weight for each, no numbering, no counts of
+   one against another, nothing that would read as an order to work through.
+   (The fourth group, "in your other readings", is gone: a roll-call of every
+   concept from every other text, in the panel that is meant to be this
+   reading's own work. Vocabulary holds that view.) */
 .lgroup{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--ochre);padding:14px 12px 5px;border-bottom:1px solid var(--rule)}
-/* Context, not work: these are not in this reading's warp, so they are quieter
-   and they do not open. The LABEL is what you are scanning for, so it keeps the
-   room — an unconstrained reading title ("Communities of practice and social
-   learning systems") ate the whole row and left the concept invisible, which
-   defeated the group entirely. */
-.lrow.elsewhere .lhead{cursor:default}
-.lrow.elsewhere .lconcept{color:var(--ink-soft);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lrow.elsewhere .lsrc{flex:0 1 auto;min-width:0;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* An unlabeled capture. Not a concept row — it has no head, because there is
+   nothing folded under it — so it carries its own padding, and it borrows the
+   opened row's typography so a quote reads the same wherever your work shows
+   one. */
+.lrow.loose{padding:10px 12px}
+.lrow.loose .passage{font-size:13.5px;margin:0 0 6px}
+.lrow.loose .src{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
+.lrow.loose .pnote{font-size:13px;font-style:italic;color:var(--ink-soft);margin:0 0 6px}
+.lrow.loose .quietrow{margin-top:9px;padding-top:9px}
 /* coding log */
 .lrow{border-bottom:1px dotted var(--rule)}
 .lhead{display:flex;gap:10px;align-items:baseline;padding:9px 12px;cursor:pointer}

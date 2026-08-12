@@ -23,8 +23,13 @@
 //
 // So: it happened, here is where, and here is the way out if it was wrong.
 // Homonyms are a ratified legal state, which is what makes the way out cheap —
-// Vocabulary tells two apart by their passage counts, and merge exists if the
-// student changes their mind back.
+// Vocabulary tells two apart by their passage counts.
+//
+// The way BACK is no longer one act (2026-08-12): merge is hidden while TJ
+// resolves what it means, so a student who separates and then changes their
+// mind refiles this passage onto the concept they kept and removes the new
+// one. Worth knowing before this button is made any easier to press — it is
+// still cheap, but it is now cheap in one direction and manual in the other.
 //
 // Shown ONLY when the concept was already evidenced in a DIFFERENT reading.
 // A second passage under the same concept in the same reading is not ambiguous

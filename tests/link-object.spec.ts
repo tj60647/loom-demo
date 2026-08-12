@@ -89,13 +89,17 @@ async function removeThread(page: import("@playwright/test").Page, mustExist = f
 test("a label coined with no thread is a row, and tapping it labels a thread", async ({ page }) => {
   await removeThread(page)
 
-  // --- coin it, with nothing using it ---
+  // --- add it, with nothing using it ---
+  // The button reads "Add" since 2026-08-12: the student's language is now
+  // "label the link", and this is the one box where there is no link to label
+  // yet. The id and the action behind it are unchanged (`#coinLabel`,
+  // `link.coin`) — the record keeps its own names.
   await openStation(page, "Vocabulary")
   const row = page.locator(`.lrow[data-link-label="${COINED}"]`)
 
   if ((await row.count()) === 0) {
     await page.locator("#coinLabel").fill(COINED)
-    await page.getByRole("button", { name: "Coin" }).click()
+    await page.getByRole("button", { name: "Add" }).click()
   }
   await expect(row, "the coined label is a row of its own").toHaveCount(1, { timeout: 15_000 })
   await expect(row.locator(".lsrc")).toHaveText(/0 threads/)
@@ -151,7 +155,9 @@ test("a label coined with no thread is a row, and tapping it labels a thread", a
   const thread = sent.locator("..")
   await expect(thread.locator(".pill", { hasText: "description" })).toBeVisible()
 
-  await thread.locator(".act", { hasText: "coin a label" }).click()
+  // "edit label" whether the thread carries one or not since 2026-08-12 — the
+  // pill beside it is what says which.
+  await thread.locator(".act", { hasText: "edit label" }).click()
   const chip = page.locator(".verbchip.borrowed", { hasText: COINED })
   await expect(chip, "a label coined ahead of use is offered as a chip").toHaveCount(1)
 
@@ -200,6 +206,6 @@ test("a Link nothing uses is findable — search covers the object, not just the
   // says so rather than looking clickable and going nowhere. This is the state
   // 5.1 exists for, met at the one surface that can see every reading at once.
   await expect(hit).toContainClass("off")
-  await expect(hit.getByText("coined, with no thread using it yet")).toBeVisible()
+  await expect(hit.getByText("a label with no link using it yet")).toBeVisible()
   await expect(hit.locator("a")).toHaveCount(0)
 })

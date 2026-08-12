@@ -145,13 +145,20 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     }
   }
 
+  // One handler for both filings, because they are the same act: naming the
+  // concept a passage evidences. The difference is only how many it already
+  // had — a passage filed nowhere is being named for the first time, so the
+  // copy says that rather than "a second concept" (TJ, 2026-08-12).
   const handleRefile = async (b: Passage) => {
     if (refileBusy[b.id]) return
+    const first = b.conceptIds.length === 0
     const nm = (refileInputs[b.id] ?? "").trim()
     if (!nm) {
       await notify({
-        title: "Name the second concept first.",
-        body: "Type the concept this passage also evidences, then File.",
+        title: first ? "Name the concept first." : "Name the second concept first.",
+        body: first
+          ? "Type the concept this passage evidences, then Name it."
+          : "Type the concept this passage also evidences, then File.",
       })
       return
     }
@@ -171,7 +178,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
       await refilePassage(b.id, concept.id)
       setRefileInputs(prev => ({ ...prev, [b.id]: "" }))
       setOpenLogRows(prev => ({ ...prev, [concept!.id]: true }))
-      flash("filed under a second concept")
+      flash(first ? `named — filed under “${concept.label}”` : "filed under a second concept")
     } catch {
       // refilePassage resyncs and flashes the server message before rethrowing;
       // swallow here to avoid an unhandled rejection.
@@ -195,9 +202,14 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     const label = state.concepts.find(c => c.id === conceptId)?.label ?? "this concept"
     const ok = await confirm({
       title: `Delete “${label}”?`,
+      // Names where the passages GO, because since merge went behind a
+      // curtain this delete is half of the duplicate repair, and the other
+      // half is finding them again: they land in Unlabeled, in this list.
+      // ("Export from Keep first" stood here until 2026-08-12, four days
+      // after Keep was deleted; download lives at each object now.)
       body: passageCount
-        ? `Its ${passageCount} captured passage${passageCount !== 1 ? "s" : ""} stay${passageCount !== 1 ? "" : "s"} in your work, unfiled. Export from Keep first if you might want this back.`
-        : "Export from Keep first if you might want this back.",
+        ? `Its ${passageCount} captured passage${passageCount !== 1 ? "s" : ""} stay${passageCount !== 1 ? "" : "s"} in your work, under Unlabeled — file them under another concept whenever you like. Download your cloth first if you might want the concept itself back.`
+        : "Download your cloth first if you might want this back.",
       confirmLabel: "Delete concept",
       danger: true,
     })
@@ -219,7 +231,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
       // be two distinct ideas. Same idea → reuse the one you have.
       const ok = await confirm({
         title: `You already have a concept named “${existing.label}”.`,
-        body: "Make a second, distinct concept with the same name? They stay separate (homonyms) — if they turn out to be one idea, merge them in Vocabulary.",
+        body: "Make a second, distinct concept with the same name? They stay separate (homonyms) — if they turn out to be one idea, file the passages under the one you keep and remove the other.",
         confirmLabel: "Make a homonym",
       })
       if (!ok) {
@@ -563,6 +575,19 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
   const namedOnly = sortedByLabel(scoped.concepts).filter(c =>
     !scoped.passages.some(b => b.conceptIds.includes(c.id))
   )
+  /**
+   * The captures with no name on them (TJ, 2026-08-12). An unlabeled passage
+   * is a whole act, not half of one — the capture toast says so, and says
+   * "name it in Your work whenever the word arrives". Your work had nowhere
+   * for it to be: every row here hangs off a concept, so a passage filed
+   * under none of them counted in the tally at the head of the panel and then
+   * appeared in no row beneath it. The student's own words, invisible in the
+   * one place that is meant to hold them.
+   *
+   * Kept in capture order, not A–Z: they have no label to sort by, and the
+   * order you found them in is the only order they have.
+   */
+  const unlabeled = scoped.passages.filter(b => b.conceptIds.length === 0)
 
   const logCard = (
       <div className="card">
@@ -586,7 +611,9 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
         )}
 
         <div className="scrollbox">
-          {scoped.concepts.length === 0 && (
+          {/* Empty means empty. A reading whose only capture is an unlabeled
+              passage is not a blank warp, and it used to be told it was. */}
+          {scoped.concepts.length === 0 && unlabeled.length === 0 && (
             <div className="empty">
               <svg width="34" height="18" viewBox="0 0 34 18" fill="none" stroke="#a39f92" strokeWidth="1.3"><path d="M2 13 L7 5 L12 13 L17 5 L22 13 L27 5 L32 13"/></svg>
               <span className="cap">your work fills as you lay warp</span>
@@ -649,10 +676,14 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                           )
                           if (clash) {
                             // Warned, never forbidden (ruling 36): homonyms
-                            // are legal; merge handles true duplicates.
+                            // are legal. What the second sentence offers is
+                            // the repair that EXISTS — merge is hidden while
+                            // TJ resolves what it means (VocabularyTab's
+                            // MERGE_VISIBLE), and a dialog is a bad place to
+                            // learn that the way out it named is not there.
                             const ok = await confirm({
                               title: `You already have a concept named “${v}”.`,
-                              body: "Rename anyway? The two stay distinct concepts sharing a name — if they are one idea, merge them instead.",
+                              body: "Rename anyway? The two stay distinct concepts sharing a name — if they are one idea, file this one's passages under the other and remove it.",
                               confirmLabel: "Rename anyway",
                             })
                             if (!ok) {
@@ -734,9 +765,12 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                         {elsewhere} more passage{elsewhere !== 1 ? "s" : ""} evidence{elsewhere === 1 ? "s" : ""} this concept in your other readings — one concept, evidence from several texts.
                       </p>
                     )}
-                    {/* Merge lives on 04 · Vocabulary (model §3 tab 4), where
-                        you can see every concept you own at once — which is
-                        what you need to judge whether two are really one. */}
+                    {/* Deleting is the only repair on this row, and since
+                        migration 0021 it is a soft one: the passages survive
+                        and land in Unlabeled above. 04 · Vocabulary is still
+                        where you see every concept you own at once — which is
+                        what you need to judge whether two are really one —
+                        but its one-act merge is hidden (2026-08-12). */}
                     <button
                       type="button"
                       className="rm"
@@ -753,20 +787,66 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
           </div>
           ))}
 
-          {/* The third kind. Lighter than the other two on purpose: these are
-              not in this reading's warp — you cannot link them here until a
-              passage brings them in — so they are context rather than work.
-              But they are NAMED now, where this used to be a bare count: the
-              whole point of the group is scanning what you are looking for
-              while you read. */}
-          {scoped.outside.length > 0 && (
+          {/* Your work is THIS reading's work (TJ, 2026-08-12). What used to
+              close the list was a third group, "In your other readings" —
+              every concept the student owns from every other text, listed
+              here where none of them can be linked or filed. It grew with the
+              term, so by week six the longest thing in Your work was the part
+              that was not your work on this reading. Vocabulary is where you
+              see them all; the note below keeps that door and the typing that
+              reaches them, without the roll-call.
+
+              What closes the list instead is the student's own capture that
+              has no name yet — see `unlabeled` above. Last, because it is a
+              designation and not a queue: nothing here has to be named, and
+              an unlabeled passage may stay one forever. */}
+          {unlabeled.length > 0 && (
             <>
-              <div className="lgroup">In your other readings</div>
-              {sortedByLabel(scoped.outside).map(c => (
-                <div key={c.id} className="lrow elsewhere">
-                  <div className="lhead" style={{ display: "flex", alignItems: "center" }}>
-                    <div className="lconcept" style={{ flex: 1 }}>{c.label}</div>
-                    <div className="lsrc">{readingsOf(c.id, state.passages).map(titleOf).join(" · ")}</div>
+              <div className="lgroup">Unlabeled</div>
+              {unlabeled.map(b => (
+                <div key={b.id} data-passage-id={b.id} className="lrow loose">
+                  <div className="passage">&quot;{b.content}&quot;</div>
+                  {/* Shown here and nowhere else in the list, because here it
+                      is the only thing the student wrote: the capture dialog
+                      calls the note "the whole of what an unlabeled capture
+                      can say". A concept row has a description and a label
+                      doing that work. */}
+                  {b.note ? <div className="pnote">{b.note}</div> : null}
+                  {/* The citation and the two controls on separate lines. In a
+                      concept row they share one, indented under a heading; in
+                      the 380px sheet this row has no indent to spare and
+                      "…Places You'll Go! · p. 38 goto remove passage" ran
+                      together into one mono string. */}
+                  <div className="src">{b.source || "—"}{b.location ? ` · ${b.location}` : ""}</div>
+                  <div className="src rm-actions" style={{ marginTop: "5px" }}>
+                    <button
+                      type="button"
+                      className="rm"
+                      style={{ marginRight: "10px", background: "none", border: "none", padding: 0 }}
+                      onClick={() => onGotoPassage?.(b)}
+                      disabled={!b.sourceId && !b.source}
+                      title={b.sourceId || b.source ? "Open this passage in the reading" : "No reading linked to this passage"}
+                    >
+                      goto
+                    </button>
+                    <button
+                      type="button"
+                      className="rm"
+                      style={{ background: "none", border: "none", padding: 0 }}
+                      onClick={() => removePassage(b.id)}
+                    >
+                      remove passage
+                    </button>
+                  </div>
+                  <div className="quietrow">
+                    <input
+                      list={listId}
+                      placeholder="name the concept this passage evidences…"
+                      title="optional — a passage can stay unlabeled for as long as you like"
+                      value={refileInputs[b.id] ?? ""}
+                      onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
+                    />
+                    <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>Name it</button>
                   </div>
                 </div>
               ))}
@@ -774,10 +854,18 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
           )}
         </div>
 
+        {unlabeled.length > 0 && (
+          <p className="ghostnote" style={{ marginTop: "10px" }}>
+            <b>Unlabeled</b> is a state, not a fault — the passage is captured and it is
+            yours. Name it when the word arrives, or never.
+          </p>
+        )}
+
         {scoped.outside.length > 0 && (
           <p className="ghostnote" style={{ marginTop: "10px" }}>
-            Not hidden, just not evidenced here. Type one&apos;s name above to file a
-            passage from this reading under it{onGotoVocabulary ? <>, or <button type="button" className="linkish" onClick={onGotoVocabulary}>see them all in Vocabulary</button></> : null}.
+            This list is this reading&apos;s work. Concepts you named in other readings
+            are still offered as you type a concept above — filing a passage from here
+            under one is what joins the two texts{onGotoVocabulary ? <> — and <button type="button" className="linkish" onClick={onGotoVocabulary}>Vocabulary</button> shows every concept you own</> : null}.
           </p>
         )}
 

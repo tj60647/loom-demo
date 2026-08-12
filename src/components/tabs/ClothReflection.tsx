@@ -119,7 +119,7 @@ export default function ClothReflection() {
       readPrompts.push({
         key: 'your words', gap: false,
         q: <>You&apos;ve reached for <b>&ldquo;{rec[0][0]}&rdquo;</b> on {rec[0][1].length} threads — it&apos;s becoming one of your own labels. See it with the rest on <b>04 · Vocabulary</b>.</>,
-        move: 'a coinage forming'
+        move: 'a label recurring'
       })
     }
   }
@@ -310,8 +310,8 @@ export default function ClothReflection() {
 
       <div className="legend">
         <span><span className="sw" style={{borderTop: "2px solid var(--ochre)"}}></span>warp — concept</span>
-        <span><span className="sw" style={{borderTop: "2px solid var(--sage)"}}></span>coined label</span>
-        <span><span className="sw" style={{borderTop: "2px dashed var(--grey)"}}></span>unnamed — description only</span>
+        <span><span className="sw" style={{borderTop: "2px solid var(--sage)"}}></span>labelled link</span>
+        <span><span className="sw" style={{borderTop: "2px dashed var(--grey)"}}></span>unlabelled — description only</span>
         <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>what you&apos;re tracing</span>
       </div>
 
@@ -390,7 +390,7 @@ export default function ClothReflection() {
             </div>
           ))}
           {state.concepts.length > 0 && loose > 0 && (
-            <div className="ghostnote" style={{ marginTop: "6px" }}>{loose} thread{loose !== 1 ? 's' : ''} with no label yet — coin one on 02 so a word can recur.</div>
+            <div className="ghostnote" style={{ marginTop: "6px" }}>{loose} thread{loose !== 1 ? 's' : ''} with no label yet — label one on 02 so a word can recur.</div>
           )}
           {/* A designation, not a scolding (TJ, 2026-08-08): a concept may be
               named ahead of its evidence on purpose. Counted, not judged — so

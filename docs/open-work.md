@@ -307,6 +307,44 @@ gaps are now demonstrable rather than suspected:
     up rather than building a fixer for a mess nobody has made. Delete needs a
     rule for a Link that Threads still use (refuse, or detach them and say how
     many), and that rule is TJ's, not mine.
+- **5.1f Concept merge — HIDDEN 2026-08-12, and it is TJ's call what happens
+  next.** *"hide the merge capability in the concepts list in vocabulary. we
+  need to resolve what this really means and its consequences."* Done as a
+  curtain, not a demolition: `MERGE_VISIBLE` in
+  [VocabularyTab.tsx](../src/components/tabs/VocabularyTab.tsx) is `false` and
+  the action, the provider method, the sandbox copy and the `concept.merge`
+  event all stand, so the control returns on one flag and a merge already
+  performed still reads in the Capture Log. What the hiding cost in student
+  copy is stamped in [contracts.md](contracts.md); the repair is now two acts
+  by hand (file the passages onto the concept you keep, remove the other —
+  its passages survive, unlabeled).
+
+  **The reasoning that was already ratified for the other half of this.** 5.1e
+  says hold *Link* merge longest — "prevention decides nothing on a student's
+  behalf, repair always risks it, so wait until a real vocabulary is observed
+  to silt up rather than building a fixer for a mess nobody has made".
+  Concept merge was built before that sentence existed and was never
+  re-examined under it. The two should be answered together.
+
+  **What "what it really means" turns on** — read off
+  [`mergeConcepts`](../src/actions/loom.ts), not guessed:
+
+  | Question | What the code does today |
+  |---|---|
+  | Is merge a claim about the present, or about the past? | Both, silently. Passages captured under the source now read as evidence for the target, while the Capture Log's earlier rows still name the source. The record and the graph disagree about the same passage, and there is no unmerge. |
+  | Whose sentence survives? | The target's. `if (!target.def && source.def)` — the source's Description is inherited **only** into an empty field, otherwise dropped, and the event payload does not carry it either. A sentence the student wrote is unrecoverable. |
+  | What happens to the sorting? | It is pruned, not carried. `pruneViews(…{positions, order, pins, tiers})` deletes the source's tier, card position and pin from **every** projection — so merging silently discards the sorting work done on the source, in projections the student may not have open. |
+  | What if a thread runs between the two? | It becomes a self-loop. `fromId` and `toId` both repoint, and nothing in the repo refuses `fromId === toId` — the proposition then reads "X ⟶ X" on the board. Merge is the only way to make one. |
+  | How far does it reach? | Everywhere. Concepts are User-level, so a repair performed inside one reading rewrites every other reading's warp and its 02 · Linking bench. The act is scoped in feel and unscoped in effect. |
+
+  **The fork, stated so it can be answered in one line each:** (a) is merge a
+  student act at all, or a repair someone else performs? (b) must it be
+  reversible — and if so, does the source stay as a tombstone or does the event
+  carry enough to rebuild it? (c) when the two disagree (two Descriptions, two
+  tiers, a thread between them), does merge refuse, or ask, or pick? Today it
+  picks, silently, three times over. Nothing should be rebuilt until (c) has an
+  answer, because every one of those is a place the tool currently decides what
+  the student meant — which is red line 2.
 - ~~**The practice loom shows no worked cloth**~~ — **built 2026-08-11.** TJ:
   *"the guide should always be available, like the tutorials in any game. if
   the sandbox is the guide, then it should be clearly accessible. it is the

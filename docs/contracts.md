@@ -829,7 +829,7 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** as **Your work** (`#yourwork`), a sheet that slides over the text — closed by default, toggled from the viewer toolbar, and mounted *inside* `.pdf-shell` so it survives fullscreen; the **Cloth Title/Description** at the head of that sheet; **the margin cards** (2026-08-09, from the reverted spread canvas) — page mode's "Cards" toggle, `ConceptRails`: read-only cards beside each page, leader-lined to their highlights, a door to Your work and never an editor, rails and cards `user-select:none` so a stray drag cannot file text to the wrong page; and **a matrix that zooms as pure transform** (`PageRaster` under a once-rendered text layer), visible pages re-rastering after the gesture settles |
 | 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Threads download here. It used to carry `ClothFold` at the whole weave, which had no Reading station; that branch went with the whole weave on 2026-08-11, and the Cloth's only editor is 01 · Reading |
 | 03 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, **the list and the board** (the sorted rows and the tiered card-and-thread surface — "board", never "table", which reads as a spreadsheet on a screen; TJ 2026-08-10); the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); **the Capture Log for this reading** (`HistoryPanel` — the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**), downloadable |
-| **04 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); **merge Concepts — its only home**; Concepts/Links Overlays |
+| **04 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); ~~merge Concepts — its only home~~ **merge is HIDDEN, 2026-08-12** (`MERGE_VISIBLE`, below); Concepts/Links Overlays |
 | ~~05 Weave~~ | — | **GONE, route and station, 2026-08-11.** Hiding it had not been enough: `/weave` carried no gate of any kind, and the Library's search results linked into it in four places. **TJ:** *"we are removing whole weave as it exists in the app because it is poorly defined and not supported in the course. it should not be in the app as an idea until the faculty and the authors of the app agree on what it means to have a 'full weave'."* `Workbench` now requires a reading; `WHOLE_WEAVE` survives only as the internal scope of surfaces that are not a reading (the Library), and no student surface writes at `scopeKey ''`. Rows already written there are left where they are — TJ: *"i am not at all worried about losing whole weave"* — and are simply not rendered |
 | ~~05 Keep~~ | — | **GONE, 2026-08-11.** Download happens at each object instead — the cloth at 01, threads at 02, a projection and the Capture Log at 03, vocabulary at 04 — which is what the model said all along (*"Export — both levels: a Cloth … and a Projection"*). Import, "clear the table" and "take it all out" went with it (TJ, 2026-08-10), and so did the worked example, whose only exit was that reset; the practice loom at `/sandbox` replaced it, and the Library's "New to this?" card is now its first door. The bar is the model's five, 00–04 |
 
@@ -850,9 +850,61 @@ reading's captures; 04 Vocabulary is everything you own.** A concept does not
 belong to a reading — a passage does — so the holdings render identically
 inside a reading and at the whole weave. The Overlay alone stays reading-gated.
 
+**What Your work lists** (TJ, 2026-08-12): concepts evidenced here (`In this
+reading`), concepts with no evidence anywhere (`No evidence`), and **this
+reading's Unlabeled Passages** (`Unlabeled` — quote, note, citation, and an
+input that names one when the word arrives). Kinds, never stages. The
+unlabeled group is the model's own requirement — *"Unlabeled Passages appear in
+the Reading (highlights), the Capture Log (rows), and in Projections"* — and it
+was the one of the three that had never been built: the head bar counted the
+passage in `N passages` and no row beneath it held the words, so the capture
+toast's *"name it in Your work whenever the word arrives"* pointed at a surface
+with nowhere for it to be. `MapTab`'s unattached group (03) is the same
+passages, projected.
+
+A fourth group, **`In your other readings`**, is gone with the same pass — a
+roll-call of every concept the student owned from every other text, in the
+panel that is meant to be this reading's own work, and growing with the term.
+It could not be linked or filed from there in any case (02 works on this
+reading's concepts only); what reaches those concepts is typing one's name at
+capture, where the datalist has always offered all of them, and 04 Vocabulary,
+which the ghostnote in its place still opens.
+
 Before this pass 03 held the cloth prompts and a *second* read editor
 (`#readEssence`/`#yourRead`) writing the same map fields as 04's; those ids no
 longer exist.
+
+**Merge is behind a curtain** (TJ, 2026-08-12: *"hide the merge capability in
+the concepts list in vocabulary. we need to resolve what this really means and
+its consequences."*). `MERGE_VISIBLE` in
+[VocabularyTab.tsx](../src/components/tabs/VocabularyTab.tsx) is `false`; the
+`mergeConcepts` action, its provider method, the sandbox's copy and the
+`concept.merge` event are all untouched, so a merge already performed still
+reads in the Capture Log and one flag restores the control. **This is a build
+state, not a model change** — [loom-model-build.md](loom-model-build.md) still
+gives Vocabulary the merge and stays the authority; the question TJ has put on
+it is logged in [open-work.md](open-work.md).
+
+The consequences, because they are copy in five places rather than one control:
+
+- **The duplicate repair is now two acts, by hand** — file the passages under
+  the concept you are keeping, then remove the other; its passages survive,
+  unlabeled (migration 0021), and land in Your work's `Unlabeled` group. Both
+  homonym dialogs in [OpenTab.tsx](../src/components/tabs/OpenTab.tsx) (rename
+  clash, name-ahead clash) and the Concepts hint on 04 now say that instead of
+  "merge them". Ruling 36 is untouched: homonyms stay legal and stay warned,
+  never forbidden.
+- **`ReuseOffer`'s way out is now cheap in one direction only.** Separating a
+  reused concept is one button; rejoining is the manual repair above. The
+  reasoning in that file's header assumed merge — it says so now.
+- **The student flow says so** — `vocab` reads "Sharpen descriptions, see what
+  recurs"; a generated diagram would otherwise draw a step nobody can take.
+- **`journey-learner.spec.ts` asserts the button is ABSENT**, so the flag
+  flipping by accident turns the suite red rather than passing quietly.
+- **Both delete-concept dialogs stopped citing Keep**, which was deleted
+  2026-08-11 — they now name where the passages go and which download holds
+  the concept. That copy only started mattering when delete became the
+  sanctioned repair.
 
 **Station numbers are derived, never written.** `JourneyNav` numbers the
 *visible* stations in order and exports `stationNumber()`, which the workbench

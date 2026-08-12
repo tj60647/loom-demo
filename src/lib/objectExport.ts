@@ -302,7 +302,7 @@ export function buildVocabularyMarkdown(state: LoomState, provenance: ExportProv
     out.push(`- **${c.label}** (${counted})${c.def ? ` — ${c.def}` : ""}`)
   }
   out.push("", `## Link labels (${data.linkLabels.length})`, "")
-  if (!data.linkLabels.length) out.push("_None coined yet._")
+  if (!data.linkLabels.length) out.push("_None yet._")
   for (const l of data.linkLabels) out.push(`- **${l.label}** (${l.uses} thread${l.uses !== 1 ? "s" : ""})${l.description ? ` — ${l.description}` : ""}`)
   return out.join("\n")
 }

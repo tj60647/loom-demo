@@ -84,7 +84,7 @@ const student: Flow = {
     { id: "ahead", label: "Or name a concept you expect, and gloss it — then read for support", where: "01 · Reading — shows as “no evidence” until a passage backs it" },
     { id: "capture", label: "Highlight a passage", where: "01 · Reading" },
     { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — Your work, slid out over the text" },
-    { id: "link", label: "Pick two concepts, say the sentence, coin a label", where: "02 · Linking" },
+    { id: "link", label: "Pick two concepts, say the sentence, label the link", where: "02 · Linking" },
     // 03 before 04, in the array and in the edges below. Stations 03 and 04
     // were swapped on 2026-08-08 (TJ) — "you lay the graph out and read it, and
     // the vocabulary you have collected is what you check afterwards" — and the
@@ -94,7 +94,11 @@ const student: Flow = {
     // labelled "03 · Knowledge Graph" and the numbers ran backwards on screen.
     { id: "sort", label: "Sort into tiers, arrange the cards", where: "03 · Knowledge Graph" },
     { id: "write", label: "Trace the prompts, write the one-line and the read", where: "03 · Knowledge Graph" },
-    { id: "vocab", label: "Sharpen descriptions, merge duplicates", where: "04 · Vocabulary" },
+    // "merge duplicates" was the second half of this step until 2026-08-12,
+    // when TJ hid the merge control pending what it means and what it costs
+    // (VocabularyTab's MERGE_VISIBLE). The diagram is generated, so a step the
+    // student can no longer take would simply be drawn, wrongly, forever.
+    { id: "vocab", label: "Sharpen descriptions, see what recurs", where: "04 · Vocabulary" },
     { id: "overlay", label: "Compare a section, or all of them", where: "Overlays — faculty and admins only" },
     // There used to be a "weave" node here — "Every reading at once", at
     // /weave. It came out in 2026-08-09 because the diagram drew a step no

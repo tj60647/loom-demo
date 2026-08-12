@@ -864,7 +864,12 @@ export default function MapTab({ practice = false }: {
           leaving it is equally legal — a passage may never gain a concept. */}
       {unfiled.length > 0 && (
         <div className="card" id="unfiledPassages" style={{ marginTop: 12 }}>
-          <span className="label">Unfiled passages ({unfiled.length})</span>
+          {/* The model's own word, and the one Your work uses on 01 since
+              2026-08-12 — "unfiled" here and "Unlabeled" there named the same
+              passages twice, and the delete dialogs now send students to the
+              group by name. The id stays `#unfiledPassages`: it is linked
+              from elsewhere and is not student-facing. */}
+          <span className="label">Unlabeled passages ({unfiled.length})</span>
           <p className="hint">
             Captured without a concept — part of your cloth, shown here as its own group.
             Name one to bring it onto the graph, or leave it as it is.

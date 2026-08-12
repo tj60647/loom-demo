@@ -262,7 +262,7 @@ export default function ShelfSearch({
                 <Hit
                   key={hit.id}
                   href={sourceId ? `/reading/${sourceId}?tab=read` : hit.sourceId ? `/reading/${hit.sourceId}?tab=read` : null}
-                  nowhere="coined, with no thread using it yet"
+                  nowhere="a label with no link using it yet"
                 >
                   <div className="searchhithead">
                     <h3>{hit.label}</h3>

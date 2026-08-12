@@ -199,7 +199,7 @@ export default function VocabularyOverlay({
                 </div>
                 <div className="scrollbox" style={{ padding: "10px 12px", marginTop: "6px" }}>
                   {data.links.length === 0 && (
-                    <p className="empty">No link labels coined here yet.</p>
+                    <p className="empty">No link labels here yet.</p>
                   )}
                   {data.links.map((term) => (
                     <TermRow key={term.label} term={term} />
@@ -215,7 +215,7 @@ export default function VocabularyOverlay({
                 {data.unlabeledLinks > 0 && (
                   <p className="ghostnote">
                     {data.unlabeledLinks} link{data.unlabeledLinks !== 1 ? "s" : ""} with no label
-                    yet — described, not yet coined.
+                    yet — described, not yet labelled.
                   </p>
                 )}
               </div>

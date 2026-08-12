@@ -11,9 +11,10 @@
 //
 // It holds what the model gives Vocabulary and nothing else: browse/filter
 // Concepts as full objects and Link Labels, recurrence, edit Descriptions,
-// merge Concepts, and the Concepts/Links Overlays. The cloth-reflection
-// prompts and "Your read" that used to live on 03 moved to 04 · Knowledge
-// Graph, where the projection they describe already lives (TJ, 2026-08-08).
+// merge Concepts (HIDDEN — see MERGE_VISIBLE), and the Concepts/Links
+// Overlays. The cloth-reflection prompts and "Your read" that used to live on
+// 03 moved to 04 · Knowledge Graph, where the projection they describe already
+// lives (TJ, 2026-08-08).
 
 import { useMemo, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
@@ -26,6 +27,36 @@ import { usesOf } from "@/lib/linkResolve"
 import ObjectDownload from "@/components/ui/ObjectDownload"
 import { buildVocabularyExport, buildVocabularyMarkdown } from "@/lib/objectExport"
 import VocabularyOverlay from "@/components/tabs/VocabularyOverlay"
+
+/**
+ * Merge, behind a curtain (TJ, 2026-08-12): *"hide the merge capability in the
+ * concepts list in vocabulary. we need to resolve what this really means and
+ * its consequences."*
+ *
+ * HIDDEN, NOT REMOVED. The `mergeConcepts` action, its provider method, the
+ * `concept.merge` event and the sandbox's copy of it all stand — a merge
+ * already performed still renders in the Capture Log, and turning this to
+ * `true` puts the control back exactly where it was. Nothing about the data
+ * changed, so nothing here is a migration.
+ *
+ * WHAT IS UNRESOLVED. Merge is the one irreversible act a student can perform
+ * on their own vocabulary — "There is no unmerge" — and it is offered at the
+ * moment they are least able to judge it: two concepts share a label, and the
+ * only thing on screen telling them apart is a passage count. The same
+ * argument is already ratified for Link merge (open-work 5.1e, TJ 2026-08-11:
+ * hold it longest — "wait until a real vocabulary is observed to silt up
+ * rather than building a fixer for a mess nobody has made"). Concept merge was
+ * built before that reasoning existed and never re-examined under it.
+ *
+ * WHAT IT COSTS WHILE HIDDEN — the duplicate a student makes is now repaired
+ * by hand rather than in one act: file the passages under the concept you are
+ * keeping (Your work, or "also file this passage under another concept"), then
+ * remove the other — its passages survive the deletion, unlabeled, since
+ * migration 0021. Every dialog that used to say "merge them" says that
+ * instead. Homonyms stay legal and stay warned-never-forbidden (ruling 36);
+ * what is gone is the one-click repair, not the state it repaired.
+ */
+const MERGE_VISIBLE: boolean = false
 
 /** Case- and space-insensitive contains, so "object worlds" finds "Object  Worlds". */
 function matches(haystack: string | null | undefined, needle: string) {
@@ -67,9 +98,9 @@ export default function VocabularyTab() {
       const link = await addLink(label)
       setCoinLabel("")
       setOpenLabels((p) => ({ ...p, [link.id]: true }))
-      flash("· coined ·")
+      flash("· added ·")
     } catch (err) {
-      flash(err instanceof Error ? err.message : "could not coin that")
+      flash(err instanceof Error ? err.message : "could not add that")
     } finally {
       setCoining(false)
     }
@@ -214,11 +245,16 @@ export default function VocabularyTab() {
       })
       return
     }
+    // With merge hidden, deleting the row you are not keeping IS the duplicate
+    // repair — so this says where the passages go (01 · Reading, Your work,
+    // under Unlabeled) rather than leaving "unfiled" as a word with no place
+    // attached. It said "Export from Keep first" until 2026-08-12, four days
+    // after Keep was deleted; the vocabulary downloads at the head of this tab.
     const ok = await confirm({
       title: `Delete “${concept.label}”?`,
       body: passages
-        ? `Its ${passages} captured passage${passages !== 1 ? "s" : ""} stay${passages !== 1 ? "" : "s"} in your log, unfiled. Export from Keep first if you might want this back.`
-        : "Export from Keep first if you might want this back.",
+        ? `Its ${passages} captured passage${passages !== 1 ? "s" : ""} stay${passages !== 1 ? "" : "s"} in your work on ${passages !== 1 ? "their readings" : "its reading"}, under Unlabeled — file them under another concept whenever you like. Download your vocabulary first if you might want the concept itself back.`
+        : "Download your vocabulary first if you might want this back.",
       confirmLabel: "Delete concept",
       danger: true,
     })
@@ -241,10 +277,10 @@ export default function VocabularyTab() {
         />
       </div>
       <p className="tasksub">
-        Every concept you have named and every label you have coined — across all your
-        readings, not just this one. A concept does not belong to a text; it emerges from
-        one and may then be evidenced in several. Sharpen a description, retire a
-        duplicate, and see which of your words are becoming yours.
+        Every concept you have named and every label you have given a link — across all
+        your readings, not just this one. A concept does not belong to a text; it emerges from
+        one and may then be evidenced in several. Sharpen a description, and see which of
+        your words are becoming yours.
       </p>
 
       <div className="two">
@@ -256,8 +292,10 @@ export default function VocabularyTab() {
             </span>
           </h2>
           <p className="hint">
-            Click a concept to open it — edit its description, or merge it into another if
-            you named the same idea twice.
+            Click a concept to open it — edit its description, and see which readings
+            evidence it. Two rows with the same name are two concepts, which is legal:
+            if they are one idea, file the passages under the one you are keeping and
+            remove the other.
           </p>
           <div className="quietrow" style={{ marginBottom: "10px" }}>
             <input
@@ -337,7 +375,7 @@ export default function VocabularyTab() {
                         </p>
                       )}
 
-                      <div className="quietrow" style={{ marginTop: "12px" }}>
+                      {MERGE_VISIBLE && <div className="quietrow" style={{ marginTop: "12px" }}>
                         {/* A picker, not a text field. Typing a NAME to choose
                             an OBJECT is the bug: two concepts may legally share
                             one label, and then no amount of typing can say
@@ -365,7 +403,7 @@ export default function VocabularyTab() {
                         >
                           Merge
                         </button>
-                      </div>
+                      </div>}
                       <button
                         type="button"
                         className="rm"
@@ -388,7 +426,7 @@ export default function VocabularyTab() {
             <span className="n">{linkRows.length ? `(${linkRows.length})` : ""}</span>
           </h2>
           <p className="hint">
-            The words you coined for the relations themselves — yours, across every
+            The words you use to label the relations themselves — yours, across every
             reading. A label you reach for again is a word becoming yours; open one to
             give it your own description and read the threads that use it.
           </p>
@@ -402,29 +440,36 @@ export default function VocabularyTab() {
             />
           </div>
 
-          {/* Coin a Link with no thread using it — TJ, 2026-08-10: "it is
-              possible to have a link with label and definition without it
-              being used in a thread". Here rather than in the throw bench,
-              because the bench is for connecting two concepts and the design
-              note keeps a gloss field out of that flow. */}
+          {/* A Link with no thread using it — TJ, 2026-08-10: "it is possible
+              to have a link with label and definition without it being used in
+              a thread". Here rather than in the throw bench, because the bench
+              is for connecting two concepts and the design note keeps a gloss
+              field out of that flow.
+
+              It says "add", not "coin" (TJ, 2026-08-12: the language moves from
+              coining a label to labelling a link). This is the one place where
+              "label the link" cannot be said, because there is no link yet —
+              so it is the plainest verb instead. The handler is still `coin()`
+              and the event is still `link.coin`: the record keeps its own
+              names. */}
           <div className="quietrow" style={{ marginBottom: "10px", gap: "6px" }}>
             <input
               id="coinLabel"
-              placeholder="coin a label — e.g. leads to"
-              aria-label="Coin a new link label"
+              placeholder="add a label — e.g. leads to"
+              aria-label="Add a new link label"
               value={coinLabel}
               onChange={(e) => setCoinLabel(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") coin() }}
             />
             <button className="btn mini" onClick={coin} disabled={!coinLabel.trim() || coining}>
-              {coining ? "…" : "Coin"}
+              {coining ? "…" : "Add"}
             </button>
           </div>
 
           <div className="scrollbox">
             {linkRows.length === 0 && (
               <div className="empty">
-                <span className="cap">no labels yet — coin one, or throw a thread and name it</span>
+                <span className="cap">no labels yet — add one, or throw a thread and label the link</span>
               </div>
             )}
             {linkRows.length > 0 && visibleLabels.length === 0 && (
@@ -512,7 +557,7 @@ export default function VocabularyTab() {
           {looseLinks.length > 0 && (
             <p className="ghostnote" style={{ marginTop: "10px" }}>
               {looseLinks.length} link{looseLinks.length !== 1 ? "s carry" : " carries"} a
-              description but no label yet — coin one on <b>02 · Linking</b> so a word can
+              description but no label yet — label one on <b>02 · Linking</b> so a word can
               recur.
             </p>
           )}
