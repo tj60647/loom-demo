@@ -20,9 +20,6 @@ async function mockSession(page: import('@playwright/test').Page) {
       body: JSON.stringify(ADMIN_SESSION),
     });
   });
-  await page.addInitScript(() => {
-    localStorage.setItem('loom_has_seen_walkthrough', 'true');
-  });
 }
 
 test.describe('Library verification', () => {

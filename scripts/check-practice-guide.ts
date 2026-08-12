@@ -77,7 +77,7 @@ const worked = (): LoomState => ({
   views: { cardTable: { positions: {}, bends: {} } },
 })
 
-const QUIET: GuideSignals = { captureOpened: false, kitCopied: false }
+const QUIET: GuideSignals = { readingOpened: false, captureOpened: false, kitCopied: false }
 
 console.log("\npractice guide — a beat ticks only when the student did it")
 
@@ -92,14 +92,24 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
     "a beat is missing one of the two"
   )
   assert(
-    GUIDE_STEPS.filter((s) => s.readOnly).length === 1,
-    "exactly one beat is a place to look rather than a move — the arrival",
-    `${GUIDE_STEPS.filter((s) => s.readOnly).map((s) => s.key).join(", ")}`
+    GUIDE_STEPS.every((s) => !s.readOnly),
+    "every beat is a move the student makes — none is a caption",
+    `${GUIDE_STEPS.filter((s) => s.readOnly).map((s) => s.key).join(", ")} ask for nothing`
+  )
+  assert(
+    GUIDE_STEPS[0].station === "library" && GUIDE_STEPS[0].key === "arrive",
+    "the guide opens on the shelf, where opening a reading is something you do",
+    `first beat is ${GUIDE_STEPS[0].key} at ${GUIDE_STEPS[0].station}`
+  )
+  assert(
+    GUIDE_STEPS.every((s) => s.target.trim() !== ""),
+    "every beat points at something",
+    "a beat has no target to glow"
   )
   // The order is the work's order, and the stations must not go backwards
   // through it — a guide that sends you to 03 and then back to 01 is teaching
   // the tabs, not the practice.
-  const rank: Record<string, number> = { reading: 0, throw: 1, map: 2, read: 3 }
+  const rank: Record<string, number> = { library: 0, reading: 1, throw: 2, map: 3, read: 4 }
   const stations = GUIDE_STEPS.map((s) => rank[s.station])
   assert(
     stations.every((r, i) => i === 0 || r >= stations[i - 1]),
@@ -120,7 +130,7 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
   )
   assert(
     standOn(base, state, SRC, QUIET) === 0,
-    "the guide opens on the FIRST beat — the arrival is where a student starts, and it can never be 'done'",
+    "the guide opens on the FIRST beat — the shelf, before anything is open",
     `stood on ${standOn(base, state, SRC, QUIET)}`
   )
   // Re-opening half way through should land where the work got to.
@@ -129,10 +139,16 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
     passages: [...state.passages, passage("p5", ["c9"])],
     concepts: [...state.concepts, concept("c9")],
   }
+  const midwaySignals = { ...QUIET, readingOpened: true, captureOpened: true }
   assert(
-    standOn(base, midway, SRC, { ...QUIET, captureOpened: true }) === 3,
-    "…but a student who has already captured and named finds it at the next move",
-    `stood on ${standOn(base, midway, SRC, { ...QUIET, captureOpened: true })}`
+    standOn(base, midway, SRC, midwaySignals) === 3,
+    "…but a student who has already opened, captured and named finds it at the next move",
+    `stood on ${standOn(base, midway, SRC, midwaySignals)}`
+  )
+  assert(
+    stepDone("arrive", base, state, SRC, { ...QUIET, readingOpened: true }),
+    "opening the reading ticks the first beat",
+    "the shelf card did not tick the beat that asks for it"
   )
 }
 
@@ -216,14 +232,23 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
   )
   const workbench = readFileSync("src/components/Workbench.tsx", "utf8")
   assert(
-    /loom:practice-station/.test(workbench) && /<PracticeGuide \/>/.test(workbench),
-    "the workbench mounts the guide and answers its station changes",
-    "Workbench no longer renders PracticeGuide, or ignores loom:practice-station"
+    /loom:practice-station/.test(workbench) && /loom:practice-focus/.test(workbench),
+    "the workbench answers the guide's station and page changes",
+    "Workbench ignores loom:practice-station or loom:practice-focus"
+  )
+  // The guide is mounted by SandboxWorkbench, not Workbench, so that it spans
+  // the shelf as well as the stations. That file cannot be reached from a real
+  // reading, which is what keeps the guide out of a student's own work.
+  const sandbox = readFileSync("src/components/SandboxWorkbench.tsx", "utf8")
+  assert(
+    /<PracticeGuide \/>/.test(sandbox) && !/<PracticeGuide \/>/.test(workbench),
+    "the guide is mounted by the practice loom alone",
+    "PracticeGuide is mounted outside SandboxWorkbench — it would coach a student through their real work"
   )
   assert(
-    /\{practice && <PracticeGuide \/>\}/.test(workbench),
-    "…and mounts it ONLY in the practice loom",
-    "PracticeGuide is rendered outside the practice loom — it would coach a student through their real work"
+    /loom:practice-opened/.test(sandbox),
+    "opening the practice reading raises the signal the first beat waits on",
+    "SandboxWorkbench no longer dispatches loom:practice-opened"
   )
 }
 

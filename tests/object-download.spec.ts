@@ -16,9 +16,6 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 test.describe('Download at the object', () => {
   test('the cloth, its threads and the vocabulary each come out whole', async ({ page }) => {
     test.setTimeout(120_000);
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
     await openReading(page, 'Object Worlds');
 
     const readFile = async (click: Promise<void>) => {
@@ -76,9 +73,6 @@ test.describe('Download at the object', () => {
 
   test('the Capture Log lives on the Knowledge Graph, scoped to the reading, and downloads', async ({ page }) => {
     test.setTimeout(120_000);
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
     await openReading(page, 'Object Worlds');
     await page.locator('nav[aria-label="The journey"] button', { hasText: 'Knowledge Graph' }).click();
 
@@ -113,11 +107,13 @@ test.describe('Download at the object', () => {
 
   test('the practice loom shows no Capture Log', async ({ page }) => {
     test.setTimeout(90_000);
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
     await page.goto('/sandbox');
-    await expect(page.locator('.practiceband')).toBeVisible({ timeout: 30_000 });
+    // The practice loom opens on its own Library; one card enters the loom.
+    // Retried because the shelf is server-rendered — see sandbox.spec.
+    await expect(async () => {
+      await page.locator('#practiceOpen').click({ timeout: 10_000 });
+      await expect(page.locator('.practiceband')).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 40_000, intervals: [500, 1_000, 2_000] });
     await page.locator('nav[aria-label="The journey"] button', { hasText: 'Knowledge Graph' }).click();
     // It reads the student's REAL record over its own route, bypassing the
     // provider — it must not appear inside a space that keeps nothing.

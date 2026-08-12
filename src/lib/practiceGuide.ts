@@ -27,8 +27,11 @@
 
 import type { LoomState } from "./types"
 
-/** The workbench tab a beat happens on. Matches Workbench's `Tab`. */
-export type GuideStation = "reading" | "throw" | "map" | "read"
+/**
+ * Where a beat happens. `library` is the practice loom's first stage — the
+ * shelf, before a reading is open; the rest match Workbench's `Tab`.
+ */
+export type GuideStation = "library" | "reading" | "throw" | "map" | "read"
 
 export type GuideStep = {
   key: string
@@ -54,24 +57,30 @@ export type GuideStep = {
    * advance on Next; everything else advances when the student acts.
    */
   readOnly?: boolean
+  /**
+   * True when the beat is about the words on the page, so the viewer must be
+   * showing a page that HAS words. `Oh, the Places You'll Go!` opens on two
+   * covers, where "drag across a line or two" points at a picture.
+   */
+  needsText?: boolean
 }
 
 export const GUIDE_STEPS: GuideStep[] = [
   {
     key: "arrive",
     label: "Open a reading",
-    station: "reading",
-    target: ".scopetitle",
+    station: "library",
+    target: "#practiceOpen",
     say:
-      "You are inside a reading — this one. Every card in the Library opens a workbench like it, and the work you do here belongs to that text and travels with it. This one is on loan for practice.",
+      "Press the glowing card. In the practice loom only this reading opens; on your own shelf every card does.",
     why: "A reading is the unit of work: one text, the passages you take from it, and what you make of them, all kept together.",
-    readOnly: true,
   },
   {
     key: "capture",
     label: "Highlight a passage",
     station: "reading",
     target: ".react-pdf__Page__textContent",
+    needsText: true,
     say:
       "Drag across a line or two of the glowing text. When you let go, a “Capture as Passage” button appears at your cursor — press it.",
     why: "Choosing which words to take is itself the reading. The judgement is yours, and it is the work.",
@@ -81,8 +90,9 @@ export const GUIDE_STEPS: GuideStep[] = [
     label: "Name the concept",
     station: "reading",
     target: "#captureConcept",
+    needsText: true,
     say:
-      "The dialog holds the words you took. Name the concept they evidence in the glowing field — a short noun phrase, often the author's own term — describe it in your own words if you can, and Save Passage.",
+      "Name the concept those words evidence in the glowing field — a short noun phrase, often the author's own term. Then Save Passage.",
     why: "The passage is the evidence; the concept is what you claim it is evidence OF. Naming it is the interpretation.",
   },
   {
@@ -91,7 +101,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     station: "reading",
     target: "#yourwork-toggle",
     say:
-      "Open Your work with this button. At the head of the sheet is the Cloth Title — your own headline for this reading, not the author's — and a description under it.",
+      "Open Your work here. At the head of the sheet, give the cloth a title: your own headline for this reading, not the author's.",
     why: "The cloth is your reading of the text as a whole. Everything else you make here is an arrangement of it.",
   },
   {
@@ -100,7 +110,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     station: "throw",
     target: "#warp",
     say:
-      "Tap two concepts in the glowing warp. The bench wakes when two are picked: say how they hang together — long and awkward is fine — and throw it. Afterwards you can coin a short label for that kind of link.",
+      "Tap two concepts in the glowing warp, then say how they hang together and throw it. Long and awkward is fine.",
     why: "The sentence IS the thread. A label is a convenience that lets one of your words recur; the claim is the sentence.",
   },
   {
@@ -109,7 +119,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     station: "map",
     target: "#triageList",
     say:
-      "Give a concept a tier in the glowing list — primary, secondary, tertiary. That makes your first projection. Name it, write its one-line, and drag its cards on the board beneath: general above, specific below.",
+      "Give a concept a tier in the glowing list. That makes your first projection — name it, write its one-line, and arrange its board.",
     why: "A projection is one reading of your cloth. Keep several and each can say something different about the same material.",
   },
   {
@@ -158,6 +168,8 @@ export function baselineOf(state: LoomState, scopeKey: string): GuideBaseline {
 
 /** Signals the loom's state cannot carry, raised by the interface itself. */
 export type GuideSignals = {
+  /** The practice reading has been opened from the shelf. */
+  readingOpened: boolean
   /** The capture dialog has been opened at least once. */
   captureOpened: boolean
   /** The concept-map kit has been downloaded. */
@@ -177,6 +189,8 @@ export function stepDone(
   signals: GuideSignals
 ): boolean {
   switch (key) {
+    case "arrive":
+      return signals.readingOpened
     case "capture":
       // The dialog opening IS the highlight — it only appears from a
       // selection. Counting passages here would leave this beat unfinished

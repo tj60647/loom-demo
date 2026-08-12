@@ -5,7 +5,6 @@ import { LoomProvider } from "@/components/providers/LoomProvider";
 import { ReadingsProvider } from "@/components/providers/ReadingsProvider";
 import { DialogProvider } from "@/components/providers/DialogProvider";
 import Header from "@/components/ui/Header";
-import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough";
 import TipLayer from "@/components/ui/TipLayer";
 
 // Which deployment this is. VERCEL_ENV is "production" only on the real
@@ -39,12 +38,11 @@ export default function RootLayout({
             <ReadingsProvider>
               <DialogProvider>
                 <Header deployEnv={deployEnv} />
-                {/* One mount, here, so the header's "?" always has a listener.
-                    It used to live on the shelf and the workbench only —
-                    which left the button dead on every /admin page, where the
-                    header still drew it (TJ, 2026-08-08). It decides for itself
-                    whether to open unprompted. */}
-                <FirstRunWalkthrough />
+                {/* The first-run walkthrough was mounted here — five slides describing the
+                    stations, opened by a "?" in the header. TJ retired it on 2026-08-11:
+                    the guide walks those same moves in the real interface, and About says
+                    what Loom is, so the deck was the middle of three overlapping surfaces
+                    and the only one that merely described. */}
                 {/* The hover tips, in the top layer. Mounted once, here, for
                     the same reason the walkthrough is: [data-tip] is on
                     controls in the header, the admin nav and every page. */}

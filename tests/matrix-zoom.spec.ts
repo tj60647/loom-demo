@@ -16,9 +16,6 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 test.describe('Matrix zoom', () => {
   test('zoom re-rasters the canvas without rebuilding the text layer', async ({ page }) => {
     test.setTimeout(90_000);
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
 
@@ -113,9 +110,6 @@ test.describe('Matrix zoom', () => {
 
   test('wheel and pinch drive the transform, Fit restores it, Cards flank the spreads', async ({ page }) => {
     test.setTimeout(90_000);
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
     await page.getByRole('button', { name: 'Matrix' }).click();

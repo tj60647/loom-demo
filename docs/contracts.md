@@ -400,7 +400,8 @@
 > using `.card` (background `rgba(255,255,255,.5)`), so the scrim showed
 > through it — every other one uses `.info-dialog`, which is paper. Its copy
 > described an app that had moved on: "Bite-Sized Capture" (a pun on the
-> retired `byte`), "Throw" and "Read" as station names, a whole-graph export.
+> old spelling of Passage), "Throw" and "Read" as station names, a
+> whole-graph export.
 > It now names the five stations, says plainly what Loom will not do, and
 > keeps the theory — Bucciarelli, Wenger, Star, with Novak & Gowin added for
 > the board.

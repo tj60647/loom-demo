@@ -72,9 +72,21 @@ export default async function SandboxPage() {
     [source.author, source.title].filter(Boolean).join(", ")
   )
 
+  // The shelf the guide opens on. Every visible reading is drawn so the
+  // Library looks like the Library; only the practice one opens.
+  const cards = withFile.concat(sources.filter((s) => !s.storageKey)).map((s) => ({
+    id: s.id,
+    title: s.title,
+    author: s.author,
+    description: s.description,
+    isDescriptionVisible: s.isDescriptionVisible,
+    hasFile: !!s.storageKey,
+  }))
+
   return (
     <SandboxWorkbench
       sourceId={source.id}
+      cards={cards}
       practiceCloth={practiceCloth}
       source={{
         id: source.id,

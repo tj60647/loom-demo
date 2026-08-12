@@ -20,9 +20,6 @@ test.describe('Concept rail', () => {
     test.setTimeout(90_000);
     const conceptName = 'Rail Test Concept A';
 
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
     await openReading(page, 'Object Worlds');
 
     const textLayer = page.locator('.react-pdf__Page__textContent');

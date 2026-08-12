@@ -13,6 +13,20 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
  * capture lands in a real student's loom. `scripts/check-sandbox.ts` guards
  * the imports; this guards the behaviour, by watching the wire.
  */
+/**
+ * Enter the loom from its own Library. Retried because the shelf is
+ * server-rendered: the card is on screen and clickable a beat before React
+ * has hydrated its handler, and a single click lands on markup and does
+ * nothing.
+ */
+async function enterPracticeLoom(page: import('@playwright/test').Page) {
+  await expect(page.locator('#practiceOpen')).toBeVisible({ timeout: 30_000 });
+  await expect(async () => {
+    await page.locator('#practiceOpen').click();
+    await expect(page.locator('.practiceband')).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 40_000, intervals: [500, 1_000, 2_000] });
+}
+
 test.describe('Practice loom', () => {
   test('the real interface works and nothing is written', async ({ page }) => {
     test.setTimeout(120_000);
@@ -25,21 +39,24 @@ test.describe('Practice loom', () => {
       if (r.method() === 'POST' && !/\/api\/auth|_next|test-login/.test(r.url())) writes.push(r.url());
     });
 
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
 
     // What the student's real loom holds before any practice happens.
     const before = await page.request.get('/api/loom').then((r) => r.json());
 
     await page.goto('/sandbox');
 
+    // The practice loom opens on the Library now, with one card that opens —
+    // the guide's first beat is a move, not a caption (TJ, 2026-08-12). The
+    // rest of the shelf is drawn and inert.
+    await expect(page.locator('.shelfcard.off').first()).toBeVisible({ timeout: 30_000 });
+    await enterPracticeLoom(page);
+
     // The band is the safety argument — a student who cannot see it cannot
     // tell a practice space from data loss. Generous timeout: /sandbox is its
     // own route and compiles on demand under `next dev`, so a cold first hit
     // outruns the 5s default.
     await expect(page.locator('.practiceband')).toBeVisible({ timeout: 30_000 });
-    await expect(page.locator('.practiceband')).toContainText('Nothing is kept');
+    await expect(page.locator('.practiceband')).toContainText(/nothing is kept/i);
 
     // A REAL reading, with a real text layer to drag-select — not a mock.
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 40_000 });
@@ -130,8 +147,10 @@ test.describe('Practice loom', () => {
     // Nothing the student did survives, and the example comes back exactly as
     // it was — which is also the "start over" this place would otherwise need
     // a button for.
+    // A reload puts the whole place back, the Library included — so starting
+    // over starts where a student starts, at the guide's first beat.
     await page.reload();
-    await expect(page.locator('.practiceband')).toBeVisible({ timeout: 30_000 });
+    await enterPracticeLoom(page);
     await expect.poll(workCount, { timeout: 20_000 }).toBe(exampleWork);
     await expect(page.locator('.scopemeta').nth(1)).toHaveText(exampleScope ?? '');
     await page.locator('nav button', { hasText: 'Vocabulary' }).click();

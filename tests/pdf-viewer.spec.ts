@@ -19,9 +19,6 @@ test.describe('PDF Viewer and Highlighting', () => {
       test.setTimeout(60_000);
       const conceptName = `Test Concept for ${pdf.cardTitle}`;
 
-      await page.addInitScript(() => {
-        localStorage.setItem("loom_has_seen_walkthrough", "true");
-      });
       // The shelf is the home screen: pick the reading off it, which opens
       // that reading's workbench, and read the text from tab 00 inside it.
       await openReading(page, pdf.cardTitle);

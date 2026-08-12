@@ -20,7 +20,6 @@ import MapTab from "@/components/tabs/MapTab"
 import JourneyNav, { stationNumber, type Station } from "@/components/ui/JourneyNav"
 import ShelfSearch from "@/components/shelf/ShelfSearch"
 import type { Passage } from "@/lib/types"
-import PracticeGuide from "@/components/practice/PracticeGuide"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
 
@@ -162,8 +161,20 @@ export default function Workbench({
         goTo(wanted as Tab)
       }
     }
+    // The guide also turns the page. Its "highlight a passage" beat cannot
+    // teach anything on a cover, and `Oh, the Places You'll Go!` opens on two
+    // of them — so the guide asks for one of the example's own passages and
+    // the viewer lands on the page it was taken from, marked.
+    const onFocus = (e: Event) => {
+      const id = (e as CustomEvent).detail
+      if (typeof id === "string") setPdfFocusPassageId(id)
+    }
     window.addEventListener("loom:practice-station", onStation)
-    return () => window.removeEventListener("loom:practice-station", onStation)
+    window.addEventListener("loom:practice-focus", onFocus)
+    return () => {
+      window.removeEventListener("loom:practice-station", onStation)
+      window.removeEventListener("loom:practice-focus", onFocus)
+    }
   }, [practice, tabs, goTo])
    const shouldRender = (tab: Tab) => (KEEP_ALIVE.has(tab) ? visited.has(tab) : activeTab === tab)
 
@@ -241,9 +252,6 @@ export default function Workbench({
 
   return (
     <>
-      {/* Fixed, so it floats over the layout rather than displacing it. */}
-      {practice && <PracticeGuide />}
-
       <div className="scopebar">
         {/* No "‹ library" here (TJ, 2026-08-08): 00 · Library is in the journey
             bar directly below, so this was a second door to the same place. */}
@@ -285,16 +293,17 @@ export default function Workbench({
       </div>
 
       {practice && (
-        /* Persistent, not a toast: `flash` self-clears after 1500ms, and a
-           student who missed a disappearing notice cannot tell a practice
-           loom from data loss. This band IS the safety argument. */
+        /* A floater, not a header (TJ, 2026-08-11) — the practice loom should
+           look like the loom, and a full-width band across the top made it a
+           different-shaped app before a student had done anything. Persistent
+           rather than a toast all the same: `flash` self-clears after 1500ms,
+           and someone who missed a disappearing notice cannot tell a practice
+           space from data loss. This band IS the safety argument, so it stays
+           on screen — it just stops rearranging the page to say so. Short,
+           because the guide beside it explains the worked example in full. */
         <div className="practiceband" role="status">
-          <b>Practice loom.</b> A finished piece of work is already here — four
-          passages, three concepts, two threads and a projection — so you can
-          see where the moves lead before making any. Everything works: capture
-          a passage, name a concept, throw a thread, lay out the board, take
-          the example apart. <b>Nothing is kept.</b> Reload to put it back;
-          your own work is untouched.
+          <b>Practice loom.</b> Everything here works and <b>nothing is kept</b>.
+          Reload to put the example back; your own work is untouched.
         </div>
       )}
 

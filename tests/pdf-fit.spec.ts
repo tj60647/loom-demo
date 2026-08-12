@@ -9,9 +9,6 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 test.describe('PDF Viewer Fit Modes', () => {
   test('fit to width should not cause horizontal scroll', async ({ page }) => {
     // 1. Navigate to the app and bypass walkthrough
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
     // 2-4. Pick the reading off the shelf and open the text (tab 00).
     await openReading(page, 'Object Worlds');
 

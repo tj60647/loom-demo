@@ -83,16 +83,6 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
             guide
           </Link>
         )}
-        <button
-          onClick={() => window.dispatchEvent(new Event("loom:walkthrough"))}
-          className="helpbtn"
-          id="helpBtn"
-          data-tip="how Loom works — the walkthrough"
-          aria-label="how Loom works — open the walkthrough"
-          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontFamily: "inherit" }}
-        >
-          ?
-        </button>
       </header>
 
       {/* Same ink scrim as every other overlay — the light blurred backdrop

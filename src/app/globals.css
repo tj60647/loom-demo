@@ -318,28 +318,9 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .aboutbox h3{font-family:var(--display);font-size:16px;font-weight:600;margin:20px 0 8px;
   border-bottom:1px solid var(--rule);padding-bottom:4px}
 @media(max-width:560px){.info-dialog{padding:22px 20px 18px}.info-dialog h2{font-size:23px}}
-/* first-run walkthrough overlay */
-/* v14 used z-index:40, which was top of its stack. This app has overlays v14
-   never had (PDF viewer, capture modal, info dialogs, up to 10000), and the
-   walkthrough must sit above all of them. */
-.scrim{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:10001;display:none;align-items:center;justify-content:center;padding:22px}
-.scrim.show{display:flex}
-.guide{max-width:540px;width:100%;background:var(--paper);border:1px solid var(--ink);border-radius:6px;
-  box-shadow:0 18px 50px rgba(0,0,0,.3);padding:24px 26px 20px}
-.guide .gk{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ochre)}
-.guide h2{font-family:var(--display);font-size:25px;font-weight:600;margin:6px 0 8px;display:flex;align-items:center;gap:11px}
-.guide p{font-size:15.5px;line-height:1.5;margin:0 0 10px}
-.guide .gloom{font-size:13.5px;color:var(--ink-soft);border-left:2px solid var(--ochre);padding-left:11px;margin:12px 0}
-.guide .gnav{display:flex;justify-content:space-between;align-items:center;margin-top:18px;border-top:1px solid var(--rule);padding-top:14px}
-.guide .dots{display:flex;gap:6px}
-.guide .dot{width:7px;height:7px;border-radius:50%;background:var(--rule)}
-.guide .dot.on{background:var(--ochre)}
-.guide .skip{font-family:var(--mono);font-size:11px;color:var(--ink-soft);cursor:pointer;letter-spacing:.04em}
-/* 36px to match .btn.mini's min-height: the header is one row of equal
-   controls, and a smaller circle beside them read as a different species. */
-.helpbtn{font-family:var(--display);font-size:17px;background:none;border:1px solid var(--rule);border-radius:50%;
-  width:36px;height:36px;cursor:pointer;color:var(--ink-soft);line-height:1;align-self:center}
-.helpbtn:hover{border-color:var(--ochre);color:var(--ochre)}
+/* The first-run walkthrough's scrim, panel and round "?" button lived here.
+   Retired 2026-08-11 with the deck itself — the guide walks the same moves in
+   the real interface (.guidefloat, below) and About carries the overview. */
 /* One box model for header controls whatever the element (a, button):
    a bare <a class="btn"> otherwise top-aligns its text next to a <button>. */
 header .btn{display:inline-flex;align-items:center;justify-content:center}
@@ -443,15 +424,28 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    self-clears after 1500ms, and a student who missed a disappearing notice
    cannot tell a practice space from data loss. Sage rather than red — this is
    an invitation, not a warning. */
-.practiceband{
-  background:rgba(111,125,92,.10);
-  border-bottom:1px solid var(--sage);
-  color:var(--ink);
-  font-family:var(--body);
-  font-size:13px;
-  line-height:1.5;
-  padding:8px 24px;
-}
+/* The practice loom's standing notice — a floater, not a header (TJ,
+   2026-08-11): a full-width band made the practice loom a different-shaped
+   app before the student had done anything, and the point is that it IS the
+   loom. Bottom-left, opposite the guide's usual corner. Takes no pointer
+   events: it is prose, and prose must never eat a control. */
+.practiceband{position:fixed;left:18px;bottom:52px;z-index:898;
+  width:min(320px,calc(100vw - 32px));pointer-events:none;
+  background:rgba(111,125,92,.13);border:1px solid var(--sage);border-radius:6px;
+  box-shadow:0 8px 24px rgba(0,0,0,.14);
+  color:var(--ink);font-family:var(--body);font-size:12.5px;line-height:1.45;
+  padding:9px 12px}
+@media(max-width:640px){.practiceband{left:12px;right:12px;width:auto;bottom:auto;top:64px}}
+
+/* A shelf card that is not in the practice loom: shown so the Library looks
+   like the Library, and plainly not a door. */
+.shelfcard.off{opacity:.5}
+.shelfcard.off .shelfmain{cursor:default}
+/* The practice shelf's one openable card is a <button>, not a <Link> — it
+   opens a stage rather than a route. Strip the button chrome so it is the
+   same object to look at as every other card. */
+.shelfcard button.shelfmain{background:none;border:none;padding:0;margin:0;
+  font:inherit;color:inherit;text-align:inherit;width:100%;cursor:pointer;display:block}
 .practiceband b{font-weight:600}
 
 /* The download that lives at its object (TJ, 2026-08-10) — the same pair of
@@ -482,10 +476,10 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    from whatever it is pointing at. Above the footer (z 5) and the card menu
    (z 6), below the dialogs (z 10000): the capture dialog must cover it, since
    one beat is about that dialog. */
-.guidefloat{position:fixed;z-index:900;width:min(360px,calc(100vw - 32px));
+.guidefloat{position:fixed;z-index:900;width:min(320px,calc(100vw - 32px));
   background:var(--paper);border:1px solid var(--ink);border-radius:6px;
   box-shadow:0 14px 40px rgba(0,0,0,.22),0 0 0 4px rgba(168,132,63,.10);
-  padding:12px 14px 10px;
+  padding:10px 12px 8px;
   /* The card takes no clicks of its own — only its buttons do (below). A
      floater in a corner will sooner or later sit over a control: at 1280x720
      it lands squarely on the PDF's Next Page arrow, which is how the suite
@@ -493,8 +487,8 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
      made incapable of eating anything instead. Its buttons opt back in. */
   pointer-events:none}
 .guidefloat .gstep,.guidefloat .btn{pointer-events:auto}
-.guidefloat.br{right:18px;bottom:52px}
-.guidefloat.bl{left:18px;bottom:52px}
+.guidefloat.br{right:18px;bottom:14px}
+.guidefloat.bl{left:18px;bottom:14px}
 .guidefloat.tr{right:18px;top:96px}
 .guidefloat.tl{left:18px;top:96px}
 .guideopen{position:fixed;right:18px;bottom:52px;z-index:900;background:var(--paper)}
@@ -515,10 +509,16 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .gstep.done{color:var(--ochre);border-color:var(--ochre)}
 .gstep.done.now{color:var(--paper);background:var(--ochre)}
 .gcount{margin-left:auto}
-.guidefloat .gsay{margin:0;font-size:13.5px;line-height:1.45}
+.guidefloat .gsay{margin:0;font-size:13px;line-height:1.42}
 .guidefloat .gwhy{margin:5px 0 0;font-size:12px;line-height:1.4;color:var(--ink-soft);font-style:italic}
-.guidefoot{display:flex;align-items:center;gap:6px;margin-top:10px;border-top:1px solid var(--rule);padding-top:9px}
-.guidefoot .ghide{margin-left:auto}
+.guidefoot{display:flex;align-items:center;gap:5px;margin-top:8px;border-top:1px solid var(--rule);padding-top:7px}
+.guidefoot .gwhybtn{margin-left:auto}
+/* "Go on" as the move: the one control the reader should reach for when the
+   beat asks nothing of them. Slow and small — this app does not flash. */
+@keyframes gpulse{0%,100%{box-shadow:0 0 0 0 rgba(168,132,63,0)}
+  50%{box-shadow:0 0 0 4px rgba(168,132,63,.30)}}
+.btn.gpulse{border-color:var(--ochre);color:var(--ink);animation:gpulse 1.9s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.btn.gpulse{animation:none;border-color:var(--ochre)}}
 @media(max-width:640px){
   .guidefloat,.guidefloat.br,.guidefloat.bl,.guidefloat.tr,.guidefloat.tl{
     left:12px;right:12px;bottom:52px;top:auto;width:auto}

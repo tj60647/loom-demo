@@ -7,9 +7,6 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 
 test.describe('Audit Seed Passages', () => {
   test('verify seed passages are highlighted', async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
 
     // Pick the reading off the shelf and open its text (tab 00).
     await openReading(page, 'Object Worlds');
