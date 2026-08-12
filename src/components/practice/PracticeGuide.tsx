@@ -86,25 +86,79 @@ const near = (a: Rect | null, b: Rect | null) =>
  * so a closed sheet has a perfectly real rect off the right edge — and a
  * cutout there is a dark screen with no hole in it.
  */
-function resolveTarget(selectors: string[]): Rect | null {
+function resolveTarget(selectors: string[]): { rect: Rect | null; away: boolean } {
   let top = Infinity
   let left = Infinity
   let right = -Infinity
   let bottom = -Infinity
+  // A target that IS on the page but scrolled out of it. The beat still has
+  // something to point at; the student just cannot see it.
+  let away = false
 
   for (const selector of selectors) {
     const box = document.querySelector(selector)?.getBoundingClientRect()
     if (!box || box.width === 0 || box.height === 0) continue
-    if (box.bottom < 0 || box.top > window.innerHeight) continue
-    if (box.right < 0 || box.left > window.innerWidth) continue
+    if (
+      box.bottom < 0 || box.top > window.innerHeight ||
+      box.right < 0 || box.left > window.innerWidth
+    ) {
+      away = true
+      continue
+    }
     top = Math.min(top, box.top)
     left = Math.min(left, box.left)
     right = Math.max(right, box.right)
     bottom = Math.max(bottom, box.bottom)
   }
 
-  if (top === Infinity) return null
-  return { top, left, width: right - left, height: bottom - top }
+  if (top === Infinity) return { rect: null, away }
+  return { rect: { top, left, width: right - left, height: bottom - top }, away: false }
+}
+
+/** The nearest ancestor of `el` that actually scrolls, or null. */
+function scrollerOf(el: Element | null): Element | null {
+  for (let node = el; node; node = node.parentElement) {
+    if (node.scrollHeight > node.clientHeight + 4 &&
+        /auto|scroll/.test(getComputedStyle(node).overflowY)) return node
+  }
+  const doc = document.scrollingElement
+  return doc && doc.scrollHeight > doc.clientHeight + 4 ? doc : null
+}
+
+/**
+ * Let the wheel through the mask.
+ *
+ * A pane is `position:fixed`, so it is not in the scroll chain of whatever the
+ * page scrolls — here a `<main>`, not the document. Wheeling over a pane
+ * therefore scrolled nothing at all, while wheeling over the cutout scrolled
+ * normally: the page moved or did not depending on where the pointer happened
+ * to be, which is unexplainable to anybody it happens to. The mask is meant to
+ * constrain what you can PRESS, not to freeze the page under it.
+ */
+function wheelThrough(e: React.WheelEvent<HTMLDivElement>) {
+  const scroller = scrollerOf(document.querySelector("main"))
+  if (!scroller) return
+  scroller.scrollTop += e.deltaY
+}
+
+/**
+ * Scroll the beat's first live target back under the student's eye.
+ *
+ * Beats scroll their target into view when they OPEN, but a student can scroll
+ * away afterwards and then the card says "press the glowing card" with no glow
+ * anywhere on screen (TJ, 2026-08-12: *"in many pages it is possible to scroll
+ * away from the 'glowing button/card'. how do we indicate where the 'glow'
+ * is?"*). Rather than dragging the page back whenever they look around — which
+ * fights the scroll they just made — the card grows a button and they press it.
+ */
+function scrollToTarget(selectors: string[]) {
+  for (const selector of selectors) {
+    const el = document.querySelector(selector)
+    const box = el?.getBoundingClientRect()
+    if (!el || !box || box.width === 0 || box.height === 0) continue
+    el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" })
+    return
+  }
 }
 
 /**
@@ -170,6 +224,10 @@ export default function PracticeGuide() {
   const [dragging, setDragging] = useState(false)
   /** True while one of the app's own modal scrims is on screen. */
   const [overScrim, setOverScrim] = useState(false)
+  /** True when the beat's target is on the page but scrolled out of sight. */
+  const [away, setAway] = useState(false)
+  /** Bumped on every rail press, so re-showing the beat you are on re-finds it. */
+  const [nudge, setNudge] = useState(0)
 
   const cardRef = useRef<HTMLDivElement | null>(null)
 
@@ -208,11 +266,19 @@ export default function PracticeGuide() {
   const show = useCallback((index: number) => {
     const clamped = Math.max(0, Math.min(GUIDE_STEPS.length - 1, index))
     setAt(clamped)
-    if (GUIDE_STEPS[clamped].station !== "library") goToStation(GUIDE_STEPS[clamped].station)
+    setNudge((n) => n + 1)
+    // Including "library", which used to be excluded — so pressing pip 1 from
+    // inside the workbench showed a beat about a glowing card with no card on
+    // screen, the exact conflict TJ called confusing (2026-08-12: *"the 'open
+    // a reading' button 1 does not take us back to 'pick a reading in
+    // library', is that intentional?"* — it was not). Nothing is lost going
+    // back: the practice loom's state lives in `SandboxLoomProvider`, above
+    // the stage, so the reading re-opens holding everything you made.
+    goToStation(GUIDE_STEPS[clamped].station)
   }, [])
 
   useEffect(() => {
-    if (!open || step.station === "library") return
+    if (!open) return
     goToStation(step.station)
   }, [open, step.station])
 
@@ -224,10 +290,23 @@ export default function PracticeGuide() {
     if (onAPage) window.dispatchEvent(new CustomEvent("loom:practice-focus", { detail: onAPage.id }))
   }, [open, step.needsText, state.passages])
 
-  // Bring the target into view once per beat, and only when it is out of it.
+  /**
+   * Bring the target into view when the beat arrives, and only when it is out
+   * of it.
+   *
+   * It waits for the target rather than looking once. Pressing pip 1 from the
+   * workbench tears the whole shelf down and builds it again, and the practice
+   * Library is twenty-four cards deep — the one that opens is some two
+   * thousand pixels down it. Looking once, 260ms in, found nothing and gave
+   * up, so the shelf came back with no glow anywhere on it.
+   *
+   * `nudge` is what makes it fire on a press that does not change the beat:
+   * `at` was already 0, so a dependency on `at` alone never re-ran.
+   */
   useEffect(() => {
     if (!open) return
-    const timer = window.setTimeout(() => {
+    let tries = 0
+    const look = () => {
       for (const selector of step.targets) {
         const el = document.querySelector(selector)
         if (!el) continue
@@ -237,9 +316,11 @@ export default function PracticeGuide() {
         }
         return
       }
-    }, 260)
+      if (++tries < 12) timer = window.setTimeout(look, 180)
+    }
+    let timer = window.setTimeout(look, 260)
     return () => window.clearTimeout(timer)
-  }, [open, at, step.targets])
+  }, [open, at, nudge, step.targets])
 
   // Track the target and place the card, on one frame. The things pointed at
   // include a PDF page that re-lays itself out, a dialog that does not exist
@@ -249,7 +330,8 @@ export default function PracticeGuide() {
     if (!open) return
     let frame = 0
     const measure = () => {
-      const found = resolveTarget(step.targets)
+      const { rect: found, away } = resolveTarget(step.targets)
+      setAway((was) => (was === away ? was : away))
       const padded: Rect | null = found
         ? {
             top: Math.max(0, found.top - PAD),
@@ -286,6 +368,21 @@ export default function PracticeGuide() {
     frame = window.requestAnimationFrame(measure)
     return () => window.cancelAnimationFrame(frame)
   }, [open, step.targets])
+
+  /**
+   * Publish the cutout so the practice loom's other fixed chrome can get out
+   * of its way.
+   *
+   * The "you are in the guide" notice has to sit ABOVE the mask — it is a 13%
+   * wash, so underneath it the dim showed through on one side of a cutout
+   * boundary and the lit page through the other, a seam down the sentence.
+   * Above the mask it can instead cover the thing the beat is ringing, which
+   * on the kit beat it did: the button read "OAD THE CONCEPT-MAP KIT". So the
+   * guide says where the hole is and the notice yields when it overlaps.
+   */
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("loom:guide-hole", { detail: open ? hole : null }))
+  }, [open, hole])
 
   // The one hand-off: highlighting finishes when the capture dialog opens,
   // and the next beat is about that dialog. Asking for a press in between is
@@ -326,7 +423,7 @@ export default function PracticeGuide() {
       <button
         className="btn ghost mini guideopen"
         onClick={() => setOpen(true)}
-        data-tip="the seven moves, walked on this reading"
+        data-tip="every move, walked on this reading"
       >
         show the guide · {finished}/{GUIDE_STEPS.length}
       </button>
@@ -346,7 +443,7 @@ export default function PracticeGuide() {
         // (it would block the hole and leak everything else), and not an SVG,
         // which re-rasterises a viewport-sized path every frame. The hole is
         // genuinely empty DOM, so hit-testing is exact and free.
-        <div className="guidemask" aria-hidden="true">
+        <div className="guidemask" aria-hidden="true" onWheel={wheelThrough}>
           <div className="gpane" style={{ top: 0, left: 0, width: vw, height: hole.top }} />
           <div className="gpane" style={{ top: hole.top + hole.height, left: 0, width: vw, height: Math.max(0, vh - hole.top - hole.height) }} />
           <div className="gpane" style={{ top: hole.top, left: 0, width: hole.left, height: hole.height }} />
@@ -393,7 +490,21 @@ export default function PracticeGuide() {
 
         <p className="gsay">
           <b>{step.label}.</b>{" "}
-          {ready ? <span className="gdone">Done. Press next.</span> : step.say}
+          {ready ? (
+            <span className="gdone">
+              {last
+                ? "That’s the guide — and the kit in your downloads is the one thing it keeps."
+                : "Done. Press next."}
+            </span>
+          ) : (
+            step.say
+          )}
+          {/* The card says the situation as well as offering the button. With
+              nothing glowing anywhere, an instruction naming a control the
+              student cannot see reads as an app that is broken. */}
+          {away && !ready && (
+            <span className="gaway"> It has scrolled out of sight — press “show me”.</span>
+          )}
         </p>
         {showWhy && <p className="gwhy">{step.why}</p>}
 
@@ -408,14 +519,35 @@ export default function PracticeGuide() {
               cannot fire early because the predicate is what turns it on.
               Still pressable while quiet: a disabled button traps anybody the
               guide has misread, and a separate skip control would be a second
-              button meaning the same thing. */}
+              button meaning the same thing.
+
+              On the LAST beat it closes the guide instead of advancing. It
+              used to be `disabled={last}`, so the copy said "Press next" over
+              a dead button and the guide had no ending at all (TJ, 2026-08-12:
+              *"the instructions are to press next, but the next is not
+              active"*). Closing is what finishing means here — the reopen chip
+              stays, so nothing is lost by pressing it. */}
           <button
-            className={ready && !last ? "btn mini gnext gpulse" : "btn ghost mini"}
-            onClick={() => show(at + 1)}
-            disabled={last}
+            className={ready ? "btn mini gnext gpulse" : "btn ghost mini"}
+            onClick={() => (last ? setOpen(false) : show(at + 1))}
           >
-            {ready ? "next ›" : "skip ›"}
+            {last ? (ready ? "done ›" : "close ›") : ready ? "next ›" : "skip ›"}
           </button>
+          {/* Only when the target is on the page and off the screen — a button
+              that is always there is one more thing to read. When it IS there
+              it takes the primary's treatment, because with the glow off
+              screen this card is the only thing left to look at and finding
+              the control again is the whole of what there is to do (TJ,
+              2026-08-12: *"if the action to take is off screen the guide card
+              needs to offer some direction"*). */}
+          {away && !ready && (
+            <button
+              className="btn mini gnext gpulse gfind"
+              onClick={() => scrollToTarget(step.targets)}
+            >
+              show me ›
+            </button>
+          )}
           <button
             className="btn ghost mini gwhybtn"
             onClick={() => setShowWhy((v) => !v)}

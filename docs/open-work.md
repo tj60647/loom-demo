@@ -325,8 +325,13 @@ gaps are now demonstrable rather than suspected:
   `tests/practice-guide.spec.ts`.
   **Still open:** whether the example should be swappable per course (TJ: "we
   can change it out later if it seems to conflict with the intention"), and
-  whether the 23 dimmed cards on the practice Library should be cut to the one
-  that opens.
+  what to do about the practice Library being twenty-four cards deep with the
+  one that opens **last**. The guide scrolls to it on arrival and offers "show
+  me" when you leave it, so the reported problem is closed — but the cheaper
+  answers are still on the table and are TJ's call: cut the dimmed cards to
+  one, or float the openable card to the front. Against the second: the real
+  Library has a real order, and the practice one mirroring it is the whole
+  reason the dimmed cards are there.
 - **5.2 The screen snip** — [screen-snip.md](screen-snip.md). Much smaller than
   it looks: a snip of a library PDF needs **no image storage**, only a rect.
   TJ settled export (the image embeds). One number open: the size cap, worth

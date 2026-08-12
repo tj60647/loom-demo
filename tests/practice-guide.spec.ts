@@ -19,6 +19,7 @@
  * Requires `npm run seed:demo`. Writes nothing — this is the practice loom.
  */
 import { test, expect, type Page } from "@playwright/test"
+import { GUIDE_STEPS } from "../src/lib/practiceGuide"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 
@@ -149,6 +150,154 @@ test.describe("The guide", () => {
     // Every pip green, and the whole walk wrote nothing to the server.
     await expect(page.locator(".gstep.done")).toHaveCount(8)
     expect(writes, `the guide wrote to the server: ${writes.join(", ")}`).toHaveLength(0)
+
+    // ---- the ending ---------------------------------------------------------
+    // The walk above ticked every beat and then stopped, which is exactly how
+    // the guide shipped with no ending: the last beat said "Press next" over a
+    // button that was `disabled` because there was nowhere to advance to (TJ,
+    // 2026-08-12: *"the instructions are to press next, but the next is not
+    // active"*). So the last thing this test does is press it.
+    const finish = page.locator(".guidefoot .btn").nth(1)
+    await expect(finish).toBeEnabled()
+    await expect(finish).toHaveText("done ›")
+    await expect(page.locator(".guidepop .gdone")).not.toContainText("Press next")
+    await finish.click()
+
+    // It closes, and it can be got back — the guide is never a one-way door.
+    await expect(page.locator(".guidepop")).toHaveCount(0)
+    const reopen = page.locator(".guideopen")
+    await expect(reopen).toContainText("8/8")
+    await reopen.click()
+    await expect(page.locator(".guidepop")).toBeVisible()
+  })
+
+  test("scrolling away from the glow leaves a way back to it", async ({ page }) => {
+    test.setTimeout(120_000)
+
+    // TJ, 2026-08-12: *"in many pages it is possible to scroll away from the
+    // 'glowing button/card'. how do we indicate where the 'glow' is?"* — on
+    // the Library that is 24 cards deep, and the beat goes on saying "press
+    // the glowing card" with nothing glowing anywhere on screen.
+    await page.goto("/sandbox")
+    await expect(page.locator(".guidepop")).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator(".guideglow")).toBeVisible()
+    await expect(page.locator(".gfind")).toHaveCount(0)
+
+    // Scroll the one openable card clean out of the viewport — UPWARD, which
+    // is the direction that does it: the practice reading is the last card of
+    // twenty-four, so the guide arrives with the Library scrolled to its foot
+    // and scrolling back to the top is what loses the glow. This is also the
+    // wheel going through a mask pane, which used to swallow it entirely: a
+    // fixed pane is not in `main`'s scroll chain, so the page moved or did not
+    // depending on where the pointer happened to be.
+    await page.mouse.move(700, 500)
+    await expect
+      .poll(async () => page.evaluate(() => document.querySelector(".gpane") !== null))
+      .toBe(true)
+    await page.mouse.wheel(0, -2_500)
+    await expect
+      .poll(async () =>
+        page.locator("#practiceOpen").evaluate((el) => {
+          const box = el.getBoundingClientRect()
+          return box.bottom < 0 || box.top > window.innerHeight
+        })
+      , { timeout: 10_000 })
+      .toBe(true)
+
+    // The card offers the way back, and taking it brings the glow with it.
+    const find = page.locator(".gfind")
+    await expect(find).toBeVisible({ timeout: 10_000 })
+    await find.click()
+    await expect
+      .poll(async () =>
+        page.locator("#practiceOpen").evaluate((el) => {
+          const box = el.getBoundingClientRect()
+          return box.top >= 0 && box.bottom <= window.innerHeight
+        })
+      , { timeout: 10_000 })
+      .toBe(true)
+    await expect(page.locator(".guideglow")).toBeVisible()
+    await expect(find).toHaveCount(0)
+  })
+
+  test("no beat can strand you with neither a glow nor a way back to it", async ({ page }) => {
+    test.setTimeout(180_000)
+
+    // TJ, 2026-08-12: *"this is something each beat needs, if the action to
+    // take is off screen the guide card needs to offer some direction."* So
+    // this is the rule, checked on every beat at both ends of the scroll:
+    // whenever the beat has a live control on the page, the student can either
+    // SEE it glowing or press one button to get back to it. Never neither.
+    await page.goto("/sandbox")
+    await expect(page.locator(".guidepop")).toBeVisible({ timeout: 30_000 })
+    await expect(async () => {
+      await page.locator("#practiceOpen").click()
+      await expect(page.locator("#yourwork-toggle")).toBeVisible({ timeout: 2_000 })
+    }).toPass({ timeout: 40_000, intervals: [500, 1_000, 2_000] })
+
+    await expect(page.locator(".gstep")).toHaveCount(GUIDE_STEPS.length)
+
+    for (const [i, step] of GUIDE_STEPS.entries()) {
+      await page.locator(".gstep").nth(i).click()
+      await page.waitForTimeout(1_200)
+      const label = await beat(page)
+
+      // A beat already performed is exempt: its card says "Done. Press next."
+      // and there is no action left to be off screen.
+      if (await page.locator(".gstep").nth(i).evaluate((el) => el.classList.contains("done"))) continue
+
+      for (const end of ["top", "bottom"] as const) {
+        await page.evaluate((to) => {
+          for (const el of Array.from(document.querySelectorAll<HTMLElement>("main, .scrollbox"))) {
+            el.scrollTop = to === "top" ? 0 : el.scrollHeight
+          }
+        }, end)
+        await page.waitForTimeout(800)
+
+        // Exempt too: a beat whose control does not exist yet — the capture
+        // dialog is not on the page until a selection opens it, and there is
+        // nothing to scroll to.
+        const hasLiveTarget = await page.evaluate((selectors) =>
+          selectors.some((selector) => {
+            const box = document.querySelector(selector)?.getBoundingClientRect()
+            return !!box && box.width > 0 && box.height > 0
+          })
+        , step.targets)
+        if (!hasLiveTarget) continue
+
+        const glow = await page.locator(".guideglow").count()
+        const find = await page.locator(".gfind").count()
+        expect(
+          glow + find,
+          `beat "${label}" scrolled to the ${end}: no glow on screen and no "show me" offered`
+        ).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  test("pip 1 goes back to the Library, and the work survives it", async ({ page }) => {
+    test.setTimeout(120_000)
+
+    // TJ, 2026-08-12: *"the 'open a reading' button 1 does not take us back to
+    // 'pick a reading in library', is that intentional?"* — it was not. Every
+    // other pip navigates to where its beat happens; that one silently did
+    // nothing, and showed a beat about a glowing card with no card on screen.
+    await page.goto("/sandbox")
+    await expect(async () => {
+      await page.locator("#practiceOpen").click()
+      await expect(page.locator("#yourwork-toggle")).toBeVisible({ timeout: 2_000 })
+    }).toPass({ timeout: 40_000, intervals: [500, 1_000, 2_000] })
+
+    const before = ((await page.locator("#yourwork-toggle").textContent()) ?? "").trim()
+
+    await page.locator(".gstep").nth(0).click()
+    await expect(page.locator("#practiceOpen")).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator(".guideglow")).toBeVisible()
+
+    // Back in, holding everything — the loom's state lives above the stage.
+    await page.locator("#practiceOpen").click()
+    await expect(page.locator("#yourwork-toggle")).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator("#yourwork-toggle")).toHaveText(before)
   })
 
   test("a passage can be kept with no concept at all", async ({ page }) => {

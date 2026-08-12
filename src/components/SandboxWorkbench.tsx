@@ -17,7 +17,7 @@
  * stages: it has to be on the shelf to point at the card.
  */
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import SandboxLoomProvider from "@/components/providers/SandboxLoomProvider"
 import PracticeGuide from "@/components/practice/PracticeGuide"
 import PracticeShelf, { type PracticeCard } from "@/components/practice/PracticeShelf"
@@ -72,6 +72,39 @@ export default function SandboxWorkbench({
     hasFile: !!source.storageKey,
   }
 
+  // The guide's rail is a navigator, and pip 1 happens here. Without this it
+  // was the one pip that went nowhere — it showed a beat about a glowing card
+  // while you stood in the workbench with no card on screen. Nothing is lost:
+  // the loom's state lives in the provider below, above this stage flag, so
+  // the reading re-opens holding everything.
+  useEffect(() => {
+    const onStation = (e: Event) => {
+      const station = (e as CustomEvent<string>).detail
+      if (station === "library") setOpened(false)
+    }
+    window.addEventListener("loom:practice-station", onStation)
+    return () => window.removeEventListener("loom:practice-station", onStation)
+  }, [])
+
+  // The standing notice rides above the guide's mask (or the dim seams across
+  // it), which means it can also cover the control a beat is ringing. It gets
+  // out of the way when the cutout reaches it.
+  const bandRef = useRef<HTMLDivElement | null>(null)
+  const [bandClear, setBandClear] = useState(true)
+  useEffect(() => {
+    const onHole = (e: Event) => {
+      const hole = (e as CustomEvent<{ top: number; left: number; width: number; height: number } | null>).detail
+      const band = bandRef.current?.getBoundingClientRect()
+      const clear =
+        !hole || !band ||
+        hole.left > band.right || hole.left + hole.width < band.left ||
+        hole.top > band.bottom || hole.top + hole.height < band.top
+      setBandClear((was) => (was === clear ? was : clear))
+    }
+    window.addEventListener("loom:guide-hole", onHole)
+    return () => window.removeEventListener("loom:guide-hole", onHole)
+  }, [])
+
   const open = () => {
     setOpened(true)
     // The guide's first beat is done the moment the reading opens — the same
@@ -91,7 +124,7 @@ export default function SandboxWorkbench({
           reloading, which named the machinery rather than the place the
           student is in, and described a recovery from a loss they had not had.
           Takes no pointer events: prose must never eat a control. */}
-      <div className="practiceband" role="status">
+      <div ref={bandRef} className={`practiceband${bandClear ? "" : " yielded"}`} role="status">
         <b>You are in the guide.</b> Everything works and <b>nothing is kept</b>.
       </div>
       <PracticeGuide />

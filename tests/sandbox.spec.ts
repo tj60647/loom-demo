@@ -145,7 +145,11 @@ test.describe('Practice loom', () => {
     const dragged = await page.evaluate(() => (window.getSelection()?.toString() ?? '').trim().length);
     expect(dragged, 'a drag across the cutout still selects text under the mask').toBeGreaterThan(0);
 
-    await page.locator('.gstep').first().click();
+    // The rail navigates and the card still renders. Pip 2, not pip 1: since
+    // 2026-08-12 pip 1 returns to the Library — every other pip goes to where
+    // its beat happens and that one used to go nowhere — which would take the
+    // reading, and the text layer, out from under the capture below.
+    await page.locator('.gstep').nth(1).click();
     await expect(page.locator('.guidepop .gsay')).toBeVisible();
 
     // Really select, really capture — the same path a student takes.

@@ -474,6 +474,32 @@
 > "say what you make of it" — is **gone**: TJ, *"it is a nice to have in a
 > cloth not a must have."* Arrive · capture · name · thread · project · sort ·
 > board · kit.
+>
+> **Four things a walk through the deployed build found**, all TJ's, none of
+> them caught by a test that watched only predicates. **The guide had no
+> ending**: the last beat said "Done. Press next." over a button `disabled`
+> because there was nowhere to advance to (*"the instructions are to press
+> next, but the next is not active"*). It closes the guide now, and says what
+> the student is left holding. **Pip 1 went nowhere**: every other pip
+> navigates to where its beat happens, and that one silently did not, showing a
+> beat about a glowing card from inside the workbench — the same conflict that
+> got the old first beat rewritten. It returns to the Library, and nothing is
+> lost, because the loom's state lives in `SandboxLoomProvider`, above the
+> stage. **The mask swallowed the wheel**: a pane is `position:fixed` and so is
+> not in the scroll chain of what the page actually scrolls (a `<main>`, not
+> the document), so scrolling worked over the cutout and did nothing over the
+> dim. The mask constrains what you can press, not whether the page moves.
+> **And the glow can still be scrolled away from** — the practice reading is
+> the last of twenty-four cards, so the Library opens at its foot and scrolling
+> up loses it, leaving "press the glowing card" with nothing glowing. The beat
+> re-finds its target now (it waits for it, rather than looking once 260ms in
+> and giving up, which is why a rebuilt shelf came back dark), and when the
+> target is on the page but off the screen the card grows a **show me** button
+> — TJ's own suggestion, and better than dragging the page back under a student
+> who just chose to look elsewhere. The notice also yields when the cutout
+> reaches it: it must ride above the mask (13% alpha, so underneath it a cutout
+> boundary drew a seam down the sentence) and above the mask it was covering
+> the kit button it was ringing.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.

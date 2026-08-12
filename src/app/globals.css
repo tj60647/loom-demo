@@ -444,6 +444,11 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
   box-shadow:0 8px 24px rgba(0,0,0,.14);
   color:var(--ink);font-family:var(--body);font-size:12.5px;line-height:1.45;
   padding:9px 12px}
+/* Out of the way when the guide's cutout reaches it: it rides above the mask,
+   so where it overlapped it covered the control the beat was ringing — the kit
+   button read "OAD THE CONCEPT-MAP KIT". Faded rather than removed, so the
+   student can still see they are in the guide. */
+.practiceband.yielded{opacity:.16;transition:opacity .18s ease}
 @media(max-width:640px){.practiceband{left:12px;right:12px;width:auto;bottom:auto;top:64px}}
 
 /* A shelf card that is not in the practice loom: shown so the Library looks
@@ -546,6 +551,8 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* A finished beat says so instead of repeating an instruction the student has
    already carried out. */
 .guidepop .gdone{color:var(--sage,#5d6b52);font-weight:600}
+/* Said when the beat's control is on the page but off the screen. */
+.guidepop .gaway{color:var(--ochre);font-weight:600}
 .guidepop .gwhy{margin:5px 0 0;font-size:12px;line-height:1.4;color:var(--ink-soft);font-style:italic}
 .guidefoot{display:flex;align-items:center;gap:5px;margin-top:8px;border-top:1px solid var(--rule);padding-top:7px}
 .guidefoot .gwhybtn{margin-left:auto}
