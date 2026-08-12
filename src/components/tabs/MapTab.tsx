@@ -518,7 +518,12 @@ export default function MapTab({ practice = false }: {
       studentName,
       activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
     )).then(ok => {
-      if (ok) flash("concept-map kit copied — take it to paper or Figma")
+      if (ok) {
+        flash("concept-map kit copied — take it to paper or Figma")
+        // The practice guide's last beat listens for this. Harmless in the
+        // real app: nothing there is listening.
+        window.dispatchEvent(new Event("loom:mapkit-copied"))
+      }
       else flash("select & copy by hand")
     })
   }

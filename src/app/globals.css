@@ -470,6 +470,25 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    Dashed rather than dimmed — the work is real, it just has no door yet. */
 .searchhit.off{border-style:dashed;background:transparent;cursor:default}
 .searchhit.off:hover{border-color:var(--rule);background:transparent}
+
+/* The practice guide (src/components/practice/PracticeGuide.tsx). Its own row
+   under the practice band, never a floating card: it names controls that are
+   on the page, and fixed chrome in this app has form for covering the thing it
+   is pointing at. */
+.guideband{border-bottom:1px solid var(--rule);background:rgba(168,132,63,.05);
+  padding:9px 24px;display:flex;flex-direction:column;gap:7px}
+.guideband.collapsed{flex-direction:row;align-items:center;gap:12px}
+.guiderail{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.gstep{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-soft);background:transparent;border:1px solid var(--rule);border-radius:3px;
+  padding:3px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.gstep:hover{border-color:var(--ochre)}
+.gstep.now{color:var(--ink);border-color:var(--ochre);background:rgba(168,132,63,.12)}
+.gstep.done{color:var(--sage,#5d6b52)}
+.gstep .gn{font-weight:700;opacity:.75}
+.guidebody .gsay{margin:0;font-size:14px;line-height:1.5}
+.guidebody .gwhy{margin:3px 0 0;font-size:12.5px;line-height:1.45;color:var(--ink-soft);font-style:italic}
+.guidefoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .searchhithead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .searchhithead h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0}
 .searchwhere{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:2px 0 0}

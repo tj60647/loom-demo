@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { contentWords } from "@/lib/utils"
 import { readingsOf } from "@/lib/scope"
@@ -41,6 +41,13 @@ export type CaptureReuse = {
 }
 
 export default function CaptureModal({ passage, source, sourceId, location, pageNumber, startOffset, endOffset, pageContentHash, onClose, onCaptured }: CaptureModalProps) {
+  // The practice guide's signal that a highlight became a capture attempt:
+  // this dialog only opens from a selection, so its appearance IS the
+  // gesture. Harmless in the real app — nothing there listens.
+  useEffect(() => {
+    window.dispatchEvent(new Event("loom:capture-open"))
+  }, [])
+
   const { state, addConcept, addPassage, editConcept } = useLoom()
   const [conceptLabel, setConceptLabel] = useState("")
   const [workingDef, setWorkingDef] = useState("")

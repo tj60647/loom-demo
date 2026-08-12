@@ -9,7 +9,7 @@
 // is honest per reading now that placement is per-map (maps carry their own
 // tiers): a reading's map sorts only against that reading's concepts.
 
-import { useCallback, useState } from "react"
+import { useCallback, useState, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
@@ -20,6 +20,7 @@ import MapTab from "@/components/tabs/MapTab"
 import JourneyNav, { stationNumber, type Station } from "@/components/ui/JourneyNav"
 import ShelfSearch from "@/components/shelf/ShelfSearch"
 import type { Passage } from "@/lib/types"
+import PracticeGuide from "@/components/practice/PracticeGuide"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
 
@@ -105,12 +106,16 @@ export default function Workbench({
   const { isLoading, scoped } = useLoom()
   // Tab order follows the journey bar: Knowledge Graph (03) before Vocabulary
   // (04). The keys are legacy — `map` is the graph, `read` is Vocabulary.
-  const tabs: Tab[] = ["reading", "throw", "map", "read"]
+  // Memoised because the practice guide's station listener depends on it —
+  // a fresh array each render would tear the listener down and rebuild it on
+  // every keystroke anywhere in the workbench.
+  const tabs = useMemo<Tab[]>(() => ["reading", "throw", "map", "read"], [])
   // `?tab=open` predates the merge and is still in links and bookmarks.
   const requested = (initialTab as string) === "open" ? "reading" : initialTab
   const firstTab: Tab = requested && tabs.includes(requested as Tab) ? (requested as Tab) : "reading"
   const [activeTab, setActiveTab] = useState<Tab>(firstTab)
-  const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([firstTab]))
+
+ const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([firstTab]))
   const [pdfPage, setPdfPage] = useState(1)
   const [pdfFocusPassageId, setPdfFocusPassageId] = useState<string | null>(null)
   // Where the reader actually is, which is not the same as `pdfPage` — that
@@ -137,12 +142,30 @@ export default function Workbench({
     setWorkOpen((v) => !v)
   }, [])
 
-  const goTo = (tab: Tab) => {
+  const goTo = useCallback((tab: Tab) => {
     setActiveTab(tab)
     setVisited((seen) => (seen.has(tab) ? seen : new Set(seen).add(tab)))
-  }
+  }, [])
 
-  const shouldRender = (tab: Tab) => (KEEP_ALIVE.has(tab) ? visited.has(tab) : activeTab === tab)
+  // The practice guide moves the student between stations as its beats change.
+  // An event rather than a prop: the guide renders below this component's own
+  // chrome, and threading a setter down through it would put the workbench's
+  // tab state in the hands of something that is not a tab.
+  useEffect(() => {
+    if (!practice) return
+    const onStation = (e: Event) => {
+      const wanted = (e as CustomEvent).detail
+      if (typeof wanted === "string" && (tabs as string[]).includes(wanted)) {
+        // Through `goTo`, not `setActiveTab`: a kept-alive tab renders only
+        // once it has been VISITED, so setting the active tab alone switched
+        // the underline and left the station blank.
+        goTo(wanted as Tab)
+      }
+    }
+    window.addEventListener("loom:practice-station", onStation)
+    return () => window.removeEventListener("loom:practice-station", onStation)
+  }, [practice, tabs, goTo])
+   const shouldRender = (tab: Tab) => (KEEP_ALIVE.has(tab) ? visited.has(tab) : activeTab === tab)
 
   // Since the merge, "goto" is not a tab away at all — the text and your work
   // are the same station, so this only moves the page under the reader. It
@@ -173,7 +196,7 @@ export default function Workbench({
 
   // "See them all in Vocabulary", from the capture side. The tab is this
   // component's state, so it has to be moved from here.
-  const handleGotoVocabulary = useCallback(() => goTo("read"), [])
+  const handleGotoVocabulary = useCallback(() => goTo("read"), [goTo])
 
   // Loading comes FIRST. Until next-auth has answered we do not yet know
   // whether anybody is signed in, and guessing "signed out" is the guess that
@@ -271,6 +294,8 @@ export default function Workbench({
           your own work is untouched.
         </div>
       )}
+
+      {practice && <PracticeGuide />}
 
       {/* Not rendered in the practice loom: ShelfSearch reads the student's
           REAL loom over its own GET route, bypassing the provider entirely —

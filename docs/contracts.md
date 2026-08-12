@@ -348,6 +348,33 @@
 > loom opens empty, as it did before. Nothing is persisted, so a reload
 > restores the example — which is the "start over" this place would otherwise
 > need a button for.
+>
+> **And the guide itself** (2026-08-11, TJ: *"the guide should walk through
+> opening a reading, highlighting text, labeling a concept, building a thread,
+> sorting the knowledge graph, making a projection, and saving materials for a
+> concept map"* · *"by saving i meant the kit"*). Seven beats
+> ([practiceGuide.ts](../src/lib/practiceGuide.ts)), rendered as a band under
+> the practice band — a row of its own rather than a floating card, because
+> fixed chrome in this app has form for covering the control it is pointing
+> at. The band moves the workbench to each beat's station as it goes.
+>
+> **Beats tick when the student ACTS, not on Next.** Every beat carries a
+> predicate over the loom's own state, measured against a baseline frozen when
+> the guide opens — the practice loom already holds four passages, so the
+> question is never "are there any" but "is there one more than when you
+> began". An absolute test would tick the whole guide green on load, which is
+> the specific bug `scripts/check-practice-guide.ts` exists to catch.
+> Two beats cannot be seen in the state and are raised by the interface:
+> `loom:capture-open` from `CaptureModal` (the dialog only opens from a
+> selection, so its appearance IS the highlight) and `loom:mapkit-copied` from
+> `MapTab`.
+>
+> **One correction the interface forced.** TJ's list separates highlighting
+> from labeling; `CaptureModal` disables Save until a concept is named, so a
+> passage captured from the PDF always arrives labelled. They stay two beats —
+> they are two decisions — but the second happens in the dialog the first
+> opened, and the guide says so rather than describing an app that does not
+> exist.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.

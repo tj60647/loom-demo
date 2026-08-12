@@ -9,7 +9,7 @@ const LEGACY_SEEN_KEY = "loom_has_seen_walkthrough"
 const GUIDE = [
  {k:'how loom works', h:'Loom turns reading into weaving',
   p:'You read anywhere — paper, PDF, screen — marking what strikes you. Then you bring the best passages here. Over three moves, the pieces become a graph of your own understanding. The tool holds the structure; you do all the thinking.',
-  loom:'Three moves, in order: 01 Reading · 02 Linking · 03 Knowledge Graph, where you lay it out and read it. 04 Vocabulary is the words you have collected along the way. 00 Library is where you start, and Keep is where your work comes out.'},
+  loom:'Three moves, in order: 01 Reading · 02 Linking · 03 Knowledge Graph, where you lay it out and read it. 04 Vocabulary is the words you have collected along the way, and 00 Library is where you start. Every object you make downloads where you made it. Never done this? Press practice in the header — the same interface, a worked example already in it, and nothing kept.'},
  {k:'01 — reading', h:'① Read, capture and name',
   p:'The text and your captures are one place. Highlight a passage in the reading — or paste one with its citation — and name the concept it evidences: a short noun phrase, often the author\'s own term ("boundary objects"). Gloss it in your own words in the description; crude is welcome there. Your work slides out over the text.',
   loom:'Warp = your concepts: the threads held under tension first. Choosing the passage is the judgment.'},
@@ -23,7 +23,7 @@ const GUIDE = [
   p:'Every concept you have named and every label you have coined, across all your readings — not just this one. Sharpen a description, see which words are recurring, and merge two entries if you named the same idea twice.',
   loom:'A concept does not belong to a reading; a passage does. This is your lexicon.'},
  {k:'after loom', h:'⑤ Where this goes next',
-  p:'Your weave is the middle step, not the deliverable. Copy the concept-map kit and draw your real concept map by hand (arranging is thinking), build your chalk talk from it, and export your graph from Keep (JSON) — yours to keep, submit, or explore further.',
+  p:'Your weave is the middle step, not the deliverable. Copy the concept-map kit and draw your real concept map by hand (arranging is thinking), and build your chalk talk from it. Everything downloads where it was made — the cloth at 01, its threads at 02, a projection and your Capture Log at 03, your vocabulary at 04 — yours to keep, submit, or explore further.',
   loom:'text → notes → concepts → weave → concept map → chalk talk → questions → discussion.'},
 ];
 
