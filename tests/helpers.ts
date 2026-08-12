@@ -1,4 +1,21 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page, type Request } from '@playwright/test';
+
+/**
+ * Is this POST a delete round-trip?
+ *
+ * Told apart from every other server-action call by its payload shape: an id,
+ * optionally followed by the reading the act happened in. That second argument
+ * arrived on 2026-08-11, when every act began recording where the student did
+ * it — deleting a concept or a thread included. An EDIT posts an object as its
+ * second argument and a CREATE posts one as its first, so neither matches.
+ *
+ * Tests wait on this because the row vanishes optimistically: ending a test at
+ * the disappearance closes the browser mid-flight and strands the row for the
+ * next run.
+ */
+export const isDeletePost = (request: Request) =>
+  request.method() === 'POST' &&
+  /^\["[0-9a-f-]{36}"(,(null|"[0-9a-f-]{36}"))?\]$/.test(request.postData() ?? '');
 
 /**
  * Reading-first navigation.

@@ -18,6 +18,7 @@
  * second — which is the same rule the app itself follows.
  */
 import { test, expect } from "@playwright/test"
+import { isDeletePost } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 test.beforeEach(() => test.setTimeout(120_000))
@@ -67,13 +68,8 @@ async function removeThread(page: import("@playwright/test").Page, mustExist = f
   await sent.first().locator("..").locator(".rm", { hasText: "remove" }).click()
   // The row goes optimistically while the delete is still in flight; ending
   // the test there closes the browser mid-action and strands the thread for
-  // the next run. deleteEdge's payload is a bare ["<uuid>"] — wait for it.
-  const committed = page.waitForResponse(
-    (res) =>
-      res.request().method() === "POST" &&
-      /^\["[0-9a-f-]{36}"\]$/.test(res.request().postData() ?? "") &&
-      res.ok()
-  )
+  // the next run.
+  const committed = page.waitForResponse((res) => isDeletePost(res.request()) && res.ok())
   await page.getByRole("button", { name: "Remove thread" }).click()
   await expect(page.locator(".sent", { hasText: "holds the other open" })).toHaveCount(0, { timeout: 15_000 })
   await committed
@@ -150,13 +146,14 @@ test("a label coined with no thread is a row, and tapping it labels a thread", a
 
   // The whole point: tapped, not typed, and no Save. The fold closes because
   // the act is finished.
-  // attachLink's payload is exactly two ids — the thread and the Link. An
-  // any-POST waiter matches the throw that is still in flight instead, and the
-  // test navigates away before the attach is ever sent.
+  // attachLink's payload is the thread, the Link, and the reading the act
+  // happened in. Matched on shape rather than on any POST: an any-POST waiter
+  // latches onto the throw still in flight, and the test then navigates away
+  // before the attach is ever sent.
   const attached = page.waitForResponse(
     (res) =>
       res.request().method() === "POST" &&
-      /^\["[0-9a-f-]{36}","[0-9a-f-]{36}"\]$/.test(res.request().postData() ?? "")
+      /^\["[0-9a-f-]{36}","[0-9a-f-]{36}"(,(null|"[0-9a-f-]{36}"))?\]$/.test(res.request().postData() ?? "")
   )
   await chip.click()
   await attached

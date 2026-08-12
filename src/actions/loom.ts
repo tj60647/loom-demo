@@ -276,7 +276,11 @@ export async function createConcept(data: { label: string, def?: string, note?: 
   return newConcept[0]
 }
 
-export async function updateConcept(id: string, data: Partial<{ label: string, def: string, note: string }>) {
+export async function updateConcept(
+  id: string,
+  data: Partial<{ label: string, def: string, note: string }>,
+  atSourceId?: string | null
+) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
@@ -289,11 +293,11 @@ export async function updateConcept(id: string, data: Partial<{ label: string, d
 
   if (updated.length > 0) {
     const kind = data.label !== undefined ? "concept.rename" : "concept.update"
-    await recordEvent(userId, courseId, kind, "concept", id, { ...data })
+    await recordEvent(userId, courseId, kind, "concept", id, { ...data, sourceId: atSourceId ?? null })
   }
 }
 
-export async function deleteConcept(id: string) {
+export async function deleteConcept(id: string, atSourceId?: string | null) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
@@ -311,7 +315,10 @@ export async function deleteConcept(id: string) {
     .where(and(eq(concepts.id, id), eq(concepts.userId, userId), inCourse(concepts.courseId, courseId)))
     .returning({ label: concepts.label })
   if (removed.length > 0) {
-    await recordEvent(userId, courseId, "concept.delete", "concept", id, { label: removed[0].label })
+    await recordEvent(userId, courseId, "concept.delete", "concept", id, {
+      label: removed[0].label,
+      sourceId: atSourceId ?? null,
+    })
     await pruneViews(userId, courseId, { positions: [id], order: [id], pins: [id], tiers: [id] })
   }
 }
@@ -506,7 +513,7 @@ export async function refilePassage(passageId: string, conceptId: string) {
  * object; merge is the student-driven repair for duplicates found later —
  * always an explicit act, never automatic.
  */
-export async function mergeConcepts(sourceId: string, targetId: string) {
+export async function mergeConcepts(sourceId: string, targetId: string, atSourceId?: string | null) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
   if (sourceId === targetId) throw new Error("That is the same concept.")
@@ -544,6 +551,7 @@ export async function mergeConcepts(sourceId: string, targetId: string) {
     fromLabel: source.label,
     intoLabel: target.label,
     pointersMoved: moved.length,
+    sourceId: atSourceId ?? null,
   })
   await pruneViews(userId, courseId, { positions: [sourceId], order: [sourceId], pins: [sourceId], tiers: [sourceId] })
 
@@ -677,7 +685,12 @@ export async function createEdge(data: { fromId: string, toId: string, sentence?
  * Homonyms stay legal (ruling 36): this reuses an exact-label match, it never
  * refuses a new label that merely resembles one.
  */
-async function resolveLink(userId: string, courseId: string | null, rawLabel: string): Promise<Link | null> {
+async function resolveLink(
+  userId: string,
+  courseId: string | null,
+  rawLabel: string,
+  atSourceId?: string | null
+): Promise<Link | null> {
   const label = rawLabel.trim()
   if (!label) return null
 
@@ -690,7 +703,15 @@ async function resolveLink(userId: string, courseId: string | null, rawLabel: st
     .limit(1)
   if (existing.length) return existing[0]
 
+  // Typing a word for the first time COINS the Link, and coining is an act.
+  // It went unrecorded until 2026-08-11 — the commonest way a student's
+  // vocabulary grows wrote nothing to the log at all, so the record showed a
+  // thread taking a label and never showed the label being born.
   const made = await db.insert(links).values({ courseId, userId, label, description: "" }).returning()
+  await recordEvent(userId, courseId, "link.coin", "link", made[0].id, {
+    label: made[0].label,
+    sourceId: atSourceId ?? null,
+  })
   return made[0]
 }
 
@@ -701,14 +722,18 @@ async function resolveLink(userId: string, courseId: string | null, rawLabel: st
  * would exist server-side and be missing from the Link List until reload —
  * the derived list it replaced never had that gap.
  */
-export async function updateEdge(id: string, data: Partial<{ handle: string, sentence: string }>): Promise<Link | null | undefined> {
+export async function updateEdge(
+  id: string,
+  data: Partial<{ handle: string, sentence: string }>,
+  atSourceId?: string | null
+): Promise<Link | null | undefined> {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
   // Coining a label attaches the Link OBJECT as well as writing the string.
   // Dual-write through 5.1's expand phase: `handle` stays until its column is
   // dropped, so an unmigrated reader and this one agree.
-  const link = data.handle !== undefined ? await resolveLink(userId, courseId, data.handle) : undefined
+  const link = data.handle !== undefined ? await resolveLink(userId, courseId, data.handle, atSourceId) : undefined
   const patch = link !== undefined ? { ...data, linkId: link?.id ?? null } : data
 
   const updated = await db.update(edges).set(patch)
@@ -717,7 +742,11 @@ export async function updateEdge(id: string, data: Partial<{ handle: string, sen
 
   if (updated.length > 0) {
     const kind = data.handle !== undefined ? "edge.coin" : "edge.update"
-    await recordEvent(userId, courseId, kind, "edge", id, { ...data, ...(link !== undefined ? { linkId: link?.id ?? null } : {}) })
+    await recordEvent(userId, courseId, kind, "edge", id, {
+      ...data,
+      ...(link !== undefined ? { linkId: link?.id ?? null } : {}),
+      sourceId: atSourceId ?? null,
+    })
   }
   return link
 }
@@ -728,7 +757,7 @@ export async function updateEdge(id: string, data: Partial<{ handle: string, sen
  * a thread". Unrepresentable before 5.1, because a label was a column on the
  * thread that would have had to exist first.
  */
-export async function createLink(data: { label: string; description?: string }) {
+export async function createLink(data: { label: string; description?: string; atSourceId?: string | null }) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
   const label = data.label.trim()
@@ -764,13 +793,16 @@ export async function createLink(data: { label: string; description?: string }) 
     label,
     description: data.description ?? "",
   }).returning()
-  await recordEvent(userId, courseId, "link.coin", "link", made[0].id, { label: made[0].label })
+  await recordEvent(userId, courseId, "link.coin", "link", made[0].id, {
+    label: made[0].label,
+    sourceId: data.atSourceId ?? null,
+  })
   return made[0]
 }
 
 /** Point a Thread at a Link — or at none. Dual-writes `handle` while that
  *  column survives, so both readers agree about the label. */
-export async function attachLink(edgeId: string, linkId: string | null) {
+export async function attachLink(edgeId: string, linkId: string | null, atSourceId?: string | null) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
@@ -788,12 +820,20 @@ export async function attachLink(edgeId: string, linkId: string | null) {
     .returning({ id: edges.id })
 
   if (updated.length > 0) {
-    await recordEvent(userId, courseId, "edge.coin", "edge", edgeId, { handle: label, linkId })
+    await recordEvent(userId, courseId, "edge.coin", "edge", edgeId, {
+      handle: label,
+      linkId,
+      sourceId: atSourceId ?? null,
+    })
   }
 }
 
 /** Sharpen a Link's label or its gloss — one meaning, shared by every Thread. */
-export async function updateLink(id: string, data: Partial<{ label: string; description: string }>) {
+export async function updateLink(
+  id: string,
+  data: Partial<{ label: string; description: string }>,
+  atSourceId?: string | null
+) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
   const updated = await db.update(links).set(data)
@@ -807,11 +847,11 @@ export async function updateLink(id: string, data: Partial<{ label: string; desc
       await db.update(edges).set({ handle: data.label })
         .where(and(eq(edges.linkId, id), eq(edges.userId, userId)))
     }
-    await recordEvent(userId, courseId, "link.update", "link", id, { ...data })
+    await recordEvent(userId, courseId, "link.update", "link", id, { ...data, sourceId: atSourceId ?? null })
   }
 }
 
-export async function deleteEdge(id: string) {
+export async function deleteEdge(id: string, atSourceId?: string | null) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
@@ -819,7 +859,7 @@ export async function deleteEdge(id: string) {
     .where(and(eq(edges.id, id), eq(edges.userId, userId), inCourse(edges.courseId, courseId)))
     .returning({ fromId: edges.fromId, toId: edges.toId })
   if (removed.length > 0) {
-    await recordEvent(userId, courseId, "edge.delete", "edge", id, removed[0])
+    await recordEvent(userId, courseId, "edge.delete", "edge", id, { ...removed[0], sourceId: atSourceId ?? null })
     await pruneViews(userId, courseId, { bends: [id] })
   }
 }

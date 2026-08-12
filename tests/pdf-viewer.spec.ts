@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openReading, openYourWork } from './helpers';
+import { isDeletePost, openReading, openYourWork } from './helpers';
 
 // Runs as Test User A (see playwright/global-setup.ts): the concepts and passages
 // this spec captures belong to the test account, never to a real person's loom.
@@ -114,9 +114,7 @@ test.describe('PDF Viewer and Highlighting', () => {
       );
       await row.getByRole('button', { name: 'remove passage' }).click();
       await passageDeleted;
-      const conceptDeleted = page.waitForResponse((r) =>
-        r.request().method() === 'POST' && /^\["[0-9a-f-]{36}"\]$/.test(r.request().postData() ?? '')
-      );
+      const conceptDeleted = page.waitForResponse((r) => isDeletePost(r.request()));
       await row.getByRole('button', { name: 'remove concept' }).click();
       await page.getByRole('button', { name: 'Delete concept' }).click();
       await conceptDeleted;

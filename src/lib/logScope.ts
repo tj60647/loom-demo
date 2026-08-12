@@ -9,19 +9,31 @@
 // two Concepts. So "everything you did in this reading" cannot be read off
 // the rows. Three answers, in this order:
 //
-//  1. THE ACT SAID SO. Since 2026-08-10 every event carries the reading it
-//     happened in — passages from their own row, concepts and threads from
-//     the route the student was on. A stamp is authoritative, including a
-//     null one: capturing an untethered passage belongs to no reading, and
-//     saying so is not the same as not knowing.
+//  1. THE ACT SAID SO. Every event carries the reading it happened in —
+//     passages from their own row, everything else from the route the student
+//     was on. A stamp is authoritative, including a null one: capturing an
+//     untethered passage belongs to no reading, and saying so is not the same
+//     as not knowing.
+//
+//     Passages, concepts and threads were stamped on 2026-08-10; on
+//     2026-08-11 the rest followed — editing, merging and deleting a concept,
+//     coining and rewording and removing a thread, coining a Link and giving
+//     it its gloss. TJ's reason, once the whole weave was ruled out of the
+//     app: "i am worried about losing meaningful activities related to
+//     reading, passage capture, concept labeling, link labeling, building
+//     threads, organizing concepts and threads, and building projections from
+//     a readings cloth." Every one of those is an act in a reading, so every
+//     one of them now says which.
 //
 //  2. ITS SCOPE SAID SO. Cloth and projection events carry a scopeKey, which
 //     for a single-reading scope IS the sourceId.
 //
-//  3. THE EVIDENCE SAYS SO. For acts recorded before the stamp existed: a
-//     concept belongs where it has a passage, a thread where both its ends
-//     do. This is the same rule contextual search uses, so the two surfaces
-//     agree about what "in this reading" means.
+//  3. THE EVIDENCE SAYS SO. For acts recorded before the stamp existed, and
+//     for the create events `getGraphEvents` synthesizes for rows that have
+//     none: a concept belongs where it has a passage, a thread where both its
+//     ends do. This is the same rule contextual search uses, so the two
+//     surfaces agree about what "in this reading" means. It is a fallback for
+//     the record's history, not the path new work takes.
 //
 // The honest cost of (3), worth knowing rather than hiding: an old entry can
 // appear in a reading later, when evidence arrives. Nothing is ever rewritten

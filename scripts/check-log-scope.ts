@@ -10,6 +10,7 @@
  *
  * Run: npx tsx scripts/check-log-scope.ts   (part of `npm run check`)
  */
+import { readFileSync } from "node:fs"
 import { eventBelongsToReading, eventsForReading } from "../src/lib/logScope"
 import type { GraphEvent, LoomState, Passage } from "../src/lib/types"
 
@@ -131,6 +132,92 @@ assert(
   "an unrecognised act is not placed by guesswork",
   "an unknown kind leaked into a reading"
 )
+
+// --- every act says which reading it happened in (2026-08-11) ---
+//
+// TJ ruled the whole weave out of the app, and named what must not be lost
+// with it: "reading, passage capture, concept labeling, link labeling,
+// building threads, organizing concepts and threads, and building projections
+// from a readings cloth". Every one of those is an act in a reading. Before
+// this, five of them placed only by EVIDENCE and two placed nowhere at all —
+// so sharpening a concept you had named ahead of its evidence, or coining a
+// word for a relation, left no trace in any reading's log.
+//
+// Two halves, and the second is the one that rots: the placement rule has to
+// honour the stamp, AND the emitters have to write it. A server action that
+// quietly stops passing it type-checks and renders and loses the act.
+{
+  for (const [kind, entity] of [
+    ["concept.rename", "concept"],
+    ["concept.update", "concept"],
+    ["concept.merge", "concept"],
+    ["concept.delete", "concept"],
+    ["edge.coin", "edge"],
+    ["edge.update", "edge"],
+    ["edge.delete", "edge"],
+    ["link.coin", "link"],
+    ["link.update", "link"],
+  ] as const) {
+    // Deliberately an id the evidence rule could never place: no passage, no
+    // live row. The stamp has to be doing all the work.
+    const e = ev(kind, entity, "unevidenced", { sourceId: HERE })
+    const elsewhere = ev(kind, entity, "unevidenced", { sourceId: THERE })
+    assert(
+      here(e) && !here(elsewhere),
+      `${kind} places where the student did it, with no evidence to lean on`,
+      `${kind}: here=${here(e)} elsewhere=${here(elsewhere)}`
+    )
+  }
+}
+
+{
+  const loom = readFileSync("src/actions/loom.ts", "utf8")
+  // Each emitter must carry a sourceId into its payload. The payload is read
+  // from the kind literal up to whatever comes first — the next recordEvent
+  // call or 400 characters — so a one-line call and a wrapped one both work,
+  // and a sourceId belonging to the NEXT emitter cannot be mistaken for this
+  // one's.
+  // EVERY recordEvent call naming the kind, not just the first — `edge.coin`
+  // has two emitters (typing a label, and tapping one you already own) and a
+  // stamp on one of them is not a stamp on the act.
+  const emittersOf = (kind: string) =>
+    [...loom.matchAll(new RegExp(`recordEvent\\([^)]{0,80}?"${kind.replace(/\./g, "\\.")}"`, "g"))]
+      .map((m) => loom.slice(m.index!, m.index! + 400))
+
+  for (const kind of [
+    "concept.delete", "concept.merge", "edge.coin", "edge.delete", "link.coin", "link.update",
+  ]) {
+    const calls = emittersOf(kind)
+    assert(
+      calls.length > 0 && calls.every((c) => c.includes("sourceId")),
+      `every ${kind} emitter stamps the reading (${calls.length} found)`,
+      calls.length === 0
+        ? `no recordEvent call for ${kind} — this guard has gone blind`
+        : `${calls.filter((c) => !c.includes("sourceId")).length} of ${calls.length} calls for ${kind} carry no sourceId — the act would place only by evidence, or not at all`
+    )
+  }
+  // The two kinds whose payload is built from a variable `kind` need their
+  // own look: concept.rename/update share one call, edge.update shares with
+  // edge.coin.
+  assert(
+    /const kind = data\.label !== undefined \? "concept\.rename"[\s\S]{0,200}?sourceId/.test(loom),
+    "concept.rename and concept.update stamp the reading",
+    "the shared concept edit emitter dropped its sourceId"
+  )
+  assert(
+    /const kind = data\.handle !== undefined \? "edge\.coin"[\s\S]{0,260}?sourceId/.test(loom),
+    "edge.coin and edge.update stamp the reading",
+    "the shared thread edit emitter dropped its sourceId"
+  )
+  // Coining by TYPING a label on a thread mints the Link inside resolveLink.
+  // That path recorded nothing at all until 2026-08-11 — the commonest way a
+  // vocabulary grows, invisible in the record of growing it.
+  assert(
+    /async function resolveLink[\s\S]{0,1200}?recordEvent\([^)]*"link\.coin"/.test(loom),
+    "minting a Link by typing a label records the coining",
+    "resolveLink inserts a link with no event — the word appears in the vocabulary with nothing in the log saying it was coined"
+  )
+}
 
 console.log(`\n${checks} checks, ${failures} failing\n`)
 if (failures > 0) process.exit(1)

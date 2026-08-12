@@ -16,7 +16,7 @@
  * prompts and the read.
  */
 import { test, expect } from "@playwright/test"
-import { enterReadingFromCard, openYourWork } from "./helpers"
+import { enterReadingFromCard, isDeletePost, openYourWork } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 // Each test is independent and removes what it adds — no serial mode, so one
@@ -127,9 +127,7 @@ test("01 · a passage captured by hand lands in the coding log — and cleans up
   )
   await row.getByRole("button", { name: "remove passage" }).click()
   await passageDeleted
-  const conceptDeleted = page.waitForResponse((r) =>
-    r.request().method() === "POST" && /^\["[0-9a-f-]{36}"\]$/.test(r.request().postData() ?? "")
-  )
+  const conceptDeleted = page.waitForResponse((r) => isDeletePost(r.request()))
   await row.getByRole("button", { name: "remove concept" }).click()
   await page.getByRole("button", { name: "Delete concept" }).click()
   await conceptDeleted
@@ -167,15 +165,9 @@ test("02 · pick two, say the sentence, throw the thread, coin a term — then u
   // The row disappears optimistically while the server delete is still in
   // flight — and ending the test there closes the browser mid-action,
   // stranding the thread for the NEXT run (which then finds two and fails).
-  // Hold for deleteEdge's own round-trip — its payload is a bare ["<uuid>"],
-  // unlike createEdge's [{...}] or updateEdge's [id, {...}] — then prove the
-  // delete stuck with a fresh load.
-  const removeCommitted = page.waitForResponse(
-    (res) =>
-      res.request().method() === "POST" &&
-      /^\["[0-9a-f-]{36}"\]$/.test(res.request().postData() ?? "") &&
-      res.ok()
-  )
+  // Hold for deleteEdge's own round-trip, then prove the delete stuck with a
+  // fresh load.
+  const removeCommitted = page.waitForResponse((res) => isDeletePost(res.request()) && res.ok())
   await page.getByRole("button", { name: "Remove thread" }).click()
   await expect(page.locator(".sent", { hasText: "one sustains the other" })).toHaveCount(0, { timeout: 15_000 })
   await removeCommitted

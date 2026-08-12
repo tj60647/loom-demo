@@ -287,7 +287,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       concepts: s.concepts.map(c => c.id === id ? { ...c, ...data } : c)
     }))
     try {
-      await updateConcept(id, data)
+      await updateConcept(id, data, soleSourceId(scope))
       savedOk()
     } catch (e) {
       await resync(e)
@@ -320,7 +320,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       ) as LoomViews,
     }))
     try {
-      await deleteConcept(id)
+      await deleteConcept(id, soleSourceId(scope))
       savedOk()
     } catch (e) {
       await resync(e)
@@ -332,7 +332,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     // returns the whole truth — simpler and safer than replaying that
     // bookkeeping optimistically.
     try {
-      const data = await mergeConceptsAction(sourceId, targetId)
+      const data = await mergeConceptsAction(sourceId, targetId, soleSourceId(scope))
       applyTruth(data)
       flash("merged — evidence and threads now point at one concept")
     } catch (e) {
@@ -527,7 +527,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       // back so it can join the Link List now rather than at the next reload.
       // `undefined` means the edit never touched the label; null means it was
       // cleared, and the thread must let go of the object too.
-      const link = await updateEdge(await resolveEdgeId(id), data)
+      const link = await updateEdge(await resolveEdgeId(id), data, soleSourceId(scope))
       if (link !== undefined) {
         applyLocal(s => ({
           ...s,
@@ -557,7 +557,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       ) as LoomViews,
     }))
     try {
-      await deleteEdge(await resolveEdgeId(id))
+      await deleteEdge(await resolveEdgeId(id), soleSourceId(scope))
       savedOk()
     } catch (e) {
       await resync(e)
@@ -574,7 +574,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
    * list, so the round trip is affordable.
    */
   const addLink = async (label: string, description?: string) => {
-    const saved = await createLink({ label, description })
+    const saved = await createLink({ label, description, atSourceId: soleSourceId(scope) })
     applyLocal(s => ({
       ...s,
       links: s.links.some(l => l.id === saved.id)
@@ -596,7 +596,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
         : s.edges,
     }))
     try {
-      await updateLink(id, data)
+      await updateLink(id, data, soleSourceId(scope))
       savedOk()
     } catch (e) {
       await resync(e)
@@ -610,7 +610,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       edges: s.edges.map(e => (e.id === edgeId ? { ...e, linkId, handle: link?.label ?? "" } : e)),
     }))
     try {
-      await attachLinkAction(await resolveEdgeId(edgeId), linkId)
+      await attachLinkAction(await resolveEdgeId(edgeId), linkId, soleSourceId(scope))
       savedOk()
     } catch (e) {
       await resync(e)
