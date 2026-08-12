@@ -91,16 +91,62 @@ test.describe('Practice loom', () => {
     // route, bypassing the provider entirely.
     await expect(page.getByRole('button', { name: 'Search everything' })).toHaveCount(0);
 
-    // The guide floats over the layout, so it WILL sit over controls — at
-    // 1280x720 its corner lands squarely on this arrow. It must never eat one:
-    // the card takes no pointer events, only its own buttons do. This click is
-    // the assertion; it fails by timing out on an intercepted click.
-    await expect(page.locator('.guidefloat')).toBeVisible();
-    await page.getByRole('button', { name: 'Next Page' }).click({ timeout: 10_000 });
-    await page.waitForTimeout(1200);
-    // …and the guide is still usable itself.
+    // --- the coach mark constrains without trapping -------------------------
+    //
+    // The mask blocks by geometry: four inert panes with a genuinely empty
+    // hole. Two things must both be true, and the rest of this spec cannot
+    // see either of them because it synthesises its selection with
+    // createRange — which bypasses hit-testing entirely and would pass a mask
+    // that blocks every real drag.
+    await expect(page.locator('.guidepop')).toBeVisible();
+    await page.locator('.gstep').nth(1).click();          // beat 2: the text
+    await expect(page.locator('.guidemask')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.gpane')).toHaveCount(4);
+
+    // 1. The cutout is REACHABLE — the point at its centre hits the page, not
+    //    a pane.
+    const hole = await page.locator('.guideglow').boundingBox();
+    expect(hole, 'the beat has a cutout').toBeTruthy();
+    const inHole = await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y)
+      return el?.closest('.guidemask') ? 'pane' : (el?.tagName ?? 'nothing')
+    }, [hole!.x + hole!.width / 2, hole!.y + hole!.height / 2]);
+    expect(inHole, 'the cutout is empty DOM, not a pane').not.toBe('pane');
+
+    // 2. Outside it is BLOCKED — a pane is what the pointer finds.
+    const outside = await page.evaluate(() => {
+      const el = document.elementFromPoint(window.innerWidth - 6, 6)
+      return el?.classList.contains('gpane') ? 'pane' : (el?.className ?? 'nothing')
+    });
+    expect(outside, 'the dim area is behind a pane').toBe('pane');
+
+    // 3. And a REAL drag inside the cutout still selects — with the mouse, not
+    //    a synthesised Range, and overshooting the hole on the way out, which
+    //    is exactly the gesture this beat teaches.
+    // The beat turns to a page that HAS text, and the layer renders after the
+    // page does — wait for the words before trying to drag across them.
+    await expect(page.locator('.react-pdf__Page__textContent span').first())
+      .toBeAttached({ timeout: 30_000 });
+    const line = await page.evaluate(() => {
+      const spans = Array.from(document.querySelectorAll('.react-pdf__Page__textContent span'))
+        .filter((s) => (s.textContent ?? '').trim().length > 8)
+      if (!spans.length) return null
+      const a = spans[0].getBoundingClientRect()
+      const b = spans[Math.min(2, spans.length - 1)].getBoundingClientRect()
+      return { x1: a.left + 2, y1: a.top + a.height / 2, x2: b.right - 2, y2: b.top + b.height / 2 }
+    });
+    expect(line, 'the page the guide turned to has text on it').toBeTruthy();
+    await page.mouse.move(line!.x1, line!.y1);
+    await page.mouse.down();
+    await page.mouse.move(line!.x2, line!.y2, { steps: 14 });
+    // …and out past the cutout's edge before letting go.
+    await page.mouse.move(hole!.x + hole!.width + 60, line!.y2 + 30, { steps: 8 });
+    await page.mouse.up();
+    const dragged = await page.evaluate(() => (window.getSelection()?.toString() ?? '').trim().length);
+    expect(dragged, 'a drag across the cutout still selects text under the mask').toBeGreaterThan(0);
+
     await page.locator('.gstep').first().click();
-    await expect(page.locator('.guidefloat .gsay')).toBeVisible();
+    await expect(page.locator('.guidepop .gsay')).toBeVisible();
 
     // Really select, really capture — the same path a student takes.
     const selected = await page.locator('.react-pdf__Page__textContent').first().evaluate((layer) => {

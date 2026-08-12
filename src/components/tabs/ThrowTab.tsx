@@ -467,7 +467,7 @@ export default function ThrowTab() {
           </div>
         </div>
 
-        <div className="card">
+        <div className="card" id="throwBench">
           <h2>Throw a thread</h2>
           <p className="hint calm">When two are picked, say how they hang together — long and awkward is fine. The description <i>is</i> the thread. A good check: does it read aloud as a claim you&apos;d defend in section?</p>
 
@@ -532,7 +532,7 @@ export default function ThrowTab() {
                 onChange={(e) => setSentence(e.target.value)}
               />
             </div>
-            <button className="btn" onClick={handleThrow} disabled={!both}>Throw it</button>
+            <button id="throwIt" className="btn" onClick={handleThrow} disabled={!both}>Throw it</button>
             {/* The sentence is encouraged, never required (P0.3) — the note
                 coaches toward it instead of the button withholding the throw. */}
             <p className="ghostnote" style={{marginTop: "7px"}}>

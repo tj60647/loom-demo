@@ -2190,6 +2190,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       {/* Floating Capture Button */}
       {highlightRect && (
         <button 
+          id="captureNow"
           className="btn mini"
           style={{
             position: "fixed",

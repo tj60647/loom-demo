@@ -15,7 +15,8 @@
  *
  * Run: npx tsx scripts/check-practice-guide.ts   (part of `npm run check`)
  */
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import {
   GUIDE_STEPS,
   baselineOf,
@@ -77,7 +78,7 @@ const worked = (): LoomState => ({
   views: { cardTable: { positions: {}, bends: {} } },
 })
 
-const QUIET: GuideSignals = { readingOpened: false, captureOpened: false, kitCopied: false }
+const QUIET: GuideSignals = { readingOpened: false, capturing: false, kitCopied: false }
 
 console.log("\npractice guide — a beat ticks only when the student did it")
 
@@ -92,9 +93,9 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
     "a beat is missing one of the two"
   )
   assert(
-    GUIDE_STEPS.every((s) => !s.readOnly),
-    "every beat is a move the student makes — none is a caption",
-    `${GUIDE_STEPS.filter((s) => s.readOnly).map((s) => s.key).join(", ")} ask for nothing`
+    GUIDE_STEPS.every((s) => s.overlay === "mask" || s.overlay === "none"),
+    "every beat declares how the backdrop behaves",
+    "a beat has no overlay mode"
   )
   assert(
     GUIDE_STEPS[0].station === "library" && GUIDE_STEPS[0].key === "arrive",
@@ -102,9 +103,9 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
     `first beat is ${GUIDE_STEPS[0].key} at ${GUIDE_STEPS[0].station}`
   )
   assert(
-    GUIDE_STEPS.every((s) => s.target.trim() !== ""),
+    GUIDE_STEPS.every((s) => s.targets.length > 0 && s.targets.every((t) => t.trim() !== "")),
     "every beat points at something",
-    "a beat has no target to glow"
+    "a beat has an empty target chain"
   )
   // The order is the work's order, and the stations must not go backwards
   // through it — a guide that sends you to 03 and then back to 01 is teaching
@@ -139,7 +140,7 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
     passages: [...state.passages, passage("p5", ["c9"])],
     concepts: [...state.concepts, concept("c9")],
   }
-  const midwaySignals = { ...QUIET, readingOpened: true, captureOpened: true }
+  const midwaySignals = { ...QUIET, readingOpened: true }
   assert(
     standOn(base, midway, SRC, midwaySignals) === 3,
     "…but a student who has already opened, captured and named finds it at the next move",
@@ -161,14 +162,21 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
   // without a selection, and the same dialog also does the naming, so waiting
   // for a passage would leave this beat unfinished until the next one is.
   assert(
-    stepDone("capture", base, state, SRC, { ...QUIET, captureOpened: true }),
+    stepDone("capture", base, state, SRC, { ...QUIET, capturing: true }),
     "highlighting ticks when the capture dialog opens",
     "opening the dialog did not tick the highlight beat"
   )
   assert(
-    !stepDone("name", base, state, SRC, { ...QUIET, captureOpened: true }),
+    !stepDone("name", base, state, SRC, { ...QUIET, capturing: true }),
     "…and opening it does NOT tick the naming beat",
     "the naming beat ticked on an unfinished capture"
+  )
+  // CANCELLING the dialog un-ticks it. It used to latch: cancel left the beat
+  // green and the guide advanced to one about a field that no longer existed.
+  assert(
+    !stepDone("capture", base, state, SRC, QUIET),
+    "…and cancelling the dialog un-ticks it — nothing was captured",
+    "the highlight beat stayed green after a cancelled capture"
   )
 
   const captured: LoomState = {
@@ -177,6 +185,15 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
     concepts: [...state.concepts, concept("c9")],
   }
   assert(stepDone("name", base, captured, SRC, QUIET), "naming ticks when the passage and its concept land", "no tick")
+  // REUSING a concept is the pedagogically right move — the dialog offers a
+  // datalist of your own concepts and its copy invites it. Requiring a NEW
+  // concept left this beat unfinishable for anyone who took the offer.
+  const reused: LoomState = { ...state, passages: [...state.passages, passage("p6", ["c1"])] }
+  assert(
+    stepDone("name", base, reused, SRC, QUIET),
+    "…and naming an EXISTING concept ticks it too — reuse is the point",
+    "filing a passage under a concept you already own did not tick the beat"
+  )
   assert(!stepDone("thread", base, captured, SRC, QUIET), "…and threading has not ticked yet", "threading ticked early")
 
   const clothed: LoomState = { ...state, cloths: [cloth("My own headline")] }
@@ -190,14 +207,31 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
   const threaded: LoomState = { ...state, edges: [...state.edges, edge("e3", "c1", "c3")] }
   assert(stepDone("thread", base, threaded, SRC, QUIET), "threading ticks on a new thread", "no tick")
 
-  // Sorting: either a tier moved on the projection that is already there, or a
-  // new projection appeared. Both are "you sorted something".
-  const retiered: LoomState = { ...state, maps: [map("m1", { c1: "p", c2: "s", c3: "t" })] }
-  assert(stepDone("sort", base, retiered, SRC, QUIET), "sorting ticks when a concept gains a tier", "no tick")
-  const demoted: LoomState = { ...state, maps: [map("m1", { c1: "p" })] }
-  assert(stepDone("sort", base, demoted, SRC, QUIET), "…and when one loses it — un-sorting is sorting", "no tick")
+  // Sorting is measured per concept, not by COUNTING tiered concepts — the
+  // worked cloth tiers every one, so a count could not move when the student
+  // followed the instruction, and DID move when they pressed a lit chip and
+  // un-tiered it. The beat went green for undoing the example.
+  const retiered: LoomState = { ...state, maps: [map("m1", { c1: "t", c2: "s" })] }
+  assert(
+    stepDone("sort", base, retiered, SRC, QUIET),
+    "re-tiering an already-tiered concept ticks — the count would not have moved",
+    "changing a concept's tier did not tick the sort beat"
+  )
+  const newlyTiered: LoomState = { ...state, maps: [map("m1", { c1: "p", c2: "s", c3: "t" })] }
+  assert(stepDone("sort", base, newlyTiered, SRC, QUIET), "…so does tiering one that had none", "no tick")
   const another: LoomState = { ...state, maps: [...state.maps, map("m2", {})] }
-  assert(stepDone("sort", base, another, SRC, QUIET), "…and when a second projection is made", "no tick")
+  assert(stepDone("sort", base, another, SRC, QUIET), "…and so does a second projection", "no tick")
+  // Deleting a concept strips its tier from every map. That is not sorting.
+  const deleted: LoomState = {
+    ...state,
+    concepts: state.concepts.filter((c) => c.id !== "c2"),
+    maps: [map("m1", { c1: "p" })],
+  }
+  assert(
+    !stepDone("sort", base, deleted, SRC, QUIET),
+    "…but deleting a concept is NOT — its tier vanishing is not a sort",
+    "deleting a concept ticked the sort beat"
+  )
 
   assert(stepDone("kit", base, state, SRC, { ...QUIET, kitCopied: true }), "the kit ticks when it is downloaded", "no tick")
   assert(!stepDone("kit", base, state, SRC, QUIET), "…and not before", "the kit ticked untaken")
@@ -249,6 +283,94 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
     /loom:practice-opened/.test(sandbox),
     "opening the practice reading raises the signal the first beat waits on",
     "SandboxWorkbench no longer dispatches loom:practice-opened"
+  )
+}
+
+// --- every target actually exists ---
+//
+// The failure this catches is the one that produced the review: a beat whose
+// selector matches nothing renders no ring, and — now that there is a mask —
+// would dim the screen with no hole in it. `target !== ""` was the only check
+// before, so renaming an id left the guide pointing at nothing, and green.
+{
+  const sources = readdirSync("src", { recursive: true, encoding: "utf8" })
+    .filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"))
+    .map((f) => readFileSync(join("src", f), "utf8"))
+    .join("\n")
+
+  for (const step of GUIDE_STEPS) {
+    for (const selector of step.targets) {
+      const found = selector.startsWith("#")
+        ? sources.includes(`id="${selector.slice(1)}"`)
+        : sources.includes(selector.replace(/^\./, ""))
+      assert(
+        found,
+        `${step.key} → ${selector} exists in the app`,
+        `nothing in src/ carries ${selector} — the beat would point at nothing, and the mask would dim the screen with no hole`
+      )
+    }
+  }
+}
+
+// --- the mask cannot eat what it is pointing at ---
+{
+  const css = readFileSync("src/app/globals.css", "utf8")
+  const rung = (name: string) => {
+    const rule = css.match(new RegExp(`${name.replace(".", "\.")}\{[^}]*\}`))
+    const found = rule?.[0].match(/z-index:(\d+)/)
+    return found ? Number(found[1]) : NaN
+  }
+  const mask = rung(".guidemask")
+  const pop = rung(".guidepop")
+  const scrim = rung(".info-scrim")
+  const fullscreen = Number(
+    readFileSync("src/components/pdf/PdfViewer.tsx", "utf8")
+      .match(/\.pdf-shell\.fullscreen[\s\S]{0,240}?z-index:\s*(\d+)/)?.[1] ?? NaN
+  )
+
+  assert(
+    mask > fullscreen,
+    "the mask sits above fullscreen — `f` cannot delete the guide",
+    `mask ${mask} vs fullscreen ${fullscreen}`
+  )
+  assert(
+    mask < scrim && pop < scrim,
+    "…and below the app's own modal scrim, which is its own constraint",
+    `mask ${mask} / popover ${pop} vs scrim ${scrim}`
+  )
+  assert(
+    /\.gpane\{[^}]*pointer-events:auto/.test(css),
+    "the mask panes block by geometry",
+    "a pane that takes no pointer events constrains nothing"
+  )
+  assert(
+    /\.guideglow\{[^}]*pointer-events:none/.test(css),
+    "the ring never takes a click",
+    "a tutorial that swallows the button it just told you to press is worse than no tutorial"
+  )
+  assert(
+    !/\.gpane\{[^}]*box-shadow/.test(css),
+    "the hole is empty DOM, not a box-shadow spread",
+    "a box-shadow spread is not hit-tested: it would block the cutout and leak everything else"
+  )
+}
+
+// --- the dialog beat suppresses the mask ---
+{
+  const modal = readFileSync("src/components/pdf/CaptureModal.tsx", "utf8")
+  for (const step of GUIDE_STEPS) {
+    const inDialog = step.targets.some((t) => t.startsWith("#") && modal.includes(`id="${t.slice(1)}"`))
+    if (!inDialog) continue
+    assert(
+      step.overlay === "none",
+      `${step.key} does not double-dim the capture dialog`,
+      `${step.key} points inside .info-scrim and still asks for a mask`
+    )
+  }
+  assert(
+    /loom:capture-close/.test(modal),
+    "the capture dialog says when it CLOSES",
+    "CaptureModal no longer dispatches loom:capture-close — cancelling would leave the highlight beat ticked"
   )
 }
 

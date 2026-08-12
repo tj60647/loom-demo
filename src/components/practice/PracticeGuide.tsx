@@ -1,29 +1,40 @@
 "use client"
 
 /**
- * The guide, floating over the real interface (TJ, 2026-08-11: "the guide
- * should always be available, like the tutorials in any game" · "the guide
- * info should be in a layer that floats over the actual loom layout, not
- * displacing everything… like floaters with a small glow").
+ * The guide: a coach mark over the real interface.
  *
- * Two parts. A small card pinned to a corner, and a GLOW ringing whatever the
- * current beat is talking about — every beat names a target selector, so the
- * copy can point ("the glowing field") instead of gesturing ("on the left"),
- * which is wrong on a narrow screen anyway.
+ * TJ, 2026-08-12, reviewing the first version: *"the beats seem out of sync
+ * with the activities they describe, there is no clear hit this button now
+ * glow, like 'next'. the instructions are in remote corners far from the main
+ * controls… the actions one can take should be very constrained by the guide.
+ * is this not a standard/best practice for these kinds of thing?"*
  *
- * The card moves out of the glow's way. It was a full-width band first, on the
- * reasoning that fixed chrome in this app has form for covering the control it
- * points at; the honest answer is not to displace the page but to know where
- * the target is and sit elsewhere. So the card measures the ring and takes the
- * corner furthest from it.
+ * It is. The pattern is a guided tour, and its anatomy is settled — Shepherd,
+ * driver.js, Intro.js and react-joyride all ship the same four parts, and the
+ * first version had one of them:
  *
- * It advances when the student ACTS, not when they press Next — every beat
- * carries a predicate over the loom's own state (src/lib/practiceGuide.ts), so
- * a tick means the gesture happened. Next and Back are for reading ahead and
- * going back over something; neither marks anything done.
+ *   1. A MASKED BACKDROP with a cutout on the target. Draws the eye, and
+ *      constrains the move: everything else sits behind an inert pane.
+ *   2. A POPOVER ANCHORED to the target, with a beak. The instruction sits at
+ *      the thing it is about. The old version scored the four viewport
+ *      corners and deliberately took the one FURTHEST from the target.
+ *   3. ONE PRIMARY ACTION, filled, pulsing the moment the beat's own
+ *      predicate says the gesture landed.
+ *   4. PROGRESS, and a way out.
  *
- * Only ever rendered in the practice loom. It reads `useLoom()`, which inside
- * `/sandbox` is the sandbox's own context, so it watches practice state alone.
+ * WHERE THE PATTERN BENDS HERE, both deliberate:
+ *
+ *   - Beat 2 teaches DRAG-SELECTING text in a PDF, so the cutout must stay
+ *     fully interactive, and a drag that starts inside it and wanders out
+ *     must not die on a pane. The panes therefore carry no handlers at all —
+ *     they block by geometry and nothing else — and go away entirely for the
+ *     duration of a drag that began inside the hole.
+ *   - Beat 3's target is inside the app's own modal scrim, which already IS
+ *     the constraint. That beat sets `overlay: "none"`: dimming twice only
+ *     darkens the dialog.
+ *
+ * Only ever rendered in the practice loom (`SandboxWorkbench`). It reads
+ * `useLoom()`, which there is the sandbox's own context.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -37,75 +48,89 @@ import {
   type GuideSignals,
 } from "@/lib/practiceGuide"
 
-/** Ask the workbench to change station. Workbench listens; see its handler. */
 function goToStation(station: string) {
   window.dispatchEvent(new CustomEvent("loom:practice-station", { detail: station }))
 }
 
-type Ring = { top: number; left: number; width: number; height: number }
+type Rect = { top: number; left: number; width: number; height: number }
+type Side = "top" | "right" | "bottom" | "left"
 
-/** Which corner the card sits in. */
-type Corner = "br" | "bl" | "tr" | "tl"
+/** Breathing room between the cutout and the popover. */
+const GAP = 14
+/** How far the cutout grows around the target, so nothing is clipped. */
+const PAD = 6
 
-const CORNERS: Corner[] = ["br", "tr", "tl", "bl"]
-
-/** The CSS offsets, mirrored so a corner can be scored before it is taken. */
-const PAD = 18
-const BOTTOM_GAP = 14
-const TOP_GAP = 96
-
-function rectFor(corner: Corner, w: number, h: number) {
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const left = corner.endsWith("r") ? vw - PAD - w : PAD
-  const top = corner.startsWith("b") ? vh - BOTTOM_GAP - h : TOP_GAP
-  return { left, top, right: left + w, bottom: top + h }
-}
-
-const overlaps = (
-  a: { left: number; top: number; right: number; bottom: number },
-  b: { left: number; top: number; right: number; bottom: number }
-) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+const near = (a: Rect | null, b: Rect | null) =>
+  !!a && !!b &&
+  Math.abs(a.top - b.top) < 1 && Math.abs(a.left - b.left) < 1 &&
+  Math.abs(a.width - b.width) < 1 && Math.abs(a.height - b.height) < 1
 
 /**
- * The corner that covers nothing you could press.
+ * The rect of the first target on the page — and a target is "on the page"
+ * only if it is actually IN the viewport.
  *
- * A floating card WILL sit over a control sooner or later — at 1280x720 the
- * bottom-right lands squarely on the PDF's page-turn arrow, which is how the
- * suite found this twice. The card body takes no pointer events, so the page
- * beneath stays usable, but the card's OWN buttons must be clickable and they
- * do block. Choosing by geometry alone cannot know that, so this counts the
- * controls each corner would cover and takes an empty one — preferring, among
- * empty corners, the one furthest from what the beat is pointing at.
+ * Size alone is not enough: the Your-work sheet is always mounted, parked at
+ * `translateX(100% + 12px)`, so a closed sheet has a perfectly real rect
+ * sitting off the right edge. A cutout there is a black screen with no hole.
  */
-function bestCorner(ring: Ring | null, size: { w: number; h: number }): Corner {
-  if (typeof window === "undefined" || size.w === 0) return "br"
-  const controls = Array.from(
-    document.querySelectorAll<HTMLElement>("button, a[href], input, textarea, select")
-  )
-    .filter((el) => !el.closest(".guidefloat"))
-    .map((el) => el.getBoundingClientRect())
-    .filter((r) => r.width > 0 && r.height > 0)
-
-  const ringMid = ring
-    ? { x: ring.left + ring.width / 2, y: ring.top + ring.height / 2 }
-    : { x: window.innerWidth / 2, y: window.innerHeight / 2 }
-
-  let best: Corner = "br"
-  let bestScore = -Infinity
-  for (const corner of CORNERS) {
-    const box = rectFor(corner, size.w, size.h)
-    const blocked = controls.filter((c) => overlaps(box, c)).length
-    const mid = { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 }
-    const away = Math.hypot(mid.x - ringMid.x, mid.y - ringMid.y)
-    // Covering nothing dominates; distance from the target breaks ties.
-    const score = blocked * -10000 + away
-    if (score > bestScore) {
-      bestScore = score
-      best = corner
-    }
+function resolveTarget(selectors: string[]): Rect | null {
+  for (const selector of selectors) {
+    const box = document.querySelector(selector)?.getBoundingClientRect()
+    if (!box || box.width === 0 || box.height === 0) continue
+    if (box.bottom < 0 || box.top > window.innerHeight) continue
+    if (box.right < 0 || box.left > window.innerWidth) continue
+    return { top: box.top, left: box.left, width: box.width, height: box.height }
   }
-  return best
+  return null
+}
+
+/**
+ * Place the popover beside the cutout: the first side with room, else the one
+ * with the most. Then clamp it on screen — which is what makes the beak
+ * necessary, since a clamped card no longer points at anything by position.
+ */
+function place(hole: Rect, card: { w: number; h: number }) {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const room: Record<Side, number> = {
+    bottom: vh - (hole.top + hole.height),
+    right: vw - (hole.left + hole.width),
+    top: hole.top,
+    left: hole.left,
+  }
+  const order: Side[] = ["bottom", "right", "top", "left"]
+  const need = (side: Side) => (side === "top" || side === "bottom" ? card.h : card.w) + GAP * 2
+  const side =
+    order.find((s) => room[s] >= need(s)) ??
+    order.reduce((best, s) => (room[s] > room[best] ? s : best), order[0])
+
+  let top: number
+  let left: number
+  if (side === "bottom") {
+    top = hole.top + hole.height + GAP
+    left = hole.left + hole.width / 2 - card.w / 2
+  } else if (side === "top") {
+    top = hole.top - card.h - GAP
+    left = hole.left + hole.width / 2 - card.w / 2
+  } else if (side === "right") {
+    left = hole.left + hole.width + GAP
+    top = hole.top + hole.height / 2 - card.h / 2
+  } else {
+    left = hole.left - card.w - GAP
+    top = hole.top + hole.height / 2 - card.h / 2
+  }
+
+  const clampedLeft = Math.max(GAP, Math.min(Math.max(GAP, vw - card.w - GAP), left))
+  const clampedTop = Math.max(GAP, Math.min(Math.max(GAP, vh - card.h - GAP), top))
+
+  const targetX = hole.left + hole.width / 2
+  const targetY = hole.top + hole.height / 2
+  const beak =
+    side === "top" || side === "bottom"
+      ? Math.max(16, Math.min(Math.max(16, card.w - 16), targetX - clampedLeft))
+      : Math.max(16, Math.min(Math.max(16, card.h - 16), targetY - clampedTop))
+
+  return { side, top: clampedTop, left: clampedLeft, beak }
 }
 
 export default function PracticeGuide() {
@@ -113,143 +138,150 @@ export default function PracticeGuide() {
   const scopeKey = scope.key
 
   const [open, setOpen] = useState(true)
-  const [signals, setSignals] = useState<GuideSignals>({
-    readingOpened: false, captureOpened: false, kitCopied: false,
-  })
-  const [ring, setRing] = useState<Ring | null>(null)
-  const [corner, setCorner] = useState<Corner>("br")
-  // The reasoning is folded away by default. Not decoration: at 360x227 the
-  // card was taller than any free corner on a 1280x720 screen, so it covered
-  // a control wherever it went. Compact, it fits below the page-turn arrow.
   const [showWhy, setShowWhy] = useState(false)
+  const [signals, setSignals] = useState<GuideSignals>({
+    readingOpened: false, capturing: false, kitCopied: false,
+  })
+  const [hole, setHole] = useState<Rect | null>(null)
+  const [spot, setSpot] = useState<{ side: Side; top: number; left: number; beak: number } | null>(null)
+  /** True while a drag that began inside the cutout is still in flight. */
+  const [dragging, setDragging] = useState(false)
+
   const cardRef = useRef<HTMLDivElement | null>(null)
 
-  // Frozen on mount: the practice loom opens holding a worked cloth, so every
-  // test is "one more than when you began" rather than "is there any".
   const [base] = useState<GuideBaseline>(() => baselineOf(state, scopeKey))
   const [at, setAt] = useState(() =>
-    standOn(baselineOf(state, scopeKey), state, scopeKey, { readingOpened: false, captureOpened: false, kitCopied: false })
+    standOn(baselineOf(state, scopeKey), state, scopeKey, {
+      readingOpened: false, capturing: false, kitCopied: false,
+    })
   )
 
   useEffect(() => {
-    const onOpened = () => setSignals((s) => (s.readingOpened ? s : { ...s, readingOpened: true }))
-    const onCapture = () => setSignals((s) => (s.captureOpened ? s : { ...s, captureOpened: true }))
-    const onKit = () => setSignals((s) => (s.kitCopied ? s : { ...s, kitCopied: true }))
+    const set = (patch: Partial<GuideSignals>) => setSignals((s) => ({ ...s, ...patch }))
+    const onOpened = () => set({ readingOpened: true })
+    const onCaptureOpen = () => set({ capturing: true })
+    const onCaptureClose = () => set({ capturing: false })
+    const onKit = () => set({ kitCopied: true })
     window.addEventListener("loom:practice-opened", onOpened)
-    window.addEventListener("loom:capture-open", onCapture)
+    window.addEventListener("loom:capture-open", onCaptureOpen)
+    window.addEventListener("loom:capture-close", onCaptureClose)
     window.addEventListener("loom:mapkit-taken", onKit)
     return () => {
       window.removeEventListener("loom:practice-opened", onOpened)
-      window.removeEventListener("loom:capture-open", onCapture)
+      window.removeEventListener("loom:capture-open", onCaptureOpen)
+      window.removeEventListener("loom:capture-close", onCaptureClose)
       window.removeEventListener("loom:mapkit-taken", onKit)
     }
   }, [])
 
   const done = useMemo(
-    () =>
-      GUIDE_STEPS.map((s) =>
-        s.readOnly ? false : stepDone(s.key, base, state, scopeKey, signals)
-      ),
+    () => GUIDE_STEPS.map((s) => stepDone(s.key, base, state, scopeKey, signals)),
     [base, state, scopeKey, signals]
   )
 
-  // Move on when the student finishes the beat they are STANDING on, and only
-  // then: doing something out of order ticks its own step in the rail but does
-  // not yank the guide away from what it is currently explaining. The pause is
-  // so the tick is seen before the text changes under it.
-  useEffect(() => {
-    if (!open || !done[at] || at >= GUIDE_STEPS.length - 1) return
-    const timer = window.setTimeout(() => setAt((cur) => (cur === at ? at + 1 : cur)), 900)
-    return () => window.clearTimeout(timer)
-  }, [open, done, at])
-
   const step = GUIDE_STEPS[at]
+  const ready = done[at]
+  const last = at === GUIDE_STEPS.length - 1
 
   const show = useCallback((index: number) => {
     const clamped = Math.max(0, Math.min(GUIDE_STEPS.length - 1, index))
     setAt(clamped)
-    goToStation(GUIDE_STEPS[clamped].station)
+    if (GUIDE_STEPS[clamped].station !== "library") goToStation(GUIDE_STEPS[clamped].station)
   }, [])
 
-  // Land on the right station when the guide moves itself, too.
   useEffect(() => {
     if (!open || step.station === "library") return
     goToStation(step.station)
   }, [open, step.station])
 
-  // A beat about the TEXT needs a page with text on it. The practice reading
-  // opens on two cover pages, where "drag across a line or two" points at a
-  // picture — so the guide focuses one of the worked example's own passages
-  // and the viewer turns to the page it came from. Read from state rather
-  // than hard-coded: the example is built from whatever pages the reading
-  // actually has.
+  // A beat about the text needs a page with text on it: the practice reading
+  // opens on two covers, where "drag across a line" points at a picture.
   useEffect(() => {
     if (!open || !step.needsText) return
     const onAPage = state.passages.find((p) => p.pageNumber)
     if (onAPage) window.dispatchEvent(new CustomEvent("loom:practice-focus", { detail: onAPage.id }))
   }, [open, step.needsText, state.passages])
 
-  // Bring the target into view when the beat changes. Pointing at something
-  // three thousand pixels below the fold is not pointing at it — the kit
-  // button lives under the whole board, and the glow was landing off-screen.
-  // Once per beat, and only when it is actually out of view, so it never
-  // fights a student who has scrolled somewhere on purpose.
+  // Bring the target into view once per beat, and only when it is out of it.
   useEffect(() => {
     if (!open) return
     const timer = window.setTimeout(() => {
-      const el = document.querySelector(step.target)
-      if (!el) return
-      const box = el.getBoundingClientRect()
-      const above = box.top < 80
-      const below = box.bottom > window.innerHeight - 60
-      if (above || below) el.scrollIntoView({ block: "center", behavior: "smooth" })
+      for (const selector of step.targets) {
+        const el = document.querySelector(selector)
+        if (!el) continue
+        const box = el.getBoundingClientRect()
+        if (box.top < 80 || box.bottom > window.innerHeight - 60) {
+          el.scrollIntoView({ block: "center", behavior: "smooth" })
+        }
+        return
+      }
     }, 260)
     return () => window.clearTimeout(timer)
-  }, [open, at, step.target])
+  }, [open, at, step.targets])
 
-  // Track the target. Polled on a frame rather than observed: the things being
-  // pointed at include a PDF page that re-lays itself out, a dialog that does
-  // not exist until it is opened, and a list inside a scrollbox. One cheap
-  // read a frame covers all three, where three different observers would not,
-  // and state only changes when the rect actually moves.
+  // Track the target and place the card, on one frame. The things pointed at
+  // include a PDF page that re-lays itself out, a dialog that does not exist
+  // until it is opened, and a list inside a scrollbox — one read a frame
+  // covers all of them, and state changes only when the geometry does.
   useEffect(() => {
-    // No clearing when hidden: the collapsed guide renders no ring at all, so
-    // a stale rect is never drawn — and setting state here would be a
-    // cascading render for nothing.
     if (!open) return
     let frame = 0
     const measure = () => {
-      const box = document.querySelector(step.target)?.getBoundingClientRect()
-      setRing((was) => {
-        if (!box || box.width === 0 || box.height === 0) return was === null ? was : null
-        const next = { top: box.top, left: box.left, width: box.width, height: box.height }
-        const same =
-          was &&
+      const found = resolveTarget(step.targets)
+      const padded: Rect | null = found
+        ? {
+            top: Math.max(0, found.top - PAD),
+            left: Math.max(0, found.left - PAD),
+            width: found.width + PAD * 2,
+            height: found.height + PAD * 2,
+          }
+        : null
+      setHole((was) => (near(was, padded) || (was === null && padded === null) ? was : padded))
+
+      const card = cardRef.current
+      if (card && padded) {
+        const next = place(padded, { w: card.offsetWidth, h: card.offsetHeight })
+        setSpot((was) =>
+          was && was.side === next.side &&
           Math.abs(was.top - next.top) < 1 &&
           Math.abs(was.left - next.left) < 1 &&
-          Math.abs(was.width - next.width) < 1 &&
-          Math.abs(was.height - next.height) < 1
-        return same ? was : next
-      })
-      // Same frame, same reason: the controls the card must not cover move
-      // with the page, and a corner chosen once goes stale the moment a tab
-      // changes or the viewer re-lays out.
-      const card = cardRef.current
-      if (card) {
-        const next = bestCorner(
-          box && box.width ? { top: box.top, left: box.left, width: box.width, height: box.height } : null,
-          { w: card.offsetWidth, h: card.offsetHeight }
+          Math.abs(was.beak - next.beak) < 1
+            ? was
+            : next
         )
-        setCorner((was) => (was === next ? was : next))
+      } else if (!padded) {
+        setSpot((was) => (was === null ? was : null))
       }
       frame = window.requestAnimationFrame(measure)
     }
     frame = window.requestAnimationFrame(measure)
     return () => window.cancelAnimationFrame(frame)
-  }, [open, step.target])
+  }, [open, step.targets])
+
+  /**
+   * A drag that starts in the cutout must be allowed to leave it. Once the
+   * pointer is down the browser owns the selection and the viewer listens for
+   * the release on `document`, so the panes only have to get out of the way
+   * until then.
+   */
+  useEffect(() => {
+    if (!open || !hole) return
+    const inside = (e: PointerEvent) =>
+      e.clientX >= hole.left && e.clientX <= hole.left + hole.width &&
+      e.clientY >= hole.top && e.clientY <= hole.top + hole.height
+    const down = (e: PointerEvent) => { if (inside(e)) setDragging(true) }
+    const up = () => setDragging(false)
+    window.addEventListener("pointerdown", down, true)
+    window.addEventListener("pointerup", up, true)
+    window.addEventListener("pointercancel", up, true)
+    return () => {
+      window.removeEventListener("pointerdown", down, true)
+      window.removeEventListener("pointerup", up, true)
+      window.removeEventListener("pointercancel", up, true)
+    }
+  }, [open, hole])
 
   const finished = done.filter(Boolean).length
-  const total = GUIDE_STEPS.filter((s) => !s.readOnly).length
 
   if (!open) {
     return (
@@ -258,22 +290,51 @@ export default function PracticeGuide() {
         onClick={() => setOpen(true)}
         data-tip="the seven moves, walked on this reading"
       >
-        show the guide · {finished}/{total}
+        show the guide · {finished}/{GUIDE_STEPS.length}
       </button>
     )
   }
 
+  // Never dim without a hole: a dark screen with nothing lit is the one
+  // failure worse than not dimming at all.
+  const masked = step.overlay === "mask" && !!hole && !dragging
+  const vw = typeof window === "undefined" ? 0 : window.innerWidth
+  const vh = typeof window === "undefined" ? 0 : window.innerHeight
+
   return (
     <>
-      {ring && (
+      {masked && hole && (
+        // Four inert panes — not a box-shadow, whose spread is not hit-tested
+        // (it would block the hole and leak everything else), and not an SVG,
+        // which re-rasterises a viewport-sized path every frame. The hole is
+        // genuinely empty DOM, so hit-testing is exact and free.
+        <div className="guidemask" aria-hidden="true">
+          <div className="gpane" style={{ top: 0, left: 0, width: vw, height: hole.top }} />
+          <div className="gpane" style={{ top: hole.top + hole.height, left: 0, width: vw, height: Math.max(0, vh - hole.top - hole.height) }} />
+          <div className="gpane" style={{ top: hole.top, left: 0, width: hole.left, height: hole.height }} />
+          <div className="gpane" style={{ top: hole.top, left: hole.left + hole.width, width: Math.max(0, vw - hole.left - hole.width), height: hole.height }} />
+        </div>
+      )}
+
+      {hole && (
         <div
           className="guideglow"
           aria-hidden="true"
-          style={{ top: ring.top, left: ring.left, width: ring.width, height: ring.height }}
+          style={{ top: hole.top, left: hole.left, width: hole.width, height: hole.height }}
         />
       )}
 
-      <div ref={cardRef} className={`guidefloat ${corner}`} role="region" aria-label="The guide">
+      <div
+        ref={cardRef}
+        className={`guidepop ${spot ? `at-${spot.side}` : "adrift"}`}
+        role="region"
+        aria-label="The guide"
+        style={
+          spot
+            ? ({ top: spot.top, left: spot.left, "--beak": `${spot.beak}px` } as React.CSSProperties)
+            : undefined
+        }
+      >
         <div className="guiderail">
           {GUIDE_STEPS.map((s, i) => (
             <button
@@ -287,7 +348,7 @@ export default function PracticeGuide() {
               {done[i] ? "✓" : i + 1}
             </button>
           ))}
-          <span className="cap gcount">{finished}/{total}</span>
+          <span className="cap gcount">{finished}/{GUIDE_STEPS.length}</span>
         </div>
 
         <p className="gsay">
@@ -296,18 +357,23 @@ export default function PracticeGuide() {
         {showWhy && <p className="gwhy">{step.why}</p>}
 
         <div className="guidefoot">
-          <button className="btn ghost mini" onClick={() => show(at - 1)} disabled={at === 0}>
-            ‹ back
+          <button className="btn ghost mini" onClick={() => show(at - 1)} disabled={at === 0} aria-label="Back">
+            ‹
           </button>
-          {/* Pulsing when going on IS the move: a beat with nothing to do,
-              or one the student has just finished. Otherwise still, so the
-              pulse means something when it happens. */}
+          {/* The one primary — and only once it means something. Until the
+              beat's own predicate says the gesture landed this is a quiet
+              "skip"; the moment it does, it fills, pulses and says "next".
+              That IS the "hit this button now" the review asked for, and it
+              cannot fire early because the predicate is what turns it on.
+              Still pressable while quiet: a disabled button traps anybody the
+              guide has misread, and a separate skip control would be a second
+              button meaning the same thing. */}
           <button
-            className={`btn ghost mini${(step.readOnly || done[at]) && at < GUIDE_STEPS.length - 1 ? " gpulse" : ""}`}
+            className={ready && !last ? "btn mini gnext gpulse" : "btn ghost mini"}
             onClick={() => show(at + 1)}
-            disabled={at === GUIDE_STEPS.length - 1}
+            disabled={last}
           >
-            next ›
+            {ready ? "next ›" : "skip ›"}
           </button>
           <button
             className="btn ghost mini gwhybtn"

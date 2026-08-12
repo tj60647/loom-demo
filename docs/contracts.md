@@ -376,6 +376,52 @@
 > opened, and the guide says so rather than describing an app that does not
 > exist.
 >
+> **Rebuilt to the standard pattern** (2026-08-12, TJ: *"this is not a great
+> guide… is this not a standard/best practice for these kinds of thing or am i
+> inventing something?"* — he is not). A guided tour has a settled anatomy and
+> the first version had one part of four. Now: a **masked backdrop** (four
+> inert panes with a genuinely empty hole — not a box-shadow, whose spread is
+> not hit-tested and would block the cutout while leaking everything else, and
+> not an SVG, which re-rasterises a viewport-sized path every frame), a
+> **popover anchored to the target with a beak** that keeps pointing after the
+> card is clamped on screen, and **one primary action** that fills and pulses
+> the moment the beat's own predicate says the gesture landed.
+>
+> **Where the pattern bends, deliberately.** Beat 2 teaches drag-selecting
+> text, so the cutout stays fully interactive and the panes vanish for the
+> duration of a drag that began inside it — they block by geometry and carry
+> no handlers, because cancelling events kills selection outright. Beat 3's
+> target is inside the app's own scrim, which already IS the constraint, so
+> that beat declares `overlay: "none"` rather than dimming twice. The rungs
+> are 6100–6102: above `.pdf-shell.fullscreen` (6000), or `f` would delete the
+> whole guide, and below `.info-scrim` (10000) and the capture button (9000).
+>
+> **Four sync bugs went with it**, each found by tracing a student's actual
+> path. `sort` counted tiered concepts — the worked cloth tiers them all, so
+> following the instruction changed nothing and pressing a lit chip *un*-tiered
+> one, which DID change the count: the beat went green for undoing the example.
+> It compares tier-per-concept now, over the keys both sides share, so deleting
+> a concept is not mistaken for sorting. `name` demanded a NEW concept, so
+> reusing one — which the dialog's own datalist invites — could never finish
+> it; a passage landing is the test. `capture` latched on the dialog opening,
+> so cancelling left it green; the signal tracks the dialog's life and
+> `CaptureModal` says when it closes. And the 900ms auto-advance is gone: it
+> re-armed on any state change and threw you forward again whenever you pressed
+> Back.
+>
+> **A beat is a CHAIN of targets**, because several are more than one gesture —
+> the cloth is four (open Your work, unfold, type, save) and read as one, which
+> is what "out of sync with the activities they describe" was pointing at.
+>
+> `scripts/check-practice-guide.ts` asserts every selector in every chain
+> actually exists in `src/` (a dead target used to render no ring, and would
+> now dim the screen with no hole), that the rungs stay ordered against
+> fullscreen and the scrim, that the panes block and the ring does not, and
+> that a dialog-targeted beat suppresses the mask. `tests/sandbox.spec.ts`
+> drags with a **real mouse** across the cutout and out past its edge: the old
+> spec synthesised selection with `createRange`, which bypasses hit-testing and
+> would have passed a mask that blocked every drag a student makes.
+>
 > **Corrections the same day, all TJ's:** the header door says **guide**, not
 > "practice" — it names what the student is looking for rather than the
 > sandbox it runs in. The guide **floats** rather than displacing the layout

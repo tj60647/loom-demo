@@ -46,6 +46,9 @@ export default function CaptureModal({ passage, source, sourceId, location, page
   // gesture. Harmless in the real app — nothing there listens.
   useEffect(() => {
     window.dispatchEvent(new Event("loom:capture-open"))
+    return () => {
+      window.dispatchEvent(new Event("loom:capture-close"))
+    }
   }, [])
 
   const { state, addConcept, addPassage, editConcept } = useLoom()
@@ -186,7 +189,7 @@ export default function CaptureModal({ passage, source, sourceId, location, page
 
         <div style={{ display: "flex", gap: "10px", marginTop: "24px", justifyContent: "flex-end" }}>
           <button className="btn ghost" onClick={onClose} disabled={isSubmitting}>Cancel</button>
-          <button className="btn" onClick={handleCapture} disabled={!conceptLabel.trim() || isSubmitting}>
+          <button id="capturePassageSave" className="btn" onClick={handleCapture} disabled={!conceptLabel.trim() || isSubmitting}>
             {isSubmitting ? "Saving..." : "Save Passage"}
           </button>
         </div>

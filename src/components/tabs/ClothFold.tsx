@@ -69,6 +69,7 @@ export default function ClothFold() {
   const shownTitle = (activeCloth?.title ?? "").trim()
   return (
     <details
+      id="clothFold"
       className="card invitefold"
       style={{ marginBottom: 14 }}
       open={foldOpen}
@@ -101,6 +102,7 @@ export default function ClothFold() {
       <div className="form-row">
         <span className="label">Cloth Title</span>
         <input
+          id="clothTitle"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="a sentence or headline — what your reading of it says"
@@ -116,7 +118,7 @@ export default function ClothFold() {
         />
       </div>
       <div className="clothfoot">
-        <button className="btn mini" onClick={save} disabled={busy || !dirty}>
+        <button id="clothSave" className="btn mini" onClick={save} disabled={busy || !dirty}>
           {busy ? "Saving…" : "Save cloth"}
         </button>
         {/* The cloth downloads on the cloth's own card (TJ, 2026-08-10) —

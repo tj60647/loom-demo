@@ -320,7 +320,7 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 @media(max-width:560px){.info-dialog{padding:22px 20px 18px}.info-dialog h2{font-size:23px}}
 /* The first-run walkthrough's scrim, panel and round "?" button lived here.
    Retired 2026-08-11 with the deck itself — the guide walks the same moves in
-   the real interface (.guidefloat, below) and About carries the overview. */
+   the real interface (.guidepop, below) and About carries the overview. */
 /* One box model for header controls whatever the element (a, button):
    a bare <a class="btn"> otherwise top-aligns its text next to a <button>. */
 header .btn{display:inline-flex;align-items:center;justify-content:center}
@@ -473,34 +473,51 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .searchhit.off{border-style:dashed;background:transparent;cursor:default}
 .searchhit.off:hover{border-color:var(--rule);background:transparent}
 
-/* The practice guide (src/components/practice/PracticeGuide.tsx).
-   A floater over the layout, not a band in it (TJ, 2026-08-11) — the page
-   underneath keeps its own geometry, and the card takes the corner furthest
-   from whatever it is pointing at. Above the footer (z 5) and the card menu
-   (z 6), below the dialogs (z 10000): the capture dialog must cover it, since
-   one beat is about that dialog. */
-.guidefloat{position:fixed;z-index:900;width:min(320px,calc(100vw - 32px));
-  background:var(--paper);border:1px solid var(--ink);border-radius:6px;
-  box-shadow:0 14px 40px rgba(0,0,0,.22),0 0 0 4px rgba(168,132,63,.10);
-  padding:10px 12px 8px;
-  /* The card takes no clicks of its own — only its buttons do (below). A
-     floater in a corner will sooner or later sit over a control: at 1280x720
-     it lands squarely on the PDF's Next Page arrow, which is how the suite
-     found this. Choosing a corner cannot fix that in general, so the card is
-     made incapable of eating anything instead. Its buttons opt back in. */
-  pointer-events:none}
-.guidefloat .gstep,.guidefloat .btn{pointer-events:auto}
-.guidefloat.br{right:18px;bottom:14px}
-.guidefloat.bl{left:18px;bottom:14px}
-.guidefloat.tr{right:18px;top:96px}
-.guidefloat.tl{left:18px;top:96px}
-.guideopen{position:fixed;right:18px;bottom:52px;z-index:900;background:var(--paper)}
+/* The practice guide — a coach mark (src/components/practice/PracticeGuide.tsx).
+   Standard anatomy: a masked backdrop with a cutout, a popover anchored to the
+   target with a beak, one primary action.
 
-/* The pointer. Rings the target and never takes a click — a tutorial that
-   swallows the button it just told you to press is worse than no tutorial. */
-.guideglow{position:fixed;z-index:899;pointer-events:none;border-radius:5px;
-  box-shadow:0 0 0 2px var(--ochre),0 0 16px 5px rgba(168,132,63,.35);
-  transition:top .16s ease,left .16s ease,width .16s ease,height .16s ease}
+   RUNGS. 6100–6103, deliberately ABOVE .pdf-shell.fullscreen (6000) — `f`
+   would otherwise delete the whole guide — and BELOW the floating capture
+   button (9000), the highlight tip (9500) and .info-scrim (10000), all three
+   of which are furniture of the gesture being taught and must stay lit and
+   pressable. */
+
+/* The mask. Four inert panes with a genuinely empty hole between them: the
+   geometry IS the hit-test, so anything under the hole is reachable and
+   everything else is not. No handlers, ever — blocking by cancelling events
+   kills the drag-select this guide teaches. */
+.guidemask{position:fixed;inset:0;z-index:6100;pointer-events:none}
+.gpane{position:fixed;background:rgba(26,25,22,.34);pointer-events:auto;user-select:none}
+
+/* The cutout's edge. Never takes a click: a tutorial that swallows the button
+   it just told you to press is worse than no tutorial. No transition — the
+   rAF tracking IS the animation, and a second one on the same rect smears. */
+.guideglow{position:fixed;z-index:6101;pointer-events:none;border-radius:5px;
+  box-shadow:0 0 0 2px var(--ochre),0 0 18px 6px rgba(168,132,63,.30)}
+
+/* The popover, at the target rather than in a corner. */
+.guidepop{position:fixed;z-index:6102;width:min(320px,calc(100vw - 32px));
+  background:var(--paper);border:1px solid var(--ink);border-radius:6px;
+  box-shadow:0 14px 40px rgba(0,0,0,.28);padding:10px 12px 8px}
+/* Adrift: no target on screen. Parked, beakless, and honest about it. */
+.guidepop.adrift{right:18px;bottom:14px;left:auto;top:auto}
+
+/* The beak. `--beak` is the offset along the card's edge where the target's
+   centre is, so it still points true after the card has been clamped on
+   screen. Two triangles: the border, then the paper over it. */
+.guidepop::before,.guidepop::after{content:"";position:absolute;width:0;height:0;border:8px solid transparent}
+.guidepop.at-bottom::before{bottom:100%;left:var(--beak);margin-left:-8px;border-bottom-color:var(--ink)}
+.guidepop.at-bottom::after{bottom:100%;left:var(--beak);margin-left:-8px;border-bottom-color:var(--paper);margin-bottom:-1px}
+.guidepop.at-top::before{top:100%;left:var(--beak);margin-left:-8px;border-top-color:var(--ink)}
+.guidepop.at-top::after{top:100%;left:var(--beak);margin-left:-8px;border-top-color:var(--paper);margin-top:-1px}
+.guidepop.at-right::before{right:100%;top:var(--beak);margin-top:-8px;border-right-color:var(--ink)}
+.guidepop.at-right::after{right:100%;top:var(--beak);margin-top:-8px;border-right-color:var(--paper);margin-right:-1px}
+.guidepop.at-left::before{left:100%;top:var(--beak);margin-top:-8px;border-left-color:var(--ink)}
+.guidepop.at-left::after{left:100%;top:var(--beak);margin-top:-8px;border-left-color:var(--paper);margin-left:-1px}
+.guidepop.adrift::before,.guidepop.adrift::after{display:none}
+
+.guideopen{position:fixed;right:18px;bottom:14px;z-index:6102;background:var(--paper)}
 
 .guiderail{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:8px}
 .gstep{font-family:var(--mono);font-size:11px;line-height:1;color:var(--ink-soft);
@@ -512,19 +529,22 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .gstep.done{color:var(--ochre);border-color:var(--ochre)}
 .gstep.done.now{color:var(--paper);background:var(--ochre)}
 .gcount{margin-left:auto}
-.guidefloat .gsay{margin:0;font-size:13px;line-height:1.42}
-.guidefloat .gwhy{margin:5px 0 0;font-size:12px;line-height:1.4;color:var(--ink-soft);font-style:italic}
+.guidepop .gsay{margin:0;font-size:13px;line-height:1.42}
+.guidepop .gwhy{margin:5px 0 0;font-size:12px;line-height:1.4;color:var(--ink-soft);font-style:italic}
 .guidefoot{display:flex;align-items:center;gap:5px;margin-top:8px;border-top:1px solid var(--rule);padding-top:7px}
 .guidefoot .gwhybtn{margin-left:auto}
-/* "Go on" as the move: the one control the reader should reach for when the
-   beat asks nothing of them. Slow and small — this app does not flash. */
+/* The one primary: filled where the others are ghosts. */
+.btn.gnext{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.gnext:hover:not(:disabled){background:var(--ochre);border-color:var(--ochre)}
+/* "Hit this button now": the gesture landed and going on is the move. Slow and
+   small — this app does not flash. */
 @keyframes gpulse{0%,100%{box-shadow:0 0 0 0 rgba(168,132,63,0)}
-  50%{box-shadow:0 0 0 4px rgba(168,132,63,.30)}}
-.btn.gpulse{border-color:var(--ochre);color:var(--ink);animation:gpulse 1.9s ease-in-out infinite}
-@media(prefers-reduced-motion:reduce){.btn.gpulse{animation:none;border-color:var(--ochre)}}
+  50%{box-shadow:0 0 0 5px rgba(168,132,63,.38)}}
+.btn.gpulse{animation:gpulse 1.7s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.btn.gpulse{animation:none}}
 @media(max-width:640px){
-  .guidefloat,.guidefloat.br,.guidefloat.bl,.guidefloat.tr,.guidefloat.tl{
-    left:12px;right:12px;bottom:52px;top:auto;width:auto}
+  .guidepop{left:12px !important;right:12px;top:auto !important;bottom:14px;width:auto}
+  .guidepop::before,.guidepop::after{display:none}
 }
 .searchhithead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .searchhithead h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0}
