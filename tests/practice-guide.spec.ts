@@ -12,7 +12,7 @@
  * gesture the beat's own copy describes PRODUCES that state, through the
  * actual controls, with the mask up. That gap is where "out of sync" lives.
  *
- * So: seven beats, seven real gestures, and after each one the beat's own pip
+ * So: every beat, its real gesture, and after each one that beat's own pip
  * must carry its tick. A beat that cannot be completed by doing what it says
  * fails here and nowhere else.
  *
@@ -38,7 +38,7 @@ async function beat(page: Page) {
 }
 
 test.describe("The guide", () => {
-  test("all seven beats can be completed by doing what they say", async ({ page }) => {
+  test("every beat can be completed by doing what it says", async ({ page }) => {
     test.setTimeout(180_000)
 
     const writes: string[] = []
@@ -93,18 +93,7 @@ test.describe("The guide", () => {
     await page.locator("#capturePassageSave").click()
     await ticked(page, 3)
     await onward(page)
-    expect(await beat(page)).toContain("Say what you make of it")
-
-    // ---- 4. the cloth ------------------------------------------------------
-    await page.locator("#yourwork-toggle").click()
-    await page.locator("#clothFold summary").click()
-    await page.locator("#clothTitle").fill("A practice reading of the going")
-    await page.locator("#clothSave").click()
-    await ticked(page, 4)
-    await onward(page)
-    expect(await beat(page)).toContain("Throw a thread")
-
-    // ---- 5. throw a thread -------------------------------------------------
+    // ---- 4. throw a thread -------------------------------------------------
     const warp = page.locator("#warp .crow")
     await expect(warp.first()).toBeVisible({ timeout: 20_000 })
     await warp.nth(0).click()
@@ -112,26 +101,53 @@ test.describe("The guide", () => {
     await page.getByPlaceholder("…or just start typing. Long and awkward is fine.")
       .fill("A practice thread: the one keeps turning into the other.")
     await page.locator("#throwIt").click()
-    await ticked(page, 5)
+    await ticked(page, 4)
     await onward(page)
     expect(await beat(page)).toContain("Make a projection")
 
-    // ---- 6. make a projection ---------------------------------------------
+    // ---- 5. make a projection ---------------------------------------------
     await page.locator("#newMap").click({ timeout: 20_000 })
+    await ticked(page, 5)
+    await onward(page)
+    expect(await beat(page)).toContain("Sort into tiers")
+
+    // ---- 6. sort it --------------------------------------------------------
+    // The new projection arrives EMPTY, so every chip is a real press — which
+    // is the whole reason making one comes first (TJ, 2026-08-12).
+    const firstRow = page.locator("#triageList .trow").first()
+    await expect(firstRow).toBeVisible({ timeout: 20_000 })
+    const primary = firstRow.locator(".tierchips .tchip").first()
+    await expect(primary).not.toHaveClass(/on/)
+    await primary.click()
+    await expect(primary).toHaveClass(/on/)
     await ticked(page, 6)
+    await onward(page)
+    expect(await beat(page)).toContain("Arrange the board")
+
+    // ---- 7. arrange the board ---------------------------------------------
+    // A real drag of a real card. The sorted concept landed on the board a
+    // moment ago; move it and the beat follows.
+    const card = page.locator("#cardTable g[data-card]").first()
+    await expect(card).toBeVisible({ timeout: 20_000 })
+    const box = (await card.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width / 2 + 90, box.y + box.height / 2 + 40, { steps: 12 })
+    await page.mouse.up()
+    await ticked(page, 7)
     await onward(page)
     expect(await beat(page)).toContain("Take the kit")
 
-    // ---- 7. take the kit ---------------------------------------------------
+    // ---- 8. take the kit ---------------------------------------------------
     const [download] = await Promise.all([
       page.waitForEvent("download"),
       page.locator("#mapKit").click({ timeout: 20_000 }),
     ])
     expect(await download.suggestedFilename()).toContain("concept-map-kit")
-    await ticked(page, 7)
+    await ticked(page, 8)
 
     // Every pip green, and the whole walk wrote nothing to the server.
-    await expect(page.locator(".gstep.done")).toHaveCount(7)
+    await expect(page.locator(".gstep.done")).toHaveCount(8)
     expect(writes, `the guide wrote to the server: ${writes.join(", ")}`).toHaveLength(0)
   })
 

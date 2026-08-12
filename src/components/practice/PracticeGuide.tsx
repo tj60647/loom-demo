@@ -157,8 +157,7 @@ function place(hole: Rect, card: { w: number; h: number }) {
 }
 
 export default function PracticeGuide() {
-  const { state, scope } = useLoom()
-  const scopeKey = scope.key
+  const { state } = useLoom()
 
   const [open, setOpen] = useState(true)
   const [showWhy, setShowWhy] = useState(false)
@@ -174,11 +173,9 @@ export default function PracticeGuide() {
 
   const cardRef = useRef<HTMLDivElement | null>(null)
 
-  const [base] = useState<GuideBaseline>(() => baselineOf(state, scopeKey))
+  const [base] = useState<GuideBaseline>(() => baselineOf(state))
   const [at, setAt] = useState(() =>
-    standOn(baselineOf(state, scopeKey), state, scopeKey, {
-      readingOpened: false, capturing: false, kitCopied: false,
-    })
+    standOn(baselineOf(state), state, { readingOpened: false, capturing: false, kitCopied: false })
   )
 
   useEffect(() => {
@@ -200,8 +197,8 @@ export default function PracticeGuide() {
   }, [])
 
   const done = useMemo(
-    () => GUIDE_STEPS.map((s) => stepDone(s.key, base, state, scopeKey, signals)),
-    [base, state, scopeKey, signals]
+    () => GUIDE_STEPS.map((s) => stepDone(s.key, base, state, signals)),
+    [base, state, signals]
   )
 
   const step = GUIDE_STEPS[at]
@@ -389,7 +386,9 @@ export default function PracticeGuide() {
               {done[i] ? "✓" : i + 1}
             </button>
           ))}
-          <span className="cap gcount">{finished}/{GUIDE_STEPS.length}</span>
+          {/* "done", because bare "1/8" sits on a row of numbered pips and
+              reads as a step number — which the black pip beside it contradicts. */}
+          <span className="cap gcount">{finished}/{GUIDE_STEPS.length} done</span>
         </div>
 
         <p className="gsay">

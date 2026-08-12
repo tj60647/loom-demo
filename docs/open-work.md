@@ -316,11 +316,17 @@ gaps are now demonstrable rather than suspected:
   matching are dropped and the example thins; below two passages the loom
   opens empty, as before. `tests/sandbox.spec.ts` asserts the exact shape, so
   a thinning is a failure rather than a quiet downgrade.
+  **The sequence followed on 2026-08-12** — the worked cloth showed the end
+  state without walking anyone to it, so the practice loom now opens on the
+  Library with one card lit and walks eight beats to a downloaded kit: a masked
+  backdrop, a popover beaked at the control the beat names, and a predicate per
+  beat so nothing ticks that the student did not do. Anatomy and the day's
+  rulings are stamped in [contracts.md](contracts.md); the walk itself is
+  `tests/practice-guide.spec.ts`.
   **Still open:** whether the example should be swappable per course (TJ: "we
   can change it out later if it seems to conflict with the intention"), and
-  whether the guide wants a *sequence* on top of the example — TJ's original
-  option was "supplemental slides/overlay guides", and what shipped shows the
-  end state without walking anyone to it.
+  whether the 23 dimmed cards on the practice Library should be cut to the one
+  that opens.
 - **5.2 The screen snip** — [screen-snip.md](screen-snip.md). Much smaller than
   it looks: a snip of a library PDF needs **no image storage**, only a rect.
   TJ settled export (the image embeds). One number open: the size cap, worth

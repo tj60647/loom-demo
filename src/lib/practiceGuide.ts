@@ -5,14 +5,25 @@
 // knowledge graph, making a projection, and saving materials for a concept
 // map"* — and, on the last one, *"by saving i meant the kit."*
 //
-// Those are the beats below, with one correction the interface forced.
-// Highlighting and labeling are NOT two gestures: `CaptureModal` disables its
-// Save button until a concept is named (`CaptureModal.tsx`), so a passage
-// captured from the PDF always arrives labelled. Teaching them as two separate
-// acts would describe an app that does not exist. They are kept as two beats
-// because they are two decisions — which words to take, and what to call what
-// they evidence — but the second happens in the dialog the first opened, and
-// the guide says so.
+// Those are the beats below, with three corrections TJ made on 2026-08-12.
+//
+// Highlighting and labeling are kept as two beats because they are two
+// decisions — which words to take, and what to call what they evidence — but
+// they are not two screens: the second happens in the dialog the first opened,
+// and the guide says so. Nor is the second compulsory. A passage may be kept
+// with no concept at all ("i believe a passage does not require a concept"),
+// so the beat asks for a name and says it can wait.
+//
+// Making a projection and sorting it are separate beats. Folded together, the
+// guide asked for a press and then measured a tier, and the new projection
+// arrives EMPTY on purpose so every chip pressed after it is a real press.
+//
+// Arranging the board is a beat of its own ("there needs to be a organize the
+// board step"). Nothing else in the guide asked for the gesture that is most
+// of the thinking.
+//
+// The cloth beat — say what you make of it — was removed: "it is a nice to
+// have in a cloth not a must have."
 //
 // WHY THE BEATS ARE PREDICATES, NOT A SLIDESHOW. Every step knows how to tell
 // whether the student has actually done it, from the loom's own state. A
@@ -122,18 +133,6 @@ export const GUIDE_STEPS: GuideStep[] = [
     why: "The passage is the evidence; the concept is what you claim it is evidence OF. Keeping the words and naming them are two acts, and the second can wait.",
   },
   {
-    key: "cloth",
-    label: "Say what you make of it",
-    station: "reading",
-    // Four gestures, four rects — this is the beat TJ's "out of sync" was
-    // loudest about: it read as one move and is not.
-    targets: ["#yourwork-toggle", "#clothFold", "#clothTitle", "#clothSave"],
-    overlay: "mask",
-    say:
-      "Open Your work, unfold “This cloth”, and put your own headline in the title — the example's is there to replace. Then Save cloth.",
-    why: "The cloth is your reading of the text as a whole. Everything else you make here is an arrangement of it.",
-  },
-  {
     key: "thread",
     label: "Throw a thread",
     station: "throw",
@@ -144,18 +143,32 @@ export const GUIDE_STEPS: GuideStep[] = [
     why: "The sentence IS the thread. A label is a convenience that lets one of your words recur; the claim is the sentence.",
   },
   {
-    key: "sort",
+    key: "project",
     label: "Make a projection",
     station: "map",
-    // "+ New projection", not the tier chips. The worked cloth already tiers
-    // every concept, so "give a concept a tier" pointed at chips that were
-    // already lit — and pressing one un-tiered it, because setTier toggles.
-    // A SECOND projection is the move the beat's own reason describes.
-    targets: ["#newMap", "#triageList", "#mapEssence"],
+    targets: ["#newMap"],
+    overlay: "mask",
+    say: "Press + New projection. It arrives empty — an unsorted reading of the same cloth.",
+    why: "A projection is one reading of your cloth. Keep several and each can say something different about the same material.",
+  },
+  {
+    key: "sort",
+    label: "Sort into tiers",
+    station: "map",
+    targets: ["#triageList"],
     overlay: "mask",
     say:
-      "Make a second projection, then sort its concepts into tiers and give it a one-line of its own.",
-    why: "A projection is one reading of your cloth. Keep several and each can say something different about the same material.",
+      "Give the concepts tiers — primary for what this projection hangs on, then secondary and tertiary. Sorted concepts land on the board below.",
+    why: "The tiers are the claim about what matters here. Nothing is ranked for you, and another projection may rank them differently.",
+  },
+  {
+    key: "board",
+    label: "Arrange the board",
+    station: "map",
+    targets: ["#tableWrap"],
+    overlay: "mask",
+    say: "Drag the cards into an arrangement you can read — general above, specific below. The threads you threw are drawn for you.",
+    why: "Arranging by hand is the thinking. Novak and Gowin used cards on a table; this is that, and the map you draw afterwards comes from it.",
   },
   {
     key: "kit",
@@ -177,7 +190,8 @@ export type GuideBaseline = {
   maps: number
   /** Tier per concept, so a CHANGE is detectable — a count is not. */
   tiers: Record<string, string>
-  clothTitle: string
+  /** Card positions per board, so a drag is detectable. */
+  boards: Record<string, string>
 }
 
 /**
@@ -213,14 +227,33 @@ function reTiered(base: GuideBaseline, state: LoomState): boolean {
   return Object.keys(now).some((key) => !(key in base.tiers))
 }
 
-export function baselineOf(state: LoomState, scopeKey: string): GuideBaseline {
+/** Every card's place on every board, keyed `viewKey|conceptId`. */
+function boardsOf(state: LoomState): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [key, view] of Object.entries(state.views)) {
+    for (const [conceptId, at] of Object.entries(view.positions ?? {})) {
+      out[`${key}|${conceptId}`] = `${at.x.toFixed(3)},${at.y.toFixed(1)}`
+    }
+  }
+  return out
+}
+
+/** Has a card been moved, or newly placed? Positions are the only student
+ *  gesture the graph does not otherwise record (red line 7 keeps derived
+ *  layout out of the database; a DRAG is not derived). */
+function movedACard(base: GuideBaseline, state: LoomState): boolean {
+  const now = boardsOf(state)
+  return Object.keys(now).some((key) => now[key] !== base.boards[key])
+}
+
+export function baselineOf(state: LoomState): GuideBaseline {
   return {
     passages: state.passages.length,
     concepts: state.concepts.length,
     edges: state.edges.length,
     maps: state.maps.length,
     tiers: tiersOf(state),
-    clothTitle: state.cloths.find((c) => c.scopeKey === scopeKey)?.title ?? "",
+    boards: boardsOf(state),
   }
 }
 
@@ -249,7 +282,6 @@ export function stepDone(
   key: string,
   base: GuideBaseline,
   state: LoomState,
-  scopeKey: string,
   signals: GuideSignals
 ): boolean {
   switch (key) {
@@ -266,14 +298,14 @@ export function stepDone(
       // an existing concept is the pedagogically right move, and it used to
       // leave this beat unfinished for ever.
       return state.passages.length > base.passages
-    case "cloth": {
-      const title = state.cloths.find((c) => c.scopeKey === scopeKey)?.title ?? ""
-      return title.trim() !== base.clothTitle.trim() && title.trim() !== ""
-    }
     case "thread":
       return state.edges.length > base.edges
+    case "project":
+      return state.maps.length > base.maps
     case "sort":
-      return state.maps.length > base.maps || reTiered(base, state)
+      return reTiered(base, state)
+    case "board":
+      return movedACard(base, state)
     case "kit":
       return signals.kitCopied
     default:
@@ -292,9 +324,8 @@ export function stepDone(
 export function standOn(
   base: GuideBaseline,
   state: LoomState,
-  scopeKey: string,
   signals: GuideSignals
 ): number {
-  const at = GUIDE_STEPS.findIndex((s) => !stepDone(s.key, base, state, scopeKey, signals))
+  const at = GUIDE_STEPS.findIndex((s) => !stepDone(s.key, base, state, signals))
   return at === -1 ? GUIDE_STEPS.length - 1 : at
 }

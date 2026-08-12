@@ -369,12 +369,11 @@
 > selection, so its appearance IS the highlight) and `loom:mapkit-copied` from
 > `MapTab`.
 >
-> **One correction the interface forced.** TJ's list separates highlighting
-> from labeling; `CaptureModal` disables Save until a concept is named, so a
-> passage captured from the PDF always arrives labelled. They stay two beats —
-> they are two decisions — but the second happens in the dialog the first
-> opened, and the guide says so rather than describing an app that does not
-> exist.
+> **Highlighting and labeling stay two beats** — they are two decisions, which
+> words to take and what to call what they evidence — but the second happens in
+> the dialog the first opened, and the guide says so rather than implying two
+> separate screens. The dialog no longer *requires* the second (below), so the
+> beat asks for it and says it can wait.
 >
 > **Rebuilt to the standard pattern** (2026-08-12, TJ: *"this is not a great
 > guide… is this not a standard/best practice for these kinds of thing or am i
@@ -410,8 +409,9 @@
 > Back.
 >
 > **A beat is a CHAIN of targets**, because several are more than one gesture —
-> the cloth is four (open Your work, unfold, type, save) and read as one, which
-> is what "out of sync with the activities they describe" was pointing at.
+> the thread is three (tap the warp, say how they hang together, throw it) and
+> read as one, which is what "out of sync with the activities they describe"
+> was pointing at.
 >
 > `scripts/check-practice-guide.ts` asserts every selector in every chain
 > actually exists in `src/` (a dead target used to render no ring, and would
@@ -451,6 +451,29 @@
 > It now names the five stations, says plainly what Loom will not do, and
 > keeps the theory — Bucciarelli, Wenger, Star, with Novak & Gowin added for
 > the board.
+>
+> **A passage does not require a concept** (TJ, 2026-08-12). The model has
+> always said so — an Unlabeled Passage is a legal, first-class state — and
+> `CaptureModal` was the one surface in the app that refused it, holding Save
+> disabled until a name was typed. Save is now always live and reads **"Save
+> unlabeled"** when the field is blank; the concept's own description is not
+> asked for when there is no concept; and the passage carries **its own note**
+> (`#capturePassageNote` → `passage.note`), so what you have to say about the
+> words is not forced through a concept you may not have yet. The toast says
+> what landed rather than what it lacks. `tests/practice-guide.spec.ts` keeps a
+> passage with no concept at all.
+>
+> **The beats are eight, and each is one move.** Three rulings the same day.
+> *Making* a projection was folded in with *sorting* it, so the guide asked for
+> a press and then measured a tier — the split gives `project` its own beat at
+> a glowing **+ New projection**, which arrives empty so every chip after it is
+> a real press. `board` was added because arranging the cards **is** the
+> thinking (Novak and Gowin used cards on a table) and nothing else in the
+> guide asked for it; its predicate is a card's position changing, the one
+> student gesture the graph does not otherwise record. And the cloth beat —
+> "say what you make of it" — is **gone**: TJ, *"it is a nice to have in a
+> cloth not a must have."* Arrive · capture · name · thread · project · sort ·
+> board · kit.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
@@ -1030,5 +1053,7 @@ delete or replace anything.
   corrupt the queue's canonical URL. All mutations here are gesture-driven and
   the debounced ones flush on `pagehide`, so no known user path hits it — but
   it is Next's bug to fix, not ours to paper over further.
-- Unlabeled Passages are representable and survive import/delete, but no UI creates
-  or displays them yet — the graph-view unattached group is P1.9.
+- ~~Unlabeled Passages are representable and survive import/delete, but no UI creates
+  or displays them yet~~ — **closed 2026-08-12**: `CaptureModal` saves with the
+  concept field blank ("Save unlabeled"), and the map view shows Unlabeled
+  Passages as a nameable group. The graph-view unattached group is still P1.9.

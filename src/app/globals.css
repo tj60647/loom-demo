@@ -429,9 +429,18 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    app before the student had done anything, and the point is that it IS the
    loom. Bottom-left, opposite the guide's usual corner. Takes no pointer
    events: it is prose, and prose must never eat a control. */
-.practiceband{position:fixed;left:18px;bottom:52px;z-index:898;
+/* Above the guide's panes (6100–6102). Below them the mask sliced this notice
+   in half wherever a cutout crossed it — the guide dimming its own caption,
+   with a pane edge running through the sentence. It carries no pointer events,
+   so riding that high costs nothing. */
+.practiceband{position:fixed;left:18px;bottom:52px;z-index:6103;
   width:min(320px,calc(100vw - 32px));pointer-events:none;
-  background:rgba(111,125,92,.13);border:1px solid var(--sage);border-radius:6px;
+  /* Opaque, not a 13% wash: the notice straddles the mask's edge, and a
+     translucent one let the dim through on one side of the cutout boundary
+     and the lit page through on the other — a seam down the sentence. The
+     gradient is that same wash, composited over paper instead of the page. */
+  background:linear-gradient(rgba(111,125,92,.13),rgba(111,125,92,.13)),var(--paper);
+  border:1px solid var(--sage);border-radius:6px;
   box-shadow:0 8px 24px rgba(0,0,0,.14);
   color:var(--ink);font-family:var(--body);font-size:12.5px;line-height:1.45;
   padding:9px 12px}

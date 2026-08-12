@@ -83,7 +83,7 @@ const QUIET: GuideSignals = { readingOpened: false, capturing: false, kitCopied:
 console.log("\npractice guide — a beat ticks only when the student did it")
 
 // --- the beats themselves ---
-assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.length}`)
+assert(GUIDE_STEPS.length === 8, "eight beats — the moves the work requires, and nothing optional", `got ${GUIDE_STEPS.length}`)
 {
   const keys = GUIDE_STEPS.map((s) => s.key)
   assert(new Set(keys).size === keys.length, "each beat has its own key", keys.join(", "))
@@ -122,17 +122,17 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
 // --- nothing is done at the start, on a loom that is already full ---
 {
   const state = worked()
-  const base = baselineOf(state, SRC)
-  const ticked = GUIDE_STEPS.filter((s) => stepDone(s.key, base, state, SRC, QUIET))
+  const base = baselineOf(state)
+  const ticked = GUIDE_STEPS.filter((s) => stepDone(s.key, base, state, QUIET))
   assert(
     ticked.length === 0,
     "on arrival NOTHING is ticked — even though the worked cloth is already there",
     `${ticked.map((s) => s.key).join(", ")} ticked before the student did anything`
   )
   assert(
-    standOn(base, state, SRC, QUIET) === 0,
+    standOn(base, state, QUIET) === 0,
     "the guide opens on the FIRST beat — the shelf, before anything is open",
-    `stood on ${standOn(base, state, SRC, QUIET)}`
+    `stood on ${standOn(base, state, QUIET)}`
   )
   // Re-opening half way through should land where the work got to.
   const midway: LoomState = {
@@ -142,12 +142,12 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
   }
   const midwaySignals = { ...QUIET, readingOpened: true }
   assert(
-    standOn(base, midway, SRC, midwaySignals) === 3,
+    standOn(base, midway, midwaySignals) === 3,
     "…but a student who has already opened, captured and named finds it at the next move",
-    `stood on ${standOn(base, midway, SRC, midwaySignals)}`
+    `stood on ${standOn(base, midway, midwaySignals)}`
   )
   assert(
-    stepDone("arrive", base, state, SRC, { ...QUIET, readingOpened: true }),
+    stepDone("arrive", base, state, { ...QUIET, readingOpened: true }),
     "opening the reading ticks the first beat",
     "the shelf card did not tick the beat that asks for it"
   )
@@ -156,25 +156,25 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
 // --- each beat ticks for its own gesture, and only its own ---
 {
   const state = worked()
-  const base = baselineOf(state, SRC)
+  const base = baselineOf(state)
 
   // Highlight: the capture dialog opening IS the gesture — it cannot open
   // without a selection, and the same dialog also does the naming, so waiting
   // for a passage would leave this beat unfinished until the next one is.
   assert(
-    stepDone("capture", base, state, SRC, { ...QUIET, capturing: true }),
+    stepDone("capture", base, state, { ...QUIET, capturing: true }),
     "highlighting ticks when the capture dialog opens",
     "opening the dialog did not tick the highlight beat"
   )
   assert(
-    !stepDone("name", base, state, SRC, { ...QUIET, capturing: true }),
+    !stepDone("name", base, state, { ...QUIET, capturing: true }),
     "…and opening it does NOT tick the naming beat",
     "the naming beat ticked on an unfinished capture"
   )
   // CANCELLING the dialog un-ticks it. It used to latch: cancel left the beat
   // green and the guide advanced to one about a field that no longer existed.
   assert(
-    !stepDone("capture", base, state, SRC, QUIET),
+    !stepDone("capture", base, state, QUIET),
     "…and cancelling the dialog un-ticks it — nothing was captured",
     "the highlight beat stayed green after a cancelled capture"
   )
@@ -184,28 +184,20 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
     passages: [...state.passages, passage("p5", ["c9"])],
     concepts: [...state.concepts, concept("c9")],
   }
-  assert(stepDone("name", base, captured, SRC, QUIET), "naming ticks when the passage and its concept land", "no tick")
+  assert(stepDone("name", base, captured, QUIET), "naming ticks when the passage and its concept land", "no tick")
   // REUSING a concept is the pedagogically right move — the dialog offers a
   // datalist of your own concepts and its copy invites it. Requiring a NEW
   // concept left this beat unfinishable for anyone who took the offer.
   const reused: LoomState = { ...state, passages: [...state.passages, passage("p6", ["c1"])] }
   assert(
-    stepDone("name", base, reused, SRC, QUIET),
+    stepDone("name", base, reused, QUIET),
     "…and naming an EXISTING concept ticks it too — reuse is the point",
     "filing a passage under a concept you already own did not tick the beat"
   )
-  assert(!stepDone("thread", base, captured, SRC, QUIET), "…and threading has not ticked yet", "threading ticked early")
-
-  const clothed: LoomState = { ...state, cloths: [cloth("My own headline")] }
-  assert(stepDone("cloth", base, clothed, SRC, QUIET), "the cloth ticks when its title changes", "no tick")
-  assert(
-    !stepDone("cloth", base, { ...state, cloths: [cloth("")] }, SRC, QUIET),
-    "…and clearing the title is not writing one",
-    "an empty title ticked the cloth beat"
-  )
+  assert(!stepDone("thread", base, captured, QUIET), "…and threading has not ticked yet", "threading ticked early")
 
   const threaded: LoomState = { ...state, edges: [...state.edges, edge("e3", "c1", "c3")] }
-  assert(stepDone("thread", base, threaded, SRC, QUIET), "threading ticks on a new thread", "no tick")
+  assert(stepDone("thread", base, threaded, QUIET), "threading ticks on a new thread", "no tick")
 
   // Sorting is measured per concept, not by COUNTING tiered concepts — the
   // worked cloth tiers every one, so a count could not move when the student
@@ -213,14 +205,32 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
   // un-tiered it. The beat went green for undoing the example.
   const retiered: LoomState = { ...state, maps: [map("m1", { c1: "t", c2: "s" })] }
   assert(
-    stepDone("sort", base, retiered, SRC, QUIET),
+    stepDone("sort", base, retiered, QUIET),
     "re-tiering an already-tiered concept ticks — the count would not have moved",
     "changing a concept's tier did not tick the sort beat"
   )
   const newlyTiered: LoomState = { ...state, maps: [map("m1", { c1: "p", c2: "s", c3: "t" })] }
-  assert(stepDone("sort", base, newlyTiered, SRC, QUIET), "…so does tiering one that had none", "no tick")
+  assert(stepDone("sort", base, newlyTiered, QUIET), "…so does tiering one that had none", "no tick")
+  // Sorting and making a projection are separate beats now (TJ, 2026-08-12),
+  // so neither may answer for the other: a new projection arrives EMPTY.
   const another: LoomState = { ...state, maps: [...state.maps, map("m2", {})] }
-  assert(stepDone("sort", base, another, SRC, QUIET), "…and so does a second projection", "no tick")
+  assert(
+    stepDone("project", base, another, QUIET) && !stepDone("sort", base, another, QUIET),
+    "a new projection ticks MAKING one, and not sorting it",
+    "making a projection was mistaken for sorting it"
+  )
+  // Arranging is its own gesture — and the only student act the graph does not
+  // otherwise record, since red line 7 keeps DERIVED layout out of the
+  // database and a drag is not derived.
+  const dragged: LoomState = {
+    ...state,
+    views: { ...state.views, "map:m1": { positions: { c1: { x: 0.4, y: 96 } }, bends: {} } },
+  }
+  assert(
+    stepDone("board", base, dragged, QUIET) && !stepDone("board", base, state, QUIET),
+    "moving a card ticks arranging the board, and nothing else does",
+    "the board beat did not follow a card"
+  )
   // Deleting a concept strips its tier from every map. That is not sorting.
   const deleted: LoomState = {
     ...state,
@@ -228,13 +238,13 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
     maps: [map("m1", { c1: "p" })],
   }
   assert(
-    !stepDone("sort", base, deleted, SRC, QUIET),
+    !stepDone("sort", base, deleted, QUIET),
     "…but deleting a concept is NOT — its tier vanishing is not a sort",
     "deleting a concept ticked the sort beat"
   )
 
-  assert(stepDone("kit", base, state, SRC, { ...QUIET, kitCopied: true }), "the kit ticks when it is downloaded", "no tick")
-  assert(!stepDone("kit", base, state, SRC, QUIET), "…and not before", "the kit ticked untaken")
+  assert(stepDone("kit", base, state, { ...QUIET, kitCopied: true }), "the kit ticks when it is downloaded", "no tick")
+  assert(!stepDone("kit", base, state, QUIET), "…and not before", "the kit ticked untaken")
 }
 
 // --- an EMPTY practice loom (the reading could not carry the example) ---
@@ -243,11 +253,11 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
     concepts: [], passages: [], edges: [], links: [], maps: [], cloths: [],
     views: { cardTable: { positions: {}, bends: {} } },
   }
-  const base = baselineOf(empty, SRC)
-  const ticked = GUIDE_STEPS.filter((s) => stepDone(s.key, base, empty, SRC, QUIET))
+  const base = baselineOf(empty)
+  const ticked = GUIDE_STEPS.filter((s) => stepDone(s.key, base, empty, QUIET))
   assert(ticked.length === 0, "an empty practice loom ticks nothing either", ticked.map((s) => s.key).join(", "))
   const one: LoomState = { ...empty, passages: [passage("p1", ["c1"])], concepts: [concept("c1")] }
-  assert(stepDone("name", base, one, SRC, QUIET), "and the first capture still ticks", "no tick on an empty baseline")
+  assert(stepDone("name", base, one, QUIET), "and the first capture still ticks", "no tick on an empty baseline")
 }
 
 // --- the interface raises the two signals the state cannot carry ---
@@ -342,6 +352,19 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
     /\.gpane\{[^}]*pointer-events:auto/.test(css),
     "the mask panes block by geometry",
     "a pane that takes no pointer events constrains nothing"
+  )
+  // The "you are in the guide" notice used to sit at 898, under the panes, so
+  // the mask dimmed it and a cutout edge ran straight through the sentence.
+  const band = rung(".practiceband")
+  assert(
+    band > mask && band > pop,
+    "the guide's own notice rides above its mask",
+    `band ${band} vs mask ${mask} / popover ${pop} — the mask would slice it`
+  )
+  assert(
+    /\.practiceband\{[^}]*pointer-events:none/.test(css),
+    "…and eats nothing, sitting that high over a live cutout",
+    "fixed chrome above the mask with pointer events is an invisible click-eater"
   )
   assert(
     /\.guideglow\{[^}]*pointer-events:none/.test(css),
