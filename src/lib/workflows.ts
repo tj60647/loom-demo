@@ -102,7 +102,10 @@ const student: Flow = {
     // ruled the whole weave out of the app entirely ("poorly defined and not
     // supported in the course"). Nothing goes back here until the faculty and
     // the authors agree what a full weave is.
-    { id: "keep", label: "Export the cloth or a projection", where: "Keep", kind: "end" },
+    // The terminal was "Export the cloth or a projection · Keep" until
+    // 2026-08-11, when Keep was deleted and download moved to each object.
+    // The step did not go away; it stopped being a place you travel to.
+    { id: "keep", label: "Download your work where you made it", where: "01 cloth · 02 threads · 03 a projection", kind: "end" },
   ],
   edges: [
     { from: "invited", to: "signin" },

@@ -124,11 +124,15 @@ export const CAPABILITIES: Capability[] = [
     enforcement: "server",
   },
   {
-    id: "keep-export",
-    name: "Export, import, reset your own cloth",
+    id: "object-download",
+    name: "Download your work — the cloth, its threads, a projection, your vocabulary, the log",
     group: "Reading and weaving",
     student: { verdict: "yes" }, faculty: { verdict: "yes" }, admin: { verdict: "yes" },
-    gate: { file: "src/actions/loom.ts", symbol: "resetGraph" },
+    // Every download is built in the browser from the loom this read returns,
+    // so the gate that matters is the one on reading your own rows. There is
+    // no export endpoint to gate. Import and reset were here until
+    // 2026-08-11 and no longer exist at all.
+    gate: { file: "src/actions/loom.ts", symbol: "getUserLoomData" },
     enforcement: "server",
   },
 

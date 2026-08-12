@@ -5,7 +5,7 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 
 /**
  * Download at the object (TJ, 2026-08-10). These files become the ONLY way a
- * student's work leaves Loom once Keep is gone, so the thing worth guarding
+ * student's work leaves Loom now that Keep is gone, so the thing worth guarding
  * is not that a button exists — it is that the button hands over a file with
  * the work actually in it. A builder that silently dropped passages would
  * still download something that opens.

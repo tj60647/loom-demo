@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react"
 import { useParams } from "next/navigation"
 import type { Passage, CardTableView, Cloth, Concept, Edge, Link, LoomMap, LoomState, LoomViews, Tier } from "@/lib/types"
 import { asLoomState, scopeOf, scopedGraph, soleSourceId, WHOLE_WEAVE, type Scope, type ScopedGraph } from "@/lib/scope"
-import { emptyViews, parseImport, type ParsedMapImport } from "@/lib/graphExport"
+import { emptyViews } from "@/lib/graphExport"
 import { getUserLoomData } from "@/lib/reads"
 import {
   createConcept, updateConcept, deleteConcept, mergeConcepts as mergeConceptsAction,
@@ -14,7 +14,6 @@ import {
   createLink, updateLink, attachLink as attachLinkAction,
   saveView, saveCloth as saveClothAction,
   createMap as createMapAction, updateMap as updateMapAction, deleteMap as deleteMapAction,
-  importGraph, importMapArrangement, resetGraph, loadWorkedExample,
 } from "@/actions/loom"
 
 /**
@@ -27,13 +26,14 @@ import {
  */
 export interface LoomContextType {
   /**
-   * The WHOLE graph, always. Export, import and reset work on this — the
-   * artifact is never a slice (red line #5).
+   * The WHOLE graph, always. Each object's own download slices it at the
+   * point of export; nothing else does (red line #5).
    */
   state: LoomState
   /**
    * The reading the student is working in, read off the route. `WHOLE_WEAVE`
-   * everywhere except `/reading/[sourceId]`.
+   * is what a surface that is not a reading gets — the Library — and since
+   * 2026-08-11 no student surface works in it.
    */
   scope: Scope
   /** The graph seen through `scope`, plus its bridges — derived, never stored. */
@@ -108,15 +108,6 @@ export interface LoomContextType {
    * is itself a student gesture's consequence, and it is flashed.
    */
   ensureActiveMap: () => Promise<LoomMap>
-  importFromText: (raw: string) => Promise<void>
-  /**
-   * Add one map file as a new parallel sibling — nothing replaced. Tiers and
-   * geometry land on the cards still on the table; the count that did not
-   * resolve comes back for the caller to report.
-   */
-  importMapFile: (parsed: ParsedMapImport) => Promise<{ skipped: number }>
-  resetAll: () => Promise<void>
-  loadExample: () => Promise<void>
   /** Transient status line (v14's saveDot): '· saved ·', '· copied ·', errors. */
   flashMsg: string | null
   flash: (msg: string) => void
@@ -829,57 +820,10 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }, 500))
   }
 
-  // A replace-the-graph operation must not race a stale debounced save: a
-  // pending view/map write landing after the replacement would resurrect
-  // pre-replacement state on the server.
-  const cancelPendingSaves = useCallback(() => {
-    viewTimers.current.forEach((timer) => window.clearTimeout(timer))
-    viewTimers.current.clear()
-    pendingViews.current.clear()
-    window.clearTimeout(mapTextTimer.current)
-    pendingMapText.current.clear()
-  }, [])
-
-  const importFromText = async (raw: string) => {
-    const parsed = parseImport(raw) // throws with a friendly message on bad input
-    cancelPendingSaves()
-    setSelectedByScope({})
-    try {
-      const data = await importGraph(parsed)
-      applyTruth(data)
-      flash("imported")
-    } catch (e) {
-      // The batch is atomic server-side, but the client must not keep showing
-      // a graph the server may or may not hold — reload the truth.
-      try { await loadLoom() } catch { /* initial load error path already logs */ }
-      throw e
-    }
-  }
-
-  const importMapFile = async (parsed: ParsedMapImport) => {
-    const { data, mapId, scopeKey, skipped } = await importMapArrangement(parsed)
-    applyTruth(data)
-    // Make the arrival visible: the new map is the selected one in its scope.
-    setSelectedByScope((prev) => ({ ...prev, [scopeKey]: mapId }))
-    flash(skipped > 0 ? `projection added — ${skipped} card${skipped !== 1 ? "s" : ""} not on this table` : "projection added")
-    return { skipped }
-  }
-
-  const resetAll = async () => {
-    cancelPendingSaves()
-    setSelectedByScope({})
-    await resetGraph()
-    applyTruth(blankState())
-    flash("cleared — the history of your weaving is kept")
-  }
-
-  const loadExample = async () => {
-    cancelPendingSaves()
-    setSelectedByScope({})
-    const data = await loadWorkedExample()
-    applyTruth(data)
-    flash("worked example loaded — explore it, then reset")
-  }
+  // `cancelPendingSaves` stood here — it existed so a replace-the-graph
+  // operation could not race a stale debounced write. Import and reset were
+  // the only two, and both went with Keep on 2026-08-11; nothing replaces the
+  // graph wholesale any more, so nothing needs the guard.
 
   return (
     <LoomContext.Provider value={{
@@ -894,7 +838,6 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       selectMap, addMap, renameMap, removeMap,
       setMapTiers, setMapRead, setMapEssence, flushMapText,
       setView, ensureActiveMap,
-      importFromText, importMapFile, resetAll, loadExample,
       flashMsg, flash,
       undoStack, setUndoStack, redoStack, setRedoStack
     }}>

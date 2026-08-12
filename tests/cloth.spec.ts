@@ -5,7 +5,7 @@
  * Reading, the work surface a cloth starts on).
  *
  * Unlike the journey file this spec cannot remove what it makes — the UI has
- * no single-cloth delete (Keep's reset clears everything, far too blunt) — so
+ * no single-cloth delete (reset was far too blunt, and went with Keep) — so
  * it is written to pass against both a virgin and an already-clothed seed:
  * whichever of Create/Open the card offers is the door it takes, and the
  * title is only saved when it differs.

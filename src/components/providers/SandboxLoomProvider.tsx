@@ -26,10 +26,20 @@
  * difference, and keeping it that narrow is what stops this file rotting
  * into a second, subtly different Loom.
  *
- * WHAT IS DELIBERATELY MISSING. No import, no worked example: both would
- * bring in content the student might want to keep, and nothing here can be
- * kept (see the band in `SandboxWorkbench`). `resetAll` stays — clearing your
- * own practice is a reasonable thing to want, and here it costs nothing.
+ * WHAT IS DELIBERATELY MISSING. It starts EMPTY. There was no import and no
+ * worked example here even while those existed, because both bring in content
+ * a student might want to keep and nothing here can be kept (see the band in
+ * `SandboxWorkbench`); they were deleted outright on 2026-08-11, along with
+ * the local "clear my practice" that only Keep ever rendered.
+ *
+ * Starting empty is a choice, not a conclusion. TJ, 2026-08-11: "i have yet to
+ * see the practice loom, but i imagine we can use the worked example content
+ * in it?" A practice loom that also SHOWS a worked cloth is a different and
+ * probably better thing than one that only offers the gestures — see
+ * docs/open-work.md. It would have to be built from the practice reading's own
+ * pages, though: the deleted example was Star & Griesemer, and salting Novak &
+ * Gowin's text with another book's passages would teach the wrong thing about
+ * what a passage is.
  */
 
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react"
@@ -416,13 +426,6 @@ export default function SandboxLoomProvider({
     flushMapText: () => {},
     setView,
     ensureActiveMap,
-    // Refused on purpose: both bring in content a student might want to keep,
-    // and the practice loom keeps nothing.
-    importFromText: async () => { flash("not in practice") },
-    importMapFile: async () => { flash("not in practice"); return { skipped: 0 } },
-    loadExample: async () => { flash("not in practice") },
-    // Clearing your own practice is free and reasonable.
-    resetAll: async () => { setState(blank()); setSelectedMapId(null); flash("· cleared ·") },
     flashMsg,
     flash,
     undoStack,

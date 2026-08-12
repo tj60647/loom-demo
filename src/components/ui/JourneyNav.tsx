@@ -27,7 +27,7 @@ import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 
-export type Station = "readings" | "open" | "throw" | "read" | "map" | "keep"
+export type Station = "readings" | "open" | "throw" | "read" | "map"
 
 const STATIONS: { key: Station; label: string; hidden?: boolean }[] = [
   { key: "readings", label: "Library" },
@@ -39,6 +39,9 @@ const STATIONS: { key: Station; label: string; hidden?: boolean }[] = [
   // Graph, and `?tab=` keeps speaking them (refactor spec §F).
   { key: "map", label: "Knowledge Graph" },
   { key: "read", label: "Vocabulary" },
+  // "Keep" was station 05 until 2026-08-11. Download happens at each object
+  // now — the cloth at 01, threads at 02, a projection and the Capture Log at
+  // 03, vocabulary at 04 — so the bar is exactly the model's five.
   // There was a hidden "weave" station here, and a `/weave` route behind it.
   // TJ retired both on 2026-08-11: "we are removing whole weave as it exists
   // in the app because it is poorly defined and not supported in the course.
@@ -46,7 +49,6 @@ const STATIONS: { key: Station; label: string; hidden?: boolean }[] = [
   // the app agree on what it means to have a 'full weave'." Hiding it was not
   // enough — the route had no gate, and the Library's search results linked
   // straight into it.
-  { key: "keep", label: "Keep" },
 ]
 
 /** The visible stations, each with the number it shows. */
@@ -77,7 +79,6 @@ const DEFAULT_HREF: Record<Station, string> = {
   throw: "/",
   read: "/",
   map: "/",
-  keep: "/keep",
 }
 
 /**

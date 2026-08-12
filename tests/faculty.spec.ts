@@ -43,7 +43,8 @@ test("the nav offers the read side only — no Readings, no Courses", async ({ p
   await expect(staff.getByRole("link", { name: "Cohort Graph" })).toBeVisible()
   // Their own learner surfaces, on the same bar and one click away.
   await expect(nav.getByRole("link", { name: /Library/ })).toBeVisible()
-  await expect(nav.getByRole("link", { name: /Keep/ })).toBeVisible()
+  // Keep was the second one here until 2026-08-11; the Library is the only
+  // learner station that is a link rather than a tab inside a reading.
   // Workflows sits right of Courses in the staff group (TJ, 2026-08-09) and is
   // therefore NOT duplicated in the header — it is drawn there only for someone
   // with no staff group to carry it. It is still not an admin surface: a

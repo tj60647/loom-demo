@@ -30,9 +30,8 @@ export default function Shelf() {
   // See the note in Workbench: `status` is what distinguishes "nobody is
   // signed in" from "we have not asked yet".
   const { data: session, status } = useSession()
-  const { state, isLoading, loadExample, flash } = useLoom()
+  const { state, isLoading } = useLoom()
   const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
-  const [exampleBusy, setExampleBusy] = useState(false)
   // The search bar sits behind a toggle, the reading's own ⌕ Search idiom.
   // While a query is live the results own the page; clearing the box — or
   // closing the panel — puts the week-grouped shelf back exactly as it was.
@@ -188,17 +187,6 @@ export default function Shelf() {
     )
   }
 
-  const handleLoadExample = async () => {
-    setExampleBusy(true)
-    try {
-      await loadExample()
-    } catch (e) {
-      flash(e instanceof Error ? e.message : "could not load the example")
-    } finally {
-      setExampleBusy(false)
-    }
-  }
-
   return (
     <>
       <JourneyNav active="readings" />
@@ -297,16 +285,24 @@ export default function Shelf() {
           <AddOwnReading onAdded={refresh} />
         </section>
 
+        {/* The worked example used to sit here — a finished weave loaded into
+            the student's OWN loom, whose only exit was Keep's reset. Both went
+            on 2026-08-11: a tutorial that writes into your real work is the
+            problem, and the practice loom is the answer to it (TJ, 2026-08-10:
+            "in many games the actual interface is used for the tutorial").
+            This is also the first door to `/sandbox` — the student flow has
+            drawn a `library → practice` edge since it was built, and until now
+            nothing in the app took it. */}
         {!isLoading && state.concepts.length === 0 && (
           <div className="card" style={{ marginTop: 8 }}>
             <h2>New to this?</h2>
             <p className="hint">
-              A finished weave to poke at — Star &amp; Griesemer, already captured, threaded
-              and read. Explore it, then clear it from Keep to start your own.
+              Try the moves first on the practice loom — the real interface on a real
+              reading. Highlight a passage, name what it evidences, thread two concepts
+              together, lay out a board. <b>Nothing there is kept</b>, so nothing you do
+              can go wrong.
             </p>
-            <button className="btn ghost mini" onClick={handleLoadExample} disabled={exampleBusy}>
-              load the worked example
-            </button>
+            <Link className="btn ghost mini" href="/sandbox">open the practice loom</Link>
           </div>
         )}
         </>)}

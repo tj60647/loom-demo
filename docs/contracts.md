@@ -299,6 +299,34 @@
 > evidence is** (`sourceId` on each hit). A hit with no reading — a concept
 > named ahead of its evidence, a Link nothing uses yet, an untethered passage
 > — is still shown, as a dashed row that says why it is not a door.
+>
+> **Keep is deleted, and with it import, reset and the worked example**
+> (2026-08-11, closing keep-at-the-object §6 step 6). Gone: `/keep`,
+> `KeepPage`, `KeepTab`, `src/lib/example.ts`, the four server actions
+> (`importGraph`, `importMapArrangement`, `resetGraph`, `loadWorkedExample` —
+> 428 lines), the four provider methods and their context members in BOTH
+> providers, `scripts/check-import-compat.ts` and its slot in the check chain,
+> and the whole-graph half of `graphExport.ts` (`buildExport`,
+> `buildMarkdown`, `exportFilename`, `parseImport`, `parseAnyImport`,
+> `ParsedImport`, `ParsedMapImport`) — that file is now the per-Projection
+> export and `scopeLabelOf`, 211 lines from 815.
+>
+> **What deliberately stays.** `HistoryPanel`'s cases for the four dead event
+> kinds: nothing emits them again, but the Capture Log is append-only and a
+> student who imported or reset still has those rows. `buildMapExport` and its
+> two siblings — the projection download the ruling names explicitly. And the
+> capability row, rewritten rather than deleted: `keep-export` ("Export,
+> import, reset your own cloth", gated on `resetGraph`) became
+> `object-download`, gated on `getUserLoomData`, because every download is
+> built in the browser from that read and there is no export endpoint to gate.
+>
+> **The worked example's replacement.** Its only exit was the reset that went
+> with Keep, so it could not survive; the practice loom (`/sandbox`) answers
+> the need, and the Library's "New to this?" card now opens it. That card is
+> also the FIRST door to `/sandbox` in the app — the student flow has drawn a
+> `library → practice` edge since the practice loom was built, and nothing
+> took it until now. Still open, and TJ's: the practice loom starts EMPTY, so
+> it teaches the gestures but shows no finished cloth (open-work).
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
@@ -594,7 +622,7 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | 03 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, **the list and the board** (the sorted rows and the tiered card-and-thread surface — "board", never "table", which reads as a spreadsheet on a screen; TJ 2026-08-10); the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); **the Capture Log for this reading** (`HistoryPanel` — the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**), downloadable |
 | **04 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); **merge Concepts — its only home**; Concepts/Links Overlays |
 | ~~05 Weave~~ | — | **GONE, route and station, 2026-08-11.** Hiding it had not been enough: `/weave` carried no gate of any kind, and the Library's search results linked into it in four places. **TJ:** *"we are removing whole weave as it exists in the app because it is poorly defined and not supported in the course. it should not be in the app as an idea until the faculty and the authors of the app agree on what it means to have a 'full weave'."* `Workbench` now requires a reading; `WHOLE_WEAVE` survives only as the internal scope of surfaces that are not a reading (the Library), and no student surface writes at `scopeKey ''`. Rows already written there are left where they are — TJ: *"i am not at all worried about losing whole weave"* — and are simply not rendered |
-| 05 Keep | `KeepTab` (`/keep`) | export/import/reset — ratified as a deviation from the model's five (D4) — **and the Capture Log** (`HistoryPanel`), moved here from the whole weave because that was its only render AND no export contains `graphEvents`, so withdrawing `/weave` would have made it unreachable and unkeepable at once (red line 5). **TJ, 2026-08-09: Keep is "more about the student library or cloth collection" than a whole weave** — so it is not the whole weave's home, and the "every reading at once" framing is what that ruling narrows |
+| ~~05 Keep~~ | — | **GONE, 2026-08-11.** Download happens at each object instead — the cloth at 01, threads at 02, a projection and the Capture Log at 03, vocabulary at 04 — which is what the model said all along (*"Export — both levels: a Cloth … and a Projection"*). Import, "clear the table" and "take it all out" went with it (TJ, 2026-08-10), and so did the worked example, whose only exit was that reset; the practice loom at `/sandbox` replaced it, and the Library's "New to this?" card is now its first door. The bar is the model's five, 00–04 |
 
 **A Concept with no Passages is in scope everywhere.** `scoped()` in
 [scope.ts](../src/lib/scope.ts) reads

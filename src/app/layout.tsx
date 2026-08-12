@@ -40,7 +40,7 @@ export default function RootLayout({
               <DialogProvider>
                 <Header deployEnv={deployEnv} />
                 {/* One mount, here, so the header's "?" always has a listener.
-                    It used to live on the shelf, Keep and the workbench only —
+                    It used to live on the shelf and the workbench only —
                     which left the button dead on every /admin page, where the
                     header still drew it (TJ, 2026-08-08). It decides for itself
                     whether to open unprompted. */}
