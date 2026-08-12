@@ -55,6 +55,12 @@ function reviveLoomState(raw: LoomState): LoomState {
     concepts: raw.concepts.map((c) => ({ ...c, createdAt: asDate(c.createdAt) })),
     passages: raw.passages.map((b) => ({ ...b, createdAt: asDate(b.createdAt) })),
     edges: raw.edges.map((e) => ({ ...e, createdAt: asDate(e.createdAt) })),
+    // Links revive like everything else. Missing this shipped in 960c2af and
+    // is invisible to tsc — the JSON cast below asserts LoomState, so a
+    // createdAt that is really a string type-checks as a Date until something
+    // calls a Date method on it. The homonym rule ("earliest coined wins") is
+    // exactly such a caller.
+    links: raw.links.map((l) => ({ ...l, createdAt: asDate(l.createdAt) })),
     maps: raw.maps.map((m) => ({ ...m, createdAt: asDate(m.createdAt), updatedAt: asDate(m.updatedAt) })),
     cloths: raw.cloths.map((c) => ({ ...c, createdAt: asDate(c.createdAt), updatedAt: asDate(c.updatedAt) })),
   }

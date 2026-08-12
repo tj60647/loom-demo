@@ -21,6 +21,7 @@
 
 import { scopeFromKey, scopedGraph } from "./scope"
 import { scopeLabelOf } from "./graphExport"
+import { usesOf } from "./linkResolve"
 import type { GraphEvent, LoomExport, LoomState, Tier } from "./types"
 
 export const LOOM_CLOTH_FORMAT = "loom-cloth"
@@ -261,15 +262,15 @@ export type LoomVocabularyExport = {
     readings: number
     passages: number
   }[]
-  linkLabels: { handle: string; uses: number }[]
+  /** The Link objects the student owns (5.1) — including any no thread uses. */
+  linkLabels: { label: string; description: string; uses: number }[]
 }
 
 export function buildVocabularyExport(state: LoomState, provenance: ExportProvenance): LoomVocabularyExport {
-  const uses = new Map<string, number>()
-  for (const e of state.edges) {
-    const h = (e.handle || "").trim()
-    if (h) uses.set(h, (uses.get(h) ?? 0) + 1)
-  }
+  // From the Link OBJECTS, not by grouping handles: a Link nobody has used
+  // yet is part of the vocabulary the student owns, and a file that omitted
+  // it would disagree with the list it was downloaded from.
+  const uses = usesOf(state.links, state.edges)
   return {
     format: LOOM_VOCABULARY_FORMAT,
     provenance,
@@ -284,9 +285,9 @@ export function buildVocabularyExport(state: LoomState, provenance: ExportProven
         passages: own.length,
       }
     }),
-    linkLabels: [...uses.entries()]
-      .map(([handle, n]) => ({ handle, uses: n }))
-      .sort((a, b) => a.handle.localeCompare(b.handle)),
+    linkLabels: state.links
+      .map((l) => ({ label: l.label, description: l.description, uses: (uses.get(l.id) ?? []).length }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
   }
 }
 
@@ -302,7 +303,7 @@ export function buildVocabularyMarkdown(state: LoomState, provenance: ExportProv
   }
   out.push("", `## Link labels (${data.linkLabels.length})`, "")
   if (!data.linkLabels.length) out.push("_None coined yet._")
-  for (const l of data.linkLabels) out.push(`- **${l.handle}** (${l.uses})`)
+  for (const l of data.linkLabels) out.push(`- **${l.label}** (${l.uses} thread${l.uses !== 1 ? "s" : ""})${l.description ? ` — ${l.description}` : ""}`)
   return out.join("\n")
 }
 

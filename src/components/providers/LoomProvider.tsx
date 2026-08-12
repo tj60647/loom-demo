@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { useParams } from "next/navigation"
-import type { Passage, CardTableView, Cloth, Concept, Edge, LoomMap, LoomState, LoomViews, Tier } from "@/lib/types"
+import type { Passage, CardTableView, Cloth, Concept, Edge, Link, LoomMap, LoomState, LoomViews, Tier } from "@/lib/types"
 import { asLoomState, scopeOf, scopedGraph, soleSourceId, WHOLE_WEAVE, type Scope, type ScopedGraph } from "@/lib/scope"
 import { emptyViews, parseImport, type ParsedMapImport } from "@/lib/graphExport"
 import { getUserLoomData } from "@/lib/reads"
@@ -11,6 +11,7 @@ import {
   createConcept, updateConcept, deleteConcept, mergeConcepts as mergeConceptsAction,
   createPassage, deletePassage, refilePassage as refilePassageAction, unfilePassage as unfilePassageAction, attributePassages as attributePassagesAction,
   createEdge, updateEdge, deleteEdge,
+  createLink, updateLink, attachLink as attachLinkAction,
   saveView, saveCloth as saveClothAction,
   createMap as createMapAction, updateMap as updateMapAction, deleteMap as deleteMapAction,
   importGraph, importMapArrangement, resetGraph, loadWorkedExample,
@@ -67,6 +68,18 @@ export interface LoomContextType {
   addEdge: (fromId: string, toId: string, sentence: string) => Promise<Edge>
   editEdge: (id: string, data: Partial<{handle: string, sentence: string}>) => Promise<void>
   removeEdge: (id: string) => Promise<void>
+  /**
+   * The Link vocabulary the student owns (5.1) — user-level, like concepts.
+   * A Link with no Thread using it lives here and nowhere else, which is the
+   * state the object exists for (TJ, 2026-08-10).
+   */
+  links: Link[]
+  /** Coin a Link, or return the one already owned for that label. */
+  addLink: (label: string, description?: string) => Promise<Link>
+  /** Sharpen a Link's label or its own gloss — shared by every Thread using it. */
+  editLink: (id: string, data: Partial<{ label: string; description: string }>) => Promise<void>
+  /** Point a Thread at a Link the student already owns — attach, never copy. */
+  attachLink: (edgeId: string, linkId: string | null) => Promise<void>
   /** All of the student's maps, capture order. */
   maps: LoomMap[]
   /** Maps whose scopeKey is the current scope's, capture order. */
@@ -537,6 +550,59 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // --- LINKS (5.1) ---
+
+  /**
+   * Coin a Link, or adopt the one already owned for that label. Not
+   * optimistic: the server decides whether this is a new object or one the
+   * student already has, and guessing locally would show a duplicate row for
+   * a beat and then take it away. The act is a deliberate one on a small
+   * list, so the round trip is affordable.
+   */
+  const addLink = async (label: string, description?: string) => {
+    const saved = await createLink({ label, description })
+    applyLocal(s => ({
+      ...s,
+      links: s.links.some(l => l.id === saved.id)
+        ? s.links.map(l => (l.id === saved.id ? saved : l))
+        : [...s.links, saved],
+    }))
+    savedOk()
+    return saved
+  }
+
+  const editLink = async (id: string, data: Partial<{ label: string; description: string }>) => {
+    applyLocal(s => ({
+      ...s,
+      links: s.links.map(l => (l.id === id ? { ...l, ...data } : l)),
+      // A rename fans out to every thread's legacy copy server-side; mirror
+      // it locally or the board and the list disagree until the next reload.
+      edges: typeof data.label === "string"
+        ? s.edges.map(e => (e.linkId === id ? { ...e, handle: data.label! } : e))
+        : s.edges,
+    }))
+    try {
+      await updateLink(id, data)
+      savedOk()
+    } catch (e) {
+      await resync(e)
+    }
+  }
+
+  const attachLink = async (edgeId: string, linkId: string | null) => {
+    const link = linkId ? state.links.find(l => l.id === linkId) ?? null : null
+    applyLocal(s => ({
+      ...s,
+      edges: s.edges.map(e => (e.id === edgeId ? { ...e, linkId, handle: link?.label ?? "" } : e)),
+    }))
+    try {
+      await attachLinkAction(await resolveEdgeId(edgeId), linkId)
+      savedOk()
+    } catch (e) {
+      await resync(e)
+    }
+  }
+
   // --- MAPS ---
 
   const selectMap = (id: string) => {
@@ -809,6 +875,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       addPassage, removePassage, refilePassage, unfilePassage, attributePassages,
       activeCloth, updateCloth,
       addEdge, editEdge, removeEdge,
+      links: state.links, addLink, editLink, attachLink,
       maps: state.maps, scopeMaps, activeMap,
       selectMap, addMap, renameMap, removeMap,
       setMapTiers, setMapRead, setMapEssence, flushMapText,

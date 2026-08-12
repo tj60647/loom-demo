@@ -41,11 +41,13 @@ import {
   asLoomState,
   type Scope,
 } from "@/lib/scope"
+import { findLink } from "@/lib/linkResolve"
 import type {
   CardTableView,
   Cloth,
   Concept,
   Edge,
+  Link,
   LoomMap,
   LoomState,
   Passage,
@@ -259,6 +261,58 @@ export default function SandboxLoomProvider({
     noted()
   }, [noted])
 
+  // --- links (5.1) ---
+  //
+  // Mirrors the server's rules through the SHARED resolver so the two cannot
+  // drift: coining a word already owned adopts it, an offered gloss fills an
+  // empty one, and a rename fans out to the legacy handle on every thread.
+
+  const addLink = useCallback(async (label: string, description?: string) => {
+    const trimmed = label.trim()
+    if (!trimmed) throw new Error("A link needs a label.")
+    let out: Link | null = null
+    setState((s) => {
+      const existing = findLink(s.links, trimmed)
+      if (existing) {
+        if (description && !existing.description) {
+          out = { ...existing, description }
+          return { ...s, links: s.links.map((l) => (l.id === existing.id ? out! : l)) }
+        }
+        out = existing
+        return s
+      }
+      out = {
+        id: newId(), courseId: null, userId: uid,
+        label: trimmed, description: description ?? "", createdAt: now(),
+      }
+      return { ...s, links: [...s.links, out] }
+    })
+    noted()
+    return out!
+  }, [uid, noted])
+
+  const editLink = useCallback(async (id: string, data: Partial<{ label: string; description: string }>) => {
+    setState((s) => ({
+      ...s,
+      links: s.links.map((l) => (l.id === id ? { ...l, ...data } : l)),
+      edges: typeof data.label === "string"
+        ? s.edges.map((e) => (e.linkId === id ? { ...e, handle: data.label! } : e))
+        : s.edges,
+    }))
+    noted()
+  }, [noted])
+
+  const attachLink = useCallback(async (edgeId: string, linkId: string | null) => {
+    setState((s) => {
+      const link = linkId ? s.links.find((l) => l.id === linkId) ?? null : null
+      return {
+        ...s,
+        edges: s.edges.map((e) => (e.id === edgeId ? { ...e, linkId, handle: link?.label ?? "" } : e)),
+      }
+    })
+    noted()
+  }, [noted])
+
   // --- projections ---
 
   const scopeMaps = useMemo(() => state.maps.filter((m) => m.scopeKey === scopeKey), [state.maps, scopeKey])
@@ -321,9 +375,12 @@ export default function SandboxLoomProvider({
     unfilePassage,
     activeCloth,
     updateCloth,
-    addEdge,
-    editEdge,
+    addEdge,    editEdge,
     removeEdge,
+    links: state.links,
+    addLink,
+    editLink,
+    attachLink,
     maps: state.maps,
     scopeMaps,
     activeMap,

@@ -22,6 +22,7 @@ import { useDialog } from "@/components/providers/DialogProvider"
 import type { Concept, Edge } from "@/lib/types"
 import { soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
+import { usesOf } from "@/lib/linkResolve"
 import ObjectDownload from "@/components/ui/ObjectDownload"
 import { buildVocabularyExport, buildVocabularyMarkdown } from "@/lib/objectExport"
 import VocabularyOverlay from "@/components/tabs/VocabularyOverlay"
@@ -36,6 +37,7 @@ export default function VocabularyTab() {
   const {
     state, scope, scoped,
     editConcept, removeConcept, mergeConcepts, editEdge, flash,
+    addLink, editLink,
   } = useLoom()
   const { titleOf, course } = useReadings()
   const isStaff = !!course?.isStaff
@@ -47,6 +49,31 @@ export default function VocabularyTab() {
   const [openLabels, setOpenLabels] = useState<Record<string, boolean>>({})
   const [mergeInputs, setMergeInputs] = useState<Record<string, string>>({})
   const [mergeBusy, setMergeBusy] = useState<Record<string, boolean>>({})
+  const [coinLabel, setCoinLabel] = useState("")
+  const [coining, setCoining] = useState(false)
+
+  /**
+   * Coin a Link with nothing using it yet. Reuse is silent by design: asking
+   * for a word you already own opens the one you have rather than warning —
+   * the point of the object is that reaching for a word twice is ONE word,
+   * and a dialog there would teach that recurrence is exceptional when it is
+   * the goal.
+   */
+  const coin = async () => {
+    const label = coinLabel.trim()
+    if (!label || coining) return
+    setCoining(true)
+    try {
+      const link = await addLink(label)
+      setCoinLabel("")
+      setOpenLabels((p) => ({ ...p, [link.id]: true }))
+      flash("· coined ·")
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "could not coin that")
+    } finally {
+      setCoining(false)
+    }
+  }
 
   const cq = conceptFilter.trim().toLowerCase().replace(/\s+/g, " ")
   const lq = labelFilter.trim().toLowerCase().replace(/\s+/g, " ")
@@ -83,29 +110,39 @@ export default function VocabularyTab() {
    * they are legal (a Description without a Label is the ruled order) and
    * hiding them would make the list lie about how much is still loose.
    */
-  const labelGroups = useMemo(() => {
-    const groups = new Map<string, Edge[]>()
-    for (const edge of state.edges) {
-      const key = (edge.handle ?? "").trim()
-      if (!key) continue
-      const list = groups.get(key) ?? []
-      list.push(edge)
-      groups.set(key, list)
-    }
-    return [...groups.entries()].sort(
-      (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0])
-    )
-  }, [state.edges])
+  /**
+   * The Link List, read from the OBJECTS the student owns (5.1) rather than
+   * derived by grouping strings off threads. Two consequences worth naming:
+   *
+   *  · A Link with NO thread is a row here. That state is the reason the
+   *    object exists (TJ, 2026-08-10) and it was unrepresentable before.
+   *  · The old grouping keyed on a TRIMMED but case-SENSITIVE handle, so
+   *    "Leads to" and "leads to" were two rows. Links fold case, so such a
+   *    loom now shows one. That is a correction, not a loss — the two were
+   *    always one word — and the merge of true duplicates lands in 5.1c.
+   */
+  const linkRows = useMemo(() => {
+    const uses = usesOf(state.links, state.edges)
+    return state.links
+      .map((link) => ({ link, edges: uses.get(link.id) ?? [] }))
+      .sort((a, b) => b.edges.length - a.edges.length || a.link.label.localeCompare(b.link.label))
+  }, [state.links, state.edges])
 
-  const looseLinks = state.edges.filter((e) => !(e.handle ?? "").trim())
+  // Threads carrying no label at all — still edge-derived, because that is
+  // what they are. Guarded on BOTH: while `handle` survives, a thread can
+  // carry a legacy label with no linkId and is not loose.
+  const looseLinks = state.edges.filter((e) => !e.linkId && !(e.handle ?? "").trim())
 
   const labelOf = (id: string) => state.concepts.find((c) => c.id === id)?.label ?? "?"
 
   const visibleConcepts = sortedByLabel(state.concepts).filter(
     (c) => matches(c.label, cq) || matches(c.def, cq)
   )
-  const visibleLabels = labelGroups.filter(
-    ([label, edges]) => matches(label, lq) || edges.some((e) => matches(e.sentence, lq))
+  const visibleLabels = linkRows.filter(
+    ({ link, edges }) =>
+      matches(link.label, lq) ||
+      matches(link.description, lq) ||
+      edges.some((e) => matches(e.sentence, lq))
   )
 
   /**
@@ -348,12 +385,12 @@ export default function VocabularyTab() {
         <div className="card">
           <h2>
             Link Labels{" "}
-            <span className="n">{labelGroups.length ? `(${labelGroups.length})` : ""}</span>
+            <span className="n">{linkRows.length ? `(${linkRows.length})` : ""}</span>
           </h2>
           <p className="hint">
-            The words you coined for the relations themselves. A label you reach for again
-            is a word becoming yours — open one to read its threads and sharpen what each
-            says.
+            The words you coined for the relations themselves — yours, across every
+            reading. A label you reach for again is a word becoming yours; open one to
+            give it your own description and read the threads that use it.
           </p>
           <div className="quietrow" style={{ marginBottom: "10px" }}>
             <input
@@ -365,32 +402,76 @@ export default function VocabularyTab() {
             />
           </div>
 
+          {/* Coin a Link with no thread using it — TJ, 2026-08-10: "it is
+              possible to have a link with label and definition without it
+              being used in a thread". Here rather than in the throw bench,
+              because the bench is for connecting two concepts and the design
+              note keeps a gloss field out of that flow. */}
+          <div className="quietrow" style={{ marginBottom: "10px", gap: "6px" }}>
+            <input
+              id="coinLabel"
+              placeholder="coin a label — e.g. leads to"
+              aria-label="Coin a new link label"
+              value={coinLabel}
+              onChange={(e) => setCoinLabel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") coin() }}
+            />
+            <button className="btn mini" onClick={coin} disabled={!coinLabel.trim() || coining}>
+              {coining ? "…" : "Coin"}
+            </button>
+          </div>
+
           <div className="scrollbox">
-            {labelGroups.length === 0 && (
+            {linkRows.length === 0 && (
               <div className="empty">
-                <span className="cap">labels accrue as you link</span>
+                <span className="cap">no labels yet — coin one, or throw a thread and name it</span>
               </div>
             )}
-            {labelGroups.length > 0 && visibleLabels.length === 0 && (
+            {linkRows.length > 0 && visibleLabels.length === 0 && (
               <p className="empty">No label matches “{labelFilter.trim()}”.</p>
             )}
-            {visibleLabels.map(([label, edges]) => {
-              const isOpen = openLabels[label]
+            {visibleLabels.map(({ link, edges }) => {
+              const label = link.label
+              const isOpen = openLabels[link.id]
               return (
-                <div key={label} className={`lrow ${isOpen ? "open" : ""}`} data-link-label={label}>
+                <div key={link.id} className={`lrow ${isOpen ? "open" : ""}`} data-link-id={link.id} data-link-label={label}>
                   <div
                     className="lhead"
-                    onClick={() => setOpenLabels((p) => ({ ...p, [label]: !p[label] }))}
+                    onClick={() => setOpenLabels((p) => ({ ...p, [link.id]: !p[link.id] }))}
                     style={{ display: "flex", alignItems: "center" }}
                   >
                     <div className="lconcept" style={{ flex: 1 }}>{label}</div>
                     <div className="lsrc">
-                      {edges.length} link{edges.length !== 1 ? "s" : ""}
+                      {/* Counted, never judged: a label no thread uses yet is a
+                          designation, exactly as "no evidence" is for a concept. */}
+                      {edges.length} thread{edges.length !== 1 ? "s" : ""}
                       {edges.length > 1 ? " · recurring" : ""}
                     </div>
                   </div>
                   {isOpen && (
                     <div className="lbody">
+                      {/* The LINK's own description — one meaning, shared by
+                          every thread using it. Distinct from each thread's
+                          sentence below, which belongs to that pair. */}
+                      <div className="defrow">
+                        <span className="label">Link Description</span>
+                        <input
+                          className="linkOwnDescription"
+                          placeholder="what this relation means, in your words"
+                          defaultValue={link.description}
+                          onBlur={(e) => {
+                            if (e.target.value !== link.description) {
+                              editLink(link.id, { description: e.target.value })
+                              flash("description saved")
+                            }
+                          }}
+                        />
+                      </div>
+                      {edges.length === 0 && (
+                        <p className="hint" style={{ marginTop: "8px" }}>
+                          No thread uses this yet — it is yours to reach for.
+                        </p>
+                      )}
                       {edges.map((edge) => (
                         <div
                           key={edge.id}

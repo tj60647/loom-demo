@@ -723,14 +723,65 @@ export async function updateEdge(id: string, data: Partial<{ handle: string, sen
 export async function createLink(data: { label: string; description?: string }) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
+  const label = data.label.trim()
+  if (!label) throw new Error("A link needs a label.")
+
+  // Coining a word you already own returns what you own, rather than minting
+  // a twin. Reuse is the whole point of the object — the design note's
+  // warning is that Links WITHOUT attachment keep making near-duplicates by
+  // string copy, and a vocabulary nobody trusts is worse than the derived
+  // list this replaced. Homonyms stay legal (ruling 36): this reuses an exact
+  // label, it never refuses one that merely resembles another.
+  const existing = await db.select().from(links)
+    .where(and(
+      eq(links.userId, userId),
+      inCourse(links.courseId, courseId),
+      sql`lower(btrim(${links.label})) = ${label.toLowerCase()}`
+    ))
+    .orderBy(asc(links.createdAt), asc(links.id))
+    .limit(1)
+  if (existing.length) {
+    // A gloss offered alongside a label they already have fills an EMPTY one
+    // and never overwrites what they wrote before.
+    if (data.description && !existing[0].description) {
+      await db.update(links).set({ description: data.description }).where(eq(links.id, existing[0].id))
+      return { ...existing[0], description: data.description }
+    }
+    return existing[0]
+  }
+
   const made = await db.insert(links).values({
     courseId,
     userId,
-    label: data.label.trim(),
+    label,
     description: data.description ?? "",
   }).returning()
   await recordEvent(userId, courseId, "link.coin", "link", made[0].id, { label: made[0].label })
   return made[0]
+}
+
+/** Point a Thread at a Link — or at none. Dual-writes `handle` while that
+ *  column survives, so both readers agree about the label. */
+export async function attachLink(edgeId: string, linkId: string | null) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+
+  let label = ""
+  if (linkId) {
+    const owned = await db.select({ label: links.label }).from(links)
+      .where(and(eq(links.id, linkId), eq(links.userId, userId), inCourse(links.courseId, courseId)))
+      .limit(1)
+    if (!owned.length) throw new Error("Link not found.")
+    label = owned[0].label
+  }
+
+  const updated = await db.update(edges).set({ linkId, handle: label })
+    .where(and(eq(edges.id, edgeId), eq(edges.userId, userId), inCourse(edges.courseId, courseId)))
+    .returning({ id: edges.id })
+
+  if (updated.length > 0) {
+    await recordEvent(userId, courseId, "edge.coin", "edge", edgeId, { handle: label, linkId })
+  }
 }
 
 /** Sharpen a Link's label or its gloss — one meaning, shared by every Thread. */

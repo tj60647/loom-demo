@@ -75,7 +75,13 @@ const state: LoomState = {
     passage("p4", ["c1"], OTHER, "the same concept, met again"),
   ],
   edges: [edge("e1", "c1", "c2", "constrains")],
-  links: [],
+  // A Link the student uses, and one nothing uses yet (5.1 / TJ 2026-08-10) —
+  // the second is the state the object exists for, and the export must carry
+  // it or the file disagrees with the list it came from.
+  links: [
+    { id: "lk1", courseId: null, userId: "u", label: "constrains", description: "one bounds the other", createdAt: at },
+    { id: "lk2", courseId: null, userId: "u", label: "coined, unused", description: "", createdAt: at },
+  ],
   maps: [map("m1", scopeKey, "Object worlds, sorted"), map("m2", "", "whole weave one")],
   cloths: [cloth(scopeKey, "My reading of it")],
   views: { cardTable: { positions: {}, bends: {} } },
@@ -138,7 +144,14 @@ console.log("\nobject export — each object leaves whole")
   const c1 = v.concepts.find((c) => c.label === "boundary objects")!
   assert(c1.passages === 2, "passage count is across readings", `got ${c1.passages}`)
   assert(c1.readings === 2, "recurrence counts DISTINCT readings", `got ${c1.readings}`)
-  assert(v.linkLabels.length === 1 && v.linkLabels[0].uses === 1, "link labels carry their use count", JSON.stringify(v.linkLabels))
+  assert(v.linkLabels.length === 2, "every Link the student owns travels", JSON.stringify(v.linkLabels))
+  const used = v.linkLabels.find((l) => l.label === "constrains")!
+  assert(used.uses === 1, "a Link carries its thread count", JSON.stringify(used))
+  assert(used.description === "one bounds the other", "the Link's own gloss travels — it is not the thread's sentence", JSON.stringify(used))
+  const unused = v.linkLabels.find((l) => l.label === "coined, unused")!
+  assert(!!unused && unused.uses === 0,
+    "a Link NO thread uses is in the file at zero — TJ's case survives the download",
+    JSON.stringify(v.linkLabels))
   const md = buildVocabularyMarkdown(state, prov)
   assert(md.indexOf("boundary objects") < md.indexOf("elsewhere only"), "concepts read A–Z", "not alphabetical")
   assert(!/\b(should|must|try to|consider)\b/i.test(md), "no advice in the file — counted, never judged (red line 3)", md)
