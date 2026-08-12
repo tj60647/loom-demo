@@ -48,8 +48,14 @@ export interface LoomContextType {
   removeConcept: (id: string) => Promise<void>
   /** Merge source into target: pointers and threads repoint, source goes (ruling 36). */
   mergeConcepts: (sourceId: string, targetId: string) => Promise<void>
-  /** Capture a passage. Zero concept ids is a legal capture — an Unlabeled Passage. */
-  addPassage: (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => Promise<Passage>
+  /**
+   * Capture a passage. Zero concept ids is a legal capture — an Unlabeled
+   * Passage (model §Passage: "It may never gain a Concept, which is fine").
+   * `note` is the passage's own gloss, which the model has always had a place
+   * for in the Capture Log — Passage + Gloss + Concept Label — and which no
+   * capture surface could write until 2026-08-12.
+   */
+  addPassage: (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string, note?: string) => Promise<Passage>
   removePassage: (id: string) => Promise<void>
   /** Say which reading passages came from — the student's answer, never a guess. */
   attributePassages: (passageIds: string[], sourceId: string) => Promise<number>
@@ -332,7 +338,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const addPassage = async (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => {
+  const addPassage = async (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string, note?: string) => {
     const tempId = crypto.randomUUID()
     // Capturing inside a reading stamps that reading, so a passage taken by hand
     // has the same provenance as one taken from the PDF and lands in the same
@@ -351,7 +357,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       startOffset: startOffset ?? null,
       endOffset: endOffset ?? null,
       pageContentHash: pageContentHash ?? null,
-      note: "",
+      note: note ?? "",
       question: "",
       isPullQuote: false,
       tier: "",
@@ -359,7 +365,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
     applyLocal(s => ({ ...s, passages: [...s.passages, tempPassage] }))
     try {
-      const saved = await createPassage({ conceptIds, source, sourceId: stampedSourceId, location, content, pageNumber, startOffset, endOffset, pageContentHash })
+      const saved = await createPassage({ conceptIds, source, sourceId: stampedSourceId, location, content, pageNumber, startOffset, endOffset, pageContentHash, note })
       applyLocal(s => ({ ...s, passages: s.passages.map(b => b.id === tempId ? saved : b) }))
       savedOk()
       return saved

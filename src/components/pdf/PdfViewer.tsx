@@ -2112,7 +2112,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           <p role="status">
             {captureToast.n > 1
               ? `${captureToast.n} passages captured.`
-              : <>Passage captured — filed under <b>{captureToast.label}</b>.</>}
+              : captureToast.label
+                ? <>Passage captured — filed under <b>{captureToast.label}</b>.</>
+                // An unlabeled capture is a whole act, not a half one (TJ,
+                // 2026-08-12) — so the toast reports it as done rather than
+                // as missing something.
+                : <>Passage captured — <b>unlabeled</b>. Name it in Your work whenever the word arrives.</>}
           </p>
           {/* The seam, in the toast rather than as its own card (TJ,
               2026-08-09: the PDF path should be the QUIETER of the two).

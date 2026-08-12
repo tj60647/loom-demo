@@ -111,15 +111,15 @@ export const GUIDE_STEPS: GuideStep[] = [
   },
   {
     key: "name",
-    label: "Name the concept",
+    label: "Keep it, and name it",
     station: "reading",
-    targets: ["#captureConcept", "#capturePassageSave"],
+    targets: ["#captureConcept", "#capturePassageNote", "#capturePassageSave"],
     // The dialog brings its own scrim; a second one just darkens it twice.
     overlay: "none",
     needsText: true,
     say:
-      "Name the concept those words evidence — a short noun phrase, often the author's own term. An existing name reuses that concept. Then Save Passage.",
-    why: "The passage is the evidence; the concept is what you claim it is evidence OF. Naming it is the interpretation.",
+      "Name the concept those words evidence — or leave it blank and keep the passage unlabeled. Add a note if you want one. Then save.",
+    why: "The passage is the evidence; the concept is what you claim it is evidence OF. Keeping the words and naming them are two acts, and the second can wait.",
   },
   {
     key: "cloth",

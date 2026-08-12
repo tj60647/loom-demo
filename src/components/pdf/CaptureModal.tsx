@@ -54,13 +54,37 @@ export default function CaptureModal({ passage, source, sourceId, location, page
   const { state, addConcept, addPassage, editConcept } = useLoom()
   const [conceptLabel, setConceptLabel] = useState("")
   const [workingDef, setWorkingDef] = useState("")
+  const [passageNote, setPassageNote] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  /**
+   * Keeping the passage is the act; naming it is a separate one.
+   *
+   * TJ, 2026-08-12: "a passage does not require a concept, it should be
+   * possible to capture a passage without a concept." The model has said so
+   * all along — "A Passage with no Concepts is a legal state, the Unlabeled
+   * Passage… It may never gain a Concept, which is fine" — and this dialog
+   * was the one place in the app that refused it, holding Save disabled until
+   * a name was typed. So a student who had found the words but not the word
+   * had to invent one or lose the passage.
+   */
   const handleCapture = async () => {
     const cname = conceptLabel.trim()
-    if (!cname || !passage) return
+    if (!passage) return
     setIsSubmitting(true)
     try {
+      const gloss = passageNote.trim()
+
+      // Unlabeled: keep the words now, name them later or never.
+      if (!cname) {
+        const saved = await addPassage(
+          [], source, location, passage, pageNumber, startOffset, endOffset, sourceId, pageContentHash, gloss
+        )
+        onCaptured?.(saved.id, "")
+        onClose()
+        return
+      }
+
       // Same rule as manual capture: the gloss fills a new concept, or an
       // existing one that has none, and never overwrites what you wrote before.
       const wdef = workingDef.trim()
@@ -78,7 +102,9 @@ export default function CaptureModal({ passage, source, sourceId, location, page
         await editConcept(concept.id, { def: wdef })
         filledDescription = wdef
       }
-      const saved = await addPassage([concept.id], source, location, passage, pageNumber, startOffset, endOffset, sourceId, pageContentHash)
+      const saved = await addPassage(
+        [concept.id], source, location, passage, pageNumber, startOffset, endOffset, sourceId, pageContentHash, gloss
+      )
       onCaptured?.(
         saved.id,
         concept.label,
@@ -126,7 +152,10 @@ export default function CaptureModal({ passage, source, sourceId, location, page
         </div>
 
         <div className="form-row">
-          <span className="label">Concept — a short noun phrase naming the idea</span>
+          <span className="label">
+            Concept — a short noun phrase naming the idea{" "}
+            <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+          </span>
           <input
             list="conceptOptionsModal"
             id="captureConcept"
@@ -172,25 +201,50 @@ export default function CaptureModal({ passage, source, sourceId, location, page
               </ul>
               <div style={{marginTop: "6px", color: "var(--ink-soft)", fontSize: "12px"}}>
                 A concept can be a phrase, not a word. It&apos;s provisional — rename it later, or type an existing name to reuse it.
+                Or leave it empty: the passage is kept either way, and you can name it whenever the word arrives.
               </div>
             </details>
           </div>
         </div>
 
+        {/* The CONCEPT's gloss — one meaning, shared by every passage filed
+            under it. Only asked for when there is a concept to gloss. */}
+        {conceptLabel.trim() ? (
+          <div className="form-row">
+            <span className="label">Description — the concept in your own words <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
+            <input
+              id="captureConceptDef"
+              placeholder="e.g. a thing that means different things to different groups but still holds them together"
+              title="your own-words gloss — a sentence is fine; this is where crude is welcome"
+              value={workingDef}
+              onChange={(e) => setWorkingDef(e.target.value)}
+            />
+          </div>
+        ) : null}
+
+        {/* THIS PASSAGE's own note — why you took these words, what struck you,
+            what to come back to. Distinct from the concept's description above:
+            that one belongs to the idea and travels with it, this one belongs
+            to the quotation. The Capture Log has always had a place for it
+            (model: Passage + Gloss + Concept Label) and nothing could write it
+            until now. It is also the whole of what an unlabeled capture can
+            say, which is why it sits outside the concept block. */}
         <div className="form-row">
-          <span className="label">Description — the concept in your own words <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
-          <input
-            placeholder="e.g. a thing that means different things to different groups but still holds them together"
-            title="your own-words gloss — a sentence is fine; this is where crude is welcome"
-            value={workingDef}
-            onChange={(e) => setWorkingDef(e.target.value)}
+          <span className="label">Note on this passage <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
+          <textarea
+            id="capturePassageNote"
+            placeholder="why you kept these words — what struck you, what to come back to"
+            title="your note on this quotation, not on the concept"
+            value={passageNote}
+            onChange={(e) => setPassageNote(e.target.value)}
+            rows={2}
           />
         </div>
 
         <div style={{ display: "flex", gap: "10px", marginTop: "24px", justifyContent: "flex-end" }}>
           <button className="btn ghost" onClick={onClose} disabled={isSubmitting}>Cancel</button>
-          <button id="capturePassageSave" className="btn" onClick={handleCapture} disabled={!conceptLabel.trim() || isSubmitting}>
-            {isSubmitting ? "Saving..." : "Save Passage"}
+          <button id="capturePassageSave" className="btn" onClick={handleCapture} disabled={isSubmitting}>
+            {isSubmitting ? "Saving..." : conceptLabel.trim() ? "Save Passage" : "Save unlabeled"}
           </button>
         </div>
       </div>

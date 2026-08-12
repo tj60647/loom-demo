@@ -178,7 +178,7 @@ export default function SandboxLoomProvider({
   const addPassage = useCallback(async (
     conceptIds: string[], source: string, location: string, content: string,
     pageNumber?: number, startOffset?: number, endOffset?: number,
-    passageSourceId?: string, pageContentHash?: string
+    passageSourceId?: string, pageContentHash?: string, note?: string
   ) => {
     const p: Passage = {
       id: newId(), courseId: null, userId: uid,
@@ -187,7 +187,7 @@ export default function SandboxLoomProvider({
       startOffset: startOffset ?? null,
       endOffset: endOffset ?? null,
       pageContentHash: pageContentHash ?? null,
-      note: "", question: "", isPullQuote: false, tier: "" as PassageTier,
+      note: note ?? "", question: "", isPullQuote: false, tier: "" as PassageTier,
       createdAt: now(),
     }
     setState((s) => ({ ...s, passages: [...s.passages, p] }))

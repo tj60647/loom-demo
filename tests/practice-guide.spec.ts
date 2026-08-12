@@ -83,10 +83,13 @@ test.describe("The guide", () => {
     await ticked(page, 2)
     // No press here: the dialog opening IS the hand-off, and the guide is
     // already on the beat about that dialog.
-    await expect(page.locator(".guidepop .gsay b")).toHaveText(/Name the concept/, { timeout: 10_000 })
+    await expect(page.locator(".guidepop .gsay b")).toHaveText(/Keep it, and name it/, { timeout: 10_000 })
 
-    // ---- 3. name the concept ----------------------------------------------
+    // ---- 3. keep it, and name it ------------------------------------------
+    // Both halves: the passage's own note, and a concept — which is optional
+    // now (TJ, 2026-08-12), so the unlabeled path gets its own test below.
     await page.locator("#captureConcept").fill("going on anyway")
+    await page.locator("#capturePassageNote").fill("A practice note on why these words.")
     await page.locator("#capturePassageSave").click()
     await ticked(page, 3)
     await onward(page)
@@ -130,5 +133,58 @@ test.describe("The guide", () => {
     // Every pip green, and the whole walk wrote nothing to the server.
     await expect(page.locator(".gstep.done")).toHaveCount(7)
     expect(writes, `the guide wrote to the server: ${writes.join(", ")}`).toHaveLength(0)
+  })
+
+  test("a passage can be kept with no concept at all", async ({ page }) => {
+    test.setTimeout(120_000)
+
+    // The model has always allowed this — "A Passage with no Concepts is a
+    // legal state… It may never gain a Concept, which is fine" — and the
+    // capture dialog was the one surface in the app that refused it, holding
+    // Save disabled until a name was typed (TJ, 2026-08-12).
+    await page.goto("/sandbox")
+    await expect(async () => {
+      await page.locator("#practiceOpen").click()
+      await expect(page.locator("#yourwork-toggle")).toBeVisible({ timeout: 2_000 })
+    }).toPass({ timeout: 40_000, intervals: [500, 1_000, 2_000] })
+
+    const before = Number(
+      ((await page.locator("#yourwork-toggle").textContent()) ?? "").match(/·\s*(\d+)/)?.[1] ?? 0
+    )
+
+    await page.locator(".gstep").nth(1).click()
+    await expect(page.locator(".react-pdf__Page__textContent span").first())
+      .toBeAttached({ timeout: 40_000 })
+    const line = await page.evaluate(() => {
+      const spans = Array.from(document.querySelectorAll(".react-pdf__Page__textContent span"))
+        .filter((s) => (s.textContent ?? "").trim().length > 8)
+      if (!spans.length) return null
+      const a = spans[0].getBoundingClientRect()
+      const b = spans[Math.min(3, spans.length - 1)].getBoundingClientRect()
+      return { x1: a.left + 2, y1: a.top + a.height / 2, x2: b.right - 2, y2: b.top + b.height / 2 }
+    })
+    expect(line).toBeTruthy()
+    await page.mouse.move(line!.x1, line!.y1)
+    await page.mouse.down()
+    await page.mouse.move(line!.x2, line!.y2, { steps: 14 })
+    await page.mouse.up()
+    await page.locator("#captureNow").click({ timeout: 15_000 })
+
+    // No concept. The button says so, and the note is the whole of what this
+    // capture carries.
+    await expect(page.locator("#capturePassageSave")).toBeEnabled()
+    await expect(page.locator("#capturePassageSave")).toHaveText("Save unlabeled")
+    // The concept's own description is not asked for when there is no concept.
+    await expect(page.locator("#captureConceptDef")).toHaveCount(0)
+    await page.locator("#capturePassageNote").fill("Kept before I knew what to call it.")
+    await page.locator("#capturePassageSave").click()
+
+    // It landed, and it says what it is rather than what it lacks.
+    await expect(page.locator(".captoast")).toContainText(/unlabeled/i, { timeout: 15_000 })
+    await expect
+      .poll(async () =>
+        Number(((await page.locator("#yourwork-toggle").textContent()) ?? "").match(/·\s*(\d+)/)?.[1] ?? 0)
+      , { timeout: 15_000 })
+      .toBe(before + 1)
   })
 })
