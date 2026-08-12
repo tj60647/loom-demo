@@ -112,7 +112,8 @@ test.describe('Download at the object', () => {
     // Retried because the shelf is server-rendered — see sandbox.spec.
     await expect(async () => {
       await page.locator('#practiceOpen').click({ timeout: 10_000 });
-      await expect(page.locator('.practiceband')).toBeVisible({ timeout: 2_000 });
+      // The workbench's toolbar — the notice floats over the shelf too.
+      await expect(page.locator('#yourwork-toggle')).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 40_000, intervals: [500, 1_000, 2_000] });
     await page.locator('nav[aria-label="The journey"] button', { hasText: 'Knowledge Graph' }).click();
     // It reads the student's REAL record over its own route, bypassing the

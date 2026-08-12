@@ -76,12 +76,14 @@ assert(
   "LoomProvider no longer exports LoomContextType — the sandbox would drift silently"
 )
 
-// 5. The band is the safety argument; it must be standing, not a toast.
+// 5. The notice is the safety argument; it must be standing, not a toast, and
+//    it must cover BOTH stages — the shelf as well as the workbench.
 const workbench = readFileSync("src/components/Workbench.tsx", "utf8")
+const sandboxWorkbench = readFileSync("src/components/SandboxWorkbench.tsx", "utf8")
 assert(
-  workbench.includes("practiceband"),
-  "the practice band still renders",
-  "Workbench no longer renders .practiceband — a student cannot tell practice from data loss"
+  sandboxWorkbench.includes("practiceband"),
+  "the practice notice still renders, over both stages",
+  "SandboxWorkbench no longer renders .practiceband — a student cannot tell practice from data loss"
 )
 assert(
   /\{!practice && \(/.test(workbench),

@@ -23,7 +23,9 @@ async function enterPracticeLoom(page: import('@playwright/test').Page) {
   await expect(page.locator('#practiceOpen')).toBeVisible({ timeout: 30_000 });
   await expect(async () => {
     await page.locator('#practiceOpen').click();
-    await expect(page.locator('.practiceband')).toBeVisible({ timeout: 2_000 });
+    // The workbench's own toolbar, not the practice notice: the notice floats
+    // over BOTH stages now, so waiting on it would pass without a click.
+    await expect(page.locator('#yourwork-toggle')).toBeVisible({ timeout: 2_000 });
   }).toPass({ timeout: 40_000, intervals: [500, 1_000, 2_000] });
 }
 

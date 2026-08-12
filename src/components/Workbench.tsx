@@ -292,21 +292,6 @@ export default function Workbench({
         )}
       </div>
 
-      {practice && (
-        /* A floater, not a header (TJ, 2026-08-11) — the practice loom should
-           look like the loom, and a full-width band across the top made it a
-           different-shaped app before a student had done anything. Persistent
-           rather than a toast all the same: `flash` self-clears after 1500ms,
-           and someone who missed a disappearing notice cannot tell a practice
-           space from data loss. This band IS the safety argument, so it stays
-           on screen — it just stops rearranging the page to say so. Short,
-           because the guide beside it explains the worked example in full. */
-        <div className="practiceband" role="status">
-          <b>Practice loom.</b> Everything here works and <b>nothing is kept</b>.
-          Reload to put the example back; your own work is untouched.
-        </div>
-      )}
-
       {/* Not rendered in the practice loom: ShelfSearch reads the student's
           REAL loom over its own GET route, bypassing the provider entirely —
           the one control here that would show their actual work inside a
