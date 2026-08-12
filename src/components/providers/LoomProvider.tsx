@@ -523,7 +523,21 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     const knownIds = new Set([id, edgeAlias.current.get(id) ?? id])
     applyLocal(s => ({ ...s, edges: s.edges.map(e => knownIds.has(e.id) ? { ...e, ...data } : e) }))
     try {
-      await updateEdge(await resolveEdgeId(id), data)
+      // Typing a label coins the Link OBJECT server-side, and the row comes
+      // back so it can join the Link List now rather than at the next reload.
+      // `undefined` means the edit never touched the label; null means it was
+      // cleared, and the thread must let go of the object too.
+      const link = await updateEdge(await resolveEdgeId(id), data)
+      if (link !== undefined) {
+        applyLocal(s => ({
+          ...s,
+          links: !link ? s.links
+            : s.links.some(l => l.id === link.id)
+              ? s.links.map(l => (l.id === link.id ? link : l))
+              : [...s.links, link],
+          edges: s.edges.map(e => (knownIds.has(e.id) ? { ...e, linkId: link?.id ?? null } : e)),
+        }))
+      }
       savedOk()
     } catch (e) {
       await resync(e)

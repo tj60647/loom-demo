@@ -1,7 +1,7 @@
 "use client"
 
 // One search, every scope (ruling 34): which of your readings says this —
-// and which of your own concepts, links and passages do.
+// and which of your own concepts, link labels, links and passages do.
 //
 // Typing replaces the page with grouped results: readings first (a match in a
 // text is a door back into it), then the student's own holdings by kind.
@@ -27,7 +27,7 @@ export default function ShelfSearch({
   /**
    * Contextual scope (TJ, 2026-08-10): absent, this is the Library's search
    * — the whole loom. Present, it is a reading's search — that reading's
-   * pages, cloth, projections, and the concepts, links and passages here.
+   * pages, cloth, projections, and the concepts, link labels, links and passages here.
    */
   sourceId?: string
 }) {
@@ -107,8 +107,8 @@ export default function ShelfSearch({
           }}
           placeholder={sourceId ? "search this reading…" : "search your loom…"}
           aria-label={sourceId
-            ? "Search this reading — its pages, cloth, projections, concepts, links and passages"
-            : "Search your loom — readings, cloths, projections, concepts, link labels and passages"}
+            ? "Search this reading — its pages, cloth, projections, concepts, link labels, links and passages"
+            : "Search your loom — readings, cloths, projections, concepts, link labels, links and passages"}
         />
       </div>
 
@@ -118,13 +118,14 @@ export default function ShelfSearch({
 
           {!error && results && results.length === 0 && !busy &&
             !loomResults?.concepts.length && !loomResults?.links.length &&
+            !loomResults?.linkLabels.length &&
             !loomResults?.passages.length && !loomResults?.cloths.length &&
             !loomResults?.projections.length && (
             <div className="empty">
               <span className="cap">
                 {sourceId
-                  ? "nothing in this reading matches that — pages, cloth, projections, concepts, links or passages"
-                  : "nothing in your loom matches that — readings, cloths, projections, concepts, links or passages"}
+                  ? "nothing in this reading matches that — pages, cloth, projections, concepts, link labels, links or passages"
+                  : "nothing in your loom matches that — readings, cloths, projections, concepts, link labels, links or passages"}
               </span>
             </div>
           )}
@@ -212,6 +213,25 @@ export default function ShelfSearch({
                 // standing audit item, awaiting the weave ruling.)
                 <Link key={hit.id} href={sourceId ? `/reading/${sourceId}?tab=read` : "/weave?tab=open"} className="searchhit">
                   <div className="searchhithead"><h3>{hit.label}</h3></div>
+                  <p className="searchsnip"><Snippet text={hit.snippet} /></p>
+                </Link>
+              ))}
+            </>
+          )}
+          {!error && loomResults && loomResults.linkLabels.length > 0 && (
+            <>
+              <span className="cap searchtally">your link labels</span>
+              {loomResults.linkLabels.map((hit) => (
+                // A Link Label lives in Vocabulary, alongside the concepts —
+                // and unlike a thread it can be found here before any thread
+                // uses it, which is what made it an object (5.1).
+                <Link key={hit.id} href={sourceId ? `/reading/${sourceId}?tab=read` : "/weave?tab=read"} className="searchhit">
+                  <div className="searchhithead">
+                    <h3>{hit.label}</h3>
+                    <span className="cap">
+                      {hit.uses === 0 ? "not used yet" : `${hit.uses} thread${hit.uses !== 1 ? "s" : ""}`}
+                    </span>
+                  </div>
                   <p className="searchsnip"><Snippet text={hit.snippet} /></p>
                 </Link>
               ))}

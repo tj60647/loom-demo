@@ -251,10 +251,30 @@ export default function SandboxLoomProvider({
     return e
   }, [uid, noted])
 
+  // Typing a label coins the Link object here too, or adopts the one already
+  // owned — the server does exactly this in `updateEdge`, and a practice loom
+  // where coining a word leaves the Link List empty would teach the wrong
+  // thing about what a label IS.
   const editEdge = useCallback(async (id: string, data: Partial<{ handle: string; sentence: string }>) => {
-    setState((s) => ({ ...s, edges: s.edges.map((e) => (e.id === id ? { ...e, ...data } : e)) }))
+    setState((s) => {
+      const edges = s.edges.map((e) => (e.id === id ? { ...e, ...data } : e))
+      if (data.handle === undefined) return { ...s, edges }
+      const label = data.handle.trim()
+      if (!label) {
+        return { ...s, edges: edges.map((e) => (e.id === id ? { ...e, linkId: null } : e)) }
+      }
+      const existing = findLink(s.links, label)
+      const link: Link = existing ?? {
+        id: newId(), courseId: null, userId: uid, label, description: "", createdAt: now(),
+      }
+      return {
+        ...s,
+        links: existing ? s.links : [...s.links, link],
+        edges: edges.map((e) => (e.id === id ? { ...e, linkId: link.id } : e)),
+      }
+    })
     noted()
-  }, [noted])
+  }, [uid, noted])
 
   const removeEdge = useCallback(async (id: string) => {
     setState((s) => ({ ...s, edges: s.edges.filter((e) => e.id !== id) }))

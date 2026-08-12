@@ -243,6 +243,26 @@
 > and link hits land in this workbench (04 / 02), not on the /weave doors.
 > Placeholder follows: "search this reading…". At the whole weave (source
 > null) the field stays loom-wide.
+> **A Link is an object the student owns** (5.1, built 2026-08-11 over three
+> commits; TJ: "links are user-level"). Migration 0024 is **expand-only** —
+> the `link` table (label + its own gloss), `edge.linkId`, a backfill from
+> the distinct handles, `link_search_idx`. `edge.handle` is DUAL-WRITTEN and
+> stays until Step 4 lands (open-work 5.1d); every reader may still fall back
+> to it, and `labelOf` / `findLink` / `usesOf`
+> ([linkResolve.ts](../src/lib/linkResolve.ts)) are the single shared
+> resolution the server and BOTH providers use — the practice loom cannot
+> call the server, so a second implementation is how they would drift.
+> Three consequences are contract, not decoration. **A Link can exist with no
+> Thread using it** (TJ, 2026-08-10) — coined in Vocabulary with a gloss,
+> counted at zero, findable in search, offered as a chip. **Coin-time chips
+> ATTACH** (`attachLink`), never copy the word; typing a label resolves
+> case-insensitively to the Link already owned, and `updateEdge` returns that
+> Link so the client's list is right without a reload. **Renaming a Link
+> reaches every Thread that references it** (and, while `handle` lives, their
+> copies too). Deleting and merging Links are NOT built (open-work 5.1e).
+> Search grows a `linkLabels` group beside `links`: the objects, scoped to a
+> reading's own threads inside a reading, and unfiltered at the Library where
+> a word coined ahead of use is found.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.

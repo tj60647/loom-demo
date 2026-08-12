@@ -219,6 +219,12 @@ const MAX_LOOM_HITS = 12
 
 export type LoomSearchResult = {
   concepts: { id: string; label: string; snippet: string }[]
+  /**
+   * The Link Labels the student owns (5.1) — objects now, so a word coined
+   * with a gloss and not yet used by any thread is findable. Distinct from
+   * `links` below, which are the threads themselves.
+   */
+  linkLabels: { id: string; label: string; uses: number; snippet: string }[]
   links: { id: string; handle: string; fromLabel: string; toLabel: string; snippet: string }[]
   passages: { id: string; sourceId: string | null; source: string; snippet: string }[]
   /** Single-reading cloths only — scopeKey IS the sourceId for those. */
@@ -234,7 +240,7 @@ export type LoomSearchResult = {
  * concepts evidenced there and the links between them.
  */
 export async function searchLoom(rawQuery: string, sourceId?: string | null): Promise<LoomSearchResult> {
-  const empty: LoomSearchResult = { concepts: [], links: [], passages: [], cloths: [], projections: [] }
+  const empty: LoomSearchResult = { concepts: [], linkLabels: [], links: [], passages: [], cloths: [], projections: [] }
 
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return empty
@@ -305,6 +311,50 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
       AND (setweight(to_tsvector('english', coalesce("edge"."handle", '')), 'A') ||
            setweight(to_tsvector('english', coalesce("edge"."sentence", '')), 'B')) @@ q.query
     ORDER BY rank DESC, "edge"."createdAt"
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
+  // The Link Labels themselves (5.1). A Link is user-level — it spans
+  // readings by design — so the reading scope narrows it the way the threads
+  // are narrowed: to the words this reading's own threads carry. At the
+  // library there is no such filter, which is where a word coined ahead of
+  // its first use is found. `uses` counts threads by the object AND by the
+  // legacy handle, matching usesOf() in src/lib/linkResolve.ts, so rows
+  // written before 0024 are not reported at zero.
+  const linkEdgeScope = conceptsHere
+    ? sql`AND EXISTS (
+            SELECT 1 FROM "edge" e
+            WHERE e."userId" = ${userId}
+              AND (e."linkId" = "link"."id"
+                   OR lower(btrim(coalesce(e."handle", ''))) = lower(btrim("link"."label")))
+              AND e."fromId" IN ${conceptsHere} AND e."toId" IN ${conceptsHere}
+          )`
+    : sql.raw("")
+  const linkScope = courseId
+    ? sql`("link"."courseId" = ${courseId} OR "link"."courseId" IS NULL)`
+    : sql`"link"."courseId" IS NULL`
+
+  const linkResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "link"."id", "link"."label",
+           ts_headline('english', coalesce(nullif("link"."description", ''), "link"."label"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           (SELECT count(*) FROM "edge" e
+             WHERE e."userId" = ${userId}
+               AND (e."linkId" = "link"."id"
+                    OR (e."linkId" IS NULL
+                        AND lower(btrim(coalesce(e."handle", ''))) = lower(btrim("link"."label"))))
+           )::int AS uses,
+           ts_rank(
+             (setweight(to_tsvector('english', coalesce("link"."label", '')), 'A') ||
+              setweight(to_tsvector('english', coalesce("link"."description", '')), 'B')),
+             q.query
+           ) AS rank
+    FROM "link", q
+    WHERE "link"."userId" = ${userId} AND ${linkScope}
+      ${linkEdgeScope}
+      AND (setweight(to_tsvector('english', coalesce("link"."label", '')), 'A') ||
+           setweight(to_tsvector('english', coalesce("link"."description", '')), 'B')) @@ q.query
+    ORDER BY rank DESC, "link"."createdAt"
     LIMIT ${MAX_LOOM_HITS}
   `)
 
@@ -390,6 +440,9 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
   return {
     concepts: (conceptResult.rows as { id: string; label: string; snippet: string }[]).map((r) => ({
       id: r.id, label: r.label, snippet: r.snippet,
+    })),
+    linkLabels: (linkResult.rows as { id: string; label: string; uses: number | string; snippet: string }[]).map((r) => ({
+      id: r.id, label: r.label, uses: Number(r.uses ?? 0), snippet: r.snippet,
     })),
     links: (edgeResult.rows as { id: string; handle: string | null; fromLabel: string; toLabel: string; snippet: string }[]).map((r) => ({
       id: r.id, handle: r.handle ?? "", fromLabel: r.fromLabel, toLabel: r.toLabel, snippet: r.snippet,

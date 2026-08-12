@@ -19,7 +19,7 @@ import { useMemo, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
-import type { Concept, Edge } from "@/lib/types"
+import type { Concept } from "@/lib/types"
 import { soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { usesOf } from "@/lib/linkResolve"
@@ -511,7 +511,7 @@ export default function VocabularyTab() {
 
           {looseLinks.length > 0 && (
             <p className="ghostnote" style={{ marginTop: "10px" }}>
-              {looseLinks.length} link{looseLinks.length !== 1 ? "s" : ""} carry a
+              {looseLinks.length} link{looseLinks.length !== 1 ? "s carry" : " carries"} a
               description but no label yet — coin one on <b>02 · Linking</b> so a word can
               recur.
             </p>

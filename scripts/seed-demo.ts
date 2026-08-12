@@ -4,9 +4,11 @@
  *   test-user-a@loom.local — a worked loom: 10 passages captured from two readings
  *     (Object Worlds, Communities of Practice), 8 concepts (one evidenced in
  *     both readings, one deliberately evidence-less), 6 threads (two of them
- *     cross-reading bridges, one sentence-only), and THREE MAPS — one of each
- *     reading and one of the whole weave — each with its own tiers, essence,
- *     paragraph and card-table arrangement.
+ *     cross-reading bridges, one sentence-only), six LINKS — the labels those
+ *     threads carry, one of them glossed and one coined with no thread using
+ *     it (5.1) — and THREE MAPS, one of each reading and one of the whole
+ *     weave, each with its own tiers, essence, paragraph and card-table
+ *     arrangement.
  *   test-user-b@loom.local — enrolled and empty: the fresh-account experience.
  *   test-user-c@loom.local / test-user-d@loom.local — two colleagues in A's
  *     discussion section, so the Overlays (P3.14, ruling 28) have a section
@@ -38,7 +40,7 @@
 import { db } from "../src/db"
 import {
   users, courses, courseMemberships, sections, sources, sourcePages,
-  concepts, passages, passageConcepts, edges, cloths, maps, views, graphEvents,
+  concepts, passages, passageConcepts, edges, links, cloths, maps, views, graphEvents,
 } from "../src/db/schema"
 import { eq, asc, ilike, isNotNull, and } from "drizzle-orm"
 import { textLayerProjection } from "../src/lib/pdfText"
@@ -92,6 +94,35 @@ async function findSource(titlePrefix: string) {
     .limit(1)
   if (!rows.length) throw new Error(`Reading "${titlePrefix}…" not found — run \`npm run seed:sources\` first.`)
   return rows[0]
+}
+
+/**
+ * Coin the Links the seeded threads carry, and point the threads at them.
+ *
+ * A label is an object the student owns (5.1), so a thread references a Link
+ * rather than only carrying the string in `handle`. Every action does this on
+ * write and migration 0024 did it for existing rows — but the seed writes rows
+ * straight to the table, so it has to coin them here. Without this the demo
+ * account shows an EMPTY Link List while its threads plainly wear labels.
+ *
+ * Deduped case-insensitively, like `resolveLink` in src/actions/loom.ts.
+ */
+async function withLinks<T extends { userId: string; courseId: string; handle: string; createdAt: Date }>(
+  rows: T[]
+): Promise<(T & { linkId: string | null })[]> {
+  const key = (h: string) => h.trim().toLowerCase()
+  const first = new Map<string, T>()
+  for (const r of rows) if (key(r.handle) && !first.has(key(r.handle))) first.set(key(r.handle), r)
+  if (!first.size) return rows.map((r) => ({ ...r, linkId: null }))
+
+  const made = await db.insert(links).values(
+    [...first.values()].map((r) => ({
+      userId: r.userId, courseId: r.courseId, label: r.handle.trim(), description: "", createdAt: r.createdAt,
+    }))
+  ).returning({ id: links.id, label: links.label })
+
+  const byKey = new Map(made.map((l) => [key(l.label), l.id]))
+  return rows.map((r) => ({ ...r, linkId: byKey.get(key(r.handle)) ?? null }))
 }
 
 async function findOrCreateUser(u: { email: string; name: string }) {
@@ -159,6 +190,10 @@ async function main() {
       })
     // Demolition: the whole graph, projections and history for this demo user.
     await db.delete(edges).where(eq(edges.userId, u.id))
+    // Links outlive their threads by design (5.1) — a word coined ahead of
+    // use is a row on its own. So the wipe has to name them, or every crashed
+    // suite run leaves a coinage behind and the Link List grows forever.
+    await db.delete(links).where(eq(links.userId, u.id))
     await db.delete(passages).where(eq(passages.userId, u.id))
     await db.delete(concepts).where(eq(concepts.userId, u.id))
     await db.delete(maps).where(eq(maps.userId, u.id))
@@ -223,14 +258,26 @@ async function main() {
   const E = (from: { id: string }, to: { id: string }, sentence: string, handle = "") => ({
     userId: userA.id, courseId: course.id, fromId: from.id, toId: to.id, sentence, handle, createdAt: at(),
   })
-  await db.insert(edges).values([
+  await db.insert(edges).values(await withLinks([
     E(oworlds, social, "Different object worlds must be brought into alignment before the design can move.", "constrains"),
     E(social, compromise, "The negotiated process leaves its trace in the artifact itself.", "yields"),
     E(cop, lpp, "A practice admits newcomers from its edges, by degrees of real work.", "admits"),
     E(negmean, reif, "Meaning settles into forms that then push back on the negotiating.", "hardens into"),
     E(oworlds, cop, "Each object world is sustained by its own community of practice.", "is carried by"),
     E(negmean, social, "The design conversation is itself a negotiation of meaning across worlds."), // sentence-only
-  ])
+  ]))
+
+  // One Link glossed, and one coined with NOTHING using it — the two states
+  // 5.1 exists for, so the demo account shows them rather than describing
+  // them. A word coined ahead of its first use is a row on its own.
+  await db.update(links)
+    .set({ description: "the first sets the terms the second has to work inside" })
+    .where(and(eq(links.userId, userA.id), eq(links.label, "constrains")))
+  await db.insert(links).values({
+    userId: userA.id, courseId: course.id, label: "sets the terms for",
+    description: "a word I want, before I have found the pair it belongs to",
+    createdAt: at(),
+  })
 
   // ---- Three maps: one per reading, one whole-weave (the mirror) ----------
   // Positions: x proportional 0..1, y absolute on the 560px three-band table.
@@ -342,10 +389,10 @@ async function main() {
     )
 
     if (edgeSpecs.length) {
-      await db.insert(edges).values(edgeSpecs.map(([from, to, sentence, handle]) => ({
+      await db.insert(edges).values(await withLinks(edgeSpecs.map(([from, to, sentence, handle]) => ({
         userId: user.id, courseId: course.id,
         fromId: rows[from].id, toId: rows[to].id, sentence, handle, createdAt: at(),
-      })))
+      }))))
     }
     return rows
   }
@@ -390,8 +437,8 @@ async function main() {
     ]
   )
 
-  const tally = { concepts: conceptRows.length, passages: 10, edges: 6, maps: 3 }
-  console.log(`[seed-demo] ${USER_A.email}: ${tally.concepts} concepts · ${tally.passages} passages from 2 readings · ${tally.edges} threads · ${tally.maps} maps`)
+  const tally = { concepts: conceptRows.length, passages: 10, edges: 6, links: 6, maps: 3 }
+  console.log(`[seed-demo] ${USER_A.email}: ${tally.concepts} concepts · ${tally.passages} passages from 2 readings · ${tally.edges} threads · ${tally.links} links (1 glossed, 1 with no thread) · ${tally.maps} maps`)
   console.log(`[seed-demo] ${USER_B.email}: enrolled, empty`)
   console.log(`[seed-demo] ${USER_C.email}: 3 concepts · 3 passages · 1 thread — a colleague in ${DEMO_SECTION.name}`)
   console.log(`[seed-demo] ${USER_D.email}: 4 concepts · 4 passages · 2 threads (1 unlabeled) — a colleague in ${DEMO_SECTION.name}`)

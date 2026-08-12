@@ -8,7 +8,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { resolveCourseIdForUser } from "@/lib/courses"
 import { scopeFromKey, scopeOf } from "@/lib/scope"
-import type { Passage, CardTableView, GraphEvent, LoomMap, LoomViews, PassageTier, Tier } from "@/lib/types"
+import type { Passage, CardTableView, GraphEvent, Link, LoomMap, LoomViews, PassageTier, Tier } from "@/lib/types"
 import type { ParsedImport, ParsedMapImport } from "@/lib/graphExport"
 import { WORKED_EXAMPLE, WORKED_EXAMPLE_SOURCE } from "@/lib/example"
 import { textLayerProjection } from "@/lib/pdfText"
@@ -677,32 +677,39 @@ export async function createEdge(data: { fromId: string, toId: string, sentence?
  * Homonyms stay legal (ruling 36): this reuses an exact-label match, it never
  * refuses a new label that merely resembles one.
  */
-async function resolveLink(userId: string, courseId: string | null, rawLabel: string): Promise<string | null> {
+async function resolveLink(userId: string, courseId: string | null, rawLabel: string): Promise<Link | null> {
   const label = rawLabel.trim()
   if (!label) return null
 
-  const existing = await db.select({ id: links.id }).from(links)
+  const existing = await db.select().from(links)
     .where(and(
       eq(links.userId, userId),
       inCourse(links.courseId, courseId),
       sql`lower(btrim(${links.label})) = ${label.toLowerCase()}`
     ))
     .limit(1)
-  if (existing.length) return existing[0].id
+  if (existing.length) return existing[0]
 
-  const made = await db.insert(links).values({ courseId, userId, label, description: "" }).returning({ id: links.id })
-  return made[0].id
+  const made = await db.insert(links).values({ courseId, userId, label, description: "" }).returning()
+  return made[0]
 }
 
-export async function updateEdge(id: string, data: Partial<{ handle: string, sentence: string }>) {
+/**
+ * Returns the Link this edit resolved to, so the client can put the object in
+ * its own state. Null when the label was cleared; undefined when the edit did
+ * not touch the label at all. Without this a word typed for the first time
+ * would exist server-side and be missing from the Link List until reload —
+ * the derived list it replaced never had that gap.
+ */
+export async function updateEdge(id: string, data: Partial<{ handle: string, sentence: string }>): Promise<Link | null | undefined> {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
   // Coining a label attaches the Link OBJECT as well as writing the string.
   // Dual-write through 5.1's expand phase: `handle` stays until its column is
   // dropped, so an unmigrated reader and this one agree.
-  const linkId = data.handle !== undefined ? await resolveLink(userId, courseId, data.handle) : undefined
-  const patch = linkId !== undefined ? { ...data, linkId } : data
+  const link = data.handle !== undefined ? await resolveLink(userId, courseId, data.handle) : undefined
+  const patch = link !== undefined ? { ...data, linkId: link?.id ?? null } : data
 
   const updated = await db.update(edges).set(patch)
     .where(and(eq(edges.id, id), eq(edges.userId, userId), inCourse(edges.courseId, courseId)))
@@ -710,8 +717,9 @@ export async function updateEdge(id: string, data: Partial<{ handle: string, sen
 
   if (updated.length > 0) {
     const kind = data.handle !== undefined ? "edge.coin" : "edge.update"
-    await recordEvent(userId, courseId, kind, "edge", id, { ...data, ...(linkId !== undefined ? { linkId } : {}) })
+    await recordEvent(userId, courseId, kind, "edge", id, { ...data, ...(link !== undefined ? { linkId: link?.id ?? null } : {}) })
   }
+  return link
 }
 
 /**

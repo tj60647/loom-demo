@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import ObjectDownload from "@/components/ui/ObjectDownload"
 import { buildThreadsExport, buildThreadsMarkdown } from "@/lib/objectExport"
+import { findLink, labelOf as labelOfEdge, usesOf } from "@/lib/linkResolve"
 import { scopeLabelOf } from "@/lib/graphExport"
 import { isWholeWeave } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
@@ -68,7 +69,7 @@ export default function ThrowTab() {
   // 2026-08-09 only that — while the evidence check, the duplicate-pair guard
   // and the coined-label vocabulary all read the whole graph, because those
   // are facts about the student rather than about this bench.
-  const { state, scoped, scope, addEdge, editEdge, removeEdge, flash, setUndoStack, setRedoStack } = useLoom()
+  const { state, scoped, scope, addEdge, editEdge, removeEdge, attachLink, flash, setUndoStack, setRedoStack } = useLoom()
   const { byId: readingsById } = useReadings()
   const titleOf = (id: string) => readingsById.get(id)?.title ?? id
   const { confirm, notify } = useDialog()
@@ -87,6 +88,20 @@ export default function ThrowTab() {
     nameInputRef.current?.focus()
   }
 
+  /**
+   * Put a label back on a thread — the one path undo and redo both take.
+   *
+   * A word the student already owns is re-ATTACHED, so stepping back over a
+   * tapped chip leaves the thread pointing at the Link object rather than at
+   * a string that merely agrees with it. Anything else goes through
+   * `editEdge`, which coins the object server-side and clears it on "".
+   */
+  const restoreLabel = useCallback((edgeId: string, label: string | null) => {
+    const link = label ? findLink(state.links, label) : undefined
+    if (link) attachLink(edgeId, link.id)
+    else editEdge(edgeId, { handle: label ?? "" })
+  }, [state.links, attachLink, editEdge])
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -99,7 +114,7 @@ export default function ThrowTab() {
           setRedoStack(prevRedo => {
             if (prevRedo.length === 0) return prevRedo;
             const action = prevRedo[prevRedo.length - 1];
-            editEdge(action.edgeId, { handle: action.to ?? undefined });
+            restoreLabel(action.edgeId, action.to);
             setUndoStack(prevUndo => [...prevUndo, action]);
             return prevRedo.slice(0, -1);
           });
@@ -108,7 +123,7 @@ export default function ThrowTab() {
           setUndoStack(prevUndo => {
             if (prevUndo.length === 0) return prevUndo;
             const action = prevUndo[prevUndo.length - 1];
-            editEdge(action.edgeId, { handle: action.from ?? undefined });
+            restoreLabel(action.edgeId, action.from);
             setRedoStack(prevRedo => [...prevRedo, action]);
             return prevUndo.slice(0, -1);
           });
@@ -120,7 +135,7 @@ export default function ThrowTab() {
         setRedoStack(prevRedo => {
           if (prevRedo.length === 0) return prevRedo;
           const action = prevRedo[prevRedo.length - 1];
-          editEdge(action.edgeId, { handle: action.to ?? undefined });
+          restoreLabel(action.edgeId, action.to);
           setUndoStack(prevUndo => [...prevUndo, action]);
           return prevRedo.slice(0, -1);
         });
@@ -128,7 +143,7 @@ export default function ThrowTab() {
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editEdge, setRedoStack, setUndoStack]);
+  }, [restoreLabel, setRedoStack, setUndoStack]);
 
   // Whole-graph: a concept evidenced in an earlier reading is not evidence-less
   // just because this reading has not quoted it.
@@ -222,6 +237,25 @@ export default function ThrowTab() {
     }
   }
 
+  /**
+   * Tap one of your own labels: ATTACH the object, do not copy its word.
+   * Closes the naming fold, because the act is finished — there is nothing
+   * left to type and a Save button that did nothing would invite a second
+   * write. The undo stack still records it as a label change, so ⌘Z behaves
+   * the same whether the word was tapped or typed.
+   */
+  const attachOwn = (edgeId: string, link: { id: string; label: string }) => {
+    const edge = state.edges.find((x) => x.id === edgeId)
+    const previous = edge ? labelOfEdge(edge, state.links) : ""
+    if (previous !== link.label) {
+      setUndoStack(prev => [...prev, { edgeId, from: previous || null, to: link.label }])
+      setRedoStack([])
+    }
+    attachLink(edgeId, link.id)
+    setNamingFor(null)
+    flash("label attached")
+  }
+
   const handleSaveName = (edgeId: string, previousValue: string | null) => {
     const h = nameDraft.trim()
     if (h !== (previousValue ?? "")) {
@@ -246,29 +280,24 @@ export default function ThrowTab() {
     (a.handle ? 1 : 0) - (b.handle ? 1 : 0)
   const orderedEdges = [...scoped.edges].sort(byNamed)
   // The Link List (model §Student: "belongs to the User, spans Cloths: the
-  // reusable Link Labels, tappable at coin-time"). DERIVED, not stored — there
-  // is no link-label table, and there is not meant to be: a Link Label is a
-  // parameter of a Link, and what recurs is the verb, not the Link. So a label
-  // enters this list by having been used once, and no other way. Read off
-  // `state`, never `scoped` — the labels cross readings even though, since
-  // 2026-08-09, the threads themselves do not. Same derivation as
-  // VocabularyTab's label groups, which is the list's full home.
-  // Deduped case-insensitively (one word typed twice with different capitals
-  // is one label), most-used first so the vocabulary you actually lean on is
-  // nearest the hand, then alphabetical so the order is stable across renders.
+  // reusable Link Labels, tappable at coin-time") — since 5.1 the student's
+  // own Link OBJECTS, not strings scraped off threads. Two things follow. A
+  // label coined and never used is offered here, which is the whole reason
+  // for coining ahead. And tapping one ATTACHES that object rather than
+  // copying its text, so reaching for the same word twice cannot mint a
+  // near-duplicate; the design note's warning is that objects WITHOUT
+  // attachment silt the vocabulary up by string copy.
+  //
+  // Read off `state`, never `scoped` — labels cross readings even though,
+  // since 2026-08-09, the threads themselves do not. Most-used first so the
+  // vocabulary you actually lean on is nearest the hand, then alphabetical so
+  // the order is stable across renders. VocabularyTab is the list's full home.
   const ownLabels = (() => {
-    const counts = new Map<string, { label: string; n: number }>()
-    for (const edge of state.edges) {
-      const h = edge.handle?.trim()
-      if (!h) continue
-      const key = h.toLowerCase()
-      const hit = counts.get(key)
-      if (hit) hit.n += 1
-      else counts.set(key, { label: h, n: 1 })
-    }
-    const all = [...counts.values()]
-      .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label))
-      .map(x => x.label)
+    const uses = usesOf(state.links, state.edges)
+    const all = state.links
+      .map((link) => ({ link, n: (uses.get(link.id) ?? []).length }))
+      .sort((a, b) => b.n - a.n || a.link.label.localeCompare(b.link.label))
+      .map((x) => x.link)
     // Twelve chips is what the row holds before it becomes a wall of verbs.
     // The count says what is not shown rather than quietly ending the list —
     // this IS the Link List (model §Student), and a truncated view of it that
@@ -372,8 +401,13 @@ export default function ThrowTab() {
                   {ownLabels.rest > 0 && <> — the {ownLabels.shown.length} you reach for most, of {ownLabels.shown.length + ownLabels.rest}</>}:
                 </div>
                 <div className="chips">
-                  {ownLabels.shown.map(v => (
-                    <span key={v} className="verbchip borrowed" onClick={() => pickWord(v)}>{v}</span>
+                  {ownLabels.shown.map(link => (
+                    <span
+                      key={link.id}
+                      className="verbchip borrowed"
+                      title={link.description || undefined}
+                      onClick={() => attachOwn(e.id, link)}
+                    >{link.label}</span>
                   ))}
                 </div>
               </>

@@ -13,6 +13,7 @@
  *
  * Run: npx tsx scripts/check-link-resolve.ts   (part of `npm run check`)
  */
+import { readFileSync } from "node:fs"
 import { findLink, labelOf, normLabel, unresolvedLabelled, usesOf } from "../src/lib/linkResolve"
 import type { Edge, Link } from "../src/lib/types"
 
@@ -113,6 +114,52 @@ assert(normLabel("   ") === "", "whitespace alone is no label", `"${normLabel(" 
     "a labelled thread whose word no Link owns IS unresolved — the state 5.1c's drop must reach zero",
     "missed an orphan")
   assert(unresolvedLabelled(links, [edge("e3", null, "")]).length === 0, "a bare thread is not an orphan", "counted a bare thread")
+}
+
+// --- the callers keep their end of it (source-text guards) ---
+//
+// The pure rules above are only worth anything if the app actually goes
+// through them. Three of the ways it could stop doing so are invisible: a
+// chip that copies its word instead of attaching its object, a typed label
+// that reaches the database but never joins the Link List, and a practice
+// loom that teaches a different lesson than the real one. All three
+// type-check, render, and look right for one session.
+
+{
+  const throwTab = readFileSync("src/components/tabs/ThrowTab.tsx", "utf8")
+  assert(
+    /onClick=\{\(\) => attachOwn\(e\.id, link\)\}/.test(throwTab),
+    "ThrowTab's own-label chips ATTACH the Link object",
+    "a chip in the coin-time row no longer calls attachOwn — if it went back to setting the draft text, every reuse would mint a near-duplicate by string copy"
+  )
+  assert(
+    /const attachOwn[\s\S]{0,400}attachLink\(edgeId, link\.id\)/.test(throwTab),
+    "attachOwn writes the reference, not the word",
+    "attachOwn no longer calls attachLink"
+  )
+  assert(
+    /const restoreLabel[\s\S]{0,400}attachLink\(edgeId, link\.id\)/.test(throwTab),
+    "undo re-attaches a word the student owns, rather than leaving a stale reference",
+    "restoreLabel no longer routes an owned label through attachLink"
+  )
+}
+
+{
+  const actions = readFileSync("src/actions/loom.ts", "utf8")
+  assert(
+    /export async function updateEdge[\s\S]{0,1200}\n  return link\n\}/.test(actions),
+    "updateEdge hands the resolved Link back to the client",
+    "updateEdge stopped returning the Link — a word typed for the first time would exist in the database and be missing from the Link List until reload"
+  )
+}
+
+{
+  const sandbox = readFileSync("src/components/providers/SandboxLoomProvider.tsx", "utf8")
+  assert(
+    /const editEdge = useCallback\([\s\S]{0,900}findLink\(s\.links, label\)/.test(sandbox),
+    "the practice loom coins a Link when a label is typed, exactly as the server does",
+    "SandboxLoomProvider.editEdge no longer resolves a Link — coining a word there would leave the Link List empty and teach the wrong thing about what a label is"
+  )
 }
 
 console.log(`\n${checks} checks, ${failures} failing\n`)

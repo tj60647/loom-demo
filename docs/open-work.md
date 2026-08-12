@@ -241,13 +241,30 @@ gaps are now demonstrable rather than suspected:
 
 ## Phase 5 — features, each its own phase
 
-- **5.1 Link as object** — [link-as-object.md](link-as-object.md). Link becomes a
-  User-level object (Label + its own gloss), Thread carries the references and
-  the per-pair sentence. **Ship tap-to-attach in the same phase** so chips attach
-  a `linkId` instead of copying a string; defer `mergeLinks` until the vocabulary
-  is observed to silt up, because prevention decides nothing on a student's
-  behalf and repair always risks it. Migration: additive except dropping
-  `edge.handle`. Watch `edge_search_idx`, which spans both columns.
+- ~~**5.1 Link as object**~~ — **built 2026-08-11** over three commits
+  ([link-as-object.md](link-as-object.md) is the design note). A Link is a
+  User-level object (Label + its own gloss); a Thread references one and keeps
+  the per-pair sentence. Migration 0024 is **expand-only**: the `link` table,
+  `edge.linkId`, a backfill from the distinct handles, and `link_search_idx`.
+  Tap-to-attach shipped in the same phase as the design note required — a chip
+  in ThrowTab's coin-time row attaches the object; it never copies the word.
+  Coining ahead of use works, and search finds a Link nothing uses yet.
+  **Still open, in order:**
+  - **5.1d Drop `edge.handle`.** Deliberately sequenced AFTER Step 4 deletes
+    import, so import is not first taught to synthesise Links and then deleted.
+    Every `e.handle` read becomes `labelOf(e, links)`
+    ([linkResolve.ts](../src/lib/linkResolve.ts)) — 65 mentions across 19 files
+    as of this writing (`rg '\.handle' src`), most of them display. Watch
+    `edge_search_idx`, which spans both columns, and
+    the `handle` fallback inside `usesOf`, which exists only for this window.
+  - **5.1e Delete, edit and merge a Link** (TJ, 2026-08-11: future work).
+    Editing a Label already fans out to every Thread using it; **deleting** and
+    **merging** do not exist. Merge is the one to hold longest — the design
+    note's reasoning stands: prevention decides nothing on a student's behalf,
+    repair always risks it, so wait until a real vocabulary is observed to silt
+    up rather than building a fixer for a mess nobody has made. Delete needs a
+    rule for a Link that Threads still use (refuse, or detach them and say how
+    many), and that rule is TJ's, not mine.
 - **5.2 The screen snip** — [screen-snip.md](screen-snip.md). Much smaller than
   it looks: a snip of a library PDF needs **no image storage**, only a rect.
   TJ settled export (the image embeds). One number open: the size cap, worth
