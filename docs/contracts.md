@@ -413,6 +413,19 @@
 > read as one, which is what "out of sync with the activities they describe"
 > was pointing at.
 >
+> **And on the thread beat the RING WALKS those three** (2026-08-12, TJ: *"the
+> glow should move with this"*). The hole stays the union — all three gestures
+> belong to one move, and closing the dim in behind the student would strand
+> anyone who picked the wrong pair — but the ring and the card's copy advance
+> with the work: warp → the link description → Throw it. A `GuideMove` carries
+> its own selector, its own line, and a `done` read straight off the page: the
+> bench's `.sleeper.asleep` already says whether a pair is loaded, and the
+> textarea's value already says whether it has been described, so nothing new
+> is threaded through the app to tell the guide what it can see. The last move
+> declares no `done` — the beat's own predicate is what finishes the beat — and
+> `scripts/check-practice-guide.ts` asserts exactly that, plus that every
+> move's selector exists in `src/`.
+>
 > `scripts/check-practice-guide.ts` asserts every selector in every chain
 > actually exists in `src/` (a dead target used to render no ring, and would
 > now dim the screen with no hole), that the rungs stay ordered against

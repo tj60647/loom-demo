@@ -282,13 +282,23 @@ gaps are now demonstrable rather than suspected:
   in ThrowTab's coin-time row attaches the object; it never copies the word.
   Coining ahead of use works, and search finds a Link nothing uses yet.
   **Still open, in order:**
-  - **5.1d Drop `edge.handle`.** Deliberately sequenced AFTER Step 4 deletes
-    import, so import is not first taught to synthesise Links and then deleted.
-    Every `e.handle` read becomes `labelOf(e, links)`
-    ([linkResolve.ts](../src/lib/linkResolve.ts)) — 65 mentions across 19 files
-    as of this writing (`rg '\.handle' src`), most of them display. Watch
-    `edge_search_idx`, which spans both columns, and
-    the `handle` fallback inside `usesOf`, which exists only for this window.
+  - **5.1d Drop `edge.handle` — PARKED, 2026-08-12, and the reason matters.**
+    TJ, asked to sequence it: *"i dont know what edge handle is, if it is the
+    way to move edge labels in the projection i dont think removal is a good
+    idea and dont understand why you propose it."* It is not that. `edge.handle`
+    ([types.ts](../src/lib/types.ts)) is a **string** — a legacy copy of the
+    Link Label. The word is overloaded three ways in this repo and that is the
+    whole confusion: `.thandle` is the ⠿ grip on a Sort row, and the
+    `data-ebend` path in [MapTab.tsx](../src/components/tabs/MapTab.tsx) is
+    literally commented "the drag handle for bending". Neither is touched by
+    this item. Checked while answering: `updateLink` already fans a rename out
+    to every edge's `handle`, so the copy never disagrees with the Link — which
+    means **5.1d fixes nothing observable.** It is hygiene: one source of truth
+    instead of a synced duplicate, at the cost of 65 mentions across 19 files,
+    a migration, and rebuilding `edge_search_idx` (it spans both columns; watch
+    also the `handle` fallback in `usesOf`). Recommendation on the table and
+    not overruled: leave it. Revisit only if the dual-write is ever a real
+    source of drift.
   - **5.1e Delete, edit and merge a Link** (TJ, 2026-08-11: future work).
     Editing a Label already fans out to every Thread using it; **deleting** and
     **merging** do not exist. Merge is the one to hold longest — the design
@@ -323,15 +333,16 @@ gaps are now demonstrable rather than suspected:
   beat so nothing ticks that the student did not do. Anatomy and the day's
   rulings are stamped in [contracts.md](contracts.md); the walk itself is
   `tests/practice-guide.spec.ts`.
+  **The practice Library stays as it is** — settled 2026-08-12. It is
+  twenty-four cards deep with the one that opens LAST, which is how the glow
+  got scrolled away from in the first place; the two cheap answers were to cut
+  the dimmed cards to one or float the live card to the front, and TJ took
+  neither: *"i think the library solution as is is fine, it does not
+  fictionalize the activity. no cut, no float. leave as is."* The guide scrolls
+  to the card on arrival and offers "show me" when you leave it, which is the
+  fix. **Do not re-open this.**
   **Still open:** whether the example should be swappable per course (TJ: "we
-  can change it out later if it seems to conflict with the intention"), and
-  what to do about the practice Library being twenty-four cards deep with the
-  one that opens **last**. The guide scrolls to it on arrival and offers "show
-  me" when you leave it, so the reported problem is closed — but the cheaper
-  answers are still on the table and are TJ's call: cut the dimmed cards to
-  one, or float the openable card to the front. Against the second: the real
-  Library has a real order, and the practice one mirroring it is the whole
-  reason the dimmed cards are there.
+  can change it out later if it seems to conflict with the intention").
 - **5.2 The screen snip** — [screen-snip.md](screen-snip.md). Much smaller than
   it looks: a snip of a library PDF needs **no image storage**, only a rect.
   TJ settled export (the image embeds). One number open: the size cap, worth

@@ -44,6 +44,32 @@ import type { LoomState } from "./types"
  */
 export type GuideStation = "library" | "reading" | "throw" | "map" | "read"
 
+/**
+ * One gesture inside a beat that is several.
+ *
+ * TJ, 2026-08-12: *"there are 3 parts to step 4. tap 2 concepts, describe the
+ * link, and throw it. the glow should move with this."* The hole stays the
+ * whole beat's working area — all three gestures belong to one move and
+ * closing the dim in behind the student would strand anyone who picked the
+ * wrong pair — but the RING and the card's copy walk the gestures, so what is
+ * lit is always the thing to do next.
+ */
+export type GuideMove = {
+  /** What the ring sits on while this gesture is the current one. */
+  sel: string
+  /** The instruction for this gesture. Replaces the beat's `say` while current. */
+  say: string
+  /**
+   * True once this gesture is finished, read off the page — the bench's own
+   * `.asleep` class and the textarea's value already say it, so no new state
+   * is threaded through the app to tell the guide what it can see.
+   *
+   * The LAST move has none: there is nothing after it to advance to, and the
+   * beat's own predicate is what finishes it.
+   */
+  done?: (doc: Document) => boolean
+}
+
 export type GuideStep = {
   key: string
   /** Short label for the rail. */
@@ -62,6 +88,11 @@ export type GuideStep = {
    * skipped — the capture dialog does not exist until it is opened.
    */
   targets: string[]
+  /**
+   * The gestures the beat is made of, when it is made of several. The ring and
+   * the copy walk these; the hole stays the union of `targets`.
+   */
+  moves?: GuideMove[]
   /** The instruction, in the second person, naming the control. */
   say: string
   /** One line on why the move matters — the teaching, not the mechanics. */
@@ -137,6 +168,24 @@ export const GUIDE_STEPS: GuideStep[] = [
     label: "Throw a thread",
     station: "throw",
     targets: ["#warp", "#throwBench", "#throwIt"],
+    moves: [
+      {
+        sel: "#warp",
+        say: "Tap a concept in the warp, then a second one.",
+        // The bench says this itself: `.sleeper.asleep` fades and blocks it
+        // until both slots are filled.
+        done: (doc) => !!doc.querySelector("#throwBench .sleeper:not(.asleep)"),
+      },
+      {
+        sel: "#throwBench .form-row",
+        say: "The bench is awake. Say how they hang together — long and awkward is fine.",
+        done: (doc) => {
+          const box = doc.querySelector("#throwBench textarea")
+          return !!box && (box as HTMLTextAreaElement).value.trim().length > 0
+        },
+      },
+      { sel: "#throwIt", say: "Throw it." },
+    ],
     overlay: "mask",
     say:
       "Tap two concepts in the warp. The bench wakes: say how they hang together — long and awkward is fine — and throw it.",

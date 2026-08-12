@@ -308,18 +308,64 @@ assert(GUIDE_STEPS.length === 8, "eight beats — the moves the work requires, a
     .map((f) => readFileSync(join("src", f), "utf8"))
     .join("\n")
 
+  const inSources = (selector: string) =>
+    // A compound like "#throwBench .form-row" is checked part by part.
+    selector.split(/\s+/).every((part) =>
+      part.startsWith("#")
+        ? sources.includes(`id="${part.slice(1)}"`)
+        : sources.includes(part.replace(/^\./, ""))
+    )
+
   for (const step of GUIDE_STEPS) {
     for (const selector of step.targets) {
-      const found = selector.startsWith("#")
-        ? sources.includes(`id="${selector.slice(1)}"`)
-        : sources.includes(selector.replace(/^\./, ""))
       assert(
-        found,
+        inSources(selector),
         `${step.key} → ${selector} exists in the app`,
         `nothing in src/ carries ${selector} — the beat would point at nothing, and the mask would dim the screen with no hole`
       )
     }
+
+    // --- and every gesture inside a beat that has several ---
+    if (!step.moves) continue
+    assert(
+      step.moves.length > 1,
+      `${step.key} → a walked beat has more than one gesture`,
+      "one move is just the beat; drop `moves` instead"
+    )
+    for (const move of step.moves) {
+      assert(
+        inSources(move.sel),
+        `${step.key} → move "${move.say.slice(0, 24)}…" points at ${move.sel}`,
+        `nothing in src/ carries ${move.sel} — the ring would sit on the whole beat instead of the gesture`
+      )
+    }
+    assert(
+      step.moves.slice(0, -1).every((m) => typeof m.done === "function"),
+      `${step.key} → every gesture but the last says when it is finished`,
+      "a move with no `done` swallows the ones after it — the ring would stop there for ever"
+    )
+    assert(
+      step.moves[step.moves.length - 1].done === undefined,
+      `${step.key} → the last gesture has no \`done\``,
+      "nothing follows it; the beat's own predicate is what finishes the beat"
+    )
   }
+}
+
+// --- a coupling `tests/sandbox.spec.ts` depends on ---
+//
+// That spec measures `.guideglow` and treats it as the CUTOUT: it checks the
+// centre is live DOM and then overshoots past its edge to prove a drag can
+// leave the hole. Since the ring walks the gestures of a beat that has
+// `moves`, the two are only the same rect on a beat that has none. Give the
+// capture beat moves and that spec starts measuring the ring, silently.
+{
+  const capture = GUIDE_STEPS.find((s) => s.key === "capture")
+  assert(
+    !!capture && !capture.moves,
+    "the capture beat has no walked gestures — sandbox.spec reads .guideglow as the cutout",
+    "give it `moves` and that spec measures the ring instead of the hole, and still passes"
+  )
 }
 
 // --- the mask cannot eat what it is pointing at ---

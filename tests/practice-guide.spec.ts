@@ -38,6 +38,29 @@ async function beat(page: Page) {
   return ((await page.locator(".guidepop .gsay b").textContent()) ?? "").trim()
 }
 
+/** The whole instruction the card is showing, beat name included. */
+async function says(page: Page) {
+  return ((await page.locator(".guidepop .gsay").textContent()) ?? "").trim()
+}
+
+/**
+ * The glow is sitting on `selector` — compared by geometry, because that is
+ * what a student sees. Tolerant of the ring's own padding.
+ */
+async function ringSits(page: Page, selector: string) {
+  await expect
+    .poll(async () =>
+      page.evaluate((sel) => {
+        const ring = document.querySelector(".guideglow")?.getBoundingClientRect()
+        const target = document.querySelector(sel)?.getBoundingClientRect()
+        if (!ring || !target) return "missing"
+        const off = Math.abs(ring.top - target.top) + Math.abs(ring.left - target.left)
+        return off < 20 ? "on" : `off by ${Math.round(off)}px`
+      }, selector)
+    , { timeout: 15_000, message: `the glow should be on ${selector}` })
+    .toBe("on")
+}
+
 test.describe("The guide", () => {
   test("every beat can be completed by doing what it says", async ({ page }) => {
     test.setTimeout(180_000)
@@ -95,12 +118,25 @@ test.describe("The guide", () => {
     await ticked(page, 3)
     await onward(page)
     // ---- 4. throw a thread -------------------------------------------------
+    // Three gestures, and the ring walks them (TJ, 2026-08-12: *"there are 3
+    // parts to step 4. tap 2 concepts, describe the link, and throw it. the
+    // glow should move with this."*). The hole stays the whole bench — the
+    // ring is the pointer, not the constraint.
     const warp = page.locator("#warp .crow")
     await expect(warp.first()).toBeVisible({ timeout: 20_000 })
+    await ringSits(page, "#warp")
+    expect(await says(page)).toContain("Tap a concept in the warp")
+
     await warp.nth(0).click()
     await warp.nth(1).click()
+    await ringSits(page, "#throwBench .form-row")
+    expect(await says(page)).toContain("The bench is awake")
+
     await page.getByPlaceholder("…or just start typing. Long and awkward is fine.")
       .fill("A practice thread: the one keeps turning into the other.")
+    await ringSits(page, "#throwIt")
+    expect(await says(page)).toContain("Throw it")
+
     await page.locator("#throwIt").click()
     await ticked(page, 4)
     await onward(page)

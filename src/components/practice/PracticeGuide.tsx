@@ -45,7 +45,9 @@ import {
   standOn,
   stepDone,
   type GuideBaseline,
+  type GuideMove,
   type GuideSignals,
+  type GuideStep,
 } from "@/lib/practiceGuide"
 
 function goToStation(station: string) {
@@ -113,6 +115,18 @@ function resolveTarget(selectors: string[]): { rect: Rect | null; away: boolean 
 
   if (top === Infinity) return { rect: null, away }
   return { rect: { top, left, width: right - left, height: bottom - top }, away: false }
+}
+
+/**
+ * The gesture the student is on, inside a beat made of several.
+ *
+ * The first one not yet finished — and the last one once they all are, so the
+ * ring never blinks out at the end of a beat.
+ */
+function currentMove(step: GuideStep): GuideMove | null {
+  if (!step.moves?.length) return null
+  for (const move of step.moves) if (!move.done || !move.done(document)) return move
+  return step.moves[step.moves.length - 1]
 }
 
 /** The nearest ancestor of `el` that actually scrolls, or null. */
@@ -228,6 +242,9 @@ export default function PracticeGuide() {
   const [away, setAway] = useState(false)
   /** Bumped on every rail press, so re-showing the beat you are on re-finds it. */
   const [nudge, setNudge] = useState(0)
+  /** The gesture inside a multi-part beat, and where its ring sits. */
+  const [move, setMove] = useState<GuideMove | null>(null)
+  const [ring, setRing] = useState<Rect | null>(null)
 
   const cardRef = useRef<HTMLDivElement | null>(null)
 
@@ -342,6 +359,21 @@ export default function PracticeGuide() {
         : null
       setHole((was) => (near(was, padded) || (was === null && padded === null) ? was : padded))
 
+      // The ring walks the gestures inside the beat; the hole above stays the
+      // whole working area, so picking the wrong pair is still recoverable.
+      const move = currentMove(step)
+      setMove((was) => (was === move ? was : move))
+      const ringed = move ? resolveTarget([move.sel]).rect : null
+      const ring: Rect | null = ringed
+        ? {
+            top: Math.max(0, ringed.top - PAD),
+            left: Math.max(0, ringed.left - PAD),
+            width: ringed.width + PAD * 2,
+            height: ringed.height + PAD * 2,
+          }
+        : null
+      setRing((was) => (near(was, ring) || (was === null && ring === null) ? was : ring))
+
       const card = cardRef.current
       if (card && padded) {
         const next = place(padded, { w: card.offsetWidth, h: card.offsetHeight })
@@ -451,11 +483,19 @@ export default function PracticeGuide() {
         </div>
       )}
 
-      {hole && (
+      {/* The ring sits on the current GESTURE when the beat has several, and
+          on the whole hole when it does not. The hole is the working area; the
+          ring is the pointer, and it has to move as the move is made. */}
+      {(ring ?? hole) && (
         <div
           className="guideglow"
           aria-hidden="true"
-          style={{ top: hole.top, left: hole.left, width: hole.width, height: hole.height }}
+          style={{
+            top: (ring ?? hole)!.top,
+            left: (ring ?? hole)!.left,
+            width: (ring ?? hole)!.width,
+            height: (ring ?? hole)!.height,
+          }}
         />
       )}
 
@@ -497,7 +537,7 @@ export default function PracticeGuide() {
                 : "Done. Press next."}
             </span>
           ) : (
-            step.say
+            move?.say ?? step.say
           )}
           {/* The card says the situation as well as offering the button. With
               nothing glowing anywhere, an instruction naming a control the
