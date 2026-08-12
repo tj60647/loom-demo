@@ -160,8 +160,143 @@ identically either way, which `contracts.md` already states.
 
 ## 8. TJ's remaining calls
 
-1. **The worked example's exit**, once reset is gone (§5.1).
-2. **Concept/thread entries in a per-Reading Log** — evidence-derived or
-   strictly stamped (§4).
-3. **Does the Capture Log download?** (§4)
+1. ~~**The worked example's exit**, once reset is gone (§5.1).~~ **Answered
+   2026-08-10** — the practice loom (`/sandbox`) replaced it. The example is
+   deleted rather than given an exit; see §9.5.
+2. ~~**Concept/thread entries in a per-Reading Log**~~ — **ruled
+   evidence-derived** (TJ, 2026-08-10); built in `src/lib/logScope.ts`.
+3. ~~**Does the Capture Log download?**~~ — **yes** (TJ, 2026-08-10); built.
 4. **Vocabulary at the library level** — dual surface or route-only (§7).
+5. **The student-facing whole weave** — new, and §9 is the assessment TJ
+   asked for on 2026-08-11: *"at this moment there should be no student
+   facing whole weave projection. at most it appears in the faculty."*
+
+---
+
+## 9. The Capture Log, act by act (2026-08-11)
+
+TJ, on being asked where the acts that belong to no reading should live:
+*"i am concerned this question suggests some changes have been overlooked. i
+propose we break this down and assess by act."* This is that breakdown. Every
+row was traced to its emitter and stepped through the placement rule; three
+independent verifiers then went back over the table and corrected seven claims
+in it, including the one the question rested on (§9.4).
+
+### 9.1 How an act is placed
+
+`eventBelongsToReading` ([logScope.ts](../src/lib/logScope.ts)) asks five
+questions in order, and the first that answers wins:
+
+1. **The act said so** — `payload.sourceId`. Present-and-null counts: it means
+   "no reading", which is not the same as not knowing.
+2. **Its scope said so** — `payload.scopeKey` must equal the reading.
+3. **It happened to the whole loom** — `graph.import`, `graph.reset`,
+   `graph.example`, and only those three.
+4. **The evidence says so** — a concept where it has a passage, a thread where
+   both ends do, a passage from its live row.
+5. Otherwise, no reading.
+
+### 9.2 The acts
+
+| # | The act, and where a student does it | Event | Placed by | Shows in a reading's log? |
+|---|---|---|---|---|
+| 1 | Capture a passage — **01** | `passage.capture` | 1 | Yes. An **untethered** capture stamps null → nowhere |
+| 2 | File / refile a passage — **01** | `passage.refile` | 1 | Yes — but the stamp is copied from the row, so an untethered passage → nowhere |
+| 3 | Unfile a passage — **01** | `passage.unfile` | 1 | Same as 2 |
+| 4 | Delete a passage — **01** | `passage.delete` | 1 | Same as 2 |
+| 5 | Place an untethered passage — **00 Library** | `passage.attribute` | 1 | Yes, always: the act names the reading it is claiming |
+| 6 | Name a concept — **01**, and **03** (naming an unlabeled passage) | `concept.create` | 1 | Yes inside a reading. Named at the whole weave → null → nowhere |
+| 7 | Sharpen a description / rename a concept — **01** and **04** | `concept.update` · `concept.rename` | 4 | Only in readings where that concept has a passage. **A concept named ahead of its evidence → nowhere** |
+| 8 | Merge two concepts — **04** | `concept.merge` | 4 | Only where the *target* has a passage |
+| 9 | Delete a concept — **01** and **04** | `concept.delete` | 4 | **Never.** The rule asks where the concept has passages; the row and its pointers are already gone |
+| 10 | Throw a thread — **02** | `edge.throw` | 1 | Yes. Thrown at the whole weave → nowhere |
+| 11 | Coin or edit a thread's label — **02** (typed, or by tapping a chip) | `edge.coin` | 4 | Only where **both** ends have a passage — so **never for a cross-reading bridge**. And it reads the *live* thread, so removing the thread later drops it from every log |
+| 12 | Reword a thread's sentence — **02** and **04** | `edge.update` | 4 | Same as 11 |
+| 13 | Remove a thread — **02** | `edge.delete` | 4 | Same rule, but the event carries both ends itself, so it survives the deletion |
+| 14 | Coin a Link Label from the Vocabulary field — **04** | `link.coin` | 5 | **Never.** `entityType: "link"` matches no branch |
+| 15 | Give a Link its description — **04** | `link.update` | 5 | **Never**, same reason |
+| 16 | Title or describe the cloth — **01** / **02** | `cloth.update` | 2 | Yes for a reading's cloth. The whole-weave cloth is `scopeKey: ""` → nowhere |
+| 17–21 | Make, rename, tier, write, or delete a projection — **03** | `map.create` · `.rename` · `.retier` · `.update` · `.delete` | 2 | Yes for a reading's projection. **A whole-weave projection → nowhere** |
+| 22 | Arrange the cards, bend a thread — **03** | *(no event)* | — | By design: geometry is not part of the graph's development |
+| 23 | Import a whole cloth · reset · load the worked example — **05 Keep**, and the example from **00 Library** | `graph.import` · `graph.reset` · `graph.example` | 3 | Every reading |
+| 24 | Import a projection — **05 Keep** | `map.import` | **2**, not 3 | The reading its scope resolves to — and **nowhere** when it resolves to the whole weave, which is the fallback when the file's readings are not on this deployment |
+
+**Two acts write nothing at all.** Typing a new label on a thread mints the
+Link through `resolveLink` with no event — only `edge.coin` is recorded, so the
+Link's coining is nowhere in the log. And reaching for a word you already own
+returns it before `recordEvent`. `link.coin` therefore fires only for a
+standalone coinage at 04, which makes row 14 rarer than it looks and the gap
+larger: the vocabulary can grow with no record of growing.
+
+**Most of a real log is synthesized.** `getGraphEvents` manufactures a create
+event for any concept, passage, thread or projection with no recorded one —
+including every row the seed writes. Synthesized concept and thread events
+carry **no** `sourceId`, so they place by evidence (rule 4), not by stamp. Row
+6 is rule 1 only for acts recorded since 2026-08-10.
+
+### 9.3 What lands nowhere
+
+- every `link.coin` and `link.update` — always
+- every `concept.delete` — always
+- rows 7, 8, 11, 12, 13 whenever the work has no evidence in one reading —
+  which is exactly **the cross-reading bridge**, the payoff the course notes
+  name for the back half of term
+- rows 16–21, and 24, whenever the object is whole-weave
+- rows 1–4, 6, 10 whenever the stamp is null — an untethered passage, or
+  anything done at the whole weave
+
+Measured on the seeded account (8 concepts, 10 passages, 6 threads, 6 links, 3
+projections): 27 entries, 3 of which place nowhere — the evidence-less concept,
+the one cross-reading thread, and the whole-weave projection. Across a term the
+share is of the order of 10–20%, but it is not a random tenth: it is the Link
+vocabulary 5.1 just made an object, the cross-week bridges, the concepts named
+ahead of their evidence, and the whole-weave capstone.
+
+### 9.4 The claim that was wrong
+
+I asked TJ where the residue should live "once Keep is gone", on the premise
+that KeepTab holds the only unscoped view of the record. **That premise is
+false.** `MapTab` mounts the Capture Log with `sourceId={wholeWeave ?
+undefined : …}` — so at `/weave` the Knowledge Graph already shows the whole
+record, residue included, and its download already carries it. Deleting Keep
+does not hide the residue. **The whole weave is what shows it, and the whole
+weave is the thing TJ says should not be student-facing.**
+
+### 9.5 The student-facing whole weave, today
+
+TJ: *"at this moment there should be no student facing whole weave projection.
+at most it appears in the faculty."* That is **not true of the build**, on four
+counts:
+
+1. **`/weave` has no gate** — no role check, no redirect, no middleware
+   anywhere in the repo. The only check is "is anyone signed in". A learner who
+   arrives gets Linking, Knowledge Graph and Vocabulary at `scopeKey: ""`,
+   where they can title the whole-weave cloth, thread across every reading, and
+   **make, tier, name and keep a whole-weave projection**.
+2. **Four doors open it, all in the Library's search results** —
+   [ShelfSearch.tsx:214](../src/components/shelf/ShelfSearch.tsx#L214) (a
+   concept), [:228](../src/components/shelf/ShelfSearch.tsx#L228) (a link
+   label — **added 2026-08-11 with 5.1c**),
+   [:244](../src/components/shelf/ShelfSearch.tsx#L244) (a thread),
+   [:261](../src/components/shelf/ShelfSearch.tsx#L261) (an untethered
+   passage). The journey bar is *not* a door: those stations render greyed and
+   inert outside a reading.
+3. **Keep lists and exports whole-weave projections**, and **both import paths
+   mint them** — an imported projection whose readings are not on this
+   deployment falls back to the whole weave *by design*, to satisfy red line 5.
+4. **The seed ships one** — Test User A's "The whole cloth".
+
+Three docs say otherwise and are stale: [open-work.md](open-work.md) and
+[contracts.md](contracts.md) both say "nothing links to `/weave`" and count
+**three** ShelfSearch links (there are four), and the generated student flow in
+[workflows.ts](../src/lib/workflows.ts) dropped its weave node on that same
+reasoning.
+
+### 9.6 What this means for Step 4
+
+Deleting Keep is safe for the *record* — `/weave` still shows and downloads it.
+It is not safe for the *strandings* [open-work](open-work.md) Phase 2 lists,
+because the home that note proposes for them is Keep itself. And closing the
+whole weave to students — which is what TJ's sentence asks for — would remove
+the only unscoped view of the record at the same stroke, so the two must be
+decided together, not in sequence.
