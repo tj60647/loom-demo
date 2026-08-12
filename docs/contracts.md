@@ -426,6 +426,29 @@
 > `scripts/check-practice-guide.ts` asserts exactly that, plus that every
 > move's selector exists in `src/`.
 >
+> **Capturing does not turn the page** (2026-08-12, TJ: *"stage 3 of guide does
+> not stay on page where passage was captured"*). The effect that turns to a
+> page with words on it — the practice reading opens on two covers, where "drag
+> across a line" points at a picture — depended on `state.passages`, so the
+> instant a capture landed it re-fired and focused the FIRST passage carrying a
+> page number, which is one of the worked cloth's, elsewhere in the book. The
+> student was thrown off the page they had just taken words from, mid-beat. It
+> fires on beat arrival only, and only when there is no text on screen to work
+> with. The journey reads `data-page-number` before the drag and after the save
+> and fails if they differ.
+>
+> **The band says where you are, and offers the way out.** Both halves are
+> TJ's, the same day. The promise it used to make went — *"of course everything
+> should work. i dont expect tutorial to keep my work"* — leaving one sentence.
+> And it gained an **exit guide** (*"add an 'exit guide' button"*): until then
+> the only exits were the browser's Back button and the header, and nothing on
+> the page said the guide was a place you could leave. The band takes no
+> pointer events and the exit is the single exception, which the guard asserts,
+> because a button inside `pointer-events:none` chrome is a picture of a
+> button. The yield now fades the **prose** rather than the whole band, for the
+> same reason: an escape hatch at sixteen per cent is worse than the occlusion
+> the yield exists to prevent.
+>
 > `scripts/check-practice-guide.ts` asserts every selector in every chain
 > actually exists in `src/` (a dead target used to render no ring, and would
 > now dim the screen with no hole), that the rungs stay ordered against

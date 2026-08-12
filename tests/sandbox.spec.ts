@@ -53,12 +53,13 @@ test.describe('Practice loom', () => {
     await expect(page.locator('.shelfcard.off').first()).toBeVisible({ timeout: 30_000 });
     await enterPracticeLoom(page);
 
-    // The band is the safety argument — a student who cannot see it cannot
-    // tell a practice space from data loss. Generous timeout: /sandbox is its
-    // own route and compiles on demand under `next dev`, so a cold first hit
+    // The band says where you are, and only that — the promise that nothing is
+    // kept came out on 2026-08-12 ("of course everything should work. i dont
+    // expect tutorial to keep my work"). Generous timeout: /sandbox is its own
+    // route and compiles on demand under `next dev`, so a cold first hit
     // outruns the 5s default.
     await expect(page.locator('.practiceband')).toBeVisible({ timeout: 30_000 });
-    await expect(page.locator('.practiceband')).toContainText(/nothing is kept/i);
+    await expect(page.locator('.practiceband')).toContainText(/in the guide/i);
 
     // A REAL reading, with a real text layer to drag-select — not a mock.
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 40_000 });

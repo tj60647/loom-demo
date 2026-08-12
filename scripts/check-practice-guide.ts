@@ -412,6 +412,23 @@ assert(GUIDE_STEPS.length === 8, "eight beats — the moves the work requires, a
     "…and eats nothing, sitting that high over a live cutout",
     "fixed chrome above the mask with pointer events is an invisible click-eater"
   )
+  // …with exactly one exception, which has to be an exception or it is a
+  // picture of a button inside pointer-events:none chrome.
+  assert(
+    /\.practiceband \.bandexit\{[^}]*pointer-events:auto/.test(css),
+    "the way out of the guide is pressable",
+    "`.bandexit` inherits the band's pointer-events:none and cannot be clicked"
+  )
+  assert(
+    !/\.practiceband\.yielded\{[^}]*opacity:/.test(css),
+    "yielding fades the band's PROSE, never the whole band",
+    "fading the band fades the exit with it — an escape hatch at 16% is worse than the occlusion"
+  )
+  assert(
+    readFileSync("src/components/SandboxWorkbench.tsx", "utf8").includes('className="btn ghost mini bandexit"'),
+    "the band carries the exit",
+    "nothing else on /sandbox says the guide is a place you can leave"
+  )
   assert(
     /\.guideglow\{[^}]*pointer-events:none/.test(css),
     "the ring never takes a click",

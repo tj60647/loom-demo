@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import SandboxLoomProvider from "@/components/providers/SandboxLoomProvider"
 import PracticeGuide from "@/components/practice/PracticeGuide"
 import PracticeShelf, { type PracticeCard } from "@/components/practice/PracticeShelf"
@@ -115,17 +116,30 @@ export default function SandboxWorkbench({
 
   return (
     <SandboxLoomProvider sourceId={sourceId} initial={practiceCloth ?? undefined}>
-      {/* The standing notice, over BOTH stages. Persistent rather than a
-          toast: `flash` self-clears after 1500ms, and someone who missed a
-          disappearing notice cannot tell a practice space from data loss.
-          So it stays on screen — but it says two things and stops (TJ,
-          2026-08-12: "letting folks know they are in the guide is good, but we
-          dont have to say much else"). It said "Practice loom" and explained
-          reloading, which named the machinery rather than the place the
-          student is in, and described a recovery from a loss they had not had.
-          Takes no pointer events: prose must never eat a control. */}
+      {/* The standing notice, over BOTH stages: where you are, and nothing
+          else. It has been cut twice by the same instinct. First it said
+          "Practice loom" and explained how to reload the example — machinery,
+          and a recovery from a loss nobody had had. Then it promised
+          "Everything works and nothing is kept", which went too (TJ,
+          2026-08-12): *"of course everything should work. i dont expect
+          tutorial to keep my work."* Both halves were answers to questions a
+          student was never asking. Persistent rather than a toast — `flash`
+          self-clears after 1500ms, and a notice you missed cannot tell you
+          where you are. Takes no pointer events: prose must never eat a
+          control. */}
       <div ref={bandRef} className={`practiceband${bandClear ? "" : " yielded"}`} role="status">
-        <b>You are in the guide.</b> Everything works and <b>nothing is kept</b>.
+        <span className="bandsay">
+          <b>You are in the guide.</b>
+        </span>
+        {/* The way out (TJ, 2026-08-12). Until now the only exits were the
+            browser's Back button and the header's own links — nothing on the
+            page said the guide was a place you could leave. The band takes no
+            pointer events; this does, or it would be a picture of a button.
+            It survives the yield below: fading an escape hatch to sixteen per
+            cent is worse than the occlusion the yield exists to prevent. */}
+        <Link href="/" className="btn ghost mini bandexit">
+          exit guide
+        </Link>
       </div>
       <PracticeGuide />
       {opened ? (

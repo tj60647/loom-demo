@@ -38,6 +38,15 @@ async function beat(page: Page) {
   return ((await page.locator(".guidepop .gsay b").textContent()) ?? "").trim()
 }
 
+/** Which page(s) the viewer is showing — a spread reads as "6,7". */
+async function pageLabel(page: Page) {
+  return page.evaluate(() =>
+    Array.from(document.querySelectorAll(".react-pdf__Page[data-page-number]"))
+      .map((el) => el.getAttribute("data-page-number"))
+      .join(",")
+  )
+}
+
 /** The whole instruction the card is showing, beat name included. */
 async function says(page: Page) {
   return ((await page.locator(".guidepop .gsay").textContent()) ?? "").trim()
@@ -103,11 +112,16 @@ test.describe("The guide", () => {
     await page.mouse.down()
     await page.mouse.move(line!.x2, line!.y2, { steps: 14 })
     await page.mouse.up()
+    // The page these words came from — the student must still be on it after
+    // the capture lands (below).
+    const capturedOn = await pageLabel(page)
+
     await page.locator("#captureNow").click({ timeout: 15_000 })
     await ticked(page, 2)
     // No press here: the dialog opening IS the hand-off, and the guide is
     // already on the beat about that dialog.
     await expect(page.locator(".guidepop .gsay b")).toHaveText(/Keep it, and name it/, { timeout: 10_000 })
+    expect(await pageLabel(page), "the hand-off must not turn the page").toBe(capturedOn)
 
     // ---- 3. keep it, and name it ------------------------------------------
     // Both halves: the passage's own note, and a concept — which is optional
@@ -116,6 +130,14 @@ test.describe("The guide", () => {
     await page.locator("#capturePassageNote").fill("A practice note on why these words.")
     await page.locator("#capturePassageSave").click()
     await ticked(page, 3)
+
+    // TJ, 2026-08-12: *"stage 3 of guide does not stay on page where passage
+    // was captured."* The focus effect depended on `state.passages`, so the
+    // instant a capture landed it re-fired and turned to the FIRST passage
+    // carrying a page number — one of the worked cloth's, elsewhere in the
+    // book. Poll: the jump took a beat to happen, so an immediate read passed.
+    await page.waitForTimeout(1_500)
+    expect(await pageLabel(page), "capturing must not throw you off the page").toBe(capturedOn)
     await onward(page)
     // ---- 4. throw a thread -------------------------------------------------
     // Three gestures, and the ring walks them (TJ, 2026-08-12: *"there are 3
@@ -309,6 +331,37 @@ test.describe("The guide", () => {
         ).toBeGreaterThan(0)
       }
     }
+  })
+
+  test("the band says where you are and offers the way out", async ({ page }) => {
+    test.setTimeout(120_000)
+
+    // TJ, 2026-08-12: *"add an 'exit guide' button to the 'you are in the
+    // guide' card"* — until then the only exits were the browser's Back button
+    // and the header. And the promise the band used to make came out in the
+    // same breath: *"of course everything should work. i dont expect tutorial
+    // to keep my work."*
+    await page.goto("/sandbox")
+    const band = page.locator(".practiceband")
+    await expect(band).toBeVisible({ timeout: 30_000 })
+    await expect(band).toContainText("You are in the guide")
+    await expect(band).not.toContainText(/nothing is kept/i)
+
+    // Pressable — it sits inside chrome that deliberately takes no pointer
+    // events, so this is the assertion that keeps it from being a picture.
+    const exit = page.locator(".bandexit")
+    await expect(exit).toBeVisible()
+    const eaten = await page.evaluate(() => {
+      const box = document.querySelector(".bandexit")?.getBoundingClientRect()
+      if (!box) return "missing"
+      const el = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+      return el?.closest(".bandexit") ? "reachable" : (el?.className?.toString() ?? "nothing")
+    })
+    expect(eaten, "something is sitting on top of the exit").toBe("reachable")
+
+    await exit.click()
+    await expect(page).toHaveURL(/\/$/, { timeout: 20_000 })
+    await expect(page.locator(".practiceband")).toHaveCount(0)
   })
 
   test("pip 1 goes back to the Library, and the work survives it", async ({ page }) => {

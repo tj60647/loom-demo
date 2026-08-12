@@ -299,13 +299,30 @@ export default function PracticeGuide() {
     goToStation(step.station)
   }, [open, step.station])
 
-  // A beat about the text needs a page with text on it: the practice reading
-  // opens on two covers, where "drag across a line" points at a picture.
+  /**
+   * A beat about the text needs a page with text on it: the practice reading
+   * opens on two covers, where "drag across a line" points at a picture.
+   *
+   * It turns the page ONLY when there is no text on screen to work with, and
+   * only when the beat arrives. Both halves were bugs (TJ, 2026-08-12: *"stage
+   * 3 of guide does not stay on page where passage was captured"*). It used to
+   * depend on `state.passages`, so the instant a capture landed the effect
+   * re-fired — and it focused the FIRST passage carrying a page number, which
+   * is one of the worked cloth's, on some other page entirely. The student was
+   * thrown off the page they had just taken words from, in the middle of the
+   * beat about naming them.
+   */
   useEffect(() => {
     if (!open || !step.needsText) return
-    const onAPage = state.passages.find((p) => p.pageNumber)
-    if (onAPage) window.dispatchEvent(new CustomEvent("loom:practice-focus", { detail: onAPage.id }))
-  }, [open, step.needsText, state.passages])
+    const timer = window.setTimeout(() => {
+      if (document.querySelector(".react-pdf__Page__textContent span")) return
+      const onAPage = state.passages.find((p) => p.pageNumber)
+      if (onAPage) window.dispatchEvent(new CustomEvent("loom:practice-focus", { detail: onAPage.id }))
+    }, 200)
+    return () => window.clearTimeout(timer)
+    // Deliberately NOT `state.passages`: capturing must not move the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, at, step.needsText])
 
   /**
    * Bring the target into view when the beat arrives, and only when it is out
@@ -399,7 +416,10 @@ export default function PracticeGuide() {
     }
     frame = window.requestAnimationFrame(measure)
     return () => window.cancelAnimationFrame(frame)
-  }, [open, step.targets])
+    // `step` is a stable reference out of the module-level GUIDE_STEPS, so
+    // depending on the whole beat costs nothing and the loop restarts only
+    // when the beat actually changes.
+  }, [open, step])
 
   /**
    * Publish the cutout so the practice loom's other fixed chrome can get out

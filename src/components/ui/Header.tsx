@@ -78,7 +78,7 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
           <Link
             href="/sandbox"
             className="btn ghost mini"
-            data-tip="the guide — walk the seven moves on a real reading, nothing is kept"
+            data-tip="the guide — walk every move on a real reading, nothing is kept"
           >
             guide
           </Link>

@@ -443,12 +443,21 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
   border:1px solid var(--sage);border-radius:6px;
   box-shadow:0 8px 24px rgba(0,0,0,.14);
   color:var(--ink);font-family:var(--body);font-size:12.5px;line-height:1.45;
-  padding:9px 12px}
+  padding:9px 12px;
+  display:flex;gap:10px;align-items:center;justify-content:space-between}
+/* The band eats nothing; the one control in it must. A button inside
+   pointer-events:none chrome is a picture of a button. */
+.practiceband .bandexit{pointer-events:auto;flex:none}
 /* Out of the way when the guide's cutout reaches it: it rides above the mask,
    so where it overlapped it covered the control the beat was ringing — the kit
-   button read "OAD THE CONCEPT-MAP KIT". Faded rather than removed, so the
-   student can still see they are in the guide. */
-.practiceband.yielded{opacity:.16;transition:opacity .18s ease}
+   button read "OAD THE CONCEPT-MAP KIT".
+   The PROSE is what gets out of the way, not the whole band: the exit is the
+   one way off this page and fading an escape hatch to sixteen per cent is
+   worse than the occlusion this rule exists to prevent. A small button is a
+   fraction of a 320px box, so the ring stays readable either way. */
+.practiceband>*{transition:opacity .18s ease}
+.practiceband.yielded{background:none;border-color:transparent;box-shadow:none}
+.practiceband.yielded .bandsay{opacity:.16}
 @media(max-width:640px){.practiceband{left:12px;right:12px;width:auto;bottom:auto;top:64px}}
 
 /* A shelf card that is not in the practice loom: shown so the Library looks
