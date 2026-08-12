@@ -53,6 +53,17 @@ export default function SandboxWorkbench({
 }) {
   const [opened, setOpened] = useState(false)
 
+  // What the card says it holds — read off the worked cloth itself, so the
+  // shelf cannot claim a count the loom does not have.
+  const tally = practiceCloth
+    ? {
+        passages: practiceCloth.passages.length,
+        concepts: practiceCloth.concepts.length,
+        threads: practiceCloth.edges.length,
+        clothTitle: practiceCloth.cloths[0]?.title ?? "",
+      }
+    : null
+
   const workbenchSource: WorkbenchSource = {
     id: source.id,
     title: source.title,
@@ -81,7 +92,7 @@ export default function SandboxWorkbench({
             <span className="scopemeta">the real interface, on a real reading — nothing is kept</span>
           </div>
           <JourneyNav active="readings" />
-          <PracticeShelf cards={cards} openableId={sourceId} onOpen={open} />
+          <PracticeShelf cards={cards} openableId={sourceId} tally={tally} onOpen={open} />
           <footer>
             <span className="fl">00 — LIBRARY</span>
             <span className="fr">PICK A READING</span>

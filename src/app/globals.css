@@ -445,7 +445,10 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    opens a stage rather than a route. Strip the button chrome so it is the
    same object to look at as every other card. */
 .shelfcard button.shelfmain{background:none;border:none;padding:0;margin:0;
-  font:inherit;color:inherit;text-align:inherit;width:100%;cursor:pointer;display:block}
+  font:inherit;color:inherit;text-align:inherit;width:100%;cursor:pointer;
+  /* display:flex, NOT block: .shelfmain is a flex row — thumbnail beside the
+     body — and overriding it stacked the one card the guide points at. */
+  display:flex}
 .practiceband b{font-weight:600}
 
 /* The download that lives at its object (TJ, 2026-08-10) — the same pair of
