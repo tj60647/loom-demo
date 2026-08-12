@@ -16,7 +16,6 @@ import { useLoom } from "@/components/providers/LoomProvider"
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import type { Edge } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
-import { isWholeWeave } from "@/lib/scope"
 import { copyText } from "@/lib/clipboard"
 import ClothMap from "@/components/svg/ClothMap"
 
@@ -25,8 +24,7 @@ export default function ClothReflection() {
   // edges have both ends in scope by construction, so every concept lookup
   // below resolves. Bridges are named but not drawn: they are 02 Linking's
   // material, and drawing half a thread would be a lie.
-  const { scopedState: state, scoped, scope, flash, studentName } = useLoom()
-  const wholeWeave = isWholeWeave(scope)
+  const { scopedState: state, scoped, activeCloth, flash, studentName } = useLoom()
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
   const [drafted, setDrafted] = useState("")
   const [showClothInfo, setShowClothInfo] = useState(false)
@@ -127,11 +125,10 @@ export default function ClothReflection() {
   }
 
   // Read rail: look · trace · question · write
-  // "Wrote" = any interpretive paragraph exists: the active map's read, or
-  // the whole-weave cloth's description (the old read row's successor).
-  const wholeWeaveCloth = state.cloths.find((c) => c.scopeKey === "")
+  // "Wrote" = any interpretive paragraph exists: a projection's read, or this
+  // reading's own cloth description.
   const wrote = !!(
-    state.maps.some((m) => m.read.trim()) || wholeWeaveCloth?.description.trim()
+    state.maps.some((m) => m.read.trim()) || activeCloth?.description.trim()
   )
   const railN = wrote ? 3 : readSel?.gap ? 2 : readSel ? 1 : 0
 
@@ -293,7 +290,7 @@ export default function ClothReflection() {
         ))}
       </div>
 
-      {!wholeWeave && scoped.bridges.length > 0 && (
+      {scoped.bridges.length > 0 && (
         <p className="ghostnote" style={{ marginTop: 6, marginBottom: 12 }}>
           {scoped.bridges.length} thread{scoped.bridges.length !== 1 ? "s" : ""} also run{scoped.bridges.length === 1 ? "s" : ""} out of this reading to concepts you met elsewhere.
           They are not drawn here — half a thread would be a lie — but they are listed on <b>02 · Linking</b>.

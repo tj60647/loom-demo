@@ -96,6 +96,38 @@ the rule is the point, not the wording.
 > landing 0021–0023 *and* a removal together is the highest-risk sequencing this
 > repo has attempted.
 
+**RULED 2026-08-11 — the whole weave is out of the app.** TJ: *"we are
+removing whole weave as it exists in the app because it is poorly defined and
+not supported in the course. it should not be in the app as an idea until the
+faculty and the authors of the app agree on what it means to have a 'full
+weave'."* That is option **2** below, taken — and it retires this phase's
+central question rather than answering it.
+
+The framing kept below said the whole weave "was hidden … and nothing links to
+`/weave`". **Both halves were false in the direction that mattered**: the route
+carried no gate of any kind — no role check, and no middleware anywhere in the
+repo — and the Library's search results linked into it in FOUR places, one of
+them added the same week. Hiding a station is not retiring an idea.
+
+What became of the three strandings:
+
+- the **whole-weave Cloth** and **whole-weave Projections** — not rehomed. TJ:
+  *"i am not at all worried about losing whole weave."* Rows already at
+  `scopeKey ''` stay in the database and render nowhere.
+- **`ShelfSearch`'s links into `/weave`** — repointed. A hit opens the reading
+  its work lives in, resolved as where its first evidence is; a hit with no
+  reading is shown as a dashed row saying why it is not a door. The untethered
+  passage's home is the Library's own "passages with no reading" card, which is
+  on that page already.
+
+What the ruling protects, in TJ's words: *"i am worried about losing meaningful
+activities related to reading, passage capture, concept labeling, link
+labeling, building threads, organizing concepts and threads, and building
+projections from a readings cloth."* Every one of those is an act in a reading
+and seven of them did not say which — so **4a stamped them all**. See
+contracts.md, and keep-at-the-object §9 for the act-by-act assessment that
+found it.
+
 **Superseded framing, kept for the reasoning.** The whole weave was hidden
 from the journey, its stations grey out, and nothing links to `/weave` — but the
 route still works and three pieces of student work live only there:

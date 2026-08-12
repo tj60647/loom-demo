@@ -1,15 +1,17 @@
 import { test, expect, type Page } from '@playwright/test';
 import { enterReadingFromCard } from './helpers';
-import fs from 'fs';
 
 /**
  * Multiple maps (spec §3 Map, ratified 7/31): per-scope parallel maps, each
  * holding its own tiers, essence sentence and paragraph.
  *
- * Serial: the suite builds one temporary map ("PW temp map") at the whole
- * weave, verifies it end to end, and deletes it in the last test, so the
- * account's real maps are never modified. If a mid-run failure strands it, it
- * is recognizable by name and safe to delete by hand.
+ * Serial: the suite builds one temporary projection ("PW temp map") inside
+ * Object Worlds, verifies it end to end, and deletes it in the last test, so
+ * the account's real projections are never modified. If a mid-run failure
+ * strands it, it is recognizable by name and safe to delete by hand.
+ *
+ * It used to build that projection at `/weave`. TJ retired the whole weave on
+ * 2026-08-11, so a reading is the only scope a projection can belong to.
  *
  * Local runs on this machine need the 3100-port scratch config (port 3000 sits
  * in a Windows excluded range — see NEXT_SESSION.md): keep globalSetup and
@@ -33,8 +35,12 @@ async function waitForLoom(page: Page) {
   await expect(page.getByText('Loading your loom...')).toHaveCount(0, { timeout: 20000 });
 }
 
-async function openWeaveMap(page: Page) {
-  await page.goto('/weave');
+/** The Knowledge Graph of the reading this file works in. */
+async function openReadingMap(page: Page, reading = 'Object Worlds') {
+  await page.goto('/');
+  const card = page.locator('.shelfcard', { hasText: reading }).first();
+  await expect(card).toBeVisible({ timeout: 15000 });
+  await enterReadingFromCard(page, card);
   await waitForLoom(page);
   await page.locator('nav button', { hasText: 'Knowledge Graph' }).click();
   await expect(page.locator('#mapSwitcher')).toBeVisible({ timeout: 15000 });
@@ -64,7 +70,7 @@ function responseCarrying(page: Page, needle: string) {
 
 test('a new map holds its own tiers and essence', async ({ page }) => {
   test.setTimeout(120_000);
-  await openWeaveMap(page);
+  await openReadingMap(page);
 
   // Self-heal: a failed earlier run strands its temp map (serial mode skips
   // the cleanup test), and a strand with this name breaks every locator below.
@@ -140,59 +146,22 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
   }).toPass({ timeout: 45_000, intervals: [2_000, 3_000, 5_000] });
 });
 
-test('export carries maps[] with id-valid tiers and no mirror residue', async ({ page }) => {
-  await page.goto('/keep');
-  // The export button snapshots current client state, which right after load
-  // is still the blank pre-fetch state — retry until the loaded graph (with
-  // the map test 1 made) is what lands in the file.
-  let parsed: { graph: { maps?: { name: string; essence: string; read: string; tiers: Record<string, string> }[]; concepts: { id: string; tier?: string }[]; passages?: { conceptIds?: string[] }[]; read?: string } } | undefined;
-  await expect(async () => {
-    const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export .json' }).click();
-    const download = await downloadPromise;
-    parsed = JSON.parse(fs.readFileSync((await download.path())!, 'utf8'));
-    expect(Array.isArray(parsed!.graph.maps)).toBe(true);
-    expect(parsed!.graph.maps!.length).toBeGreaterThan(0);
-  }).toPass({ timeout: 30_000, intervals: [1_000, 2_000, 3_000] });
-  if (!parsed) throw new Error('export never produced a parsed file');
-  const conceptIds = new Set(parsed.graph.concepts.map((c: { id: string }) => c.id));
-  for (const map of parsed.graph.maps!) {
-    expect(typeof map.name).toBe('string');
-    expect(typeof map.essence).toBe('string');
-    expect(typeof map.read).toBe('string');
-    for (const conceptId of Object.keys(map.tiers)) {
-      expect(conceptIds.has(conceptId)).toBe(true);
-    }
-  }
-  // The mirror is gone from the contract (P0.5): no concept-level tier, no
-  // top-level read — tiers live on maps, the paragraph on the cloth.
-  for (const c of parsed.graph.concepts) {
-    expect(c).not.toHaveProperty('tier');
-  }
-  expect(parsed.graph).not.toHaveProperty('read');
-  // And every passage carries its concept pointers as an array (P0.1).
-  for (const b of parsed.graph.passages ?? []) {
-    expect(Array.isArray(b.conceptIds)).toBe(true);
-  }
-});
+// A test stood here asserting the WHOLE-GRAPH export from /keep: every
+// projection in one file, id-valid tiers, no mirror residue. The one-file
+// export is being replaced by a download at each object, and the same
+// contract is asserted per projection in tests/object-download.spec.ts.
 
 test('04 Map lives inside a reading workbench, scoped to it', async ({ page }) => {
-  await page.goto('/');
-  const card = page.locator('.shelfcard').first();
-  await expect(card).toBeVisible({ timeout: 15000 });
-  await expect(card.locator('.shelftally')).not.toHaveText('…', { timeout: 15000 });
-  await enterReadingFromCard(page, card);
+  // The OTHER reading: a projection belongs to the text it was made in, and
+  // one reading's stack must not show another's.
+  await openReadingMap(page, 'Communities of practice');
   await expect(page).toHaveURL(/\/reading\//);
-
-  await waitForLoom(page);
-  await page.locator('nav button', { hasText: 'Knowledge Graph' }).click();
   await expect(page.locator('#mapSwitcher')).toContainText('Your projections of this reading');
-  // The whole weave's maps do not leak into a reading's stack.
   await expect(page.locator('#mapSwitcher .chip', { hasText: TEMP_NAME })).toHaveCount(0);
 });
 
 test('cleanup: delete the temp map', async ({ page }) => {
-  await openWeaveMap(page);
+  await openReadingMap(page);
   const tempChips = page.locator('#mapSwitcher .chip', { hasText: TEMP_NAME });
   // A mid-run failure in an earlier suite run strands its temp map, and two
   // chips with one name break a single-chip locator — sweep every copy.

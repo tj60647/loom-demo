@@ -1,6 +1,7 @@
 "use client"
 
-// The workbench for one scope — a reading, or the whole weave.
+// The workbench for one reading. Since 2026-08-11 that is the only scope
+// there is: the whole weave went out of the app with its route.
 //
 // Reading-first (docs/archive/reading-scope-and-map-passes.md §A.1): the shelf is the
 // home screen and this is what opens when you pick a reading off it, so the
@@ -74,8 +75,14 @@ export default function Workbench({
   initialSearch,
   practice = false,
 }: {
-  source: WorkbenchSource | null
-  /** Landing tab for journey deep links (`/weave?tab=map`); validated below. */
+  /**
+   * The reading this workbench is for. Not nullable since 2026-08-11: the
+   * whole weave was the only caller that passed null, and TJ retired it —
+   * "poorly defined and not supported in the course". A student works in a
+   * text, and every scope in the app is now one.
+   */
+  source: WorkbenchSource
+  /** Landing tab for a deep link (`?tab=map`); validated below. */
   initialTab?: Tab
   /** A shelf-search hit's query, carried into the reading's own search. */
   initialSearch?: string
@@ -98,15 +105,10 @@ export default function Workbench({
   const { isLoading, scoped } = useLoom()
   // Tab order follows the journey bar: Knowledge Graph (03) before Vocabulary
   // (04). The keys are legacy — `map` is the graph, `read` is Vocabulary.
-  const tabs: Tab[] = source ? ["reading", "throw", "map", "read"] : ["throw", "map", "read"]
+  const tabs: Tab[] = ["reading", "throw", "map", "read"]
   // `?tab=open` predates the merge and is still in links and bookmarks.
   const requested = (initialTab as string) === "open" ? "reading" : initialTab
-  const firstTab: Tab =
-    requested && tabs.includes(requested as Tab)
-      ? (requested as Tab)
-      : tabs.includes("reading")
-        ? "reading"
-        : "throw"
+  const firstTab: Tab = requested && tabs.includes(requested as Tab) ? (requested as Tab) : "reading"
   const [activeTab, setActiveTab] = useState<Tab>(firstTab)
   const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([firstTab]))
   const [pdfPage, setPdfPage] = useState(1)
@@ -147,7 +149,7 @@ export default function Workbench({
   // also sends the sheet back: you asked to see the passage in its page, and a
   // sheet over the right third of that page is not showing it to you.
   const handleGotoPassage = (passage: Passage) => {
-    if (!source?.hasFile) return
+    if (!source.hasFile) return
     setPdfPage(passage.pageNumber && passage.pageNumber > 0 ? passage.pageNumber : 1)
     setPdfFocusPassageId(passage.id)
     setWorkOpen(false)
@@ -191,7 +193,7 @@ export default function Workbench({
     return (
       <>
         <JourneyNav
-          active={source ? STATION_OF[activeTab] : "weave"}
+          active={STATION_OF[activeTab]}
           onStation={Object.fromEntries(tabs.map((tab) => [STATION_OF[tab], () => goTo(tab)]))}
         />
         <main>
@@ -219,32 +221,25 @@ export default function Workbench({
       <div className="scopebar">
         {/* No "‹ library" here (TJ, 2026-08-08): 00 · Library is in the journey
             bar directly below, so this was a second door to the same place. */}
-        {source ? (
-          <>
-            <span className="scopetitle">{source.title}</span>
-            {source.author ? <span className="scopemeta">{source.author}</span> : null}
-            <span className="scopemeta">
-              {scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} evidenced here
-              {scoped.bridges.length
-                ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out`
-                : ""}
-            </span>
-            {/* The library card used to carry this; the reading is the library
-                card now, so the affordance moves here rather than disappearing. */}
-            {source.hasFile ? (
-              <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>
-                Download PDF
-              </a>
-            ) : (
-              <span className="scopemeta scopedl">your own card — no pdf here</span>
-            )}
-          </>
-        ) : (
-          <>
-            <span className="scopetitle">Your whole weave</span>
-            <span className="scopemeta">every reading at once</span>
-          </>
-        )}
+        <>
+          <span className="scopetitle">{source.title}</span>
+          {source.author ? <span className="scopemeta">{source.author}</span> : null}
+          <span className="scopemeta">
+            {scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} evidenced here
+            {scoped.bridges.length
+              ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out`
+              : ""}
+          </span>
+          {/* The library card used to carry this; the reading is the library
+              card now, so the affordance moves here rather than disappearing. */}
+          {source.hasFile ? (
+            <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>
+              Download PDF
+            </a>
+          ) : (
+            <span className="scopemeta scopedl">your own card — no pdf here</span>
+          )}
+        </>
         {/* The one search field, present on every tab (ruling 34): readings,
             concepts, links and your own passages, grouped by kind. On wide
             screens the field itself is persistent below the bar (TJ,
@@ -282,21 +277,19 @@ export default function Workbench({
         <div className={`searchhost${searchOpen ? " open" : ""}`} style={{ padding: "0 24px" }}>
           {/* Contextual scope (TJ, 2026-08-10): inside a reading this field
               searches THE READING — its pages and your work here. The whole
-              loom is one station away, on the Library. At the whole weave
-              (source null) it stays loom-wide. */}
+              loom is one station away, on the Library. */}
           <ShelfSearch
             onActiveChange={() => {}}
             onClose={() => setSearchOpen(false)}
-            sourceId={source?.id}
+            sourceId={source.id}
           />
         </div>
       )}
 
       <JourneyNav
-        // Inside a reading the underline follows the tab; at the whole weave
-        // it stays on 05 — Weave, the journey phase this place IS, while
-        // throw/read/map act as its tools (the footer names the open one).
-        active={source ? STATION_OF[activeTab] : "weave"}
+        // The underline follows the open tab: in this workbench the stations
+        // ARE the tabs.
+        active={STATION_OF[activeTab]}
         // In this workbench the tabs are stations you can work at right here;
         // Library and Keep are elsewhere, so JourneyNav renders them as links.
         // Since the merge, station 00 is always the Library — no relabelling.
@@ -309,8 +302,8 @@ export default function Workbench({
           and wants every pixel under the journey, so main stops padding and
           stops scrolling and simply hands over its height. Every other station
           is an ordinary scrolling page. */}
-      <main className={activeTab === "reading" && source?.hasFile ? "station-reading" : undefined}>
-        {source && (
+      <main className={activeTab === "reading" && source.hasFile ? "station-reading" : undefined}>
+        {(
           <div className={`panel ${activeTab === "reading" ? "active" : ""}`}>
             {shouldRender("reading") &&
               (source.hasFile ? (

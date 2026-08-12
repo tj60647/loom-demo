@@ -6,9 +6,8 @@
  *     both readings, one deliberately evidence-less), 6 threads (two of them
  *     cross-reading bridges, one sentence-only), six LINKS — the labels those
  *     threads carry, one of them glossed and one coined with no thread using
- *     it (5.1) — and THREE MAPS, one of each reading and one of the whole
- *     weave, each with its own tiers, essence, paragraph and card-table
- *     arrangement.
+ *     it (5.1) — a CLOTH per reading, and TWO PROJECTIONS, one per reading,
+ *     each with its own tiers, essence, paragraph and board arrangement.
  *   test-user-b@loom.local — enrolled and empty: the fresh-account experience.
  *   test-user-c@loom.local / test-user-d@loom.local — two colleagues in A's
  *     discussion section, so the Overlays (P3.14, ruling 28) have a section
@@ -279,23 +278,15 @@ async function main() {
     createdAt: at(),
   })
 
-  // ---- Three maps: one per reading, one whole-weave (the mirror) ----------
+  // ---- Two projections, one per reading ----------------------------------
   // Positions: x proportional 0..1, y absolute on the 560px three-band table.
+  //
+  // There was a third here — "The whole cloth", at scopeKey "" — and it went
+  // with the whole weave on 2026-08-11 (TJ: "poorly defined and not supported
+  // in the course… it should not be in the app as an idea"). A seed that keeps
+  // shipping one models a student holding work in a scope they can no longer
+  // reach, which is how the idea would creep back in.
   const pos = (x: number, y: number) => ({ x, y })
-
-  const [mapWeave] = await db.insert(maps).values({
-    userId: userA.id, courseId: course.id, scopeKey: "", name: "The whole cloth",
-    essence: "Disciplinary worlds hold together only where practice keeps negotiating their meanings.",
-    read: "Bucciarelli watches designers fail to share a world and still produce a machine; Wenger explains why that is possible at all. The bridge is negotiation of meaning: the design conversation is not translation between fixed vocabularies but the continuous working-out Wenger describes, and the artifact that results is its reification — a compromise that then constrains the next round. What began as two readings reads as one loop.",
-    tiers: {
-      [oworlds.id]: "p", [cop.id]: "p",
-      [negmean.id]: "s", [social.id]: "s",
-      [lpp.id]: "t", [reif.id]: "t",
-      [compromise.id]: "x",
-      // vocab stays unsorted — the no-evidence concept, visibly unplaced.
-    },
-    createdAt: at(), updatedAt: at(),
-  }).returning()
 
   const [mapA] = await db.insert(maps).values({
     userId: userA.id, courseId: course.id, scopeKey: srcA.id, name: "Object worlds, sorted",
@@ -313,16 +304,7 @@ async function main() {
     createdAt: at(), updatedAt: at(),
   }).returning()
 
-  // Geometry per map. The whole-weave map is the (only) whole-weave map, hence
-  // the mirror: its geometry is echoed into cardTable exactly as saveView does.
-  const weaveView = {
-    positions: {
-      [oworlds.id]: pos(0.18, 96), [cop.id]: pos(0.62, 96),
-      [negmean.id]: pos(0.40, 268), [social.id]: pos(0.72, 268),
-      [lpp.id]: pos(0.22, 432), [reif.id]: pos(0.58, 432),
-    },
-    bends: {}, order: conceptRows.map((c) => c.id), pins: [oworlds.id],
-  }
+  // Geometry per projection.
   const viewA = {
     positions: { [oworlds.id]: pos(0.42, 96), [social.id]: pos(0.42, 268), [compromise.id]: pos(0.42, 432) },
     bends: {}, order: [], pins: [],
@@ -332,18 +314,27 @@ async function main() {
     bends: {}, order: [], pins: [],
   }
   await db.insert(views).values([
-    { userId: userA.id, courseId: course.id, key: `map:${mapWeave.id}`, data: weaveView, updatedAt: at() },
-    { userId: userA.id, courseId: course.id, key: "cardTable", data: weaveView, updatedAt: at() },
     { userId: userA.id, courseId: course.id, key: `map:${mapA.id}`, data: viewA, updatedAt: at() },
     { userId: userA.id, courseId: course.id, key: `map:${mapB.id}`, data: viewB, updatedAt: at() },
   ])
 
-  // The whole-weave cloth: the student's read paragraph lives here (P0.4/0021),
-  // exactly as saveCloth would leave it.
-  await db.insert(cloths).values({
-    userId: userA.id, courseId: course.id, scopeKey: "",
-    title: "", description: mapWeave.read, createdAt: at(), updatedAt: at(),
-  })
+  // A cloth per reading — the student's own name for their work on each text,
+  // exactly as saveCloth would leave it. (The whole-weave cloth that used to
+  // sit here went with the whole weave; see the note above the projections.)
+  await db.insert(cloths).values([
+    {
+      userId: userA.id, courseId: course.id, scopeKey: srcA.id,
+      title: "Designing between worlds",
+      description: "Bucciarelli watches designers fail to share a world and still produce a machine. The object world is the unit: each participant designs inside a different one, so the social process is not a nicety but the only place the object exists whole, and the compromise in the artifact is what that process leaves behind.",
+      createdAt: at(), updatedAt: at(),
+    },
+    {
+      userId: userA.id, courseId: course.id, scopeKey: srcB.id,
+      title: "Belonging is doing",
+      description: "Wenger explains why a machine can come out of worlds that never merged. The community is not a container but an ongoing achievement — participation and reification trading places — and negotiation of meaning is the continuous working-out that keeps it going.",
+      createdAt: at(), updatedAt: at(),
+    },
+  ])
 
   // No graph_event rows are inserted: getGraphEvents synthesizes create events
   // from row timestamps, so the history panel replays the staggered story above.
@@ -437,7 +428,7 @@ async function main() {
     ]
   )
 
-  const tally = { concepts: conceptRows.length, passages: 10, edges: 6, links: 6, maps: 3 }
+  const tally = { concepts: conceptRows.length, passages: 10, edges: 6, links: 6, maps: 2 }
   console.log(`[seed-demo] ${USER_A.email}: ${tally.concepts} concepts · ${tally.passages} passages from 2 readings · ${tally.edges} threads · ${tally.links} links (1 glossed, 1 with no thread) · ${tally.maps} maps`)
   console.log(`[seed-demo] ${USER_B.email}: enrolled, empty`)
   console.log(`[seed-demo] ${USER_C.email}: 3 concepts · 3 passages · 1 thread — a colleague in ${DEMO_SECTION.name}`)

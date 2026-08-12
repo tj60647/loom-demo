@@ -217,15 +217,30 @@ export async function searchReadings(rawQuery: string, sourceId?: string | null)
 
 const MAX_LOOM_HITS = 12
 
+/**
+ * A hit's door: the reading to open it in.
+ *
+ * A concept, a Link Label and a thread all belong to the User rather than to
+ * one text, so at the Library there is no reading in the row itself to send
+ * the reader to. The rule is **where its first evidence is** — the earliest
+ * passage of the concept, of either end of the thread, or of either end of
+ * any thread carrying the label. Null when there is none, which is a real
+ * state and not an error: a concept named ahead of its evidence is legal
+ * (red line 4), and its hit is shown without being a door.
+ *
+ * Until 2026-08-11 these three led to `/weave` instead. TJ ruled the whole
+ * weave out of the app — "poorly defined and not supported in the course" —
+ * so a hit now opens the reading where the work was actually done.
+ */
 export type LoomSearchResult = {
-  concepts: { id: string; label: string; snippet: string }[]
+  concepts: { id: string; label: string; sourceId: string | null; snippet: string }[]
   /**
    * The Link Labels the student owns (5.1) — objects now, so a word coined
    * with a gloss and not yet used by any thread is findable. Distinct from
    * `links` below, which are the threads themselves.
    */
-  linkLabels: { id: string; label: string; uses: number; snippet: string }[]
-  links: { id: string; handle: string; fromLabel: string; toLabel: string; snippet: string }[]
+  linkLabels: { id: string; label: string; uses: number; sourceId: string | null; snippet: string }[]
+  links: { id: string; handle: string; fromLabel: string; toLabel: string; sourceId: string | null; snippet: string }[]
   passages: { id: string; sourceId: string | null; source: string; snippet: string }[]
   /** Single-reading cloths only — scopeKey IS the sourceId for those. */
   cloths: { sourceId: string; title: string; snippet: string }[]
@@ -273,9 +288,19 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
     : sql`"passage"."courseId" IS NULL`
 
   // Each vector repeats its index expression from src/db/schema.ts verbatim.
+  // Where a concept's first evidence is. Repeated in shape by the two below.
+  const firstReadingOfConcept = (conceptRef: SQL) => sql`
+    (SELECT p."sourceId" FROM "passage_concept" pc
+       JOIN "passage" p ON p."id" = pc."passageId"
+      WHERE pc."conceptId" = ${conceptRef}
+        AND p."userId" = ${userId} AND p."sourceId" IS NOT NULL
+      ORDER BY p."createdAt" ASC, p."id" ASC
+      LIMIT 1)`
+
   const conceptResult = await db.execute(sql`
     WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
     SELECT "concept"."id", "concept"."label",
+           ${firstReadingOfConcept(sql`"concept"."id"`)} AS "sourceId",
            ts_headline('english', coalesce(nullif("concept"."def", ''), "concept"."label"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
            ts_rank(
              (setweight(to_tsvector('english', coalesce("concept"."label", '')), 'A') ||
@@ -297,6 +322,12 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
     WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
     SELECT "edge"."id", "edge"."handle",
            f."label" AS "fromLabel", t."label" AS "toLabel",
+           (SELECT p."sourceId" FROM "passage_concept" pc
+              JOIN "passage" p ON p."id" = pc."passageId"
+             WHERE pc."conceptId" IN ("edge"."fromId", "edge"."toId")
+               AND p."userId" = ${userId} AND p."sourceId" IS NOT NULL
+             ORDER BY p."createdAt" ASC, p."id" ASC
+             LIMIT 1) AS "sourceId",
            ts_headline('english', coalesce(nullif("edge"."sentence", ''), "edge"."handle"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
            ts_rank(
              (setweight(to_tsvector('english', coalesce("edge"."handle", '')), 'A') ||
@@ -337,6 +368,16 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
   const linkResult = await db.execute(sql`
     WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
     SELECT "link"."id", "link"."label",
+           (SELECT p."sourceId" FROM "edge" e
+              JOIN "passage_concept" pc ON pc."conceptId" IN (e."fromId", e."toId")
+              JOIN "passage" p ON p."id" = pc."passageId"
+             WHERE e."userId" = ${userId}
+               AND (e."linkId" = "link"."id"
+                    OR (e."linkId" IS NULL
+                        AND lower(btrim(coalesce(e."handle", ''))) = lower(btrim("link"."label"))))
+               AND p."sourceId" IS NOT NULL
+             ORDER BY p."createdAt" ASC, p."id" ASC
+             LIMIT 1) AS "sourceId",
            ts_headline('english', coalesce(nullif("link"."description", ''), "link"."label"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
            (SELECT count(*) FROM "edge" e
              WHERE e."userId" = ${userId}
@@ -438,14 +479,15 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
   `)
 
   return {
-    concepts: (conceptResult.rows as { id: string; label: string; snippet: string }[]).map((r) => ({
-      id: r.id, label: r.label, snippet: r.snippet,
+    concepts: (conceptResult.rows as { id: string; label: string; sourceId: string | null; snippet: string }[]).map((r) => ({
+      id: r.id, label: r.label, sourceId: r.sourceId ?? null, snippet: r.snippet,
     })),
-    linkLabels: (linkResult.rows as { id: string; label: string; uses: number | string; snippet: string }[]).map((r) => ({
-      id: r.id, label: r.label, uses: Number(r.uses ?? 0), snippet: r.snippet,
+    linkLabels: (linkResult.rows as { id: string; label: string; uses: number | string; sourceId: string | null; snippet: string }[]).map((r) => ({
+      id: r.id, label: r.label, uses: Number(r.uses ?? 0), sourceId: r.sourceId ?? null, snippet: r.snippet,
     })),
-    links: (edgeResult.rows as { id: string; handle: string | null; fromLabel: string; toLabel: string; snippet: string }[]).map((r) => ({
-      id: r.id, handle: r.handle ?? "", fromLabel: r.fromLabel, toLabel: r.toLabel, snippet: r.snippet,
+    links: (edgeResult.rows as { id: string; handle: string | null; fromLabel: string; toLabel: string; sourceId: string | null; snippet: string }[]).map((r) => ({
+      id: r.id, handle: r.handle ?? "", fromLabel: r.fromLabel, toLabel: r.toLabel,
+      sourceId: r.sourceId ?? null, snippet: r.snippet,
     })),
     passages: (passageResult.rows as { id: string; sourceId: string | null; source: string | null; snippet: string }[]).map((r) => ({
       id: r.id, sourceId: r.sourceId, source: r.source ?? "", snippet: r.snippet,

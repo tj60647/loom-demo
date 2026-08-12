@@ -2,14 +2,18 @@
  * The learner journey, end to end, against the seeded demonstration account.
  *
  * Requires `npm run seed:demo` to have run: Test User A holds 8 concepts,
- * 10 passages from two readings, 6 threads and 3 maps ("The whole cloth" at the
- * whole weave, "Object worlds, sorted" and "A practice lens" per reading).
+ * 10 passages from two readings, 6 threads and 2 projections, one per reading
+ * ("Object worlds, sorted" and "A practice lens").
  * Every mutation this file makes, it removes again — the seeded data is
  * asserted, never changed.
  *
  * Station coverage this file adds over the older specs: 01 Open's by-hand
  * capture form, 02 Linking (previously untested entirely), 03 Vocabulary
- * (same), multi-map assertions on 04, and the whole-cloth export on 06 Keep.
+ * (same), and per-reading projection assertions on 04.
+ *
+ * Everything here happens inside a reading. It used to reach several stations
+ * through `/weave`, which was the whole-weave workbench; TJ retired that on
+ * 2026-08-11 and a reading is now the only scope a student works in.
  *
  * Since 2026-08-08, 03 is the holdings tab and the cloth reflection it used to
  * hold lives on 04 — the 03 test asserts the words, the 04 test asserts the
@@ -30,13 +34,19 @@ async function loomLoaded(page: import("@playwright/test").Page) {
   await expect(page.getByText("Loading your loom...")).toHaveCount(0, { timeout: 20_000 })
 }
 
-/** The seeded whole-weave map, made active regardless of what other specs
- *  left most-recently-updated in this scope. */
-async function selectWholeCloth(page: import("@playwright/test").Page) {
-  await page.goto("/weave?tab=map")
-  await loomLoaded(page)
+/** Open a reading's Knowledge Graph and make one of its projections active,
+ *  regardless of what another spec left most-recently-updated. */
+async function selectProjection(
+  page: import("@playwright/test").Page,
+  reading: string,
+  name: string
+) {
+  await page.goto("/")
+  const card = page.locator(".shelfcard", { hasText: reading }).first()
+  await enterReadingFromCard(page, card)
+  await page.locator("nav button", { hasText: "Knowledge Graph" }).click()
   await expect(page.locator("#mapSwitcher")).toBeVisible({ timeout: 15_000 })
-  const chip = page.locator("#mapSwitcher .chip", { hasText: "The whole cloth" })
+  const chip = page.locator("#mapSwitcher .chip", { hasText: name })
   await expect(chip.first(), "seed missing — run `npm run seed:demo` first").toBeVisible()
   await chip.first().click()
 }
@@ -135,13 +145,19 @@ test("01 · a passage captured by hand lands in the coding log — and cleans up
 })
 
 test("02 · pick two, say the sentence, throw the thread, coin a term — then unpick it all", async ({ page }) => {
-  await page.goto("/weave?tab=throw")
+  // Inside the reading, because linking works on the concepts a reading
+  // evidences (TJ, 2026-08-08) — and since 2026-08-11 a reading is the only
+  // scope there is. Both ends are Object Worlds' own, and the pair is one the
+  // seed leaves uncrossed.
+  await page.goto("/")
+  await enterReadingFromCard(page, page.locator(".shelfcard", { hasText: "Object Worlds" }).first())
+  await page.locator("nav button", { hasText: "Linking" }).click()
   await loomLoaded(page)
 
   const warp = page.locator(".crow")
   await expect(warp.first(), "seed missing — run `npm run seed:demo` first").toBeVisible({ timeout: 15_000 })
   await warp.filter({ hasText: "object worlds" }).first().click()
-  await warp.filter({ hasText: "reification" }).first().click()
+  await warp.filter({ hasText: "artifact as compromise" }).first().click()
   await expect(page.locator(".slot.filled")).toHaveCount(2)
 
   await page.getByPlaceholder("…or just start typing. Long and awkward is fine.").fill(SENTENCE)
@@ -211,68 +227,32 @@ test("03 · vocabulary is every word you own, across all your readings", async (
   await expect(page.locator("#clothPrompts")).toHaveCount(0)
 })
 
-test("04 · three maps, and each scope keeps its own tiers and essence", async ({ page }) => {
-  // Whole weave: the seeded whole-cloth map with its own essence.
-  await selectWholeCloth(page)
-  await expect(page.locator("#mapEssence")).toHaveValue(/Disciplinary worlds hold together/, { timeout: 15_000 })
-  await expect(page.locator("#yourRead2")).toHaveValue(/Bucciarelli watches designers/)
+test("04 · a projection per reading, and each keeps its own tiers and essence", async ({ page }) => {
+  // Object Worlds: its own projection, its own essence, its own mirror counts.
+  await selectProjection(page, "Object Worlds", "Object worlds, sorted")
+  await expect(page.locator("#mapSwitcher")).toContainText("Your projections of this reading")
+  await expect(page.locator("#mapEssence")).toHaveValue(/between worlds/, { timeout: 15_000 })
+  await expect(page.locator("#yourRead2")).toHaveValue(/Bucciarelli's argument hangs on the object world/)
+  await expect(page.locator("#mapMirror")).toContainText("1 primary")
 
-  // The cloth reflection moved here from 03: counted prompts, and the two
-  // states counted rather than hidden — the seeded concept with no passage and
-  // the seeded sentence-only thread. Both are designations, not faults: a
-  // concept may be named ahead of its evidence (TJ, 2026-08-08), which is why
-  // the wording is "no passage yet" and not a red instruction to fix it.
+  // The cloth reflection lives here too: counted prompts, and the two states
+  // counted rather than hidden — the seeded concept with no passage and the
+  // seeded sentence-only thread. Both are designations, not faults: a concept
+  // may be named ahead of its evidence (TJ, 2026-08-08), which is why the
+  // wording is "no passage yet" and not a red instruction to fix it.
   await expect(page.locator("#clothPrompts .prompt").first()).toBeVisible({ timeout: 15_000 })
-  await expect(page.getByText(/no passage/).first()).toBeVisible()
   await expect(page.getByText(/no label yet/).first()).toBeVisible()
-  // The whole weave carries the development record; a single reading does not.
+  // The Capture Log rides with the reading, one panel, not one per projection.
   await expect(page.locator(".cap", { hasText: "Capture Log" })).toHaveCount(1)
 
-  // Inside Object Worlds: its own map, its own essence, its own mirror counts —
-  // and the whole-weave map does not leak in.
-  await page.goto("/")
-  const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
-  await enterReadingFromCard(page, card)
-  await page.locator("nav button", { hasText: "Knowledge Graph" }).click()
-  await expect(page.locator("#mapSwitcher")).toContainText("Your projections of this reading", { timeout: 15_000 })
-  await expect(page.locator("#mapSwitcher .chip", { hasText: "The whole cloth" })).toHaveCount(0)
-
-  const readingMap = page.locator("#mapSwitcher .chip", { hasText: "Object worlds, sorted" })
-  await expect(readingMap, "seed missing — run `npm run seed:demo` first").toHaveCount(1)
-  await readingMap.click()
-  await expect(page.locator("#mapEssence")).toHaveValue(/between worlds/, { timeout: 15_000 })
-  await expect(page.locator("#mapMirror")).toContainText("1 primary")
+  // The other reading keeps its own, and neither leaks into the other.
+  await selectProjection(page, "Communities of practice", "A practice lens")
+  await expect(page.locator("#mapEssence")).toHaveValue(/Belonging is doing/, { timeout: 15_000 })
+  await expect(page.locator("#mapSwitcher .chip", { hasText: "Object worlds, sorted" })).toHaveCount(0)
 })
 
-test("06 · keep lists every map, and the whole-cloth export carries them all", async ({ page }) => {
-  await page.goto("/keep")
-  // Wait out the loading window: export is only trustworthy once the tallies are real.
-  await expect(page.getByText(/[1-9]\d* concepts/).first()).toBeVisible({ timeout: 20_000 })
-  for (const name of ["The whole cloth", "Object worlds, sorted", "A practice lens"]) {
-    await expect(page.getByText(name).first()).toBeVisible()
-  }
-
-  const [download] = await Promise.all([
-    page.waitForEvent("download"),
-    page.getByRole("button", { name: "Export .json" }).click(),
-  ])
-  const fs = await import("fs")
-  const data = JSON.parse(fs.readFileSync(await download.path(), "utf-8"))
-
-  expect(data.graph.concepts.length).toBeGreaterThanOrEqual(8)
-  expect(data.graph.maps.length).toBeGreaterThanOrEqual(3)
-  const names = data.graph.maps.map((m: { name: string }) => m.name)
-  expect(names).toEqual(expect.arrayContaining(["The whole cloth", "Object worlds, sorted", "A practice lens"]))
-  // Passages carry their reading (anchor provenance survives the export contract).
-  const anchored = data.graph.passages.filter((b: { anchor?: { sourceId?: string } }) => b.anchor?.sourceId)
-  expect(anchored.length).toBeGreaterThanOrEqual(10)
-  // The P0 contract: every passage carries its concept pointers as an array.
-  for (const b of data.graph.passages) {
-    expect(Array.isArray(b.conceptIds)).toBe(true)
-  }
-  // The whole-weave cloth carries the read paragraph — the 0021 successor to
-  // the dropped mirror (the seed writes it equal to the whole-cloth map's).
-  const whole = data.graph.maps.find((m: { name: string }) => m.name === "The whole cloth")
-  const weaveCloth = data.graph.cloths?.find((c: { scopeKey: string }) => c.scopeKey === "")
-  expect(weaveCloth?.description).toBe(whole.read)
-})
+// The "06 · keep" test stood here and asserted the WHOLE-CLOTH export: every
+// projection in one file, and the whole-weave cloth's read paragraph inside
+// it. Both halves are gone — the whole weave with TJ's 2026-08-11 ruling, and
+// the one-file export with the move to a download at each object. What it
+// guarded is covered per object by tests/object-download.spec.ts.

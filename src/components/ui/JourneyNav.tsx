@@ -10,17 +10,13 @@
 // station — the text and your captures are one place (model §3 tab 2), so
 // station 00 is now always the Library.
 //
-// 05 **Weave stays hidden**, and the note that used to sit here was wrong about
-// why that was safe. It claimed "the `/weave` route still works and 06 Keep
-// links to it, so no whole-weave work is stranded." **Keep never linked to it.**
-// Nothing does — verified 2026-08-09 by grepping every `/weave` in the repo, so
-// the whole weave has had no door at all since the station was hidden.
-//
-// TJ, 2026-08-09: **the whole-weave path is unresolved**, collaboration on a
-// cloth and the Quilt are both wanted but the ambiguity about how they manifest
-// "should not inform the current design" — "the whole weave will only confuse
-// things in this moment." So do not build a home for it and do not unhide this
-// on the strength of a guess about what it becomes.
+// 2026-08-11 (TJ): **the whole weave is gone from the app**, station and route
+// together — "poorly defined and not supported in the course… it should not be
+// in the app as an idea until the faculty and authors of the app agree on what
+// it means to have a 'full weave'." Hiding the station had not been enough: the
+// route carried no gate, and the Library's search results linked into it. Do
+// not restore either on the strength of a guess about what a full weave
+// becomes; that is a decision for the faculty, not for this file.
 //
 // Step numbers are DERIVED from the visible stations, so hiding or restoring
 // one renumbers the bar instead of leaving a gap that reads as a bug. That is
@@ -31,7 +27,7 @@ import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 
-export type Station = "readings" | "open" | "throw" | "read" | "map" | "weave" | "keep"
+export type Station = "readings" | "open" | "throw" | "read" | "map" | "keep"
 
 const STATIONS: { key: Station; label: string; hidden?: boolean }[] = [
   { key: "readings", label: "Library" },
@@ -43,7 +39,13 @@ const STATIONS: { key: Station; label: string; hidden?: boolean }[] = [
   // Graph, and `?tab=` keeps speaking them (refactor spec §F).
   { key: "map", label: "Knowledge Graph" },
   { key: "read", label: "Vocabulary" },
-  { key: "weave", label: "Weave", hidden: true },
+  // There was a hidden "weave" station here, and a `/weave` route behind it.
+  // TJ retired both on 2026-08-11: "we are removing whole weave as it exists
+  // in the app because it is poorly defined and not supported in the course.
+  // it should not be in the app as an idea until the faculty and authors of
+  // the app agree on what it means to have a 'full weave'." Hiding it was not
+  // enough — the route had no gate, and the Library's search results linked
+  // straight into it.
   { key: "keep", label: "Keep" },
 ]
 
@@ -60,26 +62,34 @@ export function stationNumber(key: Station): string {
   return found < 0 ? "" : String(found).padStart(2, "0")
 }
 
+/**
+ * Where a station goes when it is not a tab you can work at right here.
+ *
+ * The four reading stations have nowhere to go — they exist inside a text and
+ * READING_ONLY renders them as inert spans, so these entries are never read
+ * for them. They point at the Library rather than at a route that would take
+ * a student somewhere unfinished; before 2026-08-11 they pointed at `/weave`,
+ * which is exactly the kind of half-built destination that ruling removed.
+ */
 const DEFAULT_HREF: Record<Station, string> = {
   readings: "/",
   open: "/",
-  throw: "/weave?tab=throw",
-  read: "/weave?tab=read",
-  map: "/weave?tab=map",
-  weave: "/weave",
+  throw: "/",
+  read: "/",
+  map: "/",
   keep: "/keep",
 }
 
 /**
  * Stations that only exist inside a reading (TJ, 2026-08-09).
  *
- * Their DEFAULT_HREF above points at `/weave` — the whole-weave workbench —
- * which is not supported for v1. So rather than carrying a student somewhere
- * that is not finished, these render **greyed and inert** wherever they are not
- * a tab you can work at right here: on the Library and on Keep, both of which
- * are about every reading at once and neither of which has a text to link in.
+ * There is nowhere else for them to be: since the whole weave went
+ * (2026-08-11) a reading IS the only scope a student works in. So rather than
+ * carrying anyone somewhere unfinished, these render **greyed and inert**
+ * wherever they are not a tab you can work at right here — on the Library and
+ * on Keep, neither of which has a text to link in.
  *
- * Inside a reading all three are handlers, so this never fires there.
+ * Inside a reading all four are handlers, so this never fires there.
  *
  * Deliberately keyed off "is there a handler" rather than off the route, so a
  * surface that gains one of these tabs gets a live station for free and nobody
@@ -87,15 +97,13 @@ const DEFAULT_HREF: Record<Station, string> = {
  *
  * NOTE: 04 Vocabulary is UNSCOPED in the model — the User's holdings across
  * every reading — so it is the one here that would be legitimate outside a
- * text. It is greyed anyway because the only surface that renders it outside a
- * reading is the whole-weave workbench. When `/weave` is ruled on, this set is
- * where that decision lands.
+ * text. Whether it gets a library-level surface of its own is open
+ * (docs/keep-at-the-object.md §7); until it does, this set is where that
+ * decision lands.
  */
 const READING_ONLY: ReadonlySet<Station> = new Set<Station>(["open", "throw", "map", "read"])
 
-const TIP: Partial<Record<Station, string>> = {
-  weave: "the big picture — every reading at once",
-}
+const TIP: Partial<Record<Station, string>> = {}
 
 /**
  * The staff group, drawn to the RIGHT of the journey and in its own colour

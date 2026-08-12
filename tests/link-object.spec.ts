@@ -18,7 +18,7 @@
  * second — which is the same rule the app itself follows.
  */
 import { test, expect } from "@playwright/test"
-import { isDeletePost } from "./helpers"
+import { enterReadingFromCard, isDeletePost } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 test.beforeEach(() => test.setTimeout(120_000))
@@ -31,6 +31,18 @@ const GLOSS = "one keeps the other from closing"
 
 async function loomLoaded(page: import("@playwright/test").Page) {
   await expect(page.getByText("Loading your loom...")).toHaveCount(0, { timeout: 20_000 })
+}
+
+/**
+ * Open a station inside Object Worlds. Everything here used to happen at
+ * `/weave`; TJ retired the whole weave on 2026-08-11, so a reading is the only
+ * scope a student — or this test — works in.
+ */
+async function openStation(page: import("@playwright/test").Page, station: "Linking" | "Vocabulary") {
+  await page.goto("/")
+  await enterReadingFromCard(page, page.locator(".shelfcard", { hasText: "Object Worlds" }).first())
+  await page.locator("nav button", { hasText: station }).click()
+  await loomLoaded(page)
 }
 
 /**
@@ -56,8 +68,7 @@ async function openRow(row: import("@playwright/test").Locator) {
  * in that gap reads zero and strands the very row it came to remove.
  */
 async function removeThread(page: import("@playwright/test").Page, mustExist = false) {
-  await page.goto("/weave?tab=throw")
-  await loomLoaded(page)
+  await openStation(page, "Linking")
   const sent = page.locator(".sent", { hasText: "holds the other open" })
   if (mustExist) {
     await expect(sent).toHaveCount(1, { timeout: 15_000 })
@@ -79,8 +90,7 @@ test("a label coined with no thread is a row, and tapping it labels a thread", a
   await removeThread(page)
 
   // --- coin it, with nothing using it ---
-  await page.goto("/weave?tab=read")
-  await loomLoaded(page)
+  await openStation(page, "Vocabulary")
   const row = page.locator(`.lrow[data-link-label="${COINED}"]`)
 
   if ((await row.count()) === 0) {
@@ -117,21 +127,22 @@ test("a label coined with no thread is a row, and tapping it labels a thread", a
   }
 
   // The gloss is the Link's, not a thread's — it survives a reload with no
-  // thread in existence to carry it.
+  // thread in existence to carry it. A reload lands on the reading's first
+  // station, so come back to Vocabulary the way a student would.
   await page.reload()
   await loomLoaded(page)
+  await page.locator("nav button", { hasText: "Vocabulary" }).click()
   await expect(row, "the coined label survives a reload").toHaveCount(1, { timeout: 15_000 })
   await page.locator("#labelFilter").fill(COINED)
   await openRow(row)
   await expect(row.locator(".linkOwnDescription")).toHaveValue(GLOSS)
 
   // --- reach for it at coin time, by tapping ---
-  await page.goto("/weave?tab=throw")
-  await loomLoaded(page)
+  await openStation(page, "Linking")
   const warp = page.locator(".crow")
   await expect(warp.first(), "seed missing — run `npm run seed:demo` first").toBeVisible({ timeout: 15_000 })
   await warp.filter({ hasText: "object worlds" }).first().click()
-  await warp.filter({ hasText: "reification" }).first().click()
+  await warp.filter({ hasText: "artifact as compromise" }).first().click()
   await page.getByPlaceholder("…or just start typing. Long and awkward is fine.").fill(SENTENCE)
   await page.getByRole("button", { name: "Throw it" }).click()
 
@@ -162,8 +173,7 @@ test("a label coined with no thread is a row, and tapping it labels a thread", a
   await expect(thread.locator(".v")).toHaveText(COINED)
 
   // --- the count follows the object ---
-  await page.goto("/weave?tab=read")
-  await loomLoaded(page)
+  await openStation(page, "Vocabulary")
   await expect(row, "still ONE row — reuse attached, it did not mint a twin").toHaveCount(1, { timeout: 15_000 })
   await expect(row.locator(".lsrc")).toHaveText(/1 thread(?!s)/)
   await page.locator("#labelFilter").fill(COINED)
@@ -186,7 +196,10 @@ test("a Link nothing uses is findable — search covers the object, not just the
   await expect(hit).toBeVisible()
   await expect(hit.getByText("not used yet")).toBeVisible()
 
-  // The door goes to Vocabulary, where Link Labels live.
-  await hit.click()
-  await expect(page).toHaveURL(/\/weave\?tab=read/)
+  // No thread uses it, so there is no reading to open it in — and the result
+  // says so rather than looking clickable and going nowhere. This is the state
+  // 5.1 exists for, met at the one surface that can see every reading at once.
+  await expect(hit).toContainClass("off")
+  await expect(hit.getByText("coined, with no thread using it yet")).toBeVisible()
+  await expect(hit.locator("a")).toHaveCount(0)
 })

@@ -16,7 +16,6 @@ import { useState, useEffect, useRef } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import ObjectDownload from "@/components/ui/ObjectDownload"
-import { isWholeWeave } from "@/lib/scope"
 import { short } from "@/lib/clothMath"
 import { buildClothExport, buildClothMarkdown } from "@/lib/objectExport"
 import { scopeLabelOf } from "@/lib/graphExport"
@@ -30,7 +29,6 @@ import { scopeLabelOf } from "@/lib/graphExport"
 export default function ClothFold() {
   const { activeCloth, updateCloth, isLoading, scope, flash, state } = useLoom()
   const { byId } = useReadings()
-  const wholeWeave = isWholeWeave(scope)
   const titleOf = (id: string) => byId.get(id)?.title ?? id
   const scopeLabel = scopeLabelOf(scope.key, titleOf)
   // Controlled so the fold can be opened from elsewhere later; today it simply
@@ -79,23 +77,23 @@ export default function ClothFold() {
       <summary>
         <span className="tw">▸</span>
         <h2>
-          {wholeWeave ? "The whole weave's cloth" : "This cloth"}{" "}
+          This cloth{" "}
           {!isLoading && (
             <span className="n">{shownTitle ? `— “${short(shownTitle, 60)}”` : "— untitled"}</span>
           )}
         </h2>
       </summary>
       <p className="hint" style={{ marginTop: 10 }}>
-        {wholeWeave
-          ? "A title and a short interpretation for everything at once — every reading, one cloth."
-          : "Your work on this reading, under your own name for it. The title is a sentence or headline — yours, not the reading's — and both show on the reading's card in the Library."}
+        Your work on this reading, under your own name for it. The title is a
+        sentence or headline — yours, not the reading&apos;s — and both show on
+        the reading&apos;s card in the Library.
       </p>
       {/* The cloth is the whole of your work here; a projection is one lens on
           it. Both carry a title and a description, and students reasonably
           assume they are the same field — they are not, and a projection's
           travel with the projection. */}
       <p className="hint" style={{ marginTop: 6, color: "var(--ink-soft)" }}>
-        This names <b>the cloth</b> — everything you have woven{wholeWeave ? "" : " from this reading"}.
+        This names <b>the cloth</b> — everything you have woven from this reading.
         A <b>projection</b> on 03 · Knowledge Graph is one arrangement of it, a particular lens,
         and carries its <i>own</i> title, one-line and description. Keep several projections and
         each keeps its own; they can say quite different things about the same cloth.
@@ -114,7 +112,7 @@ export default function ClothFold() {
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder={wholeWeave ? "your short interpretation, across the readings" : "your short interpretation of the reading"}
+          placeholder="your short interpretation of the reading"
         />
       </div>
       <div className="clothfoot">

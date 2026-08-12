@@ -466,6 +466,10 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .searchhit{display:block;padding:12px 14px;text-decoration:none;color:inherit;
   border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.5)}
 .searchhit:hover{border-color:var(--ochre);background:rgba(168,132,63,.06)}
+/* A hit with no reading to open: shown, never clickable, and it says why.
+   Dashed rather than dimmed — the work is real, it just has no door yet. */
+.searchhit.off{border-style:dashed;background:transparent;cursor:default}
+.searchhit.off:hover{border-color:var(--rule);background:transparent}
 .searchhithead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .searchhithead h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0}
 .searchwhere{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:2px 0 0}

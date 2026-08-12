@@ -96,12 +96,12 @@ const student: Flow = {
     { id: "write", label: "Trace the prompts, write the one-line and the read", where: "03 · Knowledge Graph" },
     { id: "vocab", label: "Sharpen descriptions, merge duplicates", where: "04 · Vocabulary" },
     { id: "overlay", label: "Compare a section, or all of them", where: "Overlays — faculty and admins only" },
-    // There used to be a "weave" node here, labelled "Every reading at once"
-    // and sited at "/weave — station hidden, reached from Keep". Both halves of
-    // that were wrong: the station is hidden AND nothing links to `/weave`, from
-    // Keep or anywhere else, so the diagram drew a step in the student's path
-    // that no student can take. The whole-weave path is unresolved (TJ,
-    // 2026-08-09) and the diagram must not assert a route the build lacks.
+    // There used to be a "weave" node here — "Every reading at once", at
+    // /weave. It came out in 2026-08-09 because the diagram drew a step no
+    // student could take; the route itself came out on 2026-08-11, when TJ
+    // ruled the whole weave out of the app entirely ("poorly defined and not
+    // supported in the course"). Nothing goes back here until the faculty and
+    // the authors agree what a full weave is.
     { id: "keep", label: "Export the cloth or a projection", where: "Keep", kind: "end" },
   ],
   edges: [

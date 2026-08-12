@@ -8,10 +8,8 @@ import ObjectDownload from "@/components/ui/ObjectDownload"
 import { buildThreadsExport, buildThreadsMarkdown } from "@/lib/objectExport"
 import { findLink, labelOf as labelOfEdge, usesOf } from "@/lib/linkResolve"
 import { scopeLabelOf } from "@/lib/graphExport"
-import { isWholeWeave } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
-import ClothFold from "@/components/tabs/ClothFold"
 
 const PLAIN_VERBS = ['leads to','depends on','is part of','goes against','is the same as','sets up'];
 
@@ -169,9 +167,7 @@ export default function ThrowTab() {
     if (cs.length < 2) {
       await notify({
         title: "Not enough warp yet.",
-        body: wholeWeave
-          ? "Lay at least two concepts, then the shuttle has something to draw between."
-          : "Lay at least two concepts in this reading on 01 · Reading, then the shuttle has something to draw between.",
+        body: "Lay at least two concepts in this reading on 01 · Reading, then the shuttle has something to draw between.",
       })
       return
     }
@@ -304,7 +300,6 @@ export default function ThrowTab() {
     // does not admit to being truncated misreports what the student owns.
     return { shown: all.slice(0, SUGGESTED_LABELS), rest: Math.max(0, all.length - SUGGESTED_LABELS) }
   })()
-  const wholeWeave = isWholeWeave(scope)
 
   // Concepts from the student's other readings, reachable and searchable but
   // out of the way. Never removed: threading this reading to an earlier one is
@@ -443,25 +438,19 @@ export default function ThrowTab() {
         ))}
       </div>
       <p className="hint steprailnote">{STEPS[railN]?.says}</p>
-      {/* The cloth's name lives on the work surface for its scope (TJ,
-          2026-08-08): inside a reading that is 01 · Reading, so OpenTab renders
-          it there. The whole weave has no Reading station, so this is its
-          cloth's only home. */}
-      {wholeWeave && <ClothFold />}
       <div className="two">
         <div className="card">
           <h2>The warp <span className="n">{scoped.concepts.length ? `(${scoped.concepts.length})` : ''}</span></h2>
           <p className="do">{doLine}</p>
           <p className="hint">
-            {wholeWeave
-              ? <>Every concept you have made, across all your readings. Tap one, then a second.</>
-              : <>The concepts <b>this reading</b> evidences — the ones you captured a passage for here. Tap one, then a second.</>}
+            The concepts <b>this reading</b> evidences — the ones you captured a
+            passage for here. Tap one, then a second.
           </p>
           {/* Ruled 2026-08-08 (TJ): linking works on this reading's concepts.
               A concept you met elsewhere joins the warp the honest way — you
               find a passage HERE that embodies it and file it under that same
               concept, which is offered by name while you capture. */}
-          {!wholeWeave && scoped.outside.length > 0 && (
+          {scoped.outside.length > 0 && (
             <p className="ghostnote">
               {scoped.outside.length} more concept{scoped.outside.length !== 1 ? "s" : ""}{" "}
               from your other readings are not listed here — this bench links what
@@ -554,7 +543,7 @@ export default function ThrowTab() {
           </div>
 
           <h3 style={{fontFamily: "var(--display)", fontSize: "17px", borderBottom: "1px solid var(--rule)", paddingBottom: "5px", margin: "18px 0 6px", display: "flex", alignItems: "baseline", gap: "10px"}}>
-            {wholeWeave ? "Threads thrown" : "Threads in this reading"}
+            Threads in this reading
             {' '}
             <span className="n" style={{fontFamily: "var(--mono)", fontSize: "11px", color: "var(--grey)"}}>{orderedEdges.length ? `(${orderedEdges.length})` : ''}</span>
             {/* Threads download where they are thrown (TJ, 2026-08-10). Both
@@ -563,7 +552,7 @@ export default function ThrowTab() {
               <span style={{marginLeft: "auto"}}>
                 <ObjectDownload
                   kind="threads"
-                  slug={wholeWeave ? "all-threads" : scopeLabelOf(scope.key, titleOf)}
+                  slug={scopeLabelOf(scope.key, titleOf)}
                   tip="these threads, each naming both of its concepts"
                   json={(p) => JSON.stringify(buildThreadsExport(state, scope.key, p, titleOf), null, 2)}
                   markdown={(p) => buildThreadsMarkdown(state, scope.key, p, titleOf)}

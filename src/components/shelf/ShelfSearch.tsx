@@ -15,6 +15,36 @@ import { searchReadings, searchLoom } from "@/lib/reads"
 import type { ReadingSearchHit, LoomSearchResult } from "@/actions/search"
 import Snippet from "@/components/ui/Snippet"
 
+/**
+ * One result. A door when there is a reading to open, a plain row when there
+ * is not — and it says which, rather than looking clickable and going nowhere.
+ *
+ * The three user-level kinds (a concept, a Link Label, a thread) used to lead
+ * to `/weave` at library scope, because nothing else was every-reading-at-once.
+ * TJ ruled the whole weave out of the app on 2026-08-11, so a hit now opens the
+ * reading its work lives in — and when it has none, that is a state worth
+ * showing plainly: a concept named ahead of its evidence is legal, and so is a
+ * word coined before any thread uses it.
+ */
+function Hit({
+  href,
+  nowhere,
+  children,
+}: {
+  href: string | null
+  /** What to say when there is no reading to open. */
+  nowhere: string
+  children: React.ReactNode
+}) {
+  if (href) return <Link href={href} className="searchhit">{children}</Link>
+  return (
+    <div className="searchhit off">
+      {children}
+      <p className="searchwhere"><span className="cap">{nowhere}</span></p>
+    </div>
+  )
+}
+
 export default function ShelfSearch({
   onActiveChange,
   onClose,
@@ -208,13 +238,16 @@ export default function ShelfSearch({
             <>
               <span className="cap searchtally">your concepts</span>
               {loomResults.concepts.map((hit) => (
-                // In a reading, a concept hit stays in this workbench — the
-                // Vocabulary station. (The library-scope /weave door is a
-                // standing audit item, awaiting the weave ruling.)
-                <Link key={hit.id} href={sourceId ? `/reading/${sourceId}?tab=read` : "/weave?tab=open"} className="searchhit">
+                // In a reading, a concept hit stays in this workbench. At the
+                // Library it opens the reading its first evidence is in.
+                <Hit
+                  key={hit.id}
+                  href={sourceId ? `/reading/${sourceId}?tab=read` : hit.sourceId ? `/reading/${hit.sourceId}?tab=read` : null}
+                  nowhere="named, with no passage behind it yet"
+                >
                   <div className="searchhithead"><h3>{hit.label}</h3></div>
                   <p className="searchsnip"><Snippet text={hit.snippet} /></p>
-                </Link>
+                </Hit>
               ))}
             </>
           )}
@@ -224,8 +257,13 @@ export default function ShelfSearch({
               {loomResults.linkLabels.map((hit) => (
                 // A Link Label lives in Vocabulary, alongside the concepts —
                 // and unlike a thread it can be found here before any thread
-                // uses it, which is what made it an object (5.1).
-                <Link key={hit.id} href={sourceId ? `/reading/${sourceId}?tab=read` : "/weave?tab=read"} className="searchhit">
+                // uses it, which is what made it an object (5.1). That is also
+                // why it is the kind most likely to have no reading to open.
+                <Hit
+                  key={hit.id}
+                  href={sourceId ? `/reading/${sourceId}?tab=read` : hit.sourceId ? `/reading/${hit.sourceId}?tab=read` : null}
+                  nowhere="coined, with no thread using it yet"
+                >
                   <div className="searchhithead">
                     <h3>{hit.label}</h3>
                     <span className="cap">
@@ -233,7 +271,7 @@ export default function ShelfSearch({
                     </span>
                   </div>
                   <p className="searchsnip"><Snippet text={hit.snippet} /></p>
-                </Link>
+                </Hit>
               ))}
             </>
           )}
@@ -241,14 +279,18 @@ export default function ShelfSearch({
             <>
               <span className="cap searchtally">your links</span>
               {loomResults.links.map((hit) => (
-                <Link key={hit.id} href={sourceId ? `/reading/${sourceId}?tab=throw` : "/weave?tab=throw"} className="searchhit">
+                <Hit
+                  key={hit.id}
+                  href={sourceId ? `/reading/${sourceId}?tab=throw` : hit.sourceId ? `/reading/${hit.sourceId}?tab=throw` : null}
+                  nowhere="thrown between concepts with no passage behind them yet"
+                >
                   <div className="searchhithead">
                     <h3>
                       {hit.fromLabel} —[{hit.handle || "…"}]→ {hit.toLabel}
                     </h3>
                   </div>
                   <p className="searchsnip"><Snippet text={hit.snippet} /></p>
-                </Link>
+                </Hit>
               ))}
             </>
           )}
@@ -256,14 +298,17 @@ export default function ShelfSearch({
             <>
               <span className="cap searchtally">your passages</span>
               {loomResults.passages.map((hit) => (
-                <Link
+                // An untethered passage has no reading by definition — the
+                // Library's own "passages with no reading" card is where it
+                // gets one, and that card is on this page already.
+                <Hit
                   key={hit.id}
-                  href={hit.sourceId ? `/reading/${hit.sourceId}?tab=open` : "/weave?tab=open"}
-                  className="searchhit"
+                  href={hit.sourceId ? `/reading/${hit.sourceId}?tab=open` : null}
+                  nowhere="captured with no reading — say which, on the card below"
                 >
                   {hit.source ? <div className="searchhithead"><h3>{hit.source}</h3></div> : null}
                   <p className="searchsnip"><Snippet text={hit.snippet} /></p>
-                </Link>
+                </Hit>
               ))}
             </>
           )}

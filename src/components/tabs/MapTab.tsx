@@ -16,7 +16,7 @@ import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import type { CardTableView, Concept, Tier } from "@/lib/types"
-import { isWholeWeave, readingsOf, soleSourceId } from "@/lib/scope"
+import { readingsOf, soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import { buildMapKit } from "@/lib/mapKit"
@@ -77,7 +77,6 @@ export default function MapTab({ practice = false }: {
   } = useLoom()
   const { titleOf } = useReadings()
   const { confirm } = useDialog()
-  const wholeWeave = isWholeWeave(scope)
 
   // The scope's Unlabeled Passages — the unattached group a projection must
   // show (ruling 38): nameable here, or left as visible remainder.
@@ -652,7 +651,7 @@ export default function MapTab({ practice = false }: {
       </div>
 
       <div className="mapbar" id="mapSwitcher">
-        <span className="label">{wholeWeave ? "Your projections of the whole weave" : "Your projections of this reading"}</span>
+        <span className="label">Your projections of this reading</span>
         <span className="chips" style={{ margin: 0, alignItems: "center" }}>
           {scopeMaps.map(m => (
             <span
@@ -895,7 +894,7 @@ export default function MapTab({ practice = false }: {
 
       <div className="card" style={{ marginTop: 14 }}>
         <h2>Your read of this projection {activeMap ? <span className="n">&ldquo;{activeMap.name}&rdquo; — its one-line and paragraph travel with it</span> : <span className="n">starts with your first sort</span>}</h2>
-        <p className="readq">In a sentence — what is this {wholeWeave ? "weave" : "reading"} <i>about</i>?</p>
+        <p className="readq">In a sentence — what is this reading <i>about</i>?</p>
         <input
           id="mapEssence"
           placeholder="Your one-line — the take, in a sentence."
@@ -932,8 +931,8 @@ export default function MapTab({ practice = false }: {
       {!practice && (
         <div style={{ marginTop: "22px" }}>
           <HistoryPanel
-            sourceId={wholeWeave ? undefined : (soleSourceId(scope) ?? undefined)}
-            scopeLabel={wholeWeave ? undefined : scopeLabelOf(scope.key, titleOf)}
+            sourceId={soleSourceId(scope) ?? undefined}
+            scopeLabel={scopeLabelOf(scope.key, titleOf)}
           />
         </div>
       )}

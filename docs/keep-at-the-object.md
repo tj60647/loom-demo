@@ -1,9 +1,10 @@
 # Keep at the object
 
-**Status: ruled 2026-08-10 by TJ, NOT built.** Nothing described here exists
-yet except where marked *already built*. The build order in §6 is the safety
-rule: **Keep cannot hide until its replacements exist**, or a student's work
-is stranded — the precise thing red line 5 forbids.
+**Status: ruled 2026-08-10 by TJ. §6 steps 1–5 are BUILT; step 6 is in
+progress.** The safety rule held: **Keep cannot hide until its replacements
+exist**, or a student's work is stranded — the precise thing red line 5
+forbids. §9, added 2026-08-11, is the act-by-act assessment TJ asked for, and
+it is what turned step 6 into three (4a, 4b, 4c — see §9.6).
 
 ---
 
@@ -50,13 +51,15 @@ The reassuring finding, and the reason this is smaller than it sounds:
 
 ## 3. The state of play
 
-| Object | Downloads at its object today? |
+Written 2026-08-10; every "No" below was closed by 2026-08-11.
+
+| Object | Downloads at its object? |
 |---|---|
-| A Projection | **Yes — already built.** `MapTab.tsx:679-690` ("keep .json" / "keep .md"), handlers `:526-544`. `buildMapExport` ([graphExport.ts:580](../src/lib/graphExport.ts)) and its file **stands alone**: every member concept's passages travel whole, unlabeled ones too |
-| A Cloth (one Reading) | **No builder exists** — the nearest needs a Projection to exist first |
-| Threads | **No** — only inside aggregates |
-| Vocabulary | **No** — `VocabularyTab` has no export code at all |
-| The Capture Log | **No, and never has** — in none of the four builders |
+| A Projection | **Yes, and already did.** `MapTab`'s "keep .json" / "keep .md"; `buildMapExport` ([graphExport.ts](../src/lib/graphExport.ts)) **stands alone**: every member concept's passages travel whole, unlabeled ones too |
+| A Cloth (one Reading) | ~~No builder exists~~ **Built** — `buildClothExport` / `buildClothMarkdown` ([objectExport.ts](../src/lib/objectExport.ts)), at 01 · Reading |
+| Threads | ~~No~~ **Built** — `buildThreadsExport`, at 02 · Linking |
+| Vocabulary | ~~No~~ **Built** — `buildVocabularyExport`, at 04, and it carries the Links a student owns including the ones no thread uses |
+| The Capture Log | ~~No, and never has~~ **Built** — `buildLogExport`, at 03, reading-scoped |
 
 Keep's per-Projection list is a **cross-scope index**, not a separate
 capability: the only thing lost by deleting it is reaching another Reading's
@@ -102,10 +105,12 @@ any file.
 
 **Breaks, each needing a decision or a rewrite:**
 
-1. **The worked example can no longer be cleared.** Reset is its only exit, and
-   `Shelf.tsx:305` instructs *"Explore it, then clear it from Keep to start
-   your own."* Deleting reset strands the example in the loom of anyone who
-   loads it. **This one needs an answer before Keep hides.**
+1. ~~**The worked example can no longer be cleared.**~~ **Answered by the
+   practice loom** (`/sandbox`, 2026-08-10): the example is deleted rather than
+   given an exit, because a tutorial that writes into a student's own loom is
+   the problem, not the exit. The Library card that loaded it becomes a door to
+   the practice loom — which also gives `workflows.ts`'s `library → practice`
+   edge the route it has been asserting without one.
 2. **`scripts/check-import-compat.ts`** (9 assertions) exists solely to protect
    old exports on import. With import gone its purpose goes; drop it from the
    `check` chain rather than leave a guard over nothing.
@@ -262,7 +267,21 @@ record, residue included, and its download already carries it. Deleting Keep
 does not hide the residue. **The whole weave is what shows it, and the whole
 weave is the thing TJ says should not be student-facing.**
 
-### 9.5 The student-facing whole weave, today
+### 9.5 The student-facing whole weave — **removed 2026-08-11**
+
+TJ, on reading the four counts below: *"we are removing whole weave as it
+exists in the app because it is poorly defined and not supported in the course.
+it should not be in the app as an idea until the faculty and the authors of the
+app agree on what it means to have a 'full weave'. i am not at all worried
+about losing whole weave. i am worried about losing meaningful activities
+related to reading, passage capture, concept labeling, link labeling, building
+threads, organizing concepts and threads, and building projections from a
+readings cloth."*
+
+Done in 4a + 4b: every act now records the reading it happened in, and then the
+route, the station, the seeded whole-weave rows and every `wholeWeave` branch
+came out. The four doors below are repointed at the reading each hit's work
+lives in. What follows is the state that prompted the ruling.
 
 TJ: *"at this moment there should be no student facing whole weave projection.
 at most it appears in the faculty."* That is **not true of the build**, on four
@@ -292,11 +311,21 @@ Three docs say otherwise and are stale: [open-work.md](open-work.md) and
 [workflows.ts](../src/lib/workflows.ts) dropped its weave node on that same
 reasoning.
 
-### 9.6 What this means for Step 4
+### 9.6 What this meant for Step 4, and the order it produced
 
-Deleting Keep is safe for the *record* — `/weave` still shows and downloads it.
-It is not safe for the *strandings* [open-work](open-work.md) Phase 2 lists,
-because the home that note proposes for them is Keep itself. And closing the
-whole weave to students — which is what TJ's sentence asks for — would remove
-the only unscoped view of the record at the same stroke, so the two must be
-decided together, not in sequence.
+Deleting Keep was safe for the *record* — `/weave` showed and downloaded it —
+but closing the whole weave removed that view at the same stroke, so the two
+could not be sequenced independently. Hence the order actually taken:
+
+- **4a — every act records its reading.** The precondition: nothing can be
+  removed safely while seven of the acts TJ names place only by evidence, or
+  not at all. Shipped with the guard in `scripts/check-log-scope.ts`, which
+  asserts both halves — that the rule honours a stamp, and that the emitters
+  write one.
+- **4b — the whole weave goes.** Route, station, `Workbench`'s nullable
+  source, the seeded whole-weave cloth and projection, and every `wholeWeave`
+  branch in the tabs. The Library's search keeps its scope — it is the entry
+  point to the whole contents — and changes only where a hit LEADS.
+- **4c — Keep goes**, with import, reset, the worked example and the
+  whole-graph export. What remains open is §7: whether Vocabulary (and with it
+  the unscoped part of the record) gets a library-level surface.

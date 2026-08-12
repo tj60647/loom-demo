@@ -263,6 +263,42 @@
 > Search grows a `linkLabels` group beside `links`: the objects, scoped to a
 > reading's own threads inside a reading, and unfiltered at the Library where
 > a word coined ahead of use is found.
+> **The whole weave is out of the app** (2026-08-11, TJ: *"we are removing
+> whole weave as it exists in the app because it is poorly defined and not
+> supported in the course. it should not be in the app as an idea until the
+> faculty and the authors of the app agree on what it means to have a 'full
+> weave'"*). Route, station and every branch that drew it: `/weave` deleted,
+> `weave` gone from `Station`, `Workbench` takes a reading rather than
+> `WorkbenchSource | null`, and the `wholeWeave` conditionals came out of
+> ThrowTab, MapTab, ClothFold and ClothReflection. `WHOLE_WEAVE` survives only
+> as the internal scope of a surface that is not a reading — the Library —
+> and no student surface writes at `scopeKey ''`. Rows already written there
+> stay where they are and are not rendered; TJ: *"i am not at all worried
+> about losing whole weave."*
+>
+> What that ruling protects is named in the same message: *"i am worried about
+> losing meaningful activities related to reading, passage capture, concept
+> labeling, link labeling, building threads, organizing concepts and threads,
+> and building projections from a readings cloth."* Hence **4a, the same day:
+> every act records the reading it happened in.** Editing, merging and
+> deleting a concept, coining and rewording and removing a thread's label,
+> coining a Link and giving it its gloss — all seven placed only by EVIDENCE
+> or (the two link kinds) nowhere at all, so the work vanished from the log
+> whenever the concepts involved had no passage in the reading. Rule 1 of
+> `eventBelongsToReading` was always meant to win and now has something to win
+> with. Coining a Link by TYPING a label on a thread also recorded nothing at
+> all before this — `resolveLink` minted the row silently — and now emits
+> `link.coin` like every other coinage.
+>
+> **The Library's search is unchanged in scope and changed in destination.**
+> It still searches the whole loom — readings, cloths, projections, concepts,
+> link labels, threads, passages — because the Library is the entry point to
+> the whole contents (TJ). What moved is where a hit LEADS: the three
+> user-level kinds pointed at `/weave` for want of anywhere else, and now open
+> the reading their work lives in, resolved server-side as **where the first
+> evidence is** (`sourceId` on each hit). A hit with no reading — a concept
+> named ahead of its evidence, a Link nothing uses yet, an untethered passage
+> — is still shown, as a dashed row that says why it is not a door.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
@@ -548,16 +584,16 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | Station | Component | Holds |
 | --- | --- | --- |
 | 00 Library | — (`/`) | the course's readings; always a link, never a workbench tab |
-| — | `JourneyNav` | **02/03/04 render greyed and inert outside a reading** (TJ, 2026-08-09): their `DEFAULT_HREF` is `/weave`, and the whole-weave workbench is not supported in v1. Keyed off "is this a tab you can work at here", not off a route list. `04 Vocabulary` is UNSCOPED in the model and is the one that would be legitimate outside a text — greyed anyway, because `/weave` is its only surface |
+| — | `JourneyNav` | **01/02/03/04 render greyed and inert outside a reading** (TJ, 2026-08-09): there is nowhere else for them to be. Keyed off "is this a tab you can work at here", not off a route list, so a surface that gains one of these tabs gets a live station for free. Their `DEFAULT_HREF` pointed at `/weave` until 2026-08-11 and now points at the Library; the entries are never read, because the stations render as spans. `04 Vocabulary` is UNSCOPED in the model and is the one that would be legitimate outside a text — greyed anyway until it gets a library-level surface of its own (keep-at-the-object §7) |
 | — | **`/access`** · `MetaPage` | **Access — the role matrix, its own tab** (TJ, 2026-08-09), staff only: each row cites the file and line that enforces it. `MetaPage` is the shared frame for a reference page — `/workflows` and `/access` change what is *below* the journey instead of replacing the frame, with no station active. **It is Courses' and Readings' shape: journey bar, then the page** (TJ, 2026-08-09: "workflows and access tabs should not spawn a header above their row, they should behave more like courses and readings, but without a specific course"). The heading lives in `<main>` with the content it names, exactly as `/admin/courses` puts its own `<h1>` there. An earlier pass gave these a `.scopebar` — a titled strip *above* the journey that no other staff surface has, so arriving pushed the row you had just clicked in down the page; that, its "‹ library" back link (a second door to what 00 · Library already opens) and its footer are all gone. **No `AdminNav`** — that is the "without a specific course" half: a course/section picker on a page holding no course data would be a control for a scope nothing here reads. The `/access` gate ignores the student lens, as `/admin` does: the lens hides the tab, it is not a lock |
 | — | **`src/lib/capabilities.ts`** | **the role/capability matrix** (TJ, 2026-08-09), rendered on `/workflows` under the flows. The file IS the matrix: every row names the **server gate that refuses**, and `check-workflows.ts` asserts the file exists and the symbol is still in it — a rename fails the build rather than leaving a confident, wrong table. `gate.line` deliberately unasserted. Deriving it found and fixed two holes: `peersOf` excluded `FACULTY` but not `INSTRUCTOR` (an admin's captures counted as a peer), and `createPassage` never authorized its `sourceId` while `attributePassages` did |
 | — | **`src/lib/viewAs.ts`** · `viewAsServer.ts` | **View as student** (TJ, 2026-08-09) — a lens beside the header pill. A **cookie**, because three differences are decided server-side and a client flag could not reach them: `/workflows` (three flows vs one), the Library query (an admin's shelf carries `isVisible=false` rows), and `getActiveCourse` itself. Masked **once**, in `getActiveCourse`, so every `isStaff`/`isAdmin` consumer goes quiet together; `staffTruly` rides along **unmasked for one purpose only** — drawing the control that takes the lens off. **Withholds, never grants**: every use hides a control or NARROWS a query, and no authorization path consults it (`authorizeSourceAccess` deliberately untouched). Not a security boundary |
 | — | `JourneyNav` · `.staffgroup` | **the staff group, right of the journey, in sage** (TJ, 2026-08-09) — Roster · Cohort Graph for FACULTY, plus Readings · Courses for site ADMIN, on **every** surface including `/admin`. Unnumbered: they are not steps on the student's arc. Replaces `AdminNav`'s tab row, which now holds only the course/section pickers. Drawn from `course.isStaff` / `course.isAdmin`; decides what is drawn, never what may be read |
 | **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** as **Your work** (`#yourwork`), a sheet that slides over the text — closed by default, toggled from the viewer toolbar, and mounted *inside* `.pdf-shell` so it survives fullscreen; the **Cloth Title/Description** at the head of that sheet; **the margin cards** (2026-08-09, from the reverted spread canvas) — page mode's "Cards" toggle, `ConceptRails`: read-only cards beside each page, leader-lined to their highlights, a door to Your work and never an editor, rails and cards `user-select:none` so a stray drag cannot file text to the wrong page; and **a matrix that zooms as pure transform** (`PageRaster` under a once-rendered text layer), visible pages re-rastering after the gesture settles |
-| 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Carries `ClothFold` **only at the whole weave**, which has no Reading station — and, since nothing links to `/weave`, **no student can reach that branch**, so the whole-weave Cloth's only editor is currently unreachable |
-| 03 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, **the list and the board** (the sorted rows and the tiered card-and-thread surface — "board", never "table", which reads as a spreadsheet on a screen; TJ 2026-08-10); the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); the Capture Log history at the whole weave (`HistoryPanel` — since 2026-08-09 the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**) |
+| 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Threads download here. It used to carry `ClothFold` at the whole weave, which had no Reading station; that branch went with the whole weave on 2026-08-11, and the Cloth's only editor is 01 · Reading |
+| 03 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, **the list and the board** (the sorted rows and the tiered card-and-thread surface — "board", never "table", which reads as a spreadsheet on a screen; TJ 2026-08-10); the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); **the Capture Log for this reading** (`HistoryPanel` — the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**), downloadable |
 | **04 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); **merge Concepts — its only home**; Concepts/Links Overlays |
-| ~~05 Weave~~ | `/weave` | **hidden from the journey, and with no door at all.** The 08-08 row here said "The route still works and Keep links to it, so whole-weave projections are not stranded" — **the second clause was false.** Keep never linked to it; verified 2026-08-09 by grepping every `/weave` in the repo. The only remaining references are `JourneyNav`'s three dead `DEFAULT_HREF`s (their stations are greyed, so never read) and `ShelfSearch`'s three hits. So the whole-weave Cloth, the whole-weave Projections, and the last route to an untethered Passage have all been unreachable since the station was hidden. **TJ, 2026-08-09: the whole-weave path is unresolved** — cloth collaboration and the Quilt are both wanted, but "the ambiguity about how they manifest should not inform the current design", and "the whole weave will only confuse things in this moment". Nothing is to be built for it on a guess |
+| ~~05 Weave~~ | — | **GONE, route and station, 2026-08-11.** Hiding it had not been enough: `/weave` carried no gate of any kind, and the Library's search results linked into it in four places. **TJ:** *"we are removing whole weave as it exists in the app because it is poorly defined and not supported in the course. it should not be in the app as an idea until the faculty and the authors of the app agree on what it means to have a 'full weave'."* `Workbench` now requires a reading; `WHOLE_WEAVE` survives only as the internal scope of surfaces that are not a reading (the Library), and no student surface writes at `scopeKey ''`. Rows already written there are left where they are — TJ: *"i am not at all worried about losing whole weave"* — and are simply not rendered |
 | 05 Keep | `KeepTab` (`/keep`) | export/import/reset — ratified as a deviation from the model's five (D4) — **and the Capture Log** (`HistoryPanel`), moved here from the whole weave because that was its only render AND no export contains `graphEvents`, so withdrawing `/weave` would have made it unreachable and unkeepable at once (red line 5). **TJ, 2026-08-09: Keep is "more about the student library or cloth collection" than a whole weave** — so it is not the whole weave's home, and the "every reading at once" framing is what that ruling narrows |
 
 **A Concept with no Passages is in scope everywhere.** `scoped()` in
