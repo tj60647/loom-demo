@@ -312,6 +312,11 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .info-dialog li b{font-weight:500;color:var(--ink)}
 .info-dialog .info-note{font-size:13.5px;color:var(--ink-soft);border-left:2px solid var(--ochre);padding-left:11px;margin:12px 0 16px}
 .info-close{position:absolute;top:12px;right:12px}
+/* About is the one info dialog with more than a screenful in it, so it scrolls
+   inside itself. Wider than the rest for the same reason. */
+.aboutbox{max-width:620px;max-height:84vh;overflow-y:auto}
+.aboutbox h3{font-family:var(--display);font-size:16px;font-weight:600;margin:20px 0 8px;
+  border-bottom:1px solid var(--rule);padding-bottom:4px}
 @media(max-width:560px){.info-dialog{padding:22px 20px 18px}.info-dialog h2{font-size:23px}}
 /* first-run walkthrough overlay */
 /* v14 used z-index:40, which was top of its stack. This app has overlays v14
@@ -471,24 +476,53 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .searchhit.off{border-style:dashed;background:transparent;cursor:default}
 .searchhit.off:hover{border-color:var(--rule);background:transparent}
 
-/* The practice guide (src/components/practice/PracticeGuide.tsx). Its own row
-   under the practice band, never a floating card: it names controls that are
-   on the page, and fixed chrome in this app has form for covering the thing it
-   is pointing at. */
-.guideband{border-bottom:1px solid var(--rule);background:rgba(168,132,63,.05);
-  padding:9px 24px;display:flex;flex-direction:column;gap:7px}
-.guideband.collapsed{flex-direction:row;align-items:center;gap:12px}
-.guiderail{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.gstep{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--ink-soft);background:transparent;border:1px solid var(--rule);border-radius:3px;
-  padding:3px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+/* The practice guide (src/components/practice/PracticeGuide.tsx).
+   A floater over the layout, not a band in it (TJ, 2026-08-11) — the page
+   underneath keeps its own geometry, and the card takes the corner furthest
+   from whatever it is pointing at. Above the footer (z 5) and the card menu
+   (z 6), below the dialogs (z 10000): the capture dialog must cover it, since
+   one beat is about that dialog. */
+.guidefloat{position:fixed;z-index:900;width:min(360px,calc(100vw - 32px));
+  background:var(--paper);border:1px solid var(--ink);border-radius:6px;
+  box-shadow:0 14px 40px rgba(0,0,0,.22),0 0 0 4px rgba(168,132,63,.10);
+  padding:12px 14px 10px;
+  /* The card takes no clicks of its own — only its buttons do (below). A
+     floater in a corner will sooner or later sit over a control: at 1280x720
+     it lands squarely on the PDF's Next Page arrow, which is how the suite
+     found this. Choosing a corner cannot fix that in general, so the card is
+     made incapable of eating anything instead. Its buttons opt back in. */
+  pointer-events:none}
+.guidefloat .gstep,.guidefloat .btn{pointer-events:auto}
+.guidefloat.br{right:18px;bottom:52px}
+.guidefloat.bl{left:18px;bottom:52px}
+.guidefloat.tr{right:18px;top:96px}
+.guidefloat.tl{left:18px;top:96px}
+.guideopen{position:fixed;right:18px;bottom:52px;z-index:900;background:var(--paper)}
+
+/* The pointer. Rings the target and never takes a click — a tutorial that
+   swallows the button it just told you to press is worse than no tutorial. */
+.guideglow{position:fixed;z-index:899;pointer-events:none;border-radius:5px;
+  box-shadow:0 0 0 2px var(--ochre),0 0 16px 5px rgba(168,132,63,.35);
+  transition:top .16s ease,left .16s ease,width .16s ease,height .16s ease}
+
+.guiderail{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:8px}
+.gstep{font-family:var(--mono);font-size:11px;line-height:1;color:var(--ink-soft);
+  background:transparent;border:1px solid var(--rule);border-radius:50%;
+  width:22px;height:22px;padding:0;cursor:pointer;display:inline-flex;
+  align-items:center;justify-content:center}
 .gstep:hover{border-color:var(--ochre)}
-.gstep.now{color:var(--ink);border-color:var(--ochre);background:rgba(168,132,63,.12)}
-.gstep.done{color:var(--sage,#5d6b52)}
-.gstep .gn{font-weight:700;opacity:.75}
-.guidebody .gsay{margin:0;font-size:14px;line-height:1.5}
-.guidebody .gwhy{margin:3px 0 0;font-size:12.5px;line-height:1.45;color:var(--ink-soft);font-style:italic}
-.guidefoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gstep.now{color:var(--paper);background:var(--ink);border-color:var(--ink)}
+.gstep.done{color:var(--ochre);border-color:var(--ochre)}
+.gstep.done.now{color:var(--paper);background:var(--ochre)}
+.gcount{margin-left:auto}
+.guidefloat .gsay{margin:0;font-size:13.5px;line-height:1.45}
+.guidefloat .gwhy{margin:5px 0 0;font-size:12px;line-height:1.4;color:var(--ink-soft);font-style:italic}
+.guidefoot{display:flex;align-items:center;gap:6px;margin-top:10px;border-top:1px solid var(--rule);padding-top:9px}
+.guidefoot .ghide{margin-left:auto}
+@media(max-width:640px){
+  .guidefloat,.guidefloat.br,.guidefloat.bl,.guidefloat.tr,.guidefloat.tl{
+    left:12px;right:12px;bottom:52px;top:auto;width:auto}
+}
 .searchhithead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .searchhithead h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0}
 .searchwhere{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:2px 0 0}

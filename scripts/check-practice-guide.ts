@@ -183,8 +183,8 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
   const another: LoomState = { ...state, maps: [...state.maps, map("m2", {})] }
   assert(stepDone("sort", base, another, SRC, QUIET), "…and when a second projection is made", "no tick")
 
-  assert(stepDone("kit", base, state, SRC, { ...QUIET, kitCopied: true }), "the kit ticks when it is copied", "no tick")
-  assert(!stepDone("kit", base, state, SRC, QUIET), "…and not before", "the kit ticked uncopied")
+  assert(stepDone("kit", base, state, SRC, { ...QUIET, kitCopied: true }), "the kit ticks when it is downloaded", "no tick")
+  assert(!stepDone("kit", base, state, SRC, QUIET), "…and not before", "the kit ticked untaken")
 }
 
 // --- an EMPTY practice loom (the reading could not carry the example) ---
@@ -210,9 +210,9 @@ assert(GUIDE_STEPS.length === 7, "seven beats, as ruled", `got ${GUIDE_STEPS.len
   )
   const mapTab = readFileSync("src/components/tabs/MapTab.tsx", "utf8")
   assert(
-    /loom:mapkit-copied/.test(mapTab),
-    "copying the kit announces itself",
-    "MapTab no longer dispatches loom:mapkit-copied — the last beat can never tick"
+    /loom:mapkit-taken/.test(mapTab),
+    "downloading the kit announces itself",
+    "MapTab no longer dispatches loom:mapkit-taken — the last beat can never tick"
   )
   const workbench = readFileSync("src/components/Workbench.tsx", "utf8")
   assert(

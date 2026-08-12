@@ -78,9 +78,9 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
           <Link
             href="/sandbox"
             className="btn ghost mini"
-            data-tip="the practice loom — try any move on a real reading, nothing is kept"
+            data-tip="the guide — walk the seven moves on a real reading, nothing is kept"
           >
-            practice
+            guide
           </Link>
         )}
         <button
@@ -99,42 +99,36 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
           was the one exception to the app's visual language. */}
       {showAbout && (
         <div className="info-scrim" onClick={(e) => { if (e.target === e.currentTarget) setShowAbout(false) }}>
-          <div className="card" style={{ width: "90%", maxWidth: "600px", maxHeight: "85vh", overflowY: "auto", padding: "32px", boxShadow: "0 10px 40px rgba(0,0,0,0.15)", position: "relative" }}>
-            <button
-              onClick={() => setShowAbout(false)}
-              style={{ position: "absolute", top: "16px", right: "16px", background: "none", border: "none", fontSize: "20px", cursor: "pointer", opacity: 0.5 }}
-            >✕</button>
+          <div className="info-dialog aboutbox" role="dialog" aria-modal="true" aria-label="About Loom">
+            <button className="btn ghost mini info-close" onClick={() => setShowAbout(false)} aria-label="Close">✕</button>
 
-            <h2 style={{ fontSize: "24px", marginBottom: "4px" }}>Loom</h2>
-            <p className="hint" style={{ marginBottom: "24px" }}>Weaving Knowledge Through Shared Practice</p>
+            <span className="info-k">about</span>
+            <h2>Loom</h2>
+            <p className="info-note">Weaving knowledge through shared practice.</p>
 
-            <p style={{ lineHeight: "1.6", marginBottom: "24px" }}>Loom is a tool for emergent sense-making and collaborative synthesis. It provides a space where reading, capturing, and connecting ideas form a living knowledge graph—built entirely by you and your community, without auto-generation.</p>
+            <p>Loom turns reading into weaving. You read anywhere — paper, PDF, screen — and bring the passages worth keeping here, where they become concepts, the concepts get threaded to one another, and the whole thing lays out as something you can read back. The structure is yours: the tool holds it and counts it, and never writes a word of it.</p>
 
-            <h3 style={{ fontSize: "16px", marginBottom: "12px", borderBottom: "1px solid var(--rule)", paddingBottom: "4px" }}>What is Loom?</h3>
-            <p style={{ lineHeight: "1.6", marginBottom: "12px" }}>Loom was born from the intersection of ethnographic research, theory, and practice. It is designed to help individuals and cross-disciplinary teams build shared understanding not by enforcing uniformity, but by negotiating differences.</p>
-
-            <p style={{ lineHeight: "1.6", marginBottom: "8px" }}>The core workflow is simple:</p>
-            <ul style={{ lineHeight: "1.6", marginBottom: "24px", paddingLeft: "20px" }}>
-              <li style={{ marginBottom: "6px" }}><b>Read & Capture:</b> Keep passages worth keeping — the author's words, verbatim, with citation. Name the concept each passage evidences, and gloss it in your own words in the description.</li>
-              <li style={{ marginBottom: "6px" }}><b>Throw:</b> Pick two concepts and connect them.</li>
-              <li style={{ marginBottom: "6px" }}><b>Name the Relation:</b> define the link between these ideas in your own phrasing.</li>
-            </ul>
-            <p style={{ lineHeight: "1.6", marginBottom: "24px" }}>Nothing is auto-generated. The tool only counts your own throws. The structure emerges organically from your coding: from open codes first, to axial reads across texts.</p>
-
-            <h3 style={{ fontSize: "16px", marginBottom: "12px", borderBottom: "1px solid var(--rule)", paddingBottom: "4px" }}>Features</h3>
-            <ul style={{ lineHeight: "1.6", marginBottom: "24px", paddingLeft: "20px" }}>
-              <li style={{ marginBottom: "6px" }}><b>Bite-Sized Capture:</b> Keep the passages that matter as discrete passages — the author's words, verbatim, with their citation — each filed under a concept you name.</li>
-              <li style={{ marginBottom: "6px" }}><b>Intentional Connections ("Throws"):</b> The power of Loom lies in the edges. You decide exactly how two concepts relate.</li>
-              <li style={{ marginBottom: "6px" }}><b>The Woven Graph:</b> View your interconnected graph ("Read"), then write your own "axial read" across texts. Loom lays your threads out as material and counts what it sees; you write the reading, and copy it out as a draft.</li>
+            <h3>The five stations</h3>
+            <ul>
+              <li><b>00 Library</b> — the course&apos;s readings. Each card opens its own workbench, and the work you do behind it belongs to that text.</li>
+              <li><b>01 Reading</b> — the text and your captures in one place. Highlight a passage, name the concept it evidences, and title your cloth: your own reading of the text as a whole.</li>
+              <li><b>02 Linking</b> — pick two concepts and say how they hang together. That sentence IS the thread; a short label is a convenience that lets one of your words recur.</li>
+              <li><b>03 Knowledge Graph</b> — sort your concepts into tiers and arrange them as cards on a board. Each arrangement is a projection: keep several, and each can say something different about the same cloth.</li>
+              <li><b>04 Vocabulary</b> — every concept you have named and every label you have coined, across all your readings. A concept does not belong to a text; a passage does.</li>
             </ul>
 
-            <h3 style={{ fontSize: "16px", marginBottom: "12px", borderBottom: "1px solid var(--rule)", paddingBottom: "4px" }}>The Theory Behind the Tool</h3>
-            <p style={{ lineHeight: "1.6", marginBottom: "8px" }}>Loom is built on foundational ideas from design theory, sociology, and ethnographic coding (see the concept deck for a deeper dive):</p>
-            <ul style={{ lineHeight: "1.6", marginBottom: "12px", paddingLeft: "20px" }}>
-              <li style={{ marginBottom: "8px" }}><b>Object Worlds (Bucciarelli):</b> Each discipline inhabits its own world with its own instruments and language. A mechanical engineer might name a connection "is the bottleneck for," while a humanist might say it "betrays" the text. Loom makes these differing worldviews visible and actionable.</li>
-              <li style={{ marginBottom: "8px" }}><b>Communities of Practice (Wenger):</b> Shared vocabularies are learned by participating in a community, not just by being told. Loom enables a class or team to grow its own shared edge-vocabulary over time by doing the work together.</li>
-              <li style={{ marginBottom: "8px" }}><b>Boundary Objects (Star):</b> How do people from distinct fields coordinate around one shared object without agreeing on exactly what it means? Loom serves as a cross-disciplinary boundary object—flexible enough to be locally useful, but robust enough to hold a common identity across groups.</li>
+            <h3>What Loom will not do</h3>
+            <p>Nothing here is generated for you. No model reads your work, ranks it, scores it or suggests what to write — the tool counts what you made and shows you the count. An empty state is a fact about where you have got to, not a fault to fix. And your work leaves as files wherever you made it: the cloth at 01, its threads at 02, a projection and your Capture Log at 03, your vocabulary at 04.</p>
+            <p className="info-note">Loom is the middle step, not the deliverable. It gets you to a concept map you draw by hand, and to the talk you build from that.</p>
+
+            <h3>The thinking behind it</h3>
+            <ul>
+              <li><b>Object Worlds (Bucciarelli):</b> each discipline inhabits its own world, with its own instruments and language. An engineer might name a connection &ldquo;is the bottleneck for&rdquo; where a humanist says it &ldquo;betrays&rdquo; the text. Loom keeps those differences visible instead of flattening them.</li>
+              <li><b>Communities of Practice (Wenger):</b> a shared vocabulary is learned by doing the work alongside other people, not by being handed a glossary. A class grows its own link labels over a term.</li>
+              <li><b>Boundary Objects (Star):</b> people from distinct fields coordinate around one shared object without agreeing on what it means. A cloth is meant to be exactly that — locally useful, and robust enough to hold across groups.</li>
+              <li><b>Concept maps (Novak &amp; Gowin):</b> arranging cards by hand is the thinking. The board digitises the sorting; the map you draw afterwards is where it lands.</li>
             </ul>
+
           </div>
         </div>
       )}

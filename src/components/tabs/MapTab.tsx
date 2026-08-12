@@ -23,6 +23,7 @@ import { buildMapKit } from "@/lib/mapKit"
 import { copyText } from "@/lib/clipboard"
 import { buildMapExport, buildMapMarkdown, mapExportFilename, scopeLabelOf } from "@/lib/graphExport"
 import { downloadText } from "@/lib/download"
+import { objectExportFilename } from "@/lib/objectExport"
 import CardMenu from "@/components/map/CardMenu"
 import ClothReflection from "@/components/tabs/ClothReflection"
 import HistoryPanel from "@/components/ui/HistoryPanel"
@@ -510,22 +511,28 @@ export default function MapTab({ practice = false }: {
     })
   }
 
+  /**
+   * The concept-map kit — a FILE, not a clipboard (TJ, 2026-08-11: "the map
+   * kit should be a download, not a copy to clipboard"). It is the material
+   * you draw the real map from, so it should sit in the same folder as the
+   * projection it came from rather than in a buffer one Ctrl-C destroys.
+   */
   const handleMapKit = () => {
     if (!scopedState.concepts.length) { flash("nothing to lay out yet — lay some warp first"); return }
-    copyText(buildMapKit(
-      scopedState.concepts,
-      scopedState.edges,
-      studentName,
-      activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
-    )).then(ok => {
-      if (ok) {
-        flash("concept-map kit copied — take it to paper or Figma")
-        // The practice guide's last beat listens for this. Harmless in the
-        // real app: nothing there is listening.
-        window.dispatchEvent(new Event("loom:mapkit-copied"))
-      }
-      else flash("select & copy by hand")
-    })
+    downloadText(
+      buildMapKit(
+        scopedState.concepts,
+        scopedState.edges,
+        studentName,
+        activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
+      ),
+      objectExportFilename(studentName, "concept-map-kit", activeMap?.name ?? "concept map", "md"),
+      "text/markdown"
+    )
+    flash("concept-map kit downloaded — take it to paper or Figma")
+    // The practice guide's last beat listens for this. Harmless in the real
+    // app: nothing there is listening.
+    window.dispatchEvent(new Event("loom:mapkit-taken"))
   }
 
   // Keeping a map is the primary path out of Loom (ratified TJ 2026-07-31):
@@ -919,7 +926,7 @@ export default function MapTab({ practice = false }: {
 
       <div style={{ marginTop: 10, display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <button className="btn ghost mini" data-tip="copies your paragraph to the clipboard" onClick={handleCopyRead}>Copy your read</button>
-        <button className="btn ghost mini" data-tip="same concept-map kit — now grouped by your tiers" onClick={handleMapKit}>Copy the concept-map kit → draw the real concept map</button>
+        <button id="mapKit" className="btn ghost mini" data-tip="the same concept-map kit as a file — grouped by your tiers" onClick={handleMapKit}>Download the concept-map kit → draw the real concept map</button>
       </div>
 
       {/* The record is of the whole weaving, not one reading's share of it, so

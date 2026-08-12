@@ -72,8 +72,16 @@ test.describe('Practice loom', () => {
     // route, bypassing the provider entirely.
     await expect(page.getByRole('button', { name: 'Search everything' })).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Next Page' }).click();
+    // The guide floats over the layout, so it WILL sit over controls — at
+    // 1280x720 its corner lands squarely on this arrow. It must never eat one:
+    // the card takes no pointer events, only its own buttons do. This click is
+    // the assertion; it fails by timing out on an intercepted click.
+    await expect(page.locator('.guidefloat')).toBeVisible();
+    await page.getByRole('button', { name: 'Next Page' }).click({ timeout: 10_000 });
     await page.waitForTimeout(1200);
+    // …and the guide is still usable itself.
+    await page.locator('.gstep').first().click();
+    await expect(page.locator('.guidefloat .gsay')).toBeVisible();
 
     // Really select, really capture — the same path a student takes.
     const selected = await page.locator('.react-pdf__Page__textContent').first().evaluate((layer) => {

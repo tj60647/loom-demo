@@ -36,6 +36,15 @@ export type GuideStep = {
   label: string
   /** The tab this beat happens on; the guide moves there when it opens. */
   station: GuideStation
+  /**
+   * What the beat is talking about (TJ, 2026-08-11: "the guide beats should
+   * have pointers to what they are talking about, not vague directional
+   * references"). A CSS selector the guide rings with a glow, and the copy
+   * says "here" instead of "on the left" — which is wrong on a narrow screen
+   * anyway. First match wins; a beat whose target is not on the page yet
+   * simply has no ring until it appears.
+   */
+  target: string
   /** The instruction, in the second person, naming the control. */
   say: string
   /** One line on why the move matters — the teaching, not the mechanics. */
@@ -52,58 +61,65 @@ export const GUIDE_STEPS: GuideStep[] = [
     key: "arrive",
     label: "Open a reading",
     station: "reading",
+    target: ".scopetitle",
     say:
-      "You are inside a reading — its text on the right, your work on it kept with it. Every reading in the Library is a door like this one, and the work you do behind it belongs to that text. This one is on loan for practice.",
-    why: "A reading is the unit of work. Not a folder of notes, not one big graph — one text at a time.",
+      "You are inside a reading — this one. Every card in the Library opens a workbench like it, and the work you do here belongs to that text and travels with it. This one is on loan for practice.",
+    why: "A reading is the unit of work: one text, the passages you take from it, and what you make of them, all kept together.",
     readOnly: true,
   },
   {
     key: "capture",
     label: "Highlight a passage",
     station: "reading",
+    target: ".react-pdf__Page__textContent",
     say:
-      "Drag across a line or two of the text. A “Capture as Passage” button appears where you finished — press it.",
-    why: "Choosing which words to take IS the reading. The tool never picks them for you.",
+      "Drag across a line or two of the glowing text. When you let go, a “Capture as Passage” button appears at your cursor — press it.",
+    why: "Choosing which words to take is itself the reading. The judgement is yours, and it is the work.",
   },
   {
     key: "name",
     label: "Name the concept",
     station: "reading",
+    target: "#captureConcept",
     say:
-      "In the dialog, name the concept the passage evidences — a short noun phrase, often the author's own term. Describe it in your own words if you can; crude is welcome. Then Save Passage.",
+      "The dialog holds the words you took. Name the concept they evidence in the glowing field — a short noun phrase, often the author's own term — describe it in your own words if you can, and Save Passage.",
     why: "The passage is the evidence; the concept is what you claim it is evidence OF. Naming it is the interpretation.",
   },
   {
     key: "cloth",
     label: "Say what you make of it",
     station: "reading",
+    target: "#yourwork-toggle",
     say:
-      "Open Your work and fill in the Cloth Title at its head — your own headline for this reading, not the author's — and a sentence or two under it.",
+      "Open Your work with this button. At the head of the sheet is the Cloth Title — your own headline for this reading, not the author's — and a description under it.",
     why: "The cloth is your reading of the text as a whole. Everything else you make here is an arrangement of it.",
   },
   {
     key: "thread",
     label: "Throw a thread",
     station: "throw",
+    target: "#warp",
     say:
-      "Tap two concepts in the warp on the left, then say how they hang together in the box on the right — long and awkward is fine — and throw it. Afterwards you can coin a short label for that kind of link.",
+      "Tap two concepts in the glowing warp. The bench wakes when two are picked: say how they hang together — long and awkward is fine — and throw it. Afterwards you can coin a short label for that kind of link.",
     why: "The sentence IS the thread. A label is a convenience that lets one of your words recur; the claim is the sentence.",
   },
   {
     key: "sort",
     label: "Sort and project",
     station: "map",
+    target: "#triageList",
     say:
-      "Give a concept a tier on the list — primary, secondary, tertiary. That makes your first projection. Name it, write its one-line, and drag the cards on the board below: general above, specific below.",
+      "Give a concept a tier in the glowing list — primary, secondary, tertiary. That makes your first projection. Name it, write its one-line, and drag its cards on the board beneath: general above, specific below.",
     why: "A projection is one reading of your cloth. Keep several and each can say something different about the same material.",
   },
   {
     key: "kit",
     label: "Take the kit",
     station: "map",
+    target: "#mapKit",
     say:
-      "Press “Copy the concept-map kit” under the board. It puts your concepts, their threads and your tiers on the clipboard as text.",
-    why: "The kit is what you draw the real concept map from, on paper or in Figma. Arranging by hand is the thinking; this is only the material for it.",
+      "Press the glowing button. It downloads your concepts, their threads and your tiers as a file.",
+    why: "Arranging by hand is where the thinking happens — on paper, or in Figma. The kit is the material you do it with.",
   },
 ]
 
@@ -144,7 +160,7 @@ export function baselineOf(state: LoomState, scopeKey: string): GuideBaseline {
 export type GuideSignals = {
   /** The capture dialog has been opened at least once. */
   captureOpened: boolean
-  /** The concept-map kit has been copied. */
+  /** The concept-map kit has been downloaded. */
   kitCopied: boolean
 }
 

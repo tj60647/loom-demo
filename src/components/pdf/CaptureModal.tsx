@@ -126,6 +126,7 @@ export default function CaptureModal({ passage, source, sourceId, location, page
           <span className="label">Concept — a short noun phrase naming the idea</span>
           <input
             list="conceptOptionsModal"
+            id="captureConcept"
             placeholder="e.g. boundary objects"
             title="a noun phrase, not a sentence — if the author names it, use her name for it"
             value={conceptLabel}

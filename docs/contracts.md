@@ -375,6 +375,35 @@
 > they are two decisions — but the second happens in the dialog the first
 > opened, and the guide says so rather than describing an app that does not
 > exist.
+>
+> **Corrections the same day, all TJ's:** the header door says **guide**, not
+> "practice" — it names what the student is looking for rather than the
+> sandbox it runs in. The guide **floats** rather than displacing the layout
+> ("like floaters with a small glow"): a card in the corner furthest from its
+> target, plus a glow ringing what the beat is talking about, so the copy
+> points ("the glowing field") instead of gesturing ("on the left"), which is
+> wrong on a narrow screen anyway. **The card takes no pointer events** — only
+> its own buttons do. A floater in a corner will sooner or later sit over a
+> control, and at 1280×720 it lands squarely on the PDF's Next Page arrow;
+> choosing a corner cannot fix that in general, so the card is made incapable
+> of eating anything instead, and `tests/sandbox.spec.ts` clicks that arrow
+> through it. Beats also scroll their target into view — the kit button lives
+> under the whole board, and the glow was landing three thousand pixels below
+> the fold.
+>
+> **The concept-map kit is a download**, not a clipboard copy (TJ) — it is the
+> material you draw the real map from, so it belongs in the same folder as the
+> projection rather than in a buffer one Ctrl-C destroys.
+> `<student>-<projection>.concept-map-kit.md`. "Copy your read" is untouched.
+>
+> **About was rewritten and made solid.** It was the only overlay in the app
+> using `.card` (background `rgba(255,255,255,.5)`), so the scrim showed
+> through it — every other one uses `.info-dialog`, which is paper. Its copy
+> described an app that had moved on: "Bite-Sized Capture" (a pun on the
+> retired `byte`), "Throw" and "Read" as station names, a whole-graph export.
+> It now names the five stations, says plainly what Loom will not do, and
+> keeps the theory — Bucciarelli, Wenger, Star, with Novak & Gowin added for
+> the board.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.

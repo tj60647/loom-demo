@@ -241,6 +241,9 @@ export default function Workbench({
 
   return (
     <>
+      {/* Fixed, so it floats over the layout rather than displacing it. */}
+      {practice && <PracticeGuide />}
+
       <div className="scopebar">
         {/* No "‹ library" here (TJ, 2026-08-08): 00 · Library is in the journey
             bar directly below, so this was a second door to the same place. */}
@@ -294,8 +297,6 @@ export default function Workbench({
           your own work is untouched.
         </div>
       )}
-
-      {practice && <PracticeGuide />}
 
       {/* Not rendered in the practice loom: ShelfSearch reads the student's
           REAL loom over its own GET route, bypassing the provider entirely —
