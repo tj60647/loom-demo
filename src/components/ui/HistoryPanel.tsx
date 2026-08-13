@@ -5,7 +5,7 @@
 // verdict: it renders and counts (red line #7) — no judgment, no comparison,
 // no advice. Nothing here writes; the record is read-only.
 
-import { useMemo, useState, type SyntheticEvent } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
 import ObjectDownload from "@/components/ui/ObjectDownload"
 import { useLoom } from "@/components/providers/LoomProvider"
@@ -320,6 +320,14 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
   const [failed, setFailed] = useState(false)
   // null = follow the end of the record ("now"); a number = a chosen point.
   const [pos, setPos] = useState<number | null>(null)
+  /**
+   * Two ways to read the same record (TJ, 2026-08-12). The TIMELINE replays it
+   * — one position, the cloth as it stood at that act. The LIST is the record
+   * as a record: every act with the time it happened, which the timeline can
+   * only ever show one of. Clicking a row moves the replay, so they are two
+   * views of one position rather than two panels.
+   */
+  const [view, setView] = useState<"timeline" | "list">("timeline")
 
   const load = () => {
     setLoading(true)
@@ -336,11 +344,30 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
       .finally(() => setLoading(false))
   }
 
-  const handleToggle = (ev: SyntheticEvent<HTMLDetailsElement>) => {
-    if (ev.currentTarget.open && events === null && !loading && !failed) load()
-  }
+  // A section now, not a fold (TJ, 2026-08-12: "the capture log should
+  // actually be its own section below"), so the record is read on arrival
+  // rather than on a disclosure nobody opened. `loadedFor` keeps this to one
+  // fetch per scope: the effect re-runs whenever the reading changes, and
+  // must not re-run itself when the fetch lands and sets state.
+  const loadedFor = useRef<string | null>(null)
+  useEffect(() => {
+    const key = sourceId ?? "*"
+    if (loadedFor.current === key) return
+    loadedFor.current = key
+    load()
+    // `load` closes over `state` for the reading filter, and `state` changes
+    // with every keystroke a student makes — depending on it would refetch the
+    // whole record constantly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceId])
 
-  const k = events ? (pos === null ? events.length : Math.min(pos, events.length)) : 0
+  /**
+   * The replay position, in ACTS. 1 is the first recorded act — not 0, which
+   * was "before the first recorded act": a state nobody made, shown as the
+   * left end of every slider (TJ, 2026-08-12: "the timeline should start at
+   * the first event, not before the first event").
+   */
+  const k = events ? (pos === null ? events.length : Math.min(Math.max(pos, 1), events.length)) : 0
   const cloth = useMemo(() => (events ? foldEvents(events, k) : null), [events, k])
 
   const mapState: LoomState | null = cloth
@@ -363,14 +390,35 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
     ? eventDate(current).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
     : null
 
+  /** A list row's stamp: short enough to sit in a column, exact to the minute. */
+  const stamp = (e: GraphEvent) =>
+    eventDate(e).toLocaleString([], {
+      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+    })
+
   return (
-    <details className="card" onToggle={handleToggle}>
-      <summary style={{ cursor: "pointer" }}>
-        <span className="cap">Capture Log</span>
-        <span className="hint" style={{ display: "block" }}>
-          replay how your weave grew — counted from your own acts, never judged
+    <div className="card">
+      <div className="mapbar" style={{ marginBottom: 8 }}>
+        <span className="hint" style={{ margin: 0 }}>
+          Every act that made this cloth, in the order you made them — counted, never judged.
         </span>
-      </summary>
+        {/* Two views of one record, and of one position: the chips read like
+            the projection switcher above them because they do the same job. */}
+        {events !== null && events.length > 0 && (
+          <span className="chips" style={{ margin: 0, marginLeft: "auto", alignItems: "center" }}>
+            {(["timeline", "list"] as const).map((v) => (
+              <span
+                key={v}
+                className={`chip${view === v ? " on" : ""}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => setView(v)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setView(v) } }}
+              >{v}</span>
+            ))}
+          </span>
+        )}
+      </div>
 
       {/* The Log downloads too (TJ, 2026-08-10) — it is the one object that
           has never been in any file, so without this it would be the only
@@ -410,22 +458,80 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
         </div>
       )}
 
-      {events !== null && events.length > 0 && cloth && mapState && (
+      {events !== null && events.length > 0 && view === "list" && (
+        <div className="scrollbox">
+          {events.map((e, i) => (
+            <div
+              key={e.id}
+              className={`logrow${i + 1 === k ? " on" : ""}`}
+              role="button"
+              tabIndex={0}
+              title="show the cloth as it stood after this act"
+              onClick={() => { setPos(i + 1); setView("timeline") }}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); setPos(i + 1); setView("timeline") }
+              }}
+            >
+              {/* The stamp the timeline cannot show: it has one position, and
+                  this is every act's own time (TJ, 2026-08-12). */}
+              <span className="logwhen">{stamp(e)}</span>
+              <span className="logwhat">{describeEvent(e)}</span>
+              <span className="logn">{i + 1}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {events !== null && events.length > 0 && cloth && mapState && view === "timeline" && (
         <>
+          {/* Ticked by ACT, not by clock (TJ, 2026-08-12): the record's own
+              unit is the act, and spacing by time would bunch a working
+              evening into a smear and stretch the gap to next week across half
+              the bar. One notch per act, evenly spaced.
+              Starts at 1 — the first act. It started at 0, "before the first
+              recorded act", which is a state nobody ever made. */}
+          <datalist id="logTicks">
+            {events.map((_, i) => <option key={i} value={i + 1} />)}
+          </datalist>
           <input
             type="range"
-            min={0}
+            className="logslider"
+            min={1}
             max={events.length}
             step={1}
+            list="logTicks"
             value={k}
             onChange={(ev) => setPos(Number(ev.target.value))}
-            aria-label="replay position"
-            style={{ width: "100%", margin: "4px 0 2px" }}
+            aria-label="replay position, in acts"
+            aria-valuetext={current ? `act ${k} of ${events.length} — ${describeEvent(current)}` : undefined}
+            style={{ width: "100%", margin: "4px 0 0" }}
           />
+          {/* The ticks, drawn. `list=` is the semantic half and browsers no
+              longer paint it, so the marks are a gradient with one period per
+              act — evenly spaced BY ACT, which is the whole point: spacing by
+              clock would smear an evening's work into one blur and stretch the
+              gap to next week across half the bar. Above ~180 acts the marks
+              would merge into a rule, so they thin to every nth and the bar
+              keeps meaning "many" instead of going solid. */}
+          {events.length > 1 && (
+            <div
+              className="logtickbar"
+              aria-hidden="true"
+              style={{
+                backgroundImage: `repeating-linear-gradient(90deg, var(--rule) 0 1px, transparent 1px ${
+                  (100 / (events.length - 1)) * Math.ceil((events.length - 1) / 180)
+                }%)`,
+              }}
+            />
+          )}
+          <p className="cap" style={{ margin: "0 0 2px", display: "flex", justifyContent: "space-between" }}>
+            <span>act {k} of {events.length}</span>
+            <span>{atMax ? "now" : "· drag to replay ·"}</span>
+          </p>
 
           <p className="cap" style={{ margin: "4px 0 2px" }}>
             {cloth.concepts.length} concepts · {cloth.edges.length} threads · {cloth.passages.length} passages —{" "}
-            {atMax ? "now" : when ? `as of ${when}` : "before the first recorded act"}
+            {atMax ? "now" : when ? `as of ${when}` : "at the first recorded act"}
             {cloth.readRevisions > 0 && (
               <>
                 {" · "}the read, revised{" "}
@@ -456,6 +562,6 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
           </p>
         </>
       )}
-    </details>
+    </div>
   )
 }

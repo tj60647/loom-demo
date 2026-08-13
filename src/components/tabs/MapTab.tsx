@@ -649,8 +649,12 @@ export default function MapTab({ practice = false }: {
 
       {/* sort · the board · your read — the three moves of a projection, side
           by side so the sorting that feeds the board and the read that comes
-          off it are one view rather than three screens of scrolling. */}
-      <div className="three">
+          off it are one view rather than three screens of scrolling. 1–2–1
+          (TJ, 2026-08-12): the board is the surface you WORK on and the two
+          texts flank it, so it takes half the room and they take a quarter
+          each. */}
+      <div className="projwrap">
+      <div className="projgrid">
       <div className="card">
         <div className="heading-with-info">
           <h2>Sort <span className="n" id="triageCount">{scopedState.concepts.length ? `(${onCount} of ${scopedState.concepts.length} on the board)` : ""}</span></h2>
@@ -923,25 +927,30 @@ export default function MapTab({ practice = false }: {
         </div>
       </div>
       </div>
+      </div>
 
-      {/* The record is of the whole weaving, not one reading's share of it, so
-          it belongs where the whole weave does rather than repeating itself
-          identically inside all twenty-six readings. */}
-      {/* The Capture Log, on the Knowledge Graph and scoped to THIS reading
-          (TJ, 2026-08-10). It used to render here only at the whole weave —
-          a surface nothing links to — which is how it came to be stranded on
-          Keep. Inverting the scope is what makes it reachable.
+      {/* The third section (TJ, 2026-08-12: "the cloth, projections, the
+          log"). It belongs to the CLOTH rather than to any projection — it
+          records how this cloth came to be and does not change when you switch
+          projections — but it is a different KIND of thing from either, so it
+          gets its own heading instead of riding under the weave. Scoped to
+          this reading since 2026-08-10; before that it rendered only at the
+          whole weave, a surface nothing linked to, which is how it came to be
+          stranded on Keep.
 
-          Not in the practice loom: it reads the student's REAL record over
-          its own route, bypassing the provider, so it would show their
-          actual work inside a space that keeps nothing. */}
+          Not in the practice loom: it reads the student's REAL record over its
+          own route, bypassing the provider, so it would show their actual work
+          inside a space that keeps nothing. */}
       {!practice && (
-        <div style={{ marginTop: "22px" }}>
+        <>
+          <h2 className="sectionhead" style={{ marginTop: 34 }}>
+            The log <span className="n">how this cloth came to be — replay it, or read it as a record</span>
+          </h2>
           <HistoryPanel
             sourceId={soleSourceId(scope) ?? undefined}
             scopeLabel={scopeLabelOf(scope.key, titleOf)}
           />
-        </div>
+        </>
       )}
     </>
   )

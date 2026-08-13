@@ -120,6 +120,19 @@ main.station-reading>.panel.active{height:100%}
 /* 02 · Linking is three moves, so it is three columns (TJ, 2026-08-12): the
    warp you pick from, the bench you throw at, and what you have thrown. */
 .three{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:28px}
+
+/* 03's projections: 1–2–1, because the board is the surface you work ON and
+   the sort list and the read are texts flanking it (TJ, 2026-08-12). An
+   explicit 1fr/2fr/1fr cannot fold itself the way `auto-fit` does, so the fold
+   is a CONTAINER query — the grid's own width, not the window's, which is the
+   rule in §2c-iii and matters here because the station's content box is not
+   the viewport. The breakpoint is the sum of the three minimums, not a device. */
+.projwrap{container-type:inline-size}
+.projgrid{display:grid;gap:28px;
+  grid-template-columns:minmax(260px,1fr) minmax(420px,2fr) minmax(260px,1fr)}
+@container (max-width:1060px){
+  .projgrid{grid-template-columns:1fr}
+}
 .card{border:1px solid var(--rule);border-radius:4px;padding:18px;background:rgba(255,255,255,.5)}
 .card h2{font-size:21px;margin-bottom:2px} .card h2 .n{font-family:var(--mono);font-size:11px;color:var(--grey);font-weight:400;letter-spacing:.08em}
 .card .hint{color:var(--ink-soft);font-size:14px;margin:2px 0 14px}
@@ -638,6 +651,28 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .seam{margin-top:12px;padding:11px 13px;border-left:2px solid var(--sage);background:rgba(122,138,110,.09);border-radius:0 4px 4px 0}
 .seam p{font-size:14px;line-height:1.45;margin:4px 0 9px}
 .fromwhere{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--grey);margin-top:2px}
+
+/* The replay slider and its tick strip. `accent-color` because the browser
+   default is a blue nothing else in Loom is, and the bar is ochre like every
+   other mark the student makes. */
+.logslider{accent-color:var(--ochre);display:block}
+.logtickbar{height:6px;margin:0 0 4px;border-bottom:1px solid var(--rule)}
+
+/* The log as a LIST (TJ, 2026-08-12) — the record read as a record, one act
+   per row with the time it happened, which the timeline cannot show because it
+   holds a single position. A row is a door back into the replay, so it looks
+   like the other clickable rows in the app rather than like prose. */
+.logrow{display:flex;gap:12px;align-items:baseline;padding:7px 12px;
+  border-bottom:1px dotted var(--rule);cursor:pointer}
+.logrow:last-child{border-bottom:none}
+.logrow:hover{background:rgba(0,0,0,.025)}
+.logrow.on{background:rgba(168,132,63,.10)}
+.logwhen{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--grey);
+  flex:0 0 auto;min-width:96px}
+.logwhat{font-size:14px;flex:1;min-width:0}
+/* The act's number — the same unit the slider is ticked in, so a row and a
+   notch are legibly the same thing. */
+.logn{font-family:var(--mono);font-size:10px;color:var(--dot);flex:0 0 auto}
 
 /* Concepts from the student's other readings — reachable, out of the way. */
 .outsideband{border-top:1px solid var(--rule);background:rgba(0,0,0,.015)}

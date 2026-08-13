@@ -246,8 +246,11 @@ test("04 · a projection per reading, and each keeps its own tiers and essence",
   // wording is "no passage yet" and not a red instruction to fix it.
   await expect(page.locator("#clothPrompts .prompt").first()).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText(/no label yet/).first()).toBeVisible()
-  // The Capture Log rides with the reading, one panel, not one per projection.
-  await expect(page.locator(".cap", { hasText: "Capture Log" })).toHaveCount(1)
+  // The log rides with the reading, one panel, not one per projection. Its own
+  // section since 2026-08-12 — it used to be a fold labelled "Capture Log"
+  // under the projections, which implied it changed with them.
+  await expect(page.locator(".sectionhead", { hasText: "The log" })).toHaveCount(1)
+  await expect(page.locator('input[aria-label="replay position, in acts"]')).toHaveCount(1, { timeout: 20_000 })
 
   // The other reading keeps its own, and neither leaks into the other.
   await selectProjection(page, "Communities of practice", "A practice lens")
