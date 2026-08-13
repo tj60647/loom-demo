@@ -78,6 +78,16 @@ export default function ThrowTab() {
   const [namingFor, setNamingFor] = useState<string | null>(null)
   const [nameDraft, setNameDraft] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
+  // The SENTENCE, editable where it was written (TJ, 2026-08-12: "threads need
+  // to be editable in Threads in this reading — the description, not the
+  // concepts"). It was editable only on 04 · Vocabulary, filed under whichever
+  // label the thread happens to carry — so a thread with no label had a
+  // sentence that could be read here, quoted in the delete dialog, exported,
+  // and changed nowhere. The ends stay fixed on purpose: re-pointing a thread
+  // is a different claim, and throwing a new one says so honestly.
+  const [editingFor, setEditingFor] = useState<string | null>(null)
+  const [sentDraft, setSentDraft] = useState("")
+  const sentInputRef = useRef<HTMLTextAreaElement>(null)
 
   // A tapped suggestion is a starting point, not the answer — return focus to
   // the field (v14 did the same) so the student can edit it into their own word.
@@ -224,13 +234,49 @@ export default function ThrowTab() {
     setSentence(opener + ' ' + newSentence);
   }
 
+  // The two folds are exclusive. A row is narrow and the station's own footer
+  // says "one thread at a time"; two open editors on one thread would also put
+  // the sentence on screen twice, in a textarea and in the row above it.
   const toggleNamer = (edgeId: string, currentHandle: string | null) => {
+    setEditingFor(null)
     if (namingFor === edgeId) {
       setNamingFor(null)
     } else {
       setNamingFor(edgeId)
       setNameDraft(currentHandle ?? "")
     }
+  }
+
+  const toggleEditor = (edgeId: string, currentSentence: string) => {
+    setNamingFor(null)
+    if (editingFor === edgeId) {
+      setEditingFor(null)
+    } else {
+      setEditingFor(edgeId)
+      setSentDraft(currentSentence)
+      // The fold mounts on the next paint; focus lands after it exists.
+      window.setTimeout(() => sentInputRef.current?.focus(), 0)
+    }
+  }
+
+  /**
+   * Save the sentence. Empty is allowed and is not a deletion — throwing
+   * without one is legal (P0.3, "the description is the thread, and you can
+   * throw now and write it later"), so clearing it here returns the thread to
+   * exactly the state a fresh throw can be in.
+   *
+   * Not on the undo stack: ⌘Z here is the LABEL history (`restoreLabel`
+   * reattaches Link objects), and folding a sentence into it would make one
+   * keystroke step back through two different kinds of act. The textarea's own
+   * undo works while the fold is open, which is where a typo gets fixed.
+   */
+  const handleSaveSentence = (edgeId: string, previous: string) => {
+    const s = sentDraft.trim()
+    if (s !== previous.trim()) {
+      editEdge(edgeId, { sentence: s })
+      flash(s ? "description saved" : "description cleared — the thread stays")
+    }
+    setEditingFor(null)
   }
 
   /**
@@ -332,11 +378,12 @@ export default function ThrowTab() {
     // a thread the student threw should stay visible and removable,
     // not vanish silently because one end went missing.
     const sel = namingFor === e.id
+    const edt = editingFor === e.id
     // No far-end pill any more: with the bridges band gone, every row here has
     // both ends in scope, so there is never a reading to name.
 
     return (
-      <div key={e.id} className={`thread ${sel ? "sel" : ""}`}>
+      <div key={e.id} className={`thread ${sel || edt ? "sel" : ""}`}>
         <div className="trip">
           <b>{fromC ? short(fromC.label, 30) : "?"}</b>{' '}
           {e.handle
@@ -349,6 +396,10 @@ export default function ThrowTab() {
           {e.handle
             ? <span className="pill beaten">label</span>
             : <span className="pill loose">description</span>}
+          {/* Description before label, in the row as in the ruled order. */}
+          <span className="act" onClick={() => toggleEditor(e.id, e.sentence)}>
+            {edt ? 'close' : 'edit description'}
+          </span>
           {/* One word for one control (TJ, 2026-08-12). It read "coin a label"
               on a thread with none and "edit label" on one with a label — the
               pill beside it already says which of the two this thread is. */}
@@ -366,10 +417,35 @@ export default function ThrowTab() {
               })
               if (!ok) return
               if (namingFor === e.id) setNamingFor(null)
+              if (editingFor === e.id) setEditingFor(null)
               removeEdge(e.id)
             }}
           >remove</span>
         </div>
+        {edt && (
+          <div className="distill">
+            <div className="rnote">
+              <b>The description IS the thread</b> — the claim you would defend out loud.
+              Reword it as your reading of it sharpens; the two concepts stay as they are,
+              because pointing this at a different concept would be a different claim.
+            </div>
+            <div className="form-row" style={{ margin: "6px 0 8px" }}>
+              <textarea
+                ref={sentInputRef}
+                value={sentDraft}
+                onChange={(ev) => setSentDraft(ev.target.value)}
+                placeholder="how these two hang together. Long and awkward is fine."
+                rows={3}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <button className="btn mini" onClick={() => handleSaveSentence(e.id, e.sentence)}>
+                Save description
+              </button>
+              <span className="act" onClick={() => setEditingFor(null)}>cancel</span>
+            </div>
+          </div>
+        )}
         {sel && (
           <div className="distill">
             <div className="rnote"><b>Label the link</b> (optional) — you&apos;ve already said how they relate; a short word lets this <i>kind</i> of link recur across your weave.</div>
@@ -441,7 +517,7 @@ export default function ThrowTab() {
         ))}
       </div>
       <p className="hint steprailnote">{STEPS[railN]?.says}</p>
-      <div className="two">
+      <div className="three">
         <div className="card" id="warp">
           <h2>The warp <span className="n">{scoped.concepts.length ? `(${scoped.concepts.length})` : ''}</span></h2>
           <p className="do">{doLine}</p>
@@ -544,11 +620,20 @@ export default function ThrowTab() {
                 : "Say how they hang together — however awkwardly. The description is the thread, and you can throw now and write it later."}
             </p>
           </div>
+        </div>
 
-          <h3 style={{fontFamily: "var(--display)", fontSize: "17px", borderBottom: "1px solid var(--rule)", paddingBottom: "5px", margin: "18px 0 6px", display: "flex", alignItems: "baseline", gap: "10px"}}>
+        {/* The threads are their own column, not a strip under the bench (TJ,
+            2026-08-12: "this seems like it is better suited to 3 cols"). The
+            station is three moves — the warp you pick from, the bench you
+            throw at, what you have thrown — and the third used to be the one
+            you had to scroll past the whole bench to reach, which is where
+            "edit description" and "edit label" live. A heading of its own, in
+            the same shape as its two siblings. */}
+        <div className="card" id="threadList">
+          <h2 style={{ display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" }}>
             Threads in this reading
             {' '}
-            <span className="n" style={{fontFamily: "var(--mono)", fontSize: "11px", color: "var(--grey)"}}>{orderedEdges.length ? `(${orderedEdges.length})` : ''}</span>
+            <span className="n">{orderedEdges.length ? `(${orderedEdges.length})` : ''}</span>
             {/* Threads download where they are thrown (TJ, 2026-08-10). Both
                 ends are named in the file: an id says nothing away from Loom. */}
             {orderedEdges.length > 0 && (
@@ -562,7 +647,7 @@ export default function ThrowTab() {
                 />
               </span>
             )}
-          </h3>
+          </h2>
 
           {/* What "edit label" is FOR (TJ, 2026-08-12). The control sits on
               every row with no account of why anyone would press it, and the
@@ -572,7 +657,7 @@ export default function ThrowTab() {
               only with threads on screen — with none, it explains a control
               nobody can see. */}
           {orderedEdges.length > 0 && (
-            <p className="ghostnote" style={{ margin: "0 0 9px" }}>
+            <p className="hint">
               As a thread matures you can promote its description to a <b>label</b> — one
               short word for the relation, chosen because it captures the essence of what
               you already said. That is what <i>edit label</i> on a row is for. A thread

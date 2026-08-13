@@ -827,7 +827,7 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | — | **`src/lib/viewAs.ts`** · `viewAsServer.ts` | **View as student** (TJ, 2026-08-09) — a lens beside the header pill. A **cookie**, because three differences are decided server-side and a client flag could not reach them: `/workflows` (three flows vs one), the Library query (an admin's shelf carries `isVisible=false` rows), and `getActiveCourse` itself. Masked **once**, in `getActiveCourse`, so every `isStaff`/`isAdmin` consumer goes quiet together; `staffTruly` rides along **unmasked for one purpose only** — drawing the control that takes the lens off. **Withholds, never grants**: every use hides a control or NARROWS a query, and no authorization path consults it (`authorizeSourceAccess` deliberately untouched). Not a security boundary |
 | — | `JourneyNav` · `.staffgroup` | **the staff group, right of the journey, in sage** (TJ, 2026-08-09) — Roster · Cohort Graph for FACULTY, plus Readings · Courses for site ADMIN, on **every** surface including `/admin`. Unnumbered: they are not steps on the student's arc. Replaces `AdminNav`'s tab row, which now holds only the course/section pickers. Drawn from `course.isStaff` / `course.isAdmin`; decides what is drawn, never what may be read |
 | **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** as **Your work** (`#yourwork`), a sheet that slides over the text — closed by default, toggled from the viewer toolbar, and mounted *inside* `.pdf-shell` so it survives fullscreen; the **Cloth Title/Description** at the head of that sheet; **the margin cards** (2026-08-09, from the reverted spread canvas) — page mode's "Cards" toggle, `ConceptRails`: read-only cards beside each page, leader-lined to their highlights, a door to Your work and never an editor, rails and cards `user-select:none` so a stray drag cannot file text to the wrong page; and **a matrix that zooms as pure transform** (`PageRaster` under a once-rendered text layer), visible pages re-rastering after the gesture settles |
-| 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Threads download here. It used to carry `ClothFold` at the whole weave, which had no Reading station; that branch went with the whole weave on 2026-08-11, and the Cloth's only editor is 01 · Reading |
+| 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Threads download here. **Three columns since 2026-08-12** (`.three`) — the warp, the bench, and the threads, which used to be a strip under the bench that you scrolled the whole bench to reach; at ≤1240px the third folds full-width beneath the other two, which is exactly the old shape. **A thrown thread's description is editable in the list** (TJ, 2026-08-12) — it was writable only at throw-time and on 04, filed under whichever label the thread carries, so an unlabelled thread's sentence could be read, quoted in its delete dialog and exported, and changed nowhere. The ENDS stay fixed: re-pointing a thread is a different claim, and throwing a new one says so. Not on the ⌘Z stack, which is label history. It used to carry `ClothFold` at the whole weave, which had no Reading station; that branch went with the whole weave on 2026-08-11, and the Cloth's only editor is 01 · Reading |
 | 03 Knowledge Graph | `MapTab` + **`ClothReflection`** | projections, tiers, **the list and the board** (the sorted rows and the tiered card-and-thread surface — "board", never "table", which reads as a spreadsheet on a screen; TJ 2026-08-10); the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); **the Capture Log for this reading** (`HistoryPanel` — the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**), downloadable |
 | **04 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); ~~merge Concepts — its only home~~ **merge is HIDDEN, 2026-08-12** (`MERGE_VISIBLE`, below); Concepts/Links Overlays |
 | ~~05 Weave~~ | — | **GONE, route and station, 2026-08-11.** Hiding it had not been enough: `/weave` carried no gate of any kind, and the Library's search results linked into it in four places. **TJ:** *"we are removing whole weave as it exists in the app because it is poorly defined and not supported in the course. it should not be in the app as an idea until the faculty and the authors of the app agree on what it means to have a 'full weave'."* `Workbench` now requires a reading; `WHOLE_WEAVE` survives only as the internal scope of surfaces that are not a reading (the Library), and no student surface writes at `scopeKey ''`. Rows already written there are left where they are — TJ: *"i am not at all worried about losing whole weave"* — and are simply not rendered |
@@ -951,6 +951,70 @@ under each diagram is its text alternative.
 Access: gated by `getStaffViewer` — admins **and faculty**, since the page holds
 no course data at all and the student flow is what an instructor most needs to
 read. Learners are returned to `/`.
+
+### 2c-iii. Screen widths — the standard (TJ, 2026-08-12)
+
+**Loom is a desktop tool.** Not a responsive site that happens to run on a
+laptop: it is used at a desk, on a course's readings, next to a PDF. What
+follows is the whole rule, and it is executed in
+[globals.css](../src/app/globals.css) rather than left as advice.
+
+**The numbers, and why they are not 1920.** A 1920×1080 panel does not hand the
+layout 1920 CSS pixels. Windows ships 14–15" 1080p laptops at **125% or 150%**
+scaling, so the browser reports **1536** or **1280**; Apple hardware never
+reports 1920 at all (14" MacBook Pro = **1512** logical points, 16" = **1728**,
+Studio Display = **2560**). This is visible in public traffic stats, where the
+second most common "resolution" is 1536×864 — a panel nobody manufactures, and
+1920×1080 at 125%. So:
+
+| | width | what it is |
+|---|---|---|
+| **Floor** | **1280** | must not break, may look plain. 1080p at 150%, a half-screened window on a 2560 display, older institutional laptops. |
+| **Target** | **~1600** | where it should look composed. The 1512–1728 band is where most 2026 hardware lands. |
+| **Ceiling** | **2560** | must use the room, not stripe it with empty paper. |
+| below 1280 | — | degrades gracefully, is not designed for. No phone layouts. |
+
+**Three rules that follow.**
+
+1. **Cap the measure, not the app.** Prose gets 60–75ch (`.tasksub` is `70ch`,
+   `.matrix .hint` is `64ch`). Work surfaces — warp, bench, thread list, board,
+   card lists — take the room they are given. `main` carries `--measure`,
+   default **1100px** for reading-shaped pages; `.station-work` raises it to
+   **1680px** for the workbench. One global measure over both was the defect
+   this standard exists to fix: it froze 02's three columns at 348px on every
+   screen from a 13" laptop to a 27" monitor.
+2. **Fold on the content's own minimum, never on a device width.** Multi-column
+   grids are `repeat(auto-fit, minmax(<column floor>, 1fr))` — `.two` at 360px,
+   `.three` at 340px. `auto-fit` collapses the empty tracks, so N children make
+   at most N columns and the layout folds to 2-up and 1-up by itself. This
+   matters more here than in most apps because **the content box is not the
+   viewport**: Your work slides *over* the text, so a viewport media query is
+   asking the wrong element how much room there is. Device breakpoints for
+   these grids are deleted, not tuned.
+3. **Vertical is the scarcer axis.** At the floor there is ~600px of usable
+   height under the header, journey bar and footer. `.scrollbox` is
+   `clamp(320px, 52vh, 620px)`: it shrinks on a short window and grows on a
+   tall one instead of sitting at a fixed 380px that is wrong at both ends.
+   (`.yourwork-body .scrollbox` still opts out — inside the sheet the panel
+   does the scrolling.)
+
+**Check a layout at 1280 · 1536 · 1728 · 1920**, and never by assuming a 1920
+panel gives 1920 CSS pixels. Not at phone widths.
+
+**Two controls, and they are not the same one** (TJ, 2026-08-12). The header's
+**full screen** (beside *guide*, every page) is the browser's Fullscreen API on
+`documentElement` — it buys back the ~90–120px of tab strip and URL bar, which
+is the cheapest vertical there is. `useSyncExternalStore` over
+`fullscreenchange` reads the state off the DOCUMENT, so Esc and F11 — which
+never tell the app anything — keep the label honest. Hidden where
+`document.fullscreenEnabled` is false rather than offered dead. The reading
+toolbar's control was *also* called "full screen" and never touched that API:
+it is the in-app mode `.pdf-shell.fullscreen`, covering Loom's own chrome so
+the text fills the window, and it is now labelled **"just the text"**.
+
+**Not yet done under this standard:** the Library (`/`) and the admin pages
+still sit at the 1100 measure. The shelf is arguably a work surface and would
+take a wider one; that is a look-at-it call, not a mechanical one.
 
 ### 2d. Courses & sections — [src/actions/courses.ts](../src/actions/courses.ts)
 

@@ -44,3 +44,17 @@ itself and no coordinate is ever edited. `npm run check` runs
 `scripts/check-workflows.ts`, which fails on dangling edges, orphan nodes and
 connectors that would render invisibly — but it cannot tell you the picture
 has fallen behind the build. That part is on you.
+
+# Loom is a desktop tool — check it at desktop widths
+
+The standard is **contracts.md §2c-iii** (TJ, 2026-08-12): floor **1280**,
+target **~1600**, ceiling **2560**. Prose keeps a measure of 60–75ch; work
+surfaces take the room they are given (`main` carries `--measure`,
+`.station-work` raises it). Multi-column grids fold on the **column's own
+minimum** — `repeat(auto-fit, minmax(340px, 1fr))` — never at a device width,
+because on the reading station the content box is not the viewport.
+
+Check a layout at **1280 · 1536 · 1728 · 1920** CSS px. Never assume a 1920×1080
+panel hands you 1920 CSS pixels: at Windows' default 125% scaling it hands you
+1536, and Apple hardware reports 1512–1728. There are no phone layouts here and
+none should be added.

@@ -1809,14 +1809,20 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </button>
           )}
 
+          {/* "Just the text", not "full screen" (TJ, 2026-08-12). This has
+              never been the browser's fullscreen — it is an in-app mode:
+              `.pdf-shell.fullscreen` covers Loom's own chrome so the reading
+              fills the window, and Your work still slides over it. The header
+              now carries the REAL full screen, on every page, so this one had
+              to say what it actually does. Same key (f), same Escape. */}
           <button
             className="btn ghost mini"
             onClick={() => setIsFullscreen((on) => !on)}
-            data-tip={isFullscreen ? "back to the journey (esc)" : "give the reading the whole screen (f)"}
+            data-tip={isFullscreen ? "back to the journey (esc)" : "hide Loom's chrome — the reading fills the window (f)"}
             aria-pressed={isFullscreen}
-            aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
+            aria-label={isFullscreen ? "Show the journey" : "Just the text"}
           >
-            {isFullscreen ? (isNarrow ? "↙" : "↙ Exit full screen") : (isNarrow ? "⛶" : "⛶ Full screen")}
+            {isFullscreen ? (isNarrow ? "↙" : "↙ Show the journey") : (isNarrow ? "⛶" : "⛶ Just the text")}
           </button>
         </div>
       </div>

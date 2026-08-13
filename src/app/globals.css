@@ -94,15 +94,32 @@ nav .station.off .step{color:var(--dot)}
 nav .step{font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-right:7px;color:var(--grey)}
 nav button.active .step,nav .station.active .step{color:var(--ochre)}
 /* Full-bleed so the scrollbar rides the window edge rather than the edge of a
-   centred column; the 1100px measure is kept by padding instead of max-width. */
-main{padding:24px max(26px,calc((100% - 1100px)/2)) 86px;margin:0}
+   centred column; the measure is kept by padding instead of max-width.
+
+   The measure is a VARIABLE, not a constant (TJ, 2026-08-12 — the standard is
+   contracts.md §2c-iii). 1100px is a reading measure and was applied to every
+   station, which froze 02's three columns at 348px on a 13" laptop and on a
+   27" monitor alike. Prose keeps it; work surfaces raise it. */
+main{padding:24px max(26px,calc((100% - var(--measure,1100px))/2)) 86px;margin:0}
+/* The workbench stations (01–04). Three columns come out at ~530px each here —
+   the width each card had when this station was two columns. */
+main.station-work{--measure:1680px}
 .panel{display:none} .panel.active{display:block}
 /* 00 · Reading hands its whole height to the viewer, which scrolls itself.
    No padding, no page scroll — the text is the thing on this station. */
 main.station-reading{padding:0;overflow:hidden}
 main.station-reading>.panel.active{height:100%}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:28px}
-@media(max-width:860px){.two{grid-template-columns:1fr}}
+/* Both grids fold on the COLUMN's own minimum, not on a device width
+   (contracts.md §2c-iii). `auto-fit` collapses the empty tracks, so N children
+   make at most N columns — two cards stay two columns however wide the page
+   is, and become one when 360px each stops fitting. The media queries that
+   used to do this by guessing at a viewport are gone: this station's content
+   box is not the window (Your work slides over the text), so a viewport query
+   was asking the wrong element how much room there is. */
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:28px}
+/* 02 · Linking is three moves, so it is three columns (TJ, 2026-08-12): the
+   warp you pick from, the bench you throw at, and what you have thrown. */
+.three{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:28px}
 .card{border:1px solid var(--rule);border-radius:4px;padding:18px;background:rgba(255,255,255,.5)}
 .card h2{font-size:21px;margin-bottom:2px} .card h2 .n{font-family:var(--mono);font-size:11px;color:var(--grey);font-weight:400;letter-spacing:.08em}
 .card .hint{color:var(--ink-soft);font-size:14px;margin:2px 0 14px}
@@ -110,7 +127,12 @@ main.station-reading>.panel.active{height:100%}
 textarea,.form-row input,.tinput{width:100%;font-family:var(--body);font-size:15px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:8px;color:var(--ink)}
 textarea{min-height:62px;resize:vertical;line-height:1.45}
 .mono-in{font-family:var(--mono);font-size:13px}
-.scrollbox{max-height:380px;overflow:auto;border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.55)}
+/* Height tracks the WINDOW, not a constant (contracts.md §2c-iii): vertical is
+   the scarcer axis on a desktop, and a fixed 380px was too tall at the 1280×800
+   floor and far too short on a 1440-tall monitor. Floored so a short window
+   still shows a list, capped so a very tall one does not run a single column
+   the length of the page. */
+.scrollbox{max-height:clamp(320px,52vh,620px);overflow:auto;border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.55)}
 .empty{padding:26px 14px;text-align:center}
 .empty .cap{display:block;margin-top:9px}
 .quietrow{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dotted var(--rule)}
@@ -198,7 +220,11 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .thread .v{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--sage);border:1px solid var(--sage);border-radius:10px;padding:1px 8px}
 .thread .v.loosev{color:var(--grey);border-color:var(--grey);border-style:dashed;font-style:italic}
 .thread .sent{font-size:13px;font-style:italic;color:var(--ink-soft);margin-top:4px}
-.thread .tmeta{font-family:var(--mono);font-size:10px;margin-top:6px;display:flex;gap:12px;align-items:center}
+/* Wraps as a row of whole phrases, never inside one: in a third of the width
+   "edit description" broke across two lines and read as two controls. */
+.thread .tmeta{font-family:var(--mono);font-size:10px;margin-top:6px;display:flex;
+  gap:6px 12px;align-items:center;flex-wrap:wrap}
+.thread .tmeta .act,.thread .tmeta .rm{white-space:nowrap}
 .pill{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:1px 7px;border-radius:9px}
 .pill.loose{color:var(--grey);border:1px dashed var(--grey)}
 .pill.beaten{color:var(--sage);border:1px solid var(--sage)}

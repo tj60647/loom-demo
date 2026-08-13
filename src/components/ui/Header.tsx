@@ -1,11 +1,17 @@
 "use client"
-import { useState } from "react"
+import { useState, useSyncExternalStore } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import AuthButton from "./AuthButton"
+
+/** Module-level so the store identity is stable across renders. */
+const subscribeFullscreen = (onChange: () => void) => {
+  document.addEventListener("fullscreenchange", onChange)
+  return () => document.removeEventListener("fullscreenchange", onChange)
+}
 
 export default function Header({ deployEnv }: { deployEnv?: string }) {
   const { data: session } = useSession()
@@ -17,6 +23,38 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
   // Nothing on an admin page writes to a loom, so the save dot sat there as a
   // bare em dash for the whole visit and read as a stray character.
   const inAdmin = usePathname()?.startsWith("/admin") ?? false
+
+  /**
+   * The whole screen, from every page (TJ, 2026-08-12).
+   *
+   * WHY IT EARNS A SLOT IN THE HEADER. Vertical is the scarce axis on a
+   * desktop (contracts.md §2c-iii): at the 1280×800 floor there is ~600px of
+   * usable height under the chrome, and the browser's own tab strip and URL
+   * bar are ~90–120px of what is left. F11 has always done this; almost
+   * nobody presses F11.
+   *
+   * NOT THE SAME CONTROL as the reading toolbar's "full screen", which is an
+   * in-app mode — `.pdf-shell.fullscreen` covers Loom's own chrome so the text
+   * fills the window. That one is relabelled "just the text" in the same pass,
+   * because two buttons reading "full screen" on one screen, doing different
+   * things, is worse than either name alone.
+   *
+   * The state is read from the DOCUMENT, never from what we last asked for:
+   * Esc, F11 and the browser's own affordances all leave fullscreen without
+   * telling us, and a label that only tracked our own clicks would start
+   * lying at the first Esc.
+   */
+  const isFull = useSyncExternalStore(subscribeFullscreen, () => !!document.fullscreenElement, () => false)
+  const canFull = useSyncExternalStore(subscribeFullscreen, () => !!document.fullscreenEnabled, () => false)
+  const toggleFull = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen()
+      else await document.documentElement.requestFullscreen()
+    } catch {
+      // A refused request (a policy, a gesture the browser did not count) is
+      // not a failure worth a dialog — the button simply does not latch.
+    }
+  }
   // Anywhere that isn't the real site wears the red weft through the mark —
   // the same clue as the favicon and the dev OAuth app's logo.
   const isDev = deployEnv !== "production"
@@ -82,6 +120,19 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
           >
             guide
           </Link>
+        )}
+        {/* Beside the guide, per TJ. Hidden where the browser will not grant
+            it (an iframe without allowfullscreen, a locked-down kiosk) rather
+            than offered and dead. */}
+        {session && canFull && (
+          <button
+            className="btn ghost mini"
+            onClick={toggleFull}
+            aria-pressed={isFull}
+            data-tip={isFull ? "back to the browser (esc)" : "give Loom the whole screen"}
+          >
+            {isFull ? "exit full screen" : "full screen"}
+          </button>
         )}
       </header>
 

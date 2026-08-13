@@ -325,7 +325,12 @@ export default function Workbench({
           and wants every pixel under the journey, so main stops padding and
           stops scrolling and simply hands over its height. Every other station
           is an ordinary scrolling page. */}
-      <main className={activeTab === "reading" && source.hasFile ? "station-reading" : undefined}>
+      {/* `station-work` widens the measure to 1680px (contracts.md §2c-iii):
+          these four stations are work surfaces, not prose, and the 1100px
+          reading measure was starving their columns on every screen bigger
+          than a 13" laptop. `station-reading` is the stronger case of the same
+          idea — the PDF takes the whole window and pads nothing. */}
+      <main className={activeTab === "reading" && source.hasFile ? "station-reading" : "station-work"}>
         {(
           <div className={`panel ${activeTab === "reading" ? "active" : ""}`}>
             {shouldRender("reading") &&
