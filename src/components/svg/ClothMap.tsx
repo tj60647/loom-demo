@@ -27,7 +27,12 @@ export default function ClothMap({
     if (!svg) return
     const observer = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width ?? 0
-      if (w > 0) setWidth(Math.max(w, 720))
+      // The floor was 720 — from when the cloth was the full width of the
+      // page. In half a column (TJ, 2026-08-12) a 720 layout inside a 562px
+      // box does not shrink, it CLIPS: the last concepts simply leave the
+      // frame. 480 is the narrowest the warp still reads at; below it
+      // `#mapWrap` scrolls rather than hiding anything.
+      if (w > 0) setWidth(Math.max(w, 480))
     })
     observer.observe(svg)
     return () => observer.disconnect()
@@ -36,7 +41,11 @@ export default function ClothMap({
   const H = 400
   const baseY = H - 128
   const mL = 46
-  const mR = 34
+  // Room for the LAST label, which is drawn from the node and rotated 30° into
+  // the right margin — at mR=34 it ran off the frame at any width, and half a
+  // column made that impossible to miss. Not enough for the longest label
+  // there can be (34 chars ≈ 160px projected); enough that a normal one lands.
+  const mR = 96
   
   const cs = state.concepts
   const n = cs.length

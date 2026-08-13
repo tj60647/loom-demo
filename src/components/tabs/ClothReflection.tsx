@@ -297,10 +297,19 @@ export default function ClothReflection() {
         </p>
       )}
 
+      {/* The cloth and its reading, side by side (TJ, 2026-08-12). They are one
+          gesture — you click a prompt on the right and it lights on the left —
+          and stacked vertically the two halves of it could not be seen at
+          once: tracing a prompt scrolled the cloth off the top. Half and half
+          to start. The cloth is in a card now for parity with its partner; it
+          used to be a bare block under a `.mapbar`, which read as page
+          furniture rather than as one of the two things here. */}
+      <div className="two">
+      <div className="card">
       <div className="mapbar">
         <span className="label">The cloth</span>
         <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
-          Warp in reading order; weft arcs across. Click a prompt below to trace it here — or click a concept/arc directly to pull it.
+          Warp in reading order; weft arcs across. Click a prompt beside this to trace it here — or click a concept/arc directly to pull it.
         </span>
       </div>
 
@@ -314,8 +323,9 @@ export default function ClothReflection() {
         <span><span className="sw" style={{borderTop: "2px dashed var(--grey)"}}></span>unlabelled — description only</span>
         <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>what you&apos;re tracing</span>
       </div>
+      </div>
 
-      <div className="card" style={{ marginTop: "22px" }}>
+      <div className="card">
         <h2 className="heading-with-info">
           What the cloth shows you <span className="n">counted, not judged</span>
           <button
@@ -402,6 +412,7 @@ export default function ClothReflection() {
         </div>
 
         {readingPane}
+      </div>
       </div>
     </>
   )

@@ -585,6 +585,14 @@ export default function MapTab({ practice = false }: {
       <p className="tasktitle">Lay out your projection.</p>
       <p className="tasksub">Your data, projected to be read: sort your concepts into tiers on the list, then arrange them by hand as cards on the board (Novak &amp; Gowin, <i>Learning How to Learn</i>, 1984). The tool draws the lines you already threw and counts what it sees — it never sorts, places, or links for you. Keep more than one projection: each is its own reading of the material, with its own tiers, its own one-line and its own paragraph. When a projection reads right here, draw the real concept map (paper or Figma) and build your chalk talk from it.</p>
 
+      {/* Look · trace · question, then write — AT THE TOP since 2026-08-12
+          (TJ). The cloth is what you already wove and the prompts are what it
+          shows you; both are the material you sort and arrange BELOW, so
+          reading them last meant scrolling past the whole projection to see
+          what you were projecting. The read itself still lives at the foot,
+          where the arrangement it describes has just been made. */}
+      <ClothReflection />
+
       <div className="rail" id="mapRail">
         <span className={`rstep${done1 ? " done" : ""}${!done1 ? " now" : ""}`}>sort</span>
         <span className="rsep">·</span>
@@ -902,12 +910,6 @@ export default function MapTab({ practice = false }: {
           <>On the board: <b>{n.p}</b> primary · <b>{n.s}</b> secondary · <b>{n.t}</b> tertiary{off ? ` · ${off} set aside` : ""}{unsorted ? ` · ${unsorted} unsorted` : ""} — {onTable.length} proposition{onTable.length !== 1 ? "s" : ""} drawn, <b>{cross}</b> running level-to-level or sideways (possible cross-links — the level-3 move; you decide if they&apos;re real). Right now this reads as: <b>{level}</b>. Counted, not judged.</>
         )}
       </div>
-
-      {/* Look · trace · question, then write. The cloth and its prompts moved
-          here from 03 when 03 became Vocabulary (TJ, 2026-08-08): the panel
-          reads the structure of the graph, and the read it feeds is the one
-          directly below it rather than a second copy on another tab. */}
-      <ClothReflection />
 
       <div className="card" style={{ marginTop: 14 }}>
         <h2>Your read of this projection {activeMap ? <span className="n">&ldquo;{activeMap.name}&rdquo; — its one-line and paragraph travel with it</span> : <span className="n">starts with your first sort</span>}</h2>
