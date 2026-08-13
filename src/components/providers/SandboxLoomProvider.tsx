@@ -435,6 +435,28 @@ export default function SandboxLoomProvider({
     // Nothing is debounced here because nothing is being sent anywhere; the
     // local write already happened on the keystroke.
     flushMapText: () => {},
+    /**
+     * Clearing your own practice costs nothing (contracts.md §2c) — so this is
+     * a real reset of the practice loom and a call to nothing. It returns the
+     * same counts shape the server action does, which is what lets this file
+     * satisfy `LoomContextType` while keeping its one promise: no import of
+     * `@/actions/*` (`scripts/check-sandbox.ts` fails the build otherwise).
+     *
+     * Nothing renders it today. The Header's My Loom modal hides start over on
+     * /sandbox — the real loom's counts sitting behind a page that says
+     * nothing is kept is a sentence no student should have to untangle.
+     */
+    resetLoom: async () => {
+      const cleared = {
+        concepts: state.concepts.length, passages: state.passages.length,
+        edges: state.edges.length, links: state.links.length,
+        maps: state.maps.length, cloths: state.cloths.length,
+        views: Object.keys(state.views).length,
+      }
+      setState(blank())
+      noted()
+      return cleared
+    },
     setView,
     ensureActiveMap,
     flashMsg,

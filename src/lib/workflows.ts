@@ -65,6 +65,7 @@ const student: Flow = {
     "src/components/Workbench.tsx (the tabs)",
     "src/components/tabs/*.tsx",
     "src/actions/loom.ts",
+    "src/components/ui/MyLoomModal.tsx (my loom · start over)",
   ],
   nodes: [
     { id: "invited", label: "Invited by email", where: "an instructor, on /admin", kind: "start" },
@@ -110,6 +111,12 @@ const student: Flow = {
     // 2026-08-11, when Keep was deleted and download moved to each object.
     // The step did not go away; it stopped being a place you travel to.
     { id: "keep", label: "Download your work where you made it", where: "01 cloth · 02 threads · 03 a projection", kind: "end" },
+    // A side trip like `practice`, not a step: My Loom opens from the header on
+    // every page, so a student can reach this from anywhere. It is drawn from
+    // `keep` because that is the order the dialog itself argues for — download
+    // where you made it, THEN clear — and it returns to the Library because an
+    // empty loom starts again the same way a new one does.
+    { id: "startover", label: "Start over — clear the loom, keep the log", where: "my loom · the header, on every page" },
   ],
   edges: [
     { from: "invited", to: "signin" },
@@ -135,6 +142,8 @@ const student: Flow = {
     // back to the Library for the next text once this one's work is done.
     { from: "vocab", to: "library", label: "next reading", back: true },
     { from: "vocab", to: "keep" },
+    { from: "keep", to: "startover", label: "download first" },
+    { from: "startover", to: "library", label: "an empty loom", back: true },
   ],
 }
 

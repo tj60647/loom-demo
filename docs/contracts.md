@@ -536,6 +536,51 @@
 > reaches it: it must ride above the mask (13% alpha, so underneath it a cutout
 > boundary drew a seam down the sentence) and above the mask it was covering
 > the kit button it was ringing.
+>
+> **Start over comes back, in the header** (2026-08-13, TJ: *"i need a way for
+> a user to reset there loom, thus they 'start over'"*). What went away with
+> Keep on 2026-08-11 was the tab, never the exit; a tool you cannot start over
+> in is a tool you are afraid to work in. Two questions were TJ's and both are
+> answered here.
+>
+> **Whose capability.** Everyone's, over their own work — `loom-reset` is
+> yes/yes/yes in the same group as `capture-passage` and `weave-own`, because
+> faculty and admins weave here too. The row that matters is its neighbour:
+> `loom-reset-other` is **no/no/no, admin included**. `resetLoom` takes no
+> `userId`, so a reset of somebody else is not a check that could be forgotten
+> but a sentence the function cannot say. Faculty read a student's loom
+> (`student-loom-read`) and that is where it stops.
+>
+> **Where it lives** (TJ: *"should there be a 'my loom' modal with this?
+> between about and workflows?"*). Yes, and the slot is the argument: a
+> whole-loom surface had nowhere to live once Keep was deleted, and a station
+> is the thing that was deleted — so it is chrome, like About beside it.
+> [MyLoomModal](../src/components/ui/MyLoomModal.tsx) is **a mirror and an
+> exit, never a workshop**: counts, then the work grouped by the reading that
+> holds it as real doors, then start over. It has **no download button and must
+> not grow one** — downloads happen at the object (keep-at-the-object), and the
+> moment this dialog collects them it has rebuilt Keep through the window.
+> Concepts and Links are shown as totals only, never filed under a reading:
+> they are user-level, and grouping them would teach the opposite of the model.
+>
+> **Why deletion and not a watermark** (TJ: *"if everything is timestamped on
+> the user side, couldnt we just reset the clock?"*). It cannot work in this
+> schema. `saveCloth` and `saveView` are `onConflictDoUpdate` against UNIQUE
+> (userId, courseId, scopeKey|key), so rows left in place but hidden are
+> collided INTO — the student's first post-reset cloth would upsert the hidden
+> row, whose `createdAt` is behind the watermark, and vanish on save. `view`
+> has no `createdAt` at all. And 49 read sites across five modules touch these
+> tables, four of them in `overlays.ts` and eight in `admin.ts`: miss one and a
+> student who started over still appears in a faculty overlay. The reversible
+> shape, if it is ever wanted, is a **generation column included in every
+> unique constraint** — not a clock. It is not needed, because the snapshot in
+> the event already is the record (undo: open-work 5.8).
+>
+> **The debounce guard came back with it.** `cancelPendingSaves` was deleted on
+> 2026-08-11 with the note *"nothing replaces the graph wholesale any more, so
+> nothing needs the guard"*. Reset does. Without it the 500ms view timer fires
+> after the delete and writes geometry back under a `map:<id>` key, leaving one
+> orphan row in a loom the student was told is empty.
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
@@ -660,10 +705,8 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | `deleteMap` | `id` | void | batch: map + its `map:<id>` view; `map.delete` |
 | `saveView` | `key, CardTableView` | void | key must be `cardTable` or an owned `map:<id>` else throws; **no event** (projections) |
 | `getGraphEvents()` | — | events oldest-first, with synthesized `synth-*` creates for pre-history rows | read-only |
-| `resetGraph()` | — | void | `graph.reset` event first (with counts), then batch-delete edges/passages/concepts/maps/cloths/views (passage_concept cascades). **History survives** |
-| `importGraph` | `ParsedImport` (client-parsed) | fresh `getUserLoomData()` | limits `{concepts:400, passages:2000, edges:2000, maps:40, cloths:40}`; whole-graph replace in one batch; see §4e |
-| `importMapArrangement` | `ParsedMapImport` | `{data, mapId, scopeKey, skipped}` | additive sibling only; see §4f |
-| `loadWorkedExample()` | — | fresh `getUserLoomData()` | refuses unless the loom is empty; mirror-consistent by construction; `graph.example` |
+| `resetLoom()` | **none, deliberately** | `counts` of what was cleared | Start over, 2026-08-13. **Takes no `userId`** — it reads the session and scopes on that alone, so "nobody resets anyone else's loom" is unrepresentable rather than merely checked (capabilities `loom-reset` / `loom-reset-other`). `graph.reset` event first carrying the **whole snapshot** (all seven collections + `passage_concept` filings), written with a bare `db.insert` and NOT `recordEvent`, which swallows failures — here the event is the only copy of what is about to go, so it must be allowed to throw before anything is deleted. Snapshot over `RESET_SNAPSHOT_LIMIT` (900KB) degrades to counts + `snapshotOmitted`. Then batch-delete edges → links → passages → concepts → maps → cloths → views. **History survives**; so do memberships, the session, and the student's own `isOwn` readings and their blobs |
+| ~~`resetGraph`~~ · ~~`importGraph`~~ · ~~`importMapArrangement`~~ · ~~`loadWorkedExample`~~ | — | — | **Deleted 2026-08-11 with Keep** (see the ruling above); these rows described them until 2026-08-13. `resetLoom` above is not `resetGraph` restored — different home, clears Links too, and its event carries the loom rather than counts. §4e/§4f describe import and remain history |
 
 ### 2b. Library — [src/actions/sources.ts](../src/actions/sources.ts)
 

@@ -450,6 +450,25 @@ gaps are now demonstrable rather than suspected:
   when designed. Recovery for all of it:
   `git show origin/spread-canvas-reading:src/components/pdf/SpreadCanvas.tsx`
   and the two `origin/weekly-concept-map` paths above.
+- **5.8 Undo for start over — deferred 2026-08-13, TJ: *"undo can be future
+  work, im not sure where it sits in the ui."* The DATA is already there and
+  costs nothing more to keep: `resetLoom` writes the whole cleared loom into
+  the `graph.reset` payload before deleting anything (verified on a real reset —
+  18 passages, 14 concepts, 8 links, 6 threads, 2 projections, 2 cloths and
+  their 18 filings, 24.6KB, well under the 900KB cap). What is missing is a
+  reader: nothing restores from that snapshot, so the reset is recoverable in
+  principle and not in practice.
+
+  **The open question is TJ's and it is where it lives, not whether it works.**
+  A toast with Undo is the obvious answer and the wrong one here — `flash`
+  self-clears in 1500ms, and this repo already ruled that a missed notice is
+  indistinguishable from data loss (the practice band, contracts.md §2c). The
+  candidates worth weighing: a standing "you cleared your loom N minutes ago —
+  put it back" band in My Loom itself; a restore offered from the `graph.reset`
+  row in the Capture Log, which is where the snapshot actually lives and which
+  needs no new state; or nothing, on the argument that the log IS the record
+  and a second copy of the cloth invites treating reset as reversible when a
+  student should mean it. **Do not build it before that call.**
 - **5.7 Keep dissolves; downloads happen at the object — ruled 2026-08-10,
   not built.** Full analysis: **[keep-at-the-object.md](keep-at-the-object.md)**.
   TJ: Keep is hidden; export/import/reset go away; a Projection downloads at

@@ -1113,17 +1113,139 @@ export async function getGraphEvents(): Promise<GraphEvent[]> {
 }
 
 /*
- * resetGraph, importGraph, importMapArrangement and loadWorkedExample stood
- * here — 428 lines. They went with Keep on 2026-08-11, when download moved to
- * each object and the tab that held import and "clear the table" was deleted
- * (TJ: "import goes away" · "clear the table goes away" · "take it all out
- * goes away"). The worked example went with them: reset was its only exit, and
- * the practice loom at /sandbox is what replaced it — a tutorial that writes
- * into a student's own work is the problem, not the exit.
+ * importGraph, importMapArrangement and loadWorkedExample stood here, beside
+ * the original resetGraph. They went with Keep on 2026-08-11, when download
+ * moved to each object and the tab that held import and "clear the table" was
+ * deleted (TJ: "import goes away" · "clear the table goes away" · "take it all
+ * out goes away"). The worked example went with them: reset was its only exit,
+ * and the practice loom at /sandbox is what replaced it — a tutorial that
+ * writes into a student's own work is the problem, not the exit.
  *
- * Their graph_event kinds — graph.reset, graph.import, map.import,
- * graph.example — are STILL RENDERED by HistoryPanel and still listed in the
- * contract. Nothing emits them again, but the Capture Log is append-only and
- * students who imported or reset have those rows; deleting the cases would
- * shorten a record that red line 5 says must stay legible.
+ * Reset CAME BACK on 2026-08-13 as `resetLoom` below — TJ: "i need a way for a
+ * user to reset there loom, thus they 'start over'". What went away was the
+ * tab, never the exit; a tool you cannot start over in is a tool you are
+ * afraid to work in. It is not the old function restored: it lives in the
+ * header's My Loom modal rather than a station, it clears Links too (they did
+ * not exist in August), and its event carries the whole loom rather than
+ * counts, which is what makes it undoable.
+ *
+ * The other three kinds — graph.import, map.import, graph.example — are STILL
+ * RENDERED by HistoryPanel and still listed in the contract. Nothing emits them
+ * again, but the Capture Log is append-only and students who imported have
+ * those rows; deleting the cases would shorten a record that red line 5 says
+ * must stay legible.
  */
+
+/**
+ * How much of the cleared loom the `graph.reset` event carries, serialized.
+ *
+ * The snapshot is the undo, so it wants to be complete — but it lands in one
+ * jsonb column, and a loom at the old import ceilings (2000 passages) would
+ * put megabytes into a row that every Capture Log read then drags back out.
+ * Past this, the event keeps its counts and says the snapshot was omitted,
+ * which is honest; a truncated snapshot that restored two thirds of a loom
+ * would be worse than none, because it would look like it worked.
+ */
+const RESET_SNAPSHOT_LIMIT = 900_000
+
+/**
+ * Start over: clear this student's own loom for the course they are working in.
+ *
+ * **It takes no userId, and that is the access control.** Faculty and admins
+ * weave here too and reset their OWN loom by the same route, but nobody resets
+ * anybody else's — not faculty over a student, not an admin over either. A
+ * parameter would make that a check someone can forget to write; its absence
+ * makes it a thing the function cannot express (capabilities.ts `loom-reset`,
+ * `loom-reset-other`).
+ *
+ * WHAT SURVIVES, all deliberate:
+ *   · `graph_event` — red line 5. Reset clears the cloth, not the loom's
+ *     memory of weaving, and since 2026-08-13 that memory holds the cloth
+ *     itself for as long as the row lives.
+ *   · `course_membership` and the session — starting over is not leaving.
+ *   · `source` rows the student owns (`isOwn`) and their uploaded files. A
+ *     reading is Library, not cloth; deleting rows here would orphan blobs in
+ *     storage with nothing left pointing at them. Their own readings are
+ *     removed one at a time, from the Library, where the file goes too.
+ *
+ * The event is written FIRST and NOT through `recordEvent`, which swallows its
+ * failures by design. Everywhere else that is right — a lost event must never
+ * fail the mutation it describes. Here it is exactly backwards: the event is
+ * the only copy of what is about to be deleted, so if it cannot be written the
+ * student keeps their loom instead of losing it silently.
+ */
+export async function resetLoom() {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+
+  const mineConcepts = and(eq(concepts.userId, userId), inCourse(concepts.courseId, courseId))
+  const minePassages = and(eq(passages.userId, userId), inCourse(passages.courseId, courseId))
+  const mineEdges = and(eq(edges.userId, userId), inCourse(edges.courseId, courseId))
+  const mineLinks = and(eq(links.userId, userId), inCourse(links.courseId, courseId))
+  const mineMaps = and(eq(maps.userId, userId), inCourse(maps.courseId, courseId))
+  const mineCloths = and(eq(cloths.userId, userId), inCourse(cloths.courseId, courseId))
+  const mineViews = and(eq(views.userId, userId), inCourse(views.courseId, courseId))
+
+  const [conceptRows, passageRows, edgeRows, linkRows, mapRows, clothRows, viewRows] = await Promise.all([
+    db.select().from(concepts).where(mineConcepts),
+    db.select().from(passages).where(minePassages),
+    db.select().from(edges).where(mineEdges),
+    db.select().from(links).where(mineLinks),
+    db.select().from(maps).where(mineMaps),
+    db.select().from(cloths).where(mineCloths),
+    db.select().from(views).where(mineViews),
+  ])
+
+  const counts = {
+    concepts: conceptRows.length,
+    passages: passageRows.length,
+    edges: edgeRows.length,
+    links: linkRows.length,
+    maps: mapRows.length,
+    cloths: clothRows.length,
+    views: viewRows.length,
+  }
+  const total = Object.values(counts).reduce((a, b) => a + b, 0)
+  if (!total) return counts
+
+  // The filings travel with the passages. They cascade on delete, so nothing
+  // needs them to clear the loom — they are here only so the snapshot can put
+  // a passage back under the concepts it was filed beneath, which is the part
+  // of a capture a student would most notice missing.
+  const pointerRows = passageRows.length
+    ? await db.select().from(passageConcepts)
+        .where(inArray(passageConcepts.passageId, passageRows.map((p) => p.id)))
+    : []
+
+  const snapshot = {
+    concepts: conceptRows, passages: passageRows, edges: edgeRows, links: linkRows,
+    maps: mapRows, cloths: clothRows, views: viewRows, passageConcepts: pointerRows,
+  }
+  const serialized = JSON.stringify(snapshot)
+  const payload: Record<string, unknown> =
+    serialized.length <= RESET_SNAPSHOT_LIMIT
+      ? { counts, snapshot }
+      : { counts, snapshotOmitted: true, snapshotBytes: serialized.length }
+
+  // Not recordEvent: see the note above — this one is allowed to throw, and
+  // must, before anything is deleted.
+  await db.insert(graphEvents).values({
+    userId, courseId, kind: "graph.reset", entityType: "graph", entityId: null, payload,
+  })
+
+  // Edges before their endpoints and their Links, passages before concepts.
+  // The FK cascades would cover most of this on their own; doing it in order
+  // means a batch that half-lands leaves a loom missing threads rather than
+  // one whose concepts are gone and whose threads point at nothing.
+  await db.batch([
+    db.delete(edges).where(mineEdges),
+    db.delete(links).where(mineLinks),
+    db.delete(passages).where(minePassages),
+    db.delete(concepts).where(mineConcepts),
+    db.delete(maps).where(mineMaps),
+    db.delete(cloths).where(mineCloths),
+    db.delete(views).where(mineViews),
+  ] as unknown as Parameters<typeof db.batch>[0])
+
+  return counts
+}

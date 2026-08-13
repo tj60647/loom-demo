@@ -373,6 +373,37 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .aboutbox h3{font-family:var(--display);font-size:16px;font-weight:600;margin:20px 0 8px;
   border-bottom:1px solid var(--rule);padding-bottom:4px}
 @media(max-width:560px){.info-dialog{padding:22px 20px 18px}.info-dialog h2{font-size:23px}}
+
+/* My Loom (Header) — the mirror and the exit. Scrolls inside itself like
+   About: a loom with twenty readings in it is longer than a screen, and the
+   start-over block must stay reachable at the bottom rather than clipped. */
+.myloombox{max-width:560px;max-height:84vh;overflow-y:auto}
+.myloombox h3{font-family:var(--display);font-size:16px;font-weight:600;margin:20px 0 8px;
+  border-bottom:1px solid var(--rule);padding-bottom:4px}
+.myloom-totals{list-style:none;padding:0;margin:12px 0 0;display:flex;flex-wrap:wrap;gap:6px 16px}
+.myloom-totals li{margin:0;font-size:14px;color:var(--ink-soft)}
+.myloom-totals b{font-family:var(--mono);font-size:15px;color:var(--ink);margin-right:4px}
+.myloom-readings{list-style:none;padding:0;margin:8px 0 0}
+.myloom-readings li{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+  margin:0;padding:6px 0;border-bottom:1px solid var(--rule)}
+/* The app's own link idiom (.linkish), not the browser's — a default blue
+   anchor was the one bit of this dialog that did not look like Loom. */
+.myloom-readings a{font-size:14.5px;color:var(--ochre);text-decoration:underline}
+.myloom-readings a:hover{opacity:.8}
+.myloom-readings small{font-family:var(--mono);font-size:11px;color:var(--ink-soft);
+  white-space:nowrap;flex:0 0 auto}
+/* The danger zone reads as a different room: ruled off, red-keyed, and last.
+   Nothing above it is a verb, so there is no chance of landing here by drift. */
+.myloom-danger{margin-top:22px;padding-top:4px;border-top:2px solid var(--red)}
+.myloom-danger h3{color:var(--red);border-bottom-color:var(--red)}
+.myloom-type{display:block;font-size:13.5px;color:var(--ink-soft);margin:0 0 12px}
+.myloom-type b{font-family:var(--mono);color:var(--ink)}
+.myloom-type input{display:block;width:100%;margin-top:5px;padding:7px 9px;font-family:var(--mono);
+  font-size:14px;border:1px solid var(--rule);border-radius:3px;background:var(--paper);color:var(--ink)}
+.myloom-type input:focus-visible{outline:none;border-color:var(--red)}
+.myloom-actions{display:flex;gap:8px;justify-content:flex-end}
+.myloom-error{color:var(--red);font-size:13.5px}
+.myloom-hint{display:block;margin-top:6px;font-size:12.5px;color:var(--ink-soft)}
 /* The first-run walkthrough's scrim, panel and round "?" button lived here.
    Retired 2026-08-11 with the deck itself — the guide walks the same moves in
    the real interface (.guidepop, below) and About carries the overview. */

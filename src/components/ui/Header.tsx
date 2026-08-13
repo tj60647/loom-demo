@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import AuthButton from "./AuthButton"
+import MyLoomModal from "./MyLoomModal"
 
 /** Module-level so the store identity is stable across renders. */
 const subscribeFullscreen = (onChange: () => void) => {
@@ -20,9 +21,18 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
   // come back for a staff member viewing as a student.
   const { course } = useReadings()
   const [showAbout, setShowAbout] = useState(false)
+  const [showMyLoom, setShowMyLoom] = useState(false)
   // Nothing on an admin page writes to a loom, so the save dot sat there as a
   // bare em dash for the whole visit and read as a stray character.
-  const inAdmin = usePathname()?.startsWith("/admin") ?? false
+  const pathname = usePathname()
+  const inAdmin = pathname?.startsWith("/admin") ?? false
+  // The practice loom. My Loom still opens here — the Header sits ABOVE
+  // SandboxLoomProvider in the tree (layout.tsx wraps it in the real
+  // LoomProvider), so the counts shown are the student's actual work and are
+  // correct. Start over is what gets suppressed: offering to clear a real loom
+  // from the page that promises nothing is kept is a confusion worth avoiding
+  // even though the call would do exactly what it says.
+  const inSandbox = pathname?.startsWith("/sandbox") ?? false
 
   /**
    * The whole screen, from every page (TJ, 2026-08-12).
@@ -87,6 +97,21 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
         >
           about
         </button>
+        {/* Between about and workflows (TJ, 2026-08-13). The slot is the
+            argument: a whole-loom surface had nowhere to live once Keep was
+            deleted, and a station is the thing that was deleted — so this is
+            chrome, like About beside it. Session-gated because an empty loom
+            is a fact about a student, and there is no student here without
+            one. See MyLoomModal for why it is a mirror and never a workshop. */}
+        {session && (
+          <button
+            className="btn ghost mini"
+            onClick={() => setShowMyLoom(true)}
+            data-tip="what you have made, and how to start over"
+          >
+            my loom
+          </button>
+        )}
         {/* Beside About (TJ, 2026-08-08), and reachable from every page — it is
             not an admin surface: a student reads their own flow there.
             Since 2026-08-09 it also sits right of Courses in the journey bar's
@@ -135,6 +160,10 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
           </button>
         )}
       </header>
+
+      {showMyLoom && (
+        <MyLoomModal onClose={() => setShowMyLoom(false)} allowReset={!inSandbox} />
+      )}
 
       {/* Same ink scrim as every other overlay — the light blurred backdrop
           was the one exception to the app's visual language. */}

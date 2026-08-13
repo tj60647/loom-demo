@@ -135,6 +135,32 @@ export const CAPABILITIES: Capability[] = [
     gate: { file: "src/actions/loom.ts", symbol: "getUserLoomData" },
     enforcement: "server",
   },
+  {
+    id: "loom-reset",
+    name: "Start over — clear your own loom",
+    group: "Reading and weaving",
+    // Everyone weaves here, so everyone can start over in their own work.
+    // Withholding the exit from any of the three would only mean asking
+    // somebody else to perform it, which is the row below.
+    student: { verdict: "yes" }, faculty: { verdict: "yes" }, admin: { verdict: "yes" },
+    gate: { file: "src/actions/loom.ts", symbol: "resetLoom" },
+    enforcement: "server",
+  },
+  {
+    id: "loom-reset-other",
+    name: "Clear somebody else's loom",
+    group: "Reading and weaving",
+    // The row exists to say NO in a place where the answer would otherwise be
+    // assumed from the admin column above it. `resetLoom` takes no userId: it
+    // reads the session and scopes on that alone, so this is not a check that
+    // could be forgotten but a thing the function cannot express. Faculty can
+    // READ a student's loom (`student-loom-read`) and that is where it stops.
+    student: { verdict: "no" },
+    faculty: { verdict: "no", note: "read-only over a student's loom, always" },
+    admin: { verdict: "no", note: "no admin surface deletes a student's work" },
+    gate: { file: "src/actions/loom.ts", symbol: "getUserId" },
+    enforcement: "server",
+  },
 
   // --- Overlays — the inverted one ----------------------------------------
   {

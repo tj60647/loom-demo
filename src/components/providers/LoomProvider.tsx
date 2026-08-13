@@ -14,7 +14,14 @@ import {
   createLink, updateLink, attachLink as attachLinkAction,
   saveView, saveCloth as saveClothAction,
   createMap as createMapAction, updateMap as updateMapAction, deleteMap as deleteMapAction,
+  resetLoom as resetLoomAction,
 } from "@/actions/loom"
+
+/** What a reset cleared, for the line the modal shows afterwards. */
+export type ResetCounts = {
+  concepts: number; passages: number; edges: number
+  links: number; maps: number; cloths: number; views: number
+}
 
 /**
  * Exported so the practice sandbox can supply this same context from its own
@@ -114,6 +121,16 @@ export interface LoomContextType {
    * is itself a student gesture's consequence, and it is flashed.
    */
   ensureActiveMap: () => Promise<LoomMap>
+  /**
+   * Start over — clear this loom and return what was in it (My Loom modal).
+   *
+   * The practice loom supplies its own, which clears local state and calls
+   * nothing: "reset stays — clearing your own practice costs nothing"
+   * (contracts.md §2c). The Header's modal suppresses the control there
+   * anyway, because the counts it would be clearing belong to the real loom
+   * behind the practice one and the page promises nothing is kept.
+   */
+  resetLoom: () => Promise<ResetCounts>
   /** Transient status line (v14's saveDot): '· saved ·', '· copied ·', errors. */
   flashMsg: string | null
   flash: (msg: string) => void
@@ -826,10 +843,35 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }, 500))
   }
 
-  // `cancelPendingSaves` stood here — it existed so a replace-the-graph
-  // operation could not race a stale debounced write. Import and reset were
-  // the only two, and both went with Keep on 2026-08-11; nothing replaces the
-  // graph wholesale any more, so nothing needs the guard.
+  /**
+   * Drop every debounced write still waiting, without sending it.
+   *
+   * This guard was deleted on 2026-08-11 with the note "nothing replaces the
+   * graph wholesale any more, so nothing needs the guard". Reset does, again.
+   * Without it the failure is specific and awful: a student edits a
+   * projection's essence, hits start over inside the 700ms window, and the
+   * timer fires afterwards to `updateMap` a row that no longer exists —
+   * harmless — or, worse, the 500ms view timer writes geometry back under a
+   * `map:<id>` key and leaves one orphan row in a loom the student was told is
+   * empty. Cleared here rather than flushed: the student asked for the work to
+   * go, so the last keystroke of it goes too.
+   */
+  const cancelPendingSaves = useCallback(() => {
+    window.clearTimeout(mapTextTimer.current)
+    pendingMapText.current = new Map()
+    viewTimers.current.forEach((t) => window.clearTimeout(t))
+    viewTimers.current = new Map()
+    pendingViews.current = new Map()
+  }, [])
+
+  const resetLoom = useCallback(async () => {
+    cancelPendingSaves()
+    const counts = await resetLoomAction()
+    // The server's own truth for this write: everything of this student's is
+    // gone, so the blank state IS the reload and no round trip is needed.
+    applyTruth(blankState())
+    return counts
+  }, [cancelPendingSaves, applyTruth])
 
   return (
     <LoomContext.Provider value={{
@@ -844,6 +886,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       selectMap, addMap, renameMap, removeMap,
       setMapTiers, setMapRead, setMapEssence, flushMapText,
       setView, ensureActiveMap,
+      resetLoom,
       flashMsg, flash,
       undoStack, setUndoStack, redoStack, setRedoStack
     }}>
