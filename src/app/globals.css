@@ -195,6 +195,61 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .rm:disabled{opacity:.45;cursor:not-allowed}
 .rm-actions button{font:inherit;color:inherit}
 /* concept palette — clean: just the label, with a picked tag */
+/* THE OBJECT CARDS (src/components/cards/) — one appearance per object,
+   wherever it appears, with editability a mode rather than a second card
+   (TJ, 2026-08-13). Two objects, not one: .oconcept is concept-first (an idea,
+   its evidence under it) and .opassage is passage-first (a quotation, the
+   concepts said about it) — "one is a passage with concept, the other is
+   concept with passages".
+
+   NO FIXED WIDTH AND NO px TYPE except where a step is the point. These sit in
+   a 380px sheet, a margin rail and a popover; sizes in `em` step with whatever
+   container they land in, which is what stops the card needing re-tuning per
+   home (and what went wrong in Your work before the scoped step-down). */
+.ocard{font-size:1em}
+.oconcept-def{margin:8px 0 0;font-size:.87em;line-height:1.5;color:var(--ink)}
+.oconcept-def.empty{color:var(--ink-soft);font-style:italic}
+.oconcept-note{margin:6px 0 0;font-size:.82em;line-height:1.45;color:var(--ink-soft)}
+.oconcept-evidence{margin-top:12px}
+.oconcept-evidence .lgroup{margin:0 0 6px;padding:0}
+.opassage{padding:8px 0;border-top:1px dotted var(--rule)}
+.opassage-text{margin:0;padding:0 0 0 9px;border-left:2px solid var(--rule);
+  font-size:.85em;line-height:1.5;color:var(--ink)}
+.opassage-note{margin:5px 0 0;font-size:.8em;font-style:italic;color:var(--ink-soft)}
+.ocard-foot{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:5px}
+.ocard-where{font-family:var(--mono);font-size:.62em;letter-spacing:.05em;color:var(--ink-soft);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ocard-goto{flex:0 0 auto}
+.ocard-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.ocard-chip{font-family:var(--mono);font-size:.6em;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ochre);border:1px solid var(--rule);border-radius:999px;padding:2px 7px}
+
+/* The warp's dot, and the card it opens. */
+.cdot{flex:0 0 auto;background:none;border:none;padding:0 2px;cursor:pointer;line-height:1;
+  font-size:9px;color:var(--dot);transition:color .12s}
+.cdot:hover,.cdot[aria-expanded="true"]{color:var(--ochre)}
+.cdot:focus-visible{outline:none;color:var(--ochre)}
+/* TOP LAYER, via popover="auto" — no z-index and no ancestor can reach it.
+   The first cut was position:absolute inside the warp and was invisible:
+   .scrollbox is overflow:auto and clipped it, while the scrollbox's stacking
+   context let its own scrim paint over it. Positioned from JS (placeCard), so
+   the UA's centring margin has to go. */
+.cpop{position:fixed;margin:0;inset:auto;width:320px;max-width:min(44vw,360px);
+  max-height:76vh;overflow-y:auto;
+  background:var(--paper);color:var(--ink);border:1px solid var(--ink);border-radius:6px;
+  box-shadow:0 12px 34px rgba(0,0,0,.22);padding:14px 16px 13px;font-size:15px}
+.cpop::backdrop{background:none}
+.cpop:not(:popover-open){display:none}
+.cpop .info-close{top:8px;right:8px}
+.cpop .lhead{padding:0 26px 0 0;cursor:default;align-items:baseline}
+.cpop .lhead:hover{background:none}
+/* The label ellipsises in a list row, where one line is the point. In a card
+   there is room, and a truncated concept name is the one thing this card
+   exists to show. */
+.cpop .lconcept{white-space:normal;overflow:visible;text-overflow:clip}
+.cpop-cost{margin:10px 0 0;padding-top:8px;border-top:1px solid var(--rule);
+  font-size:.72em;line-height:1.4;color:var(--ink-soft)}
+
 .crow{padding:10px 12px;border-bottom:1px dotted var(--rule);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;border-radius:4px}
 .crow:hover{background:rgba(168,132,63,.08)}
 .crow .clabel{font-size:16px}

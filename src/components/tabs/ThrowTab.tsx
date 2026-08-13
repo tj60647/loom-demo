@@ -10,6 +10,8 @@ import { findLink, labelOf as labelOfEdge, usesOf } from "@/lib/linkResolve"
 import { scopeLabelOf } from "@/lib/graphExport"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
+import ConceptCard from "@/components/cards/ConceptCard"
+import type { Passage } from "@/lib/types"
 
 const PLAIN_VERBS = ['leads to','depends on','is part of','goes against','is the same as','sets up'];
 
@@ -61,7 +63,7 @@ const STEPS: { label: string; says: string }[] = [
   },
 ]
 
-export default function ThrowTab() {
+export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: Passage) => void } = {}) {
   // Scoped for what this reading is about; whole for anything that has to be
   // TRUE. The thread lists are `scoped` — this reading's own work, and since
   // 2026-08-09 only that — while the evidence check, the duplicate-pair guard
@@ -70,6 +72,81 @@ export default function ThrowTab() {
   const { state, scoped, scope, addEdge, editEdge, removeEdge, attachLink, flash, setUndoStack, setRedoStack } = useLoom()
   const { byId: readingsById } = useReadings()
   const titleOf = (id: string) => readingsById.get(id)?.title ?? id
+  /**
+   * Which warp concept has its card open, or null. A POPOVER rather than an
+   * inline expansion (TJ, 2026-08-13: "popover is better"): the warp is a list
+   * being scanned for a second pick, and a row that grows in place reflows
+   * everything under the cursor mid-scan.
+   */
+  const [cardFor, setCardFor] = useState<string | null>(null)
+  const popRef = useRef<HTMLDivElement>(null)
+  const popAnchor = useRef<HTMLElement | null>(null)
+
+  /**
+   * The card rides the browser's TOP LAYER, via the native popover API — the
+   * same escape TipLayer takes, and for the same reason.
+   *
+   * The first cut was an absolutely-positioned div inside the warp, and it was
+   * invisible: `.scrollbox` is `overflow:auto`, which CLIPPED it, and the
+   * scrollbox's stacking context meant its own click-away scrim painted over
+   * it. Every assertion passed — the element existed, had a sane rect and
+   * reported visible — and the screenshot showed nothing at all. The top layer
+   * is clipped by nothing and outranks every z-index in the app.
+   *
+   * `popover="auto"` also brings light-dismiss and Escape with it, so there is
+   * no scrim to maintain and no key handler to write.
+   */
+  const placeCard = useCallback(() => {
+    const pop = popRef.current
+    const host = popAnchor.current
+    if (!pop || !host?.isConnected) return
+    const r = host.getBoundingClientRect()
+    if (!r.width && !r.height) { setCardFor(null); return }
+    const w = pop.offsetWidth || 320
+    const h = pop.offsetHeight
+    const GAP = 10, EDGE = 12
+    // Beside the row by preference, flipped when the right-hand side has no
+    // room — the warp is the leftmost column, so that is the common case.
+    const right = r.right + GAP
+    const left = right + w + EDGE <= window.innerWidth ? right : Math.max(r.left - GAP - w, EDGE)
+    pop.style.left = `${Math.round(left)}px`
+    pop.style.top = `${Math.round(
+      Math.min(Math.max(r.top - 8, EDGE), Math.max(window.innerHeight - h - EDGE, EDGE))
+    )}px`
+  }, [])
+
+  useEffect(() => {
+    const pop = popRef.current
+    if (!pop) return
+    if (!cardFor) {
+      if (pop.matches(":popover-open")) pop.hidePopover()
+      return
+    }
+    if (!pop.matches(":popover-open")) pop.showPopover()
+    placeCard()
+    // A scroll inside the warp, or a resize, must move the card with its row —
+    // capture:true so the scrollbox's own scroll is seen, not just the page's.
+    window.addEventListener("scroll", placeCard, true)
+    window.addEventListener("resize", placeCard)
+    return () => {
+      window.removeEventListener("scroll", placeCard, true)
+      window.removeEventListener("resize", placeCard)
+    }
+  }, [cardFor, placeCard])
+
+  // Light-dismiss and Escape close it without going through React, so the
+  // state has to follow the element rather than the other way round.
+  useEffect(() => {
+    const pop = popRef.current
+    if (!pop) return
+    const onToggle = (e: Event) => {
+      if ((e as ToggleEvent).newState === "closed") setCardFor(null)
+    }
+    pop.addEventListener("toggle", onToggle)
+    return () => pop.removeEventListener("toggle", onToggle)
+  }, [])
+
+  const cardConcept = cardFor ? state.concepts.find((c) => c.id === cardFor) ?? null : null
   const { confirm, notify } = useDialog()
   const [pairA, setPairA] = useState<string | null>(null)
   const [pairB, setPairB] = useState<string | null>(null)
@@ -367,6 +444,24 @@ export default function ThrowTab() {
         {isPicked
           ? <div className="pickedtag">PICK {pairA === c.id ? 1 : 2}</div>
           : (noev && <div className="pickedtag" style={{ color: "var(--ink-soft)" }} title="no passage backs this yet — you may have named it ahead of its evidence, which is allowed">no evidence</div>)}
+        {/* The dot: "what was this grounded in?", answered without leaving 02.
+            stopPropagation because the whole row is already a click target
+            that loads the bench — a small control inside a big button is an
+            accidental-pick generator otherwise. */}
+        <button
+          type="button"
+          className="cdot"
+          aria-label={`Show the concept card for ${c.label}`}
+          data-tip="see this concept — its meaning and evidence"
+          aria-expanded={cardFor === c.id}
+          onClick={(e) => {
+            e.stopPropagation()
+            popAnchor.current = e.currentTarget.closest(".crow") as HTMLElement
+            setCardFor((cur) => (cur === c.id ? null : c.id))
+          }}
+        >
+          ●
+        </button>
       </div>
     )
   }
@@ -503,6 +598,42 @@ export default function ThrowTab() {
 
   return (
     <>
+      {/* ONE card element for the whole warp, not one per row: it lives in the
+          top layer, so there is nothing for a per-row instance to anchor to
+          and every extra one would be a second thing to keep positioned. */}
+      <div
+        ref={popRef}
+        popover="auto"
+        className="cpop"
+        role="dialog"
+        aria-label={cardConcept ? `${cardConcept.label} — concept card` : "Concept card"}
+      >
+        {cardConcept && (
+          <>
+            <button
+              type="button"
+              className="btn ghost mini info-close"
+              onClick={() => setCardFor(null)}
+              aria-label="Close"
+            >✕</button>
+            <ConceptCard
+              concept={cardConcept}
+              passages={passagesOf(cardConcept.id)}
+              concepts={state.concepts}
+              titleOf={titleOf}
+              onGotoPassage={onGotoPassage && ((p) => { setCardFor(null); onGotoPassage(p) })}
+            />
+            {onGotoPassage && (
+              // Said plainly, because it is true and not obvious: stations
+              // unmount, so leaving drops the picks.
+              <p className="cpop-cost">
+                Opening a passage goes to <b>01 · Reading</b> and lets go of your picks here.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Four pills reading "pick · pick · say · throw" said the shape of the
           move but not the move. Numbered, named, and with the current step
           spelled out underneath, so the bar teaches instead of labelling. */}
