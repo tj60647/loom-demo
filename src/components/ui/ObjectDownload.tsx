@@ -20,18 +20,34 @@ import { objectExportFilename, provenanceOf, type ExportProvenance } from "@/lib
 
 export default function ObjectDownload({
   kind,
+  noun,
   slug,
   json,
   markdown,
   tip,
+  id,
+  onTaken,
 }: {
   /** `cloth` | `threads` | `vocabulary` — becomes part of the filename. */
   kind: string
+  /**
+   * What the button says it downloads (TJ, 2026-08-12: "that they all say keep
+   * is not helpful. 'download projection .json' is more helpful than keep
+   * .json"). Four of these sat on four stations all saying the same two words,
+   * so which object you were taking depended on remembering where you were.
+   * Defaults to the kind, which is already the object's name in every case
+   * but the hyphenated ones.
+   */
+  noun?: string
   /** The object's own name, slugified into the filename. */
   slug: string
   json: (provenance: ExportProvenance) => string
   markdown: (provenance: ExportProvenance) => string
   tip: string
+  /** For the practice guide, which glows a specific control. */
+  id?: string
+  /** Raised after either file is handed over — the guide listens for the kit. */
+  onTaken?: () => void
 }) {
   const { studentName, flash } = useLoom()
   const { course } = useReadings()
@@ -46,24 +62,28 @@ export default function ObjectDownload({
   const provenance = () =>
     provenanceOf(studentName, course ? `${course.name}${course.term ? ` · ${course.term}` : ""}` : undefined)
 
+  const what = noun ?? kind
+
   return (
-    <span className="objdl" data-tip={tip}>
+    <span className="objdl" id={id} data-tip={tip}>
       <button
         className="btn ghost mini"
         onClick={() => {
           const p = provenance()
           downloadText(json(p), objectExportFilename(studentName, kind, slug, "json"), "application/json")
-          flash("· kept ·")
+          flash(`· ${what} downloaded ·`)
+          onTaken?.()
         }}
-      >keep .json</button>
+      >download {what} .json</button>
       <button
         className="btn ghost mini"
         onClick={() => {
           const p = provenance()
           downloadText(markdown(p), objectExportFilename(studentName, kind, slug, "md"), "text/markdown")
-          flash("· kept ·")
+          flash(`· ${what} downloaded ·`)
+          onTaken?.()
         }}
-      >keep .md</button>
+      >download {what} .md</button>
     </span>
   )
 }

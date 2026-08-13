@@ -376,8 +376,28 @@ function threadLine(from = "?", to = "?", handle = "", sentence = ""): string {
 }
 
 /** `<student>-<slug>.<kind>.<ext>`, the shape mapExportFilename already uses. */
-export function objectExportFilename(student: string, kind: string, slug: string, ext: string): string {
+/**
+ * When the file was taken, as `yymmddhhmm` in the student's own clock (TJ,
+ * 2026-08-12: "file downloads should include the yymmddhhmm in the filename,
+ * timestamp. anywhere a download is made").
+ *
+ * LAST, before the extension — "so that like files group together when
+ * sorting" (TJ). A folder then sorts student → object → kind, with every
+ * take of the same thing adjacent and in the order they were taken. It sat
+ * before the slug for one revision, which sorted by session instead and
+ * scattered the versions of a cloth through the list.
+ *
+ * Local time, not UTC: this is for a person filing their own downloads, and a
+ * folder that sorts by the hour they remember working is worth more than one
+ * that agrees with a server.
+ */
+export function fileStamp(at: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0")
+  return `${p(at.getFullYear() % 100)}${p(at.getMonth() + 1)}${p(at.getDate())}${p(at.getHours())}${p(at.getMinutes())}`
+}
+
+export function objectExportFilename(student: string, kind: string, slug: string, ext: string, at?: Date): string {
   const who = (student || "loom").replace(/\s+/g, "_").toLowerCase()
   const what = (slug || kind).replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "").toLowerCase() || kind
-  return `${who}-${what}.${kind}.${ext}`
+  return `${who}-${what}.${kind}.${fileStamp(at)}.${ext}`
 }

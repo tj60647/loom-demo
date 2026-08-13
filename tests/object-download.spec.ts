@@ -32,9 +32,11 @@ test.describe('Download at the object', () => {
       (d as HTMLDetailsElement).open = true;
     });
     const cloth = await readFile(
-      page.locator('.objdl button:visible', { hasText: 'keep .json' }).first().click()
+      page.locator('.objdl button:visible', { hasText: /download .+ \.json/ }).first().click()
     );
-    expect(cloth.name).toContain('.cloth.json');
+    // The stamp is LAST, before the extension (TJ, 2026-08-12), so like files
+    // group when a folder sorts: `…name.cloth.2608122215.json`.
+    expect(cloth.name).toMatch(/\.cloth\.\d{10}\.json$/);
     const clothData = JSON.parse(cloth.text);
     expect(clothData.format).toBe('loom-cloth');
     // Whole, not a slice: the seeded reading's captures, their concepts, and
@@ -51,18 +53,18 @@ test.describe('Download at the object', () => {
     // --- the threads, where they are thrown ---
     await page.locator('nav[aria-label="The journey"] button', { hasText: 'Linking' }).click();
     const threads = await readFile(
-      page.locator('.objdl button:visible', { hasText: 'keep .md' }).first().click()
+      page.locator('.objdl button:visible', { hasText: /download .+ \.md/ }).first().click()
     );
-    expect(threads.name).toContain('.threads.md');
+    expect(threads.name).toMatch(/\.threads\.\d{10}\.md$/);
     // Both ends NAMED — an id would say nothing away from Loom.
     expect(threads.text).toMatch(/- \*\*.+\*\* —\[.*\]→ \*\*.+\*\*/);
 
     // --- the vocabulary, on the tab that holds it ---
     await page.locator('nav[aria-label="The journey"] button', { hasText: 'Vocabulary' }).click();
     const vocab = await readFile(
-      page.locator('.objdl button:visible', { hasText: 'keep .json' }).first().click()
+      page.locator('.objdl button:visible', { hasText: /download .+ \.json/ }).first().click()
     );
-    expect(vocab.name).toContain('.vocabulary.json');
+    expect(vocab.name).toMatch(/\.vocabulary\.\d{10}\.json$/);
     const vocabData = JSON.parse(vocab.text);
     expect(vocabData.format).toBe('loom-vocabulary');
     // Unscoped by definition: more concepts than this one reading evidences.
@@ -83,7 +85,11 @@ test.describe('Download at the object', () => {
     await expect(page.locator('.sectionhead', { hasText: 'The log' })).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('input[aria-label="replay position, in acts"]')).toBeVisible({ timeout: 20_000 });
 
-    const button = page.locator('.objdl button:visible', { hasText: 'keep .json' });
+    // By NAME, not by being the only one: since 2026-08-12 the buttons say
+    // what they hand over ("download the log .json"), and the concept-map kit
+    // on this same station is an ObjectDownload too — a count of one was
+    // asserting that the log was the station's only download, which it is not.
+    const button = page.locator('.objdl button:visible', { hasText: /download the log \.json/ });
     await expect(button).toHaveCount(1, { timeout: 20_000 });
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 20_000 }),
@@ -94,7 +100,7 @@ test.describe('Download at the object', () => {
     for await (const chunk of stream) text += chunk;
     const data = JSON.parse(text);
 
-    expect(download.suggestedFilename()).toContain('.capture-log.json');
+    expect(download.suggestedFilename()).toMatch(/\.capture-log\.\d{10}\.json$/);
     expect(data.format).toBe('loom-capture-log');
     // Scoped: the file names the reading and holds only its acts.
     expect(data.scopeLabel).toContain('Object Worlds');

@@ -126,6 +126,7 @@ export default function ClothFold() {
             between those, and its projections. */}
         <ObjectDownload
           kind="cloth"
+          noun="cloth"
           slug={activeCloth?.title || scopeLabel}
           tip="this cloth, whole — its passages, concepts, threads and projections"
           json={(p) => JSON.stringify(buildClothExport(state, scope.key, p, titleOf), null, 2)}

@@ -593,6 +593,7 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
         <div style={{ margin: "6px 0 10px" }}>
           <ObjectDownload
             kind="capture-log"
+            noun="the log"
             slug={scopeLabel ?? "capture-log"}
             tip="your acts, in order — the record of how this grew"
             json={(p) => JSON.stringify(buildLogExport(events, p, scopeLabel), null, 2)}

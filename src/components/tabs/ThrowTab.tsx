@@ -528,16 +528,13 @@ export default function ThrowTab() {
           {/* Ruled 2026-08-08 (TJ): linking works on this reading's concepts.
               A concept you met elsewhere joins the warp the honest way — you
               find a passage HERE that embodies it and file it under that same
-              concept, which is offered by name while you capture. */}
-          {scoped.outside.length > 0 && (
-            <p className="ghostnote">
-              {scoped.outside.length} more concept{scoped.outside.length !== 1 ? "s" : ""}{" "}
-              from your other readings are not listed here — this bench links what
-              <i> this</i> reading evidences. To bring one in, capture a passage from this
-              reading and file it under that concept while naming it; it then joins the
-              warp above.
-            </p>
-          )}
+              concept, which is offered by name while you capture.
+
+              A ghostnote used to count them here — "17 more concepts from your
+              other readings are not listed here…" with the recipe for bringing
+              one in. Gone (TJ, 2026-08-12: "not necessary and is leading"). The
+              line above already says what this list IS, and a running count of
+              what is absent reads as an instruction to go and fetch it. */}
 
           <div className="scrollbox">
             {warp.length === 0 ? (
@@ -640,6 +637,7 @@ export default function ThrowTab() {
               <span style={{marginLeft: "auto"}}>
                 <ObjectDownload
                   kind="threads"
+                  noun="threads"
                   slug={scopeLabelOf(scope.key, titleOf)}
                   tip="these threads, each naming both of its concepts"
                   json={(p) => JSON.stringify(buildThreadsExport(state, scope.key, p, titleOf), null, 2)}

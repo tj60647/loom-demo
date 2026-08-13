@@ -19,11 +19,11 @@ import type { CardTableView, Concept, Tier } from "@/lib/types"
 import { readingsOf, soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
-import { buildMapKit } from "@/lib/mapKit"
+import { buildMapKit, buildMapKitData } from "@/lib/mapKit"
 import { buildMapExport, buildMapMarkdown, mapExportFilename, scopeLabelOf } from "@/lib/graphExport"
 import { downloadText } from "@/lib/download"
-import { objectExportFilename } from "@/lib/objectExport"
 import CardMenu from "@/components/map/CardMenu"
+import ObjectDownload from "@/components/ui/ObjectDownload"
 import ClothReflection from "@/components/tabs/ClothReflection"
 import HistoryPanel from "@/components/ui/HistoryPanel"
 
@@ -107,6 +107,25 @@ export default function MapTab({ practice = false }: {
   const releaseMenu = useCallback(() => {
     window.clearTimeout(closeTimer.current)
     closeTimer.current = window.setTimeout(() => setMenuFor(null), 160)
+  }, [])
+
+  /**
+   * Arriving at a projection you just made from the cloth panel above (TJ,
+   * 2026-08-12). Selecting it changed the sort and the board a screen below,
+   * where the student was not looking; this takes them there. The heading, not
+   * the switcher, so the section arrives whole — you see which projection is
+   * lit, then the sort it produced.
+   */
+  const projectionsRef = useRef<HTMLHeadingElement>(null)
+  const goToProjections = useCallback(() => {
+    // AFTER the paint that the new projection causes, not during it. Creating
+    // one re-renders the sort list, the board and the cloth panel above; a
+    // scroll issued in the same tick is measured against a layout that is
+    // about to change under it, and lands nowhere (measured: the heading
+    // stayed 1180px down the page).
+    window.setTimeout(() => {
+      projectionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 120)
   }, [])
 
   const svgRef = useRef<SVGSVGElement>(null)
@@ -484,23 +503,18 @@ export default function MapTab({ practice = false }: {
    * you draw the real map from, so it should sit in the same folder as the
    * projection it came from rather than in a buffer one Ctrl-C destroys.
    */
-  const handleMapKit = () => {
-    if (!scopedState.concepts.length) { flash("nothing to lay out yet — lay some warp first"); return }
-    downloadText(
-      buildMapKit(
-        scopedState.concepts,
-        scopedState.edges,
-        studentName,
-        activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
-      ),
-      objectExportFilename(studentName, "concept-map-kit", activeMap?.name ?? "concept map", "md"),
-      "text/markdown"
-    )
-    flash("concept-map kit downloaded — take it to paper or Figma")
-    // The practice guide's last beat listens for this. Harmless in the real
-    // app: nothing there is listening.
-    window.dispatchEvent(new Event("loom:mapkit-taken"))
-  }
+  // The kit is an ObjectDownload like every other object now (TJ, 2026-08-12),
+  // so it offers .json as well as .md and its buttons say what they hand over.
+  // These two build it; the component does the naming, the stamping and the
+  // provenance.
+  const kitMap = () =>
+    activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
+  const kitMarkdown = () => buildMapKit(scopedState.concepts, scopedState.edges, studentName, kitMap())
+  const kitJson = () =>
+    JSON.stringify(buildMapKitData(scopedState.concepts, scopedState.edges, studentName, kitMap()), null, 2)
+  // The practice guide's last beat listens for this. Harmless in the real app:
+  // nothing there is listening.
+  const handleKitTaken = () => window.dispatchEvent(new Event("loom:mapkit-taken"))
 
   // Keeping a map is the primary path out of Loom (ratified TJ 2026-07-31):
   // the file is this map — tiers, essence, paragraph, arrangement — carried
@@ -584,18 +598,21 @@ export default function MapTab({ practice = false }: {
             onBlur={flushMapText}
             style={{ width: 140, fontSize: 12, padding: "4px 7px" }}
           />
+          {/* Named like every other download since 2026-08-12 (TJ): four pairs
+              of "keep .json" on four stations meant the object you were taking
+              depended on remembering which one you were looking at. */}
           <button
             className="btn ghost mini"
-            aria-label={`Keep the projection ${activeMap.name} as .json`}
-            data-tip="keep this projection as its own file — the artifact to submit"
+            aria-label={`Download the projection ${activeMap.name} as .json`}
+            data-tip="this projection as its own file — the artifact to submit"
             onClick={handleKeepMapJson}
-          >keep .json</button>
+          >download projection .json</button>
           <button
             className="btn ghost mini"
-            aria-label={`Keep the projection ${activeMap.name} as .md`}
+            aria-label={`Download the projection ${activeMap.name} as .md`}
             data-tip="this projection as a readable outline — notes, Obsidian, an agent"
             onClick={handleKeepMapMd}
-          >keep .md</button>
+          >download projection .md</button>
           <button className="btn ghost mini" data-tip="delete this projection — concepts and threads stay" onClick={handleDeleteMap}>delete</button>
         </span>
       )}
@@ -615,9 +632,9 @@ export default function MapTab({ practice = false }: {
       <h2 className="sectionhead">
         The cloth <span className="n">what you have woven — one per reading, and the material for everything below</span>
       </h2>
-      <ClothReflection />
+      <ClothReflection onProjectionCreated={goToProjections} />
 
-      <h2 className="sectionhead" style={{ marginTop: 34 }}>
+      <h2 className="sectionhead" id="projections" ref={projectionsRef} style={{ marginTop: 34 }}>
         Projections <span className="n">each one a reading of that same cloth, with its own tiers, one-line and paragraph</span>
       </h2>
 
@@ -917,7 +934,16 @@ export default function MapTab({ practice = false }: {
           gave them, with the threads between them. Take it to paper or Figma and draw
           the real concept map from it.
         </p>
-        <button id="mapKit" className="btn ghost mini" onClick={handleMapKit}>Download the kit</button>
+        <ObjectDownload
+          id="mapKit"
+          kind="concept-map-kit"
+          noun="the kit"
+          slug={activeMap?.name ?? "concept map"}
+          tip="your concepts by tier and the propositions between them — the material for drawing the map"
+          json={kitJson}
+          markdown={kitMarkdown}
+          onTaken={handleKitTaken}
+        />
       </div>
       </div>
       </div>

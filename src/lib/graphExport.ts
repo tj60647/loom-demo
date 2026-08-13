@@ -11,6 +11,7 @@
 
 import type { CardTableView, LoomExport, LoomMap, LoomState, LoomViews, Tier } from "./types"
 import { scopeFromKey, scopedGraph } from "./scope"
+import { fileStamp } from "./objectExport"
 
 const TIER_GROUPS: [Tier, string][] = [
   ["p", "Primary"],
@@ -209,8 +210,9 @@ export function buildMapMarkdown(
   return lines.join("\n")
 }
 
-export function mapExportFilename(student: string, mapName: string, ext: string): string {
+export function mapExportFilename(student: string, mapName: string, ext: string, at?: Date): string {
   const name = (student || "loom").replace(/\s+/g, "_").toLowerCase()
   const mapSlug = (mapName || "projection").replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "").toLowerCase() || "projection"
-  return `${name}-${mapSlug}.projection.${ext}`
+  // Stamped like every other download, last (TJ, 2026-08-12) — see `fileStamp`.
+  return `${name}-${mapSlug}.projection.${fileStamp(at)}.${ext}`
 }

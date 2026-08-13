@@ -270,6 +270,7 @@ export default function VocabularyTab() {
             evidenced it. */}
         <ObjectDownload
           kind="vocabulary"
+          noun="vocabulary"
           slug="vocabulary"
           tip="every concept and link label you own, with what evidences them"
           json={(p) => JSON.stringify(buildVocabularyExport(state, p), null, 2)}

@@ -18,7 +18,17 @@ import type { Edge, Tier } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
 import ClothMap from "@/components/svg/ClothMap"
 
-export default function ClothReflection() {
+export default function ClothReflection({ onProjectionCreated }: {
+  /**
+   * Take the student to the projection they just made (TJ, 2026-08-12:
+   * "clicking the create projection button should also navigate us to the new
+   * projection"). Selecting it is not arriving at it: this panel is at the top
+   * of the station and the Projections section is a screen below, so the sort
+   * and the board changed out of sight. The scroll lives in `MapTab`, which
+   * owns that section's DOM.
+   */
+  onProjectionCreated?: () => void
+} = {}) {
   // The cloth and the counted report are this scope's — the scoped graph's
   // edges have both ends in scope by construction, so every concept lookup
   // below resolves. Bridges are named but not drawn: they are 02 Linking's
@@ -134,7 +144,19 @@ export default function ClothReflection() {
   )
   const railN = wrote ? 3 : readSel?.gap ? 2 : readSel ? 1 : 0
 
+  /**
+   * A prompt is a TOGGLE: press it to trace, press it again to put it away
+   * (TJ, 2026-08-12: "the 'what the cloth shows you' options should be click
+   * to reveal click to hide toggles"). It only ever revealed before, so the
+   * one way out of a trace was to press a different prompt — and the pane
+   * below stayed full of threads you had finished with.
+   */
   const handlePromptClick = (p: ReadPrompt, idx: number) => {
+    if (readSel?.promptIdx === idx) {
+      setReadSel(null)
+      setDrafted("")
+      return
+    }
     if (p.repHub) {
       setReadSel({ type: "hub", ids: p.repHub, promptIdx: idx, gap: false })
     } else if (p.rep) {
@@ -169,10 +191,15 @@ export default function ClothReflection() {
       if (!primary.size) { flash("nothing traced yet"); return }
       const name = `Cloth projection ${scopeMaps.length + 1}`
       const map = await addMap(name)
+      // Go THEN sort, not sort then go: both writes are server round-trips and
+      // waiting for the second one before moving left the student on the cloth
+      // panel for ~2.5 seconds with nothing happening — long enough to read as
+      // a dead button. Travelling first means they watch the sort fill in.
+      selectMap(map.id)
+      onProjectionCreated?.()
       const tiers: Record<string, Tier> = {}
       state.concepts.forEach((c) => { tiers[c.id] = primary.has(c.id) ? "p" : "x" })
       await setMapTiers(map.id, tiers)
-      selectMap(map.id)
       flash(`“${name}” — ${primary.size} concept${primary.size === 1 ? "" : "s"} primary, the rest set aside`)
     } catch (e) {
       flash(e instanceof Error ? e.message : "could not start a projection")

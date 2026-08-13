@@ -86,3 +86,43 @@ export function buildMapKit(
   }
   return out
 }
+
+/**
+ * The same kit as data (TJ, 2026-08-12: "update the download map kit to
+ * include the .json and .md"). Every other object on the station hands over
+ * both, and the kit is the one thing a student takes to another tool — where
+ * a machine-readable copy is worth more than a printout, not less.
+ *
+ * Deliberately the SAME content as the markdown, in the same order: concepts
+ * grouped by the tiers the student gave them, and the propositions between
+ * them with both ends named. It is not the projection export — that one
+ * carries the arrangement, the reads and the passages; this is the material
+ * for drawing the map by hand.
+ */
+export function buildMapKitData(
+  concepts: Concept[],
+  edges: Edge[],
+  student: string,
+  map?: { name?: string; essence?: string; tiers?: Record<string, Tier> }
+) {
+  const tierOf = (c: Concept): Tier => map?.tiers?.[c.id] ?? ""
+  const label = (id: string) => concepts.find((c) => c.id === id)?.label ?? "?"
+  return {
+    format: "loom-concept-map-kit",
+    student: student || "my weave",
+    projection: map?.name ?? null,
+    oneLine: map?.essence?.trim() || null,
+    tiers: TIER_GROUPS.map(([tier, name]) => ({
+      tier: name.toLowerCase(),
+      concepts: concepts
+        .filter((c) => tierOf(c) === tier)
+        .map((c) => ({ label: c.label, description: c.def || null, threads: degreeOf(edges, c.id) })),
+    })).filter((g) => g.concepts.length),
+    propositions: edges.map((e) => ({
+      from: label(e.fromId),
+      label: e.handle || null,
+      to: label(e.toId),
+      sentence: e.sentence,
+    })),
+  }
+}

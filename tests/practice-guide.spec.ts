@@ -211,9 +211,12 @@ test.describe("The guide", () => {
     expect(await beat(page)).toContain("Take the kit")
 
     // ---- 8. take the kit ---------------------------------------------------
+    // The kit is an ObjectDownload since 2026-08-12, so `#mapKit` is the pair
+    // and either file completes the beat. Taking the .md, which is what the
+    // beat is about — the sheet you draw the map from.
     const [download] = await Promise.all([
       page.waitForEvent("download"),
-      page.locator("#mapKit").click({ timeout: 20_000 }),
+      page.locator("#mapKit button", { hasText: /\.md$/ }).click({ timeout: 20_000 }),
     ])
     expect(await download.suggestedFilename()).toContain("concept-map-kit")
     await ticked(page, 8)

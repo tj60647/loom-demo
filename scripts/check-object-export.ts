@@ -17,6 +17,7 @@ import {
   buildVocabularyExport,
   buildVocabularyMarkdown,
   objectExportFilename,
+  fileStamp,
   provenanceOf,
 } from "../src/lib/objectExport"
 import { scopeOf } from "../src/lib/scope"
@@ -167,10 +168,19 @@ console.log("\nobject export — each object leaves whole")
 
 // --- filenames ---
 {
+  // Stamped with the minute it was taken (TJ, 2026-08-12), LAST: a folder
+  // sorts student → object → kind, so every take of one thing sits together
+  // in the order it was taken.
+  const at = new Date(2026, 7, 12, 22, 15)
   assert(
-    objectExportFilename("Test Student", "cloth", "Object Worlds", "json") === "test_student-object_worlds.cloth.json",
-    "filename is student-slug.kind.ext",
-    objectExportFilename("Test Student", "cloth", "Object Worlds", "json")
+    objectExportFilename("Test Student", "cloth", "Object Worlds", "json", at) === "test_student-object_worlds.cloth.2608122215.json",
+    "filename is student-slug.kind.yymmddhhmm.ext — the stamp last, so like files group",
+    objectExportFilename("Test Student", "cloth", "Object Worlds", "json", at)
+  )
+  assert(
+    /^\d{10}$/.test(fileStamp(at)) && fileStamp(at) === "2608122215",
+    "the stamp is yymmddhhmm in the student's own clock",
+    fileStamp(at)
   )
   // Letters stay letters — a student named Díaz gets their name spelled
   // right. What must never survive is whitespace and punctuation.
@@ -180,7 +190,7 @@ console.log("\nobject export — each object leaves whole")
     "spaces and punctuation never reach the filesystem, accents do",
     awkward
   )
-  assert(awkward.endsWith(".threads.md"), "the kind and extension survive an awkward name", awkward)
+  assert(/\.threads\.\d{10}\.md$/.test(awkward), "the kind, the stamp and the extension survive an awkward name", awkward)
 }
 
 console.log(`\n${checks} checks, ${failures} failing\n`)
