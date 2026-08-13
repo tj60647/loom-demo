@@ -188,7 +188,20 @@ test.describe("The guide", () => {
     // moment ago; move it and the beat follows.
     const card = page.locator("#cardTable g[data-card]").first()
     await expect(card).toBeVisible({ timeout: 20_000 })
+    // Bring the CARD itself into the scroller before pressing on it. `visible`
+    // is not "on screen": an SVG node scrolled above the top of `main` still
+    // reports a box, and a raw mouse.down at those coordinates lands on
+    // whatever is painted there — the journey bar. That is what made this beat
+    // fail two runs in three (2026-08-12); the guide's own scroll now aligns a
+    // too-tall target by its top, and this makes the test independent of it.
+    await card.scrollIntoViewIfNeeded()
+    await page.waitForTimeout(400)
     const box = (await card.boundingBox())!
+    const onScreen = await page.evaluate(
+      ([x, y]) => !!document.elementFromPoint(x, y)?.closest("#cardTable"),
+      [box.x + box.width / 2, box.y + box.height / 2]
+    )
+    expect(onScreen, "the card the beat asks you to drag must be on screen").toBe(true)
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     await page.mouse.down()
     await page.mouse.move(box.x + box.width / 2 + 90, box.y + box.height / 2 + 40, { steps: 12 })

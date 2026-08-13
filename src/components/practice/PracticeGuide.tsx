@@ -170,7 +170,16 @@ function scrollToTarget(selectors: string[]) {
     const el = document.querySelector(selector)
     const box = el?.getBoundingClientRect()
     if (!el || !box || box.width === 0 || box.height === 0) continue
-    el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" })
+    // CENTRE a target that fits; align the TOP of one that does not (TJ,
+    // 2026-08-12, chasing the board beat). The board is 562px tall and `main`
+    // is 471 at a 1280×720 laptop: centring a target taller than its scroller
+    // pushes the top of it off the top of the screen — and the top of the
+    // board is the primary band, which is exactly where the card the beat
+    // asks you to drag has just landed. The beat then says "drag the cards"
+    // with the cards above the fold.
+    const scroller = el.closest("main") ?? document.documentElement
+    const fits = box.height <= scroller.getBoundingClientRect().height
+    el.scrollIntoView({ behavior: "smooth", block: fits ? "center" : "start", inline: "nearest" })
     return
   }
 }
@@ -346,7 +355,12 @@ export default function PracticeGuide() {
         if (!el) continue
         const box = el.getBoundingClientRect()
         if (box.top < 80 || box.bottom > window.innerHeight - 60) {
-          el.scrollIntoView({ block: "center", behavior: "smooth" })
+          // Same rule as `scrollToTarget`: a target taller than its scroller
+          // is aligned by its TOP, or centring hides the top of it — and the
+          // top of the board is where the beat's card is.
+          const scroller = el.closest("main") ?? document.documentElement
+          const fits = box.height <= scroller.getBoundingClientRect().height
+          el.scrollIntoView({ block: fits ? "center" : "start", behavior: "smooth" })
         }
         return
       }
