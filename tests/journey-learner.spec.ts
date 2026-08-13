@@ -239,17 +239,18 @@ test("04 · a projection per reading, and each keeps its own tiers and essence",
   await expect(page.locator("#yourRead2")).toHaveValue(/Bucciarelli's argument hangs on the object world/)
   await expect(page.locator("#mapMirror")).toContainText("1 primary")
 
-  // The cloth reflection lives here too: counted prompts, and the two states
-  // counted rather than hidden — the seeded concept with no passage and the
-  // seeded sentence-only thread. Both are designations, not faults: a concept
-  // may be named ahead of its evidence (TJ, 2026-08-08), which is why the
-  // wording is "no passage yet" and not a red instruction to fix it.
-  await expect(page.locator("#clothPrompts .prompt").first()).toBeVisible({ timeout: 15_000 })
-  await expect(page.getByText(/no label yet/).first()).toBeVisible()
-  // The log rides with the reading, one panel, not one per projection. Its own
-  // section since 2026-08-12 — it used to be a fold labelled "Capture Log"
-  // under the projections, which implied it changed with them.
-  await expect(page.locator(".sectionhead", { hasText: "The log" })).toHaveCount(1)
+  // The cloth reflection lives here too. Its counted-prompts panel — and with
+  // it the "no label yet" and "no passage yet" designations — is hidden behind
+  // SHOW_PROMPTS since 2026-08-13, so the graph takes the whole column. What
+  // the station shows is the cloth itself.
+  await expect(page.locator("#clothPrompts")).toHaveCount(0)
+  // The log rides with the reading, one panel, not one per projection. It was
+  // its own section from 2026-08-12 until 2026-08-13, when it became the second
+  // register of the CLOTH card — so it has no heading of its own to find, and
+  // the station draws the cloth exactly once. It used to draw it twice: the
+  // live one here and the log's own copy a screen below.
+  await expect(page.locator(".sectionhead", { hasText: "The log" })).toHaveCount(0)
+  await expect(page.locator("#map")).toHaveCount(1, { timeout: 15_000 })
   await expect(page.locator('input[aria-label="replay position, in acts"]')).toHaveCount(1, { timeout: 20_000 })
 
   // The other reading keeps its own, and neither leaks into the other.

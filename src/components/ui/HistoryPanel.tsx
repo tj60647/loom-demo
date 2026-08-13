@@ -4,9 +4,18 @@
 // grew, reconstructed by folding their own recorded acts. An instrument, not a
 // verdict: it renders and counts (red line #7) — no judgment, no comparison,
 // no advice. Nothing here writes; the record is read-only.
+//
+// Since 2026-08-13 this file is no longer a panel: it is the log's STATE
+// (`useCaptureLog`) and its two controls (`CaptureLogScrubber`,
+// `CaptureLogRecord`), which `ClothReflection` composes into the cloth card.
+// It drew a second `ClothMap` of its own until then, so 03 rendered the same
+// component twice a screen apart. The one cloth is upstairs now.
+//
+// `foldEvents` stays HERE by contract: `scripts/check-vocabulary.ts` reads this
+// file by path and asserts every kind `recordEvent` emits has a matching
+// `case`. Move the fold and that guard goes looking at an empty file.
 
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
 import ObjectDownload from "@/components/ui/ObjectDownload"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { short } from "@/lib/clothMath"
@@ -258,8 +267,18 @@ function foldEvents(events: GraphEvent[], upTo: number) {
   }
 }
 
-/** One line per act, past tense, in the student's own vocabulary. Never a judgment. */
-export default function HistoryPanel({ sourceId, scopeLabel }: {
+/**
+ * The record, the replay position, and the cloth as it stood at that position.
+ *
+ * A hook rather than a panel since 2026-08-13 (TJ: "the log is awesome and
+ * needs to be integrated into the cloth view, thus these are not separate
+ * cards but one card"). It used to own a second `ClothMap` of its own, so the
+ * station drew the same component twice a screen apart — once live, once
+ * folded. Now the cloth card owns the one drawing and this owns only time:
+ * `ClothReflection` reads `mapState` when the student scrubs back and its own
+ * live state at the end of the record.
+ */
+export function useCaptureLog({ sourceId, enabled = true }: {
   /**
    * Read this reading's acts only (TJ, 2026-08-10 — the Log lives on 03 now,
    * "specific to that reading, not all readings"). Absent = the whole record.
@@ -268,8 +287,15 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
    * has a reading of its own to read off.
    */
   sourceId?: string
-  /** Readable name for the scope, for the download's filename and heading. */
-  scopeLabel?: string
+  /**
+   * Whether to read the record at all. False in the practice loom, and it must
+   * gate the FETCH, not just the render: this reads the student's real acts
+   * over its own route, bypassing the provider, and an absent `sourceId` means
+   * "the whole record" — so a hook that mounted disabled and fetched anyway
+   * would pull their entire real history into a space that keeps nothing.
+   * The old panel got this for free by not being mounted at all.
+   */
+  enabled?: boolean
 } = {}) {
   const { state } = useLoom()
   const [events, setEvents] = useState<GraphEvent[] | null>(null)
@@ -278,13 +304,13 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
   // null = follow the end of the record ("now"); a number = a chosen point.
   const [pos, setPos] = useState<number | null>(null)
   /**
-   * Two ways to read the same record (TJ, 2026-08-12). The TIMELINE replays it
-   * — one position, the cloth as it stood at that act. The LIST is the record
-   * as a record: every act with the time it happened, which the timeline can
-   * only ever show one of. Clicking a row moves the replay, so they are two
-   * views of one position rather than two panels.
+   * The timeline/list chips are gone with the merge (2026-08-13). They existed
+   * because the replay and the record were two panels showing one position:
+   * you pressed a chip to move between them, and each had its own door back
+   * ("on the cloth ›", "in the list ›"). With one cloth in one card there is
+   * one position and no journey — the scrubber and the record now move the
+   * same drawing, so a row click needs no door and no view to switch to.
    */
-  const [view, setView] = useState<"timeline" | "list">("timeline")
   /** Running the replay forward on its own (TJ, 2026-08-12). */
   const [playing, setPlaying] = useState(false)
   /**
@@ -316,6 +342,7 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
   // must not re-run itself when the fetch lands and sets state.
   const loadedFor = useRef<string | null>(null)
   useEffect(() => {
+    if (!enabled) return
     const key = sourceId ?? "*"
     if (loadedFor.current === key) return
     loadedFor.current = key
@@ -324,7 +351,7 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
     // with every keystroke a student makes — depending on it would refetch the
     // whole record constantly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceId])
+  }, [sourceId, enabled])
 
   /**
    * The replay position, in ACTS. 1 is the first recorded act — not 0, which
@@ -377,20 +404,6 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
   }, [playing, k, events])
 
   /**
-   * Arriving in the list, land on the act you were looking at. Without this,
-   * "in the list ›" from act 60 of 66 opens a list scrolled to act 1 and the
-   * marked row is somewhere below the fold — the door would technically work
-   * and practically strand you.
-   */
-  const listRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (view !== "list") return
-    listRef.current
-      ?.querySelector(`[data-act="${k}"]`)
-      ?.scrollIntoView({ block: "center", behavior: "auto" })
-  }, [view, k])
-
-  /**
    * What the current act touched, for the glow. A passage is not drawn on the
    * cloth, so a capture glows the CONCEPT it was filed under — which is what
    * visibly changed. Concepts and threads glow themselves.
@@ -410,11 +423,63 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
     ? eventDate(current).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
     : null
 
-  /** A list row's stamp: short enough to sit in a column, exact to the minute. */
-  const stamp = (e: GraphEvent) =>
-    eventDate(e).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-  const dayOf = (e: GraphEvent) =>
-    eventDate(e).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })
+  return {
+    events, loading, failed, reload: load,
+    k, atMax, current, when, cloth, mapState, glowId, pulse,
+    goTo, playing, setPlaying,
+    /**
+     * Whether the student has moved the scrubber at all. The cloth glows only
+     * once they have: on arrival the card should be a calm drawing of their
+     * work, not a pulse on whatever they happened to do last.
+     */
+    scrubbed: pos !== null,
+    /**
+     * Safe to draw time. False while the record loads, when it fails, and when
+     * there is nothing recorded — in every one of those the cloth card still
+     * renders its live drawing and simply shows no scrubber. The log must never
+     * be able to blank the cloth.
+     */
+    ready: events !== null && events.length > 0 && mapState !== null,
+  }
+}
+
+export type CaptureLog = ReturnType<typeof useCaptureLog>
+
+/** A list row's stamp: short enough to sit in a column, exact to the minute. */
+const stamp = (e: GraphEvent) =>
+  eventDate(e).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+const dayOf = (e: GraphEvent) =>
+  eventDate(e).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })
+
+/**
+ * The record itself — every act in order, under the cloth it produced.
+ *
+ * Folded shut by default (2026-08-13): the card's first job is the drawing,
+ * and 60 rows of prose above the fold would bury it. Open it and a row click
+ * moves the scrubber, which moves the one cloth above.
+ */
+export function CaptureLogRecord({ log, scopeLabel }: {
+  log: CaptureLog
+  /** Readable name for the scope, for the download's filename and heading. */
+  scopeLabel?: string
+}) {
+  const { state } = useLoom()
+  const [open, setOpen] = useState(false)
+  const { events, k, goTo } = log
+
+  /**
+   * Land on the act you were looking at. Opening the record at act 60 of 66
+   * with the list scrolled to act 1 would put the marked row below the fold —
+   * technically working and practically stranding you. Runs on open and as the
+   * position moves, so playing the replay walks the list along with it.
+   */
+  const listRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    listRef.current
+      ?.querySelector(`[data-act="${k}"]`)
+      ?.scrollIntoView({ block: "center", behavior: "auto" })
+  }, [open, k])
 
   /**
    * What the act was ABOUT (TJ, 2026-08-12: "the list view should include more
@@ -513,43 +578,28 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
     return bits.length ? <span className="logctx">{bits}</span> : null
   }
 
-  return (
-    <div className="card">
-      <div className="mapbar" style={{ marginBottom: 8 }}>
-        {/* The heading above says WHAT this is; this says how to use it and
-            what a row holds. They both opened with "how this cloth came to
-            be" until TJ read them together (2026-08-12: "these are odd
-            together, perhaps redundant?"). ("counted, never judged" stood here
-            before that — the build's own phrase, red line #7, which said
-            nothing a student needed.) */}
-        <span className="hint" style={{ margin: 0 }}>
-          Replay it act by act, or read it as a record — each entry keeps the words you
-          kept, the name you gave them, and the note you wrote at the time.
-        </span>
-        {/* Two views of one record, and of one position: the chips read like
-            the projection switcher above them because they do the same job. */}
-        {events !== null && events.length > 0 && (
-          <span className="chips" style={{ margin: 0, marginLeft: "auto", alignItems: "center" }}>
-            {(["timeline", "list"] as const).map((v) => (
-              <span
-                key={v}
-                className={`chip${view === v ? " on" : ""}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => setView(v)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setView(v) } }}
-              >{v}</span>
-            ))}
-          </span>
-        )}
-      </div>
+  if (!events || events.length === 0) return null
 
-      {/* The Log downloads too (TJ, 2026-08-10) — it is the one object that
-          has never been in any file, so without this it would be the only
-          work a student cannot take with them. Only once the record is
-          loaded: there is nothing to hand over before that. */}
-      {events !== null && events.length > 0 && (
-        <div style={{ margin: "6px 0 10px" }}>
+  return (
+    <>
+      <div className="logbar" style={{ marginTop: 2 }}>
+        <button
+          type="button"
+          className="btn ghost mini"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+        >
+          {open ? "▾ the record" : "▸ the record"}
+        </button>
+        <span className="cap">
+          {events.length} act{events.length !== 1 ? "s" : ""} — each keeps the words you kept,
+          the name you gave them, and the note you wrote at the time
+        </span>
+        {/* The Log downloads too (TJ, 2026-08-10) — it is the one object that
+            has never been in any file, so without this it would be the only
+            work a student cannot take with them. Beside the disclosure rather
+            than inside it: you should not have to open the record to take it. */}
+        <span style={{ marginLeft: "auto" }}>
           <ObjectDownload
             kind="capture-log"
             noun="the log"
@@ -558,33 +608,11 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
             json={(p) => JSON.stringify(buildLogExport(events, p, scopeLabel), null, 2)}
             markdown={(p) => buildLogMarkdown(events, p, scopeLabel)}
           />
-        </div>
-      )}
+        </span>
+      </div>
 
-      {loading && <p className="ghostnote">reading the record…</p>}
-
-      {failed && !loading && (
-        <p className="ghostnote">
-          could not read the record{" "}
-          <button
-            type="button"
-            className="act"
-            style={{ background: "none", border: "none", padding: 0 }}
-            onClick={load}
-          >
-            try again
-          </button>
-        </p>
-      )}
-
-      {events !== null && events.length === 0 && (
-        <div className="empty">
-          <span className="cap">no weaving recorded yet — the record starts as you work</span>
-        </div>
-      )}
-
-      {events !== null && events.length > 0 && view === "list" && (
-        <div className="scrollbox" ref={listRef}>
+      {open && (
+        <div className="scrollbox" ref={listRef} style={{ marginTop: 8 }}>
           {events.map((e, i) => {
             // A day heading where the date turns over. A term's record is
             // mostly made of sittings, and seeing where one ended is half of
@@ -593,38 +621,28 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
             return (
               <Fragment key={e.id}>
                 {newDay && <div className="logday">{dayOf(e)}</div>}
-                {/* A row click moves the replay and STAYS here (TJ,
-                    2026-08-12: "clicking a row in the log list should not take
-                    us out of the list"). Reading the record and watching the
-                    cloth are two different jobs; the view changes only when
-                    the badge says it will. */}
+                {/* A row click moves the scrubber, and the cloth above moves
+                    with it. The "on the cloth ›" door each row used to carry is
+                    gone: it existed to switch you to the other panel, and there
+                    is no other panel now — the cloth is already on screen. */}
                 <div
                   className={`logrow${i + 1 === k ? " on" : ""}`}
                   data-act={i + 1}
                   role="button"
                   tabIndex={0}
-                  title="mark this act — the replay moves with you"
+                  title="see the cloth as it stood at this act"
                   onClick={() => goTo(i + 1)}
                   onKeyDown={(ev) => {
                     if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); goTo(i + 1) }
                   }}
                 >
-                  {/* The stamp the timeline cannot show: it holds one position,
+                  {/* The stamp the scrubber cannot show: it holds one position,
                       and this is every act's own time (TJ, 2026-08-12). */}
                   <span className="logwhen">{stamp(e)}</span>
                   <span className="logwhat">
                     <span className="logact">{describeEvent(e)}</span>
                     {contextOf(e)}
                   </span>
-                  {/* The door to the other view, said out loud. */}
-                  <button
-                    type="button"
-                    className="logjump"
-                    title="see the cloth as it stood at this act"
-                    onClick={(ev) => { ev.stopPropagation(); goTo(i + 1); setView("timeline") }}
-                  >
-                    on the cloth ›
-                  </button>
                   <span className="logn">{i + 1}</span>
                 </div>
               </Fragment>
@@ -632,118 +650,145 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
           })}
         </div>
       )}
+    </>
+  )
+}
 
-      {events !== null && events.length > 0 && cloth && mapState && view === "timeline" && (
-        <>
-          {/* Ticked by ACT, not by clock (TJ, 2026-08-12): the record's own
-              unit is the act, and spacing by time would bunch a working
-              evening into a smear and stretch the gap to next week across half
-              the bar. One notch per act, evenly spaced.
-              Starts at 1 — the first act. It started at 0, "before the first
-              recorded act", which is a state nobody ever made. */}
-          {/* ONE set of ticks (TJ, 2026-08-12: "the slider ticks and the
-              timeline ticks dont line up. maybe we only need the slider
-              ticks"). There were two, and they could not agree: the browser
-              paints `list=` ticks across the whole track while the thumb only
-              travels between its own half-widths, so the drawn strip and the
-              native marks were offset by 8px at each end and drifted in
-              between. The datalist is gone; the drawn strip is inset by the
-              thumb's radius so a mark sits exactly under the thumb that
-              selects it. */}
-          <input
-            type="range"
-            className="logslider"
-            min={1}
-            max={events.length}
-            step={1}
-            value={k}
-            onChange={(ev) => { setPlaying(false); goTo(Number(ev.target.value)) }}
-            aria-label="replay position, in acts"
-            aria-valuetext={current ? `act ${k} of ${events.length} — ${describeEvent(current)}` : undefined}
-            style={{ width: "100%", margin: "4px 0 0" }}
-          />
-          {/* Spaced BY ACT, which is the whole point: by clock, an evening's
-              work smears into one blur and the gap to next week takes half the
-              bar. Above ~180 acts the marks would merge into a rule, so they
-              thin to every nth and the strip keeps meaning "many". */}
-          {events.length > 1 && (
-            <div
-              className="logtickbar"
-              aria-hidden="true"
-              style={{
-                backgroundImage: `repeating-linear-gradient(90deg, var(--grey) 0 1px, transparent 1px ${
-                  (100 / (events.length - 1)) * Math.ceil((events.length - 1) / 180)
-                }%)`,
-              }}
-            />
-          )}
-          <div className="logbar">
-            {/* Play runs it forward a beat at a time and stops at the end. At
-                the end it starts over, because that is the only thing the word
-                can mean there. */}
-            <button
-              type="button"
-              className="btn ghost mini"
-              onClick={() => {
-                if (playing) { setPlaying(false); return }
-                if (atMax) goTo(1)
-                setPlaying(true)
-              }}
-              aria-pressed={playing}
-            >
-              {playing ? "❚❚ pause" : atMax ? "▶ replay from the start" : "▶ play"}
-            </button>
-            <span className="cap">act {k} of {events.length}{atMax ? " · now" : ""}</span>
-            {/* The badge back, the mirror of the list's (TJ, 2026-08-12:
-                "and conversely for the [timeline]"). */}
-            <button
-              type="button"
-              className="logjump"
-              title="find this act in the record"
-              onClick={() => { setPlaying(false); setView("list") }}
-            >
-              in the list ›
-            </button>
-          </div>
+/**
+ * Time, under the cloth it belongs to: a scrubber from the first recorded act
+ * to now, a play button, and the shape of the cloth at wherever you are.
+ *
+ * It draws no map of its own — that is the whole point of the merge. The one
+ * `ClothMap` in the card above reads `log.mapState` while this sits away from
+ * the end of the record.
+ */
+export function CaptureLogScrubber({ log }: { log: CaptureLog }) {
+  const { events, k, goTo, playing, setPlaying, atMax, current, when, cloth, loading, failed, reload } = log
 
-          {/* The counts are the cloth's SHAPE at this act — the three things
-              drawn below. "· the read, revised once so far" used to hang off
-              the end of them and TJ read it as irrelevant (2026-08-12); it was
-              worse than that. It counted `read.update` and cloth-description
-              edits, so it named an object that no longer exists: "the read"
-              was the cloth's paragraph before migration 0021 replaced it with
-              the Cloth Description, and today "your read" means a
-              PROJECTION's paragraph, a different object again. It counted a
-              thing you cannot see, under a name for something else, next to
-              three things you can. The acts it counted are in the list, said
-              plainly: "revised a cloth's description · the description". */}
-          <p className="cap" style={{ margin: "4px 0 2px" }}>
-            {cloth.concepts.length} concepts · {cloth.edges.length} threads · {cloth.passages.length} passages —{" "}
-            {atMax ? "now" : when ? `as of ${when}` : "at the first recorded act"}
-          </p>
-          {current && (
-            <p className="ghostnote" style={{ margin: "0 0 8px" }}>
-              {describeEvent(current)}
-            </p>
-          )}
+  if (loading) return <p className="ghostnote" style={{ margin: "8px 0 0" }}>reading the record…</p>
 
-          {/* Same frame as #mapWrap, inlined so this panel never duplicates the
-              Weave tab's id when both sit on one page. */}
-          <div
-            style={{
-              border: "1px solid var(--rule)",
-              borderRadius: "4px",
-              background: "radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec",
-            }}
-          >
-            <ReadOnlyClothMap state={mapState} glow={glowId ? { id: glowId, seq: pulse } : null} />
-          </div>
+  if (failed) {
+    return (
+      <p className="ghostnote" style={{ margin: "8px 0 0" }}>
+        could not read the record{" "}
+        <button
+          type="button"
+          className="act"
+          style={{ background: "none", border: "none", padding: 0 }}
+          onClick={reload}
+        >
+          try again
+        </button>
+      </p>
+    )
+  }
 
-          {/* The second "counted, never judged", and it also promised a reset
-              that was deleted with Keep on 2026-08-11. Both gone: the panel
-              says what it is once, at the top. */}
-        </>
+  if (!events || events.length === 0 || !cloth) {
+    return (
+      <p className="ghostnote" style={{ margin: "8px 0 0" }}>
+        no weaving recorded yet — the record starts as you work
+      </p>
+    )
+  }
+
+  return (
+    <>
+      {/* Ticked by ACT, not by clock (TJ, 2026-08-12): the record's own unit is
+          the act, and spacing by time would bunch a working evening into a
+          smear and stretch the gap to next week across half the bar. One notch
+          per act, evenly spaced.
+          Starts at 1 — the first act. It started at 0, "before the first
+          recorded act", which is a state nobody ever made. */}
+      {/* ONE set of ticks (TJ, 2026-08-12: "the slider ticks and the timeline
+          ticks dont line up. maybe we only need the slider ticks"). There were
+          two, and they could not agree: the browser paints `list=` ticks across
+          the whole track while the thumb only travels between its own
+          half-widths, so the drawn strip and the native marks were offset by
+          8px at each end and drifted in between. The datalist is gone; the
+          drawn strip is inset by the thumb's radius so a mark sits exactly
+          under the thumb that selects it. */}
+      <input
+        type="range"
+        className="logslider"
+        min={1}
+        max={events.length}
+        step={1}
+        value={k}
+        onChange={(ev) => { setPlaying(false); goTo(Number(ev.target.value)) }}
+        aria-label="replay position, in acts"
+        aria-valuetext={current ? `act ${k} of ${events.length} — ${describeEvent(current)}` : undefined}
+        style={{ width: "100%", margin: "4px 0 0" }}
+      />
+      {/* Spaced BY ACT, which is the whole point: by clock, an evening's work
+          smears into one blur and the gap to next week takes half the bar.
+          Above ~180 acts the marks would merge into a rule, so they thin to
+          every nth and the strip keeps meaning "many". */}
+      {events.length > 1 && (
+        <div
+          className="logtickbar"
+          aria-hidden="true"
+          style={{
+            backgroundImage: `repeating-linear-gradient(90deg, var(--grey) 0 1px, transparent 1px ${
+              (100 / (events.length - 1)) * Math.ceil((events.length - 1) / 180)
+            }%)`,
+          }}
+        />
       )}
-    </div>
+      <div className="logbar">
+        {/* Play runs it forward a beat at a time and stops at the end. At the
+            end it starts over, because that is the only thing the word can
+            mean there. */}
+        <button
+          type="button"
+          className="btn ghost mini"
+          onClick={() => {
+            if (playing) { setPlaying(false); return }
+            if (atMax) goTo(1)
+            setPlaying(true)
+          }}
+          aria-pressed={playing}
+        >
+          {playing ? "❚❚ pause" : atMax ? "▶ replay from the start" : "▶ play"}
+        </button>
+        <span className="cap">act {k} of {events.length}{atMax ? " · now" : ""}</span>
+        {/* Back to the live cloth in one press. Dragging the scrubber the last
+            few pixels is a fiddly way to say "never mind, show me my work". */}
+        {!atMax && (
+          <button
+            type="button"
+            className="act"
+            style={{ background: "none", border: "none", padding: 0 }}
+            onClick={() => { setPlaying(false); goTo(events.length) }}
+          >
+            back to now ›
+          </button>
+        )}
+      </div>
+
+      {/* The counts are the cloth's SHAPE at this act — the three things drawn
+          above. "· the read, revised once so far" used to hang off the end of
+          them and TJ read it as irrelevant (2026-08-12); it was worse than
+          that. It counted `read.update` and cloth-description edits, so it
+          named an object that no longer exists: "the read" was the cloth's
+          paragraph before migration 0021 replaced it with the Cloth
+          Description, and today "your read" means a PROJECTION's paragraph, a
+          different object again. It counted a thing you cannot see, under a
+          name for something else, next to three things you can. The acts it
+          counted are in the record, said plainly. */}
+      {/* Counted one at a time: "1 concepts · 0 threads" is the same slip TJ
+          caught on My Loom (commit 66172a1, "1 threads" becomes "1 thread"),
+          and the first act of any record is always a 1. */}
+      <p className="cap" style={{ margin: "4px 0 2px" }}>
+        {cloth.concepts.length} concept{cloth.concepts.length !== 1 ? "s" : ""} ·{" "}
+        {cloth.edges.length} thread{cloth.edges.length !== 1 ? "s" : ""} ·{" "}
+        {cloth.passages.length} passage{cloth.passages.length !== 1 ? "s" : ""} —{" "}
+        {atMax ? "now" : when ? `as of ${when}` : "at the first recorded act"}
+      </p>
+      {current && !atMax && (
+        <p className="ghostnote" style={{ margin: "0 0 4px" }}>
+          {describeEvent(current)}
+        </p>
+      )}
+    </>
   )
 }

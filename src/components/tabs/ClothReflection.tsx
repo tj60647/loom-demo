@@ -17,6 +17,7 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import type { Edge, Tier } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
 import ClothMap from "@/components/svg/ClothMap"
+import { useCaptureLog, CaptureLogScrubber, CaptureLogRecord } from "@/components/ui/HistoryPanel"
 
 /**
  * "What the cloth shows you" — the counted prompts, the threads they lay out,
@@ -31,7 +32,7 @@ import ClothMap from "@/components/svg/ClothMap"
  */
 const SHOW_PROMPTS = false
 
-export default function ClothReflection({ onProjectionCreated }: {
+export default function ClothReflection({ onProjectionCreated, showLog = false, sourceId, scopeLabel }: {
   /**
    * Take the student to the projection they just made (TJ, 2026-08-12:
    * "clicking the create projection button should also navigate us to the new
@@ -41,6 +42,17 @@ export default function ClothReflection({ onProjectionCreated }: {
    * owns that section's DOM.
    */
   onProjectionCreated?: () => void
+  /**
+   * Draw time under the cloth. Off in the practice loom, which must not read
+   * the student's real record: the log fetches over its own route, bypassing
+   * the provider, so it would show their actual work inside a space that keeps
+   * nothing.
+   */
+  showLog?: boolean
+  /** This reading's acts only — see `useCaptureLog`. */
+  sourceId?: string
+  /** Readable name for the scope, for the log download's filename. */
+  scopeLabel?: string
 } = {}) {
   // The cloth and the counted report are this scope's — the scoped graph's
   // edges have both ends in scope by construction, so every concept lookup
@@ -54,6 +66,22 @@ export default function ClothReflection({ onProjectionCreated }: {
   const [drafted, setDrafted] = useState("")
   const [showClothInfo, setShowClothInfo] = useState(false)
   const closeInfoButtonRef = useRef<HTMLButtonElement>(null)
+
+  /**
+   * The cloth over time (TJ, 2026-08-13). The hook is called unconditionally —
+   * hooks must be — so `enabled` is what keeps the practice loom from reading
+   * the student's real record. Gating only the render would still fetch it.
+   */
+  const log = useCaptureLog({ sourceId, enabled: showLog })
+  /**
+   * WHICH cloth the one map draws. Live state at the end of the record, the
+   * folded reconstruction anywhere behind it. `log.ready` is false while the
+   * record loads, when it fails, and when nothing is recorded — in every one of
+   * those this stays false and the card draws the student's real work. The log
+   * can hide its own scrubber; it can never blank the cloth.
+   */
+  const inThePast = showLog && log.ready && !log.atMax
+  const drawn = inThePast && log.mapState ? log.mapState : state
 
   type ReadPrompt = {
     key: string
@@ -349,10 +377,21 @@ export default function ClothReflection({ onProjectionCreated }: {
         Warp in reading order; weft arcs across.{SHOW_PROMPTS
           ? " Click a prompt beside this to trace it here — or click a concept/arc directly to pull it."
           : " Click a concept or arc to trace it."}
+        {showLog && " Scrub below to see how it grew."}
       </p>
 
+      {/* ONE cloth. It draws the student's live weave, or — while the scrubber
+          sits back from the end of the record — the same weave folded to the
+          act they are looking at. The glow marks what that act touched, and
+          only once they have actually moved: on arrival this is a calm drawing
+          of their work, not a pulse on whatever they last happened to do. */}
       <div id="mapWrap">
-        <ClothMap state={state} readSel={readSel} setReadSel={setReadSel} />
+        <ClothMap
+          state={drawn}
+          readSel={readSel}
+          setReadSel={setReadSel}
+          glow={showLog && log.scrubbed && log.glowId ? { id: log.glowId, seq: log.pulse } : null}
+        />
       </div>
 
       <div className="legend">
@@ -361,6 +400,18 @@ export default function ClothReflection({ onProjectionCreated }: {
         <span><span className="sw" style={{borderTop: "2px dashed var(--grey)"}}></span>unlabelled — description only</span>
         <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>what you&apos;re tracing</span>
       </div>
+
+      {/* The log, in the same card as the cloth it describes (TJ, 2026-08-13).
+          A rule rather than a card edge: these are two registers of one thing —
+          the cloth, and the cloth over time — not two objects sitting next to
+          each other. It was its own section with its own heading and its own
+          second drawing of the same graph until today. */}
+      {showLog && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--rule)" }}>
+          <CaptureLogScrubber log={log} />
+          <CaptureLogRecord log={log} scopeLabel={scopeLabel} />
+        </div>
+      )}
       </div>
 
       {SHOW_PROMPTS && <div className="card">

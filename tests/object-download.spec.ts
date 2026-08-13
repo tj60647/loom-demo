@@ -79,10 +79,11 @@ test.describe('Download at the object', () => {
     await page.locator('nav[aria-label="The journey"] button', { hasText: 'Knowledge Graph' }).click();
 
     // It used to render here only at the whole weave — a surface nothing
-    // links to, which is how it came to be stranded on Keep. Since 2026-08-12
-    // it is the station's third SECTION rather than a fold: no disclosure to
-    // open, and the record loads on arrival.
-    await expect(page.locator('.sectionhead', { hasText: 'The log' })).toBeVisible({ timeout: 15_000 });
+    // links to, which is how it came to be stranded on Keep. It was the
+    // station's third SECTION from 2026-08-12, and since 2026-08-13 it is the
+    // second register of the CLOTH card: no heading of its own, one drawing on
+    // the station rather than two, and the record still loading on arrival.
+    await expect(page.locator('#map')).toHaveCount(1, { timeout: 15_000 });
     await expect(page.locator('input[aria-label="replay position, in acts"]')).toBeVisible({ timeout: 20_000 });
 
     // By NAME, not by being the only one: since 2026-08-12 the buttons say
@@ -124,9 +125,12 @@ test.describe('Download at the object', () => {
     }).toPass({ timeout: 40_000, intervals: [500, 1_000, 2_000] });
     await page.locator('nav[aria-label="The journey"] button', { hasText: 'Knowledge Graph' }).click();
     // It reads the student's REAL record over its own route, bypassing the
-    // provider — it must not appear inside a space that keeps nothing. Both
-    // halves asserted: the section that would head it, and the replay itself.
-    await expect(page.locator('.sectionhead', { hasText: 'The log' })).toHaveCount(0);
+    // provider — it must not appear inside a space that keeps nothing. Since
+    // 2026-08-13 the log is a register of the cloth card rather than its own
+    // section, so a missing heading would prove nothing: what must hold is that
+    // the card still draws the practice cloth and carries no replay with it.
+    await expect(page.locator('#map')).toHaveCount(1);
     await expect(page.locator('input[aria-label="replay position, in acts"]')).toHaveCount(0);
+    await expect(page.locator('.objdl button', { hasText: /download the log/ })).toHaveCount(0);
   });
 });

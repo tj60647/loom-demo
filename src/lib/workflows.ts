@@ -94,7 +94,14 @@ const student: Flow = {
     // picture drew an arrow from a node labelled "04 · Vocabulary" into one
     // labelled "03 · Knowledge Graph" and the numbers ran backwards on screen.
     { id: "sort", label: "Sort into tiers, arrange the cards", where: "03 · Knowledge Graph" },
-    { id: "write", label: "Trace the prompts, write the one-line and the read", where: "03 · Knowledge Graph" },
+    // "Trace the prompts" until 2026-08-13, when TJ hid the counted-prompts
+    // panel so the cloth could take the full column (ClothReflection's
+    // SHOW_PROMPTS). Tracing did not go away — you click a concept or an arc on
+    // the cloth itself — but the prompts that used to name what to trace are
+    // not on screen, and the same rule as the merge control below applies: a
+    // step the student can no longer take would simply be drawn, wrongly,
+    // forever.
+    { id: "write", label: "Trace the cloth, write the one-line and the read", where: "03 · Knowledge Graph" },
     // "merge duplicates" was the second half of this step until 2026-08-12,
     // when TJ hid the merge control pending what it means and what it costs
     // (VocabularyTab's MERGE_VISIBLE). The diagram is generated, so a step the

@@ -25,7 +25,6 @@ import { downloadText } from "@/lib/download"
 import CardMenu from "@/components/map/CardMenu"
 import ObjectDownload from "@/components/ui/ObjectDownload"
 import ClothReflection from "@/components/tabs/ClothReflection"
-import HistoryPanel from "@/components/ui/HistoryPanel"
 
 const TIERS: [Tier, string][] = [["p", "PRIMARY"], ["s", "SECONDARY"], ["t", "TERTIARY"]]
 const TABLE_H = 560
@@ -629,7 +628,17 @@ export default function MapTab({ practice = false }: {
       <h2 className="sectionhead">
         The cloth <span className="n">what you have woven — one per reading, and the material for everything below</span>
       </h2>
-      <ClothReflection onProjectionCreated={goToProjections} />
+      {/* The cloth and its log are one card now (TJ, 2026-08-13): the log used
+          to be its own section at the foot of the station, drawing a second
+          copy of this same graph. `practice` still gates it — it reads the
+          student's REAL record over its own route, bypassing the provider, so
+          it would show their actual work inside a space that keeps nothing. */}
+      <ClothReflection
+        onProjectionCreated={goToProjections}
+        showLog={!practice}
+        sourceId={soleSourceId(scope) ?? undefined}
+        scopeLabel={scopeLabelOf(scope.key, titleOf)}
+      />
 
       <h2 className="sectionhead" id="projections" ref={projectionsRef} style={{ marginTop: 34 }}>
         Projections <span className="n">each one a reading of that same cloth, with its own tiers, one-line and paragraph</span>
@@ -937,29 +946,12 @@ export default function MapTab({ practice = false }: {
       </div>
       </div>
 
-      {/* The third section (TJ, 2026-08-12: "the cloth, projections, the
-          log"). It belongs to the CLOTH rather than to any projection — it
-          records how this cloth came to be and does not change when you switch
-          projections — but it is a different KIND of thing from either, so it
-          gets its own heading instead of riding under the weave. Scoped to
-          this reading since 2026-08-10; before that it rendered only at the
-          whole weave, a surface nothing linked to, which is how it came to be
-          stranded on Keep.
-
-          Not in the practice loom: it reads the student's REAL record over its
-          own route, bypassing the provider, so it would show their actual work
-          inside a space that keeps nothing. */}
-      {!practice && (
-        <>
-          <h2 className="sectionhead" style={{ marginTop: 34 }}>
-            The log <span className="n">every act that made this cloth, in the order you made them</span>
-          </h2>
-          <HistoryPanel
-            sourceId={soleSourceId(scope) ?? undefined}
-            scopeLabel={scopeLabelOf(scope.key, titleOf)}
-          />
-        </>
-      )}
+      {/* The log was the third section here (TJ, 2026-08-12: "the cloth,
+          projections, the log") until 2026-08-13, when it moved into the cloth
+          card — it always belonged to the CLOTH rather than to any projection,
+          and as its own section it drew a second copy of the same graph a
+          screen below the first. It is scoped, gated and rendered up there
+          now; the station is two sections. */}
     </>
   )
 }
