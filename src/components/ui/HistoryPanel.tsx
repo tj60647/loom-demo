@@ -5,14 +5,20 @@
 // verdict: it renders and counts (red line #7) — no judgment, no comparison,
 // no advice. Nothing here writes; the record is read-only.
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
 import ObjectDownload from "@/components/ui/ObjectDownload"
 import { useLoom } from "@/components/providers/LoomProvider"
+import { short } from "@/lib/clothMath"
 import { getGraphEvents } from "@/lib/reads"
 import { eventsForReading } from "@/lib/logScope"
 import { buildLogExport, buildLogMarkdown } from "@/lib/objectExport"
 import type { Passage, Concept, Edge, GraphEvent, LoomState } from "@/lib/types"
+
+/** The tier letters as the student reads them on the Sort list. */
+const TIER_WORD: Record<string, string> = {
+  p: "primary", s: "secondary", t: "tertiary", x: "set aside", "": "unsorted",
+}
 
 // Events arrive through a server-action boundary; be tolerant of a Date that
 // serialized to a string.
@@ -392,15 +398,117 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
 
   /** A list row's stamp: short enough to sit in a column, exact to the minute. */
   const stamp = (e: GraphEvent) =>
-    eventDate(e).toLocaleString([], {
-      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-    })
+    eventDate(e).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  const dayOf = (e: GraphEvent) =>
+    eventDate(e).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })
+
+  /**
+   * What the act was ABOUT (TJ, 2026-08-12: "the list view should include more
+   * contextual data to help log ones memory about a decision. not just the
+   * act… the idea is to help the student remember their decision making
+   * process").
+   *
+   * A verb alone — "captured a passage" — is the one thing a student cannot
+   * fail to remember and the one thing that tells them nothing. What brings
+   * the moment back is what they WROTE: the words they kept, the note they
+   * wrote about keeping them, the name they gave the idea, the sentence they
+   * would defend. Four places, and this shows whichever the act touched.
+   *
+   * Payload first, live rows second. The payload is what the act itself
+   * recorded and cannot change afterwards; the passage's text and note and a
+   * concept's description live on rows that may since have been edited or
+   * deleted — so they are shown when they resolve and simply absent when they
+   * do not, which is the honest state for a log that outlives its rows.
+   */
+  const conceptLabel = (id: unknown): string | null =>
+    typeof id === "string" ? state.concepts.find((c) => c.id === id)?.label ?? null : null
+  const contextOf = (e: GraphEvent): ReactNode => {
+    const p = (e.payload ?? {}) as Record<string, unknown>
+    const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null)
+    const passage = e.entityType === "passage" && e.entityId
+      ? state.passages.find((b) => b.id === e.entityId)
+      : undefined
+    const bits: ReactNode[] = []
+
+    if (passage) {
+      bits.push(<span key="q" className="logquote">&ldquo;{short(passage.content, 220)}&rdquo;</span>)
+      const note = str(passage.note)
+      if (note) bits.push(<span key="n" className="lognote">your note: {short(note, 180)}</span>)
+    }
+    // The concepts it was filed under — by label, resolved now, because the
+    // payload records ids and an id says nothing to a person.
+    const filed = Array.isArray(p.conceptIds)
+      ? (p.conceptIds as unknown[]).map(conceptLabel).filter(Boolean)
+      : [conceptLabel(p.conceptId)].filter(Boolean)
+    if (filed.length) bits.push(<span key="f" className="logmeta">under {filed.join(" · ")}</span>)
+
+    if (e.entityType === "concept") {
+      const label = str(p.label) ?? conceptLabel(e.entityId)
+      const def = e.entityId ? str(state.concepts.find((c) => c.id === e.entityId)?.def) : null
+      if (label && !/"/.test(describeEvent(e))) bits.push(<span key="c" className="logmeta">{label}</span>)
+      if (def) bits.push(<span key="d" className="lognote">your description: {short(def, 180)}</span>)
+    }
+
+    if (e.entityType === "edge") {
+      const from = conceptLabel(p.fromId), to = conceptLabel(p.toId)
+      const sentence = str(p.sentence)
+      if (from && to) bits.push(<span key="t" className="logmeta">{from} → {to}</span>)
+      if (sentence) bits.push(<span key="s" className="logquote">&ldquo;{short(sentence, 180)}&rdquo;</span>)
+    }
+
+    // A sort is a judgement about what this projection hangs on, and the act
+    // recorded WHICH concepts moved and where to (`changed`). Without this the
+    // commonest row in a working session reads "re-sorted a projection" and
+    // remembers nothing.
+    if (p.changed && typeof p.changed === "object") {
+      const moves = Object.entries(p.changed as Record<string, string>)
+        .map(([cid, tier]) => {
+          const label = conceptLabel(cid)
+          return label ? `${label} → ${TIER_WORD[tier] ?? "unsorted"}` : null
+        })
+        .filter(Boolean) as string[]
+      if (moves.length) {
+        bits.push(
+          <span key="m" className="logmeta">
+            {moves.slice(0, 4).join(" · ")}{moves.length > 4 ? ` · +${moves.length - 4} more` : ""}
+          </span>
+        )
+      }
+    }
+
+    // Which piece of writing was touched. The payload keeps only a character
+    // count — deliberately, it is not a copy of the student's prose — but
+    // WHICH field it was is the part worth remembering.
+    const fields = [
+      p.essenceChars !== undefined ? "the one-line" : null,
+      p.readChars !== undefined ? "the paragraph" : null,
+      p.titleChars !== undefined ? "the title" : null,
+      p.descriptionChars !== undefined ? "the description" : null,
+    ].filter(Boolean)
+    if (fields.length) bits.push(<span key="fl" className="logmeta">{fields.join(" · ")}</span>)
+
+    if (e.entityType === "cloth") {
+      const title = str(state.cloths.find((c) => c.id === e.entityId)?.title)
+      if (title) bits.push(<span key="ct" className="logmeta">{title}</span>)
+    }
+
+    // Where it came from, which is how you find it again in the text.
+    const where = [str(p.source), str(p.location)].filter(Boolean).join(" · ")
+    if (where) bits.push(<span key="w" className="logmeta">{where}</span>)
+
+    return bits.length ? <span className="logctx">{bits}</span> : null
+  }
 
   return (
     <div className="card">
       <div className="mapbar" style={{ marginBottom: 8 }}>
+        {/* "counted, never judged" is the build's own phrase (red line #7) and
+            it had leaked into student copy in two places here. TJ, 2026-08-12:
+            "i dont get the counted never judged line, that seems weird." It
+            said nothing a student needed; this says what the log is FOR. */}
         <span className="hint" style={{ margin: 0 }}>
-          Every act that made this cloth, in the order you made them — counted, never judged.
+          How this reading became a cloth: the words you kept, the names you gave them,
+          and what you wrote at the time — in the order it happened.
         </span>
         {/* Two views of one record, and of one position: the chips read like
             the projection switcher above them because they do the same job. */}
@@ -460,25 +568,36 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
 
       {events !== null && events.length > 0 && view === "list" && (
         <div className="scrollbox">
-          {events.map((e, i) => (
-            <div
-              key={e.id}
-              className={`logrow${i + 1 === k ? " on" : ""}`}
-              role="button"
-              tabIndex={0}
-              title="show the cloth as it stood after this act"
-              onClick={() => { setPos(i + 1); setView("timeline") }}
-              onKeyDown={(ev) => {
-                if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); setPos(i + 1); setView("timeline") }
-              }}
-            >
-              {/* The stamp the timeline cannot show: it has one position, and
-                  this is every act's own time (TJ, 2026-08-12). */}
-              <span className="logwhen">{stamp(e)}</span>
-              <span className="logwhat">{describeEvent(e)}</span>
-              <span className="logn">{i + 1}</span>
-            </div>
-          ))}
+          {events.map((e, i) => {
+            // A day heading where the date turns over. A term's record is
+            // mostly made of sittings, and seeing where one ended is half of
+            // remembering what you were doing in it.
+            const newDay = i === 0 || dayOf(e) !== dayOf(events[i - 1])
+            return (
+              <Fragment key={e.id}>
+                {newDay && <div className="logday">{dayOf(e)}</div>}
+                <div
+                  className={`logrow${i + 1 === k ? " on" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  title="show the cloth as it stood after this act"
+                  onClick={() => { setPos(i + 1); setView("timeline") }}
+                  onKeyDown={(ev) => {
+                    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); setPos(i + 1); setView("timeline") }
+                  }}
+                >
+                  {/* The stamp the timeline cannot show: it holds one position,
+                      and this is every act's own time (TJ, 2026-08-12). */}
+                  <span className="logwhen">{stamp(e)}</span>
+                  <span className="logwhat">
+                    <span className="logact">{describeEvent(e)}</span>
+                    {contextOf(e)}
+                  </span>
+                  <span className="logn">{i + 1}</span>
+                </div>
+              </Fragment>
+            )
+          })}
         </div>
       )}
 
@@ -490,35 +609,37 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
               the bar. One notch per act, evenly spaced.
               Starts at 1 — the first act. It started at 0, "before the first
               recorded act", which is a state nobody ever made. */}
-          <datalist id="logTicks">
-            {events.map((_, i) => <option key={i} value={i + 1} />)}
-          </datalist>
+          {/* ONE set of ticks (TJ, 2026-08-12: "the slider ticks and the
+              timeline ticks dont line up. maybe we only need the slider
+              ticks"). There were two, and they could not agree: the browser
+              paints `list=` ticks across the whole track while the thumb only
+              travels between its own half-widths, so the drawn strip and the
+              native marks were offset by 8px at each end and drifted in
+              between. The datalist is gone; the drawn strip is inset by the
+              thumb's radius so a mark sits exactly under the thumb that
+              selects it. */}
           <input
             type="range"
             className="logslider"
             min={1}
             max={events.length}
             step={1}
-            list="logTicks"
             value={k}
             onChange={(ev) => setPos(Number(ev.target.value))}
             aria-label="replay position, in acts"
             aria-valuetext={current ? `act ${k} of ${events.length} — ${describeEvent(current)}` : undefined}
             style={{ width: "100%", margin: "4px 0 0" }}
           />
-          {/* The ticks, drawn. `list=` is the semantic half and browsers no
-              longer paint it, so the marks are a gradient with one period per
-              act — evenly spaced BY ACT, which is the whole point: spacing by
-              clock would smear an evening's work into one blur and stretch the
-              gap to next week across half the bar. Above ~180 acts the marks
-              would merge into a rule, so they thin to every nth and the bar
-              keeps meaning "many" instead of going solid. */}
+          {/* Spaced BY ACT, which is the whole point: by clock, an evening's
+              work smears into one blur and the gap to next week takes half the
+              bar. Above ~180 acts the marks would merge into a rule, so they
+              thin to every nth and the strip keeps meaning "many". */}
           {events.length > 1 && (
             <div
               className="logtickbar"
               aria-hidden="true"
               style={{
-                backgroundImage: `repeating-linear-gradient(90deg, var(--rule) 0 1px, transparent 1px ${
+                backgroundImage: `repeating-linear-gradient(90deg, var(--grey) 0 1px, transparent 1px ${
                   (100 / (events.length - 1)) * Math.ceil((events.length - 1) / 180)
                 }%)`,
               }}
@@ -557,9 +678,9 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
             <ReadOnlyClothMap state={mapState} />
           </div>
 
-          <p className="ghostnote" style={{ marginTop: "8px" }}>
-            This is your own record — reset clears the cloth, not this. It counts; it never grades.
-          </p>
+          {/* The second "counted, never judged", and it also promised a reset
+              that was deleted with Keep on 2026-08-11. Both gone: the panel
+              says what it is once, at the top. */}
         </>
       )}
     </div>
