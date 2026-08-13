@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
-import { contentWords } from "@/lib/utils"
 import { readingsOf } from "@/lib/scope"
+import ConceptNamingAssist from "@/components/ui/ConceptNamingAssist"
 
 interface CaptureModalProps {
   passage: string;
@@ -169,42 +169,15 @@ export default function CaptureModal({ passage, source, sourceId, location, page
             {state.concepts.map(c => <option key={c.id} value={c.label} />)}
           </datalist>
 
-          <div className="scaffold" style={{marginTop: "12px"}}>
-            <div className="snote" style={{fontSize: "12px", color: "var(--ink-soft)"}}>
-              Stuck naming it? You don't need a clever term — <b style={{color: "var(--ink)", fontWeight: 500}}>point at the words in the passage that carry the point</b> and tap to build the concept from the author's own words.
-            </div>
-            {passage.trim() ? (
-              <div className="chips" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
-                {contentWords(passage).map(w => (
-                  <span 
-                    key={w} 
-                    className="chip" 
-                    onClick={() => setConceptLabel(prev => prev ? `${prev} ${w}` : w)}
-                    style={{
-                      fontFamily: "var(--mono)", fontSize: "12px", background: "#fff", border: "1px solid var(--rule)", 
-                      borderRadius: "12px", padding: "3px 9px", cursor: "pointer", color: "var(--ink)"
-                    }}
-                  >{w}</span>
-                ))}
-              </div>
-            ) : null}
-            
-            <details className="ladder" style={{marginTop: "12px", fontSize: "13px"}}>
-              <summary style={{cursor: "pointer", color: "var(--sage)"}}>still stuck? a few ways in</summary>
-              <ul style={{marginTop: "6px", paddingLeft: "20px", color: "var(--ink-soft)", lineHeight: "1.5"}}>
-                <li>What is this passage an <b style={{color: "var(--ink)", fontWeight: 500}}>example of</b>?</li>
-                <li>Tell a friend what this bit is about in <b style={{color: "var(--ink)", fontWeight: 500}}>five words</b>.</li>
-                <li>What's the <b style={{color: "var(--ink)", fontWeight: 500}}>one move</b> the author is making here?</li>
-                <li className="eg" style={{marginTop: "6px", color: "var(--ink-soft)"}}>
-                  Just to show the shape — concepts as noun phrases: &nbsp;<i>&ldquo;boundary objects&rdquo; · &ldquo;the central tension&rdquo;</i>
-                </li>
-              </ul>
-              <div style={{marginTop: "6px", color: "var(--ink-soft)", fontSize: "12px"}}>
-                A concept can be a phrase, not a word. It&apos;s provisional — rename it later, or type an existing name to reuse it.
-                Or leave it empty: the passage is kept either way, and you can name it whenever the word arrives.
-              </div>
-            </details>
-          </div>
+          {/* Shared with the typed form since 2026-08-13 — this markup was
+              copied there and the two had drifted. `conceptOptional` is the one
+              real difference: an Unlabeled capture is a whole act here. */}
+          <ConceptNamingAssist
+            passage={passage}
+            value={conceptLabel}
+            onChange={setConceptLabel}
+            conceptOptional
+          />
         </div>
 
         {/* The CONCEPT's gloss — one meaning, shared by every passage filed

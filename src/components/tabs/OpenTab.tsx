@@ -6,10 +6,11 @@ import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import type { Passage } from "@/lib/types"
 import { readingsOf, soleSourceId } from "@/lib/scope"
-import { contentWords, sortedByLabel } from "@/lib/utils"
+import { sortedByLabel } from "@/lib/utils"
 import { tidy } from "@/lib/clothMath"
 import ClothFold from "@/components/tabs/ClothFold"
 import ReuseOffer from "@/components/ui/ReuseOffer"
+import ConceptNamingAssist from "@/components/ui/ConceptNamingAssist"
 
 type OpenTabProps = {
   onGotoPassage?: (passage: Passage) => void
@@ -439,51 +440,18 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
               setContent(tidy(e.clipboardData.getData("text")))
             }}
           />
-          <div className="scaffold" style={{marginTop: "12px"}}>
-            <div className="snote">
-              A <b>concept</b> is the idea this passage evidences — a <b>short noun phrase</b>, often the author's own words. If she names it ("boundary objects"), use her name for it. Your own-words gloss goes in the <b>description</b> — a sentence is fine there, crude is welcome. Rename anything later.
-            </div>
-            <div className="snote" style={{marginTop: "5px", color: "var(--ink-soft)"}}>
-              One passage can hold several concepts — capture it once, then "also file under another concept" from your work.
-            </div>
-            <div className="snote" style={{fontSize: "12px", color: "var(--ink-soft)", marginTop: "8px"}}>
-              Stuck naming it? <b style={{color: "var(--ink)", fontWeight: 500}}>Point at the words in the passage that carry the point</b> and tap to build the concept from the author's own words.
-            </div>
-            {content.trim() ? (
-              <div className="chips" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
-                {contentWords(content).map(w => (
-                  <span 
-                    key={w} 
-                    className="chip" 
-                    onClick={() => setConceptLabel(prev => prev ? `${prev} ${w}` : w)}
-                    style={{
-                      fontFamily: "var(--mono)", fontSize: "12px", background: "#fff", border: "1px solid var(--rule)", 
-                      borderRadius: "12px", padding: "3px 9px", cursor: "pointer", color: "var(--ink)"
-                    }}
-                  >{w}</span>
-                ))}
-              </div>
-            ) : (
-              <div className="snote" style={{fontStyle: "italic", fontSize: "12px", color: "var(--ink-soft)", marginTop: "8px"}}>
-                …paste a passage above and its words appear here to tap.
-              </div>
-            )}
-            
-            <details className="ladder" style={{marginTop: "12px", fontSize: "13px"}}>
-              <summary style={{cursor: "pointer", color: "var(--sage)"}}>still stuck? a few ways in</summary>
-              <ul style={{marginTop: "6px", paddingLeft: "20px", color: "var(--ink-soft)", lineHeight: "1.5"}}>
-                <li>What is this passage an <b style={{color: "var(--ink)", fontWeight: 500}}>example of</b>?</li>
-                <li>Tell a friend what this bit is about in <b style={{color: "var(--ink)", fontWeight: 500}}>five words</b>.</li>
-                <li>What's the <b style={{color: "var(--ink)", fontWeight: 500}}>one move</b> the author is making here?</li>
-                <li className="eg" style={{marginTop: "6px", color: "var(--ink-soft)"}}>
-                  Just to show the shape — concepts as noun phrases: &nbsp;<i>&ldquo;boundary objects&rdquo; · &ldquo;the central tension&rdquo;</i>
-                </li>
-              </ul>
-              <div style={{marginTop: "6px", color: "var(--ink-soft)", fontSize: "12px"}}>
-                A concept can be a phrase, not a word. It's provisional — rename it later, or type an existing name to reuse it.
-              </div>
-            </details>
-          </div>
+          {/* The naming assist used to sit HERE — above the Concept field it
+              coaches, inside the passage row (TJ, 2026-08-13). It is under that
+              field now, and shared with the capture modal:
+              components/ui/ConceptNamingAssist.
+
+              Two prose notes went with it, because the Concept field's own
+              label already says both: "a short noun phrase naming the idea"
+              carried the first, and "(one per passage — you can file the same
+              passage under a second concept from your work)" is the second,
+              word for word. The only line not said elsewhere on screen was that
+              a crude description is welcome, which the Description row now says
+              in its own label instead of by hover. */}
         </div>
         
         <div className="form-row">
@@ -501,10 +469,11 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
           <datalist id={listId}>
             {sortedByLabel(state.concepts).map(c => <option key={c.id} value={c.label} />)}
           </datalist>
+          <ConceptNamingAssist passage={content} value={conceptLabel} onChange={setConceptLabel} />
         </div>
 
         <div className="form-row">
-          <span className="label">Description — the concept in your own words <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
+          <span className="label">Description — the concept in your own words <span style={{textTransform: "none", letterSpacing: 0}}>(optional — a sentence is fine, crude is welcome)</span></span>
           <input
             placeholder="e.g. a thing that means different things to different groups but still holds them together"
             title="your own-words gloss — a sentence is fine; this is where crude is welcome"
@@ -652,10 +621,20 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                       EVIDENCE: it says the same thing twice, and the zero is
                       the more judgemental of the two. A count belongs where
                       there is something to count. */}
-                  {(conceptPassages.length > 0 || elsewhere > 0) && (
+                  {/* This reading's evidence, and only this reading's (TJ,
+                      2026-08-13: "the header is 'in this reading' … only count
+                      the concept in this reading"). The row used to carry
+                      "· N elsewhere" as well — passages for the same concept in
+                      your other readings — and under a heading that says IN
+                      THIS READING that is a second scope in the same line: one
+                      number the heading governs, one it does not. The
+                      cross-reading fact is not lost, it is just not counted
+                      here — open the row and it is said in full.
+
+                      The count is still passages, not readings. */}
+                  {conceptPassages.length > 0 && (
                     <div className="lsrc">
                       {conceptPassages.length} passage{conceptPassages.length !== 1 ? "s" : ""}
-                      {elsewhere ? ` · ${elsewhere} elsewhere` : ""}
                     </div>
                   )}
                 </div>
@@ -760,11 +739,15 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                         </div>
                       </div>
                     ))}
-                    {elsewhere > 0 && (
-                      <p className="ghostnote" style={{ marginTop: "10px" }}>
-                        {elsewhere} more passage{elsewhere !== 1 ? "s" : ""} evidence{elsewhere === 1 ? "s" : ""} this concept in your other readings — one concept, evidence from several texts.
-                      </p>
-                    )}
+                    {/* "N more passages evidence this concept in your other
+                        readings" stood here until 2026-08-13 (TJ: "i think that
+                        belongs in vocabulary, not 'in this reading'"). It does,
+                        and it is already there, said better: 04 counts the
+                        readings a concept travels through and NAMES them, which
+                        is the number that means something. This panel is the
+                        reading-scoped record of what you captured here — the
+                        division 04's own header draws. Nothing was moved; a
+                        thinner copy of it stopped being shown twice. */}
                     {/* Deleting is the only repair on this row, and since
                         migration 0021 it is a soft one: the passages survive
                         and land in Unlabeled above. 04 · Vocabulary is still
@@ -918,20 +901,29 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
             title can wait as long as you like. */}
         <ClothFold />
         {logCard}
+        {/* Named for the occasion, not the mechanism (TJ, 2026-08-13: "the
+            instructions are bizarre. what is the use case and journey?"). It
+            was "Capture a passage by hand" over a paragraph that opened with
+            what to do INSTEAD, spent three clauses on why typing is worse, and
+            reached the use case last — an argument against itself, sitting on
+            top of its own form, met by someone who has opened it precisely
+            because they need it. The guardrail is true and stays; it is one
+            line now, and it comes after the reason to be here. */}
         <details className="card handfold">
           <summary>
             <span className="tw">▸</span>
-            <h2>Capture a passage by hand</h2>
+            <h2>Type a passage you can&apos;t select</h2>
           </summary>
           <p className="hint" style={{ marginTop: "10px" }}>
-            Normally you capture by <b>selecting the words in the text</b> beside this —
-            that keeps the passage verbatim and anchors it to the page, so it lights up
-            whenever you open the reading. But <b>some things on a page cannot be
-            selected at all</b>: a concept map, a diagram&apos;s labels, a figure drawn
-            by hand, a page that was photographed rather than typeset. There is no text
-            layer under them for a highlight to hold on to, so this is how you keep
-            them. Loom fills in the reading and the page you are on; a typed passage is
-            not anchored and will not highlight.
+            For anything on the page a highlight cannot hold on to: a concept map, a
+            diagram&apos;s labels, a figure drawn by hand, a page that was photographed
+            rather than typeset. There is no text layer under them to select, so you
+            type the words instead — Loom fills in the reading and the page you are on.
+          </p>
+          <p className="ghostnote" style={{ marginTop: "6px" }}>
+            Anything you <i>can</i> select is better captured by selecting it: a typed
+            passage carries no offsets, so it will not light up in the text the way the
+            others do.
           </p>
           {captureForm}
         </details>

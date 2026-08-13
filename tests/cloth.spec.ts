@@ -49,13 +49,18 @@ test("the card opens the reading, and carries the cloth's name and last edit", a
   const titleInput = fold.getByPlaceholder(/a sentence or headline/)
   await expect(titleInput).toBeVisible()
   if ((await titleInput.inputValue()) !== CLOTH_TITLE) {
+    // The cloth autosaves (commit 30414ae, 2026-08-13) — there is no Save
+    // button to press, and `onBlur={flushCloth}` writes ahead of the debounce.
+    // This still asked for "Save cloth" until 2026-08-13 and passed anyway,
+    // because an earlier run had already written CLOTH_TITLE: the branch that
+    // does the saving only runs on a freshly seeded row, so the stale
+    // assertion sat unreached until the next `npm run seed:demo`.
     await titleInput.fill(CLOTH_TITLE)
-    const save = fold.getByRole("button", { name: /Save cloth|Saving…/ })
-    await expect(save).toBeEnabled()
-    await save.click()
-    // Saved = no longer dirty: the button falls back to disabled once the
-    // server row round-trips.
-    await expect(save).toBeDisabled({ timeout: 15_000 })
+    await titleInput.blur()
+    await expect(fold.getByRole("button", { name: /Save cloth|Saving…/ })).toHaveCount(0)
+    // Saved = the summary reads the row back, not the field: it renders from
+    // `activeCloth.title`, so it only says this once the write has landed.
+    await expect(fold.locator("summary")).toContainText(CLOTH_TITLE, { timeout: 15_000 })
   }
 
   // Back on the shelf: the card speaks the cloth's name outright — no hover,
