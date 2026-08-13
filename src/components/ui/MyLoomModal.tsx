@@ -20,7 +20,7 @@
  * behind it.
  */
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
@@ -48,6 +48,60 @@ export default function MyLoomModal({
   const [typed, setTyped] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const panelRef = useRef<HTMLDivElement>(null)
+  const typeRef = useRef<HTMLInputElement>(null)
+
+  /**
+   * The keyboard manners the app's own confirm already has
+   * ([DialogProvider](../providers/DialogProvider.tsx)): focus lands inside,
+   * Escape closes, Tab stays. `aria-modal` is a claim, and without these it is
+   * a false one — focus walks out into the page behind while a screen reader
+   * has been told the rest of the app is inert.
+   *
+   * Nothing is auto-focused in the summary: the only button here is
+   * destructive, and DialogProvider's rule — never let a stray Enter land on
+   * the delete — applies before the dialog is armed as much as after. Focus
+   * goes to the PANEL, so the first Tab reaches Close. Once armed, the field
+   * takes focus because typing is the required next act, and the phrase is
+   * itself the guard against a careless Enter.
+   */
+  useEffect(() => {
+    if (arming) typeRef.current?.focus()
+    else panelRef.current?.focus()
+  }, [arming])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      // A reset in flight is not interruptible — closing the dialog would not
+      // recall the request, only hide whether it landed.
+      if (busy) return
+      if (event.key === "Escape") {
+        event.preventDefault()
+        onClose()
+        return
+      }
+      if (event.key === "Tab" && panelRef.current) {
+        // Wider than DialogProvider's button-only sweep: this dialog also
+        // holds reading links and the confirm field.
+        const focusable = [...panelRef.current.querySelectorAll<HTMLElement>(
+          "button:not(:disabled), a[href], input:not(:disabled)"
+        )]
+        if (!focusable.length) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [busy, onClose])
 
   const total =
     state.concepts.length + state.passages.length + state.edges.length +
@@ -105,7 +159,16 @@ export default function MyLoomModal({
 
   return (
     <div className="info-scrim" onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose() }}>
-      <div className="info-dialog myloombox" role="dialog" aria-modal="true" aria-label="My Loom">
+      <div
+        className="info-dialog myloombox"
+        role="dialog"
+        aria-modal="true"
+        aria-label="My Loom"
+        ref={panelRef}
+        // Focusable as a container so the dialog itself can hold focus on
+        // open without putting it on the one destructive control.
+        tabIndex={-1}
+      >
         <button className="btn ghost mini info-close" onClick={onClose} disabled={busy} aria-label="Close">✕</button>
 
         <span className="info-k">my loom</span>
@@ -196,6 +259,7 @@ export default function MyLoomModal({
                 <label className="myloom-type">
                   Type <b>{CONFIRM_PHRASE}</b> to confirm
                   <input
+                    ref={typeRef}
                     type="text"
                     value={typed}
                     onChange={(e) => setTyped(e.target.value)}

@@ -378,6 +378,10 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
    About: a loom with twenty readings in it is longer than a screen, and the
    start-over block must stay reachable at the bottom rather than clipped. */
 .myloombox{max-width:560px;max-height:84vh;overflow-y:auto}
+/* The panel takes focus on open (tabIndex -1) so the first Tab reaches Close
+   rather than the destructive button. No ring: the focus is programmatic and
+   the box is already the only lit thing on screen. */
+.myloombox:focus{outline:none}
 .myloombox h3{font-family:var(--display);font-size:16px;font-weight:600;margin:20px 0 8px;
   border-bottom:1px solid var(--rule);padding-bottom:4px}
 .myloom-totals{list-style:none;padding:0;margin:12px 0 0;display:flex;flex-wrap:wrap;gap:6px 16px}
