@@ -234,6 +234,14 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    button chrome so the same word reads the same whatever the element. */
 button.act,button.rm{appearance:none;background:none;border:none;padding:0}
 /* weave */
+/* A station's own sections — 03 has two, the cloth you wove and the
+   projections you make of it (TJ, 2026-08-12). Louder than a card's heading,
+   quieter than the page title, and it carries the same `.n` gloss the cards
+   use so a section can say what it is without a paragraph. */
+.sectionhead{font-family:var(--display);font-size:20px;font-weight:600;margin:22px 0 12px;
+  padding-bottom:6px;border-bottom:1px solid var(--rule);
+  display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.sectionhead .n{font-family:var(--body);font-size:13.5px;font-weight:400;color:var(--ink-soft);letter-spacing:0}
 .mapbar{display:flex;gap:16px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
 .loosebanner{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:10px}
 /* Scrolls rather than clips: the cloth lays itself out to its container down

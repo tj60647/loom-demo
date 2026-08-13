@@ -86,8 +86,11 @@ export default function ClothMap({
   
   eo.sort((a, b) => Math.abs(X(idx[b.e.fromId]) - X(idx[b.e.toId])) - Math.abs(X(idx[a.e.fromId]) - X(idx[a.e.toId])))
 
+  // minWidth pairs with the 480 floor in the observer above: this is drawn in
+  // raw CSS pixels, so a 480-wide warp inside a narrower element is cut off
+  // rather than scaled down. With the minimum real, `#mapWrap` scrolls.
   return (
-    <svg ref={svgRef} id="map" style={{ width: "100%", height: H, touchAction: "none" }}>
+    <svg ref={svgRef} id="map" style={{ width: "100%", minWidth: 480, height: H, touchAction: "none" }}>
       <defs>
         <marker id="arwS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="var(--sage)" />

@@ -306,12 +306,12 @@ export default function ClothReflection() {
           furniture rather than as one of the two things here. */}
       <div className="two">
       <div className="card">
-      <div className="mapbar">
-        <span className="label">The cloth</span>
-        <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
-          Warp in reading order; weft arcs across. Click a prompt beside this to trace it here — or click a concept/arc directly to pull it.
-        </span>
-      </div>
+      {/* No "THE CLOTH" label on the card: 03's section heading says it now
+          (TJ, 2026-08-12), and the same words twice, six lines apart, read as
+          two different things. */}
+      <p className="hint">
+        Warp in reading order; weft arcs across. Click a prompt beside this to trace it here — or click a concept/arc directly to pull it.
+      </p>
 
       <div id="mapWrap">
         <ClothMap state={state} readSel={readSel} setReadSel={setReadSel} />

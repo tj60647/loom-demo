@@ -73,36 +73,13 @@ export default function MapTab({ practice = false }: {
     activeMap, scopeMaps, selectMap, addMap, renameMap, removeMap,
     setMapTiers, setMapRead, setMapEssence, flushMapText,
     setView, ensureActiveMap,
-    addConcept, refilePassage,
     flash, studentName,
   } = useLoom()
   const { titleOf } = useReadings()
   const { confirm } = useDialog()
 
-  // The scope's Unlabeled Passages — the unattached group a projection must
-  // show (ruling 38): nameable here, or left as visible remainder.
-  const unfiled = scopedState.passages.filter((b) => b.conceptIds.length === 0)
-  const [unfiledInputs, setUnfiledInputs] = useState<Record<string, string>>({})
-  const [unfiledBusy, setUnfiledBusy] = useState<Record<string, boolean>>({})
-  const handleNameUnfiled = async (passageId: string) => {
-    if (unfiledBusy[passageId]) return
-    const nm = (unfiledInputs[passageId] ?? "").trim()
-    if (!nm) return
-    setUnfiledBusy((prev) => ({ ...prev, [passageId]: true }))
-    try {
-      // Same reuse rule as capture: an existing label joins its concept, a
-      // new one coins it — the student named it either way.
-      const existing = state.concepts.find((c) => c.label.toLowerCase() === nm.toLowerCase())
-      const concept = existing ?? (await addConcept(nm))
-      await refilePassage(passageId, concept.id)
-      setUnfiledInputs((prev) => ({ ...prev, [passageId]: "" }))
-      flash(existing ? `filed under "${concept.label}"` : `named — "${concept.label}" joins your warp`)
-    } catch {
-      // refilePassage resyncs and flashes before rethrowing; swallow here.
-    } finally {
-      setUnfiledBusy((prev) => ({ ...prev, [passageId]: false }))
-    }
-  }
+  // Unlabeled passages are NOT a section here (TJ, 2026-08-12) — see the note
+  // where the group used to render. Naming one happens on 01, in Your work.
 
   // This map's tier for a concept — '' (unsorted) when the map has no entry,
   // or no map exists yet in this scope.
@@ -143,7 +120,11 @@ export default function MapTab({ practice = false }: {
     if (!svg) return
     const observer = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width ?? 0
-      if (w > 0) setWidth(Math.max(Math.floor(w), 720))
+      // 480, not 720 — the same fix the cloth needed when it went into a
+      // column (TJ, 2026-08-12). A 720-wide layout inside a narrower box does
+      // not shrink: the band labels and the right-hand cards leave the frame.
+      // `#tableWrap` scrolls below 480 rather than hiding a card.
+      if (w > 0) setWidth(Math.max(Math.floor(w), 480))
     })
     observer.observe(svg)
     return () => observer.disconnect()
@@ -580,18 +561,83 @@ export default function MapTab({ practice = false }: {
     return f && t2 && isPlaced(tierOf(f.id)) && isPlaced(tierOf(t2.id)) && effPos[f.id] && effPos[t2.id]
   })
 
+  /**
+   * Which projection you are in — the head of the Projections section (TJ,
+   * 2026-08-12). Held in a variable rather than written inline because it is
+   * a bar ABOVE the three columns while everything it governs is inside them;
+   * keeping it here stops the JSX below reading as though the switcher were
+   * part of the sort column.
+   */
+  const mapSwitcher = (
+    <div className="mapbar" id="mapSwitcher">
+      <span className="label">Your projections of this reading</span>
+      <span className="chips" style={{ margin: 0, alignItems: "center" }}>
+        {scopeMaps.map(m => (
+          <span
+            key={m.id}
+            className={`chip${activeMap?.id === m.id ? " on" : ""}`}
+            role="button"
+            tabIndex={0}
+            onClick={() => selectMap(m.id)}
+            onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectMap(m.id) } }}
+          >{m.name}</span>
+        ))}
+        <button
+          className="btn ghost mini"
+          id="newMap"
+          data-tip="start another projection of the same concepts — a different reading of them"
+          onClick={() => void addMap().catch(e => flash(e instanceof Error ? e.message : "could not start a projection"))}
+        >+ New projection</button>
+      </span>
+      {activeMap && (
+        <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          <input
+            aria-label="Rename this projection"
+            value={activeMap.name}
+            onChange={e => renameMap(activeMap.id, e.target.value)}
+            onBlur={flushMapText}
+            style={{ width: 140, fontSize: 12, padding: "4px 7px" }}
+          />
+          <button
+            className="btn ghost mini"
+            aria-label={`Keep the projection ${activeMap.name} as .json`}
+            data-tip="keep this projection as its own file — the artifact to submit"
+            onClick={handleKeepMapJson}
+          >keep .json</button>
+          <button
+            className="btn ghost mini"
+            aria-label={`Keep the projection ${activeMap.name} as .md`}
+            data-tip="this projection as a readable outline — notes, Obsidian, an agent"
+            onClick={handleKeepMapMd}
+          >keep .md</button>
+          <button className="btn ghost mini" data-tip="delete this projection — concepts and threads stay" onClick={handleDeleteMap}>delete</button>
+        </span>
+      )}
+    </div>
+  )
+
   return (
     <>
-      <p className="tasktitle">Lay out your projection.</p>
+      <p className="tasktitle">Examine your cloth — lay out your projection.</p>
       <p className="tasksub">Your data, projected to be read: sort your concepts into tiers on the list, then arrange them by hand as cards on the board (Novak &amp; Gowin, <i>Learning How to Learn</i>, 1984). The tool draws the lines you already threw and counts what it sees — it never sorts, places, or links for you. Keep more than one projection: each is its own reading of the material, with its own tiers, its own one-line and its own paragraph. When a projection reads right here, draw the real concept map (paper or Figma) and build your chalk talk from it.</p>
 
-      {/* Look · trace · question, then write — AT THE TOP since 2026-08-12
-          (TJ). The cloth is what you already wove and the prompts are what it
-          shows you; both are the material you sort and arrange BELOW, so
-          reading them last meant scrolling past the whole projection to see
-          what you were projecting. The read itself still lives at the foot,
-          where the arrangement it describes has just been made. */}
+      {/* TWO SECTIONS, in the order of the two acts (TJ, 2026-08-12): examine
+          the cloth you wove, then lay out a projection of it. The cloth is one
+          thing per reading and the projections are many, which is why the
+          switcher belongs inside the second section rather than at the top of
+          the page — it selects one of the several, not the one. */}
+      <h2 className="sectionhead">
+        The cloth <span className="n">what you have woven — one per reading, and the material for everything below</span>
+      </h2>
       <ClothReflection />
+
+      <h2 className="sectionhead" style={{ marginTop: 34 }}>
+        Projections <span className="n">each one a reading of that same cloth, with its own tiers, one-line and paragraph</span>
+      </h2>
+
+      {/* The switcher sits at the head of its own section now: which projection
+          you are in decides what every column beneath it shows. */}
+      {mapSwitcher}
 
       <div className="rail" id="mapRail">
         <span className={`rstep${done1 ? " done" : ""}${!done1 ? " now" : ""}`}>sort</span>
@@ -601,7 +647,11 @@ export default function MapTab({ practice = false }: {
         <span className={`rstep${done3 ? " done" : ""}${!done3 && done2 ? " now" : ""}`}>check</span>
       </div>
 
-      <div className="card" style={{ marginBottom: 14 }}>
+      {/* sort · the board · your read — the three moves of a projection, side
+          by side so the sorting that feeds the board and the read that comes
+          off it are one view rather than three screens of scrolling. */}
+      <div className="three">
+      <div className="card">
         <div className="heading-with-info">
           <h2>Sort <span className="n" id="triageCount">{scopedState.concepts.length ? `(${onCount} of ${scopedState.concepts.length} on the board)` : ""}</span></h2>
           <button
@@ -670,63 +720,21 @@ export default function MapTab({ practice = false }: {
         </div>
       </div>
 
-      <div className="mapbar" id="mapSwitcher">
-        <span className="label">Your projections of this reading</span>
-        <span className="chips" style={{ margin: 0, alignItems: "center" }}>
-          {scopeMaps.map(m => (
-            <span
-              key={m.id}
-              className={`chip${activeMap?.id === m.id ? " on" : ""}`}
-              role="button"
-              tabIndex={0}
-              onClick={() => selectMap(m.id)}
-              onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectMap(m.id) } }}
-            >{m.name}</span>
-          ))}
-          <button
-            className="btn ghost mini"
-            id="newMap"
-            data-tip="start another projection of the same concepts — a different reading of them"
-            onClick={() => void addMap().catch(e => flash(e instanceof Error ? e.message : "could not start a projection"))}
-          >+ New projection</button>
-        </span>
-        {activeMap && (
-          <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-            <input
-              aria-label="Rename this projection"
-              value={activeMap.name}
-              onChange={e => renameMap(activeMap.id, e.target.value)}
-              onBlur={flushMapText}
-              style={{ width: 140, fontSize: 12, padding: "4px 7px" }}
-            />
-            <button
-              className="btn ghost mini"
-              aria-label={`Keep the projection ${activeMap.name} as .json`}
-              data-tip="keep this projection as its own file — the artifact to submit"
-              onClick={handleKeepMapJson}
-            >keep .json</button>
-            <button
-              className="btn ghost mini"
-              aria-label={`Keep the projection ${activeMap.name} as .md`}
-              data-tip="this projection as a readable outline — notes, Obsidian, an agent"
-              onClick={handleKeepMapMd}
-            >keep .md</button>
-            <button className="btn ghost mini" data-tip="delete this projection — concepts and threads stay" onClick={handleDeleteMap}>delete</button>
-          </span>
-        )}
-      </div>
-      <div className="mapbar">
-        <span className="label">The board</span>
-        <span style={{ color: "var(--ink-soft)", fontSize: 13 }}>Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋯</b> — its description, the passages behind it, and where else you met it.</span>
-      </div>
+      <div className="card">
+        <h2>The board</h2>
+        <p className="hint">Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋯</b> — its description, the passages behind it, and where else you met it.</p>
 
       {/* position:relative anchors the card menus, which are HTML over the SVG. */}
-      <div id="tableWrap" style={{ position: "relative", border: "1px solid var(--rule)", borderRadius: 4, background: "radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec" }}>
+      <div id="tableWrap" style={{ position: "relative", overflowX: "auto", border: "1px solid var(--rule)", borderRadius: 4, background: "radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec" }}>
         <svg
           ref={svgRef}
           id="cardTable"
           // userSelect: dragging a card used to sweep-select its label text.
-          style={{ display: "block", width: "100%", height: 560, touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
+          // minWidth pairs with the 480 floor above: the layout is drawn in
+          // raw CSS pixels (no viewBox), so a 480-wide arrangement inside a
+          // 353-wide element is not scaled down, it is cut off. With a real
+          // 480 minimum the element outgrows its wrap and `#tableWrap` scrolls.
+          style={{ display: "block", width: "100%", minWidth: 480, height: 560, touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -866,56 +874,34 @@ export default function MapTab({ practice = false }: {
         )}
       </div>
 
-      {/* The unattached group (ruling 38): unlabeled passages are part of the
-          projection — visible remainder, never hidden (red line #4). Naming
-          one here coins (or joins) a concept and the passage enters the graph;
-          leaving it is equally legal — a passage may never gain a concept. */}
-      {unfiled.length > 0 && (
-        <div className="card" id="unfiledPassages" style={{ marginTop: 12 }}>
-          {/* The model's own word, and the one Your work uses on 01 since
-              2026-08-12 — "unfiled" here and "Unlabeled" there named the same
-              passages twice, and the delete dialogs now send students to the
-              group by name. The id stays `#unfiledPassages`: it is linked
-              from elsewhere and is not student-facing. */}
-          <span className="label">Unlabeled passages ({unfiled.length})</span>
-          <p className="hint">
-            Captured without a concept — part of your cloth, shown here as its own group.
-            Name one to bring it onto the graph, or leave it as it is.
-          </p>
-          {unfiled.map((b) => (
-            <div key={b.id} data-passage-id={b.id} style={{ marginTop: 10, borderBottom: "1px dotted var(--rule)", paddingBottom: 8 }}>
-              <div className="passage">&quot;{b.content}&quot;</div>
-              <div className="src">{b.source || "—"}{b.location ? ` · ${b.location}` : ""}</div>
-              <div className="quietrow" style={{ marginTop: 6 }}>
-                <input
-                  placeholder="name the concept this passage evidences…"
-                  value={unfiledInputs[b.id] ?? ""}
-                  onChange={(e) => setUnfiledInputs((prev) => ({ ...prev, [b.id]: e.target.value }))}
-                />
-                <button
-                  className="btn ghost mini"
-                  onClick={() => handleNameUnfiled(b.id)}
-                  disabled={!!unfiledBusy[b.id]}
-                >
-                  Name it
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* No unlabeled-passages group here (TJ, 2026-08-12: "there should not be
+          an unlabeled passages section in the knowledge graph"). It stood for
+          ruling 38 — the unattached group a projection shows — and it was the
+          only place those passages could be seen until 01's Your work grew an
+          `Unlabeled` group this same week, which is nearer the words and is
+          where the capture toast already points. The passages are untouched:
+          they still export with the cloth and a projection. The divergence
+          from the model doc is logged in contracts.md rather than papered
+          over. */}
 
+      {/* The mirror belongs to the board — it counts what is drawn on it — so
+          it rides in the same column rather than under all three. */}
       <div className="ghostnote" id="mapMirror" style={{ marginTop: 8 }}>
         {scopedState.concepts.length > 0 && (
           <>On the board: <b>{n.p}</b> primary · <b>{n.s}</b> secondary · <b>{n.t}</b> tertiary{off ? ` · ${off} set aside` : ""}{unsorted ? ` · ${unsorted} unsorted` : ""} — {onTable.length} proposition{onTable.length !== 1 ? "s" : ""} drawn, <b>{cross}</b> running level-to-level or sideways (possible cross-links — the level-3 move; you decide if they&apos;re real). Right now this reads as: <b>{level}</b>. Counted, not judged.</>
         )}
       </div>
+      </div>
 
-      <div className="card" style={{ marginTop: 14 }}>
+      <div className="card">
         <h2>Your read of this projection {activeMap ? <span className="n">&ldquo;{activeMap.name}&rdquo; — its one-line and paragraph travel with it</span> : <span className="n">starts with your first sort</span>}</h2>
         <p className="readq">In a sentence — what is this reading <i>about</i>?</p>
+        {/* `.tinput` for the app's input styling AND its width:100%. A bare
+            <input> takes the browser's ~177px default, which was merely odd
+            across a full-width card and reads as broken in a column. */}
         <input
           id="mapEssence"
+          className="tinput"
           placeholder="Your one-line — the take, in a sentence."
           value={activeMap?.essence ?? ""}
           onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapEssence(m.id, v)) }}
@@ -929,11 +915,13 @@ export default function MapTab({ practice = false }: {
           onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapRead(m.id, v)) }}
           onBlur={flushMapText}
         />
+        {/* Inside the read now, not adrift under the page: both act on the
+            projection this column is about. */}
+        <div style={{ marginTop: 10, display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <button className="btn ghost mini" data-tip="copies your paragraph to the clipboard" onClick={handleCopyRead}>Copy your read</button>
+          <button id="mapKit" className="btn ghost mini" data-tip="the same concept-map kit as a file — grouped by your tiers" onClick={handleMapKit}>Download the concept-map kit → draw the real concept map</button>
+        </div>
       </div>
-
-      <div style={{ marginTop: 10, display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        <button className="btn ghost mini" data-tip="copies your paragraph to the clipboard" onClick={handleCopyRead}>Copy your read</button>
-        <button id="mapKit" className="btn ghost mini" data-tip="the same concept-map kit as a file — grouped by your tiers" onClick={handleMapKit}>Download the concept-map kit → draw the real concept map</button>
       </div>
 
       {/* The record is of the whole weaving, not one reading's share of it, so
