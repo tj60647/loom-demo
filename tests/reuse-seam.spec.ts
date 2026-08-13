@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { openReading, openYourWork } from "./helpers"
+import { cardOwnReading } from "./helpers"
 
 /**
  * The seam between readings — naming a concept you already named somewhere else.
@@ -23,61 +23,66 @@ test.use({ storageState: "playwright/.auth/testa.json" })
 
 const unique = (stem: string) => `${stem} ${Date.now().toString().slice(-6)}`
 
-/** Capture by hand, in whichever reading is open. Returns nothing; asserts it landed. */
+/**
+ * Type a passage into whichever CARDED reading is open. Asserts it landed.
+ *
+ * Typing is offered only on a reading with no PDF since 2026-08-13 (TJ), so
+ * these tests card their own books rather than borrowing a seeded reading —
+ * there is no Your work sheet here, and no fold: the capture form is the page.
+ */
 async function captureByHand(page: import("@playwright/test").Page, label: string, gloss = "") {
-  const panel = await openYourWork(page)
-  // The fold sits low in a scrollbox and the viewer's fixed chrome has eaten
-  // clicks down there before; open it directly rather than clicking it.
-  await panel.locator("details.handfold").evaluate((d) => {
-    ;(d as HTMLDetailsElement).open = true
-  })
-  await panel.locator("#bText").fill(`A passage supporting ${label}.`)
-  // nth(1): the first input carrying the concept datalist is the filter above
-  // the log; the capture form's is the second.
-  await panel.locator('input[list="conceptOptions-reading"]').nth(1).fill(label)
+  await page.locator("#bText").fill(`A passage supporting ${label}.`)
+  // By placeholder, not nth(): three inputs on this station share the concept
+  // datalist — the capture form's, the refile row inside an opened log row, and
+  // "the concept you are looking for". Only this one has this placeholder.
+  await page.getByPlaceholder("e.g. boundary objects · satisficing · valence").fill(label)
   if (gloss) {
-    await panel.locator(".form-row", { hasText: "Description — the concept in your own words" })
+    await page.locator(".form-row", { hasText: "Description — the concept in your own words" })
       .locator("input").fill(gloss)
   }
-  await panel.getByRole("button", { name: "Add passage" }).click()
+  await page.getByRole("button", { name: "Add passage" }).click()
   // Wait for the write to LAND, not just for the click. `handleAddPassage`
   // clears the passage box only after `addPassage` resolves, so an empty
   // #bText is the first honest sign the round trip finished. Without this the
   // next `openReading` navigates mid-save and the capture never persists —
   // which fails the test two steps later, as "no seam appeared", for a reason
   // nothing on screen would explain.
-  await expect(panel.locator("#bText")).toHaveValue("", { timeout: 20000 })
+  await expect(page.locator("#bText")).toHaveValue("", { timeout: 20000 })
 }
 
 test("a concept met only in THIS reading raises no seam", async ({ page }) => {
   const label = unique("single reading concept")
-  await openReading(page, "Object Worlds")
-  const panel = await openYourWork(page)
+  const book = unique("a carded book")
+  await cardOwnReading(page, book)
 
   await captureByHand(page, label)
-  await expect(panel.locator(".seam")).toHaveCount(0)
+  await expect(page.locator(".seam")).toHaveCount(0)
 
   // A second passage under the same concept, still in the same reading, is not
   // ambiguous either — this is the case that would fire if the trigger were
   // "the label already exists" rather than "met in another reading".
   await captureByHand(page, label)
-  await expect(panel.locator(".seam")).toHaveCount(0)
+  await expect(page.locator(".seam")).toHaveCount(0)
 })
 
 test("the same concept in a second reading offers the way out, and taking it splits them", async ({ page }) => {
   const label = unique("crossing concept")
+  // Two carded books, because the seam is about meeting a concept in ANOTHER
+  // reading and typing only happens on a reading with no PDF.
+  const first = unique("first carded book")
+  const second = unique("second carded book")
 
-  await openReading(page, "Object Worlds")
+  await cardOwnReading(page, first)
   await captureByHand(page, label)
 
   // Same label, different reading — the only ambiguous case.
-  await openReading(page, "Communities of Practice")
-  const panel = await openYourWork(page)
+  await cardOwnReading(page, second)
   await captureByHand(page, label)
 
-  const seam = panel.locator(".seam")
+  const seam = page.locator(".seam")
   await expect(seam).toBeVisible({ timeout: 15000 })
-  await expect(seam).toContainText("Object Worlds")
+  // It names the reading you met the concept in — the first book, not this one.
+  await expect(seam).toContainText(first)
   // The ruling, in one assertion: it reports, it does not rule. The old copy
   // said "it is one concept, not two".
   await expect(seam).not.toContainText("not two")

@@ -20,7 +20,7 @@
  * prompts and the read.
  */
 import { test, expect } from "@playwright/test"
-import { enterReadingFromCard, isDeletePost, openYourWork } from "./helpers"
+import { cardOwnReading, enterReadingFromCard, isDeletePost } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 // Each test is independent and removes what it adds — no serial mode, so one
@@ -95,21 +95,15 @@ test("00 · the shelf shows the readings with the student's own tallies", async 
   await expect(page.locator('input[type="file"]')).toHaveCount(0)
 })
 
-test("01 · a passage captured by hand lands in the coding log — and cleans up", async ({ page }) => {
-  await page.goto("/")
-  const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
-  await enterReadingFromCard(page, card)
-  // Station buttons are named "01 —Reading" etc. — match by substring, never
-  // exact. Since the 2026-08-08 merge the capture form IS this station: the
-  // text holding the room, and Your work slid out over it from the toolbar.
-  await page.locator("nav button", { hasText: "Reading" }).click()
-  await loomLoaded(page)
-  await openYourWork(page)
-  // Beside a text you can select, capture-by-hand is a fold at the foot of
-  // Your work (TJ, 2026-08-08) — typing a passage that is on screen is the
-  // exception, so it is one deliberate click away rather than the first thing
-  // you meet.
-  await page.locator("#yourwork details.handfold > summary").click()
+test("01 · a passage typed into a carded reading lands in the coding log — and cleans up", async ({ page }) => {
+  // Typing a passage is offered ONLY where there is nothing to select (TJ,
+  // 2026-08-13) — a book or a lecture the library does not hold. Beside a PDF
+  // it is gone: it was a fold at the foot of Your work, and it justified itself
+  // with things you cannot type anyway (a diagram is a screen grab).
+  //
+  // Every seeded reading carries a file, so this cards its own. On that station
+  // the capture form IS the page: no sheet to slide out, no fold to open.
+  await cardOwnReading(page, `A book carded by the journey suite ${Date.now().toString().slice(-6)}`)
   await expect(page.locator("#bText")).toBeVisible({ timeout: 15_000 })
 
   await page.locator("#bText").fill("A passage typed by the journey suite, verbatim enough for the log.")
@@ -119,9 +113,9 @@ test("01 · a passage captured by hand lands in the coding log — and cleans up
   await page.locator("#bLocation").fill("p. 999")
   await page.getByRole("button", { name: "Add passage" }).click()
 
-  // Scoped to the sheet: it is mounted permanently now, so an unscoped
-  // .lrow is a strict-mode violation waiting on the next surface that grows one.
-  const row = page.locator("#yourwork .lrow", { hasText: "journey test concept" })
+  // No `#yourwork` here — that sheet belongs to the PDF station. On a carded
+  // reading the log is a card on the page, and it is the only surface with rows.
+  const row = page.locator(".lrow", { hasText: "journey test concept" })
   await expect(row).toHaveCount(1, { timeout: 15_000 })
 
   // Cleanup through the product's own controls. Since 0021 a passage survives

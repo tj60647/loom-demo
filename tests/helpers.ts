@@ -57,6 +57,35 @@ export async function openReading(page: Page, title: string) {
 }
 
 /**
+ * Card a book or a lecture — a reading with NO PDF — and open it.
+ *
+ * The only place typing a passage is offered since 2026-08-13 (TJ: "lets make
+ * it only visible in a reading without a pdf"). Every seeded reading carries a
+ * file, so a spec that needs the typed form has to make its own card; there is
+ * no fixture to borrow.
+ *
+ * Unique titles, for the reason reuse-seam gives about labels: Test User A's
+ * shelf is shared with the rest of the suite and accumulates across runs, so a
+ * fixed title would match a card from a previous run and open that instead.
+ */
+export async function cardOwnReading(page: Page, title: string) {
+  await page.goto('/');
+  await page.getByRole('button', { name: '+ a reading of your own' }).click();
+  const form = page.locator('.card', { hasText: 'A reading of your own' }).first();
+  await expect(form).toBeVisible({ timeout: 15000 });
+  // No file: that is what makes it reference-only, and what puts the capture
+  // form on 01 rather than a PDF.
+  await form.getByPlaceholder('Plans and Situated Actions').fill(title);
+  await form.getByRole('button', { name: 'Add to my shelf' }).click();
+
+  const card = page.locator('.shelfcard', { hasText: title }).first();
+  await expect(card).toBeVisible({ timeout: 20000 });
+  await enterReadingFromCard(page, card);
+  await page.locator('nav[aria-label="The journey"] button', { hasText: 'Reading' }).click();
+  await expect(page.getByText('Loading your loom...')).toHaveCount(0, { timeout: 20000 });
+}
+
+/**
  * Slide Your work out over the text.
  *
  * Since 2026-08-09 the sheet is always in the DOM, parked off the right edge,

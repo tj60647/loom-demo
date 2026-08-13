@@ -886,13 +886,19 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
 
   // Two shapes, because the doorway differs (TJ, 2026-08-08).
   //
-  // Beside a text you can select, the LOG is the rail and capture by hand is a
-  // fold at its foot. Typing a passage that is on screen invites paraphrase
-  // where the rule is the author's words verbatim, re-enters a page number the
-  // viewer already knows exactly, and — because a typed passage carries no
-  // offsets — produces a passage that never highlights, sitting in the same
-  // list as ones that do. The fold stays because a scanned page has no text
-  // layer to select from, and this library has those.
+  // BESIDE A PDF THERE IS ONE DOORWAY: select the words. Typing is not offered
+  // at all (TJ, 2026-08-13: "lets make it only visible in a reading without a
+  // pdf"). It was a fold at the foot of Your work, justified by the things on a
+  // page a highlight cannot hold — a concept map, a diagram's labels, a
+  // photographed page. That justification never survived contact: you cannot
+  // TYPE a diagram, you screen-grab it, so the card promised a use it could not
+  // serve and every real use it had was a worse way to do what selecting does
+  // (paraphrase where the rule is verbatim, a page number the viewer already
+  // knows, and no offsets, so the passage never highlights and sits in the same
+  // list as ones that do).
+  //
+  // A page with no text layer at all is a damaged reading, not a student's
+  // problem to type around: that is what the repair pipeline is for.
   if (compact) {
     return (
       <div className="onecol">
@@ -901,32 +907,6 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
             title can wait as long as you like. */}
         <ClothFold />
         {logCard}
-        {/* Named for the occasion, not the mechanism (TJ, 2026-08-13: "the
-            instructions are bizarre. what is the use case and journey?"). It
-            was "Capture a passage by hand" over a paragraph that opened with
-            what to do INSTEAD, spent three clauses on why typing is worse, and
-            reached the use case last — an argument against itself, sitting on
-            top of its own form, met by someone who has opened it precisely
-            because they need it. The guardrail is true and stays; it is one
-            line now, and it comes after the reason to be here. */}
-        <details className="card handfold">
-          <summary>
-            <span className="tw">▸</span>
-            <h2>Type a passage you can&apos;t select</h2>
-          </summary>
-          <p className="hint" style={{ marginTop: "10px" }}>
-            For anything on the page a highlight cannot hold on to: a concept map, a
-            diagram&apos;s labels, a figure drawn by hand, a page that was photographed
-            rather than typeset. There is no text layer under them to select, so you
-            type the words instead — Loom fills in the reading and the page you are on.
-          </p>
-          <p className="ghostnote" style={{ marginTop: "6px" }}>
-            Anything you <i>can</i> select is better captured by selecting it: a typed
-            passage carries no offsets, so it will not light up in the text the way the
-            others do.
-          </p>
-          {captureForm}
-        </details>
       </div>
     )
   }

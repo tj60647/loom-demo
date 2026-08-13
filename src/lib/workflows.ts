@@ -84,20 +84,21 @@ const student: Flow = {
     { id: "read", label: "Read the text", where: "01 · Reading" },
     { id: "ahead", label: "Or name a concept you expect, and gloss it — then read for support", where: "01 · Reading — shows as “no evidence” until a passage backs it" },
     { id: "capture", label: "Highlight a passage", where: "01 · Reading" },
-    // The second doorway into a passage, and the ONLY one on a reading with no
-    // PDF (TJ, 2026-08-13: "is that even a capability anymore? … what is the
-    // use case and journey?"). It was drawn in neither the diagram nor the
-    // copy: this flow showed "Highlight a passage" as the sole way in, while a
-    // reference-only reading — a book or a lecture the library does not hold —
-    // cannot be highlighted at all, and a scanned page has no text layer to
-    // select from either.
+    // The other doorway, and since 2026-08-13 the only place it appears: a
+    // reading with NO PDF — a book, a lecture, a card the student added
+    // themselves. Beside a PDF, typing is not offered at all (TJ: "lets make it
+    // only visible in a reading without a pdf"), so this fork is the reading
+    // having no text to select rather than a page having none.
+    //
+    // Drawn at all because the flow claimed "Highlight a passage" was the sole
+    // way in, and on a card with no file there is nothing to highlight.
     //
     // It does NOT pass through `file`. That step is naming the concept
     // afterwards, which is a real second act for a highlight (a capture may
     // stay Unlabeled). The typed form will not submit without a concept, so
     // capturing and filing are one gesture here and the path rejoins at
     // Linking.
-    { id: "typed", label: "Type a passage you can't select", where: "01 · Reading — a diagram, a figure's labels or a scan; the only door on a reading with no PDF" },
+    { id: "typed", label: "Type the passage in", where: "01 · Reading — a reading with no PDF: a book, a lecture, a card you added yourself" },
     { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — Your work, slid out over the text" },
     { id: "link", label: "Pick two concepts, say the sentence, label the link", where: "02 · Linking" },
     // 03 before 04, in the array and in the edges below. Stations 03 and 04
@@ -151,7 +152,7 @@ const student: Flow = {
     { from: "open", to: "read" },
     { from: "read", to: "ahead" },
     { from: "read", to: "capture" },
-    { from: "read", to: "typed", label: "nothing to select" },
+    { from: "read", to: "typed", label: "no PDF to select from" },
     { from: "ahead", to: "capture", label: "hunt for it" },
     { from: "capture", to: "file" },
     { from: "file", to: "capture", label: "another passage", back: true },
