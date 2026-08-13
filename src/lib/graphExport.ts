@@ -183,6 +183,10 @@ export function buildMapMarkdown(
         .forEach((b) => {
           const cite = [b.source, b.location].filter(Boolean).join(" · ")
           lines.push(`  - > ${b.content}${cite ? ` — ${cite}` : ""}`)
+          // The .json has carried these since the file existed; the prose
+          // dropped them (TJ, 2026-08-12: the pair is one content, two forms).
+          if (b.note) lines.push(`    - note: ${b.note}`)
+          if (b.question) lines.push(`    - question: ${b.question}`)
         })
     })
     lines.push("")
@@ -205,6 +209,22 @@ export function buildMapMarkdown(
       if (e.sentence) lines.push(`  - "${e.sentence}"`)
     })
     lines.push("")
+  }
+
+  // The arrangement is the one thing prose cannot be: a board is coordinates.
+  // Say that it exists and where it lives, rather than letting the .md read as
+  // though this projection had never been laid out.
+  const view = state.views[`map:${map.id}`]
+  const placed = Object.keys(view?.positions ?? {}).length
+  const bent = Object.keys(view?.bends ?? {}).length
+  if (placed || bent) {
+    lines.push("## The arrangement", "")
+    lines.push(
+      `_${placed} card${placed === 1 ? "" : "s"} placed by hand${
+        bent ? `, ${bent} line${bent === 1 ? "" : "s"} bowed` : ""
+      } — the coordinates travel in the .json of this projection._`,
+      ""
+    )
   }
 
   return lines.join("\n")

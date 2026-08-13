@@ -20,6 +20,7 @@
 // artifacts: a portfolio, a hand-in, the student's own copy.
 
 import { scopeFromKey, scopedGraph } from "./scope"
+import { describeEvent, TIER_WORD } from "./logPhrase"
 import { scopeLabelOf } from "./graphExport"
 import { usesOf } from "./linkResolve"
 import type { GraphEvent, LoomExport, LoomState, Tier } from "./types"
@@ -164,11 +165,15 @@ export function buildClothMarkdown(
   out.push(`_${data.cloth.scopeLabel} · ${provenance.student}${where}_`, "")
   if (data.cloth.description) out.push(data.cloth.description, "")
 
+  // Same facts as the .json, in prose (TJ, 2026-08-12: "the json and md files
+  // should be similar content in different forms"). It used to drop the
+  // concept's note, the passage's citation SOURCE, and the note and question a
+  // student wrote on a capture — all of which the .json has carried all along.
   out.push(`## Concepts (${data.graph.concepts.length})`, "")
   for (const c of data.graph.concepts) {
-    out.push(`- **${c.label}**${c.def ? ` — ${c.def}` : ""}`)
+    out.push(`- **${c.label}**${c.def ? ` — ${c.def}` : ""}${c.note ? ` _(${c.note})_` : ""}`)
     for (const p of data.graph.passages.filter((b) => b.conceptIds.includes(c.id))) {
-      out.push(`  - ${quote(p.text)}${p.location ? ` (${p.location})` : ""}`)
+      out.push(...passageLines(p, "  "))
     }
   }
   out.push("")
@@ -176,7 +181,7 @@ export function buildClothMarkdown(
   const unlabeled = data.graph.passages.filter((p) => p.conceptIds.length === 0)
   if (unlabeled.length) {
     out.push(`## Unlabeled passages (${unlabeled.length})`, "")
-    for (const p of unlabeled) out.push(`- ${quote(p.text)}${p.location ? ` (${p.location})` : ""}`)
+    for (const p of unlabeled) out.push(...passageLines(p, ""))
     out.push("")
   }
 
@@ -190,9 +195,40 @@ export function buildClothMarkdown(
     out.push(`## Projection — ${p.name}`, "")
     if (p.essence) out.push(`_${p.essence}_`, "")
     if (p.read) out.push(p.read, "")
+    // The tiers travel in the .json; without them the prose said a projection
+    // existed and not what it claimed.
+    const tiered = data.graph.concepts.filter((c) => p.tiers[c.id])
+    if (tiered.length) {
+      for (const [tier, name] of TIER_ORDER) {
+        const group = tiered.filter((c) => p.tiers[c.id] === tier)
+        if (group.length) out.push(`- **${name}**: ${group.map((c) => c.label).join(" · ")}`)
+      }
+      out.push("")
+    }
   }
 
   return out.join("\n")
+}
+
+/** The tiers as a student reads them, in the order the board stacks them. */
+const TIER_ORDER: [Tier, string][] = [
+  ["p", "Primary"], ["s", "Secondary"], ["t", "Tertiary"], ["x", "Set aside"],
+]
+
+/**
+ * A passage in prose, carrying what the .json carries: the words, the whole
+ * citation (source AND location — the source was silently dropped), and the
+ * student's own note and question when they wrote them.
+ */
+function passageLines(
+  p: LoomExport["graph"]["passages"][number],
+  indent: string
+): string[] {
+  const cite = [p.source, p.location].filter(Boolean).join(" · ")
+  const lines = [`${indent}- ${quote(p.text)}${cite ? ` — ${cite}` : ""}`]
+  if (p.note) lines.push(`${indent}  - note: ${p.note}`)
+  if (p.question) lines.push(`${indent}  - question: ${p.question}`)
+  return lines
 }
 
 // --- the threads of a scope ---
@@ -358,10 +394,44 @@ export function buildLogMarkdown(
   }
   for (const e of events) {
     const when = (e.at instanceof Date ? e.at : new Date(e.at)).toISOString().slice(0, 16).replace("T", " ")
-    const label = typeof e.payload?.label === "string" ? ` — ${e.payload.label}` : ""
-    out.push(`- \`${when}\` **${e.kind}**${label}`)
+    // The act in the student's own language, as the panel says it — not the
+    // record's kind. `passage.capture` is what the database calls it; the file
+    // a student opens should read like the list they saw (TJ, 2026-08-12).
+    out.push(`- \`${when}\` **${describeEvent(e)}**`)
+    for (const line of logPayloadLines(e)) out.push(`  - ${line}`)
   }
   return out.join("\n")
+}
+
+/**
+ * The readable half of a payload — the same facts the JSON carries verbatim,
+ * so the pair is one content in two forms rather than a summary beside a
+ * record. Only what the payload itself holds: a passage's words live on its
+ * row, not in the act, and this file cannot invent them.
+ */
+function logPayloadLines(e: GraphEvent): string[] {
+  const p = (e.payload ?? {}) as Record<string, unknown>
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null)
+  const lines: string[] = []
+  const sentence = str(p.sentence)
+  if (sentence) lines.push(`"${sentence}"`)
+  const where = [str(p.source), str(p.location)].filter(Boolean).join(" · ")
+  if (where) lines.push(where)
+  if (p.changed && typeof p.changed === "object") {
+    const moves = Object.values(p.changed as Record<string, string>)
+      .map((tier) => TIER_WORD[tier] ?? "unsorted")
+    const counts = moves.reduce<Record<string, number>>((acc, t) => ({ ...acc, [t]: (acc[t] ?? 0) + 1 }), {})
+    const said = Object.entries(counts).map(([tier, n]) => `${n} → ${tier}`).join(" · ")
+    if (said) lines.push(said)
+  }
+  const fields = [
+    p.essenceChars !== undefined ? "the one-line" : null,
+    p.readChars !== undefined ? "the paragraph" : null,
+    p.titleChars !== undefined ? "the title" : null,
+    p.descriptionChars !== undefined ? "the description" : null,
+  ].filter(Boolean)
+  if (fields.length) lines.push(fields.join(" · "))
+  return lines
 }
 
 // --- shared shaping ---

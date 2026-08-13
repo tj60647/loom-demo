@@ -124,5 +124,15 @@ export function buildMapKitData(
       to: label(e.toId),
       sentence: e.sentence,
     })),
+    // The two things the kit COUNTS rather than copies. They were in the
+    // markdown and not here, which broke the rule the pair lives under (TJ,
+    // 2026-08-12: "the json and md files should be similar content in
+    // different forms").
+    longestChain: (() => {
+      const comps = allComponents(concepts, edges)
+      if (!comps.length || comps[0].edges.length < 2) return []
+      return comps[0].edges.map((e) => ({ from: label(e.fromId), to: label(e.toId) }))
+    })(),
+    untouched: concepts.filter((c) => !degreeOf(edges, c.id)).map((c) => c.label),
   }
 }

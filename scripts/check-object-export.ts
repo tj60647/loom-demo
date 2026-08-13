@@ -193,5 +193,23 @@ console.log("\nobject export — each object leaves whole")
   assert(/\.threads\.\d{10}\.md$/.test(awkward), "the kind, the stamp and the extension survive an awkward name", awkward)
 }
 
+// --- the pair: .json and .md are one content in two forms (TJ, 2026-08-12) ---
+//
+// The failure this catches is the quiet one: a field added to the JSON and
+// never to the prose, so two files claiming to be the same object disagree
+// about what the student did. Asserted on the facts a reader would miss.
+{
+  const md = buildClothMarkdown(state, scopeKey, prov)
+  const j = buildClothExport(state, scopeKey, prov)
+  const p1 = j.graph.passages.find((p) => p.conceptIds.length > 0)!
+  assert(md.includes(p1.source), "a passage's SOURCE reads in the prose, as it does in the json", md.slice(0, 240))
+  assert(md.includes(p1.location), "and its location", p1.location)
+  assert(
+    j.projections.length === 0 || md.includes("**Primary**"),
+    "a projection's TIERS read in the prose — the json has carried them all along",
+    md
+  )
+}
+
 console.log(`\n${checks} checks, ${failures} failing\n`)
 if (failures > 0) process.exit(1)
