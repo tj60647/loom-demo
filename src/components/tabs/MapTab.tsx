@@ -20,7 +20,6 @@ import { readingsOf, soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import { buildMapKit } from "@/lib/mapKit"
-import { copyText } from "@/lib/clipboard"
 import { buildMapExport, buildMapMarkdown, mapExportFilename, scopeLabelOf } from "@/lib/graphExport"
 import { downloadText } from "@/lib/download"
 import { objectExportFilename } from "@/lib/objectExport"
@@ -474,23 +473,10 @@ export default function MapTab({ practice = false }: {
     setBend(null)
   }
 
-  // Came with the read editor when 03's duplicate was retired — the paragraph
-  // and its one-line copy out together, which is how a student hands the take
-  // to something outside Loom.
-  const handleCopyRead = () => {
-    const read = (activeMap?.read || "").trim()
-    const essence = (activeMap?.essence || "").trim()
-    if (!read && !essence) { flash("your read is empty — write a short paragraph first"); return }
-    const out = [
-      (studentName ? studentName + " — " : "") + (activeMap?.name || "my read of the cloth"),
-      essence,
-      read,
-    ].filter(Boolean).join("\n\n")
-    copyText(out).then(ok => {
-      if (ok) flash("read copied to clipboard")
-      else flash("select & copy by hand")
-    })
-  }
+  // "Copy your read" stood here until 2026-08-12 (TJ). It copied the one-line
+  // and the paragraph to the clipboard — two fields the student is looking at
+  // and can select — while the projection's own `keep .json` / `keep .md` at
+  // the head of the section already hand the whole thing over as a file.
 
   /**
    * The concept-map kit — a FILE, not a clipboard (TJ, 2026-08-11: "the map
@@ -919,12 +905,19 @@ export default function MapTab({ practice = false }: {
           onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapRead(m.id, v)) }}
           onBlur={flushMapText}
         />
-        {/* Inside the read now, not adrift under the page: both act on the
-            projection this column is about. */}
-        <div style={{ marginTop: 10, display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <button className="btn ghost mini" data-tip="copies your paragraph to the clipboard" onClick={handleCopyRead}>Copy your read</button>
-          <button id="mapKit" className="btn ghost mini" data-tip="the same concept-map kit as a file — grouped by your tiers" onClick={handleMapKit}>Download the concept-map kit → draw the real concept map</button>
-        </div>
+        {/* The kit, explained in a sentence rather than in a button (TJ,
+            2026-08-12: the label "was doing more work than it should"). Every
+            other box in this station says what it is above the control; this
+            one carried its whole instruction inside the button, which made it
+            three lines wide and still cryptic. "Copy your read" went in the
+            same pass — it duplicated the paragraph you can select and copy,
+            one field away. */}
+        <p className="hint" style={{ marginTop: 14 }}>
+          The kit is this projection as a file: your concepts grouped by the tiers you
+          gave them, with the threads between them. Take it to paper or Figma and draw
+          the real concept map from it.
+        </p>
+        <button id="mapKit" className="btn ghost mini" onClick={handleMapKit}>Download the kit</button>
       </div>
       </div>
       </div>

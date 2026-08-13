@@ -110,7 +110,6 @@ function foldEvents(events: GraphEvent[], upTo: number) {
   // spans both eras, so the fold must replay each passage under the semantics
   // it actually lived under.
   const cascadeEraPassages = new Set<string>()
-  let readRevisions = 0
 
   for (let i = 0; i < upTo && i < events.length; i++) {
     const e = events[i]
@@ -215,16 +214,10 @@ function foldEvents(events: GraphEvent[], upTo: number) {
         if (e.entityId) edges.delete(e.entityId)
         break
       }
-      case "read.update": {
-        readRevisions++
-        break
-      }
-      // The cloth description is the read's successor (0021); count a
-      // description revision the same way. Title edits change nothing drawn.
-      case "cloth.update": {
-        if (typeof p.descriptionChars === "number") readRevisions++
-        break
-      }
+      // `read.update` and `cloth.update` change nothing the fold draws — the
+      // cloth is concepts, threads and passages. They were counted here for a
+      // line under the slider that has gone (2026-08-12); the list view shows
+      // each of them as its own row, which is where an act belongs.
       // Reset clears the cloth.
       case "graph.reset": {
         concepts.clear()
@@ -255,7 +248,6 @@ function foldEvents(events: GraphEvent[], upTo: number) {
     concepts: [...concepts.values()],
     passages: [...passages.values()],
     edges: [...edges.values()],
-    readRevisions,
   }
 }
 
@@ -754,15 +746,20 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
             </button>
           </div>
 
+          {/* The counts are the cloth's SHAPE at this act — the three things
+              drawn below. "· the read, revised once so far" used to hang off
+              the end of them and TJ read it as irrelevant (2026-08-12); it was
+              worse than that. It counted `read.update` and cloth-description
+              edits, so it named an object that no longer exists: "the read"
+              was the cloth's paragraph before migration 0021 replaced it with
+              the Cloth Description, and today "your read" means a
+              PROJECTION's paragraph, a different object again. It counted a
+              thing you cannot see, under a name for something else, next to
+              three things you can. The acts it counted are in the list, said
+              plainly: "revised a cloth's description · the description". */}
           <p className="cap" style={{ margin: "4px 0 2px" }}>
             {cloth.concepts.length} concepts · {cloth.edges.length} threads · {cloth.passages.length} passages —{" "}
             {atMax ? "now" : when ? `as of ${when}` : "at the first recorded act"}
-            {cloth.readRevisions > 0 && (
-              <>
-                {" · "}the read, revised{" "}
-                {cloth.readRevisions === 1 ? "once" : `${cloth.readRevisions} times`} so far
-              </>
-            )}
           </p>
           {current && (
             <p className="ghostnote" style={{ margin: "0 0 8px" }}>

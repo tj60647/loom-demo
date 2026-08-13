@@ -14,9 +14,8 @@
 
 import { useLoom } from "@/components/providers/LoomProvider"
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
-import type { Edge } from "@/lib/types"
+import type { Edge, Tier } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
-import { copyText } from "@/lib/clipboard"
 import ClothMap from "@/components/svg/ClothMap"
 
 export default function ClothReflection() {
@@ -24,7 +23,10 @@ export default function ClothReflection() {
   // edges have both ends in scope by construction, so every concept lookup
   // below resolves. Bridges are named but not drawn: they are 02 Linking's
   // material, and drawing half a thread would be a lie.
-  const { scopedState: state, scoped, activeCloth, flash, studentName } = useLoom()
+  const {
+    scopedState: state, scoped, activeCloth, flash,
+    addMap, setMapTiers, selectMap, scopeMaps,
+  } = useLoom()
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
   const [drafted, setDrafted] = useState("")
   const [showClothInfo, setShowClothInfo] = useState(false)
@@ -145,38 +147,38 @@ export default function ClothReflection() {
       : 'just a pattern to notice — nothing to lay out.')
   }
 
-  const buildDraft = () => {
-    if (!readSel) return ""
-    let edges: Edge[] = []
-    let head = ""
-    if (readSel.type === "concept" && readSel.id) {
-      const c = state.concepts.find(x => x.id === readSel.id)
-      if (!c) return ""
-      head = "Threads from: " + c.label
-      edges = componentOf(c.id, adj).edges
-    } else if (readSel.type === "hub" && readSel.ids) {
-      const names = readSel.ids.map(id => state.concepts.find(c => c.id === id)?.label).filter(Boolean)
-      head = "Threads meeting at: " + names.join(" / ")
-      edges = state.edges.filter(e => readSel.ids!.includes(e.fromId) || readSel.ids!.includes(e.toId))
-    } else {
-      return ""
+  /**
+   * Make these threads a projection (TJ, 2026-08-12). It used to be "copy
+   * these threads", which put them on the clipboard and left the student to
+   * do the laying out somewhere else — a dead end inside the tool that had
+   * just found the trace.
+   *
+   * The trace IS a claim about what matters: the concepts it runs through go
+   * on the top tier, and every other concept in this reading is set aside.
+   * That is a starting arrangement, not a verdict — the sort list is right
+   * there and every chip is one press. Nothing is written that the student
+   * cannot immediately re-tier.
+   */
+  const [creating, setCreating] = useState(false)
+  const createProjectionFrom = async (edges: Edge[], seeds: string[]) => {
+    if (creating) return
+    setCreating(true)
+    try {
+      const primary = new Set<string>(seeds)
+      edges.forEach((e) => { primary.add(e.fromId); primary.add(e.toId) })
+      if (!primary.size) { flash("nothing traced yet"); return }
+      const name = `Cloth projection ${scopeMaps.length + 1}`
+      const map = await addMap(name)
+      const tiers: Record<string, Tier> = {}
+      state.concepts.forEach((c) => { tiers[c.id] = primary.has(c.id) ? "p" : "x" })
+      await setMapTiers(map.id, tiers)
+      selectMap(map.id)
+      flash(`“${name}” — ${primary.size} concept${primary.size === 1 ? "" : "s"} primary, the rest set aside`)
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "could not start a projection")
+    } finally {
+      setCreating(false)
     }
-    let out = head + "\n" + (studentName ? "(" + studentName + ")\n" : "") + "\n"
-    edges.forEach(e => {
-      const f = state.concepts.find(c => c.id === e.fromId)
-      const t = state.concepts.find(c => c.id === e.toId)
-      out += (f ? f.label : "?") + " — " + (e.handle || "(loose)") + " — " + (t ? t.label : "?") + "\n" + '"' + e.sentence + '"' + "\n\n"
-    })
-    return out
-  }
-
-  const handleCopyDraft = () => {
-    const txt = buildDraft()
-    if (!txt) return
-    copyText(txt).then(ok => {
-      if (ok) { flash("copied to clipboard"); setDrafted("✓ copied") }
-      else flash("select & copy by hand")
-    })
   }
 
   // v14's tripleHtml + .readitem. Sizes come from globals.css (.threadhead is
@@ -210,8 +212,14 @@ export default function ClothReflection() {
           </div>
           <p className="hint" style={{ margin: "4px 0 9px" }}>
             The threads that converge on your busiest concept{readSel.ids.length > 1 ? 's' : ''} — your own sentences. <b>You</b> decide whether this is the core, and weave it into your read.
+            Make it a projection and these concepts start on the top tier, with the rest set aside — a starting arrangement you can re-sort in a press.
           </p>
-          <button className="btn ghost mini" onClick={handleCopyDraft} style={{ marginBottom: "12px" }}>copy these threads</button>
+          <button
+            className="btn ghost mini"
+            onClick={() => createProjectionFrom(inc, readSel.ids ?? [])}
+            disabled={creating}
+            style={{ marginBottom: "12px" }}
+          >{creating ? "…" : "create projection"}</button>
           <div>{inc.map(threadItem)}</div>
         </div>
       );
@@ -262,9 +270,15 @@ export default function ClothReflection() {
                 <span className="red">{c.label}</span> <span className="n"> · {comp.edges.length} crossing{comp.edges.length !== 1 ? 's' : ''}</span>
               </div>
               <p className="hint" style={{ margin: "4px 0 9px" }}>
-                Your threads, in walking order — your own sentences, laid out as raw material. <b>You</b> weave them into a read below, in your own words. Copy to quote a line.
+                Your threads, in walking order — your own sentences, laid out as raw material. <b>You</b> weave them into a read below, in your own words.
+                Make it a projection and these concepts start on the top tier, with the rest set aside — a starting arrangement you can re-sort in a press.
               </p>
-              <button className="btn ghost mini" onClick={handleCopyDraft} style={{ marginBottom: "12px" }}>copy these threads</button>
+              <button
+                className="btn ghost mini"
+                onClick={() => createProjectionFrom(comp.edges, [c.id])}
+                disabled={creating}
+                style={{ marginBottom: "12px" }}
+              >{creating ? "…" : "create projection"}</button>
               <div>{comp.edges.map(threadItem)}</div>
             </div>
           );

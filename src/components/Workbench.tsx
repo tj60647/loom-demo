@@ -182,11 +182,17 @@ export default function Workbench({
   // are the same station, so this only moves the page under the reader. It
   // also sends the sheet back: you asked to see the passage in its page, and a
   // sheet over the right third of that page is not showing it to you.
+  // Go to the passage in the text. Your work STAYS OUT (TJ, 2026-08-12: "why
+  // does the 'my work' panel disappear?" — "no, just dont close it"). It used
+  // to `setWorkOpen(false)` here, on the assumption that the sheet covers the
+  // passage; the sheet is a card inset in the top-right corner, sized to clear
+  // most of a two-page spread, so the panel vanished whether or not it was in
+  // the way. Where it does overlap, the student can close it themselves — the
+  // toggle is right there, and it is their call rather than ours.
   const handleGotoPassage = (passage: Passage) => {
     if (!source.hasFile) return
     setPdfPage(passage.pageNumber && passage.pageNumber > 0 ? passage.pageNumber : 1)
     setPdfFocusPassageId(passage.id)
-    setWorkOpen(false)
     goTo("reading")
   }
 
