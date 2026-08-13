@@ -29,6 +29,17 @@ import { scopeFromKey } from "@/lib/scope"
 /** What a student types to arm the reset. Deliberately the label on the button. */
 const CONFIRM_PHRASE = "start over"
 
+/**
+ * "1 thread", not "1 threads".
+ *
+ * The totals row got this right by hand and the confirm sentence did not, so
+ * the dialog counted correctly and then read "1 threads" at the one moment a
+ * student is being asked to weigh what they are about to lose. One helper for
+ * both, so they cannot drift again.
+ */
+const noun = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many)
+const count = (n: number, one: string, many = `${one}s`) => `${n} ${noun(n, one, many)}`
+
 export default function MyLoomModal({
   onClose,
   /**
@@ -182,12 +193,13 @@ export default function MyLoomModal({
         ) : (
           <>
             <ul className="myloom-totals">
-              <li><b>{state.passages.length}</b> {state.passages.length === 1 ? "passage" : "passages"}</li>
-              <li><b>{state.concepts.length}</b> {state.concepts.length === 1 ? "concept" : "concepts"}</li>
-              <li><b>{state.edges.length}</b> {state.edges.length === 1 ? "thread" : "threads"}</li>
-              <li><b>{state.links.length}</b> {state.links.length === 1 ? "link" : "links"}</li>
-              <li><b>{state.maps.length}</b> {state.maps.length === 1 ? "projection" : "projections"}</li>
-              <li><b>{state.cloths.length}</b> {state.cloths.length === 1 ? "cloth" : "cloths"}</li>
+              {([
+                [state.passages.length, "passage"], [state.concepts.length, "concept"],
+                [state.edges.length, "thread"], [state.links.length, "link"],
+                [state.maps.length, "projection"], [state.cloths.length, "cloth"],
+              ] as const).map(([n, word]) => (
+                <li key={word}><b>{n}</b> {noun(n, word)}</li>
+              ))}
             </ul>
             <p className="info-note">
               Concepts and links are yours across every reading — a concept does not
@@ -203,9 +215,9 @@ export default function MyLoomModal({
                       <Link href={`/reading/${r.id}`} onClick={onClose}>{r.title}</Link>
                       <small>
                         {[
-                          r.passages && `${r.passages} ${r.passages === 1 ? "passage" : "passages"}`,
+                          r.passages && count(r.passages, "passage"),
                           r.cloths && "a cloth",
-                          r.maps && `${r.maps} ${r.maps === 1 ? "projection" : "projections"}`,
+                          r.maps && count(r.maps, "projection"),
                         ].filter(Boolean).join(" · ")}
                       </small>
                     </li>
@@ -251,10 +263,12 @@ export default function MyLoomModal({
             ) : (
               <>
                 <p>
-                  This removes <b>{state.passages.length} passages</b>,{" "}
-                  <b>{state.concepts.length} concepts</b>, <b>{state.links.length} links</b>,{" "}
-                  <b>{state.edges.length} threads</b>, <b>{state.maps.length} projections</b> and{" "}
-                  <b>{state.cloths.length} cloths</b>. It cannot be undone from here.
+                  This removes <b>{count(state.passages.length, "passage")}</b>,{" "}
+                  <b>{count(state.concepts.length, "concept")}</b>,{" "}
+                  <b>{count(state.links.length, "link")}</b>,{" "}
+                  <b>{count(state.edges.length, "thread")}</b>,{" "}
+                  <b>{count(state.maps.length, "projection")}</b> and{" "}
+                  <b>{count(state.cloths.length, "cloth")}</b>. It cannot be undone from here.
                 </p>
                 <label className="myloom-type">
                   Type <b>{CONFIRM_PHRASE}</b> to confirm

@@ -377,7 +377,14 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 /* My Loom (Header) — the mirror and the exit. Scrolls inside itself like
    About: a loom with twenty readings in it is longer than a screen, and the
    start-over block must stay reachable at the bottom rather than clipped. */
-.myloombox{max-width:560px;max-height:84vh;overflow-y:auto}
+/* Desktop width, per contracts.md §2c-iii — this opened at 560px, which is
+   About's measure for a column of prose and wrong for what this dialog is.
+   The readings list is a two-column work surface (title, then its tally) and
+   at 560 every real title wrapped to two lines. The prose inside keeps its
+   own 60-75ch measure below rather than stretching with the box: the rule is
+   that prose holds a measure and work surfaces take the room. */
+.myloombox{max-width:820px;max-height:84vh;overflow-y:auto}
+.myloombox p,.myloombox .info-note{max-width:68ch}
 /* The panel takes focus on open (tabIndex -1) so the first Tab reaches Close
    rather than the destructive button. No ring: the focus is programmatic and
    the box is already the only lit thing on screen. */
@@ -402,8 +409,11 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .myloom-danger h3{color:var(--red);border-bottom-color:var(--red)}
 .myloom-type{display:block;font-size:13.5px;color:var(--ink-soft);margin:0 0 12px}
 .myloom-type b{font-family:var(--mono);color:var(--ink)}
-.myloom-type input{display:block;width:100%;margin-top:5px;padding:7px 9px;font-family:var(--mono);
-  font-size:14px;border:1px solid var(--rule);border-radius:3px;background:var(--paper);color:var(--ink)}
+/* Capped rather than full-width: the field takes two words, and a 770px input
+   for "start over" reads as a paragraph box and invites pasting into. */
+.myloom-type input{display:block;width:100%;max-width:320px;margin-top:5px;padding:7px 9px;
+  font-family:var(--mono);font-size:14px;border:1px solid var(--rule);border-radius:3px;
+  background:var(--paper);color:var(--ink)}
 .myloom-type input:focus-visible{outline:none;border-color:var(--red)}
 .myloom-actions{display:flex;gap:8px;justify-content:flex-end}
 .myloom-error{color:var(--red);font-size:13.5px}
