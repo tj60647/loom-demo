@@ -857,6 +857,14 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
             it, then read for support. It used to say "(rare)", which talked
             students out of it, and it took no description — so the gloss you
             had in mind at the moment of naming had nowhere to go. */}
+        {/* Built like the capture form it sits beneath (TJ, 2026-08-13: "this
+            card is not as evolved as its siblings"). It was: a `.quietrow`,
+            whose own dotted top border drew a second rule directly under this
+            block's, and a bare <input> for the gloss — no class, so it matched
+            none of `textarea, .form-row input, .tinput` and fell back to the
+            browser's own box, half the height of the field above it and
+            clipping its own placeholder. Two `.form-row`s and a named field
+            each, which is what every other pair of inputs in Loom is. */}
         <div className="aheadofit">
           <span className="label">Name a concept before its evidence</span>
           <p className="hint" style={{ marginTop: 2 }}>
@@ -865,21 +873,35 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
             backs it — a state, not a fault — and it stays in view in every reading while
             you hunt.
           </p>
-          <div className="quietrow" style={{ marginTop: 6 }}>
+          <div className="form-row">
+            <span className="label">Concept</span>
             <input
               list={listId}
               placeholder="the concept you are looking for…"
+              title="a noun phrase, not a sentence — the same shape as any other concept"
               value={newConceptOnly}
               onChange={(e) => setNewConceptOnly(e.target.value)}
             />
-            <button className="btn ghost mini" onClick={handleAddConceptOnly}>Add</button>
           </div>
-          <input
-            style={{ marginTop: 6 }}
-            placeholder="what you take it to mean, in your own words (optional)"
-            value={newConceptDef}
-            onChange={(e) => setNewConceptDef(e.target.value)}
-          />
+          <div className="form-row">
+            <span className="label">
+              Description{" "}
+              <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+            </span>
+            <input
+              placeholder="what you take it to mean, in your own words"
+              title="the reason you expect to find this — what you will read the candidate passage against"
+              value={newConceptDef}
+              onChange={(e) => setNewConceptDef(e.target.value)}
+            />
+          </div>
+          {/* Disabled until there is a name, like Add passage above: the handler
+              already returned early on an empty one, silently. */}
+          <button
+            className="btn ghost mini"
+            onClick={handleAddConceptOnly}
+            disabled={!newConceptOnly.trim()}
+          >Add</button>
         </div>
       </div>
   )
