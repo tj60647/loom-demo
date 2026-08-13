@@ -221,6 +221,17 @@ function foldEvents(events: GraphEvent[], upTo: number) {
         edges.clear()
         break
       }
+      // One reading started over. Only its captures went — concepts, links and
+      // threads are user-level and survive by ruling — so this must NOT clear
+      // the way graph.reset does, or the replay would delete work the act left
+      // standing. The snapshot names exactly which passages went; without one
+      // (an omitted, over-cap snapshot) the replay leaves them, which reads as
+      // a reading whose captures outlive their reset and is the lesser wrong.
+      case "reading.reset": {
+        const cleared = (p.snapshot as { passages?: { id: string }[] } | undefined)?.passages
+        cleared?.forEach((row) => passages.delete(row.id))
+        break
+      }
       // Import and the worked example clear too, then seed from the row
       // snapshot the event carries — the snapshot is the only source for that
       // era (getGraphEvents no longer synthesizes creates for ids it covers),

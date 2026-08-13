@@ -27,7 +27,7 @@ import { scopeLabelOf } from "@/lib/graphExport"
  * Cloth button gets its title — the shelf card shows both.
  */
 export default function ClothFold() {
-  const { activeCloth, updateCloth, isLoading, scope, flash, state } = useLoom()
+  const { activeCloth, updateCloth, isLoading, scope, flash, state, scoped, scopeMaps, resetReading } = useLoom()
   const { byId } = useReadings()
   const titleOf = (id: string) => byId.get(id)?.title ?? id
   const scopeLabel = scopeLabelOf(scope.key, titleOf)
@@ -63,6 +63,40 @@ export default function ClothFold() {
       if (ok) flash("cloth saved")
     } finally {
       setBusy(false)
+    }
+  }
+
+  /**
+   * Start this reading over — the narrower exit, at the object it clears
+   * (TJ, 2026-08-13). Only inside a reading: the whole weave has no Reading
+   * station, and there is no "this reading" to clear there.
+   */
+  const soleSource = scope.sourceIds.length === 1 ? scope.sourceIds[0] : null
+  const [arming, setArming] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const here = {
+    passages: scoped.passages.length,
+    maps: scopeMaps.length,
+    cloth: !!((activeCloth?.title ?? "") || (activeCloth?.description ?? "")),
+  }
+  const somethingHere = here.passages > 0 || here.maps > 0 || here.cloth
+
+  const startOver = async () => {
+    if (!soleSource) return
+    setClearing(true)
+    try {
+      const n = await resetReading(soleSource)
+      // The drafts are this component's own state and would otherwise sit
+      // there holding the text the server just deleted, ready to write it
+      // back on the next save.
+      setTitle("")
+      setDescription("")
+      setArming(false)
+      flash(`this reading is clear — ${n.passages} passage${n.passages === 1 ? "" : "s"} gone, your concepts kept`)
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "could not clear this reading")
+    } finally {
+      setClearing(false)
     }
   }
 
@@ -133,6 +167,37 @@ export default function ClothFold() {
           markdown={(p) => buildClothMarkdown(state, scope.key, p, titleOf)}
         />
       </div>
+
+      {/* Ruled off and last, below the download — the order is the advice:
+          keep a copy where you made it, then clear. Only drawn inside a
+          reading, and only when there is something here to clear. */}
+      {soleSource && somethingHere && (
+        <div className="clothdanger">
+          {!arming ? (
+            <button className="btn ghost mini clothreset" onClick={() => setArming(true)}>
+              start this reading over
+            </button>
+          ) : (
+            <>
+              <p className="hint" style={{ margin: "0 0 8px" }}>
+                Clears <b>{here.passages} passage{here.passages === 1 ? "" : "s"}</b> captured here
+                {here.cloth ? <>, <b>this cloth&apos;s title and description</b></> : null}
+                {here.maps ? <> and <b>{here.maps} projection{here.maps === 1 ? "" : "s"}</b></> : null}.
+                {" "}Your concepts, links and threads stay — they are yours across every reading, so
+                some will be left showing <b>no evidence</b> until you capture again.
+              </p>
+              <div className="clothfoot">
+                <button className="btn ghost mini" onClick={() => setArming(false)} disabled={clearing}>
+                  Cancel
+                </button>
+                <button className="btn danger mini" onClick={startOver} disabled={clearing}>
+                  {clearing ? "Clearing…" : "Yes, clear this reading"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </details>
   )
 }

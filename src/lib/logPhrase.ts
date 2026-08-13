@@ -57,6 +57,7 @@ export function describeEvent(e: GraphEvent): string {
     case "cloth.update":
       return typeof p.descriptionChars === "number" ? "revised a cloth's description" : "titled a cloth"
     case "graph.reset": return "reset the cloth"
+    case "reading.reset": return "started this reading over"
     case "graph.import": return "imported a cloth"
     case "graph.example": return "loaded the worked example"
     default: return "one more act on the record"

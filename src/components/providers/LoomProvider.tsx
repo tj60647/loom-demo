@@ -14,7 +14,7 @@ import {
   createLink, updateLink, attachLink as attachLinkAction,
   saveView, saveCloth as saveClothAction,
   createMap as createMapAction, updateMap as updateMapAction, deleteMap as deleteMapAction,
-  resetLoom as resetLoomAction,
+  resetLoom as resetLoomAction, resetReading as resetReadingAction,
 } from "@/actions/loom"
 
 /** What a reset cleared, for the line the modal shows afterwards. */
@@ -22,6 +22,14 @@ export type ResetCounts = {
   concepts: number; passages: number; edges: number
   links: number; maps: number; cloths: number; views: number
 }
+
+/**
+ * What clearing ONE reading took. Deliberately three fields and not seven:
+ * concepts, links and threads are user-level and survive a reading-scoped
+ * reset, so a shape that could report them would invite reporting zero and
+ * reading as though they had been checked.
+ */
+export type ReadingResetCounts = { passages: number; cloths: number; maps: number }
 
 /**
  * Exported so the practice sandbox can supply this same context from its own
@@ -131,6 +139,12 @@ export interface LoomContextType {
    * behind the practice one and the page promises nothing is kept.
    */
   resetLoom: () => Promise<ResetCounts>
+  /**
+   * Start one reading over — its captures, its cloth, its projections. The
+   * concepts those passages evidenced stay, some of them now carrying no
+   * evidence, which is a state the app names rather than a fault.
+   */
+  resetReading: (sourceId: string) => Promise<ReadingResetCounts>
   /** Transient status line (v14's saveDot): '· saved ·', '· copied ·', errors. */
   flashMsg: string | null
   flash: (msg: string) => void
@@ -873,6 +887,17 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     return counts
   }, [cancelPendingSaves, applyTruth])
 
+  const resetReading = useCallback(async (sourceId: string) => {
+    cancelPendingSaves()
+    const counts = await resetReadingAction(sourceId)
+    // Unlike resetLoom, only PART of the loom went — a blank state would be a
+    // lie and a local filter would have to re-derive which view rows belonged
+    // to which projection. Re-read instead: this is the truth including the
+    // write, so it applies unconditionally.
+    applyTruth(await getUserLoomData())
+    return counts
+  }, [cancelPendingSaves, applyTruth])
+
   return (
     <LoomContext.Provider value={{
       state, scope, scoped, scopedState, isLoading,
@@ -886,7 +911,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       selectMap, addMap, renameMap, removeMap,
       setMapTiers, setMapRead, setMapEssence, flushMapText,
       setView, ensureActiveMap,
-      resetLoom,
+      resetLoom, resetReading,
       flashMsg, flash,
       undoStack, setUndoStack, redoStack, setRedoStack
     }}>

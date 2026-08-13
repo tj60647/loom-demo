@@ -457,6 +457,22 @@ export default function SandboxLoomProvider({
       noted()
       return cleared
     },
+    /**
+     * The same act, one reading wide. The practice loom is a single reading,
+     * so here it clears everything the whole-loom reset would except the
+     * concepts, links and threads — which is exactly the real rule, and worth
+     * behaving identically to even though nothing renders it yet.
+     */
+    resetReading: async () => {
+      const cleared = {
+        passages: state.passages.length,
+        cloths: state.cloths.length,
+        maps: state.maps.length,
+      }
+      setState((s) => ({ ...s, passages: [], cloths: [], maps: [], views: { cardTable: emptyView() } }))
+      noted()
+      return cleared
+    },
     setView,
     ensureActiveMap,
     flashMsg,

@@ -147,13 +147,26 @@ export const CAPABILITIES: Capability[] = [
     enforcement: "server",
   },
   {
+    id: "reading-reset",
+    name: "Start one reading over — its captures, its cloth, its projections",
+    group: "Reading and weaving",
+    // Same verdicts as the whole-loom exit, and the same reason. The narrower
+    // act takes a sourceId — WHICH reading — and still no userId, WHOSE; the
+    // reading is additionally checked by `authorizeSourceAccess`, the gate the
+    // viewer already uses, so a forged id reaches nothing new.
+    student: { verdict: "yes" }, faculty: { verdict: "yes" }, admin: { verdict: "yes" },
+    gate: { file: "src/actions/loom.ts", symbol: "resetReading" },
+    enforcement: "server",
+  },
+  {
     id: "loom-reset-other",
     name: "Clear somebody else's loom",
     group: "Reading and weaving",
     // The row exists to say NO in a place where the answer would otherwise be
     // assumed from the admin column above it. `resetLoom` takes no userId: it
     // reads the session and scopes on that alone, so this is not a check that
-    // could be forgotten but a thing the function cannot express. Faculty can
+    // could be forgotten but a thing the function cannot express. Neither does
+    // `resetReading`, which takes WHICH reading and never WHOSE. Faculty can
     // READ a student's loom (`student-loom-read`) and that is where it stops.
     student: { verdict: "no" },
     faculty: { verdict: "no", note: "read-only over a student's loom, always" },

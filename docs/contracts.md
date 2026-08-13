@@ -576,6 +576,24 @@
 > unique constraint** — not a clock. It is not needed, because the snapshot in
 > the event already is the record (undo: open-work 5.8).
 >
+> **And the narrower exit, at the object** (2026-08-13, TJ: *"where is the
+> clear cloth/reading? i thought we were adding one"* — he was right; the tier
+> was proposed, agreed in principle and then quietly dropped when "proceed" was
+> read as covering only the modal). `resetReading` lives on the cloth's own
+> card in 01 · Reading, below the download, because the order is the advice.
+> **Concepts, Links and Threads survive it** — TJ's call, and the model's: *a
+> concept does not belong to a text; a passage does*. Deleting them from a
+> reading-scoped act would reach into every other reading and would take a
+> concept named AHEAD of its evidence, a legal first-class state. What a
+> student is left with is concepts carrying "no evidence", which the app
+> already draws as a designation rather than a fault — and the confirmation
+> says so before they commit, not after.
+>
+> **Friction is proportional.** My Loom types a phrase because it clears
+> everything; one reading arms and confirms, because it does not. A control
+> that asks for the same ceremony every time trains people to perform it
+> without reading.
+>
 > **The debounce guard came back with it.** `cancelPendingSaves` was deleted on
 > 2026-08-11 with the note *"nothing replaces the graph wholesale any more, so
 > nothing needs the guard"*. Reset does. Without it the 500ms view timer fires
@@ -706,6 +724,7 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | `saveView` | `key, CardTableView` | void | key must be `cardTable` or an owned `map:<id>` else throws; **no event** (projections) |
 | `getGraphEvents()` | — | events oldest-first, with synthesized `synth-*` creates for pre-history rows | read-only |
 | `resetLoom()` | **none, deliberately** | `counts` of what was cleared | Start over, 2026-08-13. **Takes no `userId`** — it reads the session and scopes on that alone, so "nobody resets anyone else's loom" is unrepresentable rather than merely checked (capabilities `loom-reset` / `loom-reset-other`). `graph.reset` event first carrying the **whole snapshot** (all seven collections + `passage_concept` filings), written with a bare `db.insert` and NOT `recordEvent`, which swallows failures — here the event is the only copy of what is about to go, so it must be allowed to throw before anything is deleted. Snapshot over `RESET_SNAPSHOT_LIMIT` (900KB) degrades to counts + `snapshotOmitted`. Then batch-delete edges → links → passages → concepts → maps → cloths → views. **History survives**; so do memberships, the session, and the student's own `isOwn` readings and their blobs |
+| `resetReading` | `sourceId` — **and no userId** | `{passages, cloths, maps}` | Start ONE reading over, 2026-08-13. WHICH reading is a parameter; WHOSE is the session, and `authorizeSourceAccess` re-checks the reading against the same gate the viewer uses. Clears this reading's passages, its cloth, its projections and those projections' `map:<id>` view rows (nothing cascades a view). **Concepts, Links and Threads survive by ruling** — user-level, so a reading-scoped act must not reach them; some concepts are left carrying "no evidence", which the model already names. `reading.reset` event first, **stamped with `sourceId`** so `eventBelongsToReading` rule 1 files it in this reading's Capture Log — inferring it would be impossible, since every passage it names is about to stop existing |
 | ~~`resetGraph`~~ · ~~`importGraph`~~ · ~~`importMapArrangement`~~ · ~~`loadWorkedExample`~~ | — | — | **Deleted 2026-08-11 with Keep** (see the ruling above); these rows described them until 2026-08-13. `resetLoom` above is not `resetGraph` restored — different home, clears Links too, and its event carries the loom rather than counts. §4e/§4f describe import and remain history |
 
 ### 2b. Library — [src/actions/sources.ts](../src/actions/sources.ts)

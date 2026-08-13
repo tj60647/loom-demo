@@ -7,7 +7,7 @@ import type { PgColumn } from "drizzle-orm/pg-core"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { resolveCourseIdForUser } from "@/lib/courses"
-import { scopeFromKey } from "@/lib/scope"
+import { scopeFromKey, scopeOf } from "@/lib/scope"
 import type { Passage, CardTableView, GraphEvent, Link, LoomMap, LoomViews, PassageTier, Tier } from "@/lib/types"
 import { textLayerProjection } from "@/lib/pdfText"
 import { authorizeSourceAccess } from "@/actions/sources"
@@ -1245,6 +1245,107 @@ export async function resetLoom() {
     db.delete(maps).where(mineMaps),
     db.delete(cloths).where(mineCloths),
     db.delete(views).where(mineViews),
+  ] as unknown as Parameters<typeof db.batch>[0])
+
+  return counts
+}
+
+/**
+ * Start ONE READING over: its captures, its cloth, its projections.
+ *
+ * The narrower exit, and the one a student reaches for more often — they made
+ * a mess of this text, not of everything (TJ, 2026-08-13).
+ *
+ * **Concepts, Links and Threads survive, by ruling.** They are user-level:
+ * "a concept does not belong to a text; a passage does". Deleting them from a
+ * reading-scoped act would reach into work that belongs to every other
+ * reading, and would take a concept the student named AHEAD of its evidence —
+ * a legal first-class state the model protects. What the student is left with
+ * is some concepts carrying no evidence, which is a state the app already
+ * names and draws ("no evidence"), not damage. The dialog says so before they
+ * commit rather than letting them discover it after.
+ *
+ * Takes a sourceId and still no userId — the reading is WHICH, the session is
+ * WHOSE, and those are different questions. `authorizeSourceAccess` is the
+ * same gate the viewer uses, so a forged id reaches a reading the student may
+ * already open and nothing further.
+ */
+export async function resetReading(sourceId: string) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+  // A reading the student may not open is not a reading they may clear.
+  await authorizeSourceAccess(sourceId)
+
+  // One reading's scope key IS its id (scopeOf joins a single id to itself).
+  const scopeKey = scopeOf([sourceId]).key
+
+  const minePassages = and(
+    eq(passages.userId, userId), inCourse(passages.courseId, courseId), eq(passages.sourceId, sourceId)
+  )
+  const mineCloths = and(
+    eq(cloths.userId, userId), inCourse(cloths.courseId, courseId), eq(cloths.scopeKey, scopeKey)
+  )
+  const mineMaps = and(
+    eq(maps.userId, userId), inCourse(maps.courseId, courseId), eq(maps.scopeKey, scopeKey)
+  )
+
+  const [passageRows, clothRows, mapRows] = await Promise.all([
+    db.select().from(passages).where(minePassages),
+    db.select().from(cloths).where(mineCloths),
+    db.select().from(maps).where(mineMaps),
+  ])
+
+  const counts = {
+    passages: passageRows.length,
+    cloths: clothRows.length,
+    maps: mapRows.length,
+  }
+  if (!counts.passages && !counts.cloths && !counts.maps) return counts
+
+  // A projection's board lives in its own view row, keyed `map:<id>`. Nothing
+  // cascades it — `view` points at no map — so it has to be named here or the
+  // geometry outlives the projection it arranged.
+  const viewKeys = mapRows.map((m) => `map:${m.id}`)
+  const [viewRows, pointerRows] = await Promise.all([
+    viewKeys.length
+      ? db.select().from(views).where(and(
+          eq(views.userId, userId), inCourse(views.courseId, courseId), inArray(views.key, viewKeys)
+        ))
+      : Promise.resolve([]),
+    passageRows.length
+      ? db.select().from(passageConcepts)
+          .where(inArray(passageConcepts.passageId, passageRows.map((p) => p.id)))
+      : Promise.resolve([]),
+  ])
+
+  const snapshot = {
+    passages: passageRows, cloths: clothRows, maps: mapRows,
+    views: viewRows, passageConcepts: pointerRows,
+  }
+  const serialized = JSON.stringify(snapshot)
+  // `sourceId` on the payload is what files this act in THIS reading's Capture
+  // Log — rule 1 of eventBelongsToReading, and the reason it is stamped rather
+  // than inferred: every passage it names is about to stop existing, so the
+  // evidence-based fallback would have nothing left to place it by.
+  const payload: Record<string, unknown> =
+    serialized.length <= RESET_SNAPSHOT_LIMIT
+      ? { sourceId, counts, snapshot }
+      : { sourceId, counts, snapshotOmitted: true, snapshotBytes: serialized.length }
+
+  // Event first, and allowed to throw — resetLoom's reasoning exactly.
+  await db.insert(graphEvents).values({
+    userId, courseId, kind: "reading.reset", entityType: "cloth", entityId: null, payload,
+  })
+
+  await db.batch([
+    ...(viewKeys.length
+      ? [db.delete(views).where(and(
+          eq(views.userId, userId), inCourse(views.courseId, courseId), inArray(views.key, viewKeys)
+        ))]
+      : []),
+    db.delete(maps).where(mineMaps),
+    db.delete(passages).where(minePassages),
+    db.delete(cloths).where(mineCloths),
   ] as unknown as Parameters<typeof db.batch>[0])
 
   return counts

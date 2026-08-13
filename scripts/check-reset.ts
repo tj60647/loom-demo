@@ -122,6 +122,69 @@ assert(
   "resetLoom deletes graph_event rows — reset clears the cloth, not the loom's memory of weaving"
 )
 
+console.log("\nreset — one reading start over clears the reading and not the vocabulary")
+
+const rStart = actions.indexOf("export async function resetReading")
+const rRest = actions.slice(rStart + 1)
+const rNext = rRest.indexOf("\nexport ")
+const rfn = rNext === -1 ? actions.slice(rStart) : actions.slice(rStart, rStart + 1 + rNext)
+
+// WHICH reading, never WHOSE loom. A second parameter here is the same
+// failure `loom-reset-other` describes, wearing a narrower hat.
+assert(
+  /export async function resetReading\(sourceId: string\)\s*\{/.test(actions),
+  "resetReading takes a sourceId and nothing else",
+  "resetReading's signature changed — a userId here would let one person clear another's reading, and `reading-reset` in capabilities.ts says that is impossible"
+)
+assert(
+  /await authorizeSourceAccess\(sourceId\)/.test(rfn),
+  "resetReading checks the student may open the reading first",
+  "the authorizeSourceAccess call is gone — a forged sourceId would clear work in a reading the student cannot see"
+)
+
+// THE RULING (TJ, 2026-08-13). Concepts, Links and Threads are user-level and
+// survive a reading-scoped reset: "a concept does not belong to a text; a
+// passage does". Deleting them here would reach into every other reading.
+for (const [table, why] of [
+  ["concepts", "a concept named ahead of its evidence would vanish, and one evidenced in another reading would go with it"],
+  ["links", "the student's vocabulary is not this reading's to delete"],
+  ["edges", "a thread joins two concepts and belongs to neither reading"],
+] as const) {
+  assert(
+    !new RegExp(`db\\.delete\\(${table}\\)`).test(rfn),
+    `resetReading leaves ${table} alone`,
+    `resetReading deletes ${table} — ${why}`
+  )
+}
+
+assert(
+  /db\.delete\(views\)/.test(rfn),
+  "resetReading clears the cleared projections' boards",
+  "the `map:<id>` view rows are no longer deleted — nothing cascades them, so board geometry would outlive the projection it arranged"
+)
+assert(
+  rfn.indexOf("db.insert(graphEvents)") !== -1 &&
+    rfn.indexOf("db.insert(graphEvents)") < rfn.indexOf("db.batch"),
+  "resetReading writes its event before deleting",
+  "the snapshot insert no longer precedes the batch delete"
+)
+// Stamped, not inferred: every passage this act names is about to stop
+// existing, so eventBelongsToReading's evidence fallback would have nothing
+// left to place the event by and it would fall out of the reading's log.
+// BOTH branches, checked separately. A first pass asserted `{ sourceId, counts`
+// once, which the over-cap fallback satisfied on its own — so dropping the
+// stamp from the ordinary path would have gone through unnoticed.
+assert(
+  /\?\s*\{ sourceId, counts, snapshot \}/.test(rfn),
+  "the reading.reset event carries its sourceId (with a snapshot)",
+  "the payload no longer stamps sourceId — the act would vanish from the Capture Log of the reading it happened in"
+)
+assert(
+  /:\s*\{ sourceId, counts, snapshotOmitted/.test(rfn),
+  "and carries it when the snapshot was too big to keep",
+  "the over-cap payload no longer stamps sourceId — a big reading's reset would fall out of its own log"
+)
+
 console.log("\nmy loom — a mirror and an exit, never a workshop")
 
 const MODAL = "src/components/ui/MyLoomModal.tsx"

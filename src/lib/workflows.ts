@@ -116,7 +116,7 @@ const student: Flow = {
     // `keep` because that is the order the dialog itself argues for — download
     // where you made it, THEN clear — and it returns to the Library because an
     // empty loom starts again the same way a new one does.
-    { id: "startover", label: "Start over — clear the loom, keep the log", where: "my loom · the header, on every page" },
+    { id: "startover", label: "Start over — one reading, or the whole loom", where: "01 · Reading, on the cloth's own card · or My Loom in the header, on every page" },
   ],
   edges: [
     { from: "invited", to: "signin" },
