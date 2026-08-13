@@ -6,14 +6,24 @@ import { adjacency, componentOf } from "@/lib/clothMath"
 
 type ReadSel = { type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean } | null
 
-export default function ClothMap({ 
-  state, 
-  readSel, 
-  setReadSel 
-}: { 
-  state: LoomState, 
-  readSel: ReadSel, 
-  setReadSel: (s: ReadSel) => void 
+/**
+ * What just happened, if anything (TJ, 2026-08-12: "the latest event needs a
+ * glow that fades out"). The replay hands the id of whatever the current act
+ * touched and a `seq` that changes with every step — the seq is what restarts
+ * the animation, since replaying the same concept twice must glow twice.
+ */
+export type ClothGlow = { id: string; seq: number } | null
+
+export default function ClothMap({
+  state,
+  readSel,
+  setReadSel,
+  glow = null,
+}: {
+  state: LoomState,
+  readSel: ReadSel,
+  setReadSel: (s: ReadSel) => void,
+  glow?: ClothGlow,
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [width, setWidth] = useState(720)
@@ -118,9 +128,13 @@ export default function ClothMap({
         <line x1={mL - 16} y1={baseY} x2={width - mR + 14} y2={baseY} stroke="var(--rule)" strokeWidth={1.2} />
       )}
 
-      {/* Warp Lines */}
+      {/* Warp Lines. `pointerEvents:none` — they are the paper's grain, not a
+          target, and they run the full height of the cloth: every arc crosses
+          one, and an arc clicked where it crosses used to select nothing at
+          all (the warp line is drawn under, but it wins any pixel the arc's
+          hairline does not exactly cover). */}
       {cs.map((c, i) => (
-        <line key={`warp-${c.id}`} x1={X(i)} y1={28} x2={X(i)} y2={baseY} stroke="rgba(168,132,63,.14)" strokeWidth={1} />
+        <line key={`warp-${c.id}`} x1={X(i)} y1={28} x2={X(i)} y2={baseY} stroke="rgba(168,132,63,.14)" strokeWidth={1} pointerEvents="none" />
       ))}
 
       {/* Edges */}
@@ -147,22 +161,51 @@ export default function ClothMap({
           }
         }
 
+        const d = `M ${fx} ${baseY - 6} A ${span / 2} ${h} 0 0 ${fx < tx ? 1 : 0} ${tx} ${baseY - 6}`
+
         return (
           <g key={`edge-${e.id}`}>
-            <path 
-              d={`M ${fx} ${baseY - 6} A ${span / 2} ${h} 0 0 ${fx < tx ? 1 : 0} ${tx} ${baseY - 6}`}
-              fill="none" 
-              stroke={col} 
-              opacity={op} 
-              strokeWidth={isSel ? 2 : 1.5}
-              strokeDasharray={beaten ? "none" : "5 4"}
-              markerEnd={`url(#${isSel ? 'arwR' : (beaten ? 'arwS' : 'arwG')})`}
+            {/* A WIDE INVISIBLE TWIN, so the arc can actually be hit (TJ,
+                2026-08-12, asking whether the panel's "or a concept/arc on the
+                cloth" was true). It was true of the code and false in the
+                hand: SVG hit-testing on a stroke is exactly the stroke, so the
+                target was a 1.5px hairline crossed by the warp lines — aiming
+                at an arc mostly selected nothing. The board has had this twin
+                for its bend handles all along; the cloth never got one. */}
+            <path
+              d={d}
+              fill="none"
+              stroke="rgba(0,0,0,0)"
+              strokeWidth={14}
               cursor="pointer"
               onClick={handleSelect}
             >
               <title>{`"${e.sentence}"`}</title>
             </path>
-            
+            {glow?.id === e.id && (
+              <path
+                key={`glow-${e.id}-${glow.seq}`}
+                className="clothglow"
+                d={d}
+                fill="none"
+                stroke="var(--ochre)"
+                strokeWidth={9}
+                pointerEvents="none"
+              />
+            )}
+            <path
+              d={d}
+              fill="none"
+              stroke={col}
+              opacity={op}
+              strokeWidth={isSel ? 2 : 1.5}
+              strokeDasharray={beaten ? "none" : "5 4"}
+              markerEnd={`url(#${isSel ? 'arwR' : (beaten ? 'arwS' : 'arwG')})`}
+              // The twin above takes the clicks; this one is the drawing, and
+              // must not steal a hit from a neighbour it happens to cross.
+              pointerEvents="none"
+            />
+
             <text
               x={(fx + tx) / 2}
               y={baseY - 6 - h - 5}
@@ -198,7 +241,19 @@ export default function ClothMap({
 
         return (
           <g key={`node-${c.id}`}>
-            <circle 
+            {/* The act that just landed, glowing out. Keyed by seq so stepping
+                the replay restarts it — the same concept touched twice in a
+                row must pulse twice, not sit lit. */}
+            {glow?.id === c.id && (
+              <circle
+                key={`glow-${c.id}-${glow.seq}`}
+                className="clothglow"
+                cx={x} cy={baseY} r={9}
+                fill="none" stroke="var(--ochre)" strokeWidth={3}
+                pointerEvents="none"
+              />
+            )}
+            <circle
               cx={x} cy={baseY} 
               r={isSel ? 4.6 : 3.4} 
               fill={isSel ? "var(--red)" : "var(--ochre)"} 

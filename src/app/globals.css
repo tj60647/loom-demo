@@ -682,6 +682,27 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .logquote{font-size:13.5px;line-height:1.45;color:var(--ink-soft)}
 .lognote{font-size:13px;font-style:italic;color:var(--ink-soft)}
 .logmeta{font-family:var(--mono);font-size:10px;letter-spacing:.05em;color:var(--grey)}
+/* The act that just landed, glowing out (TJ, 2026-08-12). One second, ochre,
+   and gone — long enough to catch the eye at a play beat of 420ms, short
+   enough that a paused replay is not left with a light on. */
+@keyframes clothglow{
+  from{opacity:.55;stroke-width:14}
+  to{opacity:0;stroke-width:2}
+}
+.clothglow{animation:clothglow 1s ease-out forwards}
+@media(prefers-reduced-motion:reduce){.clothglow{animation:none;opacity:.35}}
+
+/* Play · position · the door to the other view. */
+.logbar{display:flex;align-items:center;gap:12px;margin:2px 0 4px;flex-wrap:wrap}
+.logbar .cap{margin:0}
+/* The badge that crosses between the views. Quiet until you want it. */
+.logjump{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--sage);
+  background:none;border:none;padding:2px 4px;cursor:pointer;flex:0 0 auto;
+  opacity:0;transition:opacity .12s}
+.logbar .logjump{opacity:1;margin-left:auto}
+.logrow:hover .logjump,.logrow.on .logjump,.logjump:focus-visible{opacity:1}
+.logjump:hover{text-decoration:underline}
+
 /* A day's worth of work, headed where the date turns over. */
 .logday{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--ochre);padding:12px 12px 4px;border-bottom:1px solid var(--rule)}

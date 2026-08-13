@@ -944,7 +944,7 @@ export default function MapTab({ practice = false }: {
       {!practice && (
         <>
           <h2 className="sectionhead" style={{ marginTop: 34 }}>
-            The log <span className="n">how this cloth came to be — replay it, or read it as a record</span>
+            The log <span className="n">every act that made this cloth, in the order you made them</span>
           </h2>
           <HistoryPanel
             sourceId={soleSourceId(scope) ?? undefined}

@@ -334,6 +334,14 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
    * views of one position rather than two panels.
    */
   const [view, setView] = useState<"timeline" | "list">("timeline")
+  /** Running the replay forward on its own (TJ, 2026-08-12). */
+  const [playing, setPlaying] = useState(false)
+  /**
+   * Bumped on every position change, so the glow restarts even when two acts
+   * in a row touch the same concept. A counter, not the position itself: the
+   * animation must replay when you step back and forth over one act too.
+   */
+  const [pulse, setPulse] = useState(0)
 
   const load = () => {
     setLoading(true)
@@ -392,6 +400,61 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
 
   const atMax = events !== null && k === events.length
   const current = events && k > 0 ? events[k - 1] : null
+
+  /** Move the replay AND restart the glow. Every position change goes here. */
+  const goTo = (n: number) => {
+    setPos(n)
+    setPulse((p) => p + 1)
+  }
+
+  /**
+   * Play, at one act a beat. It stops itself at the end rather than looping —
+   * the record has an end, and a replay that wrapped around would say
+   * otherwise. Pressing play at the end starts again from the first act,
+   * because that is the only thing "play" can mean there.
+   */
+  useEffect(() => {
+    if (!playing || !events) return
+    // The stop lives INSIDE the beat rather than in the effect body: setState
+    // during the effect's own pass is the cascading-render trap the lint rule
+    // is named for, and the last beat is a fine place to notice the end.
+    const t = window.setTimeout(() => {
+      if (k >= events.length) setPlaying(false)
+      else goTo(k + 1)
+    }, 420)
+    return () => window.clearTimeout(t)
+  }, [playing, k, events])
+
+  /**
+   * Arriving in the list, land on the act you were looking at. Without this,
+   * "in the list ›" from act 60 of 66 opens a list scrolled to act 1 and the
+   * marked row is somewhere below the fold — the door would technically work
+   * and practically strand you.
+   */
+  const listRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (view !== "list") return
+    listRef.current
+      ?.querySelector(`[data-act="${k}"]`)
+      ?.scrollIntoView({ block: "center", behavior: "auto" })
+  }, [view, k])
+
+  /**
+   * What the current act touched, for the glow. A passage is not drawn on the
+   * cloth, so a capture glows the CONCEPT it was filed under — which is what
+   * visibly changed. Concepts and threads glow themselves.
+   */
+  const glowId = (() => {
+    if (!current) return null
+    const p = (current.payload ?? {}) as Record<string, unknown>
+    if (current.entityType === "passage") {
+      const ids = Array.isArray(p.conceptIds) ? (p.conceptIds as unknown[]) : []
+      const first = ids.find((v) => typeof v === "string") as string | undefined
+      return first ?? (typeof p.conceptId === "string" ? p.conceptId : null)
+    }
+    if (current.entityType === "concept" || current.entityType === "edge") return current.entityId
+    return null
+  })()
   const when = current
     ? eventDate(current).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
     : null
@@ -502,13 +565,15 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
   return (
     <div className="card">
       <div className="mapbar" style={{ marginBottom: 8 }}>
-        {/* "counted, never judged" is the build's own phrase (red line #7) and
-            it had leaked into student copy in two places here. TJ, 2026-08-12:
-            "i dont get the counted never judged line, that seems weird." It
-            said nothing a student needed; this says what the log is FOR. */}
+        {/* The heading above says WHAT this is; this says how to use it and
+            what a row holds. They both opened with "how this cloth came to
+            be" until TJ read them together (2026-08-12: "these are odd
+            together, perhaps redundant?"). ("counted, never judged" stood here
+            before that — the build's own phrase, red line #7, which said
+            nothing a student needed.) */}
         <span className="hint" style={{ margin: 0 }}>
-          How this reading became a cloth: the words you kept, the names you gave them,
-          and what you wrote at the time — in the order it happened.
+          Replay it act by act, or read it as a record — each entry keeps the words you
+          kept, the name you gave them, and the note you wrote at the time.
         </span>
         {/* Two views of one record, and of one position: the chips read like
             the projection switcher above them because they do the same job. */}
@@ -567,7 +632,7 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
       )}
 
       {events !== null && events.length > 0 && view === "list" && (
-        <div className="scrollbox">
+        <div className="scrollbox" ref={listRef}>
           {events.map((e, i) => {
             // A day heading where the date turns over. A term's record is
             // mostly made of sittings, and seeing where one ended is half of
@@ -576,14 +641,20 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
             return (
               <Fragment key={e.id}>
                 {newDay && <div className="logday">{dayOf(e)}</div>}
+                {/* A row click moves the replay and STAYS here (TJ,
+                    2026-08-12: "clicking a row in the log list should not take
+                    us out of the list"). Reading the record and watching the
+                    cloth are two different jobs; the view changes only when
+                    the badge says it will. */}
                 <div
                   className={`logrow${i + 1 === k ? " on" : ""}`}
+                  data-act={i + 1}
                   role="button"
                   tabIndex={0}
-                  title="show the cloth as it stood after this act"
-                  onClick={() => { setPos(i + 1); setView("timeline") }}
+                  title="mark this act — the replay moves with you"
+                  onClick={() => goTo(i + 1)}
                   onKeyDown={(ev) => {
-                    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); setPos(i + 1); setView("timeline") }
+                    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); goTo(i + 1) }
                   }}
                 >
                   {/* The stamp the timeline cannot show: it holds one position,
@@ -593,6 +664,15 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
                     <span className="logact">{describeEvent(e)}</span>
                     {contextOf(e)}
                   </span>
+                  {/* The door to the other view, said out loud. */}
+                  <button
+                    type="button"
+                    className="logjump"
+                    title="see the cloth as it stood at this act"
+                    onClick={(ev) => { ev.stopPropagation(); goTo(i + 1); setView("timeline") }}
+                  >
+                    on the cloth ›
+                  </button>
                   <span className="logn">{i + 1}</span>
                 </div>
               </Fragment>
@@ -625,7 +705,7 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
             max={events.length}
             step={1}
             value={k}
-            onChange={(ev) => setPos(Number(ev.target.value))}
+            onChange={(ev) => { setPlaying(false); goTo(Number(ev.target.value)) }}
             aria-label="replay position, in acts"
             aria-valuetext={current ? `act ${k} of ${events.length} — ${describeEvent(current)}` : undefined}
             style={{ width: "100%", margin: "4px 0 0" }}
@@ -645,10 +725,34 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
               }}
             />
           )}
-          <p className="cap" style={{ margin: "0 0 2px", display: "flex", justifyContent: "space-between" }}>
-            <span>act {k} of {events.length}</span>
-            <span>{atMax ? "now" : "· drag to replay ·"}</span>
-          </p>
+          <div className="logbar">
+            {/* Play runs it forward a beat at a time and stops at the end. At
+                the end it starts over, because that is the only thing the word
+                can mean there. */}
+            <button
+              type="button"
+              className="btn ghost mini"
+              onClick={() => {
+                if (playing) { setPlaying(false); return }
+                if (atMax) goTo(1)
+                setPlaying(true)
+              }}
+              aria-pressed={playing}
+            >
+              {playing ? "❚❚ pause" : atMax ? "▶ replay from the start" : "▶ play"}
+            </button>
+            <span className="cap">act {k} of {events.length}{atMax ? " · now" : ""}</span>
+            {/* The badge back, the mirror of the list's (TJ, 2026-08-12:
+                "and conversely for the [timeline]"). */}
+            <button
+              type="button"
+              className="logjump"
+              title="find this act in the record"
+              onClick={() => { setPlaying(false); setView("list") }}
+            >
+              in the list ›
+            </button>
+          </div>
 
           <p className="cap" style={{ margin: "4px 0 2px" }}>
             {cloth.concepts.length} concepts · {cloth.edges.length} threads · {cloth.passages.length} passages —{" "}
@@ -675,7 +779,7 @@ export default function HistoryPanel({ sourceId, scopeLabel }: {
               background: "radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec",
             }}
           >
-            <ReadOnlyClothMap state={mapState} />
+            <ReadOnlyClothMap state={mapState} glow={glowId ? { id: glowId, seq: pulse } : null} />
           </div>
 
           {/* The second "counted, never judged", and it also promised a reset
