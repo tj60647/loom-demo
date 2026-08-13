@@ -83,9 +83,15 @@ export interface LoomContextType {
   /**
    * Title or describe a cloth — the current scope's by default, or an explicit
    * scope's (the shelf creates a reading's cloth from the whole-weave scope).
-   * Resolves true on save, false when the write failed and state was resynced.
+   *
+   * Local at once, server after 700ms — a projection's text contract, which
+   * the cloth joined on 2026-08-13 when its Save button went. Void, not a
+   * promise: there is no moment for a caller to await any more, which is the
+   * point. `flushCloth` on blur if you need it sooner.
    */
-  updateCloth: (data: Partial<{ title: string; description: string }>, scopeKey?: string) => Promise<boolean>
+  updateCloth: (data: Partial<{ title: string; description: string }>, scopeKey?: string) => void
+  /** Push a pending cloth write immediately (blur), as `flushMapText` does. */
+  flushCloth: () => void
   addEdge: (fromId: string, toId: string, sentence: string) => Promise<Edge>
   editEdge: (id: string, data: Partial<{handle: string, sentence: string}>) => Promise<void>
   removeEdge: (id: string) => Promise<void>
@@ -460,9 +466,59 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Cloth title/description: optimistic upsert against the given scope (the
-  // current one unless a caller names another scope explicitly).
-  const updateCloth = async (data: Partial<{ title: string; description: string }>, scopeKeyArg?: string) => {
+  /**
+   * Cloth title/description — optimistic locally, DEBOUNCED to the server, on
+   * the same contract as a projection's name / one-line / paragraph below.
+   *
+   * It used to be the one manual save left in Loom: a Save button, a dirty
+   * flag, and text that was simply lost if a student typed a title and walked
+   * away (TJ, 2026-08-13: "why is there a 'save cloth' button in 'your work'?
+   * isnt that the download?"). A projection's title in the same situation is
+   * kept. Same kind of field on the same kind of object, two contracts, and no
+   * way for a student to tell which surface they were on.
+   *
+   * The counter-argument was in ClothFold's own header — a deliberate press is
+   * what mints the cloth row, so autosave lets a stray keystroke create one.
+   * Projections already have that property (the first keystroke in a fresh
+   * scope mints "Projection N") and autosave anyway; the app had answered this
+   * everywhere except here.
+   *
+   * Merged per scope, so a title keystroke and a description keystroke inside
+   * the window land as one write.
+   */
+  const clothTextTimer = useRef<number | undefined>(undefined)
+  const pendingClothText = useRef<Map<string, Partial<{ title: string; description: string }>>>(new Map())
+
+  const writeCloth = useCallback(async (key: string, data: Partial<{ title: string; description: string }>) => {
+    try {
+      const saved = await saveClothAction({ scopeKey: key, ...data })
+      applyLocal(s => ({
+        ...s,
+        cloths: s.cloths.some(c => c.scopeKey === key)
+          ? s.cloths.map(c => (c.scopeKey === key ? saved : c))
+          : [...s.cloths, saved],
+      }))
+      savedOk()
+      return true
+    } catch (e) {
+      await resync(e)
+      return false
+    }
+  }, [savedOk, resync])
+
+  const persistClothText = useCallback(() => {
+    const pending = pendingClothText.current
+    if (!pending.size) return
+    pendingClothText.current = new Map()
+    pending.forEach((data, key) => { void writeCloth(key, data) })
+  }, [writeCloth])
+
+  const flushCloth = useCallback(() => {
+    window.clearTimeout(clothTextTimer.current)
+    persistClothText()
+  }, [persistClothText])
+
+  const updateCloth = (data: Partial<{ title: string; description: string }>, scopeKeyArg?: string) => {
     const key = scopeKeyArg ?? scope.key
     const now = new Date()
     applyLocal(s => {
@@ -481,20 +537,10 @@ export function LoomProvider({ children }: { children: ReactNode }) {
           }]
       return { ...s, cloths }
     })
-    try {
-      const saved = await saveClothAction({ scopeKey: key, ...data })
-      applyLocal(s => ({
-        ...s,
-        cloths: s.cloths.some(c => c.scopeKey === key)
-          ? s.cloths.map(c => (c.scopeKey === key ? saved : c))
-          : [...s.cloths, saved],
-      }))
-      savedOk()
-      return true
-    } catch (e) {
-      await resync(e)
-      return false
-    }
+    const current = pendingClothText.current.get(key) ?? {}
+    pendingClothText.current.set(key, { ...current, ...data })
+    window.clearTimeout(clothTextTimer.current)
+    clothTextTimer.current = window.setTimeout(persistClothText, 700)
   }
 
   // Optimistic create WITH AN ID ALIAS, exactly as maps have (below): "coin a
@@ -817,16 +863,19 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   // before a close. (A server-action fetch during full unload can still be
   // aborted by the browser — the debounce window is the residual risk.)
   useEffect(() => {
+    // Both debounced texts, or the cloth would have gained an autosave and
+    // kept exactly the loss the Save button used to cause.
+    const flushText = () => { flushMapText(); flushCloth() }
     const onHidden = () => {
-      if (document.visibilityState === "hidden") flushMapText()
+      if (document.visibilityState === "hidden") flushText()
     }
     document.addEventListener("visibilitychange", onHidden)
-    window.addEventListener("pagehide", flushMapText)
+    window.addEventListener("pagehide", flushText)
     return () => {
       document.removeEventListener("visibilitychange", onHidden)
-      window.removeEventListener("pagehide", flushMapText)
+      window.removeEventListener("pagehide", flushText)
     }
-  }, [flushMapText])
+  }, [flushMapText, flushCloth])
 
   // View geometry: only called from student gestures (drag end, bend end,
   // de-tier cleanup) — auto-layout stays ephemeral in the component. Debounced
@@ -873,6 +922,12 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const cancelPendingSaves = useCallback(() => {
     window.clearTimeout(mapTextTimer.current)
     pendingMapText.current = new Map()
+    // Cloth text joined the debounced writes on 2026-08-13 and has to be
+    // cancelled here for the same reason map text is: a title typed 700ms
+    // before "start over" would otherwise land AFTER the delete and upsert a
+    // cloth row back into a scope the student was told is empty.
+    window.clearTimeout(clothTextTimer.current)
+    pendingClothText.current = new Map()
     viewTimers.current.forEach((t) => window.clearTimeout(t))
     viewTimers.current = new Map()
     pendingViews.current = new Map()
@@ -904,7 +959,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       studentName: session?.user?.name || "",
       addConcept, editConcept, removeConcept, mergeConcepts,
       addPassage, removePassage, refilePassage, unfilePassage, attributePassages,
-      activeCloth, updateCloth,
+      activeCloth, updateCloth, flushCloth,
       addEdge, editEdge, removeEdge,
       links: state.links, addLink, editLink, attachLink,
       maps: state.maps, scopeMaps, activeMap,

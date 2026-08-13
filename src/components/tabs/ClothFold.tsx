@@ -12,7 +12,7 @@
 // conceptually always there, and the row is written the first time you title or
 // describe it. The shelf card shows that title and when it was last edited.
 
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import ObjectDownload from "@/components/ui/ObjectDownload"
@@ -27,7 +27,7 @@ import { scopeLabelOf } from "@/lib/graphExport"
  * Cloth button gets its title — the shelf card shows both.
  */
 export default function ClothFold() {
-  const { activeCloth, updateCloth, isLoading, scope, flash, state, scoped, scopeMaps, resetReading } = useLoom()
+  const { activeCloth, updateCloth, flushCloth, isLoading, scope, flash, state, scoped, scopeMaps, resetReading } = useLoom()
   const { byId } = useReadings()
   const titleOf = (id: string) => byId.get(id)?.title ?? id
   const scopeLabel = scopeLabelOf(scope.key, titleOf)
@@ -35,36 +35,21 @@ export default function ClothFold() {
   // starts closed. A cloth starts in READING, not here (TJ, 2026-08-08), so
   // nothing routes a student straight at the title field any more.
   const [foldOpen, setFoldOpen] = useState(false)
-  const [title, setTitle] = useState(activeCloth?.title ?? "")
-  const [description, setDescription] = useState(activeCloth?.description ?? "")
-  const [busy, setBusy] = useState(false)
 
-  // Reseed the drafts when the underlying row changes identity — on load, and
-  // when a first save swaps the optimistic row for the server's. Keying on the
-  // id keeps a keystroke from being clobbered by the save it caused.
-  const seededId = useRef<string | null>(activeCloth?.id ?? null)
-  useEffect(() => {
-    const id = activeCloth?.id ?? null
-    if (id !== seededId.current) {
-      seededId.current = id
-      setTitle(activeCloth?.title ?? "")
-      setDescription(activeCloth?.description ?? "")
-    }
-  }, [activeCloth])
-
-  const dirty =
-    title !== (activeCloth?.title ?? "") || description !== (activeCloth?.description ?? "")
-
-  const save = async () => {
-    if (busy || !dirty) return
-    setBusy(true)
-    try {
-      const ok = await updateCloth({ title, description })
-      if (ok) flash("cloth saved")
-    } finally {
-      setBusy(false)
-    }
-  }
+  /**
+   * Driven straight from the row, exactly as a projection's one-line and
+   * paragraph are in MapTab — no local drafts, because `updateCloth` writes
+   * optimistically and the row IS the current text.
+   *
+   * The drafts went with the Save button (TJ, 2026-08-13). They existed to
+   * hold text between typing and pressing, and they carried a reseed effect
+   * keyed on the row id to stop a save clobbering a keystroke. Under autosave
+   * that same effect becomes the bug: the first write swaps the optimistic row
+   * for the server's, the id changes, and the reseed would revert whatever was
+   * typed in the 700ms since. Removing the drafts removes the whole class.
+   */
+  const title = activeCloth?.title ?? ""
+  const description = activeCloth?.description ?? ""
 
   /**
    * Start this reading over — the narrower exit, at the object it clears
@@ -86,11 +71,10 @@ export default function ClothFold() {
     setClearing(true)
     try {
       const n = await resetReading(soleSource)
-      // The drafts are this component's own state and would otherwise sit
-      // there holding the text the server just deleted, ready to write it
-      // back on the next save.
-      setTitle("")
-      setDescription("")
+      // Nothing to clear locally any more: the fields read straight from the
+      // row, and resetReading re-reads the loom, so they empty themselves.
+      // (They used to be drafts, which held the deleted text ready to write
+      // it back on the next save.)
       setArming(false)
       flash(`this reading is clear — ${n.passages} passage${n.passages === 1 ? "" : "s"} gone, your concepts kept`)
     } catch (e) {
@@ -138,7 +122,8 @@ export default function ClothFold() {
         <input
           id="clothTitle"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => updateCloth({ title: e.target.value })}
+          onBlur={flushCloth}
           placeholder="a sentence or headline — what your reading of it says"
           maxLength={200}
         />
@@ -147,14 +132,17 @@ export default function ClothFold() {
         <span className="label">Cloth Description</span>
         <textarea
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={(e) => updateCloth({ description: e.target.value })}
+          onBlur={flushCloth}
           placeholder="your short interpretation of the reading"
         />
       </div>
       <div className="clothfoot">
-        <button id="clothSave" className="btn mini" onClick={save} disabled={busy || !dirty}>
-          {busy ? "Saving…" : "Save cloth"}
-        </button>
+        {/* "Save cloth" stood here beside these two until 2026-08-13, three
+            buttons in a row reading SAVE CLOTH · DOWNLOAD CLOTH .JSON ·
+            DOWNLOAD CLOTH .MD — which is why it read as a third file format
+            (TJ). It is gone: the fields autosave, and the word "cloth" in this
+            foot now means one thing. */}
         {/* The cloth downloads on the cloth's own card (TJ, 2026-08-10) —
             whole: its passages, the concepts they evidence, the threads
             between those, and its projections. */}

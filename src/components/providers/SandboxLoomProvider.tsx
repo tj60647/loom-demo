@@ -416,6 +416,9 @@ export default function SandboxLoomProvider({
     unfilePassage,
     activeCloth,
     updateCloth,
+    // Nothing is debounced here because nothing is sent anywhere; the local
+    // write already happened on the keystroke, so a flush has nothing to push.
+    flushCloth: () => {},
     addEdge,    editEdge,
     removeEdge,
     links: state.links,

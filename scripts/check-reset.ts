@@ -212,6 +212,28 @@ assert(
   `${MODAL} lets focus walk out into the page behind an aria-modal dialog`
 )
 
+console.log("\ncancelPendingSaves — every debounced write a reset can race")
+
+const PROVIDER = "src/components/providers/LoomProvider.tsx"
+const provider = read(PROVIDER)
+const cpsStart = provider.indexOf("const cancelPendingSaves")
+const cps = provider.slice(cpsStart, provider.indexOf("}, [])", cpsStart))
+
+// The rule, not the list: anything queued behind a timer can fire AFTER the
+// delete and write a row back into a loom the student was told is empty. Map
+// text was the original; cloth text joined it when the Save button went. A
+// third debounced field added later needs a line here and a line above it.
+for (const [pending, what] of [
+  ["pendingMapText", "a projection's name / one-line / paragraph"],
+  ["pendingClothText", "a cloth's title / description"],
+] as const) {
+  assert(
+    new RegExp(`${pending}\\.current = new Map\\(\\)`).test(cps),
+    `cancelPendingSaves drops queued ${pending}`,
+    `${what} could still be in flight when a reset lands, and would upsert the row back afterwards — ${PROVIDER}`
+  )
+}
+
 console.log("\ncapabilities — the two rows this file defends")
 
 const own = CAPABILITIES.find((c) => c.id === "loom-reset")
