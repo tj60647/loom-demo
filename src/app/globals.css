@@ -1093,6 +1093,27 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
   padding: 16px 16px 40px;
 }
 .yourwork-body .scrollbox { max-height: none; }
+/* TYPE STEP-DOWN (TJ, 2026-08-13: "the font sizes seem overly large to me").
+   They were, and not by taste. The app's base is 17px Newsreader — right for
+   60-75ch of prose on a full-width page, which is what a reading tool should
+   set. This sheet is 380px, about 330px of content, and inherited that scale
+   unchanged: a concept row came out at 15.5px against a 17px panel title, so
+   the step between "the name of this sheet" and "one row in a list" was 1.5px
+   and the hierarchy read flat. The cloth card's own h2 was 21px — LARGER than
+   the panel containing it — because .card h2 is sized for a full-width card
+   at 01 and nothing scoped it down when the card moved in here.
+
+   Scoped to .yourwork on purpose. The reading prose is correctly sized and a
+   global change would shrink it. The ladder: 17 sheet / 15 card / 14 row /
+   13 prose / 11-10 mono, each step big enough to be read as a step. */
+.yourwork .card h2 { font-size: 15px; }
+.yourwork .lhead .lconcept { font-size: 14px; }
+.yourwork .do { font-size: 13.5px; }
+.yourwork .hint { font-size: 13px; line-height: 1.45; }
+/* The fields keep a touch more than the prose around them — they hold the
+   student's own words, and shrinking those below the labels reads as the
+   input mattering less than its caption. */
+.yourwork input, .yourwork textarea { font-size: 14px; }
 /* One column in the sheet; the two-card row needs a page's width. */
 .onecol { display: flex; flex-direction: column; gap: 16px; }
 
@@ -1169,6 +1190,12 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .handfold > summary h2 { display: inline; font-size: 15px; color: var(--ink-soft); }
 .handfold[open] > summary h2 { color: var(--ink); }
 .handfold[open] > summary .tw { transform: rotate(90deg); }
+/* The twisty was the one thing here nobody had styled, so it fell through to
+   the 17px body serif and sat next to .invitefold's 12px mono one — two folds
+   in the same panel with disclosure markers a glyph-size apart. Matched to its
+   neighbour rather than invented: same size, same face, same ochre. */
+.handfold > summary .tw { font-family: var(--mono); font-size: 12px; color: var(--ochre);
+  transition: transform .15s; display: inline-block; }
 /* The Linking step bar: named moves, not four abbreviations (TJ, 2026-08-08). */
 .steprail .rstep { text-transform: none; letter-spacing: .01em; font-family: var(--body); font-size: 12.5px; }
 .steprail .stepn {
