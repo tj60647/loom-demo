@@ -293,9 +293,6 @@ export default function MapTab({ practice = false }: {
   let level = "a list"
   if (n.p && (n.s || n.t)) level = "tiers"
   if (level === "tiers" && cross) level = "tiers + cross-links"
-  const done1 = n.p + n.s + n.t > 0
-  const done2 = done1 && Object.keys(stored).some(id => placedIds.includes(id))
-  const done3 = done2 && cross > 0
 
   const onCount = scopedState.concepts.filter(c => { const t = tierOf(c.id); return t && t !== "x" }).length
 
@@ -641,14 +638,6 @@ export default function MapTab({ practice = false }: {
       {/* The switcher sits at the head of its own section now: which projection
           you are in decides what every column beneath it shows. */}
       {mapSwitcher}
-
-      <div className="rail" id="mapRail">
-        <span className={`rstep${done1 ? " done" : ""}${!done1 ? " now" : ""}`}>sort</span>
-        <span className="rsep">·</span>
-        <span className={`rstep${done2 ? " done" : ""}${!done2 && done1 ? " now" : ""}`}>arrange</span>
-        <span className="rsep">·</span>
-        <span className={`rstep${done3 ? " done" : ""}${!done3 && done2 ? " now" : ""}`}>check</span>
-      </div>
 
       {/* sort · the board · your read — the three moves of a projection, side
           by side so the sorting that feeds the board and the read that comes

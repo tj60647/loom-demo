@@ -18,6 +18,19 @@ import type { Edge, Tier } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
 import ClothMap from "@/components/svg/ClothMap"
 
+/**
+ * "What the cloth shows you" — the counted prompts, the threads they lay out,
+ * and the "create projection" button on the end of a trace.
+ *
+ * Hidden on TJ's call (2026-08-13) so the cloth graph gets the full column
+ * rather than half of a two-up. Kept behind a flag rather than deleted because
+ * the panel is the only route from a trace to a projection: turn it back on and
+ * the prompts, the reading pane and that button all return. Everything it needs
+ * is still computed above — the cost of keeping it is a few unused renders, not
+ * a rewrite.
+ */
+const SHOW_PROMPTS = false
+
 export default function ClothReflection({ onProjectionCreated }: {
   /**
    * Take the student to the projection they just made (TJ, 2026-08-12:
@@ -34,7 +47,7 @@ export default function ClothReflection({ onProjectionCreated }: {
   // below resolves. Bridges are named but not drawn: they are 02 Linking's
   // material, and drawing half a thread would be a lie.
   const {
-    scopedState: state, scoped, activeCloth, flash,
+    scopedState: state, scoped, flash,
     addMap, setMapTiers, selectMap, scopeMaps,
   } = useLoom()
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
@@ -135,14 +148,6 @@ export default function ClothReflection({ onProjectionCreated }: {
       })
     }
   }
-
-  // Read rail: look · trace · question · write
-  // "Wrote" = any interpretive paragraph exists: a projection's read, or this
-  // reading's own cloth description.
-  const wrote = !!(
-    state.maps.some((m) => m.read.trim()) || activeCloth?.description.trim()
-  )
-  const railN = wrote ? 3 : readSel?.gap ? 2 : readSel ? 1 : 0
 
   /**
    * A prompt is a TOGGLE: press it to trace, press it again to put it away
@@ -322,36 +327,28 @@ export default function ClothReflection({ onProjectionCreated }: {
 
   return (
     <>
-      <div className="rail" id="readRail" style={{ marginTop: "22px" }}>
-        {["look", "trace", "question", "write"].map((s, i) => (
-          <Fragment key={s}>
-            {i > 0 && <span className="rsep">·</span>}
-            <span className={"rstep" + (i === railN ? " now" : "") + (i < railN ? " done" : "")} data-r={i}>{s}</span>
-          </Fragment>
-        ))}
-      </div>
-
       {scoped.bridges.length > 0 && (
-        <p className="ghostnote" style={{ marginTop: 6, marginBottom: 12 }}>
+        <p className="ghostnote" style={{ marginTop: 22, marginBottom: 12 }}>
           {scoped.bridges.length} thread{scoped.bridges.length !== 1 ? "s" : ""} also run{scoped.bridges.length === 1 ? "s" : ""} out of this reading to concepts you met elsewhere.
           They are not drawn here — half a thread would be a lie — but they are listed on <b>02 · Linking</b>.
         </p>
       )}
 
-      {/* The cloth and its reading, side by side (TJ, 2026-08-12). They are one
-          gesture — you click a prompt on the right and it lights on the left —
-          and stacked vertically the two halves of it could not be seen at
-          once: tracing a prompt scrolled the cloth off the top. Half and half
-          to start. The cloth is in a card now for parity with its partner; it
-          used to be a bare block under a `.mapbar`, which read as page
-          furniture rather than as one of the two things here. */}
-      <div className="two">
+      {/* The cloth and its reading were side by side (TJ, 2026-08-12) — one
+          gesture, a prompt on the right lighting the cloth on the left. The
+          prompts panel is hidden now (TJ, 2026-08-13) and the cloth takes the
+          whole column, so there is no grid to be half of: with SHOW_PROMPTS
+          off the card is a plain full-width block and ClothMap reflows to it.
+          Tracing still works by clicking a concept or arc on the cloth itself. */}
+      <div className={SHOW_PROMPTS ? "two" : undefined}>
       <div className="card">
       {/* No "THE CLOTH" label on the card: 03's section heading says it now
           (TJ, 2026-08-12), and the same words twice, six lines apart, read as
           two different things. */}
       <p className="hint">
-        Warp in reading order; weft arcs across. Click a prompt beside this to trace it here — or click a concept/arc directly to pull it.
+        Warp in reading order; weft arcs across.{SHOW_PROMPTS
+          ? " Click a prompt beside this to trace it here — or click a concept/arc directly to pull it."
+          : " Click a concept or arc to trace it."}
       </p>
 
       <div id="mapWrap">
@@ -366,7 +363,7 @@ export default function ClothReflection({ onProjectionCreated }: {
       </div>
       </div>
 
-      <div className="card">
+      {SHOW_PROMPTS && <div className="card">
         <h2 className="heading-with-info">
           What the cloth shows you <span className="n">counted, not judged</span>
           <button
@@ -453,7 +450,7 @@ export default function ClothReflection({ onProjectionCreated }: {
         </div>
 
         {readingPane}
-      </div>
+      </div>}
       </div>
     </>
   )
