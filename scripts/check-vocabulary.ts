@@ -51,12 +51,24 @@ const FILE_DATA = new Set([
   "src/lib/storage.ts",
   "src/lib/textLayerRepair.ts",
   "src/lib/repairPipeline.ts",
+  // `repaired.bytes` — textLayerRepair's rewritten PDF buffer, applied here.
+  "src/lib/repairApply.ts",
   "src/lib/reingest.ts",
   "src/lib/readingScore.ts",
   "src/lib/readingUpload.ts",
   "src/lib/readingUploadClient.ts",
   "src/actions/repairs.ts",
   "src/actions/sources.ts",
+  // The same buffer, round-tripped through a generated fixture.
+  "scripts/check-block-repair.ts",
+  // The reading route's Content-Length/ETag prose and the page-image
+  // pipeline: "bytes" is always the PDF's octets or an encoded WebP —
+  // source.byteLength, buffer.byteLength, "10MB of bytes re-downloaded".
+  "src/app/api/readings/[sourceId]/route.ts",
+  "src/app/api/readings/[sourceId]/pages/sheet/route.ts",
+  "src/lib/pdfPages.ts",
+  "src/components/pdf/PageSlot.tsx",
+  "scripts/backfill-page-assets.ts",
 ])
 
 /**

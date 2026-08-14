@@ -29,7 +29,13 @@ import { db, databaseLabel } from "../src/db"
 import { sourcePages, sources } from "../src/db/schema"
 import { readingStorage } from "../src/lib/storage"
 import { destroyPdf, loadPdfjs } from "../src/lib/pdfjs"
-import { getSourcePageImageKey, renderSourcePageImages, PAGE_IMAGE_WIDTHS } from "../src/lib/pdfPages"
+import {
+  composeSheetFromStored,
+  getSourcePageImageKey,
+  getSourceSheetKey,
+  renderSourcePageImages,
+  PAGE_IMAGE_WIDTHS,
+} from "../src/lib/pdfPages"
 
 const args = process.argv.slice(2)
 const dryRun = args.includes("--dry-run")
@@ -66,6 +72,15 @@ async function readPageSizes(buffer: Buffer) {
 async function hasPageImages(sourceId: string) {
   try {
     await readingStorage.get(getSourcePageImageKey(sourceId, 1, PAGE_IMAGE_WIDTHS[0]))
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function hasSheet(sourceId: string) {
+  try {
+    await readingStorage.get(getSourceSheetKey(sourceId))
     return true
   } catch {
     return false
@@ -110,8 +125,12 @@ async function main() {
     const needsDims = !imagesOnly && (force ? pageRows.length > 0 : missingDims > 0)
     const needsSize = source.byteLength == null || force
     const needsImages = !dimsOnly && (force || !(await hasPageImages(source.id)))
+    // The full image render composes the sheet itself; this covers readings
+    // whose page images predate the sheet — a cheap compose from stored
+    // thumbs, no PDF fetched.
+    const needsSheet = !dimsOnly && !needsImages && (force || !(await hasSheet(source.id)))
 
-    if (!needsDims && !needsSize && !needsImages) {
+    if (!needsDims && !needsSize && !needsImages && !needsSheet) {
       console.log(`[backfill] ${source.title}: complete, skipped`)
       continue
     }
@@ -122,6 +141,7 @@ async function main() {
             needsDims ? `${force ? pageRows.length : missingDims} page dims` : null,
             needsSize ? "byteLength" : null,
             needsImages ? "page images" : null,
+            needsSheet ? "sheet" : null,
           ]
             .filter(Boolean)
             .join(", ")
@@ -129,7 +149,12 @@ async function main() {
       continue
     }
 
-    const buffer = await readingStorage.get(source.storageKey)
+    // The sheet-only path composes from stored thumbs — the PDF itself is
+    // needed only for dims, size, or a full image render.
+    const buffer =
+      needsDims || needsSize || needsImages
+        ? await readingStorage.get(source.storageKey)
+        : Buffer.alloc(0)
 
     if (needsSize) {
       await db
@@ -167,6 +192,9 @@ async function main() {
         `[backfill] ${source.title}: ${result.rendered}/${result.pageCount} page images rendered` +
           (result.failed.length ? ` (failed: ${result.failed.join(", ")})` : "")
       )
+    } else if (needsSheet) {
+      const composed = await composeSheetFromStored(source.id)
+      console.log(`[backfill] ${source.title}: sheet ${composed ? "composed" : "NOT composed (no thumbs)"}`)
     }
   }
 

@@ -26,18 +26,97 @@
  * that replaces the canonical text. Deleting a source orphans its images in
  * blob — same standing as superseded PDF revisions, which are also kept.
  */
-import { createCanvas } from "@napi-rs/canvas"
-import { eq } from "drizzle-orm"
+import { createCanvas, loadImage } from "@napi-rs/canvas"
+import { asc, eq } from "drizzle-orm"
 import { db } from "@/db"
-import { sources } from "@/db/schema"
+import { sourcePages, sources } from "@/db/schema"
 import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
+import { spreadLayout, pageX } from "@/lib/spreadLayout"
 import { readingStorage } from "@/lib/storage"
 
 export const PAGE_IMAGE_WIDTHS = [320, 1280] as const
 export type PageImageWidth = (typeof PAGE_IMAGE_WIDTHS)[number]
+/** Width of the whole-document sheet (below). */
+export const SHEET_WIDTH = 2560
 
 export function getSourcePageImageKey(sourceId: string, pageNumber: number, width: number) {
   return `pages/${sourceId}/${pageNumber}.w${width}.webp`
+}
+
+export function getSourceSheetKey(sourceId: string) {
+  return `pages/${sourceId}/sheet.w${SHEET_WIDTH}.webp`
+}
+
+/**
+ * The level of the pyramid ABOVE the page: the whole matrix contact sheet as
+ * ONE image — a map's low-zoom tile, where a single fetch covers the whole
+ * territory. Opening the matrix at fit used to be 132 image requests (each
+ * an authenticated function invocation); the sheet makes it one, already
+ * cached, with the per-page thumbs painting over their own cells as they
+ * arrive — invisibly, because the sheet is composed FROM those same thumbs.
+ *
+ * Composed with the client's own spreadLayout at the thumb's native 320px
+ * page width, so server and client geometry agree to within the rounding of
+ * the gap terms (~0.1% — invisible at fit-all, and erased where it could
+ * ever be seen by the identical thumbs replacing their cells). Same red-line
+ * standing as the covers: a derived render cache of a deterministic
+ * projection, not geometry anyone authored.
+ *
+ * Page dims come from source_page (the grid-cell aspect is the tallest
+ * page, the client's own rule). Thumbs may be passed in-memory (the render
+ * pass just produced them) or fetched from blob (the ensure/backfill path).
+ */
+async function composeAndStoreSheet(
+  sourceId: string,
+  thumbs: Map<number, Buffer>
+): Promise<boolean> {
+  const rows = await db
+    .select({ pageNumber: sourcePages.pageNumber, width: sourcePages.width, height: sourcePages.height })
+    .from(sourcePages)
+    .where(eq(sourcePages.sourceId, sourceId))
+    .orderBy(asc(sourcePages.pageNumber))
+  const numPages = Math.max(rows.length, thumbs.size)
+  if (numPages === 0 || thumbs.size === 0) return false
+
+  let gridAspect = 0
+  for (const row of rows) {
+    if (row.width && row.height) gridAspect = Math.max(gridAspect, row.height / row.width)
+  }
+  if (gridAspect === 0) gridAspect = 11 / 8.5
+
+  const pageW = PAGE_IMAGE_WIDTHS[0]
+  const layout = spreadLayout(numPages, pageW, pageW * gridAspect, true)
+  const scale = Math.min(SHEET_WIDTH / layout.canvasW, 1)
+  const sheet = createCanvas(Math.round(layout.canvasW * scale), Math.round(layout.canvasH * scale))
+  const context = sheet.getContext("2d")
+  // Transparent ground: the client lays the sheet over the stage's own
+  // colour, so the gutters between pages stay the stage's, not ours.
+
+  for (const spread of layout.spreads) {
+    for (const p of spread.rightPage ? [spread.leftPage, spread.rightPage] : [spread.leftPage]) {
+      const thumb = thumbs.get(p)
+      const x = pageX(layout, spread, p, pageW) * scale
+      const y = spread.y * scale
+      const w = pageW * scale
+      if (!thumb) {
+        // A page whose render failed still occupies its cell — a white
+        // stand-in, exactly what the live slot shows for it.
+        context.fillStyle = "#ffffff"
+        context.fillRect(x, y, w, layout.unitH * scale)
+        continue
+      }
+      try {
+        const image = await loadImage(thumb)
+        context.drawImage(image, x, y, w, (image.height / image.width) * w)
+      } catch {
+        context.fillStyle = "#ffffff"
+        context.fillRect(x, y, w, layout.unitH * scale)
+      }
+    }
+  }
+
+  await readingStorage.put(getSourceSheetKey(sourceId), await sheet.encode("webp", 80))
+  return true
 }
 
 export type PageImageRenderResult = {
@@ -75,6 +154,9 @@ export async function renderSourcePageImages(
   const [large, small] = [PAGE_IMAGE_WIDTHS[1], PAGE_IMAGE_WIDTHS[0]]
   let rendered = 0
   const failed: number[] = []
+  // Kept for the sheet compose below — the thumbs are already in memory, so
+  // the sheet costs a composite and an encode, never a second render.
+  const thumbs = new Map<number, Buffer>()
 
   try {
     for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
@@ -106,6 +188,7 @@ export async function renderSourcePageImages(
           readingStorage.put(getSourcePageImageKey(sourceId, pageNumber, large), largeBytes),
           readingStorage.put(getSourcePageImageKey(sourceId, pageNumber, small), smallBytes),
         ])
+        thumbs.set(pageNumber, smallBytes)
         rendered += 1
       } catch (error) {
         failed.push(pageNumber)
@@ -116,7 +199,61 @@ export async function renderSourcePageImages(
     await destroyPdf(doc, loadingTask)
   }
 
+  try {
+    await composeAndStoreSheet(sourceId, thumbs)
+  } catch (error) {
+    console.warn(`[Loom] Sheet compose failed for ${sourceId}`, error)
+  }
+
   return { sourceId, pageCount: doc.numPages, rendered, failed }
+}
+
+/**
+ * Compose the sheet from thumbs already in blob — the path for readings whose
+ * page images predate the sheet. Costs page-count small reads and one write;
+ * no PDF is fetched and nothing is re-rendered.
+ */
+export async function composeSheetFromStored(sourceId: string): Promise<boolean> {
+  const rows = await db
+    .select({ pageNumber: sourcePages.pageNumber })
+    .from(sourcePages)
+    .where(eq(sourcePages.sourceId, sourceId))
+  if (rows.length === 0) return false
+  const thumbs = new Map<number, Buffer>()
+  const batch = 16
+  for (let start = 0; start < rows.length; start += batch) {
+    await Promise.all(
+      rows.slice(start, start + batch).map(async (row) => {
+        try {
+          thumbs.set(
+            row.pageNumber,
+            await readingStorage.get(getSourcePageImageKey(sourceId, row.pageNumber, PAGE_IMAGE_WIDTHS[0]))
+          )
+        } catch {
+          // No thumb for this page; the sheet shows its white cell.
+        }
+      })
+    )
+  }
+  if (thumbs.size === 0) return false
+  return composeAndStoreSheet(sourceId, thumbs)
+}
+
+/** Same one-run gate as ensureSourcePageImages, for the sheet route's miss
+ *  path. Falls through to the full render only when there are no thumbs to
+ *  compose from at all. */
+const sheetInflight = new Set<string>()
+
+export async function ensureSourceSheet(sourceId: string): Promise<void> {
+  if (sheetInflight.has(sourceId)) return
+  sheetInflight.add(sourceId)
+  try {
+    if (await composeSheetFromStored(sourceId)) return
+    await ensureSourcePageImages(sourceId)
+  } catch (error) {
+    sheetInflight.delete(sourceId)
+    console.warn(`[Loom] ensureSourceSheet failed for ${sourceId}`, error)
+  }
 }
 
 /**
