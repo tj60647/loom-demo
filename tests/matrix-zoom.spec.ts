@@ -23,7 +23,7 @@ test.describe('Matrix zoom', () => {
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
 
-    await page.getByRole('button', { name: 'Matrix' }).click();
+    await page.getByRole('button', { name: 'Canvas' }).click();
 
     // The spread canvas is live, and at fit-all it is a contact sheet of
     // pre-rendered images: no page canvas, no text layer, no spans — the
@@ -124,7 +124,7 @@ test.describe('Matrix zoom', () => {
     test.setTimeout(90_000);
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
-    await page.getByRole('button', { name: 'Matrix' }).click();
+    await page.getByRole('button', { name: 'Canvas' }).click();
     await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
 
     const canvasK = () =>
@@ -181,13 +181,13 @@ test.describe('Matrix zoom', () => {
       .toBeLessThan(atFit * 0.06);
     await expect(minimap).toBeHidden({ timeout: 5000 });
 
-    // Cards in the matrix, AT FIT-ALL: no text layer is mounted down here —
-    // fit-all is the impostor tier — so the card anchors analytically, off
-    // the passage's stored page and offset against the manifest's text
-    // length. This is the concept-map reading of the far zoom: pages as
-    // thumbnails, cards at reading size, leaders still drawn. A mounted
-    // highlight is exactly what this assertion must NOT wait for.
-    await page.getByRole('button', { name: 'Cards in the margin' }).click();
+    // Cards on the canvas, standing (2026-08-15, no toggle), AT FIT-ALL: no
+    // text layer is mounted down here — fit-all is the impostor tier — so the
+    // card anchors analytically, off the passage's stored page and offset
+    // against the manifest's text length. This is the concept-map reading of
+    // the far zoom: pages as thumbnails, cards at reading size, leaders still
+    // drawn. A mounted highlight is exactly what this assertion must NOT
+    // wait for.
     await expect(page.locator('.pdf-spread-canvas .pdf-railcard').first()).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.pdf-spread-canvas .pdf-rail-leaders path').first()).toBeAttached();
   });

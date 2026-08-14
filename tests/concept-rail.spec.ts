@@ -6,12 +6,12 @@ import { isDeletePost, openReading, openYourWork } from './helpers';
 test.use({ storageState: 'playwright/.auth/testa.json' });
 
 /**
- * The margin cards (page mode's "Cards" toggle): a passage captured on the
- * open spread grows a card beside its page, leader-lined to the highlight,
- * and the card is a door to Your work — never an editor. The rail is a
- * display toggle, not a mode: turning it on must change nothing about how a
- * passage is captured, and turning the layout under it (single page, strip)
- * must never strand it.
+ * The margin cards, always on (2026-08-15): a passage captured on the open
+ * pages grows a card beside its page, leader-lined to the highlight, and the
+ * card is a door to Your work — never an editor. There is no Cards toggle any
+ * more; both rails stand in page mode, a card's side is its page number's
+ * parity (odd left, even right) in every view, and turning the layout under
+ * a card (1 page, 2 pages, canvas) must never strand it.
  */
 test.describe('Concept rail', () => {
   test('a captured passage gets a card, and the card opens Your work', async ({ page }) => {
@@ -59,35 +59,34 @@ test.describe('Concept rail', () => {
     await expect(page.getByRole('heading', { name: 'Capture Passage' })).toBeHidden({ timeout: 30_000 });
     await expect(page.locator('.loom-passage-highlight').first()).toBeVisible({ timeout: 5000 });
 
-    // Rails on. Two-page spread on a desktop viewport → a rail on each side,
-    // and the fresh capture's card beside its page with a leader to the span.
-    const cardsToggle = page.getByRole('button', { name: 'Cards in the margin' });
-    await cardsToggle.click();
-    await expect(cardsToggle).toHaveAttribute('aria-pressed', 'true');
+    // The rails are standing — no toggle to press, and none offered. Both
+    // rails on a desktop viewport, and the fresh capture's card beside its
+    // page with a leader to the span.
+    await expect(page.getByRole('button', { name: 'Cards in the margin' })).toHaveCount(0);
     await expect(page.locator('.pdf-rail')).toHaveCount(2);
     const card = page.locator('.pdf-railcard', { hasText: conceptName }).first();
     await expect(card).toBeVisible({ timeout: 5000 });
     await expect(page.locator('.pdf-rail-leaders path').first()).toBeAttached();
 
-    // Single page → a single rail, and the card survives the re-layout.
-    await page.getByText('2-Page Spread').click();
-    await expect(page.locator('.pdf-rail')).toHaveCount(1, { timeout: 5000 });
+    // One page → both rails still stand (a card's side is its page's parity,
+    // so the room is permanent), and the card survives the re-layout.
+    await page.getByRole('button', { name: '1 page' }).click();
+    await expect(page.locator('.pdf-rail')).toHaveCount(2, { timeout: 5000 });
     await expect(page.locator('.pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 5000 });
 
-    // The toggle follows the mode: in the matrix the same capture's card
-    // flanks its spread on the canvas (Strip is hidden — TJ 2026-08-10, the
-    // canvas supersedes it — so there is no third mode to check).
-    await page.getByRole('button', { name: 'Matrix' }).click();
+    // In the canvas the same capture's card flanks its spread (Strip is
+    // hidden — TJ 2026-08-10, the canvas supersedes it — so there is no
+    // fourth mode to check).
+    await page.getByRole('button', { name: 'Canvas' }).click();
     await expect(page.locator('.pdf-spread-canvas .pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: 'Strip' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Page', exact: true }).click();
-    await expect(page.locator('.pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 10_000 });
 
-    // Back to the spread: the capture was on the left page, so its card
+    // Back to the spread: the capture was on an odd page, so its card
     // returns to the left rail — well clear of the search panel about to
     // open at the right edge.
-    await page.getByText('2-Page Spread').click();
+    await page.getByRole('button', { name: '2 pages' }).click();
     await expect(page.locator('.pdf-rail')).toHaveCount(2, { timeout: 5000 });
+    await expect(page.locator('.pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 10_000 });
 
     // The card is a door, not an editor: clicking it opens Your work at the
     // passage's row (red line #5 — the work is never out of reach). And the
@@ -132,13 +131,18 @@ test.describe('Concept rail', () => {
     await expect(page.locator('.pdf-railcard', { hasText: conceptName })).toHaveCount(0, { timeout: 5000 });
   });
 
-  test('the rail toggle never moves the stage', async ({ page }) => {
+  test('the standing rails never move the stage', async ({ page }) => {
     await openReading(page, 'Object Worlds');
+    // The rails are simply there — part of the page-mode layout, not a mode.
+    await expect(page.locator('.pdf-rail')).toHaveCount(2);
     const stage = page.locator('.pdf-stage');
     const before = await stage.boundingBox();
-    await page.getByRole('button', { name: 'Cards in the margin' }).click();
     // The rails live INSIDE the stage; the stage's own box — what the sheet,
-    // the toolbar and the fit math all measure against — must not move.
+    // the toolbar and the fit math all measure against — must not move when
+    // the layout under it turns.
+    await page.getByRole('button', { name: '1 page' }).click();
+    expect((await stage.boundingBox())?.width).toBe(before?.width);
+    await page.getByRole('button', { name: '2 pages' }).click();
     expect((await stage.boundingBox())?.width).toBe(before?.width);
     await openYourWork(page);
     await expect(page.locator('#yourwork')).toBeVisible();
