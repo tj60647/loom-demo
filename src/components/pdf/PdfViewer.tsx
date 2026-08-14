@@ -28,17 +28,6 @@ import Mark from 'mark.js';
 // in the course, blaming a file that was served fine from our own server.
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
-// Where the worker fetches its WASM codecs (JPX/JPEG2000 decode, ICC color),
-// copied to public/pdf-wasm/ by the same script that copies the worker. A
-// scanned reading is JPX images page after page, and without this option the
-// text layer renders while every page image silently fails to decode — the
-// reading opens as selectable text on blank paper. The trailing slash is
-// load-bearing: pdf.js appends filenames to this string verbatim.
-//
-// Module-level constant, never inline: react-pdf treats a new `options`
-// identity as a new document and reloads the PDF on every render.
-const documentOptions = { wasmUrl: '/pdf-wasm/' };
-
 interface PdfViewerProps {
   url: string;
   sourceName: string;
@@ -1968,7 +1957,6 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       <div ref={attachStage} className={`pdf-stage mode-${viewMode}`}>
         <Document
           file={url}
-          options={documentOptions}
           onLoadSuccess={onDocumentLoadSuccess}
           loading={<div className="hint" style={{ padding: 24 }}>Loading PDF...</div>}
           error={<div className="hint" style={{ padding: 24, color: "var(--red)" }}>Failed to load PDF. Check file path.</div>}
