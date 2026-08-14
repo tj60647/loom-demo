@@ -30,13 +30,13 @@
  *
  * Requires DATABASE_URL, blob credentials and OPENROUTER_API_KEY (.env.local).
  */
-import { and, asc, eq, inArray, isNotNull } from "drizzle-orm"
+import { and, asc, count, eq, inArray, isNotNull } from "drizzle-orm"
 import { db, databaseLabel } from "../src/db"
 import { sourceRepairs, sourceRevisions, sources, users } from "../src/db/schema"
 import { isAdminUser } from "../src/lib/auth"
 import { readingStorage } from "../src/lib/storage"
-import { detectRepairsForSource, transcribeRepairRegion } from "../src/lib/repairPipeline"
-import { acceptRepairDecision, applyAcceptedRepairs } from "../src/lib/repairApply"
+import { detectRepairsForSource, proposeRetranscription, transcribeRepairRegion } from "../src/lib/repairPipeline"
+import { ApplyRefusedPage, acceptRepairDecision, applyAcceptedRepairs } from "../src/lib/repairApply"
 import { REPAIR_JUDGE_MODEL, arbitrateRepair } from "../src/lib/repairJudge"
 import { rescoreSource } from "../src/lib/readingScore"
 
@@ -45,6 +45,14 @@ const survey = args.includes("--survey")
 const run = args.includes("--run")
 const backfillOnly = args.includes("--backfill")
 const rescoreOnly = args.includes("--rescore")
+/**
+ * The whole-document act: re-derive every damaged page's text from the page
+ * images, through the same panel → judge → guarded apply as detection. Takes
+ * EXPLICIT source ids only — "re-OCR this document" is an admin's judgement
+ * about a named document, and a flag that could quietly mean "re-OCR the
+ * whole library" would be a budget accident waiting for a typo.
+ */
+const retranscribe = args.includes("--retranscribe")
 const maxUsdIndex = args.indexOf("--max-usd")
 const MAX_USD = maxUsdIndex !== -1 ? Number(args[maxUsdIndex + 1]) || 40 : 40
 const ids = args.filter((arg, i) => !arg.startsWith("--") && args[i - 1] !== "--max-usd")
@@ -113,6 +121,40 @@ async function backfillRevisions() {
   console.log(`[reprocess] backfilled ${created} revision row${created === 1 ? "" : "s"}`)
 }
 
+/**
+ * Apply, setting aside the pages the gate names. An apply covers every
+ * accepted page at once, so one page failing a per-page gate would hold a
+ * whole document on its worst page forever. A named refusal becomes that
+ * page's rejection — reason recorded — and the rest apply.
+ */
+async function applySettingAside(sourceId: string, title: string) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      return await applyAcceptedRepairs(sourceId)
+    } catch (error) {
+      if (!(error instanceof ApplyRefusedPage)) throw error
+      await db
+        .update(sourceRepairs)
+        .set({ status: "rejected", reviewNote: `Set aside by the apply gate (reprocess-library): ${error.message}` })
+        .where(
+          and(
+            eq(sourceRepairs.sourceId, sourceId),
+            eq(sourceRepairs.pageNumber, error.pageNumber),
+            eq(sourceRepairs.status, "accepted")
+          )
+        )
+      console.log(`         p${error.pageNumber}: set aside — ${error.message.split(".")[0]}`)
+      held.push({ title, pageNumber: error.pageNumber, why: `set aside at apply: ${error.message.split(".")[0]}` })
+      const [{ value: remaining }] = await db
+        .select({ value: count() })
+        .from(sourceRepairs)
+        .where(and(eq(sourceRepairs.sourceId, sourceId), eq(sourceRepairs.status, "accepted")))
+      if (remaining === 0) return null
+    }
+  }
+  throw new Error("apply kept refusing pages beyond any plausible count — investigate")
+}
+
 /** Unanimous panel, big enough to mean something, with text to accept. */
 function strongConsensus(repair: typeof sourceRepairs.$inferSelect): { ok: true } | { ok: false; why: string } {
   const votes = repair.votes
@@ -153,12 +195,14 @@ async function processSource(
         .where(and(eq(sourceRepairs.sourceId, source.id), eq(sourceRepairs.status, "accepted")))
       if (acceptedPending.length > 0) {
         try {
-          const result = await applyAcceptedRepairs(source.id)
-          console.log(
-            `  wrote  ${source.title} — pages ${result.pagesReplaced.join(", ")} → ${result.revisedKey}` +
-              (result.highlightsMoved ? ` (${result.highlightsMoved} highlights re-anchored)` : "")
-          )
-          applied.push({ title: source.title, pages: result.pagesReplaced, revisedKey: result.revisedKey })
+          const result = await applySettingAside(source.id, source.title)
+          if (result) {
+            console.log(
+              `  wrote  ${source.title} — pages ${result.pagesReplaced.join(", ")} → ${result.revisedKey}` +
+                (result.highlightsMoved ? ` (${result.highlightsMoved} highlights re-anchored)` : "")
+            )
+            applied.push({ title: source.title, pages: result.pagesReplaced, revisedKey: result.revisedKey })
+          }
           const fresh = await db
             .select({ storageKey: sources.storageKey })
             .from(sources)
@@ -175,18 +219,37 @@ async function processSource(
       }
 
       const buffer = await readingStorage.get(source.storageKey)
-      const detection = await detectRepairsForSource(source.id, buffer, source.storageKey)
-      if (detection.unlocatable.length > 0) {
-        console.log(`         pages damaged but not repairable here (lost spaces): ${detection.unlocatable.join(", ")}`)
+      if (retranscribe) {
+        const proposal = await proposeRetranscription(source.id, buffer, source.storageKey)
+        if (proposal.blank.length > 0) {
+          console.log(`         pages whose render came out empty (investigate): ${proposal.blank.join(", ")}`)
+        }
+        if (proposal.regions === 0) {
+          console.log(
+            cycle === 1
+              ? `  clean  ${source.title} — nothing over the retranscription floors (${proposal.skippedClean} clean pages)`
+              : `         retranscription complete — nothing further over the floors`
+          )
+          return
+        }
+        console.log(
+          `  cycle ${cycle}  ${source.title} — retranscribing ${proposal.regions} page${proposal.regions === 1 ? "" : "s"} ` +
+            `(${proposal.skippedClean} clean pages skipped)`
+        )
+      } else {
+        const detection = await detectRepairsForSource(source.id, buffer, source.storageKey)
+        if (detection.unlocatable.length > 0) {
+          console.log(`         pages damaged but not repairable here (lost spaces): ${detection.unlocatable.join(", ")}`)
+        }
+        if (detection.blank.length > 0) {
+          console.log(`         pages whose crop rendered empty (investigate): ${detection.blank.join(", ")}`)
+        }
+        if (detection.regions === 0) {
+          if (cycle === 1) console.log(`  clean  ${source.title}`)
+          return
+        }
+        console.log(`  cycle ${cycle}  ${source.title} — ${detection.regions} page${detection.regions === 1 ? "" : "s"} proposed`)
       }
-      if (detection.blank.length > 0) {
-        console.log(`         pages whose crop rendered empty (investigate): ${detection.blank.join(", ")}`)
-      }
-      if (detection.regions === 0) {
-        if (cycle === 1) console.log(`  clean  ${source.title}`)
-        return
-      }
-      console.log(`  cycle ${cycle}  ${source.title} — ${detection.regions} page${detection.regions === 1 ? "" : "s"} proposed`)
       proposals = await db
         .select()
         .from(sourceRepairs)
@@ -300,12 +363,14 @@ async function processSource(
     }
 
     try {
-      const result = await applyAcceptedRepairs(source.id)
-      console.log(
-        `  wrote  ${source.title} — pages ${result.pagesReplaced.join(", ")} → ${result.revisedKey}` +
-          (result.highlightsMoved ? ` (${result.highlightsMoved} highlights re-anchored)` : "")
-      )
-      applied.push({ title: source.title, pages: result.pagesReplaced, revisedKey: result.revisedKey })
+      const result = await applySettingAside(source.id, source.title)
+      if (result) {
+        console.log(
+          `  wrote  ${source.title} — pages ${result.pagesReplaced.join(", ")} → ${result.revisedKey}` +
+            (result.highlightsMoved ? ` (${result.highlightsMoved} highlights re-anchored)` : "")
+        )
+        applied.push({ title: source.title, pages: result.pagesReplaced, revisedKey: result.revisedKey })
+      }
       // The rotation moved the key; the next cycle must measure the new file.
       const fresh = await db
         .select({ storageKey: sources.storageKey })
@@ -325,10 +390,16 @@ async function processSource(
 
 async function main() {
   console.log(`[reprocess] database: ${databaseLabel()}`)
-  console.log(`[reprocess] mode: ${survey ? "survey" : backfillOnly ? "backfill" : rescoreOnly ? "rescore" : run ? `run (ceiling $${MAX_USD})` : "?"}`)
+  console.log(
+    `[reprocess] mode: ${survey ? "survey" : backfillOnly ? "backfill" : rescoreOnly ? "rescore" : retranscribe ? `retranscribe (ceiling $${MAX_USD})` : run ? `run (ceiling $${MAX_USD})` : "?"}`
+  )
 
-  if (!survey && !run && !backfillOnly && !rescoreOnly) {
-    console.error("[reprocess] pass --survey, --run, --backfill or --rescore")
+  if (!survey && !run && !backfillOnly && !rescoreOnly && !retranscribe) {
+    console.error("[reprocess] pass --survey, --run, --retranscribe <sourceId…>, --backfill or --rescore")
+    process.exit(1)
+  }
+  if (retranscribe && ids.length === 0) {
+    console.error("[reprocess] --retranscribe takes explicit source ids — it re-reads whole documents and spends accordingly")
     process.exit(1)
   }
 

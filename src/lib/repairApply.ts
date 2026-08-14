@@ -33,6 +33,20 @@ import { hashText } from "@/lib/hash"
 export const MIN_KEPT_TEXT_SHARE = 0.6
 
 /**
+ * A refusal that names the page that caused it. An apply covers every accepted
+ * page at once, so one page failing a per-page gate vetoes the rest — and a
+ * batch caller that knows WHICH page can set that one repair aside (rejected,
+ * with this reason as its record) and apply the pages that measured well,
+ * instead of holding a whole document on its worst page forever.
+ */
+export class ApplyRefusedPage extends Error {
+  constructor(message: string, public readonly pageNumber: number) {
+    super(message)
+    this.name = "ApplyRefusedPage"
+  }
+}
+
+/**
  * Record a decision on one repair, in the acting user's name.
  *
  * The text is checked against the readings before it is stored — not to second
@@ -161,10 +175,11 @@ export async function applyAcceptedRepairs(sourceId: string) {
     .filter((page) => page.now < page.was * MIN_KEPT_TEXT_SHARE)
   if (emptied.length > 0) {
     const worst = emptied.sort((a, b) => a.now / (a.was || 1) - b.now / (b.was || 1))[0]
-    throw new Error(
+    throw new ApplyRefusedPage(
       `Discarded: page ${worst.pageNumber} would keep only ${worst.now} of its ${worst.was} characters. ` +
         `A repair replaces a page's whole text layer, so an accepted transcription has to cover the ` +
-        `whole page — this one does not. The reading is unchanged.`
+        `whole page — this one does not. The reading is unchanged.`,
+      worst.pageNumber
     )
   }
 
@@ -209,9 +224,10 @@ export async function applyAcceptedRepairs(sourceId: string) {
     const was = measurePageGarble(pageNumber, wasText)
     const now = measurePageGarble(pageNumber, nowText)
     if (was && now && now.rate > was.rate + 0.05) {
-      throw new Error(
+      throw new ApplyRefusedPage(
         `Discarded: page ${pageNumber} would read WORSE after this repair ` +
-          `(garbled-word rate ${(was.rate * 100).toFixed(1)}% → ${(now.rate * 100).toFixed(1)}%). The reading is unchanged.`
+          `(garbled-word rate ${(was.rate * 100).toFixed(1)}% → ${(now.rate * 100).toFixed(1)}%). The reading is unchanged.`,
+        pageNumber
       )
     }
   }

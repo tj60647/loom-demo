@@ -10,7 +10,7 @@
  * Nothing here modifies a reading. `source_repair.appliedAt` is the only thing
  * that says a repair reached a student, and it is written elsewhere.
  */
-import { and, eq } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 import { createCanvas } from "@napi-rs/canvas"
 import { db } from "@/db"
 import { sourceRepairs, sourceRepairReadings } from "@/db/schema"
@@ -18,7 +18,7 @@ import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
 import { extractPdfPageText } from "@/lib/pdfText"
 import { probePdfStructure } from "@/lib/pdfStructure"
 import { locatePageRepairRegion } from "@/lib/garbleRegion"
-import { isGarbled, measurePageGarble } from "@/lib/garble"
+import { isGarbled, isGarbledToken, lowercaseBodyTokens, measurePageGarble } from "@/lib/garble"
 import { computeConsensus } from "@/lib/repairConsensus"
 import { readingStorage } from "@/lib/storage"
 import { VISION_READERS, requestVisionCompletion } from "@/lib/openrouter"
@@ -330,6 +330,162 @@ export async function detectRepairsForSource(
   }
 
   return { regions: created, pagesExamined: pages.length, unlocatable, blank }
+}
+
+/**
+ * Floors for the per-document retranscription act — deliberately GENTLER than
+ * `isGarbled`'s. Detection answers "which pages scream"; this answers a
+ * different question an admin asks about a whole document: "the OCR under this
+ * scan is bad — re-derive the text from the images." A page with 8% garbled
+ * words or 5% fused-together tokens reads as damaged to a person quoting it,
+ * while sitting far under the thresholds that trigger detection. Clean pages
+ * still stay out: re-reading them buys nothing and risks a sideways trade the
+ * apply gate would then have to catch.
+ */
+const RETRANSCRIBE_GARBLE_FLOOR = 0.08
+const RETRANSCRIBE_FUSION_FLOOR = 0.05
+const FUSED_TOKEN_CHARS = 15
+
+/** Share of a page's body tokens long enough to be fused words. */
+function fusionShare(text: string) {
+  const tokens = lowercaseBodyTokens(text)
+  if (tokens.length === 0) return 0
+  return tokens.filter((token) => token.length >= FUSED_TOKEN_CHARS).length / tokens.length
+}
+
+/**
+ * Propose full-page retranscription for every damaged page of a document.
+ *
+ * This is the whole-document act detection deliberately is not: detection
+ * finds local damage by thresholds tuned to avoid false alarms, so a document
+ * whose OCR is bad EVERYWHERE — scattered fusions, soft character
+ * substitutions, per-page rates that individually stay under the alarm line —
+ * never earns proposals in proportion to its disease. Here an admin has
+ * already made the document-level judgement; the floors only keep genuinely
+ * clean pages (and blank leaves) out of the panel's time.
+ *
+ * Everything downstream is the ordinary pipeline: the same crops, the same
+ * five readers with the image as ground truth, the same consensus, judge,
+ * review and guarded apply. Nothing about this act can write text a reader
+ * did not produce.
+ */
+export async function proposeRetranscription(
+  sourceId: string,
+  buffer: Buffer,
+  storageKey: string
+) {
+  const pages = await extractPdfPageText(buffer)
+  if (pages.length === 0) {
+    return { regions: 0, pagesExamined: 0, skippedClean: 0, blank: [] as number[] }
+  }
+
+  const structure = await probePdfStructure(buffer).catch(() => null)
+  const blankPages = new Set(
+    (structure?.pages ?? []).filter((page) => page.kind === "blank").map((page) => page.pageNumber)
+  )
+
+  const damaged = pages.filter((page) => {
+    if (blankPages.has(page.pageNumber)) return false
+    const garble = measurePageGarble(page.pageNumber, page.textContent)
+    const rate = garble?.rate ?? 0
+    // A page with no measurable text at all is the scanned case detection
+    // already covers; here it still qualifies — absence is damage too.
+    const scanned = structure?.pages.find((p) => p.pageNumber === page.pageNumber)?.kind === "scanned"
+    return scanned || rate >= RETRANSCRIBE_GARBLE_FLOOR || fusionShare(page.textContent) >= RETRANSCRIBE_FUSION_FLOOR
+  })
+
+  // Same replace-undecided contract as detection, same crop cleanup.
+  const replaced = await db
+    .select({ cropKey: sourceRepairs.cropKey })
+    .from(sourceRepairs)
+    .where(and(eq(sourceRepairs.sourceId, sourceId), eq(sourceRepairs.status, "proposed")))
+  await db
+    .delete(sourceRepairs)
+    .where(and(eq(sourceRepairs.sourceId, sourceId), eq(sourceRepairs.status, "proposed")))
+  for (const row of replaced) {
+    await readingStorage.delete(row.cropKey).catch(() => {})
+  }
+
+  // Pages already carrying a decision keep it — accepted and applied because a
+  // person or a prior apply settled them, rejected because re-proposing a page
+  // somebody set aside would buy the same reading again every cycle until the
+  // budget ran out. Ordinary detection may still revisit a rejected page in a
+  // later, separate act; this batch does not.
+  const decided = new Set(
+    (
+      await db
+        .select({ pageNumber: sourceRepairs.pageNumber })
+        .from(sourceRepairs)
+        .where(
+          and(eq(sourceRepairs.sourceId, sourceId), inArray(sourceRepairs.status, ["accepted", "applied", "rejected"]))
+        )
+    ).map((row) => row.pageNumber)
+  )
+
+  const pdfjsLib = await loadPdfjs()
+  const loadingTask = pdfjsLib.getDocument({
+    data: new Uint8Array(buffer),
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+    wasmUrl: pdfjsWasmUrl(),
+    useWasm: false,
+  })
+  const doc = await loadingTask.promise
+  let created = 0
+  const blank: number[] = []
+
+  try {
+    for (const page of damaged) {
+      if (created >= MAX_REGIONS_PER_SOURCE) break
+      if (decided.has(page.pageNumber)) continue
+      const pdfPage = await doc.getPage(page.pageNumber)
+      const unscaled = pdfPage.getViewport({ scale: 1 })
+      const scale = Math.min(
+        CROP_DPI / PDF_POINTS_PER_INCH,
+        MAX_CROP_EDGE / Math.max(unscaled.width, unscaled.height)
+      )
+      const viewport = pdfPage.getViewport({ scale })
+      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
+      const context = canvas.getContext("2d")
+      context.fillStyle = "#ffffff"
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      await pdfPage.render({ canvasContext: context, viewport }).promise
+
+      const ink = inkShare(context, canvas.width, canvas.height)
+      if (ink < MIN_CROP_INK) {
+        blank.push(page.pageNumber)
+        continue
+      }
+
+      const cropKey = repairCropKey(sourceId, page.pageNumber)
+      await readingStorage.put(cropKey, canvas.toBuffer("image/png"))
+
+      const garble = measurePageGarble(page.pageNumber, page.textContent)
+      await db.insert(sourceRepairs).values({
+        sourceId,
+        pageNumber: page.pageNumber,
+        measuredAgainstKey: storageKey,
+        region: { x: 0, y: 0, width: canvas.width, height: canvas.height, scale },
+        cropKey,
+        currentText: page.textContent.slice(0, 4000),
+        garbledWords: [
+          ...new Set(lowercaseBodyTokens(page.textContent).filter(isGarbledToken)),
+        ].slice(0, 40),
+        garbleRate: garble?.rate ?? null,
+      })
+      created += 1
+    }
+  } finally {
+    await destroyPdf(doc, loadingTask)
+  }
+
+  return {
+    regions: created,
+    pagesExamined: pages.length,
+    skippedClean: pages.length - damaged.length,
+    blank,
+  }
 }
 
 const TRANSCRIBE_SYSTEM =
