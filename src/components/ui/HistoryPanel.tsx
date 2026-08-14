@@ -452,34 +452,30 @@ const dayOf = (e: GraphEvent) =>
   eventDate(e).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })
 
 /**
- * The record itself — every act in order, under the cloth it produced.
+ * The record itself — every act in order, in the box the cloth was drawn in.
  *
- * Folded shut by default (2026-08-13): the card's first job is the drawing,
- * and 60 rows of prose above the fold would bury it. Open it and a row click
- * moves the scrubber, which moves the one cloth above.
+ * A disclosure under the cloth for one day (2026-08-13), which stacked the card
+ * taller and taller. TJ, restoring what the log panel did before the merge:
+ * "the previous version had the diagram and the list in the same space,
+ * correct? why not just do that again?" — so this fills the same fixed box the
+ * drawing does, and the chips swap between them.
  */
-export function CaptureLogRecord({ log, scopeLabel }: {
-  log: CaptureLog
-  /** Readable name for the scope, for the download's filename and heading. */
-  scopeLabel?: string
-}) {
+export function CaptureLogRows({ log }: { log: CaptureLog }) {
   const { state } = useLoom()
-  const [open, setOpen] = useState(false)
   const { events, k, goTo } = log
 
   /**
-   * Land on the act you were looking at. Opening the record at act 60 of 66
-   * with the list scrolled to act 1 would put the marked row below the fold —
-   * technically working and practically stranding you. Runs on open and as the
-   * position moves, so playing the replay walks the list along with it.
+   * Land on the act you were looking at. Arriving at act 60 of 66 with the list
+   * scrolled to act 1 would put the marked row below the fold — technically
+   * working and practically stranding you. Runs as the position moves too, so
+   * playing the replay walks the list along with it.
    */
   const listRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!open) return
     listRef.current
       ?.querySelector(`[data-act="${k}"]`)
       ?.scrollIntoView({ block: "center", behavior: "auto" })
-  }, [open, k])
+  }, [k])
 
   /**
    * What the act was ABOUT (TJ, 2026-08-12: "the list view should include more
@@ -582,37 +578,8 @@ export function CaptureLogRecord({ log, scopeLabel }: {
 
   return (
     <>
-      <div className="logbar" style={{ marginTop: 2 }}>
-        <button
-          type="button"
-          className="btn ghost mini"
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-        >
-          {open ? "▾ the record" : "▸ the record"}
-        </button>
-        <span className="cap">
-          {events.length} act{events.length !== 1 ? "s" : ""} — each keeps the words you kept,
-          the name you gave them, and the note you wrote at the time
-        </span>
-        {/* The Log downloads too (TJ, 2026-08-10) — it is the one object that
-            has never been in any file, so without this it would be the only
-            work a student cannot take with them. Beside the disclosure rather
-            than inside it: you should not have to open the record to take it. */}
-        <span style={{ marginLeft: "auto" }}>
-          <ObjectDownload
-            kind="capture-log"
-            noun="the log"
-            slug={scopeLabel ?? "capture-log"}
-            tip="your acts, in order — the record of how this grew"
-            json={(p) => JSON.stringify(buildLogExport(events, p, scopeLabel), null, 2)}
-            markdown={(p) => buildLogMarkdown(events, p, scopeLabel)}
-          />
-        </span>
-      </div>
-
-      {open && (
-        <div className="scrollbox" ref={listRef} style={{ marginTop: 8 }}>
+      {(
+        <div className="scrollbox logrows" ref={listRef}>
           {events.map((e, i) => {
             // A day heading where the date turns over. A term's record is
             // mostly made of sittings, and seeing where one ended is half of
@@ -651,6 +618,32 @@ export function CaptureLogRecord({ log, scopeLabel }: {
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * The log as a file. Beside the chips rather than inside the record, because
+ * you should not have to be looking at the rows to take them — and because a
+ * control that appears and disappears reflows the card, which is the thing TJ
+ * called out ("i really hate it when buttons change size and reformat the
+ * card"). It renders in both views, in the same place, at the same size.
+ */
+export function CaptureLogDownload({ log, scopeLabel }: {
+  log: CaptureLog
+  /** Readable name for the scope, for the download's filename and heading. */
+  scopeLabel?: string
+}) {
+  const { events } = log
+  if (!events || events.length === 0) return null
+  return (
+    <ObjectDownload
+      kind="capture-log"
+      noun="the log"
+      slug={scopeLabel ?? "capture-log"}
+      tip="your acts, in order — the record of how this grew"
+      json={(p) => JSON.stringify(buildLogExport(events, p, scopeLabel), null, 2)}
+      markdown={(p) => buildLogMarkdown(events, p, scopeLabel)}
+    />
   )
 }
 
@@ -734,13 +727,24 @@ export function CaptureLogScrubber({ log }: { log: CaptureLog }) {
           }}
         />
       )}
+      {/* NOTHING IN THIS BAR MAY CHANGE WIDTH (TJ, 2026-08-13: "i really hate
+          it when buttons change size and reformat the card"). Three things did:
+          the play button relabelled between "▶ play", "❚❚ pause" and "▶ replay
+          from the start" — a threefold width swing that shoved everything after
+          it; "back to now ›" mounted and unmounted as you left and reached the
+          end of the record; and the counter's digits are proportional, so
+          "act 9 of 112" and "act 112 of 112 · now" are different widths.
+
+          So: the button reserves the width of its longest label, the counter is
+          tabular and reserves its own, and "back to now" keeps its box and
+          hides its ink. */}
       <div className="logbar">
         {/* Play runs it forward a beat at a time and stops at the end. At the
             end it starts over, because that is the only thing the word can
             mean there. */}
         <button
           type="button"
-          className="btn ghost mini"
+          className="btn ghost mini logplay"
           onClick={() => {
             if (playing) { setPlaying(false); return }
             if (atMax) goTo(1)
@@ -750,19 +754,24 @@ export function CaptureLogScrubber({ log }: { log: CaptureLog }) {
         >
           {playing ? "❚❚ pause" : atMax ? "▶ replay from the start" : "▶ play"}
         </button>
-        <span className="cap">act {k} of {events.length}{atMax ? " · now" : ""}</span>
+        <span className="cap logcount">act {k} of {events.length}{atMax ? " · now" : ""}</span>
         {/* Back to the live cloth in one press. Dragging the scrubber the last
-            few pixels is a fiddly way to say "never mind, show me my work". */}
-        {!atMax && (
-          <button
-            type="button"
-            className="act"
-            style={{ background: "none", border: "none", padding: 0 }}
-            onClick={() => { setPlaying(false); goTo(events.length) }}
-          >
-            back to now ›
-          </button>
-        )}
+            few pixels is a fiddly way to say "never mind, show me my work".
+            Always mounted — see above; at the end there is nowhere to go back
+            to, so it is inert and invisible rather than absent. */}
+        <button
+          type="button"
+          className="act"
+          style={{
+            background: "none", border: "none", padding: 0,
+            visibility: atMax ? "hidden" : "visible",
+          }}
+          aria-hidden={atMax}
+          tabIndex={atMax ? -1 : 0}
+          onClick={() => { setPlaying(false); goTo(events.length) }}
+        >
+          back to now ›
+        </button>
       </div>
 
       {/* The counts are the cloth's SHAPE at this act — the three things drawn
@@ -784,11 +793,11 @@ export function CaptureLogScrubber({ log }: { log: CaptureLog }) {
         {cloth.passages.length} passage{cloth.passages.length !== 1 ? "s" : ""} —{" "}
         {atMax ? "now" : when ? `as of ${when}` : "at the first recorded act"}
       </p>
-      {current && !atMax && (
-        <p className="ghostnote" style={{ margin: "0 0 4px" }}>
-          {describeEvent(current)}
-        </p>
-      )}
+      {/* Always in the flow, blank at the end — mounting it only once you leave
+          "now" grew the card by a line the moment you pressed play. */}
+      <p className="ghostnote logsaid" style={{ margin: "0 0 4px" }}>
+        {current && !atMax ? describeEvent(current) : ""}
+      </p>
     </>
   )
 }

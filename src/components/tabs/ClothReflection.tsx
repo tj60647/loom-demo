@@ -17,7 +17,7 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import type { Edge, Tier } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
 import ClothMap from "@/components/svg/ClothMap"
-import { useCaptureLog, CaptureLogScrubber, CaptureLogRecord } from "@/components/ui/HistoryPanel"
+import { useCaptureLog, CaptureLogScrubber, CaptureLogRows, CaptureLogDownload } from "@/components/ui/HistoryPanel"
 
 /**
  * "What the cloth shows you" — the counted prompts, the threads they lay out,
@@ -82,6 +82,19 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
    */
   const inThePast = showLog && log.ready && !log.atMax
   const drawn = inThePast && log.mapState ? log.mapState : state
+
+  /**
+   * Two views of one thing, in one box (TJ, 2026-08-13: "the previous version
+   * had the diagram and the list in the same space, correct? why not just do
+   * that again?"). It did, and this is that toggle back.
+   *
+   * The difference from then: the box used to hold a SECOND, read-only copy of
+   * the cloth while the live one stayed on the station, so switching to the
+   * list cost you nothing. There is one cloth now, so "record" hides the
+   * drawing — which is what the row badges used to be a door back from. The
+   * scrubber stays under both, because it is the position they share.
+   */
+  const [view, setView] = useState<"cloth" | "record">("cloth")
 
   type ReadPrompt = {
     key: string
@@ -373,25 +386,55 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
       {/* No "THE CLOTH" label on the card: 03's section heading says it now
           (TJ, 2026-08-12), and the same words twice, six lines apart, read as
           two different things. */}
-      <p className="hint">
-        Warp in reading order; weft arcs across.{SHOW_PROMPTS
-          ? " Click a prompt beside this to trace it here — or click a concept/arc directly to pull it."
-          : " Click a concept or arc to trace it."}
-        {showLog && " Scrub below to see how it grew."}
-      </p>
+      {/* The chips read like the projection switcher because they do the same
+          job: pick which of two views of one thing you are looking at. The
+          download sits with them so it is in the same place in both. */}
+      <div className="mapbar" style={{ marginBottom: 8 }}>
+        <span className="hint" style={{ margin: 0 }}>
+          Warp in reading order; weft arcs across.{SHOW_PROMPTS
+            ? " Click a prompt beside this to trace it here — or click a concept/arc directly to pull it."
+            : " Click a concept or arc to trace it."}
+          {showLog && " Scrub below to see how it grew."}
+        </span>
+        {showLog && log.ready && (
+          <>
+            <span className="chips" style={{ margin: 0, marginLeft: "auto", alignItems: "center" }}>
+              {([["cloth", "the cloth"], ["record", "the record"]] as const).map(([v, label]) => (
+                <span
+                  key={v}
+                  className={`chip${view === v ? " on" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setView(v)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setView(v) } }}
+                >{label}</span>
+              ))}
+            </span>
+            <CaptureLogDownload log={log} scopeLabel={scopeLabel} />
+          </>
+        )}
+      </div>
 
-      {/* ONE cloth. It draws the student's live weave, or — while the scrubber
-          sits back from the end of the record — the same weave folded to the
-          act they are looking at. The glow marks what that act touched, and
-          only once they have actually moved: on arrival this is a calm drawing
-          of their work, not a pulse on whatever they last happened to do. */}
+      {/* ONE box, two views (see `view` above). The cloth draws the student's
+          live weave, or — while the scrubber sits back from the end of the
+          record — the same weave folded to the act they are looking at. The
+          glow marks what that act touched, and only once they have actually
+          moved: on arrival this is a calm drawing of their work, not a pulse on
+          whatever they last happened to do.
+
+          Both are 400px tall, so the chips swap the contents and the legend,
+          the scrubber and everything below them stay exactly where they were. */}
       <div id="mapWrap">
-        <ClothMap
-          state={drawn}
-          readSel={readSel}
-          setReadSel={setReadSel}
-          glow={showLog && log.scrubbed && log.glowId ? { id: log.glowId, seq: log.pulse } : null}
-        />
+        {view === "record" && showLog && log.ready ? (
+          <CaptureLogRows log={log} />
+        ) : (
+          <ClothMap
+            state={drawn}
+            readSel={readSel}
+            setReadSel={setReadSel}
+            glow={showLog && log.scrubbed && log.glowId ? { id: log.glowId, seq: log.pulse } : null}
+          />
+        )}
       </div>
 
       <div className="legend">
@@ -408,8 +451,10 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
           second drawing of the same graph until today. */}
       {showLog && (
         <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--rule)" }}>
+          {/* Under BOTH views: it is the position the two of them share. Click
+              a row in the record and this moves; drag this and the cloth
+              redraws. */}
           <CaptureLogScrubber log={log} />
-          <CaptureLogRecord log={log} scopeLabel={scopeLabel} />
         </div>
       )}
       </div>

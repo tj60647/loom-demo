@@ -800,9 +800,33 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .clothglow{animation:clothglow 1s ease-out forwards}
 @media(prefers-reduced-motion:reduce){.clothglow{animation:none;opacity:.35}}
 
-/* Play · position · the door to the other view. */
-.logbar{display:flex;align-items:center;gap:12px;margin:2px 0 4px;flex-wrap:wrap}
+/* Play · position · the door to the other view.
+
+   NOWRAP and reserved widths (TJ, 2026-08-13: "i really hate it when buttons
+   change size and reformat the card"). This bar relabels as you use it — play
+   becomes pause becomes "replay from the start" — and every relabel was moving
+   its neighbours, and at a narrow width wrapping the row and moving the card.
+   The button reserves its longest label, the counter is tabular and reserves
+   its own, so the bar is the same size at every position in the record. */
+.logbar{display:flex;align-items:center;gap:12px;margin:2px 0 4px;flex-wrap:nowrap}
 .logbar .cap{margin:0}
+/* Reserves are in px and measured, not guessed in em: "▶ replay from the
+   start" renders 177px and the widest counter ("act 112 of 112 · now") 124px,
+   and an em reserve computed against the wrong font-size is a reserve that
+   silently does nothing. */
+.logbar .logplay{min-width:182px;justify-content:center;white-space:nowrap}
+.logbar .logcount{min-width:150px;white-space:nowrap;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+/* The act being replayed. Always in the flow, empty at the end of the record,
+   so leaving "now" does not grow the card by a line. */
+.logsaid{min-height:1.5em;line-height:1.5}
+
+/* The record, in the box the cloth was drawn in — same height, so the chips
+   swap the contents and nothing below them moves (TJ, 2026-08-13: "the
+   previous version had the diagram and the list in the same space"). The
+   drawing is 400px tall; so is this. */
+.logrows{height:400px;max-height:400px}
+.yourwork-body .logrows{height:400px;max-height:400px}
 /* The badge that crosses between the views. Quiet until you want it. */
 .logjump{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--sage);
   background:none;border:none;padding:2px 4px;cursor:pointer;flex:0 0 auto;
