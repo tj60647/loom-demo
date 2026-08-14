@@ -6,27 +6,41 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 
 /**
  * The matrix is a spread canvas: every 2-page spread on one transformed
- * plane, panned and zoomed as pure CSS over a raster/text-layer split. The
- * text layer renders once at a zoom-independent base width and is NEVER
- * rebuilt by the slider or a pinch; sharpness returns through our own pdf.js
- * canvas, re-rastered only after the gesture settles. The defect this
- * replaces — named in 9abbdd7's own commit message — re-rendered every page,
- * canvas and text layer both, on every 0.1 step of the slider.
+ * plane, panned and zoomed as pure CSS over a level-of-detail ladder. At
+ * fit-all every page is its pre-rendered image (the impostor) — no canvas,
+ * no text layer, which is what lets a long scan open as a contact sheet
+ * instead of decoding the whole book. Crossing reading zoom mounts react-pdf
+ * text layers for the pages near the view; those render once at a
+ * zoom-independent base width and are NEVER rebuilt by the slider or a
+ * pinch — sharpness returns through our own pdf.js canvas, re-rastered only
+ * after the gesture settles. The defect the split replaced — named in
+ * 9abbdd7's own commit message — re-rendered every page, canvas and text
+ * layer both, on every 0.1 step of the slider.
  */
 test.describe('Matrix zoom', () => {
-  test('zoom re-rasters the canvas without rebuilding the text layer', async ({ page }) => {
+  test('fit-all is impostors; zoom mounts text once and re-rasters without rebuilding it', async ({ page }) => {
     test.setTimeout(90_000);
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
 
     await page.getByRole('button', { name: 'Matrix' }).click();
 
-    // The spread canvas is live: one transformed plane of spreads, our
-    // raster under react-pdf's text layer in every slot.
+    // The spread canvas is live, and at fit-all it is a contact sheet of
+    // pre-rendered images: no page canvas, no text layer, no spans — the
+    // whole economy of the impostor tier, asserted as such.
     await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
-    const raster = page.locator('.pdf-raster').first();
-    await expect(raster).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.pdf-slot-inner .react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
+    await expect(page.locator('.pdf-slot-img').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.pdf-slot-inner .react-pdf__Page__textContent')).toHaveCount(0);
+    await expect(page.locator('.pdf-raster')).toHaveCount(0);
+
+    // Two steps in (1 → 1.4 → 1.96× fit) with the toolbar's + button — the
+    // keyboard-and-tap path onto the same transform. At this zoom the whole
+    // 9-page reading sits within the promote-or-keep margins, so every text
+    // layer mounts — the seeded passage's page included, wherever it is.
+    const zoomIn = page.getByRole('button', { name: 'Zoom in' });
+    await zoomIn.click();
+    await zoomIn.click();
+    await expect(page.locator('.pdf-slot-inner .react-pdf__Page__textContent').first()).toBeAttached({ timeout: 15000 });
 
     // A seeded passage's mark, and a probe span: if the text layer is ever
     // re-rendered, both of these exact DOM nodes are destroyed.
@@ -39,21 +53,7 @@ test.describe('Matrix zoom', () => {
     });
     await expect(page.locator('[data-probe="1"]')).toBeAttached();
 
-    // Let the initial settle pass, then record the sharpest backing anywhere.
-    // (Anywhere, not page 1: the slider zooms about the canvas CENTRE, so the
-    // corner page correctly leaves the view and keeps its base raster.)
-    const maxBacking = () =>
-      page.evaluate(() =>
-        Math.max(...Array.from(document.querySelectorAll<HTMLCanvasElement>('.pdf-raster')).map((c) => c.width))
-      );
-    await page.waitForTimeout(400);
-    const before = await maxBacking();
-
-    // Step the zoom in three times (1 → 1.4 → 1.96 → 2.74× fit) with the
-    // toolbar's + button — the keyboard-and-tap path onto the same transform.
-    const zoomIn = page.getByRole('button', { name: 'Zoom in' });
-    await zoomIn.click();
-    await zoomIn.click();
+    // One more step (→ 2.74×), so the settle retargets while the probes watch.
     await zoomIn.click();
 
     // (a) The text layer never re-rendered: the probed span and the probed
@@ -61,9 +61,21 @@ test.describe('Matrix zoom', () => {
     await expect(page.locator('[data-probe="1"]')).toBeAttached();
     await expect(page.locator('[data-probe="2"]')).toBeAttached();
 
-    // (b) After the settle, whatever is in view re-rastered sharper: the
-    // sharpest backing anywhere outgrew what it was at 1×.
-    await expect.poll(maxBacking, { timeout: 10_000 }).toBeGreaterThan(before);
+    // (b) After the settle, whatever is in view re-rastered sharper: some
+    // page's canvas backing outgrew its CSS box — the native tier at work.
+    // (At fit-all there were no canvases at all, so any native raster is
+    // already proof of the ladder promoting; this asserts it is also SHARP.)
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() =>
+            Array.from(document.querySelectorAll<HTMLCanvasElement>('.pdf-raster')).some(
+              (c) => c.width > c.clientWidth + 1
+            )
+          ),
+        { timeout: 10_000 }
+      )
+      .toBe(true);
 
     // (c) Still exactly the marks the loom holds — none lost, none doubled.
     await expect(page.locator('[data-probe="2"]')).toBeVisible();
@@ -151,9 +163,12 @@ test.describe('Matrix zoom', () => {
       .poll(async () => Math.abs((await canvasK()) - atFit), { timeout: 5000 })
       .toBeLessThan(atFit * 0.06);
 
-    // Cards in the matrix: every spread grows its rails, and a seeded
-    // passage's card appears beside the page that holds its highlight.
-    await expect(page.locator('.loom-passage-highlight').first()).toBeAttached({ timeout: 10000 });
+    // Cards in the matrix, AT FIT-ALL: no text layer is mounted down here —
+    // fit-all is the impostor tier — so the card anchors analytically, off
+    // the passage's stored page and offset against the manifest's text
+    // length. This is the concept-map reading of the far zoom: pages as
+    // thumbnails, cards at reading size, leaders still drawn. A mounted
+    // highlight is exactly what this assertion must NOT wait for.
     await page.getByRole('button', { name: 'Cards in the margin' }).click();
     await expect(page.locator('.pdf-spread-canvas .pdf-railcard').first()).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.pdf-spread-canvas .pdf-rail-leaders path').first()).toBeAttached();
