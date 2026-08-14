@@ -37,6 +37,7 @@ import { isAdminUser } from "../src/lib/auth"
 import { readingStorage } from "../src/lib/storage"
 import { detectRepairsForSource, transcribeRepairRegion } from "../src/lib/repairPipeline"
 import { acceptRepairDecision, applyAcceptedRepairs } from "../src/lib/repairApply"
+import { REPAIR_JUDGE_MODEL, arbitrateRepair } from "../src/lib/repairJudge"
 import { rescoreSource } from "../src/lib/readingScore"
 
 const args = process.argv.slice(2)
@@ -131,26 +132,41 @@ async function processSource(
   adminId: string
 ) {
   for (let cycle = 1; cycle <= MAX_CYCLES; cycle++) {
-    const buffer = await readingStorage.get(source.storageKey)
-    const detection = await detectRepairsForSource(source.id, buffer, source.storageKey)
-    if (detection.unlocatable.length > 0) {
-      console.log(`         pages damaged but not repairable here (lost spaces): ${detection.unlocatable.join(", ")}`)
-    }
-    if (detection.blank.length > 0) {
-      console.log(`         pages whose crop rendered empty (investigate): ${detection.blank.join(", ")}`)
-    }
-    if (detection.regions === 0) {
-      if (cycle === 1) console.log(`  clean  ${source.title}`)
-      return
-    }
-    console.log(`  cycle ${cycle}  ${source.title} — ${detection.regions} page${detection.regions === 1 ? "" : "s"} proposed`)
-    if (survey) return
-
-    const proposals = await db
+    // Resume before detecting: detection REPLACES undecided proposals, so
+    // running it over rows an earlier run already paid the panel to read
+    // would delete the readings and buy them again. Only when nothing is
+    // pending is a fresh detection worth its work.
+    let proposals = await db
       .select()
       .from(sourceRepairs)
       .where(and(eq(sourceRepairs.sourceId, source.id), eq(sourceRepairs.status, "proposed")))
       .orderBy(asc(sourceRepairs.pageNumber))
+
+    if (proposals.length === 0) {
+      const buffer = await readingStorage.get(source.storageKey)
+      const detection = await detectRepairsForSource(source.id, buffer, source.storageKey)
+      if (detection.unlocatable.length > 0) {
+        console.log(`         pages damaged but not repairable here (lost spaces): ${detection.unlocatable.join(", ")}`)
+      }
+      if (detection.blank.length > 0) {
+        console.log(`         pages whose crop rendered empty (investigate): ${detection.blank.join(", ")}`)
+      }
+      if (detection.regions === 0) {
+        if (cycle === 1) console.log(`  clean  ${source.title}`)
+        return
+      }
+      console.log(`  cycle ${cycle}  ${source.title} — ${detection.regions} page${detection.regions === 1 ? "" : "s"} proposed`)
+      proposals = await db
+        .select()
+        .from(sourceRepairs)
+        .where(and(eq(sourceRepairs.sourceId, source.id), eq(sourceRepairs.status, "proposed")))
+        .orderBy(asc(sourceRepairs.pageNumber))
+    } else {
+      console.log(
+        `  cycle ${cycle}  ${source.title} — resuming ${proposals.length} pending proposal${proposals.length === 1 ? "" : "s"} from an earlier run`
+      )
+    }
+    if (survey) return
 
     for (const proposal of proposals) {
       if (spentUsd >= MAX_USD) {
@@ -187,24 +203,64 @@ async function processSource(
     let acceptedCount = 0
     for (const repair of readBack) {
       const verdict = strongConsensus(repair)
-      if (!verdict.ok) {
-        console.log(`         p${repair.pageNumber}: held for review — ${verdict.why}`)
-        held.push({ title: source.title, pageNumber: repair.pageNumber, why: verdict.why })
+      if (verdict.ok) {
+        try {
+          await acceptRepairDecision(
+            repair.id,
+            repair.agreedText,
+            "Batch accept (reprocess-library, TJ 2026-08-13): unanimous five-reader panel, no disagreements.",
+            adminId
+          )
+          acceptedCount += 1
+          continue
+        } catch (error) {
+          const why = error instanceof Error ? error.message : String(error)
+          console.log(`         p${repair.pageNumber}: accept refused — ${why}`)
+          held.push({ title: source.title, pageNumber: repair.pageNumber, why: `accept refused: ${why}` })
+          continue
+        }
+      }
+
+      // A split panel goes to the judge — TJ's plan §6: it selects among the
+      // candidates or says ambiguous; it never composes. Anything it cannot
+      // settle stays held for a person, with the judge's why in the report.
+      if (repair.votes && repair.disagreements.length > 0) {
+        if (spentUsd >= MAX_USD) {
+          held.push({ title: source.title, pageNumber: repair.pageNumber, why: `${verdict.why}; spend ceiling before judging` })
+          continue
+        }
+        try {
+          const arbitration = await arbitrateRepair(repair.id)
+          spentUsd += arbitration.costUsd ?? UNPRICED_REGION_USD
+          if (arbitration.outcome === "chosen") {
+            await acceptRepairDecision(
+              repair.id,
+              arbitration.text,
+              `Judge-arbitrated accept (reprocess-library, TJ 2026-08-13): panel split ` +
+                `(${repair.disagreements.length} disagreement${repair.disagreements.length === 1 ? "" : "s"}); ` +
+                `${REPAIR_JUDGE_MODEL} compared the candidates against the crop and chose reader ` +
+                `${arbitration.reader} (${arbitration.model}): ${arbitration.why}`,
+              adminId
+            )
+            console.log(
+              `         p${repair.pageNumber}: judge chose reader ${arbitration.reader} — accepted ` +
+                `($${(arbitration.costUsd ?? 0).toFixed(2)}, total $${spentUsd.toFixed(2)})`
+            )
+            acceptedCount += 1
+          } else {
+            console.log(`         p${repair.pageNumber}: judge says ambiguous — held (${arbitration.why})`)
+            held.push({ title: source.title, pageNumber: repair.pageNumber, why: `judge: ambiguous — ${arbitration.why}` })
+          }
+        } catch (error) {
+          const why = error instanceof Error ? error.message : String(error)
+          console.log(`         p${repair.pageNumber}: judge failed — held (${why})`)
+          held.push({ title: source.title, pageNumber: repair.pageNumber, why: `${verdict.why}; judge failed: ${why}` })
+        }
         continue
       }
-      try {
-        await acceptRepairDecision(
-          repair.id,
-          repair.agreedText,
-          "Batch accept (reprocess-library, TJ 2026-08-13): unanimous five-reader panel, no disagreements.",
-          adminId
-        )
-        acceptedCount += 1
-      } catch (error) {
-        const why = error instanceof Error ? error.message : String(error)
-        console.log(`         p${repair.pageNumber}: accept refused — ${why}`)
-        held.push({ title: source.title, pageNumber: repair.pageNumber, why: `accept refused: ${why}` })
-      }
+
+      console.log(`         p${repair.pageNumber}: held for review — ${verdict.why}`)
+      held.push({ title: source.title, pageNumber: repair.pageNumber, why: verdict.why })
     }
 
     if (acceptedCount === 0) {
