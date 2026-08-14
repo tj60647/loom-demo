@@ -11,7 +11,7 @@ import ConceptRails, { RAIL_W } from './ConceptRail';
 import ReuseOffer from '@/components/ui/ReuseOffer';
 import { useLoom } from '@/components/providers/LoomProvider';
 import { useReadings } from '@/components/providers/ReadingsProvider';
-import { searchReading, getPassagesOverlay } from '@/lib/reads';
+import { searchReading, getPassagesOverlay, getReadingPageManifest } from '@/lib/reads';
 import type { ReadingPageHit } from '@/actions/search';
 import { overlayBlockMessage, type OverlayBand, type PassagesOverlay } from '@/lib/overlay';
 import { hitTermsOf } from '@/lib/searchText';
@@ -137,6 +137,41 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // The document's height/width, measured off the first page that renders, so
   // the many-page views can reserve honest space before a page has drawn.
   const [aspect, setAspect] = useState(11 / 8.5);
+  // Every page's own size and text length, stored at ingest and fetched once —
+  // the layout is exact before anything renders. Null for readings extracted
+  // before dimensions existed (the viewer measures for itself, as it always
+  // did) and for viewers with no sourceId.
+  const [manifest, setManifest] = useState<Awaited<ReturnType<typeof getReadingPageManifest>> | null>(null);
+  // Where the pre-rendered page images live; null means render from the PDF.
+  const pageImageBase = sourceId ? `/api/readings/${sourceId}/pages` : null;
+
+  useEffect(() => {
+    if (!sourceId) return;
+    let cancelled = false;
+    getReadingPageManifest(sourceId)
+      .then((m) => {
+        if (cancelled || m.pageCount === 0) return;
+        setManifest(m);
+        // Seed the shared aspect from the manifest — the MEDIAN page, so one
+        // odd plate does not set the document's reserve.
+        const aspects = m.pages
+          .filter((p) => p.width && p.height)
+          .map((p) => p.height! / p.width!)
+          .sort((a, b) => a - b);
+        if (aspects.length > 0) setAspect(aspects[Math.floor(aspects.length / 2)]);
+      })
+      .catch(() => { /* no manifest is a legal state, not an error */ });
+    return () => { cancelled = true; };
+  }, [sourceId]);
+
+  // Measured aspect reports pass only when they differ by more than 3%:
+  // scanned pages vary a percent or two each, and chasing them is the aspect
+  // storm (every change re-laid the matrix grid and re-rendered every mounted
+  // page). A real correction — a landscape document guessed portrait — still
+  // lands.
+  const acceptAspect = useCallback((a: number) => {
+    setAspect((prev) => (Math.abs(a - prev) / prev > 0.03 ? a : prev));
+  }, []);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const workPanelRef = useRef<HTMLElement>(null);
@@ -729,12 +764,25 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     if (!containerRef.current) return;
     let debounceTimer: NodeJS.Timeout;
 
-    const applyHighlights = () => {
+    /**
+     * Mark one set of layers, or every layer.
+     *
+     * Scoped, because the matrix mounts every page of the reading: during its
+     * initial load the observer below fires once per landing text layer, and
+     * re-marking ALL mounted layers each time was O(pages²) across the load —
+     * on a 132-page scan, thousands of unmark/hash/re-mark passes to produce
+     * marks that were already there. A state change (new capture, search,
+     * overlay) still sweeps everything, because it can move marks on any page;
+     * a NEW layer only needs its own marks.
+     */
+    const applyHighlights = (only?: Iterable<Element>) => {
       const passages = passagesRef.current;
       const heatPages = overlayRef.current?.pages ?? [];
       if (passages.length === 0 && searchTermsRef.current.length === 0 && heatPages.length === 0) return;
 
-      const textLayers = containerRef.current!.querySelectorAll('.react-pdf__Page__textContent');
+      const textLayers = only
+        ? Array.from(only)
+        : Array.from(containerRef.current!.querySelectorAll('.react-pdf__Page__textContent'));
 
       textLayers.forEach(layer => {
         // Skip empty text layers
@@ -858,18 +906,37 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     // 1. Run whenever this effect triggers (e.g. when state.passages changes)
     applyHighlights();
 
-    // 2. Also observe the DOM for when react-pdf injects the text layer spans
+    // 2. Also observe the DOM for when react-pdf injects the text layer spans.
+    //    The observer knows WHICH layer landed (the span's container, or the
+    //    layer div inside the added subtree), so only that layer is marked —
+    //    never the hundred that were already done.
+    const pendingLayers = new Set<Element>();
     const observer = new MutationObserver((mutations) => {
-      const hasTextLayerMutations = mutations.some(m => {
-        return Array.from(m.addedNodes).some(node => 
-          (node as HTMLElement).tagName === 'SPAN' || 
-          (node as HTMLElement).classList?.contains('react-pdf__Page__textContent')
-        );
-      });
-      
-      if (hasTextLayerMutations) {
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          const el = node as HTMLElement;
+          if (el.nodeType !== Node.ELEMENT_NODE) continue;
+          if (el.tagName === 'SPAN') {
+            const layer = (m.target as HTMLElement).closest?.('.react-pdf__Page__textContent');
+            if (layer) pendingLayers.add(layer);
+          } else if (el.classList?.contains('react-pdf__Page__textContent')) {
+            pendingLayers.add(el);
+          } else {
+            for (const layer of el.querySelectorAll('.react-pdf__Page__textContent')) {
+              pendingLayers.add(layer);
+            }
+          }
+        }
+      }
+      if (pendingLayers.size > 0) {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(applyHighlights, 100);
+        debounceTimer = setTimeout(() => {
+          // A layer can unmount between debounces (page turn); marking a
+          // detached node is wasted work.
+          const layers = Array.from(pendingLayers).filter((l) => l.isConnected);
+          pendingLayers.clear();
+          if (layers.length) applyHighlights(layers);
+        }, 100);
       }
     });
 
@@ -886,7 +953,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       observer.disconnect();
       clearTimeout(debounceTimer);
     };
-  }, [state.passages, state.concepts, pageNumber, bindHighlightNode, sourceName, searchTerms, overlay, stageEl]); // Re-run when passages, page, search terms or the overlay change — and if the stage node itself is replaced
+    // `pageNumber` is deliberately NOT a dep: the effect body never reads it,
+    // and having it there made every page turn re-register the observer and
+    // re-mark every mounted layer to update marks on the one page that changed
+    // — which the observer already catches when that page's layer lands.
+  }, [state.passages, state.concepts, bindHighlightNode, sourceName, searchTerms, overlay, stageEl]); // Re-run when passages, search terms or the overlay change — and if the stage node itself is replaced
 
   const handleCaptureClick = () => {
     if (highlightRect) {
@@ -918,6 +989,23 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   const advance = isTwoPage ? 2 : 1;
   const canGoPrev = pageNumber > 1;
   const canGoNext = numPages ? pageNumber + (isTwoPage ? 1 : 0) < numPages : false;
+
+  // Warm the browser cache with the NEXT spread's images (and the previous
+  // page's), so the placeholder above paints from cache the moment the turn
+  // happens. A few tens of KB per turn against a turn that reads as instant.
+  useEffect(() => {
+    if (!pageImageBase || viewMode !== "page") return;
+    const warm = [
+      pageNumber + advance,
+      ...(isTwoPage ? [pageNumber + advance + 1] : []),
+      pageNumber - 1,
+    ];
+    for (const n of warm) {
+      if (n < 1 || (numPages && n > numPages)) continue;
+      const img = new Image();
+      img.src = `${pageImageBase}/${n}?w=1280`;
+    }
+  }, [pageImageBase, viewMode, pageNumber, advance, isTwoPage, numPages]);
 
   const handlePrev = useCallback(() => {
     setPageNumber(p => Math.max(1, p - advance));
@@ -1994,13 +2082,27 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 onOpenPassage={gotoOpenPassage}
               >
                 <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
+                  {/* The loading node is the pre-rendered page image, sized
+                      like the page it stands in for — so a page turn paints
+                      NOW and pdf.js's crisp render replaces it when the
+                      decode lands (a second or more on a scanned reading,
+                      per page, every turn). No image, no placeholder: the
+                      blank flash is the pre-derivative behaviour. */}
                   <Page
                     pageNumber={pageNumber}
                     {...calcPageProps()}
                     renderTextLayer={true}
                     renderAnnotationLayer={true}
                     className="pdf-page-shadow"
-                    onLoadSuccess={(page) => { if (page.originalWidth) setAspect(page.originalHeight / page.originalWidth) }}
+                    onLoadSuccess={(page) => { if (page.originalWidth) acceptAspect(page.originalHeight / page.originalWidth) }}
+                    loading={pageImageBase ? (
+                      <img
+                        src={`${pageImageBase}/${pageNumber}?w=1280`}
+                        alt=""
+                        className="pdf-page-shadow"
+                        style={{ ...calcPageProps(), aspectRatio: `1 / ${aspect}`, display: "block" }}
+                      />
+                    ) : undefined}
                   />
                   {isTwoPage && pageNumber + 1 <= (numPages || 1) && (
                     <Page
@@ -2009,6 +2111,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                       renderTextLayer={true}
                       renderAnnotationLayer={true}
                       className="pdf-page-shadow"
+                      loading={pageImageBase ? (
+                        <img
+                          src={`${pageImageBase}/${pageNumber + 1}?w=1280`}
+                          alt=""
+                          className="pdf-page-shadow"
+                          style={{ ...calcPageProps(), aspectRatio: `1 / ${aspect}`, display: "block" }}
+                        />
+                      ) : undefined}
                     />
                   )}
                 </div>
@@ -2040,7 +2150,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   aspect={aspect}
                   root={stageEl}
                   eager={i === 0}
-                  onAspect={setAspect}
+                  onAspect={acceptAspect}
                 />
               ))}
             </div>
@@ -2065,7 +2175,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               passages={scoped.passages}
               concepts={state.concepts}
               onOpenPassage={gotoOpenPassage}
-              onAspect={setAspect}
+              onAspect={acceptAspect}
+              manifest={manifest}
+              pageImageBase={pageImageBase}
               zoomMultiplier={zoom}
               onZoomMultiplier={setZoom}
               focusPage={pageNumber}

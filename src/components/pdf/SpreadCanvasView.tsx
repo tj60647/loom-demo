@@ -27,7 +27,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { select, pointer } from "d3-selection";
 import { zoom, zoomIdentity, type ZoomBehavior, type D3ZoomEvent, type ZoomTransform } from "d3-zoom";
-import PageSlot from "./PageSlot";
+import PageSlot, { type PageTier } from "./PageSlot";
 import { type PdfDoc } from "./PageRaster";
 import { spreadLayout, pageX } from "@/lib/spreadLayout";
 import { layoutRail, railScale } from "@/lib/railLayout";
@@ -39,6 +39,36 @@ const CARD_FALLBACK_H = 88;
 const MEASURE_MS = 120;
 const SETTLE_MS = 200;
 const MAX_RES = 8;
+/**
+ * The LOD thresholds and budgets.
+ *
+ * TEXT_TIER_MIN_W: apparent on-screen page width (CSS px) below which no text
+ * layer mounts. Under ~240px a page's body text is beneath legibility, so
+ * selection is not a real activity there — and NOT mounting text is the whole
+ * economy: a 132-page scan at fit-all otherwise carries ~47,000 positioned
+ * spans for pages rendered 61px wide.
+ *
+ * DEMOTE_MARGIN: how far (in pages) beyond the promote margin a page may sit
+ * before its text layer unmounts again. Hysteresis, so panning back and forth
+ * across a boundary does not mount/unmount the same page each settle.
+ *
+ * RASTER_BUDGET: total canvas pixels across all native-tier pages. pdf.js's
+ * viewer caps a single canvas; a tiled view needs a cap on the SUM — six
+ * pages at res 8 on a large stage is otherwise a quarter-gigabyte of RGBA
+ * re-blitted per settle. When the in-view set would exceed it, the shared
+ * res steps down; sharpness degrades before memory does.
+ */
+const TEXT_TIER_MIN_W = 240;
+const DEMOTE_MARGIN_PAGES = 2;
+const RASTER_BUDGET = 72e6;
+
+/** One page's manifest facts, as the viewer's props carry them. */
+export type ManifestPage = {
+  pageNumber: number;
+  width: number | null;
+  height: number | null;
+  textLength: number;
+};
 
 type Anchor = {
   spreadIdx: number;
@@ -53,6 +83,8 @@ export default function SpreadCanvasView({
   numPages,
   basePageWidth,
   aspect,
+  manifest,
+  pageImageBase,
   stage,
   stageEl,
   cardsOn,
@@ -71,6 +103,12 @@ export default function SpreadCanvasView({
   /** Page width in canvas units — the width text layers render at, once. */
   basePageWidth: number;
   aspect: number;
+  /** Per-page dimensions and text lengths, when the reading has them stored.
+   *  With this the grid is exact from the first frame — no aspect feedback,
+   *  no re-layout as pages load. */
+  manifest?: { pageCount: number; pages: ManifestPage[] } | null;
+  /** `/api/readings/{id}/pages`, or null when there is nothing to serve. */
+  pageImageBase: string | null;
   stage: { w: number; h: number };
   stageEl: HTMLDivElement | null;
   cardsOn: boolean;
@@ -105,11 +143,35 @@ export default function SpreadCanvasView({
   const wheelAnchor = useRef<[number, number]>([0, 0]);
   const wheelFrame = useRef(0);
   const initedRef = useRef(false);
-  const [pageRes, setPageRes] = useState<Record<number, number>>({});
+  const [pageView, setPageView] = useState<Record<number, { tier: Exclude<PageTier, "impostor">; res: number }>>({});
   const [anchors, setAnchors] = useState<Record<string, Anchor>>({});
   const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
 
-  const basePageHeight = basePageWidth * aspect;
+  // The manifest's facts, keyed for the render and the anchor fallback.
+  const pageInfo = useMemo(() => {
+    const map = new Map<number, { aspect: number | null; textLength: number }>();
+    for (const page of manifest?.pages ?? []) {
+      map.set(page.pageNumber, {
+        aspect: page.width && page.height ? page.height / page.width : null,
+        textLength: page.textLength,
+      });
+    }
+    return map;
+  }, [manifest]);
+
+  // The grid cell's aspect: the TALLEST page when the manifest knows them all
+  // (so no page overflows its row), the shared guess otherwise. With a
+  // manifest this never moves — which is precisely what ends the aspect
+  // storm: no page load can re-lay the grid.
+  const gridAspect = useMemo(() => {
+    let max = 0;
+    for (const info of pageInfo.values()) {
+      if (info.aspect && info.aspect > max) max = info.aspect;
+    }
+    return max > 0 ? max : aspect;
+  }, [pageInfo, aspect]);
+
+  const basePageHeight = basePageWidth * gridAspect;
   // Rails are ALWAYS reserved, cards on or off (TJ, 2026-08-10: hiding cards
   // must not change the matrix layout) — toggling draws into standing margins
   // instead of re-laying the grid and re-centering under the reader's eye.
@@ -136,35 +198,75 @@ export default function SpreadCanvasView({
     live.current = { layout, stage, fitAllK, spreadFitK, basePageWidth, zoomMultiplier, onZoomMultiplier, onTransform };
   });
 
+  // Read by retargetView's hysteresis without re-registering it.
+  const pageViewRef = useRef<Record<number, { tier: Exclude<PageTier, "impostor">; res: number }>>({});
+
   /**
-   * After a settle: pages intersecting the view (plus half a page of margin)
-   * get raster resolution matching the zoom; everything else drops back to
-   * base and CSS-stretches. Analytic, off the layout — no DOM sweep.
+   * After a settle: decide what every page IS at this zoom — the LOD ladder.
+   *
+   * Below reading zoom nothing is promoted at all: every page is its
+   * pre-rendered image (the impostor), which is how a 132-page contact sheet
+   * costs 132 cached thumbnails instead of 132 live pages. At reading zoom,
+   * pages near the viewport mount their text layer over the larger image; at
+   * native zoom the pdf.js raster joins them, at a res that respects the
+   * total pixel budget. Analytic, off the layout — no DOM sweep. Pages keep
+   * their promotion until they are DEMOTE_MARGIN_PAGES beyond the promote
+   * margin, so panning along a boundary does not churn text layers.
    */
-  const retargetRes = useCallback(() => {
+  const retargetView = useCallback(() => {
     const { layout, stage, basePageWidth } = live.current;
     if (!layout || stage.w === 0) return;
     const t = tref.current;
     const dpr = window.devicePixelRatio || 1;
-    const target = Math.max(1, Math.min(MAX_RES, Math.ceil(t.k * dpr * 2) / 2));
-    const margin = basePageWidth / 2;
-    const vx = -t.x / t.k - margin;
-    const vy = -t.y / t.k - margin;
-    const vw = stage.w / t.k + margin * 2;
-    const vh = stage.h / t.k + margin * 2;
-    const next: Record<number, number> = {};
-    if (target > 1) {
+    let target = Math.max(1, Math.min(MAX_RES, Math.ceil(t.k * dpr * 2) / 2));
+    const apparentW = t.k * basePageWidth;
+
+    const inRegion = (p: number, s: (typeof layout.spreads)[number], margin: number) => {
+      const px = pageX(layout, s, p, basePageWidth);
+      const vx = -t.x / t.k - margin;
+      const vy = -t.y / t.k - margin;
+      const vw = stage.w / t.k + margin * 2;
+      const vh = stage.h / t.k + margin * 2;
+      return px < vx + vw && px + basePageWidth > vx && s.y < vy + vh && s.y + layout.unitH > vy;
+    };
+
+    const next: Record<number, { tier: Exclude<PageTier, "impostor">; res: number }> = {};
+    if (apparentW >= TEXT_TIER_MIN_W) {
+      const promoteMargin = basePageWidth / 2;
+      const keepMargin = basePageWidth * DEMOTE_MARGIN_PAGES;
+      // Who is near (gets the full treatment) and who is merely KEPT — held
+      // at reading tier by hysteresis so its text layer does not churn, but
+      // never given a native raster: kept pages are off-screen, and letting
+      // them into the budget stole sharpness from the pages under the eye.
+      const near: number[] = [];
+      const kept: number[] = [];
       for (const s of layout.spreads) {
         for (const p of s.rightPage ? [s.leftPage, s.rightPage] : [s.leftPage]) {
-          const px = pageX(layout, s, p, basePageWidth);
-          const inView = px < vx + vw && px + basePageWidth > vx && s.y < vy + vh && s.y + layout.unitH > vy;
-          if (inView) next[p] = target;
+          if (inRegion(p, s, promoteMargin)) near.push(p);
+          else if (pageViewRef.current[p] && inRegion(p, s, keepMargin)) kept.push(p);
         }
       }
+      // The budget: native rasters cost pageArea × res² each. Step the shared
+      // res down until the near set fits.
+      if (target > 1 && near.length > 0) {
+        const pageArea = basePageWidth * layout.unitH;
+        const maxRes = Math.sqrt(RASTER_BUDGET / (near.length * pageArea));
+        target = Math.max(1, Math.min(target, Math.floor(maxRes * 2) / 2));
+      }
+      const nearTier: Exclude<PageTier, "impostor"> = target > 1 ? "native" : "reading";
+      for (const p of near) next[p] = { tier: nearTier, res: target };
+      for (const p of kept) next[p] = { tier: "reading", res: 1 };
     }
-    setPageRes((prev) => {
+
+    pageViewRef.current = next;
+    setPageView((prev) => {
       const nk = Object.keys(next);
-      if (Object.keys(prev).length === nk.length && nk.every((k) => prev[+k] === next[+k])) return prev;
+      if (
+        Object.keys(prev).length === nk.length &&
+        nk.every((k) => prev[+k] && prev[+k].tier === next[+k].tier && prev[+k].res === next[+k].res)
+      ) {
+        return prev;
+      }
       return next;
     });
   }, []);
@@ -178,13 +280,13 @@ export default function SpreadCanvasView({
     live.current.onTransform?.();
     window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
-      retargetRes();
+      retargetView();
       // Keep the toolbar slider honest about where a gesture left the zoom.
       const { fitAllK, zoomMultiplier, onZoomMultiplier } = live.current;
       const m = Math.min(8, Math.max(0.5, Math.round((tref.current.k / fitAllK) * 10) / 10));
       if (Math.abs(m - zoomMultiplier) > 0.05) onZoomMultiplier(m);
     }, SETTLE_MS);
-  }, [retargetRes]);
+  }, [retargetView]);
 
   // --- the zoom behaviour: always freeform ---
   // will-change lives only around movement: standing, it makes Chrome scale
@@ -384,9 +486,26 @@ export default function SpreadCanvasView({
     zb.transform(select(el), zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k));
   }, [focusPage, layout, cancelWheel]);
 
+  /** Render-queue priority: this page's distance from the CURRENT viewport
+   *  centre, in canvas units — sampled when a render slot frees, so the
+   *  nearest waiting page always sharpens first however the view has moved
+   *  since it queued. Stable identity; reads only refs. */
+  const renderPriority = useCallback((p: number) => {
+    const { layout, stage, basePageWidth } = live.current;
+    if (!layout || stage.w === 0) return 0;
+    const t = tref.current;
+    const s = layout.spreads[Math.floor((p - 1) / 2)];
+    if (!s) return 0;
+    const cx = pageX(layout, s, p, basePageWidth) + basePageWidth / 2;
+    const cy = s.y + layout.unitH / 2;
+    const vx = (stage.w / 2 - t.x) / t.k;
+    const vy = (stage.h / 2 - t.y) / t.k;
+    return Math.hypot(cx - vx, cy - vy);
+  }, []);
+
   // --- pages ---
   const pagesEl = useMemo(() => {
-    if (!layout || !pdf) return null;
+    if (!layout) return null;
     return layout.spreads.flatMap((s) =>
       (s.rightPage ? [s.leftPage, s.rightPage] : [s.leftPage]).map((p) => (
         <div
@@ -397,19 +516,23 @@ export default function SpreadCanvasView({
           <PageSlot
             pageNumber={p}
             width={basePageWidth}
-            aspect={aspect}
+            aspect={gridAspect}
             root={stageEl}
             eager={p === 1}
             onAspect={onAspect}
             label
             pdf={pdf}
             baseWidth={basePageWidth}
-            res={pageRes[p] ?? 1}
+            res={pageView[p]?.res ?? 1}
+            tier={pageView[p]?.tier ?? "impostor"}
+            pageAspect={pageInfo.get(p)?.aspect ?? null}
+            pageImageBase={pageImageBase}
+            priority={renderPriority}
           />
         </div>
       ))
     );
-  }, [layout, pdf, basePageWidth, aspect, stageEl, onAspect, pageRes]);
+  }, [layout, pdf, basePageWidth, gridAspect, stageEl, onAspect, pageView, pageInfo, pageImageBase, renderPriority]);
 
   // --- cards: anchors off the mark.js layer, in canvas units ---
   const measure = useCallback(() => {
@@ -507,11 +630,52 @@ export default function SpreadCanvasView({
     }
   }, []);
 
+  /**
+   * Anchors for passages whose page has NO live text layer — every impostor
+   * page, which at fit-all is every page. The exact anchor comes off the
+   * rendered mark's rect; this one is arithmetic: the passage's start offset
+   * as a fraction of the page's text, placed down the page's height. Wrong by
+   * a line or two, invisible at the zooms where impostors exist — and the
+   * cards this feeds are exactly the concept-map reading of the far zoom
+   * (cards counter-scale; a fit-all matrix with Cards on reads as concepts
+   * over pages). Before this, cards existed only because every page carried
+   * a text layer; the LOD ladder removes those, so the cards needed their own
+   * geometry. DOM-measured anchors win wherever both exist.
+   */
+  const analyticAnchors = useMemo(() => {
+    const out: Record<string, Anchor> = {};
+    if (!cardsOn || !layout || pageInfo.size === 0) return out;
+    for (const passage of passages) {
+      const p = passage.pageNumber;
+      if (!p || passage.startOffset == null) continue;
+      const info = pageInfo.get(p);
+      if (!info || info.textLength <= 0) continue;
+      const spreadIdx = Math.floor((p - 1) / 2);
+      const s = layout.spreads[spreadIdx];
+      if (!s) continue;
+      const side: Anchor["side"] = p % 2 === 1 ? "left" : "right";
+      const pageH = basePageWidth * (info.aspect ?? gridAspect);
+      const frac = Math.min(1, Math.max(0, passage.startOffset / info.textLength));
+      out[passage.id] = {
+        spreadIdx,
+        side,
+        midY: s.y + frac * pageH,
+        edgeX: pageX(layout, s, p, basePageWidth) + (side === "left" ? 0 : basePageWidth),
+      };
+    }
+    return out;
+  }, [cardsOn, layout, pageInfo, passages, basePageWidth, gridAspect]);
+
+  const mergedAnchors = useMemo(
+    () => ({ ...analyticAnchors, ...anchors }),
+    [analyticAnchors, anchors]
+  );
+
   const cards = useMemo(() => {
     if (!cardsOn || !layout) return [];
     const out: { passage: Passage; concepts: Concept[]; anchor: Anchor }[] = [];
     for (const passage of passages) {
-      const anchor = anchors[passage.id];
+      const anchor = mergedAnchors[passage.id];
       if (!anchor) continue;
       out.push({
         passage,
@@ -522,7 +686,7 @@ export default function SpreadCanvasView({
       });
     }
     return out.sort((a, b) => a.anchor.midY - b.anchor.midY);
-  }, [cardsOn, layout, passages, concepts, anchors]);
+  }, [cardsOn, layout, passages, concepts, mergedAnchors]);
 
   const placement = useMemo(() => {
     const tops: Record<string, number> = {};
