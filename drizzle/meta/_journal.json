@@ -183,6 +183,13 @@
       "when": 1786685096144,
       "tag": "0025_source_revision",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786727074731,
+      "tag": "0026_page_dims_and_byte_length",
+      "breakpoints": true
     }
   ]
 }

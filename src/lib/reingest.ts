@@ -24,11 +24,12 @@
  * — before a cohort arrives, not during one.
  */
 import { db } from "@/db"
-import { sourcePages } from "@/db/schema"
+import { sourcePages, sources } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { extractPdfPageText, textLayerProjection } from "@/lib/pdfText"
 import { probePdfStructure, type PdfStructure } from "@/lib/pdfStructure"
 import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
+import { renderSourcePageImages } from "@/lib/pdfPages"
 import { readingStorage } from "@/lib/storage"
 import { recordHeuristicScore } from "@/lib/readingScore"
 import { hashText } from "@/lib/hash"
@@ -75,9 +76,18 @@ export async function reingestSource(
         pageNumber: page.pageNumber,
         textContent: page.textContent,
         contentHash: hashText(textLayerProjection(page.textContent)),
+        width: page.width,
+        height: page.height,
       }))
     )
   }
+
+  // The bytes are (or may be) new — a repair mints a new revision — so the
+  // serving-time size the reading route reports must follow them.
+  await db
+    .update(sources)
+    .set({ byteLength: buffer.byteLength })
+    .where(eq(sources.id, sourceId))
 
   // The cover is re-rendered too. The renderer has changed since some readings
   // were added — it targets a fixed width and skips blank opening pages — so a
@@ -90,6 +100,16 @@ export async function reingestSource(
     // A reading whose opening pages are genuinely blank has no cover to render.
     // That is recorded by the score, not a reason to fail the re-ingest.
     console.warn("[Loom] Cover render failed during re-ingest", error)
+  }
+
+  // And the page images — the viewer's contact sheet reads THESE, not the
+  // PDF, so leaving the old ones standing would show pre-repair pages over
+  // post-repair text. Failure warns, like the cover: the viewer falls back
+  // to rendering from the PDF for any page whose image is missing.
+  try {
+    await renderSourcePageImages(sourceId, buffer)
+  } catch (error) {
+    console.warn("[Loom] Page image render failed during re-ingest", error)
   }
 
   await recordHeuristicScore(sourceId, pages, { coverRendered, structure })

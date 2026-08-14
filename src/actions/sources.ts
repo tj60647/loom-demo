@@ -18,6 +18,7 @@ import { after } from "next/server"
 import { authOptions, isAdminUser } from "@/lib/auth"
 import { readingStorage } from "@/lib/storage"
 import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
+import { renderSourcePageImages } from "@/lib/pdfPages"
 import { extractPdfPageText, textLayerProjection } from "@/lib/pdfText"
 import { hashText } from "@/lib/hash"
 import { judgeSourceScore, recordHeuristicScore, rescoreSource } from "@/lib/readingScore"
@@ -452,6 +453,7 @@ async function ingestReading(data: {
       isDescriptionVisible: data.isDescriptionVisible ?? true,
       metadataProvenance: data.metadataProvenance || "",
       storageKey,
+      byteLength: buffer.byteLength,
       isOwn: data.isOwn ?? false,
       createdByUserId: userId,
     })
@@ -465,6 +467,8 @@ async function ingestReading(data: {
           pageNumber: p.pageNumber,
           textContent: p.textContent,
           contentHash: hashText(textLayerProjection(p.textContent)),
+          width: p.width,
+          height: p.height,
         }))
       )
     }
@@ -477,6 +481,19 @@ async function ingestReading(data: {
     } catch (error) {
       console.warn("[Loom] Failed to generate PDF cover image", error)
     }
+
+    // The per-page images the viewer's contact sheet reads. Off the request
+    // path: a long scan takes a minute or two to render at two widths, and
+    // the upload response should not wait on pages nobody has opened yet.
+    // Until they exist the viewer falls back to rendering from the PDF —
+    // slower, never wrong.
+    after(async () => {
+      try {
+        await renderSourcePageImages(source.id, buffer)
+      } catch (error) {
+        console.warn("[Loom] Failed to render page images at ingest", error)
+      }
+    })
 
     // Deterministic score, computed from the pages already in memory — no extra
     // queries, no network. The judge pass runs afterwards, off the request path.
@@ -980,6 +997,14 @@ export async function getSourceForCover(sourceId: string) {
   return { source }
 }
 
+/** Same shape, same reason, for the per-page image route and the PDF route's
+ *  conditional-request check: authorization and the row — storageKey included,
+ *  which is what the ETag derives from — without pulling a single byte. */
+export async function getSourceFileMeta(sourceId: string) {
+  const { source } = await authorizeSourceFile(sourceId)
+  return { source }
+}
+
 /**
  * The reading's passages in memory. For callers that genuinely need the whole
  * file — cover rendering, text extraction. To send it to a browser, use
@@ -995,4 +1020,48 @@ export async function getSourceFile(sourceId: string) {
 export async function getSourceFileStream(sourceId: string) {
   const { source, storageKey } = await authorizeSourceFile(sourceId)
   return { source, stream: await readingStorage.getStream(storageKey) }
+}
+
+/** One page of the manifest below. */
+export type ReadingPageInfo = {
+  pageNumber: number
+  /** PDF points, rotation applied — null on rows extracted before the
+   *  dimensions column existed and not yet backfilled. */
+  width: number | null
+  height: number | null
+  /** Length of the browser text-layer string (the offset substrate), for
+   *  placing card anchors on pages whose text layer is not mounted. */
+  textLength: number
+}
+
+/**
+ * What the viewer needs to lay a reading out BEFORE any page has rendered:
+ * every page's own size, from the same extraction pass that produced the
+ * canonical text. Without this the viewer guesses one shared aspect ratio and
+ * corrects it page by page as they load — and on a scanned book whose pages
+ * vary a few percent, every correction re-laid the whole matrix grid and
+ * re-rendered every mounted page (the "aspect storm").
+ *
+ * Same gate as the file itself: the manifest describes the file.
+ */
+export async function getReadingPageManifest(sourceId: string) {
+  await authorizeSourceAccess(sourceId)
+  const rows = await db
+    .select({
+      pageNumber: sourcePages.pageNumber,
+      width: sourcePages.width,
+      height: sourcePages.height,
+      textContent: sourcePages.textContent,
+    })
+    .from(sourcePages)
+    .where(eq(sourcePages.sourceId, sourceId))
+    .orderBy(asc(sourcePages.pageNumber))
+
+  const pages: ReadingPageInfo[] = rows.map((row) => ({
+    pageNumber: row.pageNumber,
+    width: row.width,
+    height: row.height,
+    textLength: textLayerProjection(row.textContent).length,
+  }))
+  return { pageCount: pages.length, pages }
 }

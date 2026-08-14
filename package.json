@@ -31,6 +31,7 @@
     "check:textlayer": "tsx scripts/check-text-layer-projection.ts",
     "diagnose:readings": "tsx scripts/diagnose-readings.ts",
     "reingest:readings": "tsx scripts/reingest-readings.ts",
+    "backfill:pageassets": "tsx scripts/backfill-page-assets.ts",
     "check:scoring": "tsx scripts/check-scoring.ts",
     "check:auth": "tsx scripts/check-auth.ts",
     "check:auth:db": "tsx scripts/check-auth.ts --db",

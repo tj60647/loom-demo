@@ -31,6 +31,10 @@ import { destroyPdf, loadPdfjs } from "@/lib/pdfjs"
 export interface ExtractedPage {
   pageNumber: number
   textContent: string
+  /** Page size in PDF points, rotation applied — what getViewport({scale: 1})
+   *  reports, which is the box the browser viewer will actually lay out. */
+  width: number
+  height: number
 }
 
 type PdfTextItem = { str?: string; hasEOL?: boolean }
@@ -106,9 +110,12 @@ export async function extractPdfPageText(data: Buffer): Promise<ExtractedPage[]>
   for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
     const page = await doc.getPage(pageNumber)
     const textContent = await page.getTextContent()
+    const viewport = page.getViewport({ scale: 1 })
     pages.push({
       pageNumber,
       textContent: joinPageItems(textContent.items as PdfTextItem[]),
+      width: viewport.width,
+      height: viewport.height,
     })
   }
 

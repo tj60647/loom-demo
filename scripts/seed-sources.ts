@@ -231,6 +231,8 @@ async function run() {
             pageNumber: p.pageNumber,
             textContent: p.textContent,
             contentHash: hashText(textLayerProjection(p.textContent)),
+            width: p.width,
+            height: p.height,
           }))
         )
       }

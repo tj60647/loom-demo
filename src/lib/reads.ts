@@ -26,6 +26,9 @@ import type { ReadingSearchHit, LoomSearchResult, ReadingPageSearch } from "@/ac
 import type { OverlayBand, PassagesOverlay, VocabularyOverlay } from "@/lib/overlay"
 import type { MetadataDraft } from "@/lib/metadataDraft"
 import type { getRepairSettings as getRepairSettingsAction } from "@/actions/repairs"
+import type { getReadingPageManifest as getReadingPageManifestAction } from "@/actions/sources"
+
+type ReadingPageManifest = Awaited<ReturnType<typeof getReadingPageManifestAction>>
 
 async function readJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" })
@@ -106,6 +109,12 @@ export function searchReading(sourceId: string, rawQuery: string): Promise<Readi
   return readJson<ReadingPageSearch>(
     `/api/search/reading?sourceId=${encodeURIComponent(sourceId)}&q=${encodeURIComponent(rawQuery)}`
   )
+}
+
+/** Every page's own size and text length, before any page has rendered —
+    see getReadingPageManifest in src/actions/sources.ts. */
+export function getReadingPageManifest(sourceId: string): Promise<ReadingPageManifest> {
+  return readJson<ReadingPageManifest>(`/api/readings/${encodeURIComponent(sourceId)}/manifest`)
 }
 
 /** Peer passage heat for a reading — see getPassagesOverlay in src/actions/overlays.ts. */

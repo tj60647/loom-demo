@@ -211,6 +211,14 @@ export const sources = pgTable(
     // to a reading, so a source the library does not hold still needs a row —
     // otherwise its passages have no door and fall out of every lens.
     storageKey: text("storageKey"),
+    // Size of the stored file in bytes, recorded at ingest (and refreshed when
+    // a repair mints a new revision). Serving-time metadata, not identity —
+    // the identity argument above still holds. It exists so the reading route
+    // can send Content-Length on a streamed body: without it pdf.js cannot
+    // show download progress against a total, and the 4.5MB-cap comment on
+    // that route explains why buffering to measure is not an option. Null on
+    // rows ingested before the column existed.
+    byteLength: integer("byteLength"),
     // A reading a student added for themselves. It sits on their shelf only: it
     // has no course_source row, so it never reaches anyone else's.
     isOwn: boolean("isOwn").default(false).notNull(),
@@ -276,6 +284,16 @@ export const sourcePages = pgTable(
     // Hash of textContent, duplicated onto passages.pageContentHash at capture
     // time so we can cheaply detect drift without re-fetching this row.
     contentHash: text("contentHash").notNull(),
+    // The page's own size in PDF points, from the same extraction pass that
+    // produced textContent. A document fact, like the text — NOT display
+    // geometry (red line 7 is about student gestures). The viewer needs it
+    // BEFORE any page has rendered: scanned books vary a few percent page to
+    // page, and a viewer that guesses one shared aspect re-lays its grid and
+    // re-renders every mounted page each time a differently-sized page
+    // corrects the guess. Null on rows extracted before this column existed;
+    // scripts/backfill-page-assets.ts fills them in.
+    width: real("width"),
+    height: real("height"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (page) => ({
