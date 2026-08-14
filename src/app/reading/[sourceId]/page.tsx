@@ -7,7 +7,15 @@ import { getSources } from "@/actions/sources"
 import Workbench, { type Tab } from "@/components/Workbench"
 import { firstParam } from "@/lib/courses"
 
-type ReadingPageSearchParams = { tab?: string | string[]; q?: string | string[] }
+type ReadingPageSearchParams = {
+  tab?: string | string[]
+  q?: string | string[]
+  concept?: string | string[]
+  label?: string | string[]
+  passage?: string | string[]
+  projection?: string | string[]
+  cloth?: string | string[]
+}
 
 // Deep links land on a station (`?tab=reading` from a shelf-search hit);
 // anything else lands on the default first tab, as /weave does. `q` rides
@@ -32,6 +40,25 @@ export default async function ReadingPage({
   const rawTab = firstParam(resolved.tab)
   const initialTab = rawTab && READING_TABS.has(rawTab) ? (rawTab as Tab) : undefined
   const initialSearch = firstParam(resolved.q)?.trim() || undefined
+  /**
+   * Where inside the station to land (TJ, 2026-08-13: "it seems like the
+   * search results could be more specific and contextual… concepts should have
+   * a link to the vocabulary location. links the same").
+   *
+   * A hit used to open the right ROOM and stop there: a concept landed on
+   * Vocabulary with its row somewhere in a list of every word you own. These
+   * carry the last hop, so the hit is a door to the object rather than to the
+   * surface it lives on. Each is a plain, linkable, bookmarkable param — the
+   * route is the scope here (see the note at the top), and this is the same
+   * idea one level in.
+   */
+  const focus = {
+    concept: firstParam(resolved.concept)?.trim() || undefined,
+    label: firstParam(resolved.label)?.trim() || undefined,
+    passage: firstParam(resolved.passage)?.trim() || undefined,
+    projection: firstParam(resolved.projection)?.trim() || undefined,
+    cloth: firstParam(resolved.cloth) === "1",
+  }
   const sources = await getSources()
   const source = sources.find((s) => s.id === sourceId)
 
@@ -58,6 +85,7 @@ export default async function ReadingPage({
       key={source.id}
       initialTab={initialTab}
       initialSearch={initialSearch}
+      focus={focus}
       source={{
         id: source.id,
         title: source.title,

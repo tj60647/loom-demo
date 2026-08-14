@@ -26,15 +26,20 @@ import { scopeLabelOf } from "@/lib/graphExport"
  * is its name. Saving here is also how a cloth begun from the shelf's Create
  * Cloth button gets its title — the shelf card shows both.
  */
-export default function ClothFold() {
+export default function ClothFold({ openOnArrival = false }: {
+  /** A search hit named this cloth — see below. */
+  openOnArrival?: boolean
+} = {}) {
   const { activeCloth, updateCloth, flushCloth, isLoading, scope, flash, state, scoped, scopeMaps, resetReading } = useLoom()
   const { byId } = useReadings()
   const titleOf = (id: string) => byId.get(id)?.title ?? id
   const scopeLabel = scopeLabelOf(scope.key, titleOf)
-  // Controlled so the fold can be opened from elsewhere later; today it simply
-  // starts closed. A cloth starts in READING, not here (TJ, 2026-08-08), so
-  // nothing routes a student straight at the title field any more.
-  const [foldOpen, setFoldOpen] = useState(false)
+  // Controlled so the fold can be opened from elsewhere — which is what
+  // `openOnArrival` now does. A cloth starts in READING, not here (TJ,
+  // 2026-08-08), so nothing routes a student straight at the title field
+  // otherwise; a hit whose match IS the title is the exception, since the words
+  // that matched are inside the fold. Initial value only, so closing it sticks.
+  const [foldOpen, setFoldOpen] = useState(openOnArrival)
 
   /**
    * Driven straight from the row, exactly as a projection's one-line and

@@ -69,10 +69,24 @@ const STATION_OF: Record<Tab, Station> = {
  */
 const KEEP_ALIVE: ReadonlySet<Tab> = new Set<Tab>(["reading", "throw", "read", "map"])
 
+export type WorkbenchFocus = {
+  /** A concept's label — pre-fills Vocabulary's concept filter. */
+  concept?: string
+  /** A Link Label — pre-fills Vocabulary's label filter. */
+  label?: string
+  /** A passage id — slides Your work out on its row. */
+  passage?: string
+  /** A projection id — selects it on the Knowledge Graph. */
+  projection?: string
+  /** Open the cloth's own fold at the head of Your work. */
+  cloth?: boolean
+}
+
 export default function Workbench({
   source,
   initialTab,
   initialSearch,
+  focus,
   practice = false,
 }: {
   /**
@@ -86,6 +100,11 @@ export default function Workbench({
   initialTab?: Tab
   /** A shelf-search hit's query, carried into the reading's own search. */
   initialSearch?: string
+  /**
+   * Where inside the landing station to go — see the route's own note. Read
+   * once, on arrival: it describes the trip in, not a state to keep in sync.
+   */
+  focus?: WorkbenchFocus
   /**
    * The practice loom (`/sandbox`): the same workbench, wrapped in
    * `SandboxLoomProvider` so nothing is written. Two things must change here,
@@ -123,7 +142,14 @@ export default function Workbench({
   // a stale render drag the reader back a page.
   const [livePdfPage, setLivePdfPage] = useState(1)
   const handlePageChange = useCallback((n: number) => setLivePdfPage(n), [])
-  const [openTargetPassageId, setOpenTargetPassageId] = useState<string | null>(null)
+  /**
+   * Seeded from the trip in: a search hit naming a passage lands ON its row
+   * (TJ, 2026-08-13). An INITIAL VALUE, not an effect — `focus` describes the
+   * arrival, so there is nothing to synchronise afterwards, and setting it from
+   * an effect is the cascading-render trap this file warns about above.
+   * OpenTab clears it through `onFocusHandled` once it has scrolled there.
+   */
+  const [openTargetPassageId, setOpenTargetPassageId] = useState<string | null>(focus?.passage ?? null)
   // `searchOpen` lived here to drive the standing band and its narrow-screen
   // toggle. StationSearch owns its own open state now — the panel belongs to
   // the button, and nothing else on this surface needs to know.
@@ -135,7 +161,11 @@ export default function Workbench({
   // position:fixed with its own stacking context, and swallowed the old rail
   // whole. A reference-only reading has no text to lie over, so its capture
   // side is the whole panel.
-  const [workOpen, setWorkOpen] = useState(false)
+  // Open on arrival when a hit named something INSIDE it: a passage's row, or
+  // a cloth whose Title and Description sit in a fold at its head. Beside a PDF
+  // this is a sheet that starts closed, so opening the fold alone would open it
+  // inside something nobody can see.
+  const [workOpen, setWorkOpen] = useState(!!(focus?.passage || focus?.cloth))
   // Stable identity: PdfViewer's window keydown effect takes this as a dep,
   // and an inline arrow re-bound the reading's whole keyboard every render.
   const toggleWork = useCallback(() => {
@@ -212,6 +242,7 @@ export default function Workbench({
   // the sheet is mounted permanently now, so an inline arrow re-ran that
   // effect on every Workbench render while a target was set.
   const handleFocusHandled = useCallback(() => setOpenTargetPassageId(null), [])
+
 
   // "See them all in Vocabulary", from the capture side. The tab is this
   // component's state, so it has to be moved from here.
@@ -354,6 +385,7 @@ export default function Workbench({
                         focusPassageId={openTargetPassageId}
                         onFocusHandled={handleFocusHandled}
                         onGotoVocabulary={handleGotoVocabulary}
+                        openClothFold={focus?.cloth}
                       />
                     }
                   />
@@ -366,6 +398,7 @@ export default function Workbench({
                   focusPassageId={openTargetPassageId}
                   onFocusHandled={handleFocusHandled}
                   onGotoVocabulary={handleGotoVocabulary}
+                  openClothFold={focus?.cloth}
                 />
               ))}
           </div>
@@ -377,10 +410,12 @@ export default function Workbench({
           {/* The station key stays "read" (and so does ?tab=read) — the URL
               params are deliberately legacy per refactor spec §F. What it
               renders is now the model's Vocabulary tab. */}
-          {shouldRender("read") && <VocabularyTab />}
+          {shouldRender("read") && (
+            <VocabularyTab initialConceptFilter={focus?.concept} initialLabelFilter={focus?.label} />
+          )}
         </div>
         <div className={`panel ${activeTab === "map" ? "active" : ""}`}>
-          {shouldRender("map") && <MapTab practice={practice} />}
+          {shouldRender("map") && <MapTab practice={practice} focusProjectionId={focus?.projection} />}
         </div>
       </main>
 

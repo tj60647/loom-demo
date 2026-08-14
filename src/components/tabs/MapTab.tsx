@@ -84,10 +84,16 @@ const sortOrder = (concepts: Concept[], order?: string[]): Concept[] => {
   return out
 }
 
-export default function MapTab({ practice = false }: {
+export default function MapTab({ practice = false, focusProjectionId }: {
   /** The practice loom: no Capture Log, which reads the student's real
    *  record over its own route rather than through the provider. */
   practice?: boolean
+  /**
+   * A projection named by a search hit's deep link — selected on arrival, so
+   * the hit lands on the projection that matched rather than on whichever one
+   * happened to be active (TJ, 2026-08-13).
+   */
+  focusProjectionId?: string
 } = {}) {
   const {
     state, scopedState, scope,
@@ -149,6 +155,24 @@ export default function MapTab({ practice = false }: {
       projectionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
     }, 120)
   }, [])
+
+  /**
+   * A search hit named a projection: select it, and take the student to it —
+   * the same arrival `onProjectionCreated` gives a projection you just made,
+   * for the same reason. Once, on the trip in.
+   *
+   * Guarded on the projection being IN THIS SCOPE. The id rides in on a URL,
+   * and a stale bookmark naming a projection of another reading (or a deleted
+   * one) must land quietly on whatever is active rather than select nothing.
+   */
+  const focused = useRef(false)
+  useEffect(() => {
+    if (focused.current || !focusProjectionId) return
+    if (!scopeMaps.some((m) => m.id === focusProjectionId)) return
+    focused.current = true
+    selectMap(focusProjectionId)
+    goToProjections()
+  }, [focusProjectionId, scopeMaps, selectMap, goToProjections])
 
   const svgRef = useRef<SVGSVGElement>(null)
   const [width, setWidth] = useState(720)

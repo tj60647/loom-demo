@@ -35,15 +35,17 @@ type OpenTabProps = {
    *  no heading of its own (the card's head bar carries it) and no teaching
    *  prose (it would be read once and scrolled past forever). */
   compact?: boolean
+  /** A search hit named this reading's cloth — open its fold on arrival. */
+  openClothFold?: boolean
 }
 
-export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled, compact, currentPage, onGotoVocabulary }: OpenTabProps) {
+export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled, compact, currentPage, onGotoVocabulary, openClothFold }: OpenTabProps) {
   // `state` is the WHOLE graph and `scoped` is this reading's slice of it. The
   // split is load-bearing: the log renders what this reading evidences, but
   // naming, dedup and the delete guards must see every concept the student has
   // — otherwise capturing a concept met in an earlier text would mint a
   // duplicate instead of joining its evidence (spec §2 identity).
-  const { state, scope, scoped, addConcept, addPassage, editConcept, removeConcept, removePassage, refilePassage, unfilePassage, flash } = useLoom()
+  const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, removeConcept, removePassage, refilePassage, unfilePassage, flash } = useLoom()
   const { byId, titleOf } = useReadings()
   const { confirm, notify } = useDialog()
   const activeSourceId = soleSourceId(scope)
@@ -271,7 +273,13 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     if (!focusPassageId) return
     const targetPassage = state.passages.find((b) => b.id === focusPassageId)
     if (!targetPassage) {
-      onFocusHandled?.()
+      // "Not here yet" is not "not here" (2026-08-13). This used to give up the
+      // moment it could not find the row, which was right while the only way to
+      // set a target was pressing something — the rows were already on screen.
+      // A search hit's deep link arrives with the id BEFORE the loom does, so
+      // clearing on the first empty pass threw the target away a beat before
+      // the passage existed, and the row never opened.
+      if (!isLoading) onFocusHandled?.()
       return
     }
 
@@ -290,7 +298,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
       window.clearTimeout(rowTimer)
       window.clearTimeout(timer)
     }
-  }, [focusPassageId, onFocusHandled, state.passages])
+  }, [focusPassageId, onFocusHandled, state.passages, isLoading])
 
   const captureHeading = (
         <h2 className="heading-with-info">
@@ -927,7 +935,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
         {/* The cloth names this work, so it sits at the head of it (TJ,
             2026-08-08). Folded: you are here to read and gather, and the
             title can wait as long as you like. */}
-        <ClothFold />
+        <ClothFold openOnArrival={openClothFold} />
         {logCard}
       </div>
     )
@@ -938,7 +946,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
   // the form leads.
   return (
     <>
-      <ClothFold />
+      <ClothFold openOnArrival={openClothFold} />
       <div className="two">
         <div className="card">
           {captureHeading}

@@ -64,7 +64,12 @@ function matches(haystack: string | null | undefined, needle: string) {
   return (haystack ?? "").toLowerCase().replace(/\s+/g, " ").includes(needle)
 }
 
-export default function VocabularyTab() {
+export default function VocabularyTab({ initialConceptFilter, initialLabelFilter }: {
+  /** A concept's label, from a search hit's deep link. */
+  initialConceptFilter?: string
+  /** A Link Label, from a search hit's deep link. */
+  initialLabelFilter?: string
+} = {}) {
   const {
     state, scope, scoped,
     editConcept, removeConcept, mergeConcepts, editEdge, flash,
@@ -74,8 +79,21 @@ export default function VocabularyTab() {
   const isStaff = !!course?.isStaff
   const { confirm, notify } = useDialog()
 
-  const [conceptFilter, setConceptFilter] = useState("")
-  const [labelFilter, setLabelFilter] = useState("")
+  /**
+   * Pre-filled when a search hit sent you here (TJ, 2026-08-13: "concepts
+   * should have a link to the vocabulary location. links the same").
+   *
+   * A concept hit already opened Vocabulary — the right room — and then left
+   * you to find one row among every word you own. Seeding the filter IS the
+   * last hop, and it uses the control that was already here rather than
+   * inventing a selection state: what you land on is a filtered list you can
+   * clear, which is exactly what you would have typed yourself.
+   *
+   * Initial value only. Clearing the box afterwards must not be undone by a
+   * prop still holding the query the URL arrived with.
+   */
+  const [conceptFilter, setConceptFilter] = useState(initialConceptFilter ?? "")
+  const [labelFilter, setLabelFilter] = useState(initialLabelFilter ?? "")
   const [openConcepts, setOpenConcepts] = useState<Record<string, boolean>>({})
   const [openLabels, setOpenLabels] = useState<Record<string, boolean>>({})
   const [mergeInputs, setMergeInputs] = useState<Record<string, string>>({})

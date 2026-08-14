@@ -26,6 +26,20 @@ import Snippet from "@/components/ui/Snippet"
  * showing plainly: a concept named ahead of its evidence is legal, and so is a
  * word coined before any thread uses it.
  */
+/**
+ * A door to a word in Vocabulary — the row, not the room.
+ *
+ * Concepts and Link Labels both live on 04, in two lists with two filters of
+ * their own, so the kind decides which one to seed. Null when there is no
+ * reading to open: a concept named ahead of its evidence, or a label coined
+ * before any thread uses it, belongs to no text — `Hit` says so rather than
+ * looking clickable and going nowhere.
+ */
+function vocabHref(sourceId: string | null | undefined, kind: "concept" | "label", value: string) {
+  if (!sourceId) return null
+  return `/reading/${sourceId}?tab=read&${kind}=${encodeURIComponent(value)}`
+}
+
 function Hit({
   href,
   nowhere,
@@ -219,8 +233,10 @@ export default function ShelfSearch({
               <span className="cap searchtally">your cloths</span>
               {loomResults.cloths.map((hit) => (
                 // A cloth lives where its evidence is gathered: 01 · Reading,
-                // where its Title and Description sit at the head of Your work.
-                <Link key={hit.sourceId} href={`/reading/${hit.sourceId}?tab=reading`} className="searchhit">
+                // where its Title and Description sit at the head of Your work
+                // — inside a fold, which `cloth=1` opens, because those are the
+                // words that matched.
+                <Link key={hit.sourceId} href={`/reading/${hit.sourceId}?tab=reading&cloth=1`} className="searchhit">
                   <div className="searchhithead"><h3>{hit.title || "Base cloth"}</h3></div>
                   <p className="searchsnip"><Snippet text={hit.snippet} /></p>
                 </Link>
@@ -231,8 +247,11 @@ export default function ShelfSearch({
             <>
               <span className="cap searchtally">your projections</span>
               {loomResults.projections.map((hit) => (
-                // A projection lives on the Knowledge Graph of its reading.
-                <Link key={hit.id} href={`/reading/${hit.sourceId}?tab=map`} className="searchhit">
+                // A projection lives on the Knowledge Graph of its reading —
+                // and there are several per reading, so name WHICH: the id
+                // selects it on arrival rather than landing on whichever was
+                // last active.
+                <Link key={hit.id} href={`/reading/${hit.sourceId}?tab=map&projection=${encodeURIComponent(hit.id)}`} className="searchhit">
                   <div className="searchhithead"><h3>{hit.name}</h3></div>
                   <p className="searchsnip"><Snippet text={hit.snippet} /></p>
                 </Link>
@@ -245,9 +264,12 @@ export default function ShelfSearch({
               {loomResults.concepts.map((hit) => (
                 // In a reading, a concept hit stays in this workbench. At the
                 // Library it opens the reading its first evidence is in.
+                // Either way `concept=` carries the label into Vocabulary's own
+                // filter, so you land on the ROW rather than on a list of every
+                // word you own (TJ, 2026-08-13).
                 <Hit
                   key={hit.id}
-                  href={sourceId ? `/reading/${sourceId}?tab=read` : hit.sourceId ? `/reading/${hit.sourceId}?tab=read` : null}
+                  href={vocabHref(sourceId ?? hit.sourceId, "concept", hit.label)}
                   nowhere="named, with no passage behind it yet"
                 >
                   <div className="searchhithead"><h3>{hit.label}</h3></div>
@@ -266,7 +288,7 @@ export default function ShelfSearch({
                 // why it is the kind most likely to have no reading to open.
                 <Hit
                   key={hit.id}
-                  href={sourceId ? `/reading/${sourceId}?tab=read` : hit.sourceId ? `/reading/${hit.sourceId}?tab=read` : null}
+                  href={vocabHref(sourceId ?? hit.sourceId, "label", hit.label)}
                   nowhere="a label with no link using it yet"
                 >
                   <div className="searchhithead">
@@ -308,7 +330,10 @@ export default function ShelfSearch({
                 // gets one, and that card is on this page already.
                 <Hit
                   key={hit.id}
-                  href={hit.sourceId ? `/reading/${hit.sourceId}?tab=open` : null}
+                  // `passage=` slides Your work out ON its row. `tab=open` is
+                  // the legacy spelling of the Reading station and the
+                  // Workbench folds it onto `reading` — kept per §F.
+                  href={hit.sourceId ? `/reading/${hit.sourceId}?tab=open&passage=${encodeURIComponent(hit.id)}` : null}
                   nowhere="captured with no reading — say which, on the card below"
                 >
                   {hit.source ? <div className="searchhithead"><h3>{hit.source}</h3></div> : null}
