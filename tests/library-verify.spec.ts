@@ -50,7 +50,9 @@ test.describe('Library verification', () => {
     // Scoped to the workbench nav: the station is "01 — Reading" since the
     // text and capture merged (2026-08-08), and an unscoped match would also
     // hit the help button and the Next dev-tools button in a dev build.
-    await expect(page.locator('nav').getByRole('button', { name: /Reading/i })).toBeVisible();
+    // `.station`: the bar also carries this station's search since 2026-08-13,
+    // and its button is named for the reading too.
+    await expect(page.locator('nav button.station', { hasText: 'Reading' })).toBeVisible();
 
     await page.screenshot({ path: 'test-results/reading-workbench.png', fullPage: true });
   });

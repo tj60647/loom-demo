@@ -18,7 +18,7 @@ import ThrowTab from "@/components/tabs/ThrowTab"
 import VocabularyTab from "@/components/tabs/VocabularyTab"
 import MapTab from "@/components/tabs/MapTab"
 import JourneyNav, { stationNumber, type Station } from "@/components/ui/JourneyNav"
-import ShelfSearch from "@/components/shelf/ShelfSearch"
+import StationSearch from "@/components/ui/StationSearch"
 import type { Passage } from "@/lib/types"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
@@ -124,7 +124,9 @@ export default function Workbench({
   const [livePdfPage, setLivePdfPage] = useState(1)
   const handlePageChange = useCallback((n: number) => setLivePdfPage(n), [])
   const [openTargetPassageId, setOpenTargetPassageId] = useState<string | null>(null)
-  const [searchOpen, setSearchOpen] = useState(false)
+  // `searchOpen` lived here to drive the standing band and its narrow-screen
+  // toggle. StationSearch owns its own open state now — the panel belongs to
+  // the button, and nothing else on this surface needs to know.
   // Your work — this reading's Capture Log — as a sheet over the text. Closed
   // by default: reading is what the station is for, and a student who has not
   // captured anything does not need a panel over the page. It is handed to the
@@ -280,40 +282,12 @@ export default function Workbench({
             <span className="scopemeta scopedl">your own card — no pdf here</span>
           )}
         </>
-        {/* The one search field, present on every tab (ruling 34): readings,
-            concepts, links and your own passages, grouped by kind. On wide
-            screens the field itself is persistent below the bar (TJ,
-            2026-08-10 — a visible input is the discoverable form); this
-            button is the compact form, shown only under 900px. */}
-        {!practice && (
-          <button
-            className={`btn mini searchtoggle ${searchOpen ? "" : "ghost"}`}
-            onClick={() => setSearchOpen((v) => !v)}
-            aria-pressed={searchOpen}
-            aria-label="Search everything"
-            style={{ marginLeft: "auto" }}
-          >
-            ⌕ Search
-          </button>
-        )}
       </div>
 
-      {/* Not rendered in the practice loom: ShelfSearch reads the student's
-          REAL loom over its own GET route, bypassing the provider entirely —
-          the one control here that would show their actual work inside a
-          space that keeps nothing. */}
-      {!practice && (
-        <div className={`searchhost${searchOpen ? " open" : ""}`} style={{ padding: "0 24px" }}>
-          {/* Contextual scope (TJ, 2026-08-10): inside a reading this field
-              searches THE READING — its pages and your work here. The whole
-              loom is one station away, on the Library. */}
-          <ShelfSearch
-            onActiveChange={() => {}}
-            onClose={() => setSearchOpen(false)}
-            sourceId={source.id}
-          />
-        </div>
-      )}
+      {/* The standing search band stood here, on every station, and the toolbar
+          above carried a toggle for it under 900px. Both are gone (TJ,
+          2026-08-13): the search is one button in the journey bar below, scoped
+          to the station showing. */}
 
       <JourneyNav
         // The underline follows the open tab: in this workbench the stations
@@ -324,6 +298,22 @@ export default function Workbench({
         // Since the merge, station 00 is always the Library — no relabelling.
         onStation={Object.fromEntries(
           tabs.map((tab) => [STATION_OF[tab], () => goTo(tab)])
+        )}
+        /* Scope follows the station, never a toggle (TJ, 2026-08-13: "library
+           is your loom, vocabulary is your loom, all else this reading/cloth").
+           Vocabulary is the User's holdings across every reading — JourneyNav
+           calls it "UNSCOPED in the model" — so it searches the loom from
+           inside a text, while its neighbours search the text and the cloth
+           woven from it.
+
+           Not in the practice loom: ShelfSearch reads the student's REAL loom
+           over its own GET route, bypassing the provider, so it would show
+           their actual work inside a space that keeps nothing. */
+        search={practice ? undefined : (
+          <StationSearch
+            scope={activeTab === "read" ? "loom" : "reading"}
+            sourceId={activeTab === "read" ? undefined : source.id}
+          />
         )}
       />
 

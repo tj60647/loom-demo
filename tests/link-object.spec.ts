@@ -193,7 +193,12 @@ test("a Link nothing uses is findable — search covers the object, not just the
   // thread on it. Before 5.1 there was nothing to find: search read labels off
   // the threads, so a word coined ahead of its first use was invisible.
   await page.goto("/")
-  const box = page.locator("#shelfSearchInput")
+  // The standing band is gone (TJ, 2026-08-13): one search per station, in the
+  // journey bar, scoped by where you stand. On the Library that is the loom —
+  // which is the scope this test needs, since a Link with no thread on it
+  // belongs to no reading.
+  await page.locator(".stationsearch button").click()
+  const box = page.locator(".stationsearch-panel input")
   await expect(box).toBeVisible({ timeout: 15_000 })
   await box.fill(COINED)
 

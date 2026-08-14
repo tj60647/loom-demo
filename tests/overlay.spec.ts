@@ -52,7 +52,7 @@ async function openReadingByHref(page: Page, title: string) {
 
 test("the passages overlay shades the section's marks, deepest where they agree", async ({ page }) => {
   await openReadingByHref(page, READING)
-  await page.locator("nav button", { hasText: "Reading" }).click()
+  await page.locator("nav button.station", { hasText: "Reading" }).click()
   await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 20_000 })
 
   // Off until asked for: the page is the student's own first.
@@ -148,7 +148,7 @@ test.describe("a student is offered no comparison at all", () => {
     // capture gate went with them: it existed so the crowd could not pre-code a
     // student's reading, and there is no student reading one now.
     await openReadingByHref(page, READING)
-    await page.locator("nav button", { hasText: "Reading" }).click()
+    await page.locator("nav button.station", { hasText: "Reading" }).click()
     await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 20_000 })
     await expect(page.getByLabel("Which section to compare")).toHaveCount(0)
 

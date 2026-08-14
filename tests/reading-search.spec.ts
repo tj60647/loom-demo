@@ -13,16 +13,19 @@ test.use({ storageState: "playwright/.auth/testa.json" })
 // Dev-server compile latency puts several 15s waits in sequence.
 test.beforeEach(() => test.setTimeout(120_000))
 
-test("the shelf search finds a reading and stands in for the shelf while live", async ({ page }) => {
+test("the loom search finds a reading, from a panel that leaves the shelf alone", async ({ page }) => {
   await page.goto("/")
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
 
-  // The search field is PERSISTENT on wide screens (TJ, 2026-08-10) — no
-  // toggle to click; the labelled bar simply sits under the title, and its
-  // name says how far it reaches.
-  const box = page.getByRole("searchbox", { name: "Search your loom — readings, cloths, projections, concepts, link labels, links and passages" })
+  // One search per station, in the journey bar, scoped by where you stand (TJ,
+  // 2026-08-13). The standing band is gone, and so is the page takeover it
+  // came with. The scope is on the BUTTON — a placeholder could not carry it,
+  // since it disappears at the first keystroke.
+  const control = page.locator(".stationsearch button")
+  await expect(control).toHaveText(/your loom/)
+  await control.click()
+  const box = page.locator(".stationsearch-panel input")
   await expect(box).toBeVisible()
-  await expect(page.locator(".searchbar label", { hasText: "Search" })).toBeVisible()
   await box.fill("object worlds")
 
   // A hit card names the reading and says where it matched.
@@ -30,10 +33,12 @@ test("the shelf search finds a reading and stands in for the shelf while live", 
   await expect(hit).toBeVisible({ timeout: 15_000 })
   await expect(hit.locator(".searchwhere")).toBeVisible()
 
-  // While the query is live the results own the page — no week rows behind them.
-  await expect(page.locator(".weekhead")).toHaveCount(0)
+  // The shelf STAYS. It used to be replaced while a query was live; the
+  // results are a panel over the page now, so there is nothing to put back.
+  await expect(page.locator(".weekhead").first()).toBeVisible()
+  await expect(page.locator(".shelfcard").first()).toBeVisible()
 
-  // Clearing the box puts the shelf back.
+  // Clearing the box empties the panel and leaves the shelf as it was.
   await box.fill("")
   await expect(page.locator(".searchhit")).toHaveCount(0)
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
@@ -46,7 +51,7 @@ test("the shelf search finds a reading and stands in for the shelf while live", 
   await expect(doorway).toBeVisible({ timeout: 15_000 })
   await doorway.click()
   await expect(page).toHaveURL(/\/reading\/[^?]+\?tab=reading&q=object(%20|\+)worlds/, { timeout: 15_000 })
-  await expect(page.locator("nav button.active", { hasText: "Reading" })).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator("nav button.station.active", { hasText: "Reading" })).toBeVisible({ timeout: 15_000 })
   const inReading = page.getByRole("searchbox", { name: "Search this reading for a word or phrase" })
   await expect(inReading).toBeVisible({ timeout: 15_000 })
   await expect(inReading).toHaveValue("object worlds")
@@ -70,10 +75,13 @@ test("search inside a reading lists matching pages and marks the words on the te
   await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
 
   // Tab 00 — the text itself.
-  await page.locator("nav button", { hasText: "Reading" }).click()
+  await page.locator("nav button.station", { hasText: "Reading" }).click()
   await expect(page.locator("text=Loading PDF...")).toBeHidden({ timeout: 15_000 })
 
-  await page.getByRole("button", { name: "Search this reading" }).click()
+  // The PDF's own find, scoped to its toolbar: the journey bar carries a
+  // search too since 2026-08-13, and its button is named for this reading as
+  // well. The two merge in a later commit; until then, say which.
+  await page.locator(".pdf-toolbar").getByRole("button", { name: "Search this reading" }).click()
   const box = page.getByRole("searchbox", { name: "Search this reading for a word or phrase" })
   await expect(box).toBeVisible()
   await box.fill("object")

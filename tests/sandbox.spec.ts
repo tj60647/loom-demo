@@ -75,7 +75,7 @@ test.describe('Practice loom', () => {
     await page.locator('nav button', { hasText: 'Linking' }).click();
     await expect(page.locator('.crow')).toHaveCount(3);
     await expect(page.locator('.thread')).toHaveCount(2);
-    await page.locator('nav button', { hasText: 'Reading' }).click();
+    await page.locator('nav button.station', { hasText: 'Reading' }).click();
 
     // What the example puts on the page, so everything below asserts the
     // CHANGE a student makes rather than a number the example could alter.

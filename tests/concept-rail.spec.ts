@@ -93,7 +93,9 @@ test.describe('Concept rail', () => {
     // passage's row (red line #5 — the work is never out of reach). And the
     // door closes Find on the way — the sheet and the search panel share the
     // right edge, and a panel left open underneath eats the first Escape.
-    await page.getByRole('button', { name: 'Search this reading' }).click();
+    // Scoped to the PDF's own toolbar: since 2026-08-13 the journey bar carries
+    // a search too, and its button is also named for this reading.
+    await page.locator('.pdf-toolbar').getByRole('button', { name: 'Search this reading' }).click();
     await expect(page.locator('.pdf-search-panel')).toBeVisible();
     await page.locator('.pdf-railcard', { hasText: conceptName }).first().click();
     await expect(page.locator('#yourwork')).toBeVisible({ timeout: 5000 });

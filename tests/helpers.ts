@@ -52,7 +52,7 @@ export async function openReading(page: Page, title: string) {
   // the reading station is the DEFAULT tab, so the viewer — and its own
   // "Search this reading" button — is already on screen; an unscoped
   // /Reading/i now matches both and is a strict-mode violation.
-  await page.locator('nav[aria-label="The journey"] button', { hasText: 'Reading' }).click();
+  await page.locator('nav[aria-label="The journey"] button.station', { hasText: 'Reading' }).click();
   await expect(page.locator('text=Loading PDF...')).toBeHidden({ timeout: 15000 });
 }
 
@@ -81,7 +81,7 @@ export async function cardOwnReading(page: Page, title: string) {
   const card = page.locator('.shelfcard', { hasText: title }).first();
   await expect(card).toBeVisible({ timeout: 20000 });
   await enterReadingFromCard(page, card);
-  await page.locator('nav[aria-label="The journey"] button', { hasText: 'Reading' }).click();
+  await page.locator('nav[aria-label="The journey"] button.station', { hasText: 'Reading' }).click();
   await expect(page.getByText('Loading your loom...')).toHaveCount(0, { timeout: 20000 });
 }
 

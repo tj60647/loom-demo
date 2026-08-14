@@ -21,9 +21,9 @@ import { tallyByReading } from "@/lib/scope"
 import { short } from "@/lib/clothMath"
 import { timeAgo } from "@/lib/utils"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
-import ShelfSearch from "@/components/shelf/ShelfSearch"
 import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import JourneyNav from "@/components/ui/JourneyNav"
+import StationSearch from "@/components/ui/StationSearch"
 import { SIGN_IN_EXPLANATION } from "@/lib/signIn"
 
 export default function Shelf() {
@@ -32,12 +32,6 @@ export default function Shelf() {
   const { data: session, status } = useSession()
   const { state, isLoading } = useLoom()
   const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
-  // The search bar sits behind a toggle, the reading's own ⌕ Search idiom.
-  // While a query is live the results own the page; clearing the box — or
-  // closing the panel — puts the week-grouped shelf back exactly as it was.
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [searchActive, setSearchActive] = useState(false)
-
   const tallies = useMemo(() => tallyByReading(state), [state])
 
   // Syllabus order, with unscheduled readings after the weeks rather than
@@ -65,7 +59,7 @@ export default function Shelf() {
   if (status === "loading") {
     return (
       <>
-        <JourneyNav active="readings" />
+        <JourneyNav active="readings" search={<StationSearch scope="loom" />} />
         <main>
           <div className="empty" style={{ marginTop: "100px" }}>
             <h2>Loading your readings...</h2>
@@ -189,27 +183,9 @@ export default function Shelf() {
 
   return (
     <>
-      <JourneyNav active="readings" />
+      <JourneyNav active="readings" search={<StationSearch scope="loom" />} />
       <main>
-        <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", margin: "0 0 3px" }}>
-          <p className="tasktitle" style={{ margin: 0 }}>Pick a reading.</p>
-          <button
-            className={`btn mini searchtoggle ${searchOpen ? "" : "ghost"}`}
-            onClick={() => {
-              if (searchOpen) {
-                setSearchOpen(false)
-                setSearchActive(false)
-              } else {
-                setSearchOpen(true)
-              }
-            }}
-            data-tip="find a word or phrase across the readings on your list"
-            aria-pressed={searchOpen}
-            aria-label="Search your readings"
-          >
-            ⌕ Search
-          </button>
-        </div>
+        <p className="tasktitle" style={{ margin: "0 0 3px" }}>Pick a reading.</p>
         <p className="tasksub">
           Each reading is its own piece of work: capture its passages, name what they
           evidence, thread those concepts together, and read the whole. Your concepts
@@ -217,23 +193,11 @@ export default function Shelf() {
           the evidence of both.
         </p>
 
-        {/* Which reading says this? Words, or a "quoted phrase" — matched
-            against every card and every page on your reading list, never
-            anyone else's. While a query is live the results stand in for the
-            shelf. Persistent on wide screens (TJ, 2026-08-10): the input is
-            always here, Escape clears it; below 900px the button above
-            toggles it instead. */}
-        <div className={`searchhost${searchOpen ? " open" : ""}`}>
-          <ShelfSearch
-            onActiveChange={setSearchActive}
-            onClose={() => {
-              setSearchOpen(false)
-              setSearchActive(false)
-            }}
-          />
-        </div>
-
-        {!searchActive && (<>
+        {/* The search is in the journey bar now (TJ, 2026-08-13) — one per
+            station, scoped and labeled. A standing band stood here, and while a
+            query was live its results REPLACED the shelf; both are gone. The
+            shelf simply stays put behind the panel. */}
+        {(<>
         {/* The whole weave and Keep were quick links here; they are journey
             stations now (05 · 06), so the bar carries them and this row keeps
             only the tally. */}

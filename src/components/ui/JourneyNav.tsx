@@ -213,12 +213,24 @@ export default function JourneyNav({
   active,
   onStation = {},
   labels = {},
+  search,
 }: {
   active: Station | null
   /** Stations handled in place (workbench tabs) — rendered as buttons. */
   onStation?: Partial<Record<Station, () => void>>
   /** Per-context label overrides, e.g. "Reading" (this text) inside one. */
   labels?: Partial<Record<Station, string>>
+  /**
+   * This station's search (TJ, 2026-08-13), docked right of the journey and
+   * left of the staff group. A SLOT rather than something this bar builds:
+   * scope is contextual, and only the surface knows which station is showing —
+   * Vocabulary searches the whole loom while its neighbours search one reading.
+   *
+   * It rides here because this is the one row already under the header on
+   * every learner surface, so the control is as consistently placed as the
+   * standing band it replaces and costs none of the height.
+   */
+  search?: React.ReactNode
 }) {
   return (
     <nav aria-label="The journey">
@@ -228,7 +240,12 @@ export default function JourneyNav({
         const activeCls = active === key ? " active" : ""
         if (handler) {
           return (
-            <button key={key} className={activeCls.trim()} onClick={handler}>
+            // `station`, like the <Link> and <span> forms below. It was the one
+            // variant without the class, which left `nav button` as the only
+            // way to name a station — and that stopped being unambiguous the
+            // moment the bar gained a search button whose label says "this
+            // reading" (2026-08-13).
+            <button key={key} className={`station${activeCls}`} onClick={handler}>
               <span className="step">{step}</span>
               {text}
             </button>
@@ -259,6 +276,8 @@ export default function JourneyNav({
           </Link>
         )
       })}
+
+      {search}
 
       {/* fallback={null}: a student never sees this group at all, so the
           honest empty state during hydration is nothing, not a placeholder. */}

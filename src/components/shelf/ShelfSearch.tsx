@@ -46,13 +46,18 @@ function Hit({
 }
 
 export default function ShelfSearch({
-  onActiveChange,
   onClose,
   sourceId,
 }: {
-  /** True while a query is live and the results own the page. */
-  onActiveChange: (active: boolean) => void
-  /** Fold the search away — wired to Escape, mirroring the reading's panel. */
+  /**
+   * Fold the search away — wired to Escape and to the panel's ✕.
+   *
+   * `onActiveChange` stood beside this until 2026-08-13. It told the Library
+   * that a query was live so the shelf could be REPLACED by the results (TJ:
+   * "i do not like that the standing band takes up so much space"). The results
+   * are in a panel over the page now, so there is nothing to hide and nothing
+   * to put back: the shelf stays where it was, behind the search.
+   */
   onClose: () => void
   /**
    * Contextual scope (TJ, 2026-08-10): absent, this is the Library's search
@@ -76,7 +81,6 @@ export default function ShelfSearch({
   const handleChange = (value: string) => {
     setQuery(value)
     const active = value.trim().length >= 2
-    onActiveChange(active)
     if (!active) {
       requestRef.current++
       setResults(null)
@@ -117,8 +121,11 @@ export default function ShelfSearch({
 
   return (
     <div className="searchwrap">
+      {/* The scope is named on the button that opened this panel, not in here
+          — see StationSearch. A placeholder cannot carry it: it disappears at
+          the first keystroke, which is exactly when you start needing to know
+          what you are searching. So this one only says what to type. */}
       <div className="searchbar">
-        <label className="label" htmlFor="shelfSearchInput">Search</label>
         <input
           id="shelfSearchInput"
           type="search"
@@ -126,20 +133,18 @@ export default function ShelfSearch({
           value={query}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={(e) => {
-            // Clear as well as close: on wide screens the field is permanent
-            // (no autoFocus for the same reason — a persistent input must
-            // never steal focus on mount), so Escape's visible effect is the
-            // query going, not the box.
+            // Clear AND close. The field is no longer permanent — it exists
+            // only while the panel is open — so autoFocus is right here where
+            // it would have been theft on a standing band.
             if (e.key === "Escape") {
               handleChange("")
               onClose()
             }
           }}
-          placeholder={sourceId ? "search this reading…" : "search your loom…"}
-          aria-label={sourceId
-            ? "Search this reading — its pages, cloth, projections, concepts, link labels, links and passages"
-            : "Search your loom — readings, cloths, projections, concepts, link labels, links and passages"}
+          placeholder='a word, or a "phrase"'
+          autoFocus
         />
+        <button type="button" className="btn ghost mini" onClick={onClose} aria-label="Close search">✕</button>
       </div>
 
       {active && (

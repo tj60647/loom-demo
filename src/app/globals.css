@@ -44,8 +44,15 @@ header{border-bottom:1px solid var(--rule);padding:10px 26px 8px;display:flex;al
 header .spacer{flex:1}
 header .field{display:flex;flex-direction:column;gap:3px}
 header input{font-family:var(--body);font-size:15px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:5px 8px;color:var(--ink)}
-.btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:none;border-radius:3px;padding:7px 11px;cursor:pointer}
-.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
+/* The border is TRANSPARENT, never absent (TJ, 2026-08-13, on the reading's
+   search button: "it does change the layout of the row for some reason"). A
+   button that toggles .ghost — search, Your work, anything with an on state —
+   went from `border:none` to `border:1px`, and box-sizing:border-box does not
+   save an auto-width control: its width is content + padding + border, so the
+   box grew 2px every time it opened and nudged the whole row. Same box in both
+   states; only the colour changes. */
+.btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:1px solid transparent;border-radius:3px;padding:7px 11px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
 .btn.mini{font-size:11px;padding:7px 10px;letter-spacing:.05em;min-height:36px}
 .btn:disabled{opacity:.35;cursor:default} .btn:hover:not(:disabled){opacity:.88}
 /* A control's label is not prose. Without this, every button, tab and
@@ -54,14 +61,19 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
    "this is a thing you press" — and a mis-drag on a card leaves half the
    action row highlighted. Selection stays on for anything a reader might
    legitimately want to copy: page text, transcriptions, tooltips, hints. */
-.btn,.act,summary,nav button,nav .station{-webkit-user-select:none;user-select:none}
+.btn,.act,summary,nav .station{-webkit-user-select:none;user-select:none}
 #saveDot{font-family:var(--mono);font-size:10px;color:var(--ink-soft);align-self:center}
 nav{display:flex;border-bottom:1px solid var(--rule);padding:0 26px;background:var(--paper-2);flex-wrap:wrap}
 /* `.station`, not `a.station`: a station with nowhere to go is a <span>
    (JourneyNav's READING_ONLY) and must keep the same padding and rhythm as
-   the links beside it, or the greyed ones run together. */
-nav button,nav .station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
-nav button.active,nav .station.active{color:var(--ink);border-bottom-color:var(--ochre)}
+   the links beside it, or the greyed ones run together.
+
+   `.station`, not `nav button` either. This bar carries a button that is NOT a
+   station since 2026-08-13 — the station's search — and the bare element
+   selector was dressing it as an 18px display-font tab. Every station form
+   (button, link, inert span) carries the class, so the class is the rule. */
+nav .station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
+nav .station.active{color:var(--ink);border-bottom-color:var(--ochre)}
 /* A station with nowhere to go (JourneyNav's READING_ONLY, TJ 2026-08-09).
    Still drawn and still numbered — the arc is meant to be visible whole — but
    quieter than a link and not interactive. Not `disabled`, because it is not a
@@ -92,7 +104,7 @@ nav .station.staff.active{color:var(--sage);border-bottom-color:var(--sage)}
 .linkish:hover{opacity:.8}
 nav .station.off .step{color:var(--dot)}
 nav .step{font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-right:7px;color:var(--grey)}
-nav button.active .step,nav .station.active .step{color:var(--ochre)}
+nav .station.active .step{color:var(--ochre)}
 /* Full-bleed so the scrollbar rides the window edge rather than the edge of a
    centred column; the measure is kept by padding instead of max-width.
 
@@ -352,7 +364,7 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
     -webkit-overflow-scrolling:touch;
     scrollbar-width:thin;
   }
-  nav button{flex:0 0 auto}
+  nav .station{flex:0 0 auto}
   main{padding:18px 14px 20px}
   /* Static here, in flow under the content — it overlaps nothing, so it can
      take its clicks (and text selection) back. */
@@ -569,12 +581,11 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 
 /* Shelf search: which reading says this? A hit is a link into the reading,
    shaped like a shelf card; the marked words are Postgres's, not ours. */
-.searchwrap{margin:0 0 18px}
-.searchbar{display:flex;align-items:center;gap:10px}
-/* The search input is PERSISTENT on wide screens (TJ, 2026-08-10) — a
-   visible field is the discoverable form of search. The toggle button is the
-   compact form: it exists only below 900px, where a standing input row would
-   cost reading space. */
+/* Inside the station panel now, so no bottom margin of its own to give the
+   band air — the panel's padding is the air. */
+.searchwrap{margin:0}
+.searchbar{display:flex;align-items:center;gap:8px}
+.searchbar .tinput{flex:1;min-width:0}
 /* The practice loom's standing notice. Deliberately not a toast: `flash`
    self-clears after 1500ms, and a student who missed a disappearing notice
    cannot tell a practice space from data loss. Sage rather than red — this is
@@ -642,13 +653,25 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .clothreset{color:var(--red);border-color:transparent}
 .clothreset:hover{border-color:var(--red)}
 
-.searchtoggle{display:none}
-@media (max-width:900px){
-  .searchtoggle{display:inline-block}
-  .searchhost{display:none}
-  .searchhost.open{display:block}
-}
-.searchinput{max-width:520px}
+/* ONE SEARCH PER STATION, docked in the journey bar (TJ, 2026-08-13). The
+   standing band that stood under the bar is gone — `.searchtoggle`, the
+   `.searchhost` show/hide and the <900px media block with it. The band's
+   virtue was that it never moved and its cost was a whole row on every
+   surface; riding the journey keeps the first and pays none of the second.
+
+   `margin-left:auto` puts it right of the journey and left of the staff group,
+   which docks after it. */
+.stationsearch{position:relative;margin-left:auto;display:flex;align-items:center}
+/* Anchored to the button, dropping over the work below. `nav` clips nothing,
+   and this is a sibling of <main> — whose station-reading variant is
+   overflow:hidden — so it hangs free of the page's own scrolling boxes.
+   z-index 60: above the cards and the card menu (6), above .pdf-search-panel
+   (20) and Your work (25), and far below the fixed furniture at 8000. */
+.stationsearch-panel{position:absolute;top:calc(100% + 6px);right:0;z-index:60;
+  width:min(420px,calc(100vw - 32px));max-height:min(64vh,560px);overflow:auto;
+  padding:12px 13px;background:var(--paper);border:1px solid var(--ink);
+  border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.searchinput{max-width:none}
 .searchresults{margin-top:12px;display:flex;flex-direction:column;gap:10px}
 .searchtally{display:block}
 .searchhit{display:block;padding:12px 14px;text-decoration:none;color:inherit;
