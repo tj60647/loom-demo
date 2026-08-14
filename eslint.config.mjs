@@ -18,9 +18,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Vendor asset copied from pdfjs-dist by scripts/copy-pdf-worker.mjs —
-    // minified, not ours to lint.
+    // Vendor assets copied from pdfjs-dist by scripts/copy-pdf-worker.mjs —
+    // minified, not ours to lint. pdf-wasm holds the WASM codecs and their
+    // JS fallback, which trips no-assign-module-variable if linted.
     "public/pdf.worker.min.mjs",
+    "public/pdf-wasm/**",
   ]),
 ]);
 

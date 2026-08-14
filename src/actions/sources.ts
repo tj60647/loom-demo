@@ -435,6 +435,13 @@ async function ingestReading(data: {
   const title = data.title?.trim() || fallbackTitle
   const storageKey = data.storageKey
 
+  // Before any row lands. Extraction is the step most likely to fail on a
+  // hostile file, and it used to fail AFTER the source and course rows were
+  // written — the caller's catch deleted the blob but not the rows, leaving a
+  // visible card that 404s on open. Failing here fails clean: no rows, and the
+  // caller still deletes the blob.
+  const pages = await extractPdfPageText(buffer)
+
   const [source] = await db
     .insert(sources)
     .values({
@@ -450,43 +457,56 @@ async function ingestReading(data: {
     })
     .returning()
 
-  if (data.courseId) {
-    const courseId = await resolveCourseId(data.courseId)
-    if (courseId) {
-      await db
-        .insert(courseSources)
-        .values({ courseId, sourceId: source.id })
-        .onConflictDoNothing()
+  try {
+    if (pages.length > 0) {
+      await db.insert(sourcePages).values(
+        pages.map((p) => ({
+          sourceId: source.id,
+          pageNumber: p.pageNumber,
+          textContent: p.textContent,
+          contentHash: hashText(textLayerProjection(p.textContent)),
+        }))
+      )
     }
-  }
 
-  const pages = await extractPdfPageText(buffer)
-  if (pages.length > 0) {
-    await db.insert(sourcePages).values(
-      pages.map((p) => ({
-        sourceId: source.id,
-        pageNumber: p.pageNumber,
-        textContent: p.textContent,
-        contentHash: hashText(textLayerProjection(p.textContent)),
-      }))
-    )
-  }
+    let coverRendered = false
+    try {
+      const coverBuffer = await renderPdfCoverImage(buffer)
+      await readingStorage.put(getSourceCoverKey(source.id), coverBuffer)
+      coverRendered = true
+    } catch (error) {
+      console.warn("[Loom] Failed to generate PDF cover image", error)
+    }
 
-  let coverRendered = false
-  try {
-    const coverBuffer = await renderPdfCoverImage(buffer)
-    await readingStorage.put(getSourceCoverKey(source.id), coverBuffer)
-    coverRendered = true
+    // Deterministic score, computed from the pages already in memory — no extra
+    // queries, no network. The judge pass runs afterwards, off the request path.
+    let pass: boolean | null = null
+    try {
+      pass = (await recordHeuristicScore(source.id, pages, { coverRendered })).pass
+    } catch (error) {
+      console.warn("[Loom] Failed to score extraction quality", error)
+    }
+
+    // The attach comes LAST, so the score exists to gate it: a reading that did
+    // not measure usable arrives in the course hidden, and the card's Reveal
+    // button is the explicit approval the old default-visible skipped. An
+    // unscored reading (score failed, null) is hidden too — "we didn't check"
+    // must not read as "checked and fine".
+    if (data.courseId) {
+      const courseId = await resolveCourseId(data.courseId)
+      if (courseId) {
+        await db
+          .insert(courseSources)
+          .values({ courseId, sourceId: source.id, isVisible: pass === true })
+          .onConflictDoNothing()
+      }
+    }
   } catch (error) {
-    console.warn("[Loom] Failed to generate PDF cover image", error)
-  }
-
-  // Deterministic score, computed from the pages already in memory — no extra
-  // queries, no network. The judge pass runs afterwards, off the request path.
-  try {
-    await recordHeuristicScore(source.id, pages, { coverRendered })
-  } catch (error) {
-    console.warn("[Loom] Failed to score extraction quality", error)
+    // Without this, a failure between the source insert and here leaves the
+    // phantom card the reorder above exists to prevent. Cascades take the
+    // pages and any attach with the row; the caller's catch takes the blob.
+    await db.delete(sources).where(eq(sources.id, source.id)).catch(() => {})
+    throw error
   }
 
   return source
@@ -747,6 +767,17 @@ export async function addSourceToCourse(formData: FormData) {
   const sourceId = readText(formData, "sourceId")
   if (!courseId || !sourceId) return
 
+  // Publication is gated on the score: a reading that did not measure usable —
+  // or was never scored — arrives hidden, and the course card's Reveal button
+  // is the admin's explicit approval. The old default-visible published the
+  // moment of attach, before anyone had seen a verdict, which is how a scan
+  // whose pages could not render shipped to students with a passing note.
+  const score = await db
+    .select({ pass: sourceScores.pass })
+    .from(sourceScores)
+    .where(eq(sourceScores.sourceId, sourceId))
+    .limit(1)
+
   await db
     .insert(courseSources)
     .values({
@@ -754,6 +785,7 @@ export async function addSourceToCourse(formData: FormData) {
       sourceId,
       week: readInt(formData, "week"),
       isCore: readIsCore(formData),
+      isVisible: score[0]?.pass === true,
     })
     .onConflictDoNothing()
 

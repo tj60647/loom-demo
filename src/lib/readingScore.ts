@@ -22,11 +22,14 @@
  * than folding a guess in as a real score.
  */
 import { db } from "@/db"
-import { sourcePages, sourceScores } from "@/db/schema"
+import { sourcePages, sourceScores, sources } from "@/db/schema"
 import { asc, eq } from "drizzle-orm"
 import type { ExtractionMetrics } from "@/lib/types"
 import type { PdfStructure } from "@/lib/pdfStructure"
+import { probePdfStructure } from "@/lib/pdfStructure"
 import { probeHighlights } from "@/lib/highlightProbe"
+import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
+import { readingStorage } from "@/lib/storage"
 import { isJudgeConfigured, judgeModelName, requestChatCompletion } from "@/lib/openrouter"
 
 /**
@@ -633,6 +636,25 @@ export function passFromDimensions(dimensions: Dimensions) {
   return overall >= 3 && Math.min(...scored) >= 3
 }
 
+/**
+ * The render gate over a text verdict.
+ *
+ * The four dimensions all measure extracted TEXT, and The Universal Traveler
+ * proved text is not the reading: a scan whose every page image failed to
+ * decode scored 4.0 and passed, because its OCR text extracts fine — the one
+ * signal that correlates with "the pages are blank", the cover render failing
+ * the same way the viewer fails, was a sentence in the notes. A reading whose
+ * pages do not render is not usable in Loom whatever its text scores, so the
+ * failure holds `pass` down rather than decorating it.
+ *
+ * `coverRendered` missing (old metrics rows) means "not measured", never
+ * "measured as broken" — the gate only acts on a measured failure.
+ */
+export function gatePassOnRender(pass: boolean | null, coverRendered: boolean | undefined) {
+  if (pass !== true) return pass
+  return coverRendered === false ? false : true
+}
+
 // --- LLM JUDGE ---
 
 /** Pages spread evenly through the document, skipping ones with nothing to read. */
@@ -778,6 +800,8 @@ export async function recordHeuristicScore(
     structure: null,
   }
 
+  const pass = gatePassOnRender(passFromDimensions(dimensions), metrics.coverRendered)
+
   await upsertScore({
     sourceId,
     status: metrics.pageCount === 0 ? "unscorable" : "heuristic",
@@ -786,12 +810,14 @@ export async function recordHeuristicScore(
     anchorability: heuristic.anchorability,
     structure: null,
     overall: overallFromDimensions(dimensions),
-    pass: passFromDimensions(dimensions),
+    pass,
     notes: heuristic.notes,
     judgeNotes: "",
     judgeModel: null,
     metrics,
   })
+
+  return { pass }
 }
 
 /**
@@ -851,7 +877,9 @@ export async function judgeSourceScore(sourceId: string) {
         legibility: judged,
         structure: verdict.structure,
         overall: overallFromDimensions(dimensions),
-        pass: passFromDimensions(dimensions),
+        // The judge reads text; it cannot un-fail a reading whose pages do
+        // not render. Same gate the heuristic pass applies.
+        pass: gatePassOnRender(passFromDimensions(dimensions), existing.metrics?.coverRendered),
         judgeNotes: verdict.notes,
         judgeModel: judgeModelName(),
         scoredAt: new Date(),
@@ -876,10 +904,44 @@ export async function rescoreSource(sourceId: string) {
     .where(eq(sourceScores.sourceId, sourceId))
     .limit(1)
 
-  // Cover rendering is decided at upload time and not re-tested here; carry the
-  // previous verdict forward rather than silently reporting a failure as a pass.
-  await recordHeuristicScore(sourceId, pages, {
-    coverRendered: rows[0]?.metrics?.coverRendered ?? true,
-  })
+  /**
+   * Re-test the render rather than carrying the upload-time verdict forward.
+   *
+   * The verdict goes stale in both directions: a cover that failed on a
+   * runtime that couldn't decode the scan (Node < 22.7, see pdfCover) keeps
+   * failing a reading that now renders fine, and the old `?? true` backfill
+   * let "never measured" read as "measured as fine". Rescore has to fetch the
+   * blob anyway to probe structure, and a working render refreshes the stored
+   * cover for free. A reading with no stored file (reference-only) keeps the
+   * previous verdict — there is nothing to re-test.
+   */
+  const sourceRows = await db
+    .select({ storageKey: sources.storageKey })
+    .from(sources)
+    .where(eq(sources.id, sourceId))
+    .limit(1)
+
+  let coverRendered = rows[0]?.metrics?.coverRendered ?? true
+  let structure: PdfStructure | undefined
+  if (sourceRows[0]?.storageKey) {
+    try {
+      const buffer = await readingStorage.get(sourceRows[0].storageKey)
+      structure = await probePdfStructure(buffer)
+      try {
+        const coverBuffer = await renderPdfCoverImage(buffer)
+        await readingStorage.put(getSourceCoverKey(sourceId), coverBuffer)
+        coverRendered = true
+      } catch (error) {
+        console.warn(`[Loom] Cover re-render failed for source ${sourceId}`, error)
+        coverRendered = false
+      }
+    } catch (error) {
+      // The blob itself was unreachable: nothing was measured, so nothing
+      // about the previous verdict changes.
+      console.warn(`[Loom] Rescore could not fetch the file for source ${sourceId}`, error)
+    }
+  }
+
+  await recordHeuristicScore(sourceId, pages, { coverRendered, structure })
   await judgeSourceScore(sourceId)
 }
