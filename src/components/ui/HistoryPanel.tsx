@@ -460,7 +460,16 @@ const dayOf = (e: GraphEvent) =>
  * correct? why not just do that again?" — so this fills the same fixed box the
  * drawing does, and the chips swap between them.
  */
-export function CaptureLogRows({ log }: { log: CaptureLog }) {
+export function CaptureLogRows({ log, onShowCloth }: {
+  log: CaptureLog
+  /**
+   * Show the cloth at the act this row is (TJ, 2026-08-13: "the previous
+   * list > diagram relation was ideal"). A row CLICK deliberately does not do
+   * this — "clicking a row in the log list should not take us out of the list"
+   * (TJ, 2026-08-12) — so the trip out is its own badge, said out loud.
+   */
+  onShowCloth?: () => void
+}) {
   const { state } = useLoom()
   const { events, k, goTo } = log
 
@@ -588,10 +597,10 @@ export function CaptureLogRows({ log }: { log: CaptureLog }) {
             return (
               <Fragment key={e.id}>
                 {newDay && <div className="logday">{dayOf(e)}</div>}
-                {/* A row click moves the scrubber, and the cloth above moves
-                    with it. The "on the cloth ›" door each row used to carry is
-                    gone: it existed to switch you to the other panel, and there
-                    is no other panel now — the cloth is already on screen. */}
+                {/* A row click moves the scrubber and STAYS here; the badge is
+                    the way out. Both halves are TJ's: the row must not take you
+                    out of the list (2026-08-12), and the list must be able to
+                    hand you to the drawing (2026-08-13). */}
                 <div
                   className={`logrow${i + 1 === k ? " on" : ""}`}
                   data-act={i + 1}
@@ -610,6 +619,18 @@ export function CaptureLogRows({ log }: { log: CaptureLog }) {
                     <span className="logact">{describeEvent(e)}</span>
                     {contextOf(e)}
                   </span>
+                  {/* The door to the drawing, said out loud. Quiet until the
+                      row is hovered, marked or focused — see `.logjump`. */}
+                  {onShowCloth && (
+                    <button
+                      type="button"
+                      className="logjump"
+                      title="see the cloth as it stood at this act"
+                      onClick={(ev) => { ev.stopPropagation(); goTo(i + 1); onShowCloth() }}
+                    >
+                      on the cloth ›
+                    </button>
+                  )}
                   <span className="logn">{i + 1}</span>
                 </div>
               </Fragment>

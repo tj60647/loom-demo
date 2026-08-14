@@ -426,7 +426,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
           the scrubber and everything below them stay exactly where they were. */}
       <div id="mapWrap">
         {view === "record" && showLog && log.ready ? (
-          <CaptureLogRows log={log} />
+          <CaptureLogRows log={log} onShowCloth={() => setView("cloth")} />
         ) : (
           <ClothMap
             state={drawn}
