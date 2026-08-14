@@ -149,10 +149,6 @@ export default function SpreadCanvasView({
   const tref = useRef<ZoomTransform>(zoomIdentity);
   const zbRef = useRef<ZoomBehavior<HTMLDivElement, unknown> | null>(null);
   const settleTimer = useRef<number | undefined>(undefined);
-  // The smoothed wheel: notches move the target, the rAF loop chases it.
-  const wheelTarget = useRef(1);
-  const wheelAnchor = useRef<[number, number]>([0, 0]);
-  const wheelFrame = useRef(0);
   const initedRef = useRef(false);
   const [pageView, setPageView] = useState<Record<number, { tier: Exclude<PageTier, "impostor">; res: number }>>({});
   const [anchors, setAnchors] = useState<Record<string, Anchor>>({});
@@ -492,63 +488,29 @@ export default function SpreadCanvasView({
     const sel = select(el);
     sel.call(zb);
     sel.on("dblclick.zoom", null); // double-click zoom jumps are hostile mid-reading
-    // Wheel = zoom at the cursor, drag = pan — the map-canvas idiom (TJ,
-    // 2026-08-10). But NOT d3's default wheel handler: that one applies each
-    // wheel notch instantly, a ~15% scale snap per click of the wheel, which
-    // reads as jerky. Each notch here moves a TARGET; a rAF loop eases the
-    // real transform toward it, anchored at the cursor — the Google-Maps
-    // feel. A trackpad pinch (ctrl+wheel by convention) rides the same path
-    // with d3's own 10x factor so pinching stays 1:1 rather than glacial.
+    // Figma-style trackpad, restored from the spread canvas (Lingxiu,
+    // 2026-08-15): two-finger scroll PANS, pinch (ctrl/meta+wheel by macOS
+    // convention) ZOOMS at the cursor. d3-zoom's default treats every wheel
+    // event as zoom, so its wheel handler is replaced. Routed through the
+    // behaviour (scaleBy/translateBy), so the scale extent still clamps, the
+    // slider still syncs on settle, and the will-change raster hints still
+    // ride the behaviour's start/end events.
     sel.on("wheel.zoom", null);
-    sel.on("wheel.smooth", (e: WheelEvent) => {
+    sel.on("wheel.figma", (e: WheelEvent) => {
       e.preventDefault();
-      const { fitAllK, maxMultiplier } = live.current;
-      const mult = e.deltaMode === 1 ? 0.05 : 0.002; // line-scrolling mice report lines
-      const factor = Math.pow(2, -e.deltaY * mult * (e.ctrlKey || e.metaKey ? 10 : 1));
-      if (!wheelFrame.current) wheelTarget.current = tref.current.k;
-      wheelTarget.current = Math.max(
-        fitAllK * 0.5,
-        Math.min(fitAllK * maxMultiplier, wheelTarget.current * factor)
-      );
-      wheelAnchor.current = pointer(e, el);
-      hintOn();
-      if (!wheelFrame.current) {
-        const tick = () => {
-          const zbNow = zbRef.current;
-          const elNow = viewportRef.current;
-          if (!zbNow || !elNow) { wheelFrame.current = 0; return; }
-          const t = tref.current;
-          const target = wheelTarget.current;
-          // Exponential chase: ~4 frames to close most of the gap.
-          const next = t.k + (target - t.k) * 0.35;
-          const done = Math.abs(target - next) / target < 0.002;
-          const k = done ? target : next;
-          const [px, py] = wheelAnchor.current;
-          // The canvas point under the cursor stays under the cursor.
-          zbNow.transform(select(elNow), zoomIdentity
-            .translate(px - (px - t.x) * (k / t.k), py - (py - t.y) * (k / t.k))
-            .scale(k));
-          wheelFrame.current = done ? 0 : requestAnimationFrame(tick);
-          if (done) hintRelease();
-        };
-        wheelFrame.current = requestAnimationFrame(tick);
+      const scale = e.deltaMode === 1 ? 16 : 1; // line-scrolling mice report lines, not pixels
+      if (e.ctrlKey || e.metaKey) {
+        zb.scaleBy(sel, Math.pow(2, -e.deltaY * scale * 0.01), pointer(e, el));
+      } else {
+        const k = tref.current.k;
+        zb.translateBy(sel, (-e.deltaX * scale) / k, (-e.deltaY * scale) / k);
       }
     });
     return () => {
       sel.on(".zoom", null);
-      sel.on("wheel.smooth", null);
-      cancelAnimationFrame(wheelFrame.current);
-      wheelFrame.current = 0;
+      sel.on("wheel.figma", null);
     };
   }, [layout != null]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /** A programmatic transform owns the canvas: the wheel's chase loop must
-   *  stand down first, or it keeps steering toward its stale target and
-   *  Fit/goto lose the race one frame later. */
-  const cancelWheel = useCallback(() => {
-    cancelAnimationFrame(wheelFrame.current);
-    wheelFrame.current = 0;
-  }, []);
 
   /**
    * Click (or drag) the overview: the view centre goes to that canvas point
@@ -564,7 +526,6 @@ export default function SpreadCanvasView({
     const mm = live.current.minimap;
     if (!el || !zb || !vp || !mm) return;
     e.preventDefault();
-    cancelWheel();
     const moveTo = (clientX: number, clientY: number) => {
       const r = el.getBoundingClientRect();
       const cx = (clientX - r.left) / mm.scale;
@@ -584,11 +545,10 @@ export default function SpreadCanvasView({
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerup", done);
     el.addEventListener("pointercancel", done);
-  }, [cancelWheel]);
+  }, []);
 
   /** Set k = m·fitAllK, keeping the canvas point at the stage centre fixed. */
   const applyMultiplier = useCallback((m: number, recenter = false) => {
-    cancelWheel();
     const el = viewportRef.current;
     const zb = zbRef.current;
     const { layout, stage, fitAllK } = live.current;
@@ -606,7 +566,7 @@ export default function SpreadCanvasView({
       t2 = zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k);
     }
     zb.transform(select(el), t2);
-  }, [cancelWheel]);
+  }, []);
 
   // First fit, and the toolbar's − / + / Fit. The 0.05 tolerance breaks the
   // loop with the settle-time sync above. Fit (exactly 1) recenters: "1 =
@@ -661,9 +621,8 @@ export default function SpreadCanvasView({
     const k = tref.current.k;
     const cx = pageX(layout, s, focusPage, basePageWidth) + basePageWidth / 2;
     const cy = s.y + layout.unitH / 2;
-    cancelWheel();
     zb.transform(select(el), zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k));
-  }, [focusPage, layout, cancelWheel]);
+  }, [focusPage, layout]);
 
   /** Render-queue priority: this page's distance from the CURRENT viewport
    *  centre, in canvas units — sampled when a render slot frees, so the

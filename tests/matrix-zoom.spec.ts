@@ -120,23 +120,27 @@ test.describe('Matrix zoom', () => {
     await expect(page.locator('button:has-text("Capture as Passage")')).toBeVisible({ timeout: 5000 });
   });
 
-  test('wheel and pinch drive the transform, Fit restores it, Cards flank the spreads', async ({ page }) => {
+  test('scroll pans, pinch zooms, Fit restores it, Cards flank the spreads', async ({ page }) => {
     test.setTimeout(90_000);
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
     await page.getByRole('button', { name: 'Canvas' }).click();
     await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
 
-    const canvasK = () =>
+    const canvasT = () =>
       page.locator('.pdf-spread-canvas').evaluate((el) => {
-        const m = /scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform ?? '');
-        return m ? parseFloat(m[1]) : 0;
+        const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\)/.exec(
+          (el as HTMLElement).style.transform ?? ''
+        );
+        return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]), k: parseFloat(m[3]) } : { x: 0, y: 0, k: 0 };
       });
+    const canvasK = async () => (await canvasT()).k;
     await expect.poll(canvasK, { timeout: 5000 }).toBeGreaterThan(0);
-    const atFit = await canvasK();
+    const atFit = await canvasT();
 
-    // The wheel zooms at the cursor — the map idiom (TJ, 2026-08-10) — and a
-    // trackpad pinch arrives as ctrl+wheel and zooms too.
+    // Figma-style trackpad (restored 2026-08-15, from the spread canvas):
+    // two-finger scroll PANS — the transform translates, the scale holds —
+    // and a trackpad pinch arrives as ctrl+wheel and zooms at the cursor.
     const wheelAtCenter = (opts: { ctrlKey?: boolean; deltaY: number }) =>
       page.locator('.pdf-spread-viewport').evaluate((el, o) => {
         const b = el.getBoundingClientRect();
@@ -148,14 +152,19 @@ test.describe('Matrix zoom', () => {
       }, opts);
     // Poll-and-nudge: each iteration scrolls again, so a first event lost to
     // an attach race cannot strand the assertion — and repeated notches ARE
-    // how a wheel is really used.
-    await expect
-      .poll(async () => { await wheelAtCenter({ deltaY: -240 }); return canvasK(); }, { timeout: 8000 })
-      .toBeGreaterThan(atFit);
-    const afterWheel = await canvasK();
+    // how a trackpad is really used.
+    // Pinch first: at fit-all the translate extent correctly pins the canvas
+    // (everything is in view — there is nowhere to pan to), so the pan can
+    // only be observed once the pinch has zoomed in.
     await expect
       .poll(async () => { await wheelAtCenter({ deltaY: -240, ctrlKey: true }); return canvasK(); }, { timeout: 8000 })
-      .toBeGreaterThan(afterWheel * 1.05);
+      .toBeGreaterThan(atFit.k * 1.05);
+    const afterPinch = await canvasT();
+    await expect
+      .poll(async () => { await wheelAtCenter({ deltaY: -240 }); return (await canvasT()).y; }, { timeout: 8000 })
+      .not.toBe(afterPinch.y);
+    // The pan never touched the zoom.
+    expect(Math.abs((await canvasK()) - afterPinch.k)).toBeLessThan(afterPinch.k * 0.01);
 
     // The overview inset, while zoomed: visible, and clicking it MOVES the
     // view — the jump goes through the same zb.transform, same extents, so
@@ -177,8 +186,8 @@ test.describe('Matrix zoom', () => {
     // Fit takes it back to everything-in-view — and sends the overview away.
     await page.getByRole('button', { name: 'Fit the whole reading' }).click();
     await expect
-      .poll(async () => Math.abs((await canvasK()) - atFit), { timeout: 5000 })
-      .toBeLessThan(atFit * 0.06);
+      .poll(async () => Math.abs((await canvasK()) - atFit.k), { timeout: 5000 })
+      .toBeLessThan(atFit.k * 0.06);
     await expect(minimap).toBeHidden({ timeout: 5000 });
 
     // Cards on the canvas, standing (2026-08-15, no toggle), AT FIT-ALL: no
