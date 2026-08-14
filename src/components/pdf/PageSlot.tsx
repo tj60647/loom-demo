@@ -58,6 +58,8 @@ export default memo(function PageSlot({
   tier,
   pageAspect,
   pageImageBase,
+  sheetBehind = false,
+  annotations = false,
   priority,
 }: {
   pageNumber: number
@@ -94,6 +96,15 @@ export default memo(function PageSlot({
   /** `/api/readings/{id}/pages` — null when the reading has no file or the
    *  viewer has no sourceId; the slot then renders from the PDF alone. */
   pageImageBase?: string | null
+  /** The whole-document sheet is painted under this slot. When true, a slot
+   *  whose own image is missing stays TRANSPARENT at impostor tier — the
+   *  sheet carries the cell — instead of white-boxing it and falling back
+   *  to a pdf.js render nobody needs at thumbnail size. */
+  sheetBehind?: boolean
+  /** Render link/form annotations over the text layer. Page mode wants them
+   *  (a born-digital PDF's links should stay clickable); the matrix leaves
+   *  them off — they cost a layer per page and are not part of coding. */
+  annotations?: boolean
   /** Render-queue priority for this page's raster; see PageRaster. */
   priority?: (pageNumber: number) => number
 }) {
@@ -111,6 +122,30 @@ export default memo(function PageSlot({
   const [imgFailed, setImgFailed] = useState(false)
 
   const tiered = tier !== undefined
+
+  /**
+   * Which image the slot shows — and it only ever ratchets UP. Tying the src
+   * to the tier swapped 1280 back to 320 at the pan's trailing edge (a
+   * visible re-decode pop, to save bytes the browser had already spent), and
+   * swapped 320 → 1280 in place at the leading edge, which flashes while the
+   * big one decodes. So: a slot that mounts promoted starts at 1280; a slot
+   * promoted later PRELOADS the 1280 off-DOM and swaps only once it is
+   * decoded; a slot demoted keeps what it has.
+   */
+  const [srcW, setSrcW] = useState(tiered && tier !== "impostor" ? 1280 : 320)
+  // Until this slot's own image has painted, its box stays TRANSPARENT so
+  // the whole-document sheet (SpreadCanvasView lays it under every slot)
+  // shows through — the matrix is readable off one cached image while the
+  // per-page thumbs stream in over their own cells.
+  const [imgLoaded, setImgLoaded] = useState(false)
+  useEffect(() => {
+    if (!pageImageBase || srcW >= 1280 || !tiered || tier === "impostor") return
+    let dead = false
+    const upgrade = new Image()
+    upgrade.onload = () => { if (!dead) setSrcW(1280) }
+    upgrade.src = `${pageImageBase}/${pageNumber}?w=1280`
+    return () => { dead = true }
+  }, [tiered, tier, srcW, pageImageBase, pageNumber])
 
   useEffect(() => {
     // The matrix is its own frustum; only the strip watches the viewport.
@@ -143,13 +178,16 @@ export default memo(function PageSlot({
 
   const raster = pdf && baseWidth && width
   const innerH = baseWidth ? baseWidth * (ownAspect ?? aspect) : 0
-  const imgW = tier === "impostor" ? 320 : 1280
   const showImg = tiered && !!pageImageBase && !imgFailed
   // The PDF-drawn canvas: always in the untiered raster path (strip-era
   // behaviour), and in the tiered path wherever the image cannot serve —
   // native zoom needs more pixels than 1280, and a missing image needs a
-  // fallback at every tier.
-  const showCanvas = raster && (!tiered || tier === "native" || !showImg)
+  // fallback at reading zoom and above. At IMPOSTOR tier a missing image
+  // falls back to the sheet underneath when there is one: decoding a PDF
+  // page to paint a thumbnail is the exact cost this architecture retired.
+  const showCanvas =
+    raster &&
+    (!tiered || tier === "native" || (!showImg && !(tier === "impostor" && sheetBehind)))
   const showText = raster && (!tiered || tier === "reading" || tier === "native")
 
   return (
@@ -173,6 +211,13 @@ export default memo(function PageSlot({
                 height: innerH,
                 transform: width !== baseWidth ? `scale(${width / baseWidth})` : undefined,
                 transformOrigin: "top left",
+                // White paper only once something paints here; transparent
+                // before that (and on image failure with a sheet behind),
+                // so the sheet underneath carries the cell.
+                background:
+                  !tiered || imgLoaded || showCanvas || (imgFailed && !sheetBehind)
+                    ? undefined
+                    : "transparent",
               }}
             >
               {showImg && (
@@ -183,11 +228,12 @@ export default memo(function PageSlot({
                 // agree, both being the page's own.
                 <img
                   className="pdf-slot-img"
-                  src={`${pageImageBase}/${pageNumber}?w=${imgW}`}
+                  src={`${pageImageBase}/${pageNumber}?w=${srcW}`}
                   alt=""
                   draggable={false}
                   loading="lazy"
                   decoding="async"
+                  onLoad={() => setImgLoaded(true)}
                   onError={() => setImgFailed(true)}
                   style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
                 />
@@ -215,7 +261,7 @@ export default memo(function PageSlot({
                     width={baseWidth}
                     renderMode="none"
                     renderTextLayer
-                    renderAnnotationLayer={false}
+                    renderAnnotationLayer={annotations}
                     onLoadSuccess={(page) => {
                       if (page.originalWidth) {
                         const a = page.originalHeight / page.originalWidth

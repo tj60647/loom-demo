@@ -24,7 +24,7 @@
  * read-only doors to Your work, exactly as in page mode.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { select, pointer } from "d3-selection";
 import { zoom, zoomIdentity, type ZoomBehavior, type D3ZoomEvent, type ZoomTransform } from "d3-zoom";
 import PageSlot, { type PageTier } from "./PageSlot";
@@ -48,18 +48,25 @@ const MAX_RES = 8;
  * economy: a 132-page scan at fit-all otherwise carries ~47,000 positioned
  * spans for pages rendered 61px wide.
  *
- * DEMOTE_MARGIN: how far (in pages) beyond the promote margin a page may sit
- * before its text layer unmounts again. Hysteresis, so panning back and forth
- * across a boundary does not mount/unmount the same page each settle.
+ * TEXT_MOUNT_PAGES / DEMOTE_MARGIN_PAGES: how far beyond the view text
+ * layers mount and how much further they survive. Mounting runs AHEAD of a
+ * pan (1.5 pages of lead) so a page's text is live before the reader
+ * arrives, and demotion trails well behind (6 pages) — hysteresis wide
+ * enough that panning around a neighbourhood never mounts and unmounts the
+ * same page per settle, which read as popping. A kept page is ~360 spans;
+ * a dozen kept pages are noise next to the 47,000 this replaced.
  *
  * RASTER_BUDGET: total canvas pixels across all native-tier pages. pdf.js's
  * viewer caps a single canvas; a tiled view needs a cap on the SUM — six
  * pages at res 8 on a large stage is otherwise a quarter-gigabyte of RGBA
  * re-blitted per settle. When the in-view set would exceed it, the shared
- * res steps down; sharpness degrades before memory does.
+ * res steps down; sharpness degrades before memory does. Only pages within
+ * half a page of the view sharpen at all — text mounts wide, pixels stay
+ * narrow.
  */
 const TEXT_TIER_MIN_W = 240;
-const DEMOTE_MARGIN_PAGES = 2;
+const TEXT_MOUNT_PAGES = 1.5;
+const DEMOTE_MARGIN_PAGES = 6;
 const RASTER_BUDGET = 72e6;
 
 /** One page's manifest facts, as the viewer's props carry them. */
@@ -94,6 +101,7 @@ export default function SpreadCanvasView({
   onAspect,
   zoomMultiplier,
   onZoomMultiplier,
+  onZoomRange,
   focusPage,
   fitNonce,
   onTransform,
@@ -119,6 +127,9 @@ export default function SpreadCanvasView({
   /** The toolbar slider's value: 1 = the whole canvas fits the stage. */
   zoomMultiplier: number;
   onZoomMultiplier: (m: number) => void;
+  /** Reports this document's zoom ceiling (a multiplier), so the toolbar's
+   *  + button and the gesture extent can never disagree about the top. */
+  onZoomRange?: (max: number) => void;
   /** "Go to this page": a CHANGE here centers that page at the current zoom.
    *  The scroll-based effect the other views use cannot serve a transformed
    *  canvas — its scrollIntoView would shift a hidden-overflow box by an
@@ -146,6 +157,12 @@ export default function SpreadCanvasView({
   const [pageView, setPageView] = useState<Record<number, { tier: Exclude<PageTier, "impostor">; res: number }>>({});
   const [anchors, setAnchors] = useState<Record<string, Anchor>>({});
   const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
+  // The whole-document sheet 404s until its first compose lands (readings
+  // ingested before it existed); the slots' own images carry the view then.
+  // Loaded is tracked too: a slot only defers to the sheet once the sheet
+  // has actual pixels to defer to.
+  const [sheetFailed, setSheetFailed] = useState(false);
+  const [sheetLoaded, setSheetLoaded] = useState(false);
 
   // The manifest's facts, keyed for the render and the anchor fallback.
   const pageInfo = useMemo(() => {
@@ -191,15 +208,106 @@ export default function SpreadCanvasView({
     [layout, stage.w, stage.h]
   );
 
+  /**
+   * The zoom ceiling, as a multiple of fit-all — and the reason it cannot BE
+   * a fixed multiple of fit-all: fit-all shrinks as documents grow, so
+   * "8 × fit" reached print size on a 9-page paper and stalled at barely
+   * reading size on a 132-page scan (TJ, 2026-08-14: "the zoom seems
+   * constrained"). The ceiling is anchored to the spread instead — deep
+   * enough that a QUARTER of one spread fills the stage, whatever the
+   * document's length — and expressed as a multiplier only because the
+   * toolbar, the gesture extent and the settle sync all speak that unit.
+   * Those three and the wheel clamp must all use THIS number: the extent and
+   * the clamp disagreeing is the yank-back bug the old comment warned about.
+   */
+  const maxMultiplier = useMemo(
+    () => (fitAllK > 0 ? Math.max(8, Math.ceil((spreadFitK * 4) / fitAllK)) : 8),
+    [fitAllK, spreadFitK]
+  );
+
+  /**
+   * The overview map — the "you are here" inset every deep-zoom surface
+   * grows once it can out-zoom its own fit (maps, Figma, Miro; TJ asked for
+   * it 2026-08-14, the same day the ceiling rose). Geometry only: the canvas
+   * scaled into a corner box, spread cells drawn schematically (at ~2% scale
+   * a page image is noise; a cell is a fact), and a viewport rect written
+   * imperatively from applyTransform so it can never lag the real view.
+   */
+  const minimap = useMemo(() => {
+    if (!layout) return null;
+    const scale = Math.min(168 / layout.canvasW, 112 / layout.canvasH);
+    return { scale, w: Math.ceil(layout.canvasW * scale), h: Math.ceil(layout.canvasH * scale) };
+  }, [layout]);
+  const minimapRef = useRef<HTMLDivElement | null>(null);
+  const minimapViewRef = useRef<HTMLDivElement | null>(null);
+
   // The latest of everything the imperative handlers need, without
   // re-registering them (the branch's resDeps pattern).
-  const live = useRef({ layout, stage, fitAllK, spreadFitK, basePageWidth, zoomMultiplier, onZoomMultiplier, onTransform });
+  const live = useRef({ layout, stage, fitAllK, spreadFitK, maxMultiplier, minimap, basePageWidth, zoomMultiplier, onZoomMultiplier, onTransform });
   useEffect(() => {
-    live.current = { layout, stage, fitAllK, spreadFitK, basePageWidth, zoomMultiplier, onZoomMultiplier, onTransform };
+    live.current = { layout, stage, fitAllK, spreadFitK, maxMultiplier, minimap, basePageWidth, zoomMultiplier, onZoomMultiplier, onTransform };
   });
+
+  // Tell the toolbar how far + may go for THIS document.
+  useEffect(() => {
+    onZoomRange?.(maxMultiplier);
+  }, [maxMultiplier, onZoomRange]);
 
   // Read by retargetView's hysteresis without re-registering it.
   const pageViewRef = useRef<Record<number, { tier: Exclude<PageTier, "impostor">; res: number }>>({});
+
+  /**
+   * Space-to-pan — the whiteboard convention (FigJam, Miro, Photoshop all
+   * agree on this one): hold space and the pointer becomes a hand, so a drag
+   * pans from ANYWHERE, page text included; release and the text cursor is
+   * back. A held mode, not a toggle — it cannot strand anyone in a pan tool.
+   * Without it, panning at reading zoom meant hunting for a gutter, because
+   * the text layers cover the pages and a drag on them selects (TJ,
+   * 2026-08-14).
+   *
+   * The guard leaves space alone when focus sits on anything interactive —
+   * an input takes the character, a focused button takes the click; only the
+   * unfocused reading surface gives space to the hand.
+   */
+  const spaceHeld = useRef(false);
+  useEffect(() => {
+    const setHeld = (on: boolean) => {
+      if (spaceHeld.current === on) return;
+      spaceHeld.current = on;
+      viewportRef.current?.classList.toggle("space-pan", on);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== " " || e.repeat) return;
+      const active = document.activeElement as HTMLElement | null;
+      const interactive =
+        !!active &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.tagName === "SELECT" ||
+          active.tagName === "BUTTON" ||
+          active.tagName === "A" ||
+          active.tagName === "SUMMARY" ||
+          active.isContentEditable);
+      if (interactive) return;
+      e.preventDefault();
+      setHeld(true);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === " ") setHeld(false);
+    };
+    // A window blur mid-hold (alt-tab with space down) would otherwise leave
+    // the hand stuck on with no keyup ever arriving.
+    const onBlur = () => setHeld(false);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+      setHeld(false);
+    };
+  }, []);
 
   /**
    * After a settle: decide what every page IS at this zoom — the LOD ladder.
@@ -232,42 +340,58 @@ export default function SpreadCanvasView({
 
     const next: Record<number, { tier: Exclude<PageTier, "impostor">; res: number }> = {};
     if (apparentW >= TEXT_TIER_MIN_W) {
-      const promoteMargin = basePageWidth / 2;
+      // Three rings. Text mounts out to mountMargin — AHEAD of a pan, so a
+      // page is selectable before the reader reaches it. It survives out to
+      // keepMargin. Native pixels are spent only inside resMargin: text is
+      // cheap enough to carry wide, rasters are not.
+      const mountMargin = basePageWidth * TEXT_MOUNT_PAGES;
       const keepMargin = basePageWidth * DEMOTE_MARGIN_PAGES;
-      // Who is near (gets the full treatment) and who is merely KEPT — held
-      // at reading tier by hysteresis so its text layer does not churn, but
-      // never given a native raster: kept pages are off-screen, and letting
-      // them into the budget stole sharpness from the pages under the eye.
-      const near: number[] = [];
-      const kept: number[] = [];
+      const resMargin = basePageWidth / 2;
+      const mounted: number[] = [];
+      const sharp: number[] = [];
       for (const s of layout.spreads) {
         for (const p of s.rightPage ? [s.leftPage, s.rightPage] : [s.leftPage]) {
-          if (inRegion(p, s, promoteMargin)) near.push(p);
-          else if (pageViewRef.current[p] && inRegion(p, s, keepMargin)) kept.push(p);
+          const inMount = inRegion(p, s, mountMargin);
+          const held = !inMount && pageViewRef.current[p] && inRegion(p, s, keepMargin);
+          if (inMount || held) {
+            mounted.push(p);
+            if (inRegion(p, s, resMargin)) sharp.push(p);
+          }
         }
       }
       // The budget: native rasters cost pageArea × res² each. Step the shared
-      // res down until the near set fits.
-      if (target > 1 && near.length > 0) {
+      // res down until the sharp set fits.
+      if (target > 1 && sharp.length > 0) {
         const pageArea = basePageWidth * layout.unitH;
-        const maxRes = Math.sqrt(RASTER_BUDGET / (near.length * pageArea));
+        const maxRes = Math.sqrt(RASTER_BUDGET / (sharp.length * pageArea));
         target = Math.max(1, Math.min(target, Math.floor(maxRes * 2) / 2));
       }
-      const nearTier: Exclude<PageTier, "impostor"> = target > 1 ? "native" : "reading";
-      for (const p of near) next[p] = { tier: nearTier, res: target };
-      for (const p of kept) next[p] = { tier: "reading", res: 1 };
+      const sharpSet = new Set(sharp);
+      for (const p of mounted) {
+        next[p] =
+          target > 1 && sharpSet.has(p)
+            ? { tier: "native", res: target }
+            : { tier: "reading", res: 1 };
+      }
     }
 
     pageViewRef.current = next;
-    setPageView((prev) => {
-      const nk = Object.keys(next);
-      if (
-        Object.keys(prev).length === nk.length &&
-        nk.every((k) => prev[+k] && prev[+k].tier === next[+k].tier && prev[+k].res === next[+k].res)
-      ) {
-        return prev;
-      }
-      return next;
+    // A transition, deliberately: promoting a handful of pages mounts text
+    // layers and rasters in one commit, and as an urgent update that commit
+    // landed BETWEEN pan frames — the hang TJ felt. Interruptible, it yields
+    // to the next pointer event and the pan stays fluid; the text arrives a
+    // frame or two later, which the mount margin already hides.
+    startTransition(() => {
+      setPageView((prev) => {
+        const nk = Object.keys(next);
+        if (
+          Object.keys(prev).length === nk.length &&
+          nk.every((k) => prev[+k] && prev[+k].tier === next[+k].tier && prev[+k].res === next[+k].res)
+        ) {
+          return prev;
+        }
+        return next;
+      });
     });
   }, []);
 
@@ -277,13 +401,29 @@ export default function SpreadCanvasView({
     if (!el) return;
     el.style.transform = `translate(${t.x}px, ${t.y}px) scale(${t.k})`;
     el.style.setProperty("--invk", String(Math.max(1, live.current.spreadFitK / t.k)));
+    // The minimap rides the same write: overview + detail must never drift,
+    // so the view-rect is imperative like the canvas — zero React per frame.
+    // Visible only when there is somewhere else to be: at fit-all the rect
+    // IS the map, and a map of where-you-already-are is furniture.
+    const mm = live.current.minimap;
+    const mapEl = minimapRef.current;
+    const viewEl = minimapViewRef.current;
+    if (mm && mapEl && viewEl) {
+      const { stage } = live.current;
+      const vw = (stage.w / t.k) * mm.scale;
+      const vh = (stage.h / t.k) * mm.scale;
+      viewEl.style.transform = `translate(${(-t.x / t.k) * mm.scale}px, ${(-t.y / t.k) * mm.scale}px)`;
+      viewEl.style.width = `${vw}px`;
+      viewEl.style.height = `${vh}px`;
+      mapEl.style.visibility = vw >= mm.w - 1 && vh >= mm.h - 1 ? "hidden" : "visible";
+    }
     live.current.onTransform?.();
     window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
       retargetView();
       // Keep the toolbar slider honest about where a gesture left the zoom.
-      const { fitAllK, zoomMultiplier, onZoomMultiplier } = live.current;
-      const m = Math.min(8, Math.max(0.5, Math.round((tref.current.k / fitAllK) * 10) / 10));
+      const { fitAllK, maxMultiplier, zoomMultiplier, onZoomMultiplier } = live.current;
+      const m = Math.min(maxMultiplier, Math.max(0.5, Math.round((tref.current.k / fitAllK) * 10) / 10));
       if (Math.abs(m - zoomMultiplier) > 0.05) onZoomMultiplier(m);
     }, SETTLE_MS);
   }, [retargetView]);
@@ -321,7 +461,10 @@ export default function SpreadCanvasView({
         // filtering touchstart here left phones with no way to pan a zoomed
         // canvas at all (text layers cover the whole page and touch-action is
         // none). Touch pans everywhere; a tap on a card still clicks it.
+        // With SPACE held the hand owns every mouse drag — text and cards
+        // included; that is the whole point of the mode.
         const t = e.target as HTMLElement;
+        if (e.type === "mousedown" && spaceHeld.current) return !e.button;
         if (e.type === "mousedown" && t.closest(".react-pdf__Page__textContent")) return false;
         if ((e.type === "mousedown" || e.type === "touchstart") && t.closest(".pdf-railcard")) return false;
         return !e.button;
@@ -333,14 +476,14 @@ export default function SpreadCanvasView({
     const zb = zbRef.current;
     if (!zb || !layout || stage.w === 0) return;
     const pad = layout.spreadGap * 4;
-    // The gesture range IS the slider range — [0.5, 8] × fit-all, exactly.
-    // A wider gesture ceiling (the branch allowed spreadFitK * 8) would let a
-    // pinch rest where the settle sync clamps the slider to 8, and the slider
-    // effect would then yank the view back out on its own — the extent and
-    // the clamp must never disagree.
-    zb.scaleExtent([fitAllK * 0.5, fitAllK * 8])
+    // The gesture range IS the slider range — [0.5, maxMultiplier] × fit-all,
+    // exactly. A gesture ceiling wider than the settle sync's clamp would let
+    // a pinch rest where the slider clamps lower, and the slider effect would
+    // then yank the view back out on its own — the extent and the clamp must
+    // never disagree, which is why both read maxMultiplier.
+    zb.scaleExtent([fitAllK * 0.5, fitAllK * maxMultiplier])
       .translateExtent([[-pad, -pad], [layout.canvasW + pad, layout.canvasH + pad]]);
-  }, [layout, stage.w, fitAllK]);
+  }, [layout, stage.w, fitAllK, maxMultiplier]);
 
   useEffect(() => {
     const el = viewportRef.current;
@@ -359,13 +502,13 @@ export default function SpreadCanvasView({
     sel.on("wheel.zoom", null);
     sel.on("wheel.smooth", (e: WheelEvent) => {
       e.preventDefault();
-      const { fitAllK } = live.current;
+      const { fitAllK, maxMultiplier } = live.current;
       const mult = e.deltaMode === 1 ? 0.05 : 0.002; // line-scrolling mice report lines
       const factor = Math.pow(2, -e.deltaY * mult * (e.ctrlKey || e.metaKey ? 10 : 1));
       if (!wheelFrame.current) wheelTarget.current = tref.current.k;
       wheelTarget.current = Math.max(
         fitAllK * 0.5,
-        Math.min(fitAllK * 8, wheelTarget.current * factor)
+        Math.min(fitAllK * maxMultiplier, wheelTarget.current * factor)
       );
       wheelAnchor.current = pointer(e, el);
       hintOn();
@@ -406,6 +549,42 @@ export default function SpreadCanvasView({
     cancelAnimationFrame(wheelFrame.current);
     wheelFrame.current = 0;
   }, []);
+
+  /**
+   * Click (or drag) the overview: the view centre goes to that canvas point
+   * at the CURRENT zoom — navigation, never a zoom change. Driven through
+   * zb.transform so the translate extent still constrains it and every
+   * consumer of the transform (raster retarget, slider sync, the capture
+   * button's reposition) hears about it the ordinary way.
+   */
+  const onMinimapPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const el = minimapRef.current;
+    const zb = zbRef.current;
+    const vp = viewportRef.current;
+    const mm = live.current.minimap;
+    if (!el || !zb || !vp || !mm) return;
+    e.preventDefault();
+    cancelWheel();
+    const moveTo = (clientX: number, clientY: number) => {
+      const r = el.getBoundingClientRect();
+      const cx = (clientX - r.left) / mm.scale;
+      const cy = (clientY - r.top) / mm.scale;
+      const { stage } = live.current;
+      const k = tref.current.k;
+      zb.transform(select(vp), zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k));
+    };
+    moveTo(e.clientX, e.clientY);
+    el.setPointerCapture(e.pointerId);
+    const onMove = (ev: PointerEvent) => moveTo(ev.clientX, ev.clientY);
+    const done = () => {
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", done);
+      el.removeEventListener("pointercancel", done);
+    };
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", done);
+    el.addEventListener("pointercancel", done);
+  }, [cancelWheel]);
 
   /** Set k = m·fitAllK, keeping the canvas point at the stage centre fixed. */
   const applyMultiplier = useCallback((m: number, recenter = false) => {
@@ -527,12 +706,13 @@ export default function SpreadCanvasView({
             tier={pageView[p]?.tier ?? "impostor"}
             pageAspect={pageInfo.get(p)?.aspect ?? null}
             pageImageBase={pageImageBase}
+            sheetBehind={sheetLoaded && !sheetFailed}
             priority={renderPriority}
           />
         </div>
       ))
     );
-  }, [layout, pdf, basePageWidth, gridAspect, stageEl, onAspect, pageView, pageInfo, pageImageBase, renderPriority]);
+  }, [layout, pdf, basePageWidth, gridAspect, stageEl, onAspect, pageView, pageInfo, pageImageBase, sheetLoaded, sheetFailed, renderPriority]);
 
   // --- cards: anchors off the mark.js layer, in canvas units ---
   const measure = useCallback(() => {
@@ -721,12 +901,32 @@ export default function SpreadCanvasView({
   if (!layout) return null;
 
   return (
+    <>
     <div className="pdf-spread-viewport" ref={viewportRef}>
       <div
         className="pdf-spread-canvas"
         ref={canvasRef}
         style={{ width: layout.canvasW, height: layout.canvasH }}
       >
+        {/* The tile above the page: the whole contact sheet as ONE image,
+            under every slot. At fit the matrix is readable the moment this
+            one cached fetch paints; the slots' own thumbs then cover their
+            cells with the same pixels as they arrive. Stretched to the
+            client layout's box — the ~0.1% proportional drift between the
+            server's compose and this layout is beneath notice at any zoom
+            where the sheet is still visible. */}
+        {pageImageBase && !sheetFailed && (
+          <img
+            className="pdf-spread-sheet"
+            src={`${pageImageBase}/sheet`}
+            alt=""
+            draggable={false}
+            decoding="async"
+            onLoad={() => setSheetLoaded(true)}
+            onError={() => setSheetFailed(true)}
+            style={{ position: "absolute", left: 0, top: 0, width: layout.canvasW, height: layout.canvasH }}
+          />
+        )}
         {pagesEl}
 
         {cardsOn && (
@@ -805,5 +1005,49 @@ export default function SpreadCanvasView({
         )}
       </div>
     </div>
+    {minimap && (
+      // The overview inset. aria-hidden and unfocusable by design: it is a
+      // pointer shortcut over state the toolbar (+/−/Fit) and the transform
+      // already expose; a keyboard reader loses nothing. Starts hidden —
+      // applyTransform shows it the moment the view is smaller than the map.
+      <div
+        className="pdf-minimap"
+        ref={minimapRef}
+        style={{ width: minimap.w, height: minimap.h, visibility: "hidden" }}
+        onPointerDown={onMinimapPointerDown}
+        aria-hidden="true"
+        data-testid="matrix-minimap"
+      >
+        <svg width={minimap.w} height={minimap.h} aria-hidden="true">
+          {layout.spreads.flatMap((s) =>
+            (s.rightPage ? [s.leftPage, s.rightPage] : [s.leftPage]).map((p) => (
+              <rect
+                key={p}
+                x={pageX(layout, s, p, basePageWidth) * minimap.scale}
+                y={s.y * minimap.scale}
+                width={basePageWidth * minimap.scale}
+                height={layout.unitH * minimap.scale}
+              />
+            ))
+          )}
+        </svg>
+        {/* The sheet doubles as the minimap's texture — real pages over the
+            schematic cells, which remain the fallback while it loads or if
+            it 404s (a reading the compose has not reached yet). */}
+        {pageImageBase && !sheetFailed && (
+          <img
+            className="pdf-minimap-img"
+            src={`${pageImageBase}/sheet`}
+            alt=""
+            draggable={false}
+            decoding="async"
+            onError={() => setSheetFailed(true)}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          />
+        )}
+        <div className="pdf-minimap-view" ref={minimapViewRef} />
+      </div>
+    )}
+    </>
   );
 }

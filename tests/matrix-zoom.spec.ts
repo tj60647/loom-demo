@@ -157,11 +157,29 @@ test.describe('Matrix zoom', () => {
       .poll(async () => { await wheelAtCenter({ deltaY: -240, ctrlKey: true }); return canvasK(); }, { timeout: 8000 })
       .toBeGreaterThan(afterWheel * 1.05);
 
-    // Fit takes it back to everything-in-view.
+    // The overview inset, while zoomed: visible, and clicking it MOVES the
+    // view — the jump goes through the same zb.transform, same extents, so
+    // nothing else needs to know a minimap exists. (At fit-all it hides: a
+    // map of where-you-already-are is furniture, asserted after Fit below.)
+    const minimap = page.getByTestId('matrix-minimap');
+    await expect(minimap).toBeVisible({ timeout: 5000 });
+    const beforeJump = await page
+      .locator('.pdf-spread-canvas')
+      .evaluate((el) => (el as HTMLElement).style.transform);
+    const box = (await minimap.boundingBox())!;
+    await page.mouse.click(box.x + 5, box.y + 5);
+    await expect
+      .poll(() =>
+        page.locator('.pdf-spread-canvas').evaluate((el) => (el as HTMLElement).style.transform)
+      )
+      .not.toBe(beforeJump);
+
+    // Fit takes it back to everything-in-view — and sends the overview away.
     await page.getByRole('button', { name: 'Fit the whole reading' }).click();
     await expect
       .poll(async () => Math.abs((await canvasK()) - atFit), { timeout: 5000 })
       .toBeLessThan(atFit * 0.06);
+    await expect(minimap).toBeHidden({ timeout: 5000 });
 
     // Cards in the matrix, AT FIT-ALL: no text layer is mounted down here —
     // fit-all is the impostor tier — so the card anchors analytically, off

@@ -1,6 +1,6 @@
 "use client"
-import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
+import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import CaptureModal, { type CaptureReuse } from './CaptureModal';
@@ -132,6 +132,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // panned view at multiplier 1 still needs recentring.
   const [zoom, setZoom] = useState(1);
   const [fitNonce, setFitNonce] = useState(0);
+  // How far + may go, reported by the canvas per document: the ceiling is
+  // anchored to the spread (deep enough to fill the stage with a quarter of
+  // one), not to fit-all — a fixed 8× fit-all reached print size on a short
+  // paper and stalled at barely reading size on a 132-page scan.
+  const [zoomMax, setZoomMax] = useState(8);
   // The pdf.js document proxy, kept for the matrix canvas's raster path.
   const [pdfProxy, setPdfProxy] = useState<PdfDoc | null>(null);
   // The document's height/width, measured off the first page that renders, so
@@ -163,6 +168,19 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       .catch(() => { /* no manifest is a legal state, not an error */ });
     return () => { cancelled = true; };
   }, [sourceId]);
+
+  // Per-page aspect off the manifest, for the page-mode slots.
+  const pageAspects = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const p of manifest?.pages ?? []) {
+      if (p.width && p.height) map.set(p.pageNumber, p.height / p.width);
+    }
+    return map;
+  }, [manifest]);
+
+  // Page mode always outranks the matrix's background sharpening in the
+  // shared render queue: the spread in front of the reader renders first.
+  const pageModePriority = useCallback(() => -1, []);
 
   // Measured aspect reports pass only when they differ by more than 3%:
   // scanned pages vary a percent or two each, and chasing them is the aspect
@@ -211,6 +229,175 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     setStageEl(node);
   }, []);
   const [stage, setStage] = useState({ w: 800, h: 600 });
+
+  /**
+   * Page-mode zoom, as a multiple of the fit (1 = the spread fits, exactly
+   * what page mode always showed). Same economy as the matrix: the text
+   * layer renders once at the fit width and zoom reaches it as CSS scale;
+   * only the raster re-targets, 200ms after the zoom rests. Pan is the
+   * stage's own scrolling — mode-page is already an overflow:auto box with
+   * safe centring, so a zoomed spread scrolls like any oversized content.
+   * 4× fit is print-size on this library's scans and inside every canvas cap.
+   *
+   * Sited below stageRef/stageEl on purpose: the wheel effect lists stageEl
+   * in its deps, and a dep array reads its names at render time — the same
+   * temporal dead zone requestToggleWork documents further down.
+   */
+  const PAGE_ZOOM_MAX = 4;
+  const [pageZoom, setPageZoom] = useState(1);
+  // Written by the two zoom paths below, never mirrored from render: wheel
+  // notches arrive faster than commits, and each must compound on the value
+  // the previous notch chose, not on the last committed one.
+  const pageZoomRef = useRef(1);
+  const [pageModeRes, setPageModeRes] = useState(1);
+  // Where a zoom gesture anchored, applied to the scroll box after React
+  // commits the new size — the content point under the cursor stays put.
+  const zoomAnchorRef = useRef<{ ax: number; ay: number; sl: number; st: number; from: number; to: number } | null>(null);
+
+  useEffect(() => {
+    if (viewMode !== "page") return;
+    const timer = window.setTimeout(() => {
+      const dpr = window.devicePixelRatio || 1;
+      setPageModeRes(Math.max(1, Math.min(6, Math.ceil(pageZoom * dpr * 2) / 2)));
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [pageZoom, viewMode]);
+
+  /** Zoom the spread about a stage point (or its centre), by ratio. */
+  const zoomPageBy = useCallback((factor: number, clientX?: number, clientY?: number) => {
+    const el = stageRef.current;
+    if (!el) return;
+    const from = pageZoomRef.current;
+    const to = Math.min(PAGE_ZOOM_MAX, Math.max(1, Math.round(from * factor * 100) / 100));
+    if (to === from) return;
+    const rect = el.getBoundingClientRect();
+    const ax = clientX != null ? clientX - rect.left : el.clientWidth / 2;
+    const ay = clientY != null ? clientY - rect.top : el.clientHeight / 2;
+    zoomAnchorRef.current = { ax, ay, sl: el.scrollLeft, st: el.scrollTop, from, to };
+    pageZoomRef.current = to;
+    setPageZoom(to);
+  }, [PAGE_ZOOM_MAX]);
+
+  // ctrl/cmd + wheel zooms at the cursor — the same trackpad-pinch
+  // convention the matrix speaks; a plain wheel keeps scrolling the stage.
+  useEffect(() => {
+    if (viewMode !== "page" || !stageEl) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const mult = e.deltaMode === 1 ? 0.05 : 0.002;
+      zoomPageBy(Math.pow(2, -e.deltaY * mult * 10), e.clientX, e.clientY);
+    };
+    stageEl.addEventListener("wheel", onWheel, { passive: false });
+    return () => stageEl.removeEventListener("wheel", onWheel);
+  }, [viewMode, stageEl, zoomPageBy]);
+
+  // The scroll correction, after the new size is in the DOM. Layout effect,
+  // not effect: a frame between resize and correction reads as a lurch.
+  useLayoutEffect(() => {
+    const anchor = zoomAnchorRef.current;
+    const el = stageRef.current;
+    if (!anchor || !el || viewMode !== "page") return;
+    zoomAnchorRef.current = null;
+    const ratio = anchor.to / anchor.from;
+    el.scrollLeft = (anchor.sl + anchor.ax) * ratio - anchor.ax;
+    el.scrollTop = (anchor.st + anchor.ay) * ratio - anchor.ay;
+  }, [pageZoom, viewMode]);
+
+  /**
+   * Grab-to-pan on the page stage — the matrix's gesture language, spoken
+   * here so the two views feel like one instrument (TJ, 2026-08-14: "I want
+   * to grab and pan, not move over to a scroll bar and then back"). Same
+   * rules exactly: a drag on page TEXT selects (that is capture's territory),
+   * a drag anywhere else pans, and space+drag pans from anywhere, text
+   * included. The pan itself is just scroll arithmetic — the stage already
+   * scrolls; this gives the scroll a hand.
+   */
+  const pageSpaceHeld = useRef(false);
+  useEffect(() => {
+    if (viewMode !== "page") return;
+    const setHeld = (on: boolean) => {
+      if (pageSpaceHeld.current === on) return;
+      pageSpaceHeld.current = on;
+      stageRef.current?.classList.toggle("space-pan", on);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== " " || e.repeat) return;
+      const active = document.activeElement as HTMLElement | null;
+      const interactive =
+        !!active &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.tagName === "SELECT" ||
+          active.tagName === "BUTTON" ||
+          active.tagName === "A" ||
+          active.tagName === "SUMMARY" ||
+          active.isContentEditable);
+      if (interactive) return;
+      e.preventDefault();
+      setHeld(true);
+    };
+    const onKeyUp = (e: KeyboardEvent) => { if (e.key === " ") setHeld(false); };
+    const onBlur = () => setHeld(false);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+      setHeld(false);
+    };
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "page" || !stageEl) return;
+    let dragging = false;
+    let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+    let bodySelect = "";
+    const onDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      // The sheet, search panel and toast own their own pointers always.
+      if (target.closest("[data-yourwork], .pdf-search-panel, .captoast, .loom-highlight-tooltip")) return;
+      if (!pageSpaceHeld.current) {
+        if (target.closest(".react-pdf__Page__textContent")) return; // selection's ground
+        if (target.closest("button, a, select, input, textarea, .pdf-railcard")) return;
+      }
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startLeft = stageEl.scrollLeft; startTop = stageEl.scrollTop;
+      stageEl.classList.add("panning");
+      // d3's own trick in the matrix: no selection can start mid-pan.
+      bodySelect = document.body.style.userSelect;
+      document.body.style.userSelect = "none";
+      stageEl.setPointerCapture(e.pointerId);
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!dragging) return;
+      stageEl.scrollLeft = startLeft - (e.clientX - startX);
+      stageEl.scrollTop = startTop - (e.clientY - startY);
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!dragging) return;
+      dragging = false;
+      stageEl.classList.remove("panning");
+      document.body.style.userSelect = bodySelect;
+      try { stageEl.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+    };
+    stageEl.addEventListener("pointerdown", onDown);
+    stageEl.addEventListener("pointermove", onMove);
+    stageEl.addEventListener("pointerup", onUp);
+    stageEl.addEventListener("pointercancel", onUp);
+    return () => {
+      stageEl.removeEventListener("pointerdown", onDown);
+      stageEl.removeEventListener("pointermove", onMove);
+      stageEl.removeEventListener("pointerup", onUp);
+      stageEl.removeEventListener("pointercancel", onUp);
+      stageEl.classList.remove("panning", "space-pan");
+      if (dragging) document.body.style.userSelect = bodySelect;
+    };
+  }, [viewMode, stageEl]);
   
   const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string, pageNum?: number, startOffset?: number, endOffset?: number, pageContentHash?: string} | null>(null);
   const [showCaptureModal, setShowCaptureModal] = useState(false);
@@ -1188,6 +1375,19 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     }
   };
 
+  /**
+   * The fitted width of ONE page in page mode — the base the slots render
+   * their text layers at, once; pageZoom multiplies the DISPLAY width and
+   * reaches the page as CSS scale, so zooming re-renders no text. Stepped to
+   * 8px so a live window-resize nudges the base (and the text layer with it)
+   * once per step, not once per pixel.
+   */
+  const fitProps: { height?: number; width?: number } = calcPageProps();
+  const pageBaseWidth = Math.max(
+    200,
+    Math.round((fitProps.height != null ? fitProps.height / aspect : (fitProps.width ?? 200)) / 8) * 8
+  );
+
   return (
     // In flow, not a fixed takeover: the header and the journey nav stay
     // visible and clickable above the text (ratified TJ 8/1 — the journey is
@@ -1457,7 +1657,15 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            page wider than the stage had its left side permanently unreachable.
            With safe, an overflowing item falls back to start-aligned and can
            be scrolled to. */
-        .pdf-stage.mode-page { overflow: auto; display: flex; justify-content: safe center; }
+        .pdf-stage.mode-page { overflow: auto; display: flex; justify-content: safe center; cursor: grab; }
+        /* The matrix's gesture language, spoken in page mode: the stage is
+           grabbable everywhere except over text (selection) and controls —
+           and with space held, over text too. */
+        .pdf-stage.mode-page .react-pdf__Page__textContent { cursor: text; }
+        .pdf-stage.mode-page.space-pan,
+        .pdf-stage.mode-page.space-pan .react-pdf__Page__textContent { cursor: grab; }
+        .pdf-stage.mode-page.panning,
+        .pdf-stage.mode-page.panning .react-pdf__Page__textContent { cursor: grabbing; }
         .pdf-stage.mode-strip { overflow-x: auto; overflow-y: hidden; }
         /* The matrix pans by TRANSFORM, not by scroll — clip, not hidden,
            and the difference is the same one .pdf-body documents: "hidden"
@@ -1524,6 +1732,15 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           cursor: grab;
         }
         .pdf-spread-viewport:active { cursor: grabbing; }
+        /* Space held: the hand covers everything — the text layers' own
+           cursor:text rule included, which needs the deeper selector to
+           outweigh. Grabbing while the button is down. */
+        .pdf-spread-viewport.space-pan,
+        .pdf-spread-viewport.space-pan .pdf-spread-canvas .react-pdf__Page__textContent,
+        .pdf-spread-viewport.space-pan .pdf-railcard { cursor: grab; }
+        .pdf-spread-viewport.space-pan:active,
+        .pdf-spread-viewport.space-pan:active .pdf-spread-canvas .react-pdf__Page__textContent,
+        .pdf-spread-viewport.space-pan:active .pdf-railcard { cursor: grabbing; }
         /* NO standing will-change: it caches the whole canvas as one GPU
            layer rasterized once, so every zoom scales a stale bitmap and the
            cards and pages go pixelated no matter how sharp their own pixels
@@ -1587,6 +1804,37 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
              land inside the captured passage. */
           user-select: none;
           -webkit-user-select: none;
+        }
+        /* The overview inset — "you are here" on the spread canvas. Sits on
+           the stage, not the transformed plane; applyTransform writes the
+           view-rect imperatively and shows the map only when the view is
+           smaller than the whole (at fit-all it would be a map of everywhere).
+           touch-action none: a drag here steers the view, never the page. */
+        .pdf-minimap {
+          position: absolute;
+          right: 14px;
+          bottom: 14px;
+          z-index: 5;
+          background: var(--paper-2);
+          border: 1px solid var(--rule);
+          border-radius: 4px;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+          overflow: hidden;
+          cursor: pointer;
+          user-select: none;
+          -webkit-user-select: none;
+          touch-action: none;
+        }
+        .pdf-minimap svg { display: block; }
+        .pdf-minimap rect { fill: #fff; stroke: rgba(0, 0, 0, 0.10); }
+        .pdf-minimap-view {
+          position: absolute;
+          top: 0;
+          left: 0;
+          border: 1.5px solid var(--ochre, #c8a03a);
+          background: rgba(200, 154, 46, 0.16);
+          border-radius: 2px;
+          pointer-events: none;
         }
         .pdf-modes { display: flex; background: var(--paper); border-radius: 4px; padding: 2px; border: 1px solid var(--rule); }
         .pdf-modes button { border: none; margin: 0; padding: 4px 9px; }
@@ -1775,7 +2023,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             <button
               className={`btn mini ${viewMode === "matrix" ? "" : "ghost"}`}
               onClick={() => setViewMode("matrix")}
-              data-tip="the whole reading at once — zoom in on any page"
+              data-tip="the whole reading at once — zoom in on any page; hold space to pan from anywhere"
               aria-pressed={viewMode === "matrix"}
             >Matrix</button>
           </div>
@@ -1805,7 +2053,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           {/* Map-canvas zoom controls (TJ, 2026-08-10, replacing the slider):
               − / + step multiplicatively about the view centre, Fit returns
               to everything-in-view. The wheel and pinch drive the same
-              transform; these are the keyboard-and-tap path. */}
+              transform; these are the keyboard-and-tap path. Page mode holds
+              the same three buttons over its own zoom — 1 = the fitted
+              spread, Fit returns to it — so zoom means one thing everywhere. */}
           {viewMode === "matrix" && (
             <div className="pdf-modes" role="group" aria-label="Canvas zoom">
               <button
@@ -1816,7 +2066,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               >−</button>
               <button
                 className="btn mini ghost"
-                onClick={() => setZoom((z) => Math.min(8, Math.round((z * 1.4) * 100) / 100))}
+                onClick={() => setZoom((z) => Math.min(zoomMax, Math.round((z * 1.4) * 100) / 100))}
                 aria-label="Zoom in"
                 data-tip="zoom in"
               >+</button>
@@ -1825,6 +2075,28 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 onClick={() => { setZoom(1); setFitNonce((n) => n + 1); }}
                 aria-label="Fit the whole reading"
                 data-tip="everything in view"
+              >Fit</button>
+            </div>
+          )}
+          {viewMode === "page" && (
+            <div className="pdf-modes" role="group" aria-label="Spread zoom">
+              <button
+                className="btn mini ghost"
+                onClick={() => zoomPageBy(1 / 1.4)}
+                aria-label="Zoom out"
+                data-tip="zoom out (ctrl+scroll)"
+              >−</button>
+              <button
+                className="btn mini ghost"
+                onClick={() => zoomPageBy(1.4)}
+                aria-label="Zoom in"
+                data-tip="zoom in (ctrl+scroll)"
+              >+</button>
+              <button
+                className="btn mini ghost"
+                onClick={() => { zoomAnchorRef.current = null; pageZoomRef.current = 1; setPageZoom(1); }}
+                aria-label="Fit the spread"
+                data-tip="back to the fitted spread"
               >Fit</button>
             </div>
           )}
@@ -2082,43 +2354,45 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 onOpenPassage={gotoOpenPassage}
               >
                 <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
-                  {/* The loading node is the pre-rendered page image, sized
-                      like the page it stands in for — so a page turn paints
-                      NOW and pdf.js's crisp render replaces it when the
-                      decode lands (a second or more on a scanned reading,
-                      per page, every turn). No image, no placeholder: the
-                      blank flash is the pre-derivative behaviour. */}
-                  <Page
+                  {/* The same slot the matrix reads through, at native tier:
+                      the pre-rendered image paints the turn instantly (it was
+                      prefetched), the text layer renders once at the fitted
+                      base width, and the pdf.js raster sharpens over the
+                      image through the shared queue — page mode always
+                      outranks the matrix's background work in it. Keyed by
+                      page so a turn starts the slot's state (measured aspect,
+                      image readiness) fresh for the page it now holds. */}
+                  <PageSlot
+                    key={pageNumber}
                     pageNumber={pageNumber}
-                    {...calcPageProps()}
-                    renderTextLayer={true}
-                    renderAnnotationLayer={true}
-                    className="pdf-page-shadow"
-                    onLoadSuccess={(page) => { if (page.originalWidth) acceptAspect(page.originalHeight / page.originalWidth) }}
-                    loading={pageImageBase ? (
-                      <img
-                        src={`${pageImageBase}/${pageNumber}?w=1280`}
-                        alt=""
-                        className="pdf-page-shadow"
-                        style={{ ...calcPageProps(), aspectRatio: `1 / ${aspect}`, display: "block" }}
-                      />
-                    ) : undefined}
+                    width={pageBaseWidth * pageZoom}
+                    aspect={aspect}
+                    eager
+                    onAspect={acceptAspect}
+                    pdf={pdfProxy}
+                    baseWidth={pageBaseWidth}
+                    res={pageModeRes}
+                    tier="native"
+                    pageAspect={pageAspects.get(pageNumber) ?? null}
+                    pageImageBase={pageImageBase}
+                    priority={pageModePriority}
+                    annotations
                   />
                   {isTwoPage && pageNumber + 1 <= (numPages || 1) && (
-                    <Page
+                    <PageSlot
+                      key={pageNumber + 1}
                       pageNumber={pageNumber + 1}
-                      {...calcPageProps()}
-                      renderTextLayer={true}
-                      renderAnnotationLayer={true}
-                      className="pdf-page-shadow"
-                      loading={pageImageBase ? (
-                        <img
-                          src={`${pageImageBase}/${pageNumber + 1}?w=1280`}
-                          alt=""
-                          className="pdf-page-shadow"
-                          style={{ ...calcPageProps(), aspectRatio: `1 / ${aspect}`, display: "block" }}
-                        />
-                      ) : undefined}
+                      width={pageBaseWidth * pageZoom}
+                      aspect={aspect}
+                      eager
+                      pdf={pdfProxy}
+                      baseWidth={pageBaseWidth}
+                      res={pageModeRes}
+                      tier="native"
+                      pageAspect={pageAspects.get(pageNumber + 1) ?? null}
+                      pageImageBase={pageImageBase}
+                      priority={pageModePriority}
+                      annotations
                     />
                   )}
                 </div>
@@ -2180,6 +2454,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               pageImageBase={pageImageBase}
               zoomMultiplier={zoom}
               onZoomMultiplier={setZoom}
+              onZoomRange={setZoomMax}
               focusPage={pageNumber}
               fitNonce={fitNonce}
               onTransform={handleCanvasTransform}
