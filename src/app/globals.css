@@ -39,6 +39,11 @@ h1,h2,h3{font-family:var(--display);font-weight:500;margin:0}
 .label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
 .cap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--grey)}
 header{border-bottom:1px solid var(--rule);padding:10px 26px 8px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--paper)}
+/* Reading focus (Lingxiu, 2026-08-15): with a text open on 01 · Reading the
+   station is just the text — Workbench sets this attribute and withholds its
+   own scope bar and footer; the header is the root layout's, so it is hidden
+   here. The journey bar and the viewer's toolbar are all that stand. */
+body[data-reading-focus] header{display:none}
 .wordmark{font-family:var(--display);font-size:24px;font-weight:600;line-height:1;display:flex;align-items:center;gap:9px}
 .wordmark small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);font-weight:400;margin-top:3px}
 header .spacer{flex:1}

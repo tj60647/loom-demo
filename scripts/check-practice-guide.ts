@@ -379,15 +379,14 @@ assert(GUIDE_STEPS.length === 8, "eight beats — the moves the work requires, a
   const mask = rung(".guidemask")
   const pop = rung(".guidepop")
   const scrim = rung(".info-scrim")
-  const fullscreen = Number(
-    readFileSync("src/components/pdf/PdfViewer.tsx", "utf8")
-      .match(/\.pdf-shell\.fullscreen[\s\S]{0,240}?z-index:\s*(\d+)/)?.[1] ?? NaN
-  )
-
+  // The in-app fullscreen (`.pdf-shell.fullscreen`, toggled by `f`) is gone
+  // (2026-08-15): the reading station strips Loom's chrome itself, so there
+  // is no takeover left for the mask to outrank — and no assertion to keep.
+  // If a fullscreen mode ever returns, restore the rung-above-it check here.
   assert(
-    mask > fullscreen,
-    "the mask sits above fullscreen — `f` cannot delete the guide",
-    `mask ${mask} vs fullscreen ${fullscreen}`
+    !readFileSync("src/components/pdf/PdfViewer.tsx", "utf8").includes(".pdf-shell.fullscreen {"),
+    "no in-app fullscreen stands under the guide",
+    "PdfViewer grew a `.pdf-shell.fullscreen` rule back — restore the mask-above-fullscreen z-index assertion beside this one"
   )
   assert(
     mask < scrim && pop < scrim,

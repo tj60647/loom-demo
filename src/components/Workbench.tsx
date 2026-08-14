@@ -178,6 +178,21 @@ export default function Workbench({
     setVisited((seen) => (seen.has(tab) ? seen : new Set(seen).add(tab)))
   }, [])
 
+  /**
+   * Reading focus (Lingxiu, 2026-08-15): with the text open, the station is
+   * just the text. The app header, the scope bar and the footer all stand
+   * down, leaving the journey bar and the viewer's own toolbar — the two
+   * surfaces that still do work here. The scope bar and footer are this
+   * component's to withhold below; the header is the root layout's, so it is
+   * hidden by a body attribute and one rule in globals.css.
+   */
+  const readingFocus = activeTab === "reading" && source.hasFile
+  useEffect(() => {
+    if (!readingFocus) return
+    document.body.setAttribute("data-reading-focus", "")
+    return () => document.body.removeAttribute("data-reading-focus")
+  }, [readingFocus])
+
   // The practice guide moves the student between stations as its beats change.
   // An event rather than a prop: the guide renders below this component's own
   // chrome, and threading a setter down through it would put the workbench's
@@ -291,29 +306,34 @@ export default function Workbench({
 
   return (
     <>
-      <div className="scopebar">
-        {/* No "‹ library" here (TJ, 2026-08-08): 00 · Library is in the journey
-            bar directly below, so this was a second door to the same place. */}
-        <>
-          <span className="scopetitle">{source.title}</span>
-          {source.author ? <span className="scopemeta">{source.author}</span> : null}
-          <span className="scopemeta">
-            {scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} evidenced here
-            {scoped.bridges.length
-              ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out`
-              : ""}
-          </span>
-          {/* The library card used to carry this; the reading is the library
-              card now, so the affordance moves here rather than disappearing. */}
-          {source.hasFile ? (
-            <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>
-              Download PDF
-            </a>
-          ) : (
-            <span className="scopemeta scopedl">your own card — no pdf here</span>
-          )}
-        </>
-      </div>
+      {/* Withheld in reading focus, not restyled: the title, the tallies and
+          Download PDF live on the other stations, where there is chrome to
+          carry them. */}
+      {!readingFocus && (
+        <div className="scopebar">
+          {/* No "‹ library" here (TJ, 2026-08-08): 00 · Library is in the journey
+              bar directly below, so this was a second door to the same place. */}
+          <>
+            <span className="scopetitle">{source.title}</span>
+            {source.author ? <span className="scopemeta">{source.author}</span> : null}
+            <span className="scopemeta">
+              {scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} evidenced here
+              {scoped.bridges.length
+                ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out`
+                : ""}
+            </span>
+            {/* The library card used to carry this; the reading is the library
+                card now, so the affordance moves here rather than disappearing. */}
+            {source.hasFile ? (
+              <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>
+                Download PDF
+              </a>
+            ) : (
+              <span className="scopemeta scopedl">your own card — no pdf here</span>
+            )}
+          </>
+        </div>
+      )}
 
       {/* The standing search band stood here, on every station, and the toolbar
           above carried a toggle for it under 900px. Both are gone (TJ,
@@ -419,12 +439,14 @@ export default function Workbench({
         </div>
       </main>
 
-      <footer>
-        {/* The number comes from the bar above, so hiding or restoring a
-            station can never leave the footer claiming a different one. */}
-        <span className="fl">{stationNumber(STATION_OF[activeTab])} — {FOOT[activeTab][0]}</span>
-        <span className="fr">{FOOT[activeTab][1]}</span>
-      </footer>
+      {!readingFocus && (
+        <footer>
+          {/* The number comes from the bar above, so hiding or restoring a
+              station can never leave the footer claiming a different one. */}
+          <span className="fl">{stationNumber(STATION_OF[activeTab])} — {FOOT[activeTab][0]}</span>
+          <span className="fr">{FOOT[activeTab][1]}</span>
+        </footer>
+      )}
     </>
   )
 }

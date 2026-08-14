@@ -16,7 +16,7 @@ import type { ReadingPageHit } from '@/actions/search';
 import { overlayBlockMessage, type OverlayBand, type PassagesOverlay } from '@/lib/overlay';
 import { hitTermsOf } from '@/lib/searchText';
 import Snippet from '@/components/ui/Snippet';
-import { Passage, Concept } from '@/lib/types';
+import { Passage } from '@/lib/types';
 import { hashText } from '@/lib/hash';
 import Mark from 'mark.js';
 
@@ -63,21 +63,11 @@ interface PdfViewerProps {
   onToggleWork: () => void;
   /**
    * What goes inside it. The viewer owns the sheet — its geometry, its
-   * keyboard, its focus — because the sheet lives inside .pdf-shell so that
-   * fullscreen carries it along; the workbench owns only what is written on it.
+   * keyboard, its focus — because the sheet lives inside .pdf-shell, over the
+   * reading it annotates; the workbench owns only what is written on it.
    */
   workPanel?: ReactNode;
 }
-
-/** One passage on the clicked span, as the highlight tooltip presents it. */
-type HighlightEntry = {
-  passageId: string;
-  conceptLabel: string;
-  source: string;
-  location: string;
-  startOffset: number | null;
-  endOffset: number | null;
-};
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
   const { state, scoped } = useLoom();
@@ -91,16 +81,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [isNarrow, setIsNarrow] = useState(false);
-  // One passage can carry several passages — the same span re-filed under a
-  // second concept, or overlapping captures. The tooltip lists every passage on
-  // the clicked span, so no coding is hidden behind another.
-  const [highlightTooltip, setHighlightTooltip] = useState<{
-    entries: HighlightEntry[];
-    x: number;
-    y: number;
-    sticky: boolean;
-  } | null>(null);
-  
+
   // Layout state
   const [isTwoPage, setIsTwoPage] = useState(true); // default to 2-page spread
   const [fitMode, setFitMode] = useState<"width" | "height">("height");
@@ -117,14 +98,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * passage can be selected and captured in any of them.
    */
   const [viewMode, setViewMode] = useState<"page" | "strip" | "matrix">("page");
-  /**
-   * Margin cards (the spread canvas's rail, page mode only): each passage on
-   * the open spread drawn as a card beside its page. Off by default and not
-   * persisted — the same standing as viewMode itself.
-   */
-  const [railsOn, setRailsOn] = useState(false);
-  // Covers the whole window, chrome included — the reading takes the screen.
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  // The margin cards are ALWAYS on (Lingxiu, 2026-08-15, restoring the spread
+  // canvas's intention): the concepts beside the passages they came from are
+  // the reading surface, not a display option — so there is no toggle.
   // Matrix zoom, as a multiple of the whole-canvas fit: 1 = every spread in
   // view. The − / + buttons and the canvas's own wheel/pinch drive the SAME
   // transform — SpreadCanvasView syncs this back when a gesture settles.
@@ -430,79 +406,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // and must see the current heat without being re-registered.
   const overlayRef = useRef<PassagesOverlay | null>(null);
 
-  const hideHighlightTooltip = useCallback(() => {
-    setHighlightTooltip(null);
-  }, []);
-
-  // Latest passages/concepts for click-time lookups. Overlapping captures nest
-  // their <mark> elements, so the passage list for a span is read off the DOM at
-  // click time rather than frozen per node at mark time.
+  // Latest passages for the highlight applier, which runs from a
+  // MutationObserver and must see the current rows without re-registering.
+  // A highlight is paint plus an id for the rail's anchor measure — it is not
+  // a control. The card in the margin is the door to the passage (Lingxiu,
+  // 2026-08-15: the click-a-highlight tooltip is gone; the cards say it).
   const passagesRef = useRef<Passage[]>([]);
-  const conceptsRef = useRef<Concept[]>([]);
-  useEffect(() => {
-    conceptsRef.current = state.concepts;
-  }, [state.concepts]);
-
-  /**
-   * Every passage covering this node's span: the node's own passage plus the passages
-   * of the ancestor marks it is nested inside. Ordered as the passages appear in
-   * the capture list, so the tooltip is stable no matter which layer was
-   * clicked.
-   */
-  const entriesForNode = useCallback((node: HTMLElement): HighlightEntry[] => {
-    const ids: string[] = [];
-    let el: HTMLElement | null = node.closest(".loom-passage-highlight");
-    while (el) {
-      const id = el.getAttribute("data-loom-passage-id");
-      if (id && !ids.includes(id)) ids.push(id);
-      el = el.parentElement ? el.parentElement.closest(".loom-passage-highlight") : null;
-    }
-    const orderOf = new Map(passagesRef.current.map((b, i) => [b.id, i]));
-    ids.sort((a, b) => (orderOf.get(a) ?? 0) - (orderOf.get(b) ?? 0));
-    return ids.flatMap((id) => {
-      const passage = passagesRef.current.find((b) => b.id === id);
-      if (!passage) return [];
-      const concept = conceptsRef.current.find((c) => c.id === passage.conceptIds[0]);
-      return [{
-        passageId: passage.id,
-        conceptLabel: concept?.label || "Unlabeled passage",
-        source: passage.source || sourceName,
-        location: passage.location || "",
-        startOffset: passage.startOffset ?? null,
-        endOffset: passage.endOffset ?? null,
-      }];
-    });
-  }, [sourceName]);
-
-  const bindHighlightNode = useCallback((node: HTMLElement, passageId: string) => {
-    node.setAttribute("data-loom-passage-id", passageId);
-
-    const showFromEvent = (event: MouseEvent | PointerEvent | FocusEvent, sticky = false) => {
-      const target = (event.target as HTMLElement | null) ?? node;
-      const entries = entriesForNode(target);
-      if (!entries.length) return;
-      const rect = target.getBoundingClientRect();
-      const x = rect ? rect.left + rect.width / 2 : ("clientX" in event && event.clientX ? event.clientX : 0);
-      const y = rect ? rect.top : ("clientY" in event && event.clientY ? event.clientY : 0);
-      setHighlightTooltip({ entries, x, y, sticky });
-    };
-
-    const onClick = (event: MouseEvent) => {
-      event.stopPropagation();
-      showFromEvent(event, true);
-    };
-
-    const onFocus = (event: FocusEvent) => showFromEvent(event, true);
-
-    node.addEventListener("click", onClick);
-    node.addEventListener("focus", onFocus);
-    node.setAttribute("title", "Click highlight for actions");
-
-    return () => {
-      node.removeEventListener("click", onClick);
-      node.removeEventListener("focus", onFocus);
-    };
-  }, [entriesForNode]);
 
   // Responsive sizing and layout detection
   useEffect(() => {
@@ -538,7 +447,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [viewMode, isFullscreen]);
+  }, [viewMode]);
 
   // Text selection listener
   useEffect(() => {
@@ -744,20 +653,6 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     };
   }, [highlightRect]);
 
-  useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      if (target.closest(".loom-passage-highlight") || target.closest(".loom-highlight-tooltip")) {
-        return;
-      }
-      hideHighlightTooltip();
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [hideHighlightTooltip]);
-
   function onDocumentLoadSuccess(pdf: PdfDoc): void {
     setNumPages(pdf.numPages);
     // The proxy itself, kept for the matrix's raster path: PageRaster renders
@@ -766,8 +661,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     setPdfProxy(pdf);
   }
 
-  // Keep passagesRef current (declared above, next to conceptsRef) so the
-  // MutationObserver's applier never needs state.passages as a dependency.
+  // Keep passagesRef current (declared above) so the MutationObserver's
+  // applier never needs state.passages as a dependency.
   useEffect(() => {
     passagesRef.current = state.passages.filter(b => (sourceId && b.sourceId === sourceId) || b.source === sourceName);
   }, [state.passages, sourceName, sourceId]);
@@ -1037,10 +932,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   className: "loom-passage-highlight",
                   each: (node) => {
                     const concept = state.concepts.find((c) => c.id === passage.conceptIds[0]);
-                    const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
+                    const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}.`;
                     (node as HTMLElement).setAttribute("aria-label", a11y);
-                    (node as HTMLElement).setAttribute("tabindex", "0");
-                    bindHighlightNode(node as HTMLElement, passage.id);
+                    // The id is the rail's anchor: the card in the margin is
+                    // the door, so the mark itself is paint, not a control.
+                    (node as HTMLElement).setAttribute("data-loom-passage-id", passage.id);
                   },
                   done: (count) => matches += count
                 });
@@ -1059,10 +955,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
                   each: (node) => {
                     const concept = state.concepts.find((c) => c.id === passage.conceptIds[0]);
-                    const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
+                    const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}.`;
                     (node as HTMLElement).setAttribute("aria-label", a11y);
-                    (node as HTMLElement).setAttribute("tabindex", "0");
-                    bindHighlightNode(node as HTMLElement, passage.id);
+                    (node as HTMLElement).setAttribute("data-loom-passage-id", passage.id);
                   },
                   done: (count) => matches += count
                 });
@@ -1144,7 +1039,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     // and having it there made every page turn re-register the observer and
     // re-mark every mounted layer to update marks on the one page that changed
     // — which the observer already catches when that page's layer lands.
-  }, [state.passages, state.concepts, bindHighlightNode, sourceName, searchTerms, overlay, stageEl]); // Re-run when passages, search terms or the overlay change — and if the stage node itself is replaced
+  }, [state.passages, state.concepts, sourceName, searchTerms, overlay, stageEl]); // Re-run when passages, search terms or the overlay change — and if the stage node itself is replaced
 
   const handleCaptureClick = () => {
     if (highlightRect) {
@@ -1230,8 +1125,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     const handleKeyDown = (e: KeyboardEvent) => {
       // A dialog owns the keyboard while it is up — the capture modal, Loom's
       // confirm (which you can raise from inside the sheet: "remove concept"),
-      // an info panel, the walkthrough. Escape there is theirs, and `f` must
-      // not throw a reader into fullscreen out from under one.
+      // an info panel, the walkthrough. Escape there is theirs.
       if (showCaptureModal || document.querySelector(".info-scrim, .scrim.show")) return;
 
       const active = document.activeElement as HTMLElement | null;
@@ -1252,20 +1146,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       if (inWork && e.key !== "Escape") return;
 
       if (e.key === 'Escape') {
-        // One Escape, one thing: dismiss the tooltip if one is open, then the
-        // search panel, then Your work, then fullscreen. Doing several at once
-        // would take the reading away from someone who only meant to close a
-        // label. Your work comes before fullscreen because it is the nearer
-        // thing — Escape means the topmost surface, not the biggest one.
-        if (highlightTooltip) hideHighlightTooltip();
-        else if (searchOpen) closeSearch();
+        // One Escape, one thing: the search panel first, then Your work.
+        // Doing several at once would take the reading away from someone who
+        // only meant to close a panel — Escape means the topmost surface.
+        if (searchOpen) closeSearch();
         else if (workOpen) requestToggleWork();
-        else if (isFullscreen) setIsFullscreen(false);
-        return;
-      }
-
-      if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        setIsFullscreen((on) => !on);
         return;
       }
 
@@ -1281,7 +1166,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal, viewMode, isFullscreen, highlightTooltip, searchOpen, closeSearch, workOpen, requestToggleWork]);
+  }, [canGoPrev, canGoNext, handlePrev, handleNext, showCaptureModal, viewMode, searchOpen, closeSearch, workOpen, requestToggleWork]);
 
   /**
    * Your work is not a dialog: the reading stays live and selectable behind
@@ -1339,9 +1224,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // to them here so the spread still fits without a sideways scroll. Fit-page
   // is left alone — height is unaffected, and "safe center" already lets an
   // overflowing spread scroll rather than clipping its start edge.
-  const railSpace = railsOn && !isNarrow && viewMode === "page"
-    ? (isTwoPage ? 2 : 1) * (RAIL_W + 12)
-    : 0;
+  // Both rails, always: odd pages annotate leftward and even pages rightward
+  // whatever the view, so the room is standing — a page turn or a view switch
+  // never re-centres the text under the reader's eye.
+  const railSpace = !isNarrow && viewMode === "page" ? 2 * (RAIL_W + 12) : 0;
 
   const calcPageProps = () => {
     if (fitMode === "height") {
@@ -1393,16 +1279,17 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     // visible and clickable above the text (ratified TJ 8/1 — the journey is
     // always in view; tab 00 is one of its stations).
     <div
-      className={`pdf-shell${isFullscreen ? " fullscreen" : ""}`}
+      className="pdf-shell"
       ref={containerRef}
     >
 
       <style>{`
+        /* Paint, not a control: the card in the margin is the door to the
+           passage, so the mark carries no cursor and no handlers. */
         .loom-passage-highlight {
           background-color: rgba(255, 204, 0, 0.4);
           border-bottom: 2px solid rgba(255, 204, 0, 0.8);
           color: inherit;
-          cursor: help;
           pointer-events: auto;
         }
         /* A searched word on the page. Sage, not the passage yellow: a search
@@ -1478,7 +1365,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         .pdf-overlay-scale i:nth-child(5) { background: rgba(64, 84, 112, 0.44); box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.95); }
         .pdf-search-panel {
           position: absolute;
-          top: 64px;
+          /* Just under the toolbar, which stands at its spread-canvas height. */
+          top: 40px;
           right: 12px;
           z-index: 20;
           width: min(340px, calc(100vw - 24px));
@@ -1528,102 +1416,15 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           padding: 0 1px;
           border-radius: 2px;
         }
-        .loom-highlight-tooltip {
-          position: fixed;
-          z-index: 9500;
-          max-width: min(320px, calc(100vw - 24px));
-          background: rgba(26, 25, 22, 0.95);
-          color: var(--paper);
-          border: 1px solid rgba(255, 204, 0, 0.4);
-          border-radius: 6px;
-          padding: 8px 10px;
-          font-size: 12px;
-          line-height: 1.4;
-          white-space: pre-wrap;
-          box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
-          backdrop-filter: blur(2px);
-          pointer-events: auto;
-        }
-        .loom-highlight-tooltip .entry + .entry {
-          margin-top: 8px;
-          padding-top: 8px;
-          border-top: 1px solid rgba(0, 0, 0, 0.12);
-        }
-        .loom-highlight-tooltip .head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          margin-bottom: 2px;
-        }
-        .loom-highlight-tooltip .meta {
-          font-family: var(--mono);
-          font-size: 10px;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          opacity: 0.88;
-          margin-bottom: 0;
-          color: rgba(255, 204, 0, 0.9);
-        }
-        .loom-highlight-tooltip .close {
-          margin: 0;
-          padding: 0;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          border: 1px solid rgba(255, 255, 255, 0.4);
-          background: transparent;
-          color: rgba(255, 255, 255, 0.85);
-          font-size: 10px;
-          line-height: 1;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-        }
-        .loom-highlight-tooltip .close:hover {
-          border-color: rgba(255, 255, 255, 0.75);
-          color: #fff;
-        }
-        .loom-highlight-tooltip .coding {
-          font-family: var(--display);
-          font-size: 15px;
-          color: var(--paper);
-        }
-        .loom-highlight-tooltip .foot {
-          margin-top: 8px;
-          border-top: 1px solid rgba(255, 255, 255, 0.18);
-          padding-top: 6px;
-          font-family: var(--mono);
-          font-size: 10px;
-          letter-spacing: 0.03em;
-          color: rgba(255, 255, 255, 0.8);
-        }
-        .loom-highlight-tooltip button {
-          margin-top: 8px;
-          background: transparent;
-          border: 1px solid rgba(255, 204, 0, 0.45);
-          color: rgba(255, 204, 0, 0.98);
-          border-radius: 4px;
-          font-family: var(--mono);
-          font-size: 10px;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          padding: 4px 7px;
-          cursor: pointer;
-        }
-        .loom-highlight-tooltip button:hover {
-          border-color: rgba(255, 204, 0, 0.95);
-          color: #fff2cc;
-        }
         /* Make sure the text layer passes pointer events down so we can select */
         .react-pdf__Page__textContent span {
           pointer-events: auto;
         }
 
-        /* The shell fills whatever it is given; in fullscreen it takes the
-           window, above the header and journey but below Loom's own overlays
-           (.info-scrim is 10000, so capture still opens on top). */
+        /* The shell fills whatever it is given. The old in-app fullscreen
+           (".pdf-shell.fullscreen") is gone: the reading station already
+           strips Loom's chrome down to the journey bar and this toolbar
+           (Lingxiu, 2026-08-15), so there is no fuller screen to take. */
         .pdf-shell {
           position: relative;
           background-color: var(--paper);
@@ -1635,12 +1436,6 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
              somewhere nothing can scroll to. A landscape phone leaves barely
              300px under the chrome — less than any floor worth setting — so
              the shell takes what it is given and the stage scrolls inside. */
-          min-height: 0;
-        }
-        .pdf-shell.fullscreen {
-          position: fixed;
-          inset: 0;
-          z-index: 6000;
           min-height: 0;
         }
         /* The stage is the only scrolling part of the viewer, so the toolbar
@@ -1765,13 +1560,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            not wear them. */
         .pdf-spread-canvas .pdf-rail-leaders { z-index: 3; }
         .pdf-spread-canvas .pdf-railcard { z-index: 3; }
-        /* Counter-scaling: card text never shrinks below its reading size as
-           the canvas zooms out. Done via font-size — real layout, not a
-           transform — so the card grows to hold it and the rail re-stacks. */
+        /* Counter-scaling, exactly as the spread canvas had it: the TITLE
+           ALONE never shrinks below its reading size as the canvas zooms out
+           (via font-size — real layout, so the card grows to hold it and the
+           rail re-stacks), while the definition, note and chips keep their
+           base size and shrink with the page. At full zoom-out you are
+           reading concept names, not paragraph text. */
         .pdf-spread-canvas .pdf-railcard-label { font-size: calc(13px * var(--invk, 1)); }
-        .pdf-spread-canvas .pdf-railcard-def { font-size: calc(12px * var(--invk, 1)); }
-        .pdf-spread-canvas .pdf-railcard-note { font-size: calc(11px * var(--invk, 1)); }
-        .pdf-spread-canvas .pdf-railcard-chip { font-size: calc(10px * var(--invk, 1)); }
         /* The matrix raster path: our canvas below, react-pdf's text layer
            laid absolutely over it — the Page div itself paints nothing. The
            scale wrapper clips to the slot's zoomed footprint so the transform
@@ -1836,21 +1631,25 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           border-radius: 2px;
           pointer-events: none;
         }
-        .pdf-modes { display: flex; background: var(--paper); border-radius: 4px; padding: 2px; border: 1px solid var(--rule); }
+        .pdf-modes { display: flex; background: var(--paper); border-radius: 4px; padding: 1px; border: 1px solid var(--rule); }
         .pdf-modes button { border: none; margin: 0; padding: 4px 9px; }
+        /* The spread canvas's topbar, to the pixel (sc-topbar): 2px 12px
+           around the row, buttons at 4px 9px with .btn.mini's 36px min-height
+           released — that min-height, not padding, was what made the old bar
+           tall. */
         .pdf-toolbar {
           display: flex;
           flex-wrap: wrap;
           justify-content: space-between;
           align-items: center;
-          gap: 10px;
-          padding: 10px 20px;
+          gap: 12px;
+          padding: 2px 12px;
           border-bottom: 1px solid var(--rule);
           background-color: var(--paper-2);
-          box-shadow: 0 2px 10px rgba(0,0,0,0.05);
           z-index: 10;
           flex: 0 0 auto;
         }
+        .pdf-toolbar .btn { padding: 4px 9px; min-height: 0; }
 
         @media (max-width: 900px) {
           .pdf-strip-run { gap: 10px; padding: 8px 10px; }
@@ -2007,25 +1806,33 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-          {/* How the pages are laid out. Three ways of holding the same text:
-              one spread, one long run, or the whole thing at once. */}
+          {/* How the pages are laid out — the spread canvas's one toggle,
+              restored (Lingxiu, 2026-08-15): one page, two pages, or the whole
+              reading on one zoomable canvas. Three states in one group, where
+              a Page/Matrix pair plus a 2-Page checkbox used to say the same
+              thing in two controls.
+              Strip is HIDDEN, not deleted (TJ, 2026-08-10: "the new view
+              supercedes it") — the render branch and CSS stay, so restoring a
+              button restores the mode. */}
           <div className="pdf-modes" role="group" aria-label="Page layout">
             <button
-              className={`btn mini ${viewMode === "page" ? "" : "ghost"}`}
-              onClick={() => setViewMode("page")}
-              data-tip="one spread at a time"
-              aria-pressed={viewMode === "page"}
-            >Page</button>
-            {/* Strip is HIDDEN, not deleted (TJ, 2026-08-10: "the new view
-                supercedes it") — the matrix canvas is the continuous view
-                now, and page mode holds the phone. The render branch and CSS
-                stay, so restoring the button restores the mode. */}
+              className={`btn mini ${viewMode === "page" && !isTwoPage ? "" : "ghost"}`}
+              onClick={() => { setViewMode("page"); setIsTwoPage(false); }}
+              data-tip="one page at a time"
+              aria-pressed={viewMode === "page" && !isTwoPage}
+            >1 page</button>
+            <button
+              className={`btn mini ${viewMode === "page" && isTwoPage ? "" : "ghost"}`}
+              onClick={() => { setViewMode("page"); setIsTwoPage(true); }}
+              data-tip="a two-page spread"
+              aria-pressed={viewMode === "page" && isTwoPage}
+            >2 pages</button>
             <button
               className={`btn mini ${viewMode === "matrix" ? "" : "ghost"}`}
               onClick={() => setViewMode("matrix")}
               data-tip="the whole reading at once — zoom in on any page; hold space to pan from anywhere"
               aria-pressed={viewMode === "matrix"}
-            >Matrix</button>
+            >Canvas</button>
           </div>
 
           {viewMode === "page" && (
@@ -2101,32 +1908,6 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </div>
           )}
 
-          {viewMode === "page" && !isNarrow && (
-            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }} className="label">
-              <input
-                type="checkbox"
-                checked={isTwoPage}
-                onChange={(e) => setIsTwoPage(e.target.checked)}
-              />
-              2-Page Spread
-            </label>
-          )}
-
-          {/* The margin cards. A display toggle, not a mode: the pages, the
-              capture flow and the keyboard are exactly the host view's. In
-              page mode they flank the open spread; in the matrix they flank
-              every spread and counter-scale, so zooming out reads as a
-              concept map. */}
-          {(viewMode === "page" || viewMode === "matrix") && !isNarrow && (
-            <button
-              className={`btn mini ${railsOn ? "" : "ghost"}`}
-              onClick={() => setRailsOn((on) => !on)}
-              aria-pressed={railsOn}
-              aria-label="Cards in the margin"
-              data-tip="your concepts beside the passages they came from"
-            >Cards</button>
-          )}
-
           {/* Overlay (ruling 28) — a read-only comparison with a discussion
               section or the whole cohort. **Faculty and admins only** (TJ,
               2026-08-08): students do not get this at all, and faculty meet it
@@ -2180,21 +1961,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </button>
           )}
 
-          {/* "Just the text", not "full screen" (TJ, 2026-08-12). This has
-              never been the browser's fullscreen — it is an in-app mode:
-              `.pdf-shell.fullscreen` covers Loom's own chrome so the reading
-              fills the window, and Your work still slides over it. The header
-              now carries the REAL full screen, on every page, so this one had
-              to say what it actually does. Same key (f), same Escape. */}
-          <button
-            className="btn ghost mini"
-            onClick={() => setIsFullscreen((on) => !on)}
-            data-tip={isFullscreen ? "back to the journey (esc)" : "hide Loom's chrome — the reading fills the window (f)"}
-            aria-pressed={isFullscreen}
-            aria-label={isFullscreen ? "Show the journey" : "Just the text"}
-          >
-            {isFullscreen ? (isNarrow ? "↙" : "↙ Show the journey") : (isNarrow ? "⛶" : "⛶ Just the text")}
-          </button>
+          {/* "Just the text" is gone (Lingxiu, 2026-08-15): the reading
+              station now IS just the text — the header, the scope bar and the
+              footer stand down whenever this station is open (see Workbench),
+              leaving the journey bar and this toolbar. A button to hide
+              chrome that is already hidden had nothing left to do. */}
         </div>
       </div>
 
@@ -2318,7 +2089,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       {/* The pages, and Your work over them. This wrapper exists for one
           reason: it is the sheet's containing block, so the sheet covers the
           reading and stops at the toolbar. The frame of the reading — modes,
-          fit, find, fullscreen, and the overlay bar above — stays reachable
+          fit, find, and the overlay bar above — stays reachable
           while your work is out. The stage is still the only measured box, and
           it measures exactly what it measured before. */}
       <div className="pdf-body">
@@ -2347,8 +2118,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               </button>}
 
               <ConceptRails
-                enabled={railsOn && !isNarrow}
-                twoPage={isTwoPage && pageNumber + 1 <= (numPages || 1)}
+                enabled={!isNarrow}
                 passages={scoped.passages}
                 concepts={state.concepts}
                 onOpenPassage={gotoOpenPassage}
@@ -2445,7 +2215,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               aspect={aspect}
               stage={stage}
               stageEl={stageEl}
-              cardsOn={railsOn && !isNarrow}
+              cardsOn={!isNarrow}
               passages={scoped.passages}
               concepts={state.concepts}
               onOpenPassage={gotoOpenPassage}
@@ -2638,60 +2408,6 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         />
       )}
 
-      {highlightTooltip && (
-        <div
-          className="loom-highlight-tooltip"
-          style={{
-            left: `${highlightTooltip.x}px`,
-            top: `${highlightTooltip.y - 12}px`,
-            transform: "translate(-50%, -100%)",
-          }}
-        >
-          <div className="head">
-            <div className="meta">
-              {highlightTooltip.entries.length > 1
-                ? `${highlightTooltip.entries.length} captures on this passage`
-                : "passage"}
-            </div>
-            <button
-              type="button"
-              className="close"
-              aria-label="Close highlight details"
-              onClick={(event) => {
-                event.stopPropagation();
-                hideHighlightTooltip();
-              }}
-            >
-              ×
-            </button>
-          </div>
-          {highlightTooltip.entries.map((entry) => (
-            <div className="entry" key={entry.passageId}>
-              <div className="coding">{entry.conceptLabel}</div>
-              <div className="foot">
-                {entry.source}
-                {entry.location ? ` | ${entry.location}` : ""}
-                {` | chars ${entry.startOffset ?? "?"}-${entry.endOffset ?? "?"}`}
-              </div>
-              {onGotoOpenPassage ? (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    // Find and the sheet share the right edge; this one opens
-                    // the sheet, so the other has to go.
-                    if (searchOpen) closeSearch();
-                    onGotoOpenPassage(entry.passageId);
-                    hideHighlightTooltip();
-                  }}
-                >
-                  In your work ›
-                </button>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

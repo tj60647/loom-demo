@@ -1,12 +1,16 @@
 "use client";
 
 /**
- * Margin rails for page mode: every passage on the open spread gets a card
+ * Margin rails for page mode: every passage on the open pages gets a card
  * beside the page it was captured from, centered on its highlight, with a
  * leader line to the span — so the concepts live next to the lines they came
  * from. The idea is the spread canvas's (origin/spread-canvas-reading,
  * reverted off master by 41d5b50 for deploy hygiene); this rebuild keeps its
  * layout algorithm and drops its parallel rendering and capture paths.
+ *
+ * Always on, both rails standing (Lingxiu, 2026-08-15): the cards are the
+ * reading surface, not a toggle, and a card's side is its page number's
+ * parity — odd left, even right — in every view.
  *
  * Read-only by ruling (TJ, 2026-08-09): a card displays and clicks through to
  * Your work — it edits nothing, so concept identity keeps a single editing
@@ -55,14 +59,12 @@ type CardModel = {
  */
 export default function ConceptRails({
   enabled,
-  twoPage,
   passages,
   concepts,
   onOpenPassage,
   children,
 }: {
   enabled: boolean;
-  twoPage: boolean;
   passages: Passage[];
   concepts: Concept[];
   onOpenPassage?: (passageId: string) => void;
@@ -75,9 +77,12 @@ export default function ConceptRails({
 
   /**
    * Anchors come off the DOM: the first mark per passage id, in document
-   * order, measured relative to the wrapper. Which page a mark sits on is
-   * read from the page elements' own positions rather than threaded page
-   * numbers — the leftmost page annotates leftward, everything else right.
+   * order, measured relative to the wrapper. A card's side is the PAGE
+   * NUMBER'S PARITY, never the layout: odd pages annotate leftward, even
+   * pages rightward — page 1 left, page 2 right, page 3 left — the spread
+   * canvas's fixed sides, kept identical across every view (Lingxiu,
+   * 2026-08-15). Single-page mode therefore swings its cards between the
+   * rails as the pages turn, rather than a view ever re-siding a card.
    */
   const measure = useCallback(() => {
     const wrap = wrapRef.current;
@@ -85,18 +90,17 @@ export default function ConceptRails({
     const wrapRect = wrap.getBoundingClientRect();
     if (wrapRect.width === 0) return;
 
-    const pages = Array.from(wrap.querySelectorAll<HTMLElement>(".react-pdf__Page")).sort(
-      (a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left
-    );
-    const leftPage = twoPage && pages.length >= 2 ? pages[0] : null;
-
     const next: Record<string, Anchor> = {};
     for (const mark of wrap.querySelectorAll<HTMLElement>(".loom-passage-highlight")) {
       const id = mark.getAttribute("data-loom-passage-id");
       if (!id || next[id]) continue;
       const rect = mark.getClientRects()[0];
       if (!rect || (rect.width === 0 && rect.height === 0)) continue;
-      const side: Side = leftPage && mark.closest(".react-pdf__Page") === leftPage ? "left" : "right";
+      const pageNum = Number(
+        mark.closest<HTMLElement>(".react-pdf__Page")?.getAttribute("data-page-number")
+      );
+      if (!pageNum) continue;
+      const side: Side = pageNum % 2 === 1 ? "left" : "right";
       next[id] = {
         side,
         midY: rect.top + rect.height / 2 - wrapRect.top,
@@ -125,7 +129,7 @@ export default function ConceptRails({
         ? prev
         : { w: wrapRect.width, h: wrapRect.height }
     );
-  }, [twoPage]);
+  }, []);
 
   // The marks arrive and leave asynchronously (the applier runs off its own
   // MutationObserver), so the rail watches the wrapper for both DOM churn and
@@ -232,7 +236,7 @@ export default function ConceptRails({
   }, [cards, cardHeights, wrapSize.h]);
 
   const renderRail = (side: Side) => (
-    <div className="pdf-rail" aria-label={side === "left" ? "Cards for the left page" : "Cards for this page"}>
+    <div className="pdf-rail" aria-label={side === "left" ? "Cards for odd pages" : "Cards for even pages"}>
       {cards
         .filter((c) => c.anchor.side === side)
         .map((c) => {
@@ -282,8 +286,12 @@ export default function ConceptRails({
   );
 
   return (
+    // Both rails stand whatever is open between them: a page's cards have a
+    // fixed side, so the left rail exists even when a lone even page fills
+    // it with nothing — standing room, not a re-layout, is what keeps the
+    // text still as pages turn.
     <div className="pdf-spread-wrap" ref={wrapRef}>
-      {enabled && twoPage && renderRail("left")}
+      {enabled && renderRail("left")}
       {children}
       {enabled && renderRail("right")}
       {enabled && wrapSize.w > 0 && (
