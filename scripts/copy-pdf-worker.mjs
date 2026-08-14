@@ -15,7 +15,7 @@
  * Runs from prebuild and predev, so the file is always present and always in
  * step with whatever npm actually installed.
  */
-import { copyFileSync, mkdirSync, existsSync } from "node:fs"
+import { copyFileSync, mkdirSync, existsSync, readdirSync } from "node:fs"
 import { createRequire } from "node:module"
 import path from "node:path"
 
@@ -40,3 +40,19 @@ if (!existsSync(source)) {
 mkdirSync(destDir, { recursive: true })
 copyFileSync(source, dest)
 console.log(`[pdf-worker] public/pdf.worker.min.mjs <- pdfjs-dist@${version} (react-pdf's copy)`)
+
+// The worker alone is not the whole engine. pdf.js decodes JPX (JPEG2000) and
+// ICC color through WASM codecs it fetches at runtime from `wasmUrl` — and a
+// scanned reading is nothing but such images (an Internet Archive scan is
+// JPX + JBIG2 page after page). Without these files the text layer still
+// renders, so the failure reads as "I can select text on a blank page": every
+// page image silently missing while the reading looks merely broken, not
+// unconfigured. Same origin, same reasoning as the worker; the codecs MUST
+// come from the same pdfjs-dist the worker came from, or versions skew.
+const wasmSrcDir = path.join(pdfjsDir, "wasm")
+const wasmDestDir = path.join(destDir, "pdf-wasm")
+mkdirSync(wasmDestDir, { recursive: true })
+for (const file of readdirSync(wasmSrcDir)) {
+  copyFileSync(path.join(wasmSrcDir, file), path.join(wasmDestDir, file))
+}
+console.log(`[pdf-worker] public/pdf-wasm/ <- pdfjs-dist@${version} wasm codecs (${readdirSync(wasmSrcDir).length} files)`)
