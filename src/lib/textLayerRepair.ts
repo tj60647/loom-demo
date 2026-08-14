@@ -27,7 +27,7 @@
  * student can still find and quote it even if the highlight rectangle is
  * approximate.
  */
-import { PDFDocument, StandardFonts } from "pdf-lib"
+import { PDFDocument, StandardFonts, degrees, type PDFFont, type PDFPage } from "pdf-lib"
 import { createCanvas } from "@napi-rs/canvas"
 import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
 
@@ -38,6 +38,13 @@ import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
  */
 const REPLACEMENT_DPI = 200
 const PDF_POINTS_PER_INCH = 72
+
+/**
+ * How far a block may lean and still be laid out as upright lines. Readers
+ * report a degree or two of slope on ordinary body text — a scan is never
+ * quite square — and rotating a paragraph by that is worse than ignoring it.
+ */
+const UPRIGHT_TOLERANCE_DEG = 5
 
 export type PageTranscription = {
   pageNumber: number
@@ -52,6 +59,49 @@ export type PageTranscription = {
    * still selects and quotes correctly but anchors approximately.
    */
   boxes?: { text: string; x: number; y: number; width: number; height: number }[]
+  /**
+   * Block-mode placement: the accepted blocks of an oddly-formatted page, with
+   * boxes in PDF points measured from the page's TOP-left — render space, the
+   * space the crop's fractions convert into; the flip to pdf-lib's bottom-left
+   * happens at draw time, where the page height is in hand.
+   *
+   * Body blocks are drawn FIRST, in reading order, each inside its own box;
+   * every other block follows as its own text run inside its box, rotated to
+   * its angle. Content-stream order is therefore body-then-notes, which is why
+   * a copied paragraph never has a margin note spliced into the middle of it —
+   * while visually each note's invisible glyphs sit over the note itself, at
+   * its own slope, so selecting the note follows the note.
+   */
+  blocks?: {
+    role: "body" | "margin" | "caption" | "label"
+    text: string
+    /** Degrees counterclockwise from horizontal, as drawn on the page. */
+    angleDegrees: number
+    box: { x: number; yTop: number; width: number; height: number } | null
+  }[]
+}
+
+/**
+ * A reader's block box — fractions of the crop it read — in PDF points from
+ * the page's top-left, which is the space `PageTranscription.blocks` speaks.
+ *
+ * The conversion is the crop's own making, run backwards: the repair's region
+ * records where the crop sat on the rendered page and at what scale, so a
+ * fraction of the crop is region-offset rendered pixels, and pixels over scale
+ * are points. Pure, exported and asserted (scripts/check-block-repair.ts)
+ * because it is the one place a reader's coordinates meet the page's, and a
+ * factor dropped here would place every note plausibly and wrongly.
+ */
+export function cropBoxToPagePoints(
+  region: { x: number; y: number; width: number; height: number; scale: number },
+  box: { x: number; y: number; w: number; h: number }
+) {
+  return {
+    x: (region.x + box.x * region.width) / region.scale,
+    yTop: (region.y + box.y * region.height) / region.scale,
+    width: (box.w * region.width) / region.scale,
+    height: (box.h * region.height) / region.scale,
+  }
 }
 
 export type RepairResult = {
@@ -94,6 +144,182 @@ function winAnsiSetOf(font: { getCharacterSet: () => number[] }) {
     winAnsiSets.set(font, set)
   }
   return set
+}
+
+/**
+ * The no-geometry layout: text in reading order down the page. Selection and
+ * search work; the highlight rectangle is approximate, which the review record
+ * says plainly. Shared by the whole-page fallback and by any block that
+ * arrived without a box.
+ */
+function drawFlowText(
+  page: PDFPage,
+  font: PDFFont,
+  text: string,
+  width: number,
+  height: number,
+  pageNumber: number
+) {
+  const { safe, dropped } = winAnsiSafe(text, font)
+  if (dropped > 0) console.warn(`[textLayerRepair] p${pageNumber}: ${dropped} unencodable character(s) became spaces`)
+  const lines = safe.split("\n").filter((line) => line.trim())
+  const lineHeight = Math.min(14, Math.max(8, (height - 72) / Math.max(1, lines.length)))
+  lines.forEach((line, lineIndex) => {
+    page.drawText(line, {
+      x: 36,
+      y: height - 36 - lineIndex * lineHeight,
+      size: Math.max(4, lineHeight * 0.75),
+      font,
+      opacity: 0,
+      // A long transcribed line must not silently vanish off the edge.
+      maxWidth: width - 72,
+      lineHeight,
+    })
+  })
+}
+
+type PlacedBlock = NonNullable<PageTranscription["blocks"]>[number]
+
+/**
+ * A body block inside its box: horizontal lines from the box's top, sized so
+ * the block's lines fill its height. Keeping body glyphs inside the body's own
+ * box — rather than flowed across the whole sheet — is half of what makes a
+ * margin note selectable without grabbing body text: the other half is the
+ * note's own placement, and this is what keeps the two from overlapping.
+ */
+function drawBoxedBody(
+  page: PDFPage,
+  font: PDFFont,
+  block: PlacedBlock,
+  pageHeight: number,
+  pageNumber: number
+) {
+  const box = block.box!
+  const { safe, dropped } = winAnsiSafe(block.text, font)
+  if (dropped > 0) console.warn(`[textLayerRepair] p${pageNumber}: ${dropped} unencodable character(s) became spaces`)
+  const lines = safe.split("\n").filter((line) => line.trim())
+  if (lines.length === 0) return
+  const lineHeight = Math.min(14, Math.max(4, box.height / lines.length))
+  lines.forEach((line, lineIndex) => {
+    page.drawText(line, {
+      x: box.x,
+      y: pageHeight - box.yTop - (lineIndex + 1) * lineHeight,
+      size: Math.max(4, lineHeight * 0.75),
+      font,
+      opacity: 0,
+      maxWidth: Math.max(36, box.width),
+      lineHeight,
+    })
+  })
+}
+
+/** Break one run of words into lines no wider than `limit` at this size. */
+function wrapToWidth(font: PDFFont, text: string, size: number, limit: number) {
+  const lines: string[] = []
+  let current = ""
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const candidate = current ? `${current} ${word}` : word
+    if (current && font.widthOfTextAtSize(candidate, size) > limit) {
+      lines.push(current)
+      current = word
+    } else {
+      current = candidate
+    }
+  }
+  if (current) lines.push(current)
+  return lines
+}
+
+/**
+ * A non-body block inside its box, at its angle: lines centred on the box's
+ * centre, baselines rotated by the block's own slope (pdf-lib rotates about
+ * the text origin), so the invisible glyphs lie along the note they stand for
+ * and a selection dragged across the note follows the note.
+ *
+ * The geometry is projection, not layout: the box's extent ALONG the baseline
+ * direction bounds the line length, its extent ACROSS bounds the stack of
+ * lines. Precision beyond that buys nothing — the glyphs are invisible, and
+ * what matters is that they sit over the note at its slope rather than over
+ * the body.
+ *
+ * WRAPPING IS NOT OPTIONAL, and shrinking the type is not a substitute for it.
+ * Readers report a note's text however they please: the panel that read page
+ * 67 of *The Universal Traveler* returned each hand-lettered note as a single
+ * 245-character line. An earlier version shrank the font until that one line
+ * fit the box's along-extent and drew it centred — which at the 4pt floor is
+ * still ~490pt of type centred on a box 208pt wide, so the note's opening ran
+ * off the left edge of the sheet and vanished from the text layer entirely.
+ * The tail selected; the first thirty words did not exist. So the text is
+ * wrapped to the box at a size the box can hold, and only then centred.
+ */
+function drawAngledBlock(
+  page: PDFPage,
+  font: PDFFont,
+  block: PlacedBlock,
+  pageHeight: number,
+  pageNumber: number
+) {
+  const box = block.box!
+  const { safe, dropped } = winAnsiSafe(block.text, font)
+  if (dropped > 0) console.warn(`[textLayerRepair] p${pageNumber}: ${dropped} unencodable character(s) became spaces`)
+  const paragraphs = safe.split("\n").map((line) => line.trim()).filter(Boolean)
+  if (paragraphs.length === 0) return
+
+  const radians = (block.angleDegrees * Math.PI) / 180
+  // Baseline direction, and the direction successive lines advance — the
+  // reader's "rightward" and "downward", rotated with the text. PDF y is up.
+  const alongX = Math.cos(radians)
+  const alongY = Math.sin(radians)
+  const acrossX = Math.sin(radians)
+  const acrossY = -Math.cos(radians)
+
+  /**
+   * How much room a line has INSIDE the box, along the baseline and across it.
+   *
+   * Inscribed, not circumscribed. The obvious formula — `w·|cos| + h·|sin|` —
+   * measures the rotated box's own bounding extent, which is longer than any
+   * line that actually fits through the centre: at 25° in a 175×195pt box it
+   * says 241pt, and a 241pt line centred on the box overhangs 21pt at each
+   * end. On a note in the left margin that overhang is off the sheet, which is
+   * exactly the clipping the wrapping was added to prevent. A line through the
+   * centre is bounded by whichever pair of box edges it reaches first.
+   */
+  const inscribed = (unitX: number, unitY: number) =>
+    Math.min(
+      Math.abs(unitX) > 1e-6 ? box.width / Math.abs(unitX) : Infinity,
+      Math.abs(unitY) > 1e-6 ? box.height / Math.abs(unitY) : Infinity
+    )
+  const extentAlong = inscribed(alongX, alongY)
+  const extentAcross = inscribed(acrossX, acrossY)
+
+  /**
+   * The largest size whose wrapped stack still fits the box, tried downwards
+   * from ordinary body size. A note that will not fit even at the floor keeps
+   * the floor and overflows a little across — better a note whose last line
+   * sits slightly outside its box than a note with no beginning.
+   */
+  let size = 12
+  let lines = paragraphs.flatMap((paragraph) => wrapToWidth(font, paragraph, size, extentAlong))
+  while (size > 4 && lines.length * size * 1.2 > extentAcross) {
+    size -= 1
+    lines = paragraphs.flatMap((paragraph) => wrapToWidth(font, paragraph, size, extentAlong))
+  }
+  const lineHeight = Math.min(14, Math.max(size * 1.2, extentAcross / Math.max(1, lines.length)))
+
+  const centerX = box.x + box.width / 2
+  const centerY = pageHeight - box.yTop - box.height / 2
+  lines.forEach((line, lineIndex) => {
+    const offset = (lineIndex - (lines.length - 1) / 2) * lineHeight
+    const lineWidth = font.widthOfTextAtSize(line, size)
+    page.drawText(line, {
+      x: centerX + acrossX * offset - (alongX * lineWidth) / 2,
+      y: centerY + acrossY * offset - (alongY * lineWidth) / 2,
+      size,
+      font,
+      opacity: 0,
+      rotate: degrees(block.angleDegrees),
+    })
+  })
 }
 
 /**
@@ -157,7 +383,45 @@ export async function repairPageTextLayers(
       // Invisible but selectable: opacity 0 keeps the glyphs out of the render
       // while leaving them in the text layer, which is what a text layer is.
       const boxes = transcription.boxes
-      if (boxes && boxes.length > 0) {
+      const blocks = transcription.blocks
+      if (blocks && blocks.length > 0) {
+        // Body first, then every other block — content-stream order is what a
+        // selection walks, and this is the order that keeps a copied paragraph
+        // whole. See the blocks field's own note.
+        const bodyBlocks = blocks.filter((block) => block.role === "body")
+        const noteBlocks = blocks.filter((block) => block.role !== "body")
+        const unplaced: string[] = []
+        for (const block of bodyBlocks) {
+          if (!block.text.trim()) continue
+          if (!block.box) {
+            unplaced.push(block.text)
+            continue
+          }
+          // Body is usually upright, and upright body is laid out as lines
+          // that wrap — which reads better for a paragraph than a rotated
+          // run. But body can be angled too: a sheet scanned sideways is all
+          // body at 90°, and so is the arced display type on a title page.
+          // Angle decides the GEOMETRY; role still decides the ORDER, so an
+          // angled body block is drawn here, before any note.
+          if (Math.abs(block.angleDegrees) >= UPRIGHT_TOLERANCE_DEG) {
+            drawAngledBlock(replacement, font, block, height, transcription.pageNumber)
+          } else {
+            drawBoxedBody(replacement, font, block, height, transcription.pageNumber)
+          }
+        }
+        for (const block of noteBlocks) {
+          if (!block.text.trim() || block.box) continue
+          unplaced.push(block.text)
+        }
+        if (unplaced.length > 0) {
+          pagesApproximate.push(transcription.pageNumber)
+          drawFlowText(replacement, font, unplaced.join("\n"), width, height, transcription.pageNumber)
+        }
+        for (const block of noteBlocks) {
+          if (!block.text.trim() || !block.box) continue
+          drawAngledBlock(replacement, font, block, height, transcription.pageNumber)
+        }
+      } else if (boxes && boxes.length > 0) {
         for (const box of boxes) {
           if (!box.text.trim()) continue
           const { safe, dropped } = winAnsiSafe(box.text, font)
@@ -173,25 +437,7 @@ export async function repairPageTextLayers(
         }
       } else {
         pagesApproximate.push(transcription.pageNumber)
-        // No measured layout: lay the accepted text out in reading order down
-        // the page. Selection and search work; the highlight rectangle is
-        // approximate, which the review record says plainly.
-        const { safe, dropped } = winAnsiSafe(transcription.text, font)
-        if (dropped > 0) console.warn(`[textLayerRepair] p${transcription.pageNumber}: ${dropped} unencodable character(s) became spaces`)
-        const lines = safe.split("\n").filter((line) => line.trim())
-        const lineHeight = Math.min(14, Math.max(8, (height - 72) / Math.max(1, lines.length)))
-        lines.forEach((line, lineIndex) => {
-          replacement.drawText(line, {
-            x: 36,
-            y: height - 36 - lineIndex * lineHeight,
-            size: Math.max(4, lineHeight * 0.75),
-            font,
-            opacity: 0,
-            // A long transcribed line must not silently vanish off the edge.
-            maxWidth: width - 72,
-            lineHeight,
-          })
-        })
+        drawFlowText(replacement, font, transcription.text, width, height, transcription.pageNumber)
       }
 
       // The original page sits one later now that the replacement was inserted.

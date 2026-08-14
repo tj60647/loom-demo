@@ -72,6 +72,8 @@ export type RepairRow = {
   currentText: string
   garbledWords: string[]
   garbleRate: number | null
+  /** This page was read as blocks — angled notes, diagram labels, a sideways sheet. */
+  blockMode: boolean
   agreedText: string
   disagreements: { passage: string; readings: string[] }[]
   votes: Votes | null
@@ -194,6 +196,18 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
             <p className="hint">Verbatim. This is the whole brief; there is nothing else in the request.</p>
             <pre>{settings.systemPrompt}</pre>
             <pre>{settings.instructions}</pre>
+          </section>
+
+          <section>
+            <span className="label">…and what it is told about an oddly formatted page</span>
+            <p className="hint">
+              A page whose text does not run in one horizontal stream — angled margin notes, labels
+              inside a diagram, a sheet scanned sideways — is briefed differently: each visually
+              distinct run of text comes back as its own block, with its role, its angle and where it
+              sits. Read as one stream those notes interleave into the body mid-sentence; read as
+              blocks they are voted on separately and laid over the note itself.
+            </p>
+            <pre>{settings.blockInstructions}</pre>
           </section>
         </div>
       ) : null}
@@ -549,6 +563,14 @@ export default function RepairPanel({
               <span className={`pill mini repair-${repair.status}`}>
                 {stage(repair.status, repair.readings.length > 0)}
               </span>
+              {repair.blockMode ? (
+                <span
+                  className="pill mini"
+                  data-tip="This page's text does not run in one horizontal stream — angled notes, diagram labels, or a sideways sheet. The readers transcribe it as blocks, each voted on separately and laid over the text it belongs to."
+                >
+                  blocks
+                </span>
+              ) : null}
               {repair.garbleRate != null ? (
                 <span className="hint"> {(repair.garbleRate * 100).toFixed(0)}% of this page&rsquo;s words are not words</span>
               ) : null}

@@ -12,7 +12,9 @@
 import { countPagesWithContent } from "../src/lib/readingScore"
 import { probeHighlights } from "../src/lib/highlightProbe"
 import { acceptedTextMatchesReadings } from "../src/lib/repairReview"
-import { computeConsensus } from "../src/lib/repairConsensus"
+import { computeBlockConsensus, computeConsensus, flattenBlocks, type TranscriptBlock } from "../src/lib/repairConsensus"
+import { parseReading } from "../src/lib/repairReading"
+import { measurePageGarble } from "../src/lib/garble"
 import { locateQuote, planReanchor } from "../src/lib/reanchor"
 
 let failures = 0
@@ -183,6 +185,166 @@ check("the dissenting reader shows 0% agreement", STATS.perReader[4].agreementRa
 check("  and its reading is marked solo", STATS.perReader[4].solo, 1)
 check("a majority reader shows 100%", STATS.perReader[0].agreementRate, 1)
 check("the vote distribution counts sentences by backing", STATS.distribution[4], 1)
+
+console.log("\ngarble — a word broken across a line is one word, not two")
+
+/**
+ * The distortion garble.ts's own header names: hyphenation fragments left by a
+ * line break read as garbage. It matters most where a repair is judged — a
+ * faithful transcription keeps the page's hyphenation, so the corrected page
+ * measured WORSE than the damaged one and the apply gate refused it.
+ */
+const HYPHENATED = [
+  "The secret to solving problems is to find the bridge between the way things are",
+  "and the way you want them to become. That bridge is your defini-",
+  "tion, the link between the situation as already solved and its resolu-",
+  "tion as you envision it to be. Definitions are individual points of view.",
+].join("\n")
+const HYPHEN_MEASURE = measurePageGarble(1, HYPHENATED)
+check("a page whose only oddity is hyphenated line breaks measures clean", (HYPHEN_MEASURE?.rate ?? 1) < 0.05, true)
+check("  the halves are not counted as words", HYPHEN_MEASURE?.sample.includes("defini"), false)
+check("  nor is the other half", HYPHEN_MEASURE?.sample.includes("tion"), false)
+
+// A hyphen INSIDE a line is a real compound, and joining it would invent a
+// word: `problem-solving` is two words that are both words.
+const COMPOUND = measurePageGarble(
+  1,
+  "The problem-solving guide is a soft-systems handbook about decision-making and self-reliance, " +
+    "recoded and re-set for readers who want a well-known method they can follow without a teacher."
+)
+check("a hyphenated compound inside a line is left alone", (COMPOUND?.rate ?? 1) < 0.05, true)
+
+// And real damage still reads as damage.
+const DAMAGED = measurePageGarble(
+  1,
+  "ihe feacier refigian haa oiscourse innavation cultiral peuosiad paionnsuoo tvon reCa vsA " +
+    "aDEWIGNAwCRITIQUE zD nsuoo qwertyu asdfgh zxcvbn plmokn ijnuhb"
+)
+check("genuine gibberish still measures as damage", (DAMAGED?.rate ?? 0) > 0.5, true)
+
+console.log("\nblock consensus — a margin note votes beside the body, never inside it")
+
+const BODY_A = "The secret to solving problems is to find the bridge between the way things are and the way you want them to become."
+const BODY_B = "Definitions are individual points of view, and it is unlikely that everyone will have the same one."
+const NOTE_BOX = { x: 0.02, y: 0.1, w: 0.3, h: 0.2 }
+const noteBlock = (text: string): TranscriptBlock => ({ role: "margin", angle: 25, box: NOTE_BOX, text })
+const bodyBlock = (text: string): TranscriptBlock => ({ role: "body", angle: 0, box: { x: 0.35, y: 0.05, w: 0.6, h: 0.9 }, text })
+
+// Three readers agree on the body; the note is read two ways. The failure this
+// exists to prevent: in a single stream the note lands mid-sentence, so a
+// note-placement difference reads as a body disagreement and voids sentences
+// every reader wrote identically.
+const SPLIT_NOTE = computeBlockConsensus([
+  { reader: 1, text: "", blocks: [bodyBlock(`${BODY_A}\n${BODY_B}`), noteBlock("it's time for a break")] },
+  { reader: 2, text: "", blocks: [bodyBlock(`${BODY_A}\n${BODY_B}`), noteBlock("it's time for a break")] },
+  { reader: 3, text: "", blocks: [bodyBlock(`${BODY_A}\n${BODY_B}`), noteBlock("it's time for a brick")] },
+])
+check("a disputed margin note does not void the body", SPLIT_NOTE.agreedText.includes(BODY_A), true)
+check("  both body sentences carry", SPLIT_NOTE.agreedText.includes(BODY_B), true)
+check("  the note carries by majority, in a backer's own words", SPLIT_NOTE.agreedText.includes("it's time for a break"), true)
+check("  and the outvoted wording is still shown", SPLIT_NOTE.disagreements.some((d) => d.readings.some((r) => r.includes("brick"))), true)
+
+// Two against one on the note itself: no majority, so the note is a
+// disagreement — and ONLY the note.
+const TIED_NOTE = computeBlockConsensus([
+  { reader: 1, text: "", blocks: [bodyBlock(BODY_A), noteBlock("making too many mistakes")] },
+  { reader: 2, text: "", blocks: [bodyBlock(BODY_A), noteBlock("marking too many mistakes")] },
+])
+check("a note split 1-1 carries nothing of the note", TIED_NOTE.agreedText.includes("mistakes"), false)
+check("  but the body still carries", TIED_NOTE.agreedText.includes(BODY_A), true)
+check("  and the dispute names the note's role", TIED_NOTE.disagreements.some((d) => d.passage.startsWith("[margin]")), true)
+
+// A reader that ignored the block brief still votes: its whole text is body,
+// which is what its format asserts. It backs no notes.
+const MIXED = computeBlockConsensus([
+  { reader: 1, text: "", blocks: [bodyBlock(BODY_A), noteBlock("it's time for a break")] },
+  { reader: 2, text: "", blocks: [bodyBlock(BODY_A), noteBlock("it's time for a break")] },
+  { reader: 3, text: BODY_A, blocks: null },
+])
+check("a flat-format reader still backs the body", MIXED.agreedText.includes(BODY_A), true)
+check("  a note backed by 2 of 3 readers carries", MIXED.agreedText.includes("break"), true)
+
+// The identity acceptance depends on: agreedText IS the flattening of the
+// agreed blocks, so acceptance can recover blocks by string equality.
+check("agreedText is exactly flattenBlocks(agreedBlocks)", SPLIT_NOTE.agreedText === flattenBlocks(SPLIT_NOTE.agreedBlocks), true)
+check("  and the carried note keeps its backer's box and angle", SPLIT_NOTE.agreedBlocks.find((b) => b.role === "margin")?.box, NOTE_BOX)
+
+// The bug an earlier version had: notes were grouped by SIMILARITY, greedily,
+// in the order each reader listed its blocks — so two distinct labels whose
+// words overlap could swap groups between readers, and neither reached a
+// majority. Four readers, all reading both labels, two of them listing the
+// second first: both labels must carry.
+const LABEL_A = "hidden layer 1"
+const LABEL_B = "hidden layer 2"
+const labelBlock = (text: string, x: number): TranscriptBlock => ({
+  role: "label",
+  angle: 0,
+  box: { x, y: 0.4, w: 0.15, h: 0.08 },
+  text,
+})
+const ORDER_SPLIT = computeBlockConsensus([
+  { reader: 1, text: "", blocks: [labelBlock(LABEL_A, 0.1), labelBlock(LABEL_B, 0.6)] },
+  { reader: 2, text: "", blocks: [labelBlock(LABEL_B, 0.6), labelBlock(LABEL_A, 0.1)] },
+  { reader: 3, text: "", blocks: [labelBlock(LABEL_A, 0.1), labelBlock(LABEL_B, 0.6)] },
+  { reader: 4, text: "", blocks: [labelBlock(LABEL_B, 0.6), labelBlock(LABEL_A, 0.1)] },
+])
+check("two similar labels read by every reader both carry, whatever order they were listed in", ORDER_SPLIT.agreedText.includes(LABEL_A) && ORDER_SPLIT.agreedText.includes(LABEL_B), true)
+check("  with nothing invented to disagree about", ORDER_SPLIT.disagreements.length, 0)
+
+// Same words, different places: a page saying "see p.12" in two margins has
+// two notes, and one reader reporting both is one voice, not two.
+const TWICE = computeBlockConsensus([
+  { reader: 1, text: "", blocks: [labelBlock("see p.12", 0.05), labelBlock("see p.12", 0.8)] },
+  { reader: 2, text: "", blocks: [labelBlock("see p.12", 0.05)] },
+])
+check("the same words in two places are two notes, not one doubly-backed one", TWICE.agreedBlocks.filter((b) => b.text === "see p.12").length, 1)
+
+// A concept map is labels and nothing else. The panel record must say five
+// readers answered — reprocess-library refuses anything under three, so a
+// body-only vote count would hold a unanimous page for a person forever.
+const LABEL_ONLY = computeBlockConsensus(
+  [1, 2, 3, 4, 5].map((reader) => ({
+    reader,
+    text: "",
+    blocks: [labelBlock("food & shelter", 0.1), labelBlock("her future", 0.6)],
+  }))
+)
+check("a page of labels alone still reports its readers", LABEL_ONLY.votes.readers, 5)
+check("  needing 3 of them", LABEL_ONLY.votes.majority, 3)
+check("  counts both labels as decided units", LABEL_ONLY.votes.distinctSentences, 2)
+check("  carries them", LABEL_ONLY.agreedBlocks.length, 2)
+check("  disputes nothing", LABEL_ONLY.disagreements.length, 0)
+check("  and credits every reader with the agreement", LABEL_ONLY.votes.perReader.every((stat) => stat.agreementRate === 1), true)
+
+console.log("\nreader replies — both formats parse, and the flat text is the blocks' flattening")
+
+const FLAT_REPLY = parseReading('{"orientation":"upright","text":"Plain page text.","uncertain":[],"illegibleShare":"none"}')
+check("the flat format still parses", FLAT_REPLY?.text, "Plain page text.")
+check("  with no blocks", FLAT_REPLY?.blocks, null)
+check("  and its orientation is no longer dropped", FLAT_REPLY?.orientation, "upright")
+
+const BLOCK_REPLY = parseReading(
+  '{"orientation":"body upright, margin note at ~25°","blocks":[' +
+    '{"role":"body","angle":0,"box":{"x":0.35,"y":0.05,"w":0.6,"h":0.9},"text":"Body text."},' +
+    '{"role":"margin","angle":25,"box":{"x":0.02,"y":0.1,"w":0.3,"h":0.2},"text":"a note"}],' +
+    '"uncertain":[],"illegibleShare":"some"}'
+)
+check("a block reply parses its blocks", BLOCK_REPLY?.blocks?.length, 2)
+check("  the flat text is the blocks' flattening, body first", BLOCK_REPLY?.text, "Body text.\na note")
+check("  the note's angle survives", BLOCK_REPLY?.blocks?.[1]?.angle, 25)
+
+// Percentages are the same answer in a dialect; pixels are unrecoverable.
+const PERCENT_BOX = parseReading('{"blocks":[{"role":"margin","angle":0,"box":{"x":10,"y":20,"w":30,"h":15},"text":"note"}]}')
+check("a percentage box is read as fractions", PERCENT_BOX?.blocks?.[0]?.box, { x: 0.1, y: 0.2, w: 0.3, h: 0.15 })
+const PIXEL_BOX = parseReading('{"blocks":[{"role":"margin","angle":0,"box":{"x":140,"y":300,"w":420,"h":80},"text":"note"}]}')
+check("a pixel box is dropped, never guessed at", PIXEL_BOX?.blocks?.[0]?.box, null)
+check("  without dropping the block's text", PIXEL_BOX?.blocks?.[0]?.text, "note")
+
+// A cut-off block reply: every finished block's text is salvaged, and the
+// reading is marked truncated so the vote excludes it.
+const TRUNCATED = parseReading('{"orientation":"upright","blocks":[{"role":"body","angle":0,"box":null,"text":"First block."},{"role":"margin","angle":20,"box":null,"text":"second blo')
+check("a truncated block reply salvages every text it holds", TRUNCATED?.text, "First block.\nsecond blo")
+check("  and is marked truncated", TRUNCATED?.truncated, true)
 
 console.log("\nre-anchoring — carrying a highlight across a repaired page")
 

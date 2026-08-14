@@ -109,6 +109,254 @@ const TEXT_BAND_FLOOR = 2.0
 /** A row counts as inked once this share of its pixels are. Ignores speckle. */
 const ROW_INK_FLOOR = 0.01
 
+/**
+ * The angles the ink-band measure is repeated at when asking whether a page
+ * carries text that does not run horizontally. 0 and 90 are the axes; the rest
+ * are where hand-lettered marginalia actually sit. Finer steps buy nothing:
+ * banding is a broad signal, strong within ±10° of the text's true angle.
+ */
+const BAND_ANGLES = [0, 15, -15, 30, -30, 45, -45, 60, -60, 75, -75, 90]
+
+/**
+ * The floor and the margin an off-axis band rate must clear, in alternations
+ * PER INCH — not per 100 rows, because this measure runs on whatever render
+ * is already in hand (the probe's 150dpi appearance pass, the pipeline's
+ * ~250dpi crop) and a per-row rate halves every time the resolution doubles.
+ * 3.0/inch is TEXT_BAND_FLOOR's own bar restated in inches (2.0 per 100 rows
+ * at 150dpi).
+ *
+ * The factor keeps ordinary prose out: a page of horizontal lines still bands
+ * a little off-axis, because a tilted scanline crosses several line-heights of
+ * ink and blank — but far below its own horizontal rhythm.
+ *
+ * Measured on this library (2026-08-14, ~235-300dpi renders): the Universal
+ * Traveler's hand-lettered notes band at 5.1-6.3/inch off-axis, 2.6-7.6x
+ * their zone's horizontal rate; Learning How to Learn's sideways concept maps
+ * at 3.3-18.6/inch, mostly at 90°/±75°. Typed prose in the same books and in
+ * two others (Object Worlds, Plans and Situated Actions) never cleared both
+ * bars in any zone — its off-axis rates sit under its own horizontal rhythm.
+ */
+const ANGLED_BAND_FLOOR_PER_INCH = 3.0
+const ANGLED_BAND_FACTOR = 1.5
+
+/**
+ * Text items whose transform is rotated off every axis before a page is
+ * flagged. One or two angled items are ornament — a single rotated word in a
+ * figure; a run of them is angled OCR, the free half of odd-format detection.
+ */
+const ANGLED_TEXT_ITEM_FLOOR = 3
+
+/** How far off every 90° axis an item's rotation must be to count as angled. */
+const ANGLED_ITEM_TOLERANCE_DEG = 4
+
+/**
+ * The zones of a page measured separately for angled ink: a grid of thirds,
+ * plus the whole sheet. Page-level banding alone would never see a margin
+ * note — the body's horizontal rhythm dominates the whole-page profile, and
+ * the note lives in a third the body never enters. Thirds rather than thin
+ * margin strips because the marginalia this exists for are not thin: the
+ * Universal Traveler's hand-lettered notes run to a third of the page's
+ * width, and a strip that clips a note keeps only a corner of its rhythm.
+ */
+const ANGLED_ZONES: { name: string; x: number; y: number; w: number; h: number }[] = [
+  ...[0, 1, 2].flatMap((row) =>
+    [0, 1, 2].map((column) => ({
+      name: `r${row + 1}c${column + 1}`,
+      x: column / 3,
+      y: row / 3,
+      w: 1 / 3,
+      h: 1 / 3,
+    }))
+  ),
+  { name: "page", x: 0, y: 0, w: 1, h: 1 },
+]
+
+export type AngledInkZone = {
+  /** Which zone of the page — a cell of the thirds grid, or "page". */
+  zone: string
+  /** The angle its ink bands hardest at, degrees counterclockwise. */
+  angle: number
+  /** The band rate at that angle, alternations per inch. */
+  rate: number
+  /** The rate at 0° for comparison — what horizontal text would show. */
+  horizontalRate: number
+}
+
+/**
+ * Luminance the eye would report, cheap enough per pixel to run millions of
+ * times. The channel-wise near-white test the page-kind pass uses is wrong
+ * here and measurably so: this library's aged scans photograph cream-yellow —
+ * blue channel under 200 across the whole sheet — so against a white
+ * reference every pixel of paper reads as ink and a page bands at nothing.
+ * Ink has to mean "darker than THIS page's own paper", which needs a
+ * luminance and a background to compare it to.
+ */
+function lumaAt(data: Uint8ClampedArray, index: number) {
+  if (data[index + 3] === 0) return 255
+  return 0.299 * data[index] + 0.587 * data[index + 1] + 0.114 * data[index + 2]
+}
+
+/**
+ * A zone's own paper, read off its median luminance, and the darkness a pixel
+ * must fall to below it to count as ink. Two forms because paper comes in two
+ * kinds: on light paper (cream scans, luma 215-233 across this library) a
+ * fixed offset below the median reads lettering cleanly; on a mid-tone ground
+ * the offset swallows the ink — the Universal Traveler's orange cover has
+ * median luma 72, its black title ~35, and 72−55 leaves nothing to find — so
+ * there the bar is a share of the background instead. The larger of the two
+ * governs; below it, ink.
+ */
+const INK_BELOW_BACKGROUND = 55
+const INK_BACKGROUND_SHARE = 0.55
+
+function zoneBackgroundLuma(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  zone: { x: number; y: number; w: number; h: number }
+) {
+  const x0 = Math.floor(zone.x * width)
+  const y0 = Math.floor(zone.y * height)
+  const x1 = Math.min(width, x0 + Math.floor(zone.w * width))
+  const y1 = Math.min(height, y0 + Math.floor(zone.h * height))
+  const histogram = new Array(256).fill(0)
+  let sampled = 0
+  for (let y = y0; y < y1; y += 4) {
+    for (let x = x0; x < x1; x += 4) {
+      histogram[Math.round(lumaAt(data, (y * width + x) * 4))] += 1
+      sampled += 1
+    }
+  }
+  let seen = 0
+  for (let luma = 0; luma < 256; luma++) {
+    seen += histogram[luma]
+    if (seen >= sampled / 2) return luma
+  }
+  return 255
+}
+
+/**
+ * The ink-band measure, generalised to a zone and an angle.
+ *
+ * Scanlines run along the text direction — for angle θ as a reader sees it
+ * (counterclockwise, canvas y pointing down) that is (cos θ, −sin θ) — and
+ * sweep across it. Lines of type at θ leave the same striped profile across
+ * these scanlines that horizontal type leaves across rows.
+ */
+function bandRateAtAngle(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  zone: { x: number; y: number; w: number; h: number },
+  angleDeg: number,
+  inkBelowLuma: number,
+  dpi: number
+) {
+  const x0 = Math.floor(zone.x * width)
+  const y0 = Math.floor(zone.y * height)
+  const zoneWidth = Math.floor(zone.w * width)
+  const zoneHeight = Math.floor(zone.h * height)
+  if (zoneWidth < 8 || zoneHeight < 8) return 0
+
+  const radians = (angleDeg * Math.PI) / 180
+  const alongX = Math.cos(radians)
+  const alongY = -Math.sin(radians)
+  const acrossX = Math.sin(radians)
+  const acrossY = Math.cos(radians)
+
+  const centerX = x0 + zoneWidth / 2
+  const centerY = y0 + zoneHeight / 2
+  const halfAlong = (zoneWidth * Math.abs(alongX) + zoneHeight * Math.abs(alongY)) / 2
+  const halfAcross = (zoneWidth * Math.abs(acrossX) + zoneHeight * Math.abs(acrossY)) / 2
+
+  // Every second pixel along a line and every second line: plenty to find a
+  // stripe a text line wide, at a quarter of the work.
+  const STEP = 2
+  /** A scanline mostly outside the zone says nothing about its rhythm. */
+  const MIN_LINE_SAMPLES = 24
+
+  let lines = 0
+  let transitions = 0
+  let previousInked: boolean | null = null
+  for (let across = -halfAcross; across <= halfAcross; across += STEP) {
+    let sampled = 0
+    let inked = 0
+    for (let along = -halfAlong; along <= halfAlong; along += STEP) {
+      const x = Math.round(centerX + along * alongX + across * acrossX)
+      const y = Math.round(centerY + along * alongY + across * acrossY)
+      if (x < x0 || x >= x0 + zoneWidth || y < y0 || y >= y0 + zoneHeight) continue
+      sampled += 1
+      if (lumaAt(data, (y * width + x) * 4) < inkBelowLuma) inked += 1
+    }
+    if (sampled < MIN_LINE_SAMPLES) continue
+    const lineInked = inked > sampled * ROW_INK_FLOOR
+    if (previousInked !== null && lineInked !== previousInked) transitions += 1
+    previousInked = lineInked
+    lines += 1
+  }
+
+  // Alternations per inch of sweep, so the same text measures the same at any
+  // render resolution. lines * STEP is the sweep's extent in pixels.
+  return lines > 0 ? (transitions / ((lines * STEP) / dpi)) : 0
+}
+
+/**
+ * Find the zones of a rendered page whose ink bands hardest OFF the
+ * horizontal — where angled or sideways text lives.
+ *
+ * Exported for the repair pipeline, which has to ask this question about pages
+ * the probe will not render: a page repaired by the single-stream pipeline
+ * carries a clean horizontal text layer over the same angled picture, so
+ * neither its glyphs nor its probe appearance betray it. The pipeline already
+ * renders every candidate page for its crop, and this measure reads that
+ * render.
+ *
+ * `dpi` is the resolution the pixels were rendered at — rates are normalised
+ * per inch so every caller measures against the same bar.
+ */
+export function measureAngledInk(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  dpi: number
+): AngledInkZone[] {
+  const angled: AngledInkZone[] = []
+  for (const zone of ANGLED_ZONES) {
+    const background = zoneBackgroundLuma(data, width, height, zone)
+    const inkBelow = Math.max(
+      background - INK_BELOW_BACKGROUND,
+      background * INK_BACKGROUND_SHARE
+    )
+    // A zone whose paper is already near-black holds a solid picture, not
+    // text on paper; there is no rhythm to find below it.
+    if (inkBelow <= 20) continue
+    const horizontalRate = bandRateAtAngle(data, width, height, zone, 0, inkBelow, dpi)
+    let bestAngle = 0
+    let bestRate = horizontalRate
+    for (const angle of BAND_ANGLES) {
+      if (angle === 0) continue
+      const rate = bandRateAtAngle(data, width, height, zone, angle, inkBelow, dpi)
+      if (rate > bestRate) {
+        bestRate = rate
+        bestAngle = angle
+      }
+    }
+    if (
+      bestAngle !== 0 &&
+      bestRate >= ANGLED_BAND_FLOOR_PER_INCH &&
+      bestRate >= horizontalRate * ANGLED_BAND_FACTOR
+    ) {
+      angled.push({
+        zone: zone.name,
+        angle: bestAngle,
+        rate: Math.round(bestRate * 10) / 10,
+        horizontalRate: Math.round(horizontalRate * 10) / 10,
+      })
+    }
+  }
+  return angled
+}
+
 const IMAGE_OPS = [
   "paintImageXObject",
   "paintImageXObjectRepeat",
@@ -158,6 +406,27 @@ export type PageStructure = {
    * to `kind === "scanned"`.
    */
   isScannedPage: boolean
+  /**
+   * Text items whose transform is rotated off every 90° axis — OCR that was
+   * written at an angle, the free half of odd-format detection. Zero on a page
+   * with no text layer.
+   */
+  angledTextItems: number
+  /**
+   * Zones of the rendered page whose ink bands hardest off the horizontal.
+   * Null when the page has a text layer and was therefore never rendered —
+   * a null is "not measured", never "not angled". The repair pipeline asks
+   * again on its own render (measureAngledInk) for exactly those pages.
+   */
+  angledInk: AngledInkZone[] | null
+  /**
+   * The block-mode trigger: this page carries text that does not run in one
+   * horizontal stream — angled OCR items, or ink banding off-axis. A page
+   * flagged here is transcribed as blocks (role, angle, box) rather than as a
+   * single stream, which is the difference between a margin note the eye reads
+   * beside the body and one spliced into the middle of its sentences.
+   */
+  oddFormat: boolean
 }
 
 export type FontStructure = {
@@ -206,6 +475,8 @@ type PageAppearance = {
    * type, near zero on a picture. See TEXT_BAND_FLOOR.
    */
   bandRate: number
+  /** Zones whose ink bands hardest off the horizontal. See measureAngledInk. */
+  angledInk: AngledInkZone[]
 }
 
 async function measurePageAppearance(page: PdfPageProxy): Promise<PageAppearance | null> {
@@ -253,6 +524,7 @@ async function measurePageAppearance(page: PdfPageProxy): Promise<PageAppearance
     return {
       inkShare: sampled > 0 ? inked / sampled : 0,
       bandRate: height > 0 ? (transitions / height) * 100 : 0,
+      angledInk: measureAngledInk(data, width, height, INK_RENDER_DPI),
     }
   } catch {
     return null
@@ -368,6 +640,26 @@ export async function probePdfStructure(data: Buffer): Promise<PdfStructure> {
       const appearance = total.glyphCount === 0 ? await measurePageAppearance(page) : null
       const inkShare = appearance?.inkShare ?? null
 
+      // Angled OCR shows in the text items' own transforms, which the glyph
+      // tally cannot see — the operator list attributes glyphs to fonts, not to
+      // matrices. Only pages that have text can have angled text.
+      let angledTextItems = 0
+      if (total.glyphCount > 0) {
+        try {
+          const textContent = await page.getTextContent()
+          for (const item of textContent.items as { str?: string; transform?: number[] }[]) {
+            if (!item.str?.trim() || !Array.isArray(item.transform)) continue
+            const [a, b] = item.transform
+            const angle = (Math.atan2(b, a) * 180) / Math.PI
+            const offAxis = Math.abs(angle % 90)
+            if (Math.min(offAxis, 90 - offAxis) > ANGLED_ITEM_TOLERANCE_DEG) angledTextItems += 1
+          }
+        } catch {
+          // A page whose text will not parse twice reports no angled items —
+          // the glyph tally already carried what could be carried.
+        }
+      }
+
       // A page with no extractable text is only a defect if it was SUPPOSED to
       // carry text. Lines of type leave a striped row profile; a photograph or a
       // diagram does not. Where the render failed, `appearance` is null and the
@@ -403,6 +695,11 @@ export async function probePdfStructure(data: Buffer): Promise<PdfStructure> {
         inkShare,
         kind,
         isScannedPage: kind === "scanned",
+        angledTextItems,
+        angledInk: appearance?.angledInk ?? null,
+        oddFormat:
+          angledTextItems >= ANGLED_TEXT_ITEM_FLOOR ||
+          (appearance?.angledInk.length ?? 0) > 0,
       })
     }
 

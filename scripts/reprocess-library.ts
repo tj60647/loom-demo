@@ -27,6 +27,14 @@
  *   npx tsx scripts/reprocess-library.ts --backfill          # source_revision rows for pre-0025 repairs
  *   npx tsx scripts/reprocess-library.ts --rescore           # rescore every shared reading (covers too)
  *   npx tsx scripts/reprocess-library.ts --run --max-usd 60  # raise the spend ceiling (default 40)
+ *   npx tsx scripts/reprocess-library.ts --retranscribe <sourceId> --pages 1,34,67
+ *       # re-open ONLY the named pages of one reading — past the floors, past
+ *       # any prior decision, and to the exclusion of every other page. The
+ *       # order-damage case: pages an earlier single-stream apply settled with
+ *       # real words in the wrong arrangement, which no token measure will
+ *       # ever flag again. One cycle, one panel read per page, and running it
+ *       # again is a second explicit re-opening that pays again — the scoped
+ *       # act is the point, not idempotence.
  *
  * Requires DATABASE_URL, blob credentials and OPENROUTER_API_KEY (.env.local).
  */
@@ -55,7 +63,17 @@ const rescoreOnly = args.includes("--rescore")
 const retranscribe = args.includes("--retranscribe")
 const maxUsdIndex = args.indexOf("--max-usd")
 const MAX_USD = maxUsdIndex !== -1 ? Number(args[maxUsdIndex + 1]) || 40 : 40
-const ids = args.filter((arg, i) => !arg.startsWith("--") && args[i - 1] !== "--max-usd")
+const pagesIndex = args.indexOf("--pages")
+const forcePages =
+  pagesIndex !== -1
+    ? (args[pagesIndex + 1] ?? "")
+        .split(",")
+        .map((value) => Number(value.trim()))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    : []
+const ids = args.filter(
+  (arg, i) => !arg.startsWith("--") && args[i - 1] !== "--max-usd" && args[i - 1] !== "--pages"
+)
 
 /** Cycles per source: each proposes ≤12 pages, so 5 covers a 60-page scan. */
 const MAX_CYCLES = 5
@@ -67,6 +85,17 @@ const MIN_COMPLETE_READERS = 3
 const UNPRICED_REGION_USD = 0.35
 
 let spentUsd = 0
+
+/**
+ * Repairs this invocation has already put to the judge.
+ *
+ * An "ambiguous" verdict writes nothing to the row — deliberately: the repair
+ * stays exactly where it was, proposed, for a person. But the cycle loop reads
+ * pending proposals before it does anything else, so without this the next
+ * cycle finds the same row, with the same readings and the same disagreements,
+ * and pays the same judge for the same answer. Once per row per run.
+ */
+const judgedThisRun = new Set<string>()
 
 type Held = { title: string; pageNumber: number; why: string }
 const held: Held[] = []
@@ -173,6 +202,21 @@ async function processSource(
   source: { id: string; title: string; storageKey: string },
   adminId: string
 ) {
+  /**
+   * Forced pages are re-opened ONCE per invocation — on the first cycle that
+   * actually reaches a proposal, which is not always cycle 1: a resumed run
+   * spends its first cycles on an earlier run's pending or accepted rows.
+   */
+  let forceSpent = false
+  /**
+   * …and a scoped run ENDS when a named page has been written, whether this
+   * invocation read it or an earlier one did. Both are the act completing.
+   * Without this the next cycle finds nothing pending, re-opens the same
+   * pages — force bypasses the decided skip by design — and buys the panel a
+   * second time for a page that is already correct.
+   */
+  const wroteNamedPage = (pages: number[]) =>
+    forcePages.length > 0 && pages.some((page) => forcePages.includes(page))
   for (let cycle = 1; cycle <= MAX_CYCLES; cycle++) {
     // Resume before detecting: detection REPLACES undecided proposals, so
     // running it over rows an earlier run already paid the panel to read
@@ -183,6 +227,16 @@ async function processSource(
       .from(sourceRepairs)
       .where(and(eq(sourceRepairs.sourceId, source.id), eq(sourceRepairs.status, "proposed")))
       .orderBy(asc(sourceRepairs.pageNumber))
+
+    // A scoped run spends on its named pages and nothing else: another run's
+    // pending rows stay pending, for that run's own act to finish.
+    if (forcePages.length > 0) {
+      const unnamed = proposals.filter((proposal) => !forcePages.includes(proposal.pageNumber))
+      if (unnamed.length > 0) {
+        console.log(`         leaving ${unnamed.length} pending proposal${unnamed.length === 1 ? "" : "s"} on unnamed pages untouched`)
+      }
+      proposals = proposals.filter((proposal) => forcePages.includes(proposal.pageNumber))
+    }
 
     if (proposals.length === 0) {
       // Accepted-but-unapplied rows first: a prior run's apply may have been
@@ -215,6 +269,7 @@ async function processSource(
             .where(eq(sources.id, source.id))
             .limit(1)
           source.storageKey = fresh[0]?.storageKey ?? source.storageKey
+          if (result && wroteNamedPage(result.pagesReplaced)) return
           continue
         } catch (error) {
           const why = error instanceof Error ? error.message : String(error)
@@ -224,23 +279,38 @@ async function processSource(
         }
       }
 
+      // A scoped run's named pages have had their reading — written above, or
+      // held for a person by a gate or the judge. Either way there is nothing
+      // else it may propose: falling through would drop `forcePages` and let
+      // the ordinary floors pick pages the operator never named.
+      if (forcePages.length > 0 && forceSpent) {
+        console.log(`         pages ${forcePages.join(", ")} have had their reading; a named act proposes nothing further`)
+        return
+      }
+
       const buffer = await readingStorage.get(source.storageKey)
       if (retranscribe) {
-        const proposal = await proposeRetranscription(source.id, buffer, source.storageKey)
+        const proposal = await proposeRetranscription(source.id, buffer, source.storageKey, { forcePages })
+        forceSpent = true
         if (proposal.blank.length > 0) {
           console.log(`         pages whose render came out empty (investigate): ${proposal.blank.join(", ")}`)
         }
         if (proposal.regions === 0) {
           console.log(
-            cycle === 1
-              ? `  clean  ${source.title} — nothing over the retranscription floors (${proposal.skippedClean} clean pages)`
-              : `         retranscription complete — nothing further over the floors`
+            forcePages.length > 0
+              ? `  none   ${source.title} — none of pages ${forcePages.join(", ")} could be proposed (blank, or not in this reading)`
+              : cycle === 1
+                ? `  clean  ${source.title} — nothing over the retranscription floors (${proposal.skippedClean} clean pages)`
+                : `         retranscription complete — nothing further over the floors`
           )
           return
         }
         console.log(
-          `  cycle ${cycle}  ${source.title} — retranscribing ${proposal.regions} page${proposal.regions === 1 ? "" : "s"} ` +
-            `(${proposal.skippedClean} clean pages skipped)`
+          forcePages.length > 0
+            ? `  scoped ${source.title} — re-opening page${proposal.regions === 1 ? "" : "s"} ${forcePages.join(", ")} ` +
+                `(the retranscription floors do not apply to a named act)`
+            : `  cycle ${cycle}  ${source.title} — retranscribing ${proposal.regions} page${proposal.regions === 1 ? "" : "s"} ` +
+                `(${proposal.skippedClean} clean pages skipped)`
         )
       } else {
         const detection = await detectRepairsForSource(source.id, buffer, source.storageKey)
@@ -293,12 +363,15 @@ async function processSource(
       }
     }
 
-    // Fresh rows: transcription wrote consensus onto them.
-    const readBack = await db
-      .select()
-      .from(sourceRepairs)
-      .where(and(eq(sourceRepairs.sourceId, source.id), eq(sourceRepairs.status, "proposed")))
-      .orderBy(asc(sourceRepairs.pageNumber))
+    // Fresh rows: transcription wrote consensus onto them. Scoped the same way
+    // the read was — a named act decides its named pages.
+    const readBack = (
+      await db
+        .select()
+        .from(sourceRepairs)
+        .where(and(eq(sourceRepairs.sourceId, source.id), eq(sourceRepairs.status, "proposed")))
+        .orderBy(asc(sourceRepairs.pageNumber))
+    ).filter((repair) => forcePages.length === 0 || forcePages.includes(repair.pageNumber))
 
     let acceptedCount = 0
     for (const repair of readBack) {
@@ -329,6 +402,13 @@ async function processSource(
           held.push({ title: source.title, pageNumber: repair.pageNumber, why: `${verdict.why}; spend ceiling before judging` })
           continue
         }
+        // An ambiguous verdict leaves the row proposed by design, so without
+        // this the next cycle re-reads it and buys the same answer again.
+        if (judgedThisRun.has(repair.id)) {
+          held.push({ title: source.title, pageNumber: repair.pageNumber, why: `${verdict.why}; the judge already saw this one` })
+          continue
+        }
+        judgedThisRun.add(repair.id)
         try {
           const arbitration = await arbitrateRepair(repair.id)
           spentUsd += arbitration.costUsd ?? UNPRICED_REGION_USD
@@ -390,6 +470,9 @@ async function processSource(
         .where(eq(sources.id, source.id))
         .limit(1)
       source.storageKey = fresh[0]?.storageKey ?? source.storageKey
+      // A scoped run is one act: propose the named pages, read them, write
+      // them. With them written there is nothing further it may do.
+      if (result && wroteNamedPage(result.pagesReplaced)) return
     } catch (error) {
       const why = error instanceof Error ? error.message : String(error)
       console.log(`  HELD   ${source.title} — apply refused: ${why}`)
@@ -412,6 +495,12 @@ async function main() {
   }
   if (retranscribe && ids.length === 0) {
     console.error("[reprocess] --retranscribe takes explicit source ids — it re-reads whole documents and spends accordingly")
+    process.exit(1)
+  }
+  if (forcePages.length > 0 && (!retranscribe || ids.length !== 1)) {
+    // Forced pages re-open decided pages and skip the damage floors — an act
+    // scoped to one named reading, never a batch.
+    console.error("[reprocess] --pages needs --retranscribe and exactly one source id")
     process.exit(1)
   }
 

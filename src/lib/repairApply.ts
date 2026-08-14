@@ -15,10 +15,11 @@ import { db } from "@/db"
 import { passages, sourceRepairs, sourceRepairReadings, sourceRevisions, sources } from "@/db/schema"
 import { readingStorage } from "@/lib/storage"
 import { acceptedTextMatchesReadings } from "@/lib/repairReview"
-import { repairPageTextLayers } from "@/lib/textLayerRepair"
+import { flattenBlocks } from "@/lib/repairConsensus"
+import { cropBoxToPagePoints, repairPageTextLayers, type PageTranscription } from "@/lib/textLayerRepair"
 import { reingestSource } from "@/lib/reingest"
 import { extractPdfPageText, textLayerProjection } from "@/lib/pdfText"
-import { measurePageGarble, reportGarble } from "@/lib/garble"
+import { isGarbled, measurePageGarble, reportGarble } from "@/lib/garble"
 import { planReanchor, recoverStrandedPassages } from "@/lib/reanchor"
 import { hashText } from "@/lib/hash"
 
@@ -81,11 +82,29 @@ export async function acceptRepairDecision(
   )
   if (!check.ok) throw new Error(check.reason)
 
+  /**
+   * Which blocks does this text stand for? Only an exact identity answers.
+   * The panel's agreed text is the flattening of its agreed blocks, and a
+   * judge's choice is one reader's text whole — both recoverable by string
+   * equality. A reviewer's edit breaks the identity ON PURPOSE: geometry
+   * copied onto edited text would place words the boxes no longer describe,
+   * so an edited acceptance places by reading order instead.
+   */
+  let acceptedBlocks: typeof repair.agreedBlocks = null
+  if (repair.blockMode) {
+    if (repair.agreedBlocks && flattenBlocks(repair.agreedBlocks) === acceptedText) {
+      acceptedBlocks = repair.agreedBlocks
+    } else {
+      acceptedBlocks = readings.find((reading) => reading.blocks && reading.text === acceptedText)?.blocks ?? null
+    }
+  }
+
   await db
     .update(sourceRepairs)
     .set({
       status: "accepted",
       acceptedText,
+      acceptedBlocks,
       acceptedByUserId: byUserId,
       acceptedAt: new Date(),
       reviewNote: note,
@@ -134,18 +153,33 @@ export async function applyAcceptedRepairs(sourceId: string) {
 
   // One transcription per page: a page may carry several damaged regions, and
   // the page's text layer is replaced once, from all of them together.
-  const byPage = new Map<number, string[]>()
+  const byPage = new Map<number, (typeof accepted)[number][]>()
   for (const repair of accepted) {
     const list = byPage.get(repair.pageNumber) ?? []
-    list.push(repair.acceptedText ?? "")
+    list.push(repair)
     byPage.set(repair.pageNumber, list)
+  }
+
+  // Each accepted block's box, from crop fractions into the page's own points.
+  const placedBlocks = (repair: (typeof accepted)[number]): PageTranscription["blocks"] => {
+    if (!repair.acceptedBlocks) return undefined
+    return repair.acceptedBlocks.map((block) => ({
+      role: block.role,
+      text: block.text,
+      angleDegrees: block.angle,
+      box: block.box ? cropBoxToPagePoints(repair.region, block.box) : null,
+    }))
   }
 
   const repaired = await repairPageTextLayers(
     original,
-    [...byPage.entries()].map(([pageNumber, texts]) => ({
+    [...byPage.entries()].map(([pageNumber, repairsOnPage]) => ({
       pageNumber,
-      text: texts.join("\n"),
+      text: repairsOnPage.map((repair) => repair.acceptedText ?? "").join("\n"),
+      // Block placement only when the page IS one block-mode repair: several
+      // regions of one page cannot share block geometry, and in practice both
+      // proposers write one repair per page.
+      blocks: repairsOnPage.length === 1 ? placedBlocks(repairsOnPage[0]) : undefined,
     }))
   )
 
@@ -235,12 +269,49 @@ export async function applyAcceptedRepairs(sourceId: string) {
   const textRestored = repaired.pagesReplaced.some(
     (pageNumber) => (lengthBefore.get(pageNumber) ?? 0) < 200 && (lengthAfter.get(pageNumber) ?? 0) >= 200
   )
-  if (!rateFell && !textRestored) {
+  /**
+   * The third way a repair can be better, which a falling rate cannot express:
+   * a block-mode repair makes text MEASURABLE that was not measurable before.
+   *
+   * Marginalia that extracted as glyph soup contributed no dictionary-eligible
+   * words at all, so it sat outside the denominator; transcribed, it joins it,
+   * and it carries the page's own hand-lettered hyphenation with it. Measured
+   * on page 67 of *The Universal Traveler*: the repair adds 28 measurable
+   * words, of which three are halves of hyphen-broken pairs the page really
+   * does print that way — and the page's rate rises from 1.0% to 3.0% while
+   * its text becomes strictly more correct and its notes become selectable.
+   *
+   * So for a repair that actually placed blocks, the question is not "did the
+   * rate fall" but "is the page still CLEAN" — and clean already has a
+   * calibrated meaning here, the one `isGarbled` applies everywhere else: this
+   * library's clean pages run 1-2.3% and damage starts near 30%. A page clean
+   * before and clean after has not been harmed. Every other guard still
+   * stands: the per-page gate above refuses any page whose own rate rose by
+   * more than five points, the kept-text share refuses a page that lost its
+   * body, and the accepted text had to come from the readers in the first
+   * place.
+   */
+  const blocksPlaced = accepted.some(
+    (repair) => repair.acceptedBlocks != null && (byPage.get(repair.pageNumber)?.length ?? 0) === 1
+  )
+  const stayedClean = repaired.pagesReplaced.every((pageNumber) => {
+    const measure = measurePageGarble(
+      pageNumber,
+      pagesAfter.find((page) => page.pageNumber === pageNumber)?.textContent ?? ""
+    )
+    return measure == null || !isGarbled(measure)
+  })
+  if (!rateFell && !textRestored && !(blocksPlaced && stayedClean)) {
     const show = (rate: number | null) => (rate == null ? "unmeasurable" : `${(rate * 100).toFixed(1)}%`)
     throw new Error(
       `Discarded: the repair did not measure better on the pages it replaced ` +
         `(garbled-word rate ${show(beforeRate)} before, ${show(afterRate)} after; document damage ` +
-        `${before.pagesGarbled}→${after_.pagesGarbled} pages). The reading is unchanged.`
+        `${before.pagesGarbled}→${after_.pagesGarbled} pages)` +
+        // Which condition failed, for a block repair — the rate rising is
+        // allowed there, a page reading as damaged is not, and an operator
+        // should not have to re-derive which of the two happened.
+        (blocksPlaced ? `, and a replaced page still reads as damaged after it` : ``) +
+        `. The reading is unchanged.`
     )
   }
 

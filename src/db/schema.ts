@@ -372,6 +372,14 @@ export const sourceRepairs = pgTable("source_repair", {
   garbledWords: jsonb("garbledWords").$type<string[]>().default([]).notNull(),
   garbleRate: real("garbleRate"),
   /**
+   * This page's text does not run in one horizontal stream — angled margin
+   * notes, diagram labels, a sideways sheet — so the panel is briefed to
+   * transcribe it as blocks (role, angle, box) rather than as a stream that
+   * would interleave them. Decided at proposal time from the page's own
+   * geometry and ink; see pdfStructure's odd-format measures.
+   */
+  blockMode: boolean("blockMode").default(false).notNull(),
+  /**
    * proposed  — readings gathered, awaiting an admin
    * accepted  — an admin approved text; not yet written into a PDF
    * rejected  — an admin declined; kept so it is not re-proposed forever
@@ -380,6 +388,20 @@ export const sourceRepairs = pgTable("source_repair", {
   status: text("status").$type<"proposed" | "accepted" | "rejected" | "applied">().default("proposed").notNull(),
   /** Text every reader agreed on, before any human edit. */
   agreedText: text("agreedText").default("").notNull(),
+  /**
+   * The carried blocks of a block-mode vote — body first, then each note with
+   * the box and angle of the reader whose wording carried it. `agreedText` is
+   * always their flattening, which is how acceptance later recovers which
+   * blocks an accepted text stands for. Null on single-stream repairs.
+   */
+  agreedBlocks: jsonb("agreedBlocks").$type<
+    {
+      role: "body" | "margin" | "caption" | "label"
+      angle: number
+      box: { x: number; y: number; w: number; h: number } | null
+      text: string
+    }[]
+  >(),
   /** Passages the readers differed on — where a reviewer's attention belongs. */
   disagreements: jsonb("disagreements").$type<{ passage: string; readings: string[] }[]>().default([]).notNull(),
   /**
@@ -399,6 +421,22 @@ export const sourceRepairs = pgTable("source_repair", {
   }>(),
   /** What the admin actually approved, which may be their own correction. */
   acceptedText: text("acceptedText"),
+  /**
+   * The blocks the accepted text stands for — set at acceptance, and only when
+   * the accepted text is verbatim some set of blocks' flattening (the panel's
+   * agreed blocks, or one reader's, when the judge chose it whole). A human
+   * edit breaks the identity and this stays null: the apply then places the
+   * edited text in reading order rather than into geometry it no longer
+   * describes.
+   */
+  acceptedBlocks: jsonb("acceptedBlocks").$type<
+    {
+      role: "body" | "margin" | "caption" | "label"
+      angle: number
+      box: { x: number; y: number; w: number; h: number } | null
+      text: string
+    }[]
+  >(),
   acceptedByUserId: text("acceptedByUserId").references(() => users.id, { onDelete: "set null" }),
   acceptedAt: timestamp("acceptedAt"),
   /** Why, when an admin rejects or overrides — the record is the point. */
@@ -425,6 +463,24 @@ export const sourceRepairReadings = pgTable("source_repair_reading", {
   /** Which of the independent readers this was, 1-based. */
   reader: integer("reader").notNull(),
   text: text("text").default("").notNull(),
+  /**
+   * The reader's blocks, on a block-mode page — role, angle, box and text per
+   * visually distinct run. `text` is always their flattening. Null when the
+   * reader answered in the flat format (every pre-block reading, and any
+   * reader that ignores the block brief).
+   */
+  blocks: jsonb("blocks").$type<
+    {
+      role: "body" | "margin" | "caption" | "label"
+      angle: number
+      box: { x: number; y: number; w: number; h: number } | null
+      text: string
+    }[]
+  >(),
+  /** What the reader said about the page's orientation. The brief has always
+   *  asked for it; the parse used to drop it. A reader reporting "rotated 90°
+   *  clockwise" is a finding, and now it is a recorded one. */
+  orientation: text("orientation"),
   /** Passages the reader itself flagged as unsure — honesty, recorded. */
   uncertain: jsonb("uncertain").$type<string[]>().default([]).notNull(),
   illegibleShare: text("illegibleShare").$type<"none" | "some" | "much" | "most">(),

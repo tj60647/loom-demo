@@ -58,12 +58,33 @@ function isKnown(token: string) {
 }
 
 /**
+ * A word broken across a line by a hyphen is one word, not two.
+ *
+ * Print hyphenates at the margin, and a faithful transcription keeps it —
+ * so `defini-\ntions` tokenises as `defini` and `tions`, neither of which is a
+ * word, and a correctly read page measures as damaged. Measured on page 67 of
+ * *The Universal Traveler*: every one of the newly-transcribed marginalia's
+ * "not-words" was half of a hyphenated pair — `resolu`/`tion`,
+ * `whole`/`heartedly` — and the page's rate rose from 2.8% to 4.5% while its
+ * text became MORE correct, which the apply gate then refused. The pairing is
+ * the same one repairConsensus makes before it splits sentences, for the same
+ * reason and with the same rule.
+ *
+ * Only a hyphen AT a line break joins. A hyphen inside a line is a real
+ * compound — `problem-solving` — and its halves are words already; joining
+ * those would invent `problemsolving` and count IT as damage.
+ */
+function joinHyphenatedLineBreaks(text: string) {
+  return text.replace(/[-­]\s*\n\s*/g, "")
+}
+
+/**
  * Words from a run of text that are eligible to be judged: long enough to mean
  * something, and lowercase in the source. Case is the discriminator that keeps
  * a bibliography from reading as damage — see the note at the top of this file.
  */
 export function lowercaseBodyTokens(text: string) {
-  return text
+  return joinHyphenatedLineBreaks(text)
     .split(/[^A-Za-z'’]+/)
     .filter((token) => token.length >= MIN_TOKEN_CHARS && token === token.toLowerCase())
 }
@@ -107,7 +128,9 @@ export type GarbleReport = {
  * proposes a box around the one dictionary miss it found.
  */
 export function measurePageGarble(pageNumber: number, text: string): PageGarble | null {
-  const tokens = text.split(/[^A-Za-z'’]+/).filter((token) => token.length >= MIN_TOKEN_CHARS)
+  const tokens = joinHyphenatedLineBreaks(text)
+    .split(/[^A-Za-z'’]+/)
+    .filter((token) => token.length >= MIN_TOKEN_CHARS)
   // Lowercase in the source, so not a name, an acronym or a heading. Deduped:
   // one word repeated forty times is one piece of evidence, not forty.
   const body = [...new Set(tokens.filter((token) => token === token.toLowerCase()))]

@@ -31,6 +31,48 @@ const MIN_SENTENCE_CHARS = 12
 
 export type ReaderText = { reader: number; text: string }
 
+export type BlockRole = "body" | "margin" | "caption" | "label"
+
+/**
+ * One visually distinct run of text on a block-mode page, as a reader reported
+ * it. The page's body is a block like any other; what makes the format worth
+ * having is everything that is NOT body — the hand-lettered note angled across
+ * a margin, the label inside a diagram — which a single text stream can only
+ * record by splicing it into the middle of a sentence it does not belong to.
+ */
+export type TranscriptBlock = {
+  role: BlockRole
+  /** Degrees counterclockwise from horizontal, as the text appears on the page. */
+  angle: number
+  /**
+   * Bounding box as fractions of the crop image the reader saw, origin at the
+   * image's top-left. Fractions rather than pixels because every provider
+   * resizes the image before the model reads it, so pixel coordinates would be
+   * against a raster the reader never measured. Null when the reader gave none.
+   */
+  box: { x: number; y: number; w: number; h: number } | null
+  text: string
+}
+
+/**
+ * The one flat string a set of blocks stands for — body first, then the rest.
+ *
+ * This order is load-bearing, in three places that must agree exactly: a
+ * reading's stored `text` is this flattening of its blocks, the consensus's
+ * `agreedText` is this flattening of its agreed blocks, and the apply writes
+ * blocks into the content stream in this order. The first two let acceptance
+ * recover which blocks an accepted text stands for by string equality; the
+ * third is why a copied paragraph never has a margin note spliced into it.
+ */
+export function flattenBlocks(blocks: TranscriptBlock[]) {
+  const body = blocks.filter((block) => block.role === "body")
+  const rest = blocks.filter((block) => block.role !== "body")
+  return [...body, ...rest]
+    .map((block) => block.text.trim())
+    .filter(Boolean)
+    .join("\n")
+}
+
 export type ReaderVoteStat = {
   reader: number
   /** Sentences this reader produced that a majority backed. */
@@ -295,6 +337,272 @@ export function computeConsensus(readings: ReaderText[]): Consensus {
       readers: readerCount,
       majority,
       distinctSentences: all.length,
+      distribution,
+      perReader,
+    },
+  }
+}
+
+export type ReaderBlocks = {
+  reader: number
+  /** The reading's flat text — flattenBlocks(blocks) when blocks were given. */
+  text: string
+  /** Null when this reader answered in the old single-stream format. */
+  blocks: TranscriptBlock[] | null
+}
+
+export type BlockConsensus = Consensus & {
+  /**
+   * The carried blocks: one body block holding the sentence-voted body text,
+   * then every non-body block a majority backed, each carrying the box and
+   * angle of the reader whose wording carried it. `agreedText` is always
+   * flattenBlocks of this list — see flattenBlocks for why that identity is
+   * load-bearing.
+   */
+  agreedBlocks: TranscriptBlock[]
+}
+
+/**
+ * Overlap of two note boxes, as a share of the smaller. The smaller rather
+ * than the union (IoU) because readers disagree generously about how much
+ * whitespace a note owns — one draws the words, another the whole margin —
+ * and a tight box entirely inside a loose one is the same note, not a 30%
+ * match.
+ */
+function boxOverlap(a: NonNullable<TranscriptBlock["box"]>, b: NonNullable<TranscriptBlock["box"]>) {
+  const width = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)
+  const height = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)
+  if (width <= 0 || height <= 0) return 0
+  const smaller = Math.min(a.w * a.h, b.w * b.h)
+  return smaller > 0 ? (width * height) / smaller : 0
+}
+
+/**
+ * Are two blocks carrying the SAME WORDS one note, or two?
+ *
+ * Only asked of blocks whose normalised words are identical, so it is not a
+ * similarity test — it is the duplicate question: a page that says "see p.12"
+ * in two margins has two notes, and one reader reporting both must not have
+ * them collapsed into a single doubly-backed one. Boxes that miss each other
+ * are that case; a missing box cannot rule anything out and defers.
+ */
+function sameNotePlace(a: TranscriptBlock, b: TranscriptBlock) {
+  if (!a.box || !b.box) return true
+  return boxOverlap(a.box, b.box) >= 0.4
+}
+
+/**
+ * Consensus over a block-mode page: the body voted sentence by sentence
+ * exactly as computeConsensus does, and each note voted as its own question.
+ *
+ * The separation is the point. In a single stream, a margin note lands inside
+ * whatever body sentence the reader was mid-way through, so two readers who
+ * agree on every word of the body and merely place a note differently produce
+ * different sentences — and the vote reads their agreement as dispute. Voting
+ * notes beside the body instead of inside it means a contested "cf. p.12" is
+ * one disagreement about one note, and the body it was written next to still
+ * carries.
+ *
+ * A reader that answered in the old single-stream format still votes: its
+ * whole text is treated as body, which is exactly what its format asserts. It
+ * backs no notes, which is also what it asserts.
+ *
+ * Notes are decided like sentences: exact match on normalised words, majority
+ * of the full panel. The `votes` record covers BOTH — a page can legitimately
+ * have no body at all (a concept map is labels and nothing else), and a votes
+ * record built from the body alone would report zero readers on a page five
+ * readers agreed about, which reads downstream as a panel that never answered.
+ */
+export function computeBlockConsensus(readings: ReaderBlocks[]): BlockConsensus {
+  const present = readings.filter(
+    (reading) => reading.text.trim().length > 0 || (reading.blocks?.length ?? 0) > 0
+  )
+
+  const bodyConsensus = computeConsensus(
+    present.map((reading) => ({
+      reader: reading.reader,
+      text: reading.blocks
+        ? reading.blocks
+            .filter((block) => block.role === "body")
+            .map((block) => block.text)
+            .join("\n")
+        : reading.text,
+    }))
+  )
+
+  const majority = requiredMajority(present.length)
+
+  /**
+   * Every distinct note wording, with the readers who wrote it — the note-level
+   * counterpart of the sentence clusters, and keyed the same way: role plus
+   * exact normalised words.
+   *
+   * Keyed rather than clustered by similarity, and that is the whole design.
+   * An earlier version grouped SIMILAR notes greedily, first-match in reader
+   * order, then voted inside each group — which made the outcome depend on the
+   * order readers happened to emit their blocks. Measured on the case that
+   * breaks it: a diagram labelled "hidden layer 1" and "hidden layer 2" (0.67
+   * word overlap, disjoint boxes), read identically by four readers, two of
+   * whom listed the second label first. Each group ended up holding two of
+   * each label, no wording reached 3 of 4, and BOTH unanimously-read labels
+   * vanished while two disagreements were invented. Keying by the wording that
+   * decides the vote cannot do that: a note carries iff a majority of the
+   * panel wrote those exact words, whatever order anyone listed them in.
+   */
+  type NoteCandidate = { role: BlockRole; key: string; members: { reader: number; block: TranscriptBlock }[] }
+  const candidates: NoteCandidate[] = []
+  for (const reading of present) {
+    for (const block of reading.blocks ?? []) {
+      if (block.role === "body" || !block.text.trim()) continue
+      const key = normalisedWords(block.text).join(" ")
+      if (!key) continue
+      // Same words, same role, same PLACE — a page carrying "see p.12" in two
+      // margins has two notes, and one reader reporting both must not be read
+      // as two readers agreeing on one. One voice per reader per candidate.
+      const candidate = candidates.find(
+        (existing) =>
+          existing.role === block.role &&
+          existing.key === key &&
+          existing.members.every((member) => member.reader !== reading.reader) &&
+          existing.members.every((member) => sameNotePlace(member.block, block))
+      )
+      if (candidate) candidate.members.push({ reader: reading.reader, block })
+      else candidates.push({ role: block.role, key, members: [{ reader: reading.reader, block }] })
+    }
+  }
+
+  const agreedNotes: TranscriptBlock[] = []
+  const contestedNotes: NoteCandidate[] = []
+  for (const candidate of candidates) {
+    if (candidate.members.length >= majority) {
+      // The lowest-numbered backer's block, verbatim — wording, box and angle
+      // from one reader who actually wrote it, never a merge or an average.
+      const representative = [...candidate.members].sort((a, b) => a.reader - b.reader)[0]
+      agreedNotes.push(representative.block)
+    } else {
+      contestedNotes.push(candidate)
+    }
+  }
+
+  /**
+   * The losing wordings, grouped so a reviewer sees the variants of one note
+   * together — loose where it only presents, exactly as the sentence vote is.
+   * Strictness lives in the vote above, which has already been decided.
+   */
+  const noteDisagreements: Consensus["disagreements"] = []
+  const groupedContested: NoteCandidate[][] = []
+  for (const candidate of contestedNotes) {
+    const words = candidate.key.split(" ")
+    const group = groupedContested.find(
+      (existing) =>
+        existing[0].role === candidate.role &&
+        sameDisputedPassage(existing[0].key.split(" "), words)
+    )
+    if (group) group.push(candidate)
+    else groupedContested.push([candidate])
+  }
+  for (const group of groupedContested) {
+    noteDisagreements.push({
+      passage: `[${group[0].role}] ${group[0].members[0].block.text.slice(0, 160)}`,
+      readings: group.flatMap((candidate) =>
+        candidate.members.map((member) => `Reader ${member.reader}: ${member.block.text}`)
+      ),
+    })
+  }
+
+  /**
+   * The agreed body block's geometry: the union of the body boxes of whichever
+   * reader backed the most carried body sentences would be ideal, but the body
+   * text is voted ACROSS readers and no longer corresponds to one reader's
+   * boxes line by line. The union of every block-reporting reader's body boxes
+   * is honest at the only resolution placement uses it for — keeping body
+   * glyphs over the body columns and out of the margins.
+   */
+  let bodyBox: TranscriptBlock["box"] = null
+  for (const reading of present) {
+    for (const block of reading.blocks ?? []) {
+      if (block.role !== "body" || !block.box) continue
+      bodyBox = bodyBox
+        ? {
+            x: Math.min(bodyBox.x, block.box.x),
+            y: Math.min(bodyBox.y, block.box.y),
+            w: Math.max(bodyBox.x + bodyBox.w, block.box.x + block.box.w) - Math.min(bodyBox.x, block.box.x),
+            h: Math.max(bodyBox.y + bodyBox.h, block.box.y + block.box.h) - Math.min(bodyBox.y, block.box.y),
+          }
+        : { ...block.box }
+    }
+  }
+
+  const agreedBlocks: TranscriptBlock[] = [
+    ...(bodyConsensus.agreedText.trim()
+      ? [{ role: "body" as const, angle: 0, box: bodyBox, text: bodyConsensus.agreedText }]
+      : []),
+    ...agreedNotes,
+  ]
+
+  /**
+   * The vote record, over the whole panel and both units.
+   *
+   * `readers` counts who answered, not who wrote body text — a concept map is
+   * labels and nothing else, and reporting zero readers on a page five readers
+   * agreed about is read downstream as a panel that never ran (reprocess-
+   * library's strongConsensus refuses anything under three complete readers,
+   * so such a page would be held for a person forever, unanimity and all).
+   * Each note counts as one more voted unit, so distinctSentences, the backing
+   * distribution and each reader's agreement rate describe everything the
+   * panel actually decided here.
+   */
+  const noteStats = new Map<number, { withMajority: number; total: number; solo: number }>()
+  const statOf = (reader: number) => {
+    let stat = noteStats.get(reader)
+    if (!stat) {
+      stat = { withMajority: 0, total: 0, solo: 0 }
+      noteStats.set(reader, stat)
+    }
+    return stat
+  }
+  const distribution = [...bodyConsensus.votes.distribution]
+  while (distribution.length < present.length + 1) distribution.push(0)
+  for (const candidate of candidates) {
+    distribution[candidate.members.length] += 1
+    for (const member of candidate.members) {
+      const stat = statOf(member.reader)
+      stat.total += 1
+      if (candidate.members.length >= majority) stat.withMajority += 1
+      else if (candidate.members.length === 1) stat.solo += 1
+    }
+  }
+
+  const perReader: ReaderVoteStat[] = present.map((reading) => {
+    const body = bodyConsensus.votes.perReader.find((stat) => stat.reader === reading.reader)
+    const notes = noteStats.get(reading.reader) ?? { withMajority: 0, total: 0, solo: 0 }
+    const withMajority = (body?.withMajority ?? 0) + notes.withMajority
+    const total = (body ? body.withMajority + body.outvoted : 0) + notes.total
+    return {
+      reader: reading.reader,
+      withMajority,
+      outvoted: total - withMajority,
+      solo: (body?.solo ?? 0) + notes.solo,
+      agreementRate: total > 0 ? withMajority / total : 0,
+    }
+  })
+
+  // Carried body sentences, recovered from the rate the body vote reported
+  // over its own distinct count — both integers, so this is exact.
+  const bodyDistinct = bodyConsensus.votes.distinctSentences
+  const bodyCarried = Math.round(bodyConsensus.agreementRate * bodyDistinct)
+  const allUnits = bodyDistinct + candidates.length
+
+  return {
+    ...bodyConsensus,
+    agreedText: flattenBlocks(agreedBlocks),
+    disagreements: [...bodyConsensus.disagreements, ...noteDisagreements],
+    agreedBlocks,
+    agreementRate: allUnits > 0 ? (bodyCarried + agreedNotes.length) / allUnits : 0,
+    votes: {
+      readers: present.length,
+      majority,
+      distinctSentences: allUnits,
       distribution,
       perReader,
     },
