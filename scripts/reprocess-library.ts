@@ -202,6 +202,12 @@ async function processSource(
                 (result.highlightsMoved ? ` (${result.highlightsMoved} highlights re-anchored)` : "")
             )
             applied.push({ title: source.title, pages: result.pagesReplaced, revisedKey: result.revisedKey })
+          for (const entry of result.passagesRecovered) {
+            console.log(`         p${entry.pageNumber}: tester passage recreated on corrected text — "${entry.was.slice(0, 40)}…" → "${entry.now.slice(0, 40)}…"`)
+          }
+          for (const entry of result.passagesRemoved) {
+            console.log(`         p${entry.pageNumber}: tester passage removed (no honest equivalent) — "${entry.quote.slice(0, 40)}…"; concepts kept`)
+          }
           }
           const fresh = await db
             .select({ storageKey: sources.storageKey })
@@ -370,6 +376,12 @@ async function processSource(
             (result.highlightsMoved ? ` (${result.highlightsMoved} highlights re-anchored)` : "")
         )
         applied.push({ title: source.title, pages: result.pagesReplaced, revisedKey: result.revisedKey })
+        for (const entry of result.passagesRecovered) {
+          console.log(`         p${entry.pageNumber}: tester passage recreated on corrected text — "${entry.was.slice(0, 40)}…" → "${entry.now.slice(0, 40)}…"`)
+        }
+        for (const entry of result.passagesRemoved) {
+          console.log(`         p${entry.pageNumber}: tester passage removed (no honest equivalent) — "${entry.quote.slice(0, 40)}…"; concepts kept`)
+        }
       }
       // The rotation moved the key; the next cycle must measure the new file.
       const fresh = await db

@@ -19,7 +19,7 @@ import { repairPageTextLayers } from "@/lib/textLayerRepair"
 import { reingestSource } from "@/lib/reingest"
 import { extractPdfPageText, textLayerProjection } from "@/lib/pdfText"
 import { measurePageGarble, reportGarble } from "@/lib/garble"
-import { planReanchor } from "@/lib/reanchor"
+import { planReanchor, recoverStrandedPassages } from "@/lib/reanchor"
 import { hashText } from "@/lib/hash"
 
 /**
@@ -269,20 +269,22 @@ export async function applyAcceptedRepairs(sourceId: string) {
     pagesAfter.map((page) => [page.pageNumber, textLayerProjection(page.textContent)])
   )
   const plan = planReanchor(anchored, projectionsAfter, repaired.pagesReplaced)
-  if (plan.lost.length > 0) {
-    const worst = plan.lost[0]
-    // Page-attributed, like the other per-page refusals: a batch can then set
-    // THIS page's repair aside — the students' quotations stay whole on the
-    // text they actually captured — and still apply the pages that carry no
-    // one's work. The page-vs-highlight decision itself stays a person's.
-    throw new ApplyRefusedPage(
-      `Discarded: ${plan.lost.length} highlight${plan.lost.length === 1 ? "" : "s"} could not be carried ` +
-        `across this repair, so nothing was changed. On page ${worst.pageNumber}, ${worst.why} — ` +
-        `“${worst.quote}…”. A student's quotation is not something to break in passing; if this repair ` +
-        `matters more than that highlight, the highlight has to be dealt with first.`,
-      worst.pageNumber
-    )
-  }
+  /**
+   * A quote the corrected page no longer contains used to refuse the whole
+   * apply. Ruled by TJ, 2026-08-14: a capture of garbled OCR must not block
+   * the correction — the testers will understand. Best effort, the highlight
+   * is RECREATED on the corrected wording (fuzzy word-match; the student's
+   * note, question and concepts ride along, only the quoted substrate
+   * updates); where no honest equivalent exists, the passage is removed and
+   * its concepts survive — the schema has always guaranteed that a concept
+   * outlives any passage. Both outcomes are returned so the operator can tell
+   * the people affected.
+   */
+  const stranded = recoverStrandedPassages(
+    anchored,
+    new Set(plan.lost.map((entry) => entry.id)),
+    projectionsAfter
+  )
 
   // A new key, never an overwrite: the original stays retrievable, and one blob
   // store is shared by every environment.
@@ -314,6 +316,22 @@ export async function applyAcceptedRepairs(sourceId: string) {
       })
       .where(eq(passages.id, move.id))
   }
+  for (const recovered of stranded.recovered) {
+    const projection = projectionsAfter.get(recovered.pageNumber) ?? ""
+    await db
+      .update(passages)
+      .set({
+        content: recovered.content,
+        startOffset: recovered.startOffset,
+        endOffset: recovered.endOffset,
+        pageContentHash: hashText(projection),
+      })
+      .where(eq(passages.id, recovered.id))
+  }
+  for (const removed of stranded.unrecoverable) {
+    // Cascade takes the passage↔concept pointers; the concepts themselves stay.
+    await db.delete(passages).where(eq(passages.id, removed.id))
+  }
 
   await db
     .update(sourceRepairs)
@@ -327,5 +345,9 @@ export async function applyAcceptedRepairs(sourceId: string) {
     revisedKey,
     highlightsMoved: plan.moves.length,
     highlightsUnchanged: plan.unchanged,
+    /** Recreated on the corrected wording — old and new text, for telling the owner. */
+    passagesRecovered: stranded.recovered.map(({ id, pageNumber, was, content }) => ({ id, pageNumber, was, now: content.slice(0, 80) })),
+    /** Removed outright; their concepts survive. */
+    passagesRemoved: stranded.unrecoverable.map(({ id, pageNumber, quote }) => ({ id, pageNumber, quote })),
   }
 }

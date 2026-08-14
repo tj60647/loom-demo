@@ -101,6 +101,121 @@ export type ReanchorPlan = {
  * on every document measured here, but "measured on the documents we had" is not
  * the same as "true of every PDF", and the check costs a string comparison.
  */
+/**
+ * Best-effort recovery of a highlight whose quoted text no longer exists —
+ * because the quote WAS the damage. Ruled by TJ, 2026-08-14: testers'
+ * captures of garbled OCR must not block the correction; find what they
+ * highlighted and recreate it on the corrected text, otherwise remove the
+ * passage and keep the concept.
+ *
+ * The match is word-by-word and tolerant of exactly the change a repair
+ * makes: most words survive correction untouched, the garbled ones move a
+ * character or two ("Concert" → "Concept"). A sliding window over the
+ * corrected page maximises per-word similarity; a window that clears the
+ * floor becomes the passage's new anchor AND its new content — the student's
+ * note, question, tier and concepts ride along untouched, only the quoted
+ * substrate updates to what the page now actually says. Below the floor, the
+ * quote cannot honestly be said to exist any more, and pretending otherwise
+ * would anchor their name to a sentence they never chose.
+ */
+const RECOVERY_FLOOR = 0.72
+
+function editDistance(a: string, b: string) {
+  const previous = new Array(b.length + 1).fill(0).map((_, index) => index)
+  for (let i = 1; i <= a.length; i += 1) {
+    let diagonal = previous[0]
+    previous[0] = i
+    for (let j = 1; j <= b.length; j += 1) {
+      const saved = previous[j]
+      previous[j] = Math.min(
+        previous[j] + 1,
+        previous[j - 1] + 1,
+        diagonal + (a[i - 1] === b[j - 1] ? 0 : 1)
+      )
+      diagonal = saved
+    }
+  }
+  return previous[b.length]
+}
+
+function wordSimilarity(a: string, b: string) {
+  if (a === b) return 1
+  const longer = Math.max(a.length, b.length)
+  if (longer === 0) return 1
+  return 1 - editDistance(a.toLowerCase(), b.toLowerCase()) / longer
+}
+
+/** The quote as comparable words: de-hyphenated at line breaks, whitespace collapsed. */
+function comparableWords(text: string) {
+  return text
+    .replace(/-\s*\n\s*/g, "")
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter(Boolean)
+}
+
+export type StrandedRecovery = {
+  /** Re-created on the corrected text: new span and new content. */
+  recovered: { id: string; pageNumber: number; startOffset: number; endOffset: number; content: string; was: string }[]
+  /** No honest equivalent exists; the passage should be removed, concepts kept. */
+  unrecoverable: { id: string; pageNumber: number; quote: string }[]
+}
+
+export function recoverStrandedPassages(
+  anchored: AnchoredPassage[],
+  lostIds: Set<string>,
+  pageTextAfter: Map<number, string>
+): StrandedRecovery {
+  const outcome: StrandedRecovery = { recovered: [], unrecoverable: [] }
+
+  for (const passage of anchored) {
+    if (!lostIds.has(passage.id) || passage.pageNumber == null) continue
+    const projection = pageTextAfter.get(passage.pageNumber) ?? ""
+    const quoteWords = comparableWords(passage.content)
+
+    // Tokenise the corrected page with character positions, so a winning
+    // window converts straight back into offsets.
+    const pageTokens = [...projection.matchAll(/\S+/g)].map((match) => ({
+      word: match[0],
+      start: match.index ?? 0,
+      end: (match.index ?? 0) + match[0].length,
+    }))
+
+    let best: { score: number; start: number; end: number } | null = null
+    if (quoteWords.length >= 2 && pageTokens.length >= quoteWords.length) {
+      for (let index = 0; index + quoteWords.length <= pageTokens.length; index += 1) {
+        let total = 0
+        for (let offset = 0; offset < quoteWords.length; offset += 1) {
+          total += wordSimilarity(quoteWords[offset], pageTokens[index + offset].word)
+        }
+        const score = total / quoteWords.length
+        if (!best || score > best.score) {
+          best = { score, start: pageTokens[index].start, end: pageTokens[index + quoteWords.length - 1].end }
+        }
+      }
+    }
+
+    if (best && best.score >= RECOVERY_FLOOR) {
+      outcome.recovered.push({
+        id: passage.id,
+        pageNumber: passage.pageNumber,
+        startOffset: best.start,
+        endOffset: best.end,
+        content: projection.slice(best.start, best.end),
+        was: passage.content.slice(0, 80),
+      })
+    } else {
+      outcome.unrecoverable.push({
+        id: passage.id,
+        pageNumber: passage.pageNumber,
+        quote: passage.content.slice(0, 80),
+      })
+    }
+  }
+
+  return outcome
+}
+
 export function planReanchor(
   anchored: AnchoredPassage[],
   pageTextAfter: Map<number, string>,
