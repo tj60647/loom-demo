@@ -271,11 +271,16 @@ export async function applyAcceptedRepairs(sourceId: string) {
   const plan = planReanchor(anchored, projectionsAfter, repaired.pagesReplaced)
   if (plan.lost.length > 0) {
     const worst = plan.lost[0]
-    throw new Error(
+    // Page-attributed, like the other per-page refusals: a batch can then set
+    // THIS page's repair aside — the students' quotations stay whole on the
+    // text they actually captured — and still apply the pages that carry no
+    // one's work. The page-vs-highlight decision itself stays a person's.
+    throw new ApplyRefusedPage(
       `Discarded: ${plan.lost.length} highlight${plan.lost.length === 1 ? "" : "s"} could not be carried ` +
         `across this repair, so nothing was changed. On page ${worst.pageNumber}, ${worst.why} — ` +
         `“${worst.quote}…”. A student's quotation is not something to break in passing; if this repair ` +
-        `matters more than that highlight, the highlight has to be dealt with first.`
+        `matters more than that highlight, the highlight has to be dealt with first.`,
+      worst.pageNumber
     )
   }
 
