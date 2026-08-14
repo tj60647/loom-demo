@@ -376,14 +376,19 @@ export async function createPassage(data: { conceptIds?: string[], source: strin
       // also carries the line boundaries pdf.js marks, which appear nowhere in
       // a client capture.
       //
-      // This was already the shape of a live bug: `content` comes from
-      // `selection.toString()`, which carries a newline per rendered line,
-      // while the offsets beside it come from `range.toString()`, which does
-      // not. Every multi-line capture therefore failed this lookup and fell
-      // through to the client-offset branch below.
+      // And the selection itself has to shed ITS line marks first.
+      // `selection.toString()` inserts a "\n" per rendered line at positions
+      // where the DOM string — the offset space — has zero characters, so a
+      // multi-line capture could never match the projection and every one of
+      // them fell through to the client-offset branch below. That branch keeps
+      // a working highlight, but an anchor on the client hash is invisible to
+      // the peer overlay, whose hash gate only speaks canonical. Stripping the
+      // newlines is exactly textLayerProjection's own move, applied to the
+      // selection; the stored passage keeps the student's string as selected.
+      const projectedContent = data.content.split("\n").join("")
       const canonicalIndex = findClosestTextIndex(
         textLayerProjection(page.textContent),
-        data.content,
+        projectedContent,
         data.startOffset
       )
       const clientTextMatchesCanonical = !data.pageContentHash || data.pageContentHash === page.contentHash
@@ -391,7 +396,10 @@ export async function createPassage(data: { conceptIds?: string[], source: strin
       if (canonicalIndex !== -1 && clientTextMatchesCanonical) {
         pageContentHash = page.contentHash
         startOffset = canonicalIndex
-        endOffset = canonicalIndex + data.content.length
+        // The projected length, not data.content.length: the offsets index a
+        // string those newlines do not exist in, and the overlong end used to
+        // mark past the capture by a character per line.
+        endOffset = canonicalIndex + projectedContent.length
       } else {
         pageContentHash = data.pageContentHash ?? page.contentHash
         if (canonicalIndex === -1) {

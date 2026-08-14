@@ -20,7 +20,7 @@ import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth/next"
 import { db } from "@/db"
 import { authOptions, isAdminUser } from "@/lib/auth"
-import { passages, sourceRepairs, sourceRepairReadings, sources, users } from "@/db/schema"
+import { passages, sourceRepairs, sourceRepairReadings, sourceRevisions, sources, users } from "@/db/schema"
 import { readingStorage } from "@/lib/storage"
 import { detectRepairsForSource, repairSettings, transcribeRepairRegion } from "@/lib/repairPipeline"
 import { ACCEPTED_OVERLAP_FLOOR, acceptedTextMatchesReadings } from "@/lib/repairReview"
@@ -400,11 +400,30 @@ export async function applyRepairs(sourceId: string) {
       )
     }
 
-    const improved = (after_.garbledPageRate ?? 1) < (before.garbledPageRate ?? 0)
-    if (!improved) {
+    /**
+     * Better means two different things, and the rate only sees one of them.
+     *
+     * A garble repair improves by making the rate FALL. A transcription of a
+     * page that had no text at all — a scanned page the OCR never reached —
+     * cannot move the rate down, because a textless page was never measurable
+     * to begin with; its whole improvement is text existing where none did.
+     * The old strictly-less gate refused exactly those repairs on any reading
+     * whose measurable pages were already clean, which is most scans.
+     *
+     * So: the rate falling is still improvement, and text restored to a
+     * near-empty page counts too — but only while the rate did not RISE,
+     * because restoring one page by garbling another is not a trade this
+     * gate is allowed to make.
+     */
+    const rateFell = (after_.garbledPageRate ?? 1) < (before.garbledPageRate ?? 0)
+    const rateHeld = (after_.garbledPageRate ?? 1) <= (before.garbledPageRate ?? 0)
+    const textRestored = repaired.pagesReplaced.some(
+      (pageNumber) => (lengthBefore.get(pageNumber) ?? 0) < 200 && (lengthAfter.get(pageNumber) ?? 0) >= 200
+    )
+    if (!rateFell && !(rateHeld && textRestored)) {
       throw new Error(
         `Discarded: the repair did not measure better (${before.pagesGarbled} damaged pages before, ` +
-          `${after_.pagesGarbled} after). The reading is unchanged.`
+          `${after_.pagesGarbled} after, and no textless page gained a text layer). The reading is unchanged.`
       )
     }
 
@@ -450,6 +469,16 @@ export async function applyRepairs(sourceId: string) {
     const revisedKey = `readings/${sourceId}-repaired-${Date.now()}.pdf`
     await readingStorage.put(revisedKey, repaired.bytes)
     await db.update(sources).set({ storageKey: revisedKey }).where(eq(sources.id, sourceId))
+    // The lineage row, in the same act as the rotation: without it the old key
+    // is an orphan the store holds and nothing addresses (see source_revision).
+    await db.insert(sourceRevisions).values({
+      sourceId,
+      storageKey: revisedKey,
+      predecessorKey: source.storageKey,
+      reason: `applied ${accepted.length} repair${accepted.length === 1 ? "" : "s"} on page${
+        repaired.pagesReplaced.length === 1 ? "" : "s"
+      } ${repaired.pagesReplaced.join(", ")}`,
+    })
     await reingestSource(sourceId, repaired.bytes)
 
     // After re-ingest, so the hash a highlight carries names the page rows that

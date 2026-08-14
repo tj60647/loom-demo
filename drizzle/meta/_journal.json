@@ -176,6 +176,13 @@
       "when": 1786480250015,
       "tag": "0024_link_as_object",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786685096144,
+      "tag": "0025_source_revision",
+      "breakpoints": true
     }
   ]
 }

@@ -425,6 +425,40 @@ export const sourceRepairReadings = pgTable("source_repair_reading", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 })
 
+/**
+ * One revision event of a reading's stored file — the lineage the blob store
+ * has always had and the database could not see.
+ *
+ * Applying a repair rotates `sources.storageKey` to a new blob and keeps the
+ * old one "retrievable" — but until this table, retrievable meant "present in
+ * the store with nothing addressing it": `measuredAgainstKey` on pending
+ * proposals was the only record of a prior key, deleteSource stranded every
+ * superseded blob forever, and "which file did students read in week 3?" had
+ * no answer. A row here per rotation makes the chain walkable: audit, cleanup
+ * on delete, and one day a rollback all read this table instead of guessing.
+ *
+ * Append-only by convention: rows record what happened and are never edited.
+ */
+export const sourceRevisions = pgTable(
+  "source_revision",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    sourceId: text("sourceId")
+      .notNull()
+      .references(() => sources.id, { onDelete: "cascade" }),
+    /** The key this revision made current. */
+    storageKey: text("storageKey").notNull(),
+    /** The key it superseded — the file a student saw the day before. */
+    predecessorKey: text("predecessorKey"),
+    /** Why, in a sentence: which repairs, applied by whom. The record is the point. */
+    reason: text("reason").default("").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (row) => ({
+    bySource: index("source_revision_source_idx").on(row.sourceId),
+  })
+)
+
 // --- LOOM TABLES ---
 
 export const concepts = pgTable(

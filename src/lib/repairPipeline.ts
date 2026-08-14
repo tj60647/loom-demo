@@ -16,6 +16,7 @@ import { db } from "@/db"
 import { sourceRepairs, sourceRepairReadings } from "@/db/schema"
 import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
 import { extractPdfPageText } from "@/lib/pdfText"
+import { probePdfStructure } from "@/lib/pdfStructure"
 import { locatePageRepairRegion } from "@/lib/garbleRegion"
 import { isGarbled, measurePageGarble } from "@/lib/garble"
 import { computeConsensus } from "@/lib/repairConsensus"
@@ -191,6 +192,23 @@ export async function detectRepairsForSource(
     await readingStorage.delete(row.cropKey).catch(() => {})
   }
 
+  /**
+   * The second trigger. Garble detection only fires where glyphs exist and
+   * read as damage — a page with NO text layer at all never qualifies, so the
+   * scans that need transcription most were exactly the ones detection could
+   * not see (Sketchpad: 35 such pages, proposed nothing). The structure probe
+   * already tells a `scanned` page (lines of type, none extractable — OCR's
+   * case) from a `picture` (a figure, not a defect) and a `blank` leaf, so its
+   * verdict is the trigger: scanned pages get a full-page proposal.
+   */
+  const structure = await probePdfStructure(buffer).catch((error) => {
+    console.warn("[repair] structure probe failed; scanned-page detection off this run", error)
+    return null
+  })
+  const scannedPageNumbers = new Set(
+    (structure?.pages ?? []).filter((page) => page.kind === "scanned").map((page) => page.pageNumber)
+  )
+
   const pdfjsLib = await loadPdfjs()
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(buffer),
@@ -232,7 +250,28 @@ export async function detectRepairsForSource(
         MAX_CROP_EDGE / Math.max(unscaled.width, unscaled.height)
       )
 
-      const region = await locatePageRepairRegion(page, pageNumber, scale)
+      const located = await locatePageRepairRegion(page, pageNumber, scale)
+      /**
+       * A scanned page has no glyphs to locate a region from, so its region is
+       * the page: the unit of repair is the unit of replacement either way,
+       * and the readers do better seeing the whole sheet than a guessed box.
+       * `words` is empty — there is no damaged text to warn a reader off,
+       * only absence — and `garbleRate` stays null: nothing was measurable.
+       */
+      const wholePage = page.getViewport({ scale })
+      const region =
+        located ??
+        (scannedPageNumbers.has(pageNumber)
+          ? {
+              x: 0,
+              y: 0,
+              width: Math.ceil(wholePage.width),
+              height: Math.ceil(wholePage.height),
+              words: [] as string[],
+              glyphRate: null,
+              bodyWords: 0,
+            }
+          : null)
       if (!region) {
         if (textDamaged.has(pageNumber)) unlocatable.push(pageNumber)
         continue
@@ -299,11 +338,19 @@ const TRANSCRIBE_SYSTEM =
   "invented one."
 
 function transcribePrompt(garbledWords: string[]) {
+  // Two kinds of damage arrive here: text that extracted as garbage, and text
+  // that never extracted at all (a scanned page with no OCR layer). The warning
+  // about existing damage only makes sense when damage exists to warn about.
+  const damage =
+    garbledWords.length > 0
+      ? `This is a region of a course reading whose extracted text is corrupted. What the PDF currently ` +
+        `believes is here reads: ${JSON.stringify(garbledWords.slice(0, 12))}. That is the damage — do not ` +
+        `reproduce it, and do not let it steer your reading.`
+      : `This is a page of a course reading that has NO extractable text at all — a scan the OCR never ` +
+        `reached. There is nothing to avoid reproducing; transcribe what you see.`
   return (
     `Transcribe ALL text visible in this image, VERBATIM and in reading order.\n\n` +
-    `This is a region of a course reading whose extracted text is corrupted. What the PDF currently ` +
-    `believes is here reads: ${JSON.stringify(garbledWords.slice(0, 12))}. That is the damage — do not ` +
-    `reproduce it, and do not let it steer your reading.\n\n` +
+    `${damage}\n\n` +
     `Rules that matter more than completeness:\n` +
     `- Transcribe what is ON THE PAGE, not what you think it should say. Keep the original's own ` +
     `spelling, typos and archaisms.\n` +
