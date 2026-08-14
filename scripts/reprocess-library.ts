@@ -143,6 +143,37 @@ async function processSource(
       .orderBy(asc(sourceRepairs.pageNumber))
 
     if (proposals.length === 0) {
+      // Accepted-but-unapplied rows first: a prior run's apply may have been
+      // refused (an encoding bug, a gate) and fixed since. Detecting now would
+      // re-propose the same pages BESIDE their accepted rows, pay the panel
+      // again, and then apply both texts onto one page. Apply what stands.
+      const acceptedPending = await db
+        .select({ id: sourceRepairs.id })
+        .from(sourceRepairs)
+        .where(and(eq(sourceRepairs.sourceId, source.id), eq(sourceRepairs.status, "accepted")))
+      if (acceptedPending.length > 0) {
+        try {
+          const result = await applyAcceptedRepairs(source.id)
+          console.log(
+            `  wrote  ${source.title} — pages ${result.pagesReplaced.join(", ")} → ${result.revisedKey}` +
+              (result.highlightsMoved ? ` (${result.highlightsMoved} highlights re-anchored)` : "")
+          )
+          applied.push({ title: source.title, pages: result.pagesReplaced, revisedKey: result.revisedKey })
+          const fresh = await db
+            .select({ storageKey: sources.storageKey })
+            .from(sources)
+            .where(eq(sources.id, source.id))
+            .limit(1)
+          source.storageKey = fresh[0]?.storageKey ?? source.storageKey
+          continue
+        } catch (error) {
+          const why = error instanceof Error ? error.message : String(error)
+          console.log(`  HELD   ${source.title} — apply refused: ${why}`)
+          held.push({ title: source.title, pageNumber: 0, why: `apply refused: ${why}` })
+          return
+        }
+      }
+
       const buffer = await readingStorage.get(source.storageKey)
       const detection = await detectRepairsForSource(source.id, buffer, source.storageKey)
       if (detection.unlocatable.length > 0) {

@@ -18,7 +18,7 @@ import { acceptedTextMatchesReadings } from "@/lib/repairReview"
 import { repairPageTextLayers } from "@/lib/textLayerRepair"
 import { reingestSource } from "@/lib/reingest"
 import { extractPdfPageText, textLayerProjection } from "@/lib/pdfText"
-import { reportGarble } from "@/lib/garble"
+import { measurePageGarble, reportGarble } from "@/lib/garble"
 import { planReanchor } from "@/lib/reanchor"
 import { hashText } from "@/lib/hash"
 
@@ -169,29 +169,62 @@ export async function applyAcceptedRepairs(sourceId: string) {
   }
 
   /**
-   * Better means two different things, and the rate only sees one of them.
+   * Better, measured where the repair actually happened.
    *
-   * A garble repair improves by making the rate FALL. A transcription of a
-   * page that had no text at all — a scanned page the OCR never reached —
-   * cannot move the rate down, because a textless page was never measurable
-   * to begin with; its whole improvement is text existing where none did.
-   * The old strictly-less gate refused exactly those repairs on any reading
-   * whose measurable pages were already clean, which is most scans.
+   * The gate used to compare the whole document's damaged-PAGE count, which is
+   * blind twice over. A bibliography transcribed perfectly still classifies as
+   * a garbled page — author names are not dictionary words — so a real repair
+   * of one measured as no improvement and was refused. And a textless page
+   * gaining text moves no rate at all, because an unmeasurable page was never
+   * in the denominator. Untouched pages carry identical bytes through the
+   * rewrite, so the only pages that can change are the replaced ones — and the
+   * honest question is whether THEIR damage fell, word by word:
    *
-   * So: the rate falling is still improvement, and text restored to a
-   * near-empty page counts too — but only while the rate did not RISE,
-   * because restoring one page by garbling another is not a trade this
-   * gate is allowed to make.
+   *   - the garbled-word rate across the replaced pages fell, or
+   *   - a page that had no text worth measuring now carries a real layer,
+   *
+   * and never the trade where restoring one page garbles another — a rise on
+   * any replaced page's own rate still refuses.
    */
-  const rateFell = (after_.garbledPageRate ?? 1) < (before.garbledPageRate ?? 0)
-  const rateHeld = (after_.garbledPageRate ?? 1) <= (before.garbledPageRate ?? 0)
+  const replacedRate = (pages: { pageNumber: number; textContent: string }[]) => {
+    let garbled = 0
+    let body = 0
+    for (const pageNumber of repaired.pagesReplaced) {
+      const text = pages.find((page) => page.pageNumber === pageNumber)?.textContent ?? ""
+      const measure = measurePageGarble(pageNumber, text)
+      if (measure) {
+        garbled += measure.rate * measure.bodyWords
+        body += measure.bodyWords
+      }
+    }
+    return body > 0 ? garbled / body : null
+  }
+  const beforeRate = replacedRate(pagesBefore)
+  const afterRate = replacedRate(pagesAfter)
+  // Per page, not only in aggregate: one page repaired well must not carry
+  // another repaired badly through the gate.
+  for (const pageNumber of repaired.pagesReplaced) {
+    const wasText = pagesBefore.find((page) => page.pageNumber === pageNumber)?.textContent ?? ""
+    const nowText = pagesAfter.find((page) => page.pageNumber === pageNumber)?.textContent ?? ""
+    const was = measurePageGarble(pageNumber, wasText)
+    const now = measurePageGarble(pageNumber, nowText)
+    if (was && now && now.rate > was.rate + 0.05) {
+      throw new Error(
+        `Discarded: page ${pageNumber} would read WORSE after this repair ` +
+          `(garbled-word rate ${(was.rate * 100).toFixed(1)}% → ${(now.rate * 100).toFixed(1)}%). The reading is unchanged.`
+      )
+    }
+  }
+  const rateFell = afterRate != null && (beforeRate == null || afterRate < beforeRate)
   const textRestored = repaired.pagesReplaced.some(
     (pageNumber) => (lengthBefore.get(pageNumber) ?? 0) < 200 && (lengthAfter.get(pageNumber) ?? 0) >= 200
   )
-  if (!rateFell && !(rateHeld && textRestored)) {
+  if (!rateFell && !textRestored) {
+    const show = (rate: number | null) => (rate == null ? "unmeasurable" : `${(rate * 100).toFixed(1)}%`)
     throw new Error(
-      `Discarded: the repair did not measure better (${before.pagesGarbled} damaged pages before, ` +
-        `${after_.pagesGarbled} after, and no textless page gained a text layer). The reading is unchanged.`
+      `Discarded: the repair did not measure better on the pages it replaced ` +
+        `(garbled-word rate ${show(beforeRate)} before, ${show(afterRate)} after; document damage ` +
+        `${before.pagesGarbled}→${after_.pagesGarbled} pages). The reading is unchanged.`
     )
   }
 

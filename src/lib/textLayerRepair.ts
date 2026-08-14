@@ -63,6 +63,40 @@ export type RepairResult = {
 }
 
 /**
+ * What the embedded font can actually write.
+ *
+ * The invisible layer is drawn with a standard font, and standard fonts are
+ * WinAnsi: the first accepted transcription of a diagram page carried a "√"
+ * and pdf-lib refused the WHOLE apply with `WinAnsi cannot encode "√"`. A
+ * character the font cannot carry must not veto a page of text it can, so
+ * anything unencodable becomes a space — a word boundary, not a wrong glyph,
+ * and honest about what the text layer holds: search will not find a root
+ * sign either way.
+ */
+function winAnsiSafe(text: string, font: { getCharacterSet: () => number[] }) {
+  const encodable = winAnsiSetOf(font)
+  let dropped = 0
+  const safe = [...text]
+    .map((ch) => {
+      if (ch === "\n" || ch === "\t" || encodable.has(ch.codePointAt(0) ?? -1)) return ch
+      dropped += 1
+      return " "
+    })
+    .join("")
+  return { safe, dropped }
+}
+
+const winAnsiSets = new WeakMap<object, Set<number>>()
+function winAnsiSetOf(font: { getCharacterSet: () => number[] }) {
+  let set = winAnsiSets.get(font)
+  if (!set) {
+    set = new Set(font.getCharacterSet())
+    winAnsiSets.set(font, set)
+  }
+  return set
+}
+
+/**
  * Replace the text layer of the named pages with accepted transcriptions.
  *
  * Returns new bytes; the input is never mutated. The caller decides whether the
@@ -126,7 +160,10 @@ export async function repairPageTextLayers(
       if (boxes && boxes.length > 0) {
         for (const box of boxes) {
           if (!box.text.trim()) continue
-          replacement.drawText(box.text, {
+          const { safe, dropped } = winAnsiSafe(box.text, font)
+          if (dropped > 0) console.warn(`[textLayerRepair] p${transcription.pageNumber}: ${dropped} unencodable character(s) became spaces`)
+          if (!safe.trim()) continue
+          replacement.drawText(safe, {
             x: box.x,
             y: box.y,
             size: Math.max(4, box.height * 0.8),
@@ -139,7 +176,9 @@ export async function repairPageTextLayers(
         // No measured layout: lay the accepted text out in reading order down
         // the page. Selection and search work; the highlight rectangle is
         // approximate, which the review record says plainly.
-        const lines = transcription.text.split("\n").filter((line) => line.trim())
+        const { safe, dropped } = winAnsiSafe(transcription.text, font)
+        if (dropped > 0) console.warn(`[textLayerRepair] p${transcription.pageNumber}: ${dropped} unencodable character(s) became spaces`)
+        const lines = safe.split("\n").filter((line) => line.trim())
         const lineHeight = Math.min(14, Math.max(8, (height - 72) / Math.max(1, lines.length)))
         lines.forEach((line, lineIndex) => {
           replacement.drawText(line, {
