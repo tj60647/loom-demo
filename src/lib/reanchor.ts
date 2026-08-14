@@ -170,16 +170,43 @@ export function recoverStrandedPassages(
 
   for (const passage of anchored) {
     if (!lostIds.has(passage.id) || passage.pageNumber == null) continue
-    const projection = pageTextAfter.get(passage.pageNumber) ?? ""
+    const stored = pageTextAfter.get(passage.pageNumber) ?? ""
     const quoteWords = comparableWords(passage.content)
 
-    // Tokenise the corrected page with character positions, so a winning
-    // window converts straight back into offsets.
-    const pageTokens = [...projection.matchAll(/\S+/g)].map((match) => ({
+    /**
+     * Match against the STORED page text, not the projection. The projection
+     * (the offset space) concatenates line ends with nothing between them, so
+     * "are⏎intended" reads as one token "areintended" — one fused token
+     * shifts a fixed-length window off every following word and a quote that
+     * is plainly on the page scores as absent. Measured, not hypothetical:
+     * that is exactly how a tester's capture of the chapter-opening sentence
+     * of Learning How to Learn was wrongly removed. The stored text keeps the
+     * line boundaries, so tokens split correctly; a token's offsets convert
+     * to projection space by subtracting the newlines before it. Tokens that
+     * end with a hyphen at a line break merge with their successor, the same
+     * flattening the quote side gets.
+     */
+    const rawTokens = [...stored.matchAll(/\S+/g)].map((match) => ({
       word: match[0],
       start: match.index ?? 0,
       end: (match.index ?? 0) + match[0].length,
     }))
+    const pageTokens: { word: string; start: number; end: number }[] = []
+    for (let index = 0; index < rawTokens.length; index += 1) {
+      const token = rawTokens[index]
+      if (token.word.endsWith("-") && index + 1 < rawTokens.length) {
+        const next = rawTokens[index + 1]
+        pageTokens.push({ word: token.word.slice(0, -1) + next.word, start: token.start, end: next.end })
+        index += 1
+      } else {
+        pageTokens.push(token)
+      }
+    }
+    const newlinesBefore = (position: number) => {
+      let count = 0
+      for (let index = 0; index < position; index += 1) if (stored[index] === "\n") count += 1
+      return count
+    }
 
     let best: { score: number; start: number; end: number } | null = null
     if (quoteWords.length >= 2 && pageTokens.length >= quoteWords.length) {
@@ -199,9 +226,10 @@ export function recoverStrandedPassages(
       outcome.recovered.push({
         id: passage.id,
         pageNumber: passage.pageNumber,
-        startOffset: best.start,
-        endOffset: best.end,
-        content: projection.slice(best.start, best.end),
+        // Projection space — the space every stored offset indexes.
+        startOffset: best.start - newlinesBefore(best.start),
+        endOffset: best.end - newlinesBefore(best.end),
+        content: stored.slice(best.start, best.end).replace(/-\n/g, "").split("\n").join(" "),
         was: passage.content.slice(0, 80),
       })
     } else {

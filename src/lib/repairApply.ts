@@ -280,10 +280,12 @@ export async function applyAcceptedRepairs(sourceId: string) {
    * outlives any passage. Both outcomes are returned so the operator can tell
    * the people affected.
    */
+  // The STORED-form text, line boundaries kept — recovery matches against
+  // this and converts its offsets to projection space itself.
   const stranded = recoverStrandedPassages(
     anchored,
     new Set(plan.lost.map((entry) => entry.id)),
-    projectionsAfter
+    new Map(pagesAfter.map((page) => [page.pageNumber, page.textContent]))
   )
 
   // A new key, never an overwrite: the original stays retrievable, and one blob
