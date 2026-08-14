@@ -87,8 +87,8 @@ export default function ConceptCard({
         </div>
       ) : (
         // "No evidence" is a designation, never a warning to act on — the same
-        // rule CardMenu and ThrowTab state. Said plainly, with the reason it
-        // is legal, and no verb offered.
+        // rule ThrowTab states. Said plainly, with the reason it is legal, and
+        // no verb offered.
         <p className="oconcept-def empty">
           No passage backs this yet. You may have named it ahead of its evidence,
           which is allowed.

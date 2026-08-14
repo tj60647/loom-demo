@@ -16,13 +16,13 @@ import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import type { CardTableView, Concept, Tier } from "@/lib/types"
-import { readingsOf, soleSourceId } from "@/lib/scope"
+import { soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import { buildMapKit, buildMapKitData } from "@/lib/mapKit"
 import { buildMapExport, buildMapMarkdown, mapExportFilename, scopeLabelOf } from "@/lib/graphExport"
 import { downloadText } from "@/lib/download"
-import CardMenu from "@/components/map/CardMenu"
+import ConceptCard from "@/components/cards/ConceptCard"
 import ObjectDownload from "@/components/ui/ObjectDownload"
 import ClothReflection from "@/components/tabs/ClothReflection"
 
@@ -33,6 +33,29 @@ const BAND_H = (TABLE_H - 20) / 3
 const MENU_MAX_H = 330
 
 const isPlaced = (t: Tier) => t === "p" || t === "s" || t === "t"
+
+/**
+ * Wrap a label onto as many lines as it needs — text on this board is never cut.
+ *
+ * At MODULE scope, and it must stay there. It is used by `defLines`, which
+ * `cardH` calls, which `effPos` calls while the component body is still running
+ * — so as a `const` inside the component it sat in the temporal dead zone at
+ * the moment it was first needed and threw, blanking the whole board. It only
+ * showed once a card was actually pinned, because `defLines` returns early for
+ * an unpinned one and never reaches this. Nothing here reads component state,
+ * so there is no reason for it to live inside.
+ */
+const wrapLabel = (text: string, maxChars = 24) => {
+  const lines: string[] = []
+  let line = ""
+  text.split(/\s+/).filter(Boolean).forEach(word => {
+    if (!line) line = word
+    else if ((line + " " + word).length <= maxChars) line += " " + word
+    else { lines.push(line); line = word }
+  })
+  if (line) lines.push(line)
+  return lines.length ? lines : [text]
+}
 
 /**
  * The sort list's effective sequence: ids named in views.cardTable.order first,
@@ -184,11 +207,25 @@ export default function MapTab({ practice = false }: {
   // geometry, so they belong to the active map's view.
   const pins = view.pins ?? []
   const isPinned = (c: Concept) => !!c.def && pins.includes(c.id)
-  const cardH = (c: Concept) => isPinned(c) ? 50 : 34
   const cardW = (c: Concept) => {
     const dl = isPinned(c) ? Math.min(c.def!.length, 46) * 5.2 + 22 : 0
     return Math.min(240, Math.max(90, Math.max(c.label.length * 6.4 + 22, dl)))
   }
+  /**
+   * The pinned description, wrapped to the card rather than cut (TJ,
+   * 2026-08-13: "the description under the concept name should not be
+   * ellipsis"). It was `short(def, 46)`, so a gloss any longer than that ended
+   * in an ellipsis on the one surface built to show it — and a card is pinned
+   * precisely because you want to read it while you arrange.
+   *
+   * `wrapLabel` is the same wrapper the link labels use, for the same stated
+   * reason: text on this board is never cut. The card grows a line at a time
+   * to fit, which is why cardH is measured from the lines rather than fixed.
+   */
+  const defLines = (c: Concept) =>
+    isPinned(c) ? wrapLabel(c.def!, Math.max(10, Math.floor((cardW(c) - 22) / 5.2))) : []
+  // 38 + 12/line keeps a one-line pinned card at the 50px it has always been.
+  const cardH = (c: Concept) => isPinned(c) ? 38 + defLines(c).length * 12 : 34
 
   const togglePin = (c: Concept) => {
     void ensureActiveMap().then((m) => {
@@ -263,19 +300,6 @@ export default function MapTab({ practice = false }: {
     if (!len) return { x: cx, y: cy }
     const t = Math.min(dx ? (w / 2) / Math.abs(dx) : Infinity, dy ? (h / 2) / Math.abs(dy) : Infinity)
     return { x: cx + dx * t + (dx / len) * gap, y: cy + dy * t + (dy / len) * gap }
-  }
-
-  /** Wrap a label onto as many lines as it needs — link text is never cut. */
-  const wrapLabel = (text: string, maxChars = 24) => {
-    const lines: string[] = []
-    let line = ""
-    text.split(/\s+/).filter(Boolean).forEach(word => {
-      if (!line) line = word
-      else if ((line + " " + word).length <= maxChars) line += " " + word
-      else { lines.push(line); line = word }
-    })
-    if (line) lines.push(line)
-    return lines.length ? lines : [text]
   }
 
   // --- mirror counts (counted, not judged) ---
@@ -727,7 +751,7 @@ export default function MapTab({ practice = false }: {
 
       <div className="card">
         <h2>The board</h2>
-        <p className="hint">Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋯</b> — its description, the passages behind it, and where else you met it.</p>
+        <p className="hint">Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋮</b> — its description and the passages behind it, on the same card you meet a concept on everywhere else.</p>
 
       {/* position:relative anchors the card menus, which are HTML over the SVG. */}
       <div id="tableWrap" style={{ position: "relative", overflowX: "auto", border: "1px solid var(--rule)", borderRadius: 4, background: "radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec" }}>
@@ -819,7 +843,11 @@ export default function MapTab({ practice = false }: {
                   <title>{c.label}</title>
                 </text>
                 {twoLine && (
-                  <text x={pos.x + w / 2} y={pos.y + 36} textAnchor="middle" fontFamily='"Newsreader",Georgia,serif' fontSize={10} fontStyle="italic" fill="var(--ink-soft)">{short(c.def!, 46)}</text>
+                  <text x={pos.x + w / 2} y={pos.y + 36} textAnchor="middle" fontFamily='"Newsreader",Georgia,serif' fontSize={10} fontStyle="italic" fill="var(--ink-soft)">
+                    {defLines(c).map((ln, i) => (
+                      <tspan key={i} x={pos.x + w / 2} dy={i ? 12 : 0}>{ln}</tspan>
+                    ))}
+                  </text>
                 )}
                 {/* The card's own menu. Hover, focus or tap — the whole card is
                     a drag handle, so this must be a small target of its own or
@@ -843,12 +871,18 @@ export default function MapTab({ practice = false }: {
                     }
                   }}
                 >
-                  <rect x={pos.x + w - 18} y={pos.y} width={18} height={16} fill="transparent" />
+                  {/* Stacked, not strung out (TJ, 2026-08-13: "the three dots
+                      on 'the board' concept cards seem like they could be
+                      vertical"). A vertical ⋮ is the ordinary card-menu glyph,
+                      and it takes a narrow column of the card's top-right
+                      instead of a strip across it — which matters here, because
+                      the rest of that edge is drag surface. */}
+                  <rect x={pos.x + w - 16} y={pos.y} width={16} height={22} fill="transparent" />
                   {[0, 1, 2].map(i => (
                     <circle
                       key={i}
-                      cx={pos.x + w - 13 + i * 4}
-                      cy={pos.y + 8}
+                      cx={pos.x + w - 8}
+                      cy={pos.y + 7 + i * 4}
                       r={1.1}
                       fill={menuFor === c.id ? "var(--ochre)" : "var(--grey)"}
                     />
@@ -859,23 +893,58 @@ export default function MapTab({ practice = false }: {
           })}
         </svg>
 
+        {/* THE STANDARD CONCEPT CARD, in a popover (TJ, 2026-08-13: "the board
+            concept cards could use the standard concept card instead of the
+            custom popup"). `CardMenu` was a second drawing of an object that
+            already has one, and it had drifted into saying things its own way —
+            "your description" over the gloss, hand-rolled passage quotes capped
+            at four, a "where else you met it" list. `ConceptCard` says all of
+            it in the shape every other surface uses, and its own header asks
+            for exactly this: "no fixed width: this is meant to sit in a 380px
+            sheet, a margin rail and a popover".
+
+            `.cardmenu` stays as the SHELL — it is the positioning, the 260px,
+            the scroll and the shadow, and it carries no opinion about contents.
+            `.ocard` has no chrome of its own, so the two nest cleanly.
+
+            "Where else you met it" is not lost: every PassageCard names the
+            reading its quotation came from, which is the same fact per passage
+            rather than a list at the foot. */}
         {menuConcept && menuPos && (
-          <CardMenu
-            concept={menuConcept}
-            passages={state.passages.filter(b => b.conceptIds.includes(menuConcept.id))}
-            where={readingsOf(menuConcept.id, state.passages).map(titleOf)}
-            pinned={pins.includes(menuConcept.id)}
+          <div
+            className="cardmenu"
             // Clamped so a card near the right edge does not push its menu off
             // the table, and flipped above the card when it sits low enough
             // that opening downward would hang off the table's bottom.
-            left={Math.min(menuPos.x, Math.max(0, W - 268))}
-            {...(menuPos.y + cardH(menuConcept) + MENU_MAX_H > TABLE_H
-              ? { bottom: TABLE_H - menuPos.y + 6 }
-              : { top: menuPos.y + cardH(menuConcept) + 6 })}
-            onHold={holdMenu}
-            onRelease={releaseMenu}
-            onTogglePin={handleTogglePin}
-          />
+            style={{
+              left: Math.min(menuPos.x, Math.max(0, W - 268)),
+              ...(menuPos.y + cardH(menuConcept) + MENU_MAX_H > TABLE_H
+                ? { bottom: TABLE_H - menuPos.y + 6 }
+                : { top: menuPos.y + cardH(menuConcept) + 6 }),
+            }}
+            onPointerEnter={() => holdMenu(menuConcept.id)}
+            onPointerLeave={releaseMenu}
+          >
+            <ConceptCard
+              concept={menuConcept}
+              passages={state.passages.filter(b => b.conceptIds.includes(menuConcept.id))}
+              concepts={state.concepts}
+              titleOf={titleOf}
+            />
+            {/* Pinning is the board's own gesture — it puts the gloss on the
+                card you are arranging — so it lives here rather than in the
+                shared card. Only offered when there is a description to pin. */}
+            {menuConcept.def && (
+              <button
+                type="button"
+                className="btn ghost mini compact"
+                style={{ marginTop: 10 }}
+                onClick={handleTogglePin}
+              >
+                {pins.includes(menuConcept.id) ? "unpin from the card" : "pin to the card"}
+              </button>
+            )}
+          </div>
         )}
       </div>
 
