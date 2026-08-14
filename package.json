@@ -2,6 +2,9 @@
   "name": "loom-demo",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.7.0"
+  },
   "scripts": {
     "predev": "node scripts/copy-pdf-worker.mjs",
     "dev": "next dev",
@@ -11,7 +14,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run check:remap && npm run check:scoring && npm run check:auth && npm run check:overlay && npm run check:workflows && npm run check:vocabulary && npm run check:rail && npm run check:spread && npm run check:sandbox && npm run check:guide && npm run check:objexport && npm run check:logscope && npm run check:linkresolve && npm run check:reset",
+    "check": "npm run lint && npm run typecheck && npm run check:remap && npm run check:scoring && npm run check:auth && npm run check:overlay && npm run check:workflows && npm run check:vocabulary && npm run check:rail && npm run check:spread && npm run check:sandbox && npm run check:guide && npm run check:objexport && npm run check:logscope && npm run check:linkresolve && npm run check:reset && npm run check:textparity",
+    "check:textparity": "tsx scripts/check-text-parity.ts",
     "check:linkresolve": "tsx scripts/check-link-resolve.ts",
     "check:reset": "tsx scripts/check-reset.ts",
     "check:logscope": "tsx scripts/check-log-scope.ts",
