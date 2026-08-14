@@ -810,11 +810,17 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    its own, so the bar is the same size at every position in the record. */
 .logbar{display:flex;align-items:center;gap:12px;margin:2px 0 4px;flex-wrap:nowrap}
 .logbar .cap{margin:0}
-/* Reserves are in px and measured, not guessed in em: "▶ replay from the
-   start" renders 177px and the widest counter ("act 112 of 112 · now") 124px,
-   and an em reserve computed against the wrong font-size is a reserve that
-   silently does nothing. */
-.logbar .logplay{min-width:182px;justify-content:center;white-space:nowrap}
+/* Reserves are in px and measured, not guessed in em: an em reserve computed
+   against the wrong font-size is a reserve that silently does nothing. The
+   widest counter ("act 112 of 112 · now") is 124px; the widest play label is
+   now "❚❚ pause" at 127px, since "▶ replay from the start" was shortened to
+   "▶ replay" — it was reserving 182px at every position for a sentence shown
+   at one of them (TJ: "the play button might be oversized"). */
+.logbar .logplay{min-width:96px;justify-content:center;white-space:nowrap}
+/* The shape, right-aligned: what changes about it ("now" against a full
+   timestamp) grows leftward into empty space and moves nothing. */
+.logbar .logshape{margin-left:auto;white-space:nowrap;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 .logbar .logcount{min-width:150px;white-space:nowrap;
   font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 /* The act being replayed. Always in the flow, empty at the end of the record,
@@ -859,17 +865,26 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .untetheredsrc{font-family:var(--mono);font-size:12px;margin-bottom:6px}
 .untetheredsrc .n{color:var(--grey)}
 
-/* A card's own menu — HTML over the SVG table, because a quote needs real
-   text wrapping and SVG has none. */
+/* A card's own menu — HTML over the SVG table, because a quote needs real text
+   wrapping and SVG has none.
+
+   The SHELL only, since 2026-08-13: position, width, scroll and shadow. What it
+   holds is the standard ConceptCard, so the rules that dressed the old bespoke
+   contents (.cardmenuhead, .cardmenuwhere, and a margin override for
+   .passagequote) went with it. `.cardmenudef` stays — CohortClothPanel still
+   uses it, and it was never only this menu's. */
 .cardmenu{position:absolute;z-index:6;width:260px;max-height:330px;overflow:auto;
   padding:12px 13px;background:var(--paper);border:1px solid var(--ink);border-radius:4px;
   box-shadow:0 6px 22px rgba(0,0,0,.13)}
-.cardmenuhead{font-family:var(--display);font-size:16px;margin-bottom:8px;
-  border-bottom:1px solid var(--rule);padding-bottom:5px}
 .cardmenudef{font-size:13.5px;line-height:1.45;color:var(--ink);margin:3px 0 9px}
-.cardmenuwhere{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin:3px 0 0;line-height:1.5}
-.cardmenu .passagequote{margin:6px 0 8px}
 .cardmenu .ghostnote{margin:3px 0 0}
+/* The concept's name WRAPS here. `.lconcept` ellipsises by default because in
+   Your work it is one row of a scannable list; in a 260px popover opened to
+   read this one concept, cutting its name is the same fault as cutting its
+   description (TJ, 2026-08-13) — and there is nothing to keep it on one line
+   for. */
+.cardmenu .lconcept{white-space:normal;overflow:visible;text-overflow:clip}
+.cardmenu .lhead{align-items:baseline}
 
 /* Roster: one learner per row — a roster is scanned, not read, so each entry
    is a line in a list, not a card. The pills column has a fixed basis so the

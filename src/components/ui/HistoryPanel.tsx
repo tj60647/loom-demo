@@ -749,16 +749,16 @@ export function CaptureLogScrubber({ log }: { log: CaptureLog }) {
         />
       )}
       {/* NOTHING IN THIS BAR MAY CHANGE WIDTH (TJ, 2026-08-13: "i really hate
-          it when buttons change size and reformat the card"). Three things did:
-          the play button relabelled between "▶ play", "❚❚ pause" and "▶ replay
-          from the start" — a threefold width swing that shoved everything after
-          it; "back to now ›" mounted and unmounted as you left and reached the
-          end of the record; and the counter's digits are proportional, so
-          "act 9 of 112" and "act 112 of 112 · now" are different widths.
+          it when buttons change size and reformat the card"). The button
+          reserves the width of its longest label, the counter is tabular and
+          reserves its own, and "back to now" keeps its box and hides its ink.
 
-          So: the button reserves the width of its longest label, the counter is
-          tabular and reserves its own, and "back to now" keeps its box and
-          hides its ink. */}
+          The reserve is only as wide as the longest label, so the label decides
+          the button (TJ: "the play button might be oversized"). "▶ replay from
+          the start" was holding 182px open at every position in the record, for
+          a sentence shown at exactly one of them. "▶ replay" says the same
+          thing — you are at the end, pressing it starts again — in a third of
+          the room, and now "❚❚ pause" is the widest of the three. */}
       <div className="logbar">
         {/* Play runs it forward a beat at a time and stops at the end. At the
             end it starts over, because that is the only thing the word can
@@ -772,8 +772,9 @@ export function CaptureLogScrubber({ log }: { log: CaptureLog }) {
             setPlaying(true)
           }}
           aria-pressed={playing}
+          title={atMax ? "play the record again from the first act" : undefined}
         >
-          {playing ? "❚❚ pause" : atMax ? "▶ replay from the start" : "▶ play"}
+          {playing ? "❚❚ pause" : atMax ? "▶ replay" : "▶ play"}
         </button>
         <span className="cap logcount">act {k} of {events.length}{atMax ? " · now" : ""}</span>
         {/* Back to the live cloth in one press. Dragging the scrubber the last
@@ -793,27 +794,33 @@ export function CaptureLogScrubber({ log }: { log: CaptureLog }) {
         >
           back to now ›
         </button>
+
+        {/* THE SHAPE, on the right of the same row (TJ, 2026-08-13: "the
+            metadata could be right side"). It had a line of its own under the
+            bar, which cost a row of height to say something the bar had room
+            for. Right-aligned, so the part that changes — "now" against a full
+            timestamp — grows leftward into empty space and moves nothing.
+
+            The counts are the cloth's shape at this act: the three things drawn
+            above. "· the read, revised once so far" used to hang off the end of
+            them and TJ read it as irrelevant (2026-08-12); it was worse than
+            that. It counted `read.update` and cloth-description edits, so it
+            named an object that no longer exists — "the read" was the cloth's
+            paragraph before migration 0021 replaced it with the Cloth
+            Description, and today "your read" means a PROJECTION's paragraph.
+            It counted a thing you cannot see, under a name for something else,
+            beside three things you can.
+
+            Counted one at a time: "1 concepts · 0 threads" is the same slip TJ
+            caught on My Loom (66172a1), and the first act is always a 1. */}
+        <span className="cap logshape">
+          {cloth.concepts.length} concept{cloth.concepts.length !== 1 ? "s" : ""} ·{" "}
+          {cloth.edges.length} thread{cloth.edges.length !== 1 ? "s" : ""} ·{" "}
+          {cloth.passages.length} passage{cloth.passages.length !== 1 ? "s" : ""} —{" "}
+          {atMax ? "now" : when ? `as of ${when}` : "at the first recorded act"}
+        </span>
       </div>
 
-      {/* The counts are the cloth's SHAPE at this act — the three things drawn
-          above. "· the read, revised once so far" used to hang off the end of
-          them and TJ read it as irrelevant (2026-08-12); it was worse than
-          that. It counted `read.update` and cloth-description edits, so it
-          named an object that no longer exists: "the read" was the cloth's
-          paragraph before migration 0021 replaced it with the Cloth
-          Description, and today "your read" means a PROJECTION's paragraph, a
-          different object again. It counted a thing you cannot see, under a
-          name for something else, next to three things you can. The acts it
-          counted are in the record, said plainly. */}
-      {/* Counted one at a time: "1 concepts · 0 threads" is the same slip TJ
-          caught on My Loom (commit 66172a1, "1 threads" becomes "1 thread"),
-          and the first act of any record is always a 1. */}
-      <p className="cap" style={{ margin: "4px 0 2px" }}>
-        {cloth.concepts.length} concept{cloth.concepts.length !== 1 ? "s" : ""} ·{" "}
-        {cloth.edges.length} thread{cloth.edges.length !== 1 ? "s" : ""} ·{" "}
-        {cloth.passages.length} passage{cloth.passages.length !== 1 ? "s" : ""} —{" "}
-        {atMax ? "now" : when ? `as of ${when}` : "at the first recorded act"}
-      </p>
       {/* Always in the flow, blank at the end — mounting it only once you leave
           "now" grew the card by a line the moment you pressed play. */}
       <p className="ghostnote logsaid" style={{ margin: "0 0 4px" }}>

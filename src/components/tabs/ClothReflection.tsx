@@ -59,7 +59,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
   // below resolves. Bridges are named but not drawn: they are 02 Linking's
   // material, and drawing half a thread would be a lie.
   const {
-    scopedState: state, scoped, flash,
+    scopedState: state, flash,
     addMap, setMapTiers, selectMap, scopeMaps,
   } = useLoom()
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
@@ -368,12 +368,14 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
 
   return (
     <>
-      {scoped.bridges.length > 0 && (
-        <p className="ghostnote" style={{ marginTop: 22, marginBottom: 12 }}>
-          {scoped.bridges.length} thread{scoped.bridges.length !== 1 ? "s" : ""} also run{scoped.bridges.length === 1 ? "s" : ""} out of this reading to concepts you met elsewhere.
-          They are not drawn here — half a thread would be a lie — but they are listed on <b>02 · Linking</b>.
-        </p>
-      )}
+      {/* A note counting the bridges — threads running out of this reading to
+          concepts met elsewhere — stood above the card until 2026-08-13 (TJ:
+          "i dont think this adds value"). It explained an absence: why the
+          drawing does not show something you were not looking for. The rule it
+          defended is unchanged and still true — the cloth draws only threads
+          with both ends in this reading, because half a thread would be a lie —
+          and the bridges themselves are still counted and listed where they can
+          be acted on, on 02 · Linking. */}
 
       {/* The cloth and its reading were side by side (TJ, 2026-08-12) — one
           gesture, a prompt on the right lighting the cloth on the left. The
