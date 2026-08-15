@@ -6,6 +6,18 @@
 # `e2e` needs the CI database and blob secrets (docs/deployments.md §CI);
 # it fails loudly, not silently, when they are missing — a suite that
 # quietly skips is not a gate.
+#
+# Why `push` is master-only: the suite holds a global lock (one CI database,
+# one demo account — see the e2e `concurrency` block), so a run is a turn
+# taken from every other open PR, not just runner minutes. A push to `dev` is
+# a tree the PR run already tested; re-running it only lengthens the queue.
+# `master` keeps its push run because that is the tree that ships.
+#
+# Why the scope step exists rather than `paths-ignore`: e2e is a REQUIRED
+# check. A job filtered away at the `on:` level never reports, so its check
+# sits pending forever and the docs-only PR you meant to speed up is the one
+# that cannot merge. The job therefore always runs and always reports — it
+# decides *inside* whether the suite has anything to observe.
 
 name: ci
 
@@ -13,7 +25,7 @@ on:
   pull_request:
     branches: [master, dev]
   push:
-    branches: [master, dev]
+    branches: [master]
 
 jobs:
   checks:
@@ -61,7 +73,44 @@ jobs:
       GITHUB_SECRET: ci-dummy  # through /api/auth/test-login (dev-mode only).
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The scope step diffs against the PR base, which shallow history
+          # does not contain.
+          fetch-depth: 0
+      - name: Scope — does this diff touch anything the suite can see?
+        id: scope
+        run: |
+          # Pushes to master always run: that is the tree that ships, and a
+          # merge can combine two individually-harmless diffs.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "push to master — running the full suite" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          BASE="${{ github.event.pull_request.base.sha }}"
+          CHANGED=$(git diff --name-only "$BASE" HEAD)
+          # Everything NOT in the prose-only set. No spec can observe docs,
+          # markdown, or editor/agent config; every other path is code, data,
+          # migration, dependency or CI wiring and is fair game.
+          CODE=$(printf '%s\n' "$CHANGED" \
+            | grep -vE '^(docs/|\.claude/|\.vscode/)|(^|/)[^/]*\.md$|^LICENSE' \
+            || true)
+          if [ -z "$CODE" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### e2e skipped — prose-only diff"
+              echo "No spec can observe these paths:"
+              printf '%s\n' "$CHANGED" | sed 's/^/- /'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### e2e running — code paths changed"
+              printf '%s\n' "$CODE" | sed 's/^/- /'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Require CI secrets
+        if: steps.scope.outputs.run == 'true'
         run: |
           if [ -z "$DATABASE_URL" ]; then
             echo "::error::CI_DATABASE_URL is not set. The e2e gate cannot run — see docs/deployments.md §CI for the secrets to configure."
@@ -72,6 +121,7 @@ jobs:
             exit 1
           fi
       - uses: actions/setup-node@v4
+        if: steps.scope.outputs.run == 'true'
         with:
           # THE RUNTIME IS PART OF THE TEST. pdf.js decodes scan images through
           # `openjpeg_nowasm_fallback.js` — ESM with a .js extension in a
@@ -84,17 +134,53 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+        if: steps.scope.outputs.run == 'true'
       - run: npx playwright install --with-deps chromium
+        if: steps.scope.outputs.run == 'true'
       - name: Migrate CI database
+        if: steps.scope.outputs.run == 'true'
         run: npx drizzle-kit migrate
       - name: Seed readings and demo accounts
+        if: steps.scope.outputs.run == 'true'
         run: |
           npm run seed:sources
           npm run seed:demo
       - name: Run the suite
+        if: steps.scope.outputs.run == 'true'
         # The default config: starts `next dev` itself (test-login needs a
         # non-production build), port 3000, one worker.
-        run: npx playwright test
+        #
+        # Smoke on the way in, everything on the way to master. The suite runs
+        # single-worker (playwright.config.ts: every spec shares Test User A
+        # and the capture specs delete their own rows), so 22 spec files take
+        # 16–22 minutes — a long wait to hear about a typo. A PR into `dev`
+        # therefore runs the four specs that fail first when something is
+        # actually broken:
+        #   access          — the authorization boundary
+        #   journey-learner — the student's whole path, end to end
+        #   cloth           — capture, the object everything else is built on
+        #   pdf-fit         — the viewer, and with it the Node/pdf.js decode
+        #                     path that once blanked every scan in silence
+        # `master` — the tree that ships, and the one branch protection gates
+        # — still runs all 22. Nothing reaches production on the subset.
+        #
+        # This list is the honest cost: a spec outside it can break on a `dev`
+        # PR and only be caught at the master gate. Add to it when a class of
+        # breakage escapes; that is a cheaper repair than an unread 20-minute
+        # check.
+        run: |
+          if [ "${{ github.base_ref || github.ref_name }}" = "master" ]; then
+            echo "### e2e — full suite (master)" >> "$GITHUB_STEP_SUMMARY"
+            npx playwright test
+          else
+            echo "### e2e — smoke subset (dev)" >> "$GITHUB_STEP_SUMMARY"
+            echo "Full 22-spec suite runs on the PR into \`master\`." >> "$GITHUB_STEP_SUMMARY"
+            npx playwright test \
+              tests/access.spec.ts \
+              tests/journey-learner.spec.ts \
+              tests/cloth.spec.ts \
+              tests/pdf-fit.spec.ts
+          fi
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
