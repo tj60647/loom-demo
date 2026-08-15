@@ -59,6 +59,13 @@ const READINGS: {
    * instead of failing the whole seed.
    */
   optional?: boolean
+  /**
+   * A reading that has to be REACHABLE, not merely present: something in the
+   * app looks it up through `getSources`, which only returns readings linked to
+   * a course. On no shelf it is invisible, and being invisible is a bug rather
+   * than a librarian's choice. See the filing step in `run`.
+   */
+  alwaysOnShelf?: boolean
   legacySourceLabels: string[]
 }[] = [
   {
@@ -124,6 +131,7 @@ const READINGS: {
     file: "Oh, the Places You'll Go!.pdf",
     blobKey: "readings/Oh, the Places You'll Go! ( PDFDrive )-jJ0Y9DH3gAtM8svNDPd1Os42aYhRUG.pdf",
     optional: true,
+    alwaysOnShelf: true,
     legacySourceLabels: [],
   },
 ]
@@ -226,12 +234,10 @@ async function run() {
       }
     }
 
-    let registeredHere = false
 
     if (!source) {
       const storageKey = await storageKeyFor(reading)
       if (!storageKey) continue
-      registeredHere = true
 
       const [inserted] = await db
         .insert(sources)
@@ -304,31 +310,48 @@ async function run() {
      * failure: registering the reading was not enough, and CI kept opening an
      * empty sandbox with all 47 pages of the text sitting in its database.
      *
-     * ONLY for a row this run registered itself. On dev and in production these
-     * readings already exist and are already filed — by hand, deliberately, and
-     * in production that filing is what students see on their shelf. A seed
-     * script may repair its own work; it may not publish a reading into a live
-     * course because a fixture wanted it.
+     * The condition is ON NO SHELF AT ALL, not "this run registered it" — which
+     * is what it said first, and which cannot work: the run that inserts is the
+     * only run that could ever repair, and by the time the gap was understood
+     * that run had already passed. CI kept reporting `already exists` for a row
+     * sitting on no shelf, and nothing would have filed it ever again.
      *
-     * Filed where the course readings already are, rather than at a course of
-     * this script's choosing, so the practice loom is visible in exactly the
-     * scope the rest of the seeded library occupies.
+     * Zero links is the safe test because it is not a state a librarian
+     * produces. Removing a reading from a course leaves the others; removing it
+     * from every course is indistinguishable from never having filed it, and
+     * for a reading the app must be able to REACH (`alwaysOnShelf`) the second
+     * reading is the one worth acting on. The course readings carry no such
+     * flag: what shelf they sit on is the admin's business, and in production
+     * that filing is what students see.
+     *
+     * Filed where the seeded library already is, rather than at a course of
+     * this script's choosing, so the practice loom appears in exactly the scope
+     * the rest of the seeded readings occupy.
      */
-    if (registeredHere) {
-      const shelves = await db
-        .selectDistinct({ courseId: courseSources.courseId })
+    if (reading.alwaysOnShelf) {
+      const [filed] = await db
+        .select({ courseId: courseSources.courseId })
         .from(courseSources)
-      for (const shelf of shelves) {
-        await db
-          .insert(courseSources)
-          .values({ courseId: shelf.courseId, sourceId: source.id, isVisible: true })
-          .onConflictDoNothing()
+        .where(eq(courseSources.sourceId, source.id))
+        .limit(1)
+      if (filed) {
+        console.log(`[seed-sources] "${reading.title}" is already on a shelf.`)
+      } else {
+        const shelves = await db
+          .selectDistinct({ courseId: courseSources.courseId })
+          .from(courseSources)
+        for (const shelf of shelves) {
+          await db
+            .insert(courseSources)
+            .values({ courseId: shelf.courseId, sourceId: source.id, isVisible: true })
+            .onConflictDoNothing()
+        }
+        console.log(
+          shelves.length
+            ? `[seed-sources] Filed "${reading.title}" on ${shelves.length} shelf/shelves — it was on none.`
+            : `[seed-sources] No course to file "${reading.title}" on — it stays invisible until one links it.`
+        )
       }
-      console.log(
-        shelves.length
-          ? `[seed-sources] Filed "${reading.title}" on ${shelves.length} course shelf/shelves.`
-          : `[seed-sources] No course to file "${reading.title}" on — it will not appear until one links it.`
-      )
     }
 
     const existingPages = await db
