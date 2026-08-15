@@ -15,7 +15,7 @@
 import { readFile } from "fs/promises"
 import path from "path"
 import { db } from "../src/db"
-import { sources, sourcePages, passages } from "../src/db/schema"
+import { sources, sourcePages, passages, courseSources } from "../src/db/schema"
 import { eq } from "drizzle-orm"
 import { extractPdfPageText, textLayerProjection } from "../src/lib/pdfText"
 import { hashText } from "../src/lib/hash"
@@ -156,7 +156,7 @@ async function readSeedPdf(file: string) {
 }
 
 /**
- * Where this reading's bytes are going to live: the shared store first, disk
+ * Where this reading's file is going to live: the shared store first, disk
  * second.
  *
  * Every environment points at the ONE blob store (scripts/check-covers.ts says
@@ -226,9 +226,12 @@ async function run() {
       }
     }
 
+    let registeredHere = false
+
     if (!source) {
       const storageKey = await storageKeyFor(reading)
       if (!storageKey) continue
+      registeredHere = true
 
       const [inserted] = await db
         .insert(sources)
@@ -290,6 +293,42 @@ async function run() {
         source = updated
         console.log(`[seed-sources] "${reading.title}" already exists.`)
       }
+    }
+
+    /**
+     * FILE IT ON A SHELF, or it is seeded and invisible.
+     *
+     * `getSources` reaches readings through `courseSources` (src/actions/sources.ts)
+     * — a row nobody has linked to a course is returned to nobody, however
+     * completely it is seeded. That is the second half of the practice-loom
+     * failure: registering the reading was not enough, and CI kept opening an
+     * empty sandbox with all 47 pages of the text sitting in its database.
+     *
+     * ONLY for a row this run registered itself. On dev and in production these
+     * readings already exist and are already filed — by hand, deliberately, and
+     * in production that filing is what students see on their shelf. A seed
+     * script may repair its own work; it may not publish a reading into a live
+     * course because a fixture wanted it.
+     *
+     * Filed where the course readings already are, rather than at a course of
+     * this script's choosing, so the practice loom is visible in exactly the
+     * scope the rest of the seeded library occupies.
+     */
+    if (registeredHere) {
+      const shelves = await db
+        .selectDistinct({ courseId: courseSources.courseId })
+        .from(courseSources)
+      for (const shelf of shelves) {
+        await db
+          .insert(courseSources)
+          .values({ courseId: shelf.courseId, sourceId: source.id, isVisible: true })
+          .onConflictDoNothing()
+      }
+      console.log(
+        shelves.length
+          ? `[seed-sources] Filed "${reading.title}" on ${shelves.length} course shelf/shelves.`
+          : `[seed-sources] No course to file "${reading.title}" on — it will not appear until one links it.`
+      )
     }
 
     const existingPages = await db
