@@ -48,6 +48,12 @@ export type PdfPageProxy = {
   getTextContent: () => Promise<{ items: unknown[] }>
   getOperatorList: () => Promise<{ fnArray: number[]; argsArray: unknown[][] }>
   render: (options: Record<string, unknown>) => { promise: Promise<void> }
+  /**
+   * The page's resolved objects, keyed by the names its operator list uses.
+   * Reading an image's own pixel dimensions from here is how a repair learns
+   * the resolution a page was scanned at, rather than assuming one.
+   */
+  objs: { get: (name: string, callback: (value: unknown) => void) => void }
 }
 
 function nodeModulePath(...segments: string[]) {

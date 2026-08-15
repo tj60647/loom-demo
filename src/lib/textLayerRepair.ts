@@ -27,16 +27,44 @@
  * student can still find and quote it even if the highlight rectangle is
  * approximate.
  */
-import { PDFDocument, StandardFonts, degrees, type PDFFont, type PDFPage } from "pdf-lib"
+import {
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFRawStream,
+  StandardFonts,
+  decodePDFRawStream,
+  degrees,
+  type PDFFont,
+  type PDFPage,
+} from "pdf-lib"
 import { createCanvas } from "@napi-rs/canvas"
 import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
 
 /**
- * Render resolution for the replacement page image. High enough that the page
- * is not visibly softer than it was, low enough that a 235-page book does not
- * become unopenable. Only damaged pages are rasterised.
+ * Render resolution for the LAST-RESORT replacement page image.
+ *
+ * This constant used to be the whole story, and it was quietly destroying the
+ * library. A repair rasterised the rendered page at 200dpi and embedded that;
+ * measured afterwards, *Learning How to Learn*'s scans are 2200x3400px — 400dpi
+ * at page size — and *The Universal Traveler*'s are 350dpi, so every repaired
+ * page threw away half its linear resolution and three quarters of its pixels,
+ * permanently, in exchange for fixing its text. The comment that stood here
+ * claimed the page was "not visibly softer"; at 300dpi the difference is
+ * unmistakable, and the viewer's deeper zoom now puts it under the reader's
+ * eye. It compounded, too: a page repaired twice was a 200dpi resample of a
+ * 200dpi resample.
+ *
+ * So rasterising is no longer what a repair does. `stripPageText` below keeps
+ * the page's own artwork — the scan's image object, untouched and never
+ * re-encoded — and removes only the text. This path remains for a page whose
+ * content stream will not parse, and it now renders at the page's OWN
+ * resolution rather than a fixed one; the constant is only a floor.
  */
 const REPLACEMENT_DPI = 200
+/** Never re-render above this, whatever the source claims. */
+const MAX_REPLACEMENT_DPI = 600
 const PDF_POINTS_PER_INCH = 72
 
 /**
@@ -104,12 +132,105 @@ export function cropBoxToPagePoints(
   }
 }
 
+/**
+ * Take the TEXT out of a page and leave everything else exactly as it was.
+ *
+ * This is what a repair should always have done. A scanned page is an image
+ * and a text layer, and the two are separate objects in the content stream —
+ * measured on *Learning How to Learn*, page 57's whole stream is 101 bytes:
+ *
+ *     q 1 0 0 1 0 0 cm /OCR-nDHWHy5Fj6lRO77jjeOvEQ Do Q
+ *     q 396 0 0 612 0 0 cm /Im0 Do Q
+ *
+ * The OCR text is a form XObject and the scan is an image XObject. Removing
+ * the first invocation and keeping the second replaces the text layer without
+ * touching a single pixel of the scan — no render, no re-encode, no loss, and
+ * a smaller file than it started with, because nothing was recompressed.
+ *
+ * Two shapes of text are removed: an invocation of a form whose XObject holds
+ * text, and inline `BT … ET` blocks. Returns false when the stream will not
+ * parse or when text and artwork are too entangled to separate, and the caller
+ * falls back to rasterising — losing fidelity, but never silently: the page is
+ * reported so the operator knows which pages paid.
+ */
+function stripPageText(doc: PDFDocument, page: PDFPage): boolean {
+  try {
+    const context = doc.context
+    const contents = page.node.get(PDFName.of("Contents"))
+    const resolved = contents ? context.lookup(contents) : null
+    const streams: PDFRawStream[] = []
+    if (resolved instanceof PDFRawStream) streams.push(resolved)
+    else if (resolved instanceof PDFArray) {
+      for (const ref of resolved.asArray()) {
+        const s = context.lookup(ref)
+        if (s instanceof PDFRawStream) streams.push(s)
+      }
+    }
+    if (streams.length === 0) return false
+
+    // Which named XObjects on this page are text-bearing forms? A form whose
+    // own stream contains text operators is a text layer, whatever it is
+    // called; the `/OCR-…` naming is a convention, not a guarantee.
+    const xobjects = page.node.Resources()?.get(PDFName.of("XObject"))
+    const textForms = new Set<string>()
+    const xobjectDict = xobjects ? context.lookup(xobjects) : null
+    if (xobjectDict instanceof PDFDict) {
+      for (const [key, ref] of xobjectDict.asMap()) {
+        const name = key.asString().replace(/^\//, "")
+        const target = context.lookup(ref)
+        if (!(target instanceof PDFRawStream)) continue
+        const subtype = target.dict.get(PDFName.of("Subtype"))
+        if (String(subtype) !== "/Form") continue
+        let inner = ""
+        try {
+          inner = Buffer.from(decodePDFRawStream(target).decode()).toString("latin1")
+        } catch {
+          continue
+        }
+        if (/\bBT\b/.test(inner)) textForms.add(name)
+      }
+    }
+
+    let changed = false
+    for (const stream of streams) {
+      let source: string
+      try {
+        source = Buffer.from(decodePDFRawStream(stream).decode()).toString("latin1")
+      } catch {
+        return false
+      }
+      // Inline text blocks first, then the invocations of text-bearing forms.
+      let next = source.replace(/\bBT\b[\s\S]*?\bET\b/g, "")
+      for (const name of textForms) {
+        next = next.replace(new RegExp(`/${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+Do\\b`, "g"), "")
+      }
+      if (next === source) continue
+      // A stream that still shows an image is a page that kept its artwork.
+      context.assign(
+        context.getObjectRef(stream) ?? context.register(stream),
+        context.flateStream(next)
+      )
+      changed = true
+    }
+    return changed
+  } catch {
+    return false
+  }
+}
+
 export type RepairResult = {
   /** The repaired PDF. */
   bytes: Buffer
   pagesReplaced: number[]
   /** Pages whose text was laid out without measured boxes. */
   pagesApproximate: number[]
+  /**
+   * Pages whose content stream would not give up its text, so the page was
+   * re-rendered and its original artwork replaced. Lossy — reported so the
+   * operator can see which pages paid, instead of the whole library paying
+   * silently as it did before.
+   */
+  pagesRasterised: number[]
 }
 
 /**
@@ -335,7 +456,7 @@ export async function repairPageTextLayers(
   transcriptions: PageTranscription[]
 ): Promise<RepairResult> {
   if (transcriptions.length === 0) {
-    return { bytes: original, pagesReplaced: [], pagesApproximate: [] }
+    return { bytes: original, pagesReplaced: [], pagesApproximate: [], pagesRasterised: [] }
   }
 
   const pdfjsLib = await loadPdfjs()
@@ -353,32 +474,73 @@ export async function repairPageTextLayers(
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const pagesReplaced: number[] = []
   const pagesApproximate: number[] = []
+  /** Pages that lost their original artwork to a re-render. Named, never silent. */
+  const pagesRasterised: number[] = []
 
   try {
     for (const transcription of transcriptions) {
       const index = transcription.pageNumber - 1
       if (index < 0 || index >= doc.getPageCount()) continue
 
-      // Render the original page, so the replacement is visually identical.
-      const page = await source.getPage(transcription.pageNumber)
-      const scale = REPLACEMENT_DPI / PDF_POINTS_PER_INCH
-      const viewport = page.getViewport({ scale })
-      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
-      const context = canvas.getContext("2d")
-      context.fillStyle = "#ffffff"
-      context.fillRect(0, 0, canvas.width, canvas.height)
-      await page.render({ canvasContext: context, viewport }).promise
-
       const existing = doc.getPage(index)
       const { width, height } = existing.getSize()
 
-      // A fresh page carrying the image and nothing else. Inserting rather than
-      // editing is what guarantees the old text operators are gone — leaving
-      // them would give the page two overlapping text layers, and a selection
-      // would pick up both the garbage and the correction.
-      const image = await doc.embedPng(canvas.toBuffer("image/png"))
-      const replacement = doc.insertPage(index, [width, height])
-      replacement.drawImage(image, { x: 0, y: 0, width, height })
+      /**
+       * Keep the page and take only its text out. The page's own artwork —
+       * the scan, at whatever resolution it was scanned — is never touched,
+       * so a repair costs nothing in fidelity. Only when the content stream
+       * resists does the old rasterising path run.
+       */
+      let replacement = existing
+      if (!stripPageText(doc, existing)) {
+        const page = await source.getPage(transcription.pageNumber)
+        // The page's OWN resolution, not a constant: rendering a 400dpi scan
+        // at 200 is what made the library soft. Derived from the largest image
+        // the page paints, floored at the old constant and capped for sanity.
+        let dpi = REPLACEMENT_DPI
+        try {
+          const ops = await page.getOperatorList()
+          const viewportAt1 = page.getViewport({ scale: 1 })
+          for (let op = 0; op < ops.fnArray.length; op++) {
+            if (ops.fnArray[op] !== pdfjsLib.OPS.paintImageXObject) continue
+            const name = String(ops.argsArray[op][0])
+            const painted = (await new Promise<unknown>((resolve) => {
+              try {
+                page.objs.get(name, resolve)
+              } catch {
+                resolve(null)
+              }
+            })) as { width?: number } | null
+            if (painted?.width && viewportAt1.width > 0) {
+              dpi = Math.max(dpi, (painted.width / viewportAt1.width) * PDF_POINTS_PER_INCH)
+            }
+          }
+        } catch {
+          // No usable image measurement; the floor stands.
+        }
+        dpi = Math.min(dpi, MAX_REPLACEMENT_DPI)
+
+        const viewport = page.getViewport({ scale: dpi / PDF_POINTS_PER_INCH })
+        const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
+        const context = canvas.getContext("2d")
+        context.fillStyle = "#ffffff"
+        context.fillRect(0, 0, canvas.width, canvas.height)
+        await page.render({ canvasContext: context, viewport }).promise
+
+        // A fresh page carrying the image and nothing else. Inserting rather
+        // than editing is what guarantees the old text operators are gone —
+        // leaving them would give the page two overlapping text layers, and a
+        // selection would pick up both the garbage and the correction.
+        const image = await doc.embedPng(canvas.toBuffer("image/png"))
+        replacement = doc.insertPage(index, [width, height])
+        replacement.drawImage(image, { x: 0, y: 0, width, height })
+        doc.removePage(index + 1)
+        pagesRasterised.push(transcription.pageNumber)
+        console.warn(
+          `[textLayerRepair] p${transcription.pageNumber}: content stream would not yield its text; ` +
+            `re-rendered at ${Math.round(dpi)}dpi (the page's own resolution)`
+        )
+      }
 
       // Invisible but selectable: opacity 0 keeps the glyphs out of the render
       // while leaving them in the text layer, which is what a text layer is.
@@ -440,8 +602,6 @@ export async function repairPageTextLayers(
         drawFlowText(replacement, font, transcription.text, width, height, transcription.pageNumber)
       }
 
-      // The original page sits one later now that the replacement was inserted.
-      doc.removePage(index + 1)
       pagesReplaced.push(transcription.pageNumber)
     }
   } finally {
@@ -452,5 +612,6 @@ export async function repairPageTextLayers(
     bytes: Buffer.from(await doc.save()),
     pagesReplaced,
     pagesApproximate,
+    pagesRasterised,
   }
 }

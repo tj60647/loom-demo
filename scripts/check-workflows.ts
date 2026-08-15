@@ -37,7 +37,23 @@ function assert(condition: boolean, label: string, detail: string) {
 
 console.log("\nworkflows — the diagrams describe a graph that actually connects")
 
-assert(FLOWS.length === 3, "three flows: student, faculty, admin", `got ${FLOWS.length}`)
+/**
+ * Three people and one machine. The fourth flow is the reading's own text —
+ * the pipeline that turns an upload into something quotable — and it is here
+ * because its absence is what let a detector sit wired to nothing and a write
+ * halve a scan's resolution, both unseen. AGENTS.md's rule covers the three
+ * human flows; this one earns the same treatment for the same reason.
+ */
+assert(
+  FLOWS.length === 4,
+  "four flows: student, faculty, admin, and the reading's text",
+  `got ${FLOWS.length}`
+)
+assert(
+  FLOWS.some((f) => f.key === "pipeline"),
+  "the pipeline flow is present",
+  "the only diagram of how a PDF becomes text went missing"
+)
 assert(
   new Set(FLOWS.map((f) => f.key)).size === FLOWS.length,
   "flow keys are unique",
@@ -219,6 +235,85 @@ assert(
   "every qualified verdict explains itself",
   `${unexplained} bare "qualified" verdicts tell a reader nothing`
 )
+
+/**
+ * The pipeline's ORDER, asserted — not just that its graph connects.
+ *
+ * A picture that connects can still describe the wrong sequence, and the
+ * sequence is the part that carries the guarantees: nothing is read before it
+ * is proposed, nothing is written before it is judged and gated, and every
+ * write is followed by a re-score. These read the graph rather than the prose,
+ * so reordering the pipeline in code and not here fails the build.
+ */
+console.log("\nthe pipeline's order of events")
+
+const pipeline = FLOWS.find((f) => f.key === "pipeline")
+if (!pipeline) {
+  assert(false, "the pipeline flow exists to be ordered", "no flow with key 'pipeline'")
+} else {
+  /** Every node reachable from `from` by forward (non-back) edges. */
+  const forwardFrom = (start: string) => {
+    const seen = new Set<string>()
+    const queue = [start]
+    while (queue.length) {
+      const at = queue.shift()!
+      for (const edge of pipeline.edges) {
+        if (edge.from !== at || edge.back) continue
+        if (seen.has(edge.to)) continue
+        seen.add(edge.to)
+        queue.push(edge.to)
+      }
+    }
+    return seen
+  }
+  const precedes = (before: string, after: string) => forwardFrom(before).has(after)
+
+  const ORDER: [string, string, string][] = [
+    ["upload", "extract", "a PDF is extracted before anything judges it"],
+    ["extract", "probe", "the text is extracted before the file is probed"],
+    ["probe", "score", "the probe informs the score"],
+    ["score", "damaged", "the score decides whether the text is damaged"],
+    ["damaged", "propose", "only a damaged reading proposes pages"],
+    ["propose", "read", "no page is read by the panel before it is proposed and cropped"],
+    ["read", "vote", "the panel is read before its readings are voted on"],
+    ["vote", "accept", "nothing is accepted before the vote"],
+    ["accept", "gates", "nothing reaches the gates before it is accepted"],
+    ["gates", "write", "NOTHING IS WRITTEN BEFORE THE GATES"],
+    ["write", "reingest", "a write is always followed by re-ingestion"],
+  ]
+  for (const [before, after, why] of ORDER) {
+    assert(precedes(before, after), `${before} → … → ${after}: ${why}`, `${after} is not reachable from ${before}`)
+  }
+
+  // The guarantees that are about what must NOT happen.
+  assert(!precedes("propose", "score"), "proposing does not loop back into scoring within a pass", "a cycle would re-score mid-repair")
+  assert(!precedes("read", "propose"), "reading never selects its own pages", "the panel would choose what it reads")
+  assert(
+    pipeline.edges.some((e) => e.from === "reingest" && e.to === "score" && e.back),
+    "the loop closes: a written revision is re-scored",
+    "a repair that is never re-measured cannot be known to have helped"
+  )
+  assert(
+    pipeline.edges.some((e) => e.from === "gates" && e.to === "held"),
+    "the gates can refuse, and a refusal has somewhere to go",
+    "a gate with no refusal path is not a gate"
+  )
+
+  /**
+   * Detectors the system runs and does not act on. Drawn as `noted` dead ends
+   * on purpose — this asserts they STAY visible, so the next person meets them
+   * in the picture rather than by measuring a library and finding out.
+   */
+  const noted = pipeline.nodes.filter((n) => n.kind === "noted").map((n) => n.id)
+  assert(noted.length > 0, "measurements that lead nowhere are drawn, not hidden", "a detector wired to nothing is invisible in code")
+  for (const id of noted) {
+    assert(
+      !pipeline.edges.some((e) => e.from === id),
+      `${id} is drawn as a dead end, because it is one`,
+      `${id} now leads somewhere — make it a step and say where`
+    )
+  }
+}
 
 console.log(
   failures === 0

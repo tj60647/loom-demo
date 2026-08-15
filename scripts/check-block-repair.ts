@@ -92,6 +92,71 @@ async function buildFixture(): Promise<Buffer> {
   return Buffer.from(await doc.save())
 }
 
+/**
+ * A scanned page as this library's readings actually are: one image XObject
+ * carrying the page, and a separate invisible text layer over it — the shape
+ * `stripPageText` has to separate. Drawn at 400dpi so a re-render at anything
+ * less is visible as a number, not as an opinion.
+ */
+const SCAN_DPI = 400
+async function buildScannedFixture(): Promise<Buffer> {
+  // The "scan": a page-sized raster with some marks on it.
+  const width = Math.round((612 / 72) * SCAN_DPI)
+  const height = Math.round((792 / 72) * SCAN_DPI)
+  const canvas = createCanvas(width, height)
+  const context = canvas.getContext("2d")
+  context.fillStyle = "#ffffff"
+  context.fillRect(0, 0, width, height)
+  context.fillStyle = "#111111"
+  context.font = `${Math.round(SCAN_DPI / 6)}px sans-serif`
+  for (let line = 0; line < 24; line++) {
+    context.fillText("the scanned page carries its own words as ink", SCAN_DPI, SCAN_DPI + line * SCAN_DPI * 0.34)
+  }
+  const doc = await PDFDocument.create()
+  const font = await doc.embedFont(StandardFonts.TimesRoman)
+  const page = doc.addPage([612, 792])
+  page.drawImage(await doc.embedPng(canvas.toBuffer("image/png")), { x: 0, y: 0, width: 612, height: 792 })
+  // The bad OCR layer this repair is meant to replace.
+  page.drawText("scannedd tvon garbge whit no reall wrods on it", {
+    x: 72, y: 700, size: 11, font, opacity: 0,
+  })
+  return Buffer.from(await doc.save())
+}
+
+/** The resolution of the largest image the page paints, at page size. */
+async function pageImageDpi(buffer: Buffer, pageNumber: number): Promise<number> {
+  const pdfjsLib = await loadPdfjs()
+  const loadingTask = pdfjsLib.getDocument({
+    data: new Uint8Array(buffer),
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+    wasmUrl: pdfjsWasmUrl(),
+    useWasm: false,
+  })
+  const doc = await loadingTask.promise
+  try {
+    const page = await doc.getPage(pageNumber)
+    const viewport = page.getViewport({ scale: 1 })
+    const ops = await page.getOperatorList()
+    let best = 0
+    for (let i = 0; i < ops.fnArray.length; i++) {
+      if (ops.fnArray[i] !== pdfjsLib.OPS.paintImageXObject) continue
+      const image = (await new Promise<unknown>((resolve) => {
+        try {
+          page.objs.get(String(ops.argsArray[i][0]), resolve)
+        } catch {
+          resolve(null)
+        }
+      })) as { width?: number } | null
+      if (image?.width) best = Math.max(best, (image.width / viewport.width) * 72)
+    }
+    return Math.round(best)
+  } finally {
+    await destroyPdf(doc, loadingTask)
+  }
+}
+
 async function renderPage(buffer: Buffer, pageNumber: number, dpi: number) {
   const pdfjsLib = await loadPdfjs()
   const loadingTask = pdfjsLib.getDocument({
@@ -348,6 +413,44 @@ async function main() {
       .map((item) => `(${item.transform![4].toFixed(0)},${item.transform![5].toFixed(0)})`)
       .join(" ")
   )
+
+  console.log("\nfidelity — a repair takes the text and leaves the page alone")
+
+  /**
+   * The regression this check exists for, and the one every other assertion
+   * here missed. A repair used to rasterise the page at a fixed 200dpi and
+   * embed that: measured afterwards, this library's scans are 350-400dpi, so
+   * every repaired page silently lost half its linear resolution and the file
+   * grew. Nothing caught it because every gate and every test in this pipeline
+   * reads TEXT — and the text was fine. So this asserts the page's own
+   * artwork, in pixels, and it fails on the old behaviour.
+   */
+  const scan = await buildScannedFixture()
+  const beforeDpi = await pageImageDpi(scan, 1)
+  ok("the fixture is a scan at a real resolution", beforeDpi >= 300, `${beforeDpi} dpi`)
+
+  const kept = await repairPageTextLayers(scan, [
+    { pageNumber: 1, text: "A corrected transcription of the scanned page." },
+  ])
+  const afterDpi = await pageImageDpi(kept.bytes, 1)
+  ok(
+    "the repaired page keeps its scan at full resolution",
+    afterDpi === beforeDpi,
+    `${beforeDpi} dpi before, ${afterDpi} dpi after — a repair must not re-render the page`
+  )
+  ok(
+    "no page was rasterised",
+    kept.pagesRasterised.length === 0,
+    `rasterised: ${JSON.stringify(kept.pagesRasterised)}`
+  )
+  ok(
+    "and the file did not balloon",
+    kept.bytes.length <= scan.length * 1.1,
+    `${(scan.length / 1024).toFixed(0)}KB before, ${(kept.bytes.length / 1024).toFixed(0)}KB after`
+  )
+  const keptText = (await extractPdfPageText(kept.bytes))[0].textContent
+  ok("the corrected text is there", keptText.includes("A corrected transcription"))
+  ok("and the old text layer is gone", !keptText.includes("scannedd tvon garbge"), JSON.stringify(keptText.slice(0, 90)))
 
   console.log("\ncrop fractions — the one place a reader's coordinates meet the page's")
 

@@ -18,12 +18,15 @@ const LEGEND: { kind: string; label: string }[] = [
   { kind: "decision", label: "a fork the system decides" },
   { kind: "end", label: "what they are aiming at" },
   { kind: "denied", label: "a door shut to them" },
+  { kind: "noted", label: "measured, not acted on" },
 ]
 
 export default function WorkflowsBoard({ showAll = true }: { showAll?: boolean }) {
   // A student sees their own flow only (TJ, 2026-08-08): the other two describe
   // surfaces they cannot reach, and a chart of shut doors is a puzzle rather
-  // than a help. Faculty and admins work the seam, so they see all three.
+  // than a help. Faculty and admins work the seam, so they see all of them —
+  // including the pipeline, whose actor is the system rather than a person and
+  // which is the only picture of how a PDF becomes quotable text.
   const flows = showAll ? FLOWS : FLOWS.filter((f) => f.key === "student")
   const [activeKey, setActiveKey] = useState(flows[0].key)
   const [copied, setCopied] = useState(false)

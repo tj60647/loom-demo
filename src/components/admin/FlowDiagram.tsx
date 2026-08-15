@@ -17,6 +17,10 @@ const KIND_STYLE: Record<string, { stroke: string; fill: string; label: string; 
   decision: { stroke: "var(--sage)",  fill: "var(--paper-2)", label: "var(--ink)" },
   end:      { stroke: "var(--ochre)", fill: "var(--paper-2)", label: "var(--ink)" },
   denied:   { stroke: "var(--grey)",  fill: "transparent",    label: "var(--ink-soft)", dash: "4 3" },
+  // Something measured and not acted on. Dashed like `denied` because it is
+  // the same kind of fact — a path that stops — but in red, because unlike a
+  // shut door this one is unfinished rather than intended.
+  noted:    { stroke: "var(--red)",   fill: "transparent",    label: "var(--ink-soft)", dash: "2 3" },
 }
 
 /** A decision is chamfered left and right so a fork reads as a fork at a

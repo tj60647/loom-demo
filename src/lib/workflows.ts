@@ -25,6 +25,12 @@ export type FlowNodeKind =
   | "end"
   /** A door that is closed to this actor — drawn quiet and dashed. */
   | "denied"
+  /**
+   * Something the system MEASURES and does not act on. Drawn as a dead end on
+   * purpose: a detector wired to nothing is invisible in code and expensive in
+   * the library, and the only way it stays visible is if the picture says so.
+   */
+  | "noted"
 
 export type FlowNode = {
   id: string
@@ -258,7 +264,87 @@ const admin: Flow = {
   ],
 }
 
-export const FLOWS: Flow[] = [student, faculty, admin]
+/**
+ * The reading itself, from upload to a text a student can quote — the only
+ * flow here whose actor is the system rather than a person.
+ *
+ * It exists because its absence cost the library real quality. The admin flow
+ * above draws the four buttons an operator presses; it says nothing about what
+ * runs between them, in what order, or which measurement decides what. So the
+ * ordering lived only in the code, and two things went wrong inside it unseen
+ * for a long time:
+ *
+ *   - Of six detectors, three lead nowhere. A two-page spread is measured and
+ *     never split; a broken font map is measured and never repaired; angled
+ *     text was measured and only ever changed the READERS' BRIEF, never the
+ *     work list — which is why a book with 114 interleaved pages had 3
+ *     proposed. A detector wired to nothing looks identical, in code, to one
+ *     wired to something.
+ *   - Every gate on the write measures TEXT. Nothing measured the page, so a
+ *     repair that halved a scan's resolution passed all of them.
+ *
+ * Both are drawn below, honestly: `noted` nodes are things the system knows
+ * and does not act on. Keep them that way until they DO act — a diagram that
+ * promises a step nobody implemented is worse than none.
+ */
+const pipeline: Flow = {
+  key: "pipeline",
+  title: "A reading's text",
+  blurb:
+    "How an uploaded PDF becomes text a student can select, quote and anchor to — and where that text is judged, repaired and re-judged.",
+  sources: [
+    "src/lib/pdfText.ts (canonical extraction) · src/lib/pdfStructure.ts (the probe)",
+    "src/lib/readingScore.ts (coverage · legibility · anchorability · structure)",
+    "src/lib/repairPipeline.ts (detect, propose, read) · src/lib/repairReading.ts (the briefs)",
+    "src/lib/repairConsensus.ts (the vote) · src/lib/repairJudge.ts (the split panel)",
+    "src/lib/repairApply.ts (the gates) · src/lib/textLayerRepair.ts (the write)",
+    "scripts/reprocess-library.ts (the batch)",
+  ],
+  nodes: [
+    { id: "upload", label: "A PDF is uploaded", where: "/admin/library", kind: "start" },
+    { id: "extract", label: "Extract each page's text, keeping line boundaries", where: "pdfText · the canonical string" },
+    { id: "probe", label: "Probe the file: glyphs, fonts, ink, banding, page boxes", where: "pdfStructure · reads the file, never the text" },
+    { id: "score", label: "Score it: coverage, legibility, anchorability, structure", where: "readingScore · a judge reads the TEXT" },
+    { id: "damaged", label: "Is the text damaged?", where: "garbled tokens · no text at all", kind: "decision" },
+    { id: "spread", label: "Two-page spread — measured, never split", where: "pdfStructure.isSpreadCandidate", kind: "noted" },
+    { id: "fontmap", label: "Broken font map — measured, never repaired", where: "pdfStructure.unmappedGlyphs", kind: "noted" },
+    { id: "propose", label: "Propose the damaged pages, crop each one", where: "detectRepairsForSource · proposeRetranscription" },
+    { id: "brief", label: "Odd format? Brief the readers for BLOCKS, not a stream", where: "pageWantsBlocks · refines the brief, does not select the page", kind: "decision" },
+    { id: "read", label: "Five readers transcribe the crop, independently", where: "this step costs money" },
+    { id: "vote", label: "Vote: sentences against sentences, notes against notes", where: "repairConsensus · never composes" },
+    { id: "judge", label: "Panel split? A judge picks one reader, or says ambiguous", where: "repairJudge · selects, never writes" },
+    { id: "accept", label: "Accept a transcription", where: "a person, or the batch on a unanimous panel" },
+    { id: "gates", label: "Would the write make it worse?", where: "kept text · garble rate · page still clean · highlights carried", kind: "decision" },
+    { id: "write", label: "Take the page's TEXT out, leave its artwork alone", where: "textLayerRepair · lossless; rasterises only if the stream resists" },
+    { id: "reingest", label: "New revision, re-extracted and re-anchored", where: "source_revision · passages moved or recovered" },
+    { id: "quotable", label: "A text a student can select, quote and anchor", where: "01 · Reading", kind: "end" },
+    { id: "held", label: "Held for a person", where: "the repair panel", kind: "end" },
+  ],
+  edges: [
+    { from: "upload", to: "extract" },
+    { from: "extract", to: "probe" },
+    { from: "probe", to: "score" },
+    { from: "score", to: "damaged" },
+    { from: "probe", to: "spread" },
+    { from: "probe", to: "fontmap" },
+    { from: "damaged", to: "quotable", label: "clean" },
+    { from: "damaged", to: "propose", label: "damaged" },
+    { from: "propose", to: "brief" },
+    { from: "brief", to: "read" },
+    { from: "read", to: "vote" },
+    { from: "vote", to: "accept", label: "unanimous" },
+    { from: "vote", to: "judge", label: "split" },
+    { from: "judge", to: "accept", label: "chose a reader" },
+    { from: "judge", to: "held", label: "ambiguous" },
+    { from: "accept", to: "gates" },
+    { from: "gates", to: "held", label: "refused" },
+    { from: "gates", to: "write", label: "better" },
+    { from: "write", to: "reingest" },
+    { from: "reingest", to: "score", label: "re-scored", back: true },
+  ],
+}
+
+export const FLOWS: Flow[] = [student, faculty, admin, pipeline]
 
 export function flowByKey(key: string | null | undefined): Flow {
   return FLOWS.find((f) => f.key === key) ?? FLOWS[0]
