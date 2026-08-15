@@ -15,7 +15,12 @@ import { expect, type Locator, type Page, type Request } from '@playwright/test'
  */
 export const isDeletePost = (request: Request) =>
   request.method() === 'POST' &&
-  /^\["[0-9a-f-]{36}"(,(null|"[0-9a-f-]{36}"))?\]$/.test(request.postData() ?? '');
+  // The second argument is the reading the act happened in — matched as any
+  // string, not a UUID shape: locally-seeded fixtures carry slug ids
+  // ("e2e-object-worlds"), and the UUID pattern silently never matched there,
+  // which timed out every cleanup on that one reading. The FIRST argument
+  // stays UUID-strict; it is what tells a delete from a create or an edit.
+  /^\["[0-9a-f-]{36}"(,(null|"[^"]+"))?\]$/.test(request.postData() ?? '');
 
 /**
  * Reading-first navigation.

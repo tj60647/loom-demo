@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -39,6 +39,13 @@ pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 // identity as a new document and reloads the PDF on every render.
 const documentOptions = { wasmUrl: '/pdf-wasm/' };
 
+/** Module-level so the store identity is stable across renders (Header.tsx's
+ *  pattern — this is the same browser-fullscreen control it carries). */
+const subscribeFullscreen = (onChange: () => void) => {
+  document.addEventListener("fullscreenchange", onChange);
+  return () => document.removeEventListener("fullscreenchange", onChange);
+};
+
 interface PdfViewerProps {
   url: string;
   sourceName: string;
@@ -71,6 +78,20 @@ interface PdfViewerProps {
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
   const { state, scoped } = useLoom();
+  // The browser's real fullscreen, read from the document like Header.tsx
+  // does — hidden where the browser will not grant it rather than offered
+  // and dead.
+  const isBrowserFull = useSyncExternalStore(subscribeFullscreen, () => !!document.fullscreenElement, () => false);
+  const canFullscreen = useSyncExternalStore(subscribeFullscreen, () => !!document.fullscreenEnabled, () => false);
+  const toggleBrowserFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      // A refused request (a policy, a gesture the browser did not count) is
+      // not a failure worth a dialog — the button simply does not latch.
+    }
+  }, []);
   // Drawn only for faculty and admins. Not a guard — `overlayViewer()` re-checks
   // on the server, so a student who forces the request gets an empty overlay.
   const readings = useReadings();
@@ -1721,6 +1742,54 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           color: var(--ink-soft);
         }
         .pdf-railcard-def { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+        /* The editors (Lingxiu, 2026-08-15 — the original spread canvas's
+           card fields, on the shared RailCard): bare textareas wearing the
+           label/def classes, so the canvas's counter-scale font-size applies
+           unchanged. field-sizing keeps them one line until the text needs
+           two; min-height beats globals.css's blanket textarea floor. The
+           rails are user-select:none against stray drags — the fields take
+           selection back. */
+        .pdf-railcard textarea {
+          display: block;
+          width: 100%;
+          border: none;
+          background: transparent;
+          font-family: var(--body);
+          line-height: 1.4;
+          color: inherit;
+          padding: 0;
+          outline: none;
+          resize: none;
+          field-sizing: content;
+          min-height: 0;
+          box-sizing: border-box;
+          user-select: text;
+          -webkit-user-select: text;
+          cursor: text;
+        }
+        .pdf-railcard textarea::placeholder { color: var(--ink-soft); font-weight: 400; }
+        .pdf-railcard textarea.pdf-railcard-def { border-top: 1px dotted var(--rule); padding-top: 4px; }
+        /* The door, out of the fields' way in the top-right corner. */
+        .pdf-railcard { padding-right: 24px; }
+        .pdf-railcard-open {
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          border: 1px solid var(--rule);
+          background: var(--paper);
+          color: var(--ink-soft);
+          font-size: 11px;
+          line-height: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          padding: 0;
+        }
+        .pdf-railcard-open:hover { border-color: var(--ink-soft); color: var(--ink); }
         .pdf-railcard-note { font-size: 11px; font-style: italic; color: var(--ink-soft); margin-top: 4px; }
         .pdf-railcard-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .pdf-railcard-chip {
@@ -1867,7 +1936,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             <div className="pdf-modes" role="group" aria-label="Canvas zoom">
               <button
                 className="btn mini ghost"
-                onClick={() => setZoom((z) => Math.max(0.5, Math.round((z / 1.4) * 100) / 100))}
+                onClick={() => setZoom((z) => Math.max(1, Math.round((z / 1.4) * 100) / 100))}
                 aria-label="Zoom out"
                 data-tip="zoom out"
               >−</button>
@@ -1966,6 +2035,24 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               footer stand down whenever this station is open (see Workbench),
               leaving the journey bar and this toolbar. A button to hide
               chrome that is already hidden had nothing left to do. */}
+
+          {/* The BROWSER's full screen — the same control the app header
+              carries on every other page (see Header.tsx for why it earns a
+              slot). Reading focus hides the header, so its button must ride
+              here or the reading loses the whole-screen option exactly where
+              vertical space matters most. Same state discipline as the
+              header's: read from the document, never from what we last asked
+              for — Esc and F11 leave fullscreen without telling us. */}
+          {canFullscreen && (
+            <button
+              className="btn ghost mini"
+              onClick={toggleBrowserFullscreen}
+              aria-pressed={isBrowserFull}
+              data-tip={isBrowserFull ? "back to the browser (esc)" : "give Loom the whole screen"}
+            >
+              {isBrowserFull ? "exit full screen" : "full screen"}
+            </button>
+          )}
         </div>
       </div>
 
