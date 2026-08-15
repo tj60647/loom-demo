@@ -219,10 +219,32 @@ function foldEvents(events: GraphEvent[], upTo: number) {
         if (e.entityId) edges.delete(e.entityId)
         break
       }
-      // `read.update` and `cloth.update` change nothing the fold draws — the
-      // cloth is concepts, threads and passages. They were counted here for a
-      // line under the slider that has gone (2026-08-12); the list view shows
-      // each of them as its own row, which is where an act belongs.
+      // ACTS THE FOLD DOES NOT DRAW. The cloth is concepts, threads and
+      // passages; these change other objects, so replaying them would move
+      // nothing on the map. They are written as cases, not as a comment,
+      // because `scripts/check-vocabulary.ts` reads this switch to prove no
+      // emitted kind falls through unnoticed — and "we decided this one draws
+      // nothing" and "we forgot this one" look identical from the outside.
+      // Each still appears as its own row in the list, which is where an act
+      // belongs. (`read.update` is the same story, from before 0021.)
+      case "link.coin":
+      case "link.update":
+        // The Link vocabulary — deliberately not reconstructed: `mapState`
+        // hands the drawing `links: []` rather than a half-folded lexicon.
+        break
+      case "map.create":
+      case "map.delete":
+        // Projections, likewise absent from the folded state (`maps: []`).
+        break
+      case "cloth.update":
+        // The cloth's title and description. Counted here once for a line
+        // under the slider that has gone (2026-08-12).
+        break
+      case "passage.attribute":
+        // Filing loose captures against a reading. It carries `entityId: null`
+        // — the act is about a set of passages, not one — and touches only
+        // `sourceId`, which the fold does not draw.
+        break
       // Reset clears the cloth.
       case "graph.reset": {
         concepts.clear()

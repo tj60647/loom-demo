@@ -194,11 +194,41 @@ console.log("\ncapture log — every event emitted is an event replayed")
 const loom = readFileSync(join(root, "src/actions/loom.ts"), "utf8")
 const history = readFileSync(join(root, "src/components/ui/HistoryPanel.tsx"), "utf8")
 
+/**
+ * The FOLD's cases, not every `case` in the file.
+ *
+ * This read the whole of HistoryPanel.tsx until 2026-08-15, and was green for
+ * the six days it existed without ever testing what it claimed: the file also
+ * held `describeEvent`, whose switch named every kind, so five kinds the fold
+ * had never handled were covered by the phrasing switch next door. Moving
+ * `describeEvent` to src/lib/logPhrase.ts (94b815f) took the decoy away and the
+ * real gap — there since `map.create` in July — surfaced at once, looking like
+ * a regression that commit had not caused.
+ *
+ * `\r?\n\}`, not `\n\}`: core.autocrlf is on for this checkout.
+ */
+function foldBody(src: string): string | null {
+  const start = src.indexOf("function foldEvents")
+  if (start < 0) return null
+  const end = src.slice(start).search(/\r?\n\}/)
+  return end < 0 ? null : src.slice(start, start + end)
+}
+
 // recordEvent(userId, courseId, "<kind>", …) — the third argument.
 const emitted = [...loom.matchAll(/recordEvent\(\s*[^,]+,\s*[^,]+,\s*"([a-z.]+)"/g)].map((m) => m[1])
-const replayed = new Set([...history.matchAll(/case\s+"([a-z.]+)"/g)].map((m) => m[1]))
+const fold = foldBody(history)
+const replayed = new Set([...(fold ?? "").matchAll(/case\s+"([a-z.]+)"/g)].map((m) => m[1]))
 
 assert(emitted.length > 0, "found the emitted kinds to check", "the recordEvent call shape changed; this guard is now blind")
+// Without this the guard fails open the day the fold is renamed or moved: no
+// body found is an empty case set, which would read as "nothing is replayed"
+// only if something is emitted — and would read as green if the emit regex
+// broke on the same day. Say it out loud instead.
+assert(
+  fold !== null,
+  "found foldEvents to read the cases from",
+  "no `function foldEvents` in HistoryPanel.tsx — the fold moved or was renamed, and this guard is now reading nothing"
+)
 
 const unreplayed = [...new Set(emitted)].filter((k) => !replayed.has(k))
 assert(
@@ -207,7 +237,13 @@ assert(
   `${unreplayed.join(", ")} would be written to graph_event and never shown — a shorter history than the truth, with no error`
 )
 
-const oldSpelling = [...new Set([...emitted, ...replayed])].filter((k) => k.startsWith("byte."))
+// The old spelling is hunted WIDER than the fold: scoping the search above to
+// `foldEvents` would otherwise stop this looking at the phrasing switch, and a
+// `case "byte.capture"` there is just as dead — it would silently phrase
+// nothing for every row migration 0023 rewrote.
+const allCases = [history, readFileSync(join(root, "src/lib/logPhrase.ts"), "utf8")]
+  .flatMap((src) => [...src.matchAll(/case\s+"([a-z.]+)"/g)].map((m) => m[1]))
+const oldSpelling = [...new Set([...emitted, ...allCases])].filter((k) => k.startsWith("byte."))
 assert(
   oldSpelling.length === 0,
   "no event kind still spells it byte.*",

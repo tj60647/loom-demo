@@ -147,7 +147,11 @@ assert(normLabel("   ") === "", "whitespace alone is no label", `"${normLabel(" 
 {
   const actions = readFileSync("src/actions/loom.ts", "utf8")
   assert(
-    /export async function updateEdge[\s\S]{0,1200}\n  return link\n\}/.test(actions),
+    // `\r?\n`, not `\n`: core.autocrlf is on for this checkout, so on Windows
+    // this file arrives CRLF while git stores it LF. A bare `\n` here passes in
+    // CI and fails on the machine the code was written on, which reads as a
+    // real regression and is not one.
+    /export async function updateEdge[\s\S]{0,1200}\r?\n  return link\r?\n\}/.test(actions),
     "updateEdge hands the resolved Link back to the client",
     "updateEdge stopped returning the Link — a word typed for the first time would exist in the database and be missing from the Link List until reload"
   )

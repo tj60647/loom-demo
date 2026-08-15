@@ -85,10 +85,20 @@ assert(
   "the practice notice still renders, over both stages",
   "SandboxWorkbench no longer renders .practiceband — a student cannot tell practice from data loss"
 )
+// The station's search slot must be EMPTY in practice: `StationSearch` reads
+// the student's real loom over its own GET route, bypassing the provider, so
+// it would show their actual work inside a space that keeps nothing.
+//
+// Asserted on the slot rather than on a conditional's shape. This guard read
+// `{!practice && (` until 2026-08-15 and went on passing while that form lived
+// anywhere in the file — then failed the day the slot became a ternary, with
+// the withholding still perfectly in place. What matters is that `search` is
+// handed `undefined` when practising, however that is spelled.
 assert(
-  /\{!practice && \(/.test(workbench),
+  /search=\{\s*practice\s*\?\s*undefined\s*:/.test(workbench)
+    || /\{!practice && \(\s*<StationSearch/.test(workbench),
   "search is withheld in practice",
-  "Workbench renders ShelfSearch in the practice loom — it reads the student's real rows"
+  "Workbench hands the station a search slot in the practice loom — StationSearch reads the student's real rows"
 )
 
 // 6. The worked cloth arrives as a PROP, built on the server (2026-08-11).
