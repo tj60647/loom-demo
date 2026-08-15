@@ -1,11 +1,13 @@
 /**
- * Seeds a fresh database with the three course readings: uploads each PDF to
- * Blob storage, registers it as a `sources` row, extracts its canonical per-page
- * text into `sourcePages`, and backfills `sourceId` on any existing `passages` rows
- * that reference it by an old free-text `source` label.
+ * Seeds a fresh database with the three course readings and the one the
+ * practice loom is built on: uploads each PDF to Blob storage, registers it as
+ * a `sources` row, extracts its canonical per-page text into `sourcePages`, and
+ * backfills `sourceId` on any existing `passages` rows that reference it by an
+ * old free-text `source` label.
  *
  * The PDFs are read from storage/readings/ but are NOT committed — see
- * storage/readings/.gitkeep. Supply your own copies before running.
+ * storage/readings/.gitkeep. Supply your own copies before running. A reading
+ * that names a `blobKey` needs no copy at all: see `storageKeyFor`.
  *
  * Usage: npx tsx scripts/seed-sources.ts
  * Requires DATABASE_URL and Blob credentials to be set (via .env.local).
@@ -45,6 +47,18 @@ const READINGS: {
   isDescriptionVisible: boolean
   metadataProvenance: string
   file: string
+  /**
+   * A key this reading already occupies in the shared blob store, tried before
+   * the file on disk. The point is CI, which can hold no copyrighted PDF and
+   * so could only ever seed readings some other database had already uploaded.
+   */
+  blobKey?: string
+  /**
+   * A reading the app degrades without rather than breaks without. If neither
+   * the blob nor the file can be found, it is skipped with a line saying so,
+   * instead of failing the whole seed.
+   */
+  optional?: boolean
   legacySourceLabels: string[]
 }[] = [
   {
@@ -83,6 +97,35 @@ const READINGS: {
     file: "Star, 2010 'This Is Not A Boundary Object'.pdf",
     legacySourceLabels: ["Star, This Is Not A Boundary Object"],
   },
+  /**
+   * NOT a course reading — the one the practice loom borrows.
+   *
+   * `/sandbox` opens on a worked cloth whose four passages are real substrings
+   * of THIS text at their true offsets (src/lib/practiceCloth.ts), so it is the
+   * only reading that will do: quotations from Seuss cannot be found in
+   * Bucciarelli, `buildPracticeCloth` drops what it cannot locate, and the
+   * practice loom opens empty. That is a deliberate degradation and it is
+   * silent, which is how CI came to run a suite where three specs
+   * (sandbox, practice-guide ×2) could never pass — the CI database held the
+   * three course readings and nothing else, so the fallback picked a text the
+   * worked example was not written against. Diagnosed 2026-08-15.
+   *
+   * It seeds by `blobKey` because CI cannot hold the file.
+   */
+  {
+    seedKey: "practice-loom-reading",
+    title: "Oh, the Places You'll Go!",
+    alsoKnownAs: [],
+    author: "Dr. Seuss",
+    sourceReference: "New York: Random House, 1990. ISBN 0-679-80527-3",
+    description: "A rhyming illustrated picture book addressing a reader setting out, tracing the ups, waits, and slumps of a journey.",
+    isDescriptionVisible: true,
+    metadataProvenance: "Drafted from the PDF's opening pages by anthropic/claude-opus-5 on 2026-08-12; reviewed and saved by an instructor.",
+    file: "Oh, the Places You'll Go!.pdf",
+    blobKey: "readings/Oh, the Places You'll Go! ( PDFDrive )-jJ0Y9DH3gAtM8svNDPd1Os42aYhRUG.pdf",
+    optional: true,
+    legacySourceLabels: [],
+  },
 ]
 
 /**
@@ -109,6 +152,42 @@ async function readSeedPdf(file: string) {
         `These are not committed to the repo. Place your own copies of the three ` +
         `seed readings in storage/readings/ before running this script.`
     )
+  }
+}
+
+/**
+ * Where this reading's bytes are going to live: the shared store first, disk
+ * second.
+ *
+ * Every environment points at the ONE blob store (scripts/check-covers.ts says
+ * so and backfills against it), so a reading uploaded once from a machine that
+ * has the PDF is readable everywhere afterwards — including from CI, which can
+ * never hold a copyrighted file itself. Checking the key rather than trusting
+ * it matters: a `blobKey` that has been deleted from the store must fall
+ * through to disk rather than register a row pointing at nothing, which is the
+ * "reference-only card" state the repair branch below exists to undo.
+ *
+ * Returns null only for an `optional` reading nothing can supply.
+ */
+async function storageKeyFor(reading: (typeof READINGS)[number]): Promise<string | null> {
+  if (reading.blobKey) {
+    try {
+      await readingStorage.get(reading.blobKey)
+      return reading.blobKey
+    } catch {
+      // Not in this store after all — fall through to the file on disk.
+    }
+  }
+  try {
+    const key = `${crypto.randomUUID()}.pdf`
+    await readingStorage.put(key, await readSeedPdf(reading.file))
+    return key
+  } catch (err) {
+    if (!reading.optional) throw err
+    console.log(
+      `[seed-sources] Skipped "${reading.title}" — ${(err as Error).message.split("\n")[0]}`
+    )
+    return null
   }
 }
 
@@ -148,8 +227,8 @@ async function run() {
     }
 
     if (!source) {
-      const storageKey = `${crypto.randomUUID()}.pdf`
-      await readingStorage.put(storageKey, await readSeedPdf(reading.file))
+      const storageKey = await storageKeyFor(reading)
+      if (!storageKey) continue
 
       const [inserted] = await db
         .insert(sources)
@@ -180,8 +259,8 @@ async function run() {
       }
 
       if (!hasStoredFile) {
-        const storageKey = `${crypto.randomUUID()}.pdf`
-        await readingStorage.put(storageKey, await readSeedPdf(reading.file))
+        const storageKey = await storageKeyFor(reading)
+        if (!storageKey) continue
         const [updated] = await db
           .update(sources)
           .set({

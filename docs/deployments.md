@@ -206,17 +206,38 @@ Repository secrets to configure (Settings → Secrets → Actions):
 | `CI_NEXTAUTH_SECRET` | any fresh random string (optional; has a default) |
 
 Until `CI_DATABASE_URL` is set, the `e2e` job **fails with a pointed message**
-rather than skipping — a gate that silently skips is not a gate. Fork PRs
-don't receive secrets; collaborators should push branches to this repo.
+rather than skipping — a gate that silently skips is not a gate.
 
-Branch protection on `master` initially requires only the `checks` context (so
-an unconfigured e2e gate can't block everything); **once the secrets are in
-and the job is green, add `e2e` to the required status checks** — Settings →
-Branches → master, or:
+**Both jobs run Node 22** (`engines` declares `>= 22.7.0`). This is not
+housekeeping: below 22.7 pdf.js cannot import its no-wasm JPX fallback, every
+server-rendered scan comes back blank behind a *warning*, and four specs fail
+for reasons nothing in their own code explains. Nothing enforces `engines` —
+`npm ci` ignores it — so the runner is the only place this is true.
+
+**Fork PRs cannot run `e2e`, ever.** GitHub does not pass secrets to a
+`pull_request` run from a fork, so the guard fires and the job is red no matter
+what the branch contains. Both jobs are REQUIRED (below), so such a PR cannot
+merge as-is: mirror the branch into this repo and open a same-repo PR —
 
 ```bash
-gh api -X PATCH repos/tj60647/loom-demo/branches/master/protection/required_status_checks \
-  -f "contexts[]=checks" -f "contexts[]=e2e"
+git fetch https://github.com/<owner>/loom-demo.git <branch>
+git push origin FETCH_HEAD:refs/heads/<branch>
+```
+
+— or add the contributor as a collaborator so they push here directly. Not
+`pull_request_target`: that hands the CI database and blob token to unreviewed
+code. Note the Actions UI shows a fork PR's branch with no owner prefix, so it
+reads as a local branch; `gh api repos/tj60647/loom-demo/pulls/<n> -q
+.head.repo.full_name` is the way to settle it.
+
+**Branch protection requires BOTH `checks` and `e2e`, on `master` AND `dev`**
+(verified 2026-08-15). This paragraph described the bootstrap state — "`master`
+initially requires only `checks`" — for as long as it took someone to run the
+command below, and then went on saying it, which cost a wrong call about
+whether a red `e2e` blocked anything. It does. Read the config, not this line:
+
+```bash
+gh api repos/tj60647/loom-demo/branches/master/protection/required_status_checks
 ```
 
 ## The one gate CI cannot close: the OAuth round trip
