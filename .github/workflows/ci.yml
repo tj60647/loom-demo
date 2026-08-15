@@ -32,7 +32,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22, not 20: package.json declares `engines: node >= 22.7.0`, and
+          # nothing enforces that — `npm ci` ignores engines unless strict, so
+          # CI ran an unsupported runtime for weeks without saying a word. See
+          # the e2e job for what it actually cost.
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run check   # eslint + tsc
@@ -69,7 +73,15 @@ jobs:
           fi
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # THE RUNTIME IS PART OF THE TEST. pdf.js decodes scan images through
+          # `openjpeg_nowasm_fallback.js` — ESM with a .js extension in a
+          # package with no `"type": "module"` — which needs Node's module-syntax
+          # detection, i.e. >= 22.7. On 20 it fails as `buffer
+          # .transferToFixedLength is not a function` and every server-rendered
+          # scan comes back BLANK, with a warning and no error. That silently
+          # failed four specs here (library-verify, sandbox, practice-guide ×2)
+          # while the code under them was fine.
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
