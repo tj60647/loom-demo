@@ -16,16 +16,10 @@ import { db } from "@/db"
 import { sourceRepairs, sourceRepairReadings } from "@/db/schema"
 import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
 import { extractPdfPageText } from "@/lib/pdfText"
-import { measureAngledInk, probePdfStructure } from "@/lib/pdfStructure"
+import { probePdfStructure } from "@/lib/pdfStructure"
 import { locatePageRepairRegion } from "@/lib/garbleRegion"
 import { isGarbled, isGarbledToken, lowercaseBodyTokens, measurePageGarble } from "@/lib/garble"
-import { computeBlockConsensus, computeConsensus, type TranscriptBlock } from "@/lib/repairConsensus"
-import {
-  TRANSCRIBE_SYSTEM,
-  blockTranscribePrompt,
-  parseReading,
-  transcribePrompt,
-} from "@/lib/repairReading"
+import { computeConsensus } from "@/lib/repairConsensus"
 import { readingStorage } from "@/lib/storage"
 import { VISION_READERS, requestVisionCompletion } from "@/lib/openrouter"
 
@@ -115,36 +109,11 @@ export function repairSettings() {
     /** What the readers are told, verbatim — the reviewer should see the brief. */
     systemPrompt: TRANSCRIBE_SYSTEM,
     instructions: transcribePrompt(["<the words this page currently reads as>"]),
-    /** The brief for pages flagged as oddly formatted — see blockTranscribePrompt. */
-    blockInstructions: blockTranscribePrompt(["<the words this page currently reads as>"]),
     cropDpi: CROP_DPI,
     maxCropEdge: MAX_CROP_EDGE,
     maxPagesPerRun: MAX_REGIONS_PER_SOURCE,
     minCropInk: MIN_CROP_INK,
   }
-}
-
-/**
- * Does this page need block-mode transcription?
- *
- * The structure probe's flag covers what it could see: angled text items, and
- * angled ink on pages it rendered (the ones with no text layer). What it could
- * NOT see is a page the single-stream pipeline already repaired — a clean
- * horizontal text layer laid over the same angled picture, which is precisely
- * the page most likely to be back here. The pipeline renders every candidate
- * page for its crop anyway, so the angled-ink question is asked again on that
- * render, where it is a read of pixels already in hand.
- */
-function pageWantsBlocks(
-  structurePage: { oddFormat: boolean } | undefined,
-  context: ReturnType<ReturnType<typeof createCanvas>["getContext"]>,
-  width: number,
-  height: number,
-  dpi: number
-) {
-  if (structurePage?.oddFormat) return true
-  const { data } = context.getImageData(0, 0, width, height)
-  return measureAngledInk(data, width, height, dpi).length > 0
 }
 
 /**
@@ -338,13 +307,6 @@ export async function detectRepairsForSource(
         continue
       }
 
-      // Asked of the crop, not the page: the crop is what the readers will see
-      // and what a block's box coordinates will be fractions of.
-      const structurePage = structure?.pages.find((p) => p.pageNumber === pageNumber)
-      const blockMode = pageWantsBlocks(
-        structurePage, cropContext, region.width, region.height, scale * PDF_POINTS_PER_INCH
-      )
-
       const cropKey = repairCropKey(sourceId, pageNumber)
       await readingStorage.put(cropKey, crop.toBuffer("image/png"))
 
@@ -360,7 +322,6 @@ export async function detectRepairsForSource(
         // transcription is answerable for. The stored rate measures a defect
         // this repair does not address.
         garbleRate: region.glyphRate,
-        blockMode,
       })
       created += 1
     }
@@ -411,30 +372,12 @@ function fusionShare(text: string) {
 export async function proposeRetranscription(
   sourceId: string,
   buffer: Buffer,
-  storageKey: string,
-  options: {
-    /**
-     * Pages the operator has named. When given, they REPLACE the damage
-     * floors — only these pages are proposed, and they are proposed past
-     * every filter: the floors AND a prior decision. Both bypasses exist for
-     * the same page: the damage block mode repairs — a margin note
-     * interleaved into clean body sentences, a concept map flattened into a
-     * word cloud — is made of real words in the wrong order, which no token
-     * measure sees, on pages an earlier single-stream apply already settled.
-     * And the floors must not ADD pages beside the named ones: an operator
-     * who scoped the act to three pages has scoped its spend to three pages.
-     * Naming a page here is the same kind of act as naming a source to
-     * --retranscribe: an explicit judgement, never a batch default.
-     */
-    forcePages?: number[]
-  } = {}
+  storageKey: string
 ) {
   const pages = await extractPdfPageText(buffer)
   if (pages.length === 0) {
     return { regions: 0, pagesExamined: 0, skippedClean: 0, blank: [] as number[] }
   }
-
-  const forced = new Set(options.forcePages ?? [])
 
   const structure = await probePdfStructure(buffer).catch(() => null)
   const blankPages = new Set(
@@ -443,7 +386,6 @@ export async function proposeRetranscription(
 
   const damaged = pages.filter((page) => {
     if (blankPages.has(page.pageNumber)) return false
-    if (forced.size > 0) return forced.has(page.pageNumber)
     const garble = measurePageGarble(page.pageNumber, page.textContent)
     const rate = garble?.rate ?? 0
     // A page with no measurable text at all is the scanned case detection
@@ -452,23 +394,14 @@ export async function proposeRetranscription(
     return scanned || rate >= RETRANSCRIBE_GARBLE_FLOOR || fusionShare(page.textContent) >= RETRANSCRIBE_FUSION_FLOOR
   })
 
-  /**
-   * Same replace-undecided contract as detection, same crop cleanup — but a
-   * NAMED act replaces only what it names. A scoped run that cleared every
-   * pending proposal would discard pages an earlier run had already paid the
-   * panel to read, which is the opposite of what scoping a run to three pages
-   * asks for.
-   */
-  const undecided = and(
-    eq(sourceRepairs.sourceId, sourceId),
-    eq(sourceRepairs.status, "proposed"),
-    ...(forced.size > 0 ? [inArray(sourceRepairs.pageNumber, [...forced])] : [])
-  )
+  // Same replace-undecided contract as detection, same crop cleanup.
   const replaced = await db
     .select({ cropKey: sourceRepairs.cropKey })
     .from(sourceRepairs)
-    .where(undecided)
-  await db.delete(sourceRepairs).where(undecided)
+    .where(and(eq(sourceRepairs.sourceId, sourceId), eq(sourceRepairs.status, "proposed")))
+  await db
+    .delete(sourceRepairs)
+    .where(and(eq(sourceRepairs.sourceId, sourceId), eq(sourceRepairs.status, "proposed")))
   for (const row of replaced) {
     await readingStorage.delete(row.cropKey).catch(() => {})
   }
@@ -505,8 +438,7 @@ export async function proposeRetranscription(
   try {
     for (const page of damaged) {
       if (created >= MAX_REGIONS_PER_SOURCE) break
-      // A forced page re-opens its decision — see the forcePages note above.
-      if (decided.has(page.pageNumber) && !forced.has(page.pageNumber)) continue
+      if (decided.has(page.pageNumber)) continue
       const pdfPage = await doc.getPage(page.pageNumber)
       const unscaled = pdfPage.getViewport({ scale: 1 })
       const scale = Math.min(
@@ -526,12 +458,6 @@ export async function proposeRetranscription(
         continue
       }
 
-      // The crop here IS the page, so the page render answers for the crop.
-      const structurePage = structure?.pages.find((p) => p.pageNumber === page.pageNumber)
-      const blockMode = pageWantsBlocks(
-        structurePage, context, canvas.width, canvas.height, scale * PDF_POINTS_PER_INCH
-      )
-
       const cropKey = repairCropKey(sourceId, page.pageNumber)
       await readingStorage.put(cropKey, canvas.toBuffer("image/png"))
 
@@ -547,7 +473,6 @@ export async function proposeRetranscription(
           ...new Set(lowercaseBodyTokens(page.textContent).filter(isGarbledToken)),
         ].slice(0, 40),
         garbleRate: garble?.rate ?? null,
-        blockMode,
       })
       created += 1
     }
@@ -560,6 +485,104 @@ export async function proposeRetranscription(
     pagesExamined: pages.length,
     skippedClean: pages.length - damaged.length,
     blank,
+  }
+}
+
+const TRANSCRIBE_SYSTEM =
+  "You transcribe text from images of printed and handwritten documents. You report exactly what is " +
+  "on the page and nothing else. You would rather return a short honest transcription than a complete " +
+  "invented one."
+
+function transcribePrompt(garbledWords: string[]) {
+  // Two kinds of damage arrive here: text that extracted as garbage, and text
+  // that never extracted at all (a scanned page with no OCR layer). The warning
+  // about existing damage only makes sense when damage exists to warn about.
+  const damage =
+    garbledWords.length > 0
+      ? `This is a region of a course reading whose extracted text is corrupted. What the PDF currently ` +
+        `believes is here reads: ${JSON.stringify(garbledWords.slice(0, 12))}. That is the damage — do not ` +
+        `reproduce it, and do not let it steer your reading.`
+      : `This is a page of a course reading that has NO extractable text at all — a scan the OCR never ` +
+        `reached. There is nothing to avoid reproducing; transcribe what you see.`
+  return (
+    `Transcribe ALL text visible in this image, VERBATIM and in reading order.\n\n` +
+    `${damage}\n\n` +
+    `Rules that matter more than completeness:\n` +
+    `- Transcribe what is ON THE PAGE, not what you think it should say. Keep the original's own ` +
+    `spelling, typos and archaisms.\n` +
+    `- Do NOT use outside knowledge to fill a gap. If you recognise the document, that must not change ` +
+    `a single character of what you report — recognising it is when invention is most likely.\n` +
+    `- If you cannot read something, list it in "uncertain" rather than guessing.\n` +
+    `- Some text may be rotated; say so in "orientation".\n\n` +
+    `Several readers are transcribing this independently. Your value is an honest reading, not a ` +
+    `confident one — where you are unsure, saying so is the useful answer.\n\n` +
+    `Reply with ONLY a JSON object, no prose and no code fence:\n` +
+    `{"orientation":"...","text":"...","uncertain":["..."],"illegibleShare":"none|some|much|most"}`
+  )
+}
+
+type ParsedReading = {
+  text: string
+  uncertain: string[]
+  illegibleShare: "none" | "some" | "much" | "most" | null
+  /**
+   * The model ran out of room mid-transcription. The text it did produce is
+   * real, but it is not a reading of the WHOLE region — so it is kept as a
+   * record and excluded from the vote, because its missing passages would
+   * otherwise register as disagreement with the readers who finished.
+   */
+  truncated: boolean
+}
+
+/**
+ * Tolerant parse: models are told JSON only and drift anyway, so pull the
+ * outermost braces rather than trusting the whole string. A reading that cannot
+ * be parsed is dropped rather than guessed at — one fewer reader is a weaker
+ * vote, which is honest; a fabricated reader is a false one.
+ */
+export function parseReading(raw: string): ParsedReading | null {
+  const start = raw.indexOf("{")
+  if (start === -1) return null
+  const end = raw.lastIndexOf("}")
+
+  let parsed: unknown = null
+  if (end > start) {
+    try {
+      parsed = JSON.parse(raw.slice(start, end + 1))
+    } catch {
+      parsed = null
+    }
+  }
+
+  // Truncated output has no closing brace, or has one that does not close valid
+  // JSON. The transcription inside is still real and worth recording, so pull
+  // the text field out by hand rather than discarding the call.
+  if (parsed === null) {
+    const match = raw.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)/)
+    if (!match) return null
+    let salvaged: string
+    try {
+      salvaged = JSON.parse(`"${match[1]}"`)
+    } catch {
+      return null
+    }
+    if (!salvaged.trim()) return null
+    return { text: salvaged, uncertain: [], illegibleShare: null, truncated: true }
+  }
+
+  if (typeof parsed !== "object") return null
+  const object = parsed as Record<string, unknown>
+  const text = typeof object.text === "string" ? object.text : ""
+  if (!text.trim()) return null
+  const share = object.illegibleShare
+  return {
+    text,
+    uncertain: Array.isArray(object.uncertain)
+      ? object.uncertain.filter((item): item is string => typeof item === "string").slice(0, 40)
+      : [],
+    illegibleShare:
+      share === "none" || share === "some" || share === "much" || share === "most" ? share : null,
+    truncated: false,
   }
 }
 
@@ -585,9 +608,7 @@ export async function transcribeRepairRegion(repairId: string) {
 
   const crop = await readingStorage.get(repair.cropKey)
   const imageBase64 = crop.toString("base64")
-  const message = repair.blockMode
-    ? blockTranscribePrompt(repair.garbledWords)
-    : transcribePrompt(repair.garbledWords)
+  const message = transcribePrompt(repair.garbledWords)
   const failures: { model: string; reason: string }[] = []
 
   const results = await Promise.all(
@@ -647,8 +668,6 @@ export async function transcribeRepairRegion(repairId: string) {
       model: reading.model,
       reader: reading.reader,
       text: reading.text,
-      blocks: reading.blocks,
-      orientation: reading.orientation,
       uncertain: reading.uncertain,
       illegibleShare: reading.illegibleShare,
       promptTokens: reading.usage.promptTokens,
@@ -663,24 +682,15 @@ export async function transcribeRepairRegion(repairId: string) {
   // rather than disagreeing, and counting their silence as dissent would send a
   // reviewer to passages nobody actually read differently.
   const complete = readings.filter((reading) => !reading.truncated)
-  const voting = (complete.length >= 2 ? complete : readings).map((r) => ({
-    reader: r.reader,
-    text: r.text,
-    blocks: r.blocks,
-  }))
-  // Block-mode pages vote body-beside-notes; ordinary pages vote as they always
-  // have. A block-mode reader that answered in the flat format anyway still
-  // votes — computeBlockConsensus treats its whole text as body, which is what
-  // its format asserts.
-  const consensus: ReturnType<typeof computeConsensus> & { agreedBlocks?: TranscriptBlock[] } =
-    repair.blockMode ? computeBlockConsensus(voting) : computeConsensus(voting)
+  const consensus = computeConsensus(
+    (complete.length >= 2 ? complete : readings).map((r) => ({ reader: r.reader, text: r.text }))
+  )
   await db
     .update(sourceRepairs)
     .set({
       agreedText: consensus.agreedText,
       disagreements: consensus.disagreements,
       votes: consensus.votes,
-      agreedBlocks: consensus.agreedBlocks ?? null,
     })
     .where(eq(sourceRepairs.id, repairId))
 
