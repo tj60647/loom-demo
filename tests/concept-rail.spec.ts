@@ -64,21 +64,37 @@ test.describe('Concept rail', () => {
     // page with a leader to the span.
     await expect(page.getByRole('button', { name: 'Cards in the margin' })).toHaveCount(0);
     await expect(page.locator('.pdf-rail')).toHaveCount(2);
-    const card = page.locator('.pdf-railcard', { hasText: conceptName }).first();
+    // The label is a textarea now (cards edit in place), so text-content
+    // locators can't see it — the door button's accessible name carries the
+    // concept's name instead.
+    const cardFor = (scope = '') =>
+      page.locator(`${scope ? scope + ' ' : ''}.pdf-railcard`.trim(), {
+        has: page.getByRole('button', { name: `Open ${conceptName} in your work` }),
+      });
+    const card = cardFor().first();
     await expect(card).toBeVisible({ timeout: 5000 });
     await expect(page.locator('.pdf-rail-leaders path').first()).toBeAttached();
+
+    // The card edits in place (2026-08-15): the definition writes through to
+    // the concept itself, so it must survive a view switch — the card
+    // re-adopts its fields from the graph, not from its own memory.
+    const defField = card.getByRole('textbox', { name: 'Working definition' });
+    await defField.fill('A rail-edited working definition');
+    await defField.blur();
 
     // One page → both rails still stand (a card's side is its page's parity,
     // so the room is permanent), and the card survives the re-layout.
     await page.getByRole('button', { name: '1 page' }).click();
     await expect(page.locator('.pdf-rail')).toHaveCount(2, { timeout: 5000 });
-    await expect(page.locator('.pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 5000 });
+    await expect(cardFor().first()).toBeVisible({ timeout: 5000 });
+    await expect(cardFor().first().getByRole('textbox', { name: 'Working definition' }))
+      .toHaveValue('A rail-edited working definition');
 
     // In the canvas the same capture's card flanks its spread (Strip is
     // hidden — TJ 2026-08-10, the canvas supersedes it — so there is no
     // fourth mode to check).
     await page.getByRole('button', { name: 'Canvas' }).click();
-    await expect(page.locator('.pdf-spread-canvas .pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 10_000 });
+    await expect(cardFor('.pdf-spread-canvas').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: 'Strip' })).toHaveCount(0);
 
     // Back to the spread: the capture was on an odd page, so its card
@@ -86,7 +102,7 @@ test.describe('Concept rail', () => {
     // open at the right edge.
     await page.getByRole('button', { name: '2 pages' }).click();
     await expect(page.locator('.pdf-rail')).toHaveCount(2, { timeout: 5000 });
-    await expect(page.locator('.pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 10_000 });
+    await expect(cardFor().first()).toBeVisible({ timeout: 10_000 });
 
     // The card is a door, not an editor: clicking it opens Your work at the
     // passage's row (red line #5 — the work is never out of reach). And the
@@ -96,7 +112,8 @@ test.describe('Concept rail', () => {
     // a search too, and its button is also named for this reading.
     await page.locator('.pdf-toolbar').getByRole('button', { name: 'Search this reading' }).click();
     await expect(page.locator('.pdf-search-panel')).toBeVisible();
-    await page.locator('.pdf-railcard', { hasText: conceptName }).first().click();
+    // The corner › is the door now — the card body is an editor.
+    await page.getByRole('button', { name: `Open ${conceptName} in your work` }).first().click();
     await expect(page.locator('#yourwork')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('.pdf-search-panel')).toBeHidden();
     const row = page
@@ -128,7 +145,7 @@ test.describe('Concept rail', () => {
 
     // With its passage gone, the card goes too — the rail draws only what the
     // loom still holds.
-    await expect(page.locator('.pdf-railcard', { hasText: conceptName })).toHaveCount(0, { timeout: 5000 });
+    await expect(cardFor()).toHaveCount(0, { timeout: 5000 });
   });
 
   test('the standing rails never move the stage', async ({ page }) => {

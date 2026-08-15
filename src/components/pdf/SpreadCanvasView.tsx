@@ -20,18 +20,18 @@
  * viewer's one selection handler, one CaptureModal and one ReuseOffer serve
  * this view like every other — the 2.1 invariant).
  *
- * All geometry is derived for display and discarded (red line #7). Cards are
- * read-only doors to Your work, exactly as in page mode.
+ * All geometry is derived for display and discarded (red line #7). Cards
+ * edit in place — the shared RailCard, exactly as in page mode.
  */
 
 import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { select, pointer } from "d3-selection";
 import { zoom, zoomIdentity, type ZoomBehavior, type D3ZoomEvent, type ZoomTransform } from "d3-zoom";
 import PageSlot, { type PageTier } from "./PageSlot";
+import { RailCard } from "./ConceptRail";
 import { type PdfDoc } from "./PageRaster";
 import { spreadLayout, pageX } from "@/lib/spreadLayout";
 import { layoutRail, railScale } from "@/lib/railLayout";
-import { short } from "@/lib/clothMath";
 import type { Concept, Passage } from "@/lib/types";
 
 const CARD_GAP = 12;
@@ -217,7 +217,7 @@ export default function SpreadCanvasView({
    * the clamp disagreeing is the yank-back bug the old comment warned about.
    */
   const maxMultiplier = useMemo(
-    () => (fitAllK > 0 ? Math.max(8, Math.ceil((spreadFitK * 4) / fitAllK)) : 8),
+    () => (fitAllK > 0 ? Math.max(16, Math.ceil((spreadFitK * 8) / fitAllK)) : 16),
     [fitAllK, spreadFitK]
   );
 
@@ -419,7 +419,7 @@ export default function SpreadCanvasView({
       retargetView();
       // Keep the toolbar slider honest about where a gesture left the zoom.
       const { fitAllK, maxMultiplier, zoomMultiplier, onZoomMultiplier } = live.current;
-      const m = Math.min(maxMultiplier, Math.max(0.5, Math.round((tref.current.k / fitAllK) * 10) / 10));
+      const m = Math.min(maxMultiplier, Math.max(1, Math.round((tref.current.k / fitAllK) * 10) / 10));
       if (Math.abs(m - zoomMultiplier) > 0.05) onZoomMultiplier(m);
     }, SETTLE_MS);
   }, [retargetView]);
@@ -477,7 +477,10 @@ export default function SpreadCanvasView({
     // a pinch rest where the slider clamps lower, and the slider effect would
     // then yank the view back out on its own — the extent and the clamp must
     // never disagree, which is why both read maxMultiplier.
-    zb.scaleExtent([fitAllK * 0.5, fitAllK * maxMultiplier])
+    // The floor is fit-all EXACTLY (Lingxiu, 2026-08-15, as the original
+    // spread canvas had it): the farthest you can stand back is the entire
+    // reading — there is nothing out there past it to zoom to.
+    zb.scaleExtent([fitAllK, fitAllK * maxMultiplier])
       .translateExtent([[-pad, -pad], [layout.canvasW + pad, layout.canvasH + pad]]);
   }, [layout, stage.w, fitAllK, maxMultiplier]);
 
@@ -909,9 +912,6 @@ export default function SpreadCanvasView({
               const id = c.passage.id;
               const s = layout.spreads[c.anchor.spreadIdx];
               const cs = placement.scales[id] ?? 1;
-              const first = c.concepts[0];
-              const chips = c.concepts.slice(1);
-              const name = first ? first.label : "Unlabeled passage";
               // Cards keep their rail-edge anchor and grow inward — over their
               // own page — as the canvas zooms out (width rides --invk), so at
               // full zoom-out you are reading concepts, not the shrunken text.
@@ -930,34 +930,14 @@ export default function SpreadCanvasView({
                   : { right: layout.canvasW - (s.x + layout.unitW), left: "auto" }),
               };
               return (
-                <div
+                <RailCard
                   key={id}
-                  ref={(el) => registerCard(id, el)}
-                  className="pdf-railcard"
+                  passage={c.passage}
+                  concepts={c.concepts}
+                  onOpenPassage={onOpenPassage}
+                  registerEl={(el) => registerCard(id, el)}
                   style={style}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Open ${name} in your work`}
-                  onClick={() => onOpenPassage?.(id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onOpenPassage?.(id);
-                    }
-                  }}
-                >
-                  <div className={`pdf-railcard-label${first ? "" : " unlabeled"}`}>{name}</div>
-                  {chips.length > 0 && (
-                    <div className="pdf-railcard-chips">
-                      {chips.map((chip) => (
-                        <span key={chip.id} className="pdf-railcard-chip">{chip.label}</span>
-                      ))}
-                    </div>
-                  )}
-                  {first?.def ? <div className="pdf-railcard-def">{short(first.def, 140)}</div> : null}
-                  {!first && <div className="pdf-railcard-def">{short(c.passage.content, 110)}</div>}
-                  {c.passage.note ? <div className="pdf-railcard-note">{short(c.passage.note, 110)}</div> : null}
-                </div>
+                />
               );
             })}
           </div>

@@ -12,19 +12,24 @@
  * reading surface, not a toggle, and a card's side is its page number's
  * parity — odd left, even right — in every view.
  *
- * Read-only by ruling (TJ, 2026-08-09): a card displays and clicks through to
- * Your work — it edits nothing, so concept identity keeps a single editing
- * surface. Anchors are read off the mark.js highlight layer
- * (`.loom-passage-highlight`), never re-resolved from offsets: whatever the
- * applier drew — precision or fuzzy — is what a card points at, and the
- * peer-overlay wash (`.loom-overlay-heat`) is deliberately not consulted, so
- * nobody else's marks can spawn a card here.
+ * Directly editable (Lingxiu, 2026-08-15, reversing TJ's 2026-08-09
+ * read-only ruling — the original spread canvas's cards were editors): the
+ * concept's name and working definition write through the same editConcept
+ * every other surface uses, with the original's save discipline — the name
+ * commits on blur/Enter only (labels are concept identity, and mid-typed
+ * names would collide), the definition saves on a 700ms pause and on blur.
+ * The corner › is the door to Your work. Anchors are read off the mark.js
+ * highlight layer (`.loom-passage-highlight`), never re-resolved from
+ * offsets: whatever the applier drew — precision or fuzzy — is what a card
+ * points at, and the peer-overlay wash (`.loom-overlay-heat`) is
+ * deliberately not consulted, so nobody else's marks can spawn a card here.
  *
  * All geometry is derived for display and discarded (red line #7; MapTab's
- * drift grid is the precedent). Nothing here writes.
+ * drift grid is the precedent).
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLoom } from "@/components/providers/LoomProvider";
 import type { Concept, Passage } from "@/lib/types";
 import { layoutRail, railScale } from "@/lib/railLayout";
 import { short } from "@/lib/clothMath";
@@ -242,14 +247,13 @@ export default function ConceptRails({
         .map((c) => {
           const id = c.passage.id;
           const s = placement.scales[side];
-          const first = c.concepts[0];
-          const chips = c.concepts.slice(1);
-          const name = first ? first.label : "Unlabeled passage";
           return (
-            <div
+            <RailCard
               key={id}
-              ref={(el) => registerCard(id, el)}
-              className="pdf-railcard"
+              passage={c.passage}
+              concepts={c.concepts}
+              onOpenPassage={onOpenPassage}
+              registerEl={(el) => registerCard(id, el)}
               style={{
                 top: placement.tops[id] ?? c.anchor.midY,
                 transform: s < 1 ? `scale(${s})` : undefined,
@@ -257,29 +261,7 @@ export default function ConceptRails({
                 // line arrives.
                 transformOrigin: side === "left" ? "top right" : "top left",
               }}
-              role="button"
-              tabIndex={0}
-              aria-label={`Open ${name} in your work`}
-              onClick={() => onOpenPassage?.(id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onOpenPassage?.(id);
-                }
-              }}
-            >
-              <div className={`pdf-railcard-label${first ? "" : " unlabeled"}`}>{name}</div>
-              {chips.length > 0 && (
-                <div className="pdf-railcard-chips">
-                  {chips.map((chip) => (
-                    <span key={chip.id} className="pdf-railcard-chip">{chip.label}</span>
-                  ))}
-                </div>
-              )}
-              {first?.def ? <div className="pdf-railcard-def">{short(first.def, 140)}</div> : null}
-              {!first && <div className="pdf-railcard-def">{short(c.passage.content, 110)}</div>}
-              {c.passage.note ? <div className="pdf-railcard-note">{short(c.passage.note, 110)}</div> : null}
-            </div>
+            />
           );
         })}
     </div>
@@ -307,6 +289,116 @@ export default function ConceptRails({
           })}
         </svg>
       )}
+    </div>
+  );
+}
+
+/**
+ * One margin card, shared by page mode's rails and the spread canvas — the
+ * original spread canvas's concept box, rebuilt on the passage card. The
+ * NAME and WORKING DEFINITION edit in place, through the same editConcept as
+ * every other surface; the corner › is the door to Your work. Local drafts
+ * re-adopt the saved value whenever the graph changes underneath (the same
+ * concept edited from another card, or from Your work).
+ */
+export function RailCard({
+  passage,
+  concepts,
+  onOpenPassage,
+  registerEl,
+  style,
+}: {
+  passage: Passage;
+  concepts: Concept[];
+  onOpenPassage?: (passageId: string) => void;
+  registerEl: (el: HTMLElement | null) => void;
+  style?: React.CSSProperties;
+}) {
+  const { editConcept } = useLoom();
+  const first: Concept | undefined = concepts[0];
+  const chips = concepts.slice(1);
+  const name = first ? first.label : "Unlabeled passage";
+
+  const [label, setLabel] = useState(first?.label ?? "");
+  const [def, setDef] = useState(first?.def ?? "");
+  const [prevLabel, setPrevLabel] = useState(first?.label ?? "");
+  const [prevDef, setPrevDef] = useState(first?.def ?? "");
+  if (prevLabel !== (first?.label ?? "")) {
+    setPrevLabel(first?.label ?? "");
+    setLabel(first?.label ?? "");
+  }
+  if (prevDef !== (first?.def ?? "")) {
+    setPrevDef(first?.def ?? "");
+    setDef(first?.def ?? "");
+  }
+
+  // The definition saves while you type (700ms pause) — it isn't identity,
+  // so partial states are harmless. The name commits on blur/Enter only:
+  // labels are concept identity (spec §2), and mid-typed names would collide
+  // and spam rename events into the graph history.
+  useEffect(() => {
+    if (!first || def === (first.def ?? "")) return;
+    const t = window.setTimeout(() => void editConcept(first.id, { def }), 700);
+    return () => window.clearTimeout(t);
+  }, [def, first, editConcept]);
+
+  return (
+    <div className="pdf-railcard" ref={registerEl} style={style}>
+      <button
+        type="button"
+        className="pdf-railcard-open"
+        aria-label={`Open ${name} in your work`}
+        data-tip="this passage in your work"
+        onClick={() => onOpenPassage?.(passage.id)}
+      >
+        ›
+      </button>
+      {first ? (
+        <textarea
+          className="pdf-railcard-label"
+          value={label}
+          rows={1}
+          aria-label="Concept name"
+          placeholder="concept name"
+          onChange={(e) => setLabel(e.target.value.replace(/\n/g, ""))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              (e.target as HTMLTextAreaElement).blur();
+            }
+          }}
+          onBlur={() => {
+            const v = label.trim();
+            if (v && v !== first.label) void editConcept(first.id, { label: v });
+            else setLabel(first.label);
+          }}
+        />
+      ) : (
+        <div className="pdf-railcard-label unlabeled">{name}</div>
+      )}
+      {chips.length > 0 && (
+        <div className="pdf-railcard-chips">
+          {chips.map((chip) => (
+            <span key={chip.id} className="pdf-railcard-chip">{chip.label}</span>
+          ))}
+        </div>
+      )}
+      {first ? (
+        <textarea
+          className="pdf-railcard-def"
+          value={def}
+          rows={1}
+          aria-label="Working definition"
+          placeholder="working definition"
+          onChange={(e) => setDef(e.target.value)}
+          onBlur={() => {
+            if (first && def !== (first.def ?? "")) void editConcept(first.id, { def });
+          }}
+        />
+      ) : (
+        <div className="pdf-railcard-def">{short(passage.content, 110)}</div>
+      )}
+      {passage.note ? <div className="pdf-railcard-note">{short(passage.note, 110)}</div> : null}
     </div>
   );
 }
