@@ -7,11 +7,16 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 
 /**
  * The margin cards, always on (2026-08-15): a passage captured on the open
- * pages grows a card beside its page, leader-lined to the highlight, and the
- * card is a door to Your work — never an editor. There is no Cards toggle any
- * more; both rails stand in page mode, a card's side is its page number's
- * parity (odd left, even right) in every view, and turning the layout under
- * a card (1 page, 2 pages, canvas) must never strand it.
+ * pages grows a card beside its page, leader-lined to the highlight. The card
+ * edits in place, and the corner › is still a door to Your work. There is no
+ * Cards toggle any more; both rails stand in page mode, a card's side is its
+ * page number's parity (odd left, even right) in every view, and turning the
+ * layout under a card (1 page, 2 pages, canvas) must never strand it.
+ *
+ * THE CARD'S SUBJECT IS THE PASSAGE (TJ, PR #9), which is what the second
+ * test here holds: a passage with no concept is a legal end state (model
+ * §Passage), so its card must still be fully workable — its own note written,
+ * and a concept named from it without leaving the reading.
  */
 test.describe('Concept rail', () => {
   test('a captured passage gets a card, and the card opens Your work', async ({ page }) => {
@@ -146,6 +151,102 @@ test.describe('Concept rail', () => {
     // With its passage gone, the card goes too — the rail draws only what the
     // loom still holds.
     await expect(cardFor()).toHaveCount(0, { timeout: 5000 });
+  });
+
+  test('an unlabeled passage\'s card takes its note, and names a concept from the page', async ({ page }) => {
+    test.setTimeout(90_000);
+    const conceptName = 'Rail Test Concept B';
+
+    await openReading(page, 'Object Worlds');
+    const textLayer = page.locator('.react-pdf__Page__textContent');
+    await expect(textLayer.first()).toBeAttached({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Next Page' }).click();
+    await page.waitForTimeout(1000);
+
+    const selected = await textLayer.first().evaluate((layer) => {
+      const spans = Array.from(layer.querySelectorAll('span')).filter(
+        (s) => (s.textContent ?? '').trim().length > 0
+      );
+      if (!spans.length) return '';
+      let start = spans.findIndex((s) => (s.textContent ?? '').trim().length >= 40);
+      if (start === -1) start = 0;
+      let end = start;
+      let length = (spans[start].textContent ?? '').length;
+      while (end + 1 < spans.length && length < 200) {
+        end++;
+        length += (spans[end].textContent ?? '').length;
+      }
+      const range = document.createRange();
+      range.setStartBefore(spans[start].firstChild ?? spans[start]);
+      range.setEndAfter(spans[end].firstChild ?? spans[end]);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+      return selection?.toString() ?? '';
+    });
+    expect(selected.trim().length).toBeGreaterThanOrEqual(80);
+
+    // Captured with NO concept — the Unlabeled Passage, saved as a whole act.
+    await page.locator('button:has-text("Capture as Passage")').click();
+    await page.locator('button:has-text("Save unlabeled")').click();
+    await expect(page.getByRole('heading', { name: 'Capture Passage' })).toBeHidden({ timeout: 30_000 });
+
+    const unlabeled = page
+      .locator('.pdf-railcard', { has: page.getByRole('button', { name: 'Open Unlabeled passage in your work' }) })
+      .first();
+    await expect(unlabeled).toBeVisible({ timeout: 10_000 });
+
+    // (a) The NOTE is the passage's own, so it is writable with no concept in
+    // sight — the state that used to render as truncated read-only text.
+    const noteField = unlabeled.getByRole('textbox', { name: 'Your note on this passage' });
+    await noteField.fill('A note that needed no concept');
+    await noteField.blur();
+    // It writes through to the passage, so it survives a re-layout: the card
+    // re-adopts from the graph, never from its own memory.
+    await page.getByRole('button', { name: '1 page' }).click();
+    await expect(unlabeled.getByRole('textbox', { name: 'Your note on this passage' }))
+      .toHaveValue('A note that needed no concept', { timeout: 10_000 });
+
+    // (b) A concept is named FROM the card — coined and filed in one gesture,
+    // without leaving the page. The card then heads itself with that name and
+    // offers the gloss it could not offer a moment ago.
+    const nameField = unlabeled.getByRole('textbox', { name: 'Name a concept for this passage' });
+    await nameField.fill(conceptName);
+    await nameField.blur();
+
+    const named = page
+      .locator('.pdf-railcard', { has: page.getByRole('button', { name: `Open ${conceptName} in your work` }) })
+      .first();
+    await expect(named).toBeVisible({ timeout: 10_000 });
+    await expect(named.getByRole('textbox', { name: 'Working definition' })).toBeVisible();
+    // The note the passage already carried came through the naming intact.
+    await expect(named.getByRole('textbox', { name: 'Your note on this passage' }))
+      .toHaveValue('A note that needed no concept');
+
+    // Cleanup through the same UI a student would use.
+    await page.getByRole('button', { name: `Open ${conceptName} in your work` }).first().click();
+    await expect(page.locator('#yourwork')).toBeVisible({ timeout: 5000 });
+    const row = page
+      .locator('#yourwork .lrow', { has: page.locator('.lconcept', { hasText: conceptName }) })
+      .first();
+    await expect(row).toBeVisible({ timeout: 5000 });
+    const pidLoc = row.locator('[data-passage-id]').first();
+    if (!(await pidLoc.isVisible().catch(() => false))) {
+      await row.locator('.lhead').click();
+    }
+    await expect(pidLoc).toBeVisible({ timeout: 5000 });
+    const passageId = await pidLoc.getAttribute('data-passage-id');
+    const passageDeleted = page.waitForResponse((r) =>
+      r.request().method() === 'POST' && (r.request().postData() ?? '').includes(passageId!)
+    );
+    await row.getByRole('button', { name: 'remove passage' }).click();
+    await passageDeleted;
+    const conceptDeleted = page.waitForResponse((r) => isDeletePost(r.request()));
+    await row.getByRole('button', { name: 'remove concept' }).click();
+    await page.getByRole('button', { name: 'Delete concept' }).click();
+    await conceptDeleted;
+    await expect(page.locator('.lconcept', { hasText: conceptName })).toHaveCount(0, { timeout: 5000 });
   });
 
   test('the standing rails never move the stage', async ({ page }) => {

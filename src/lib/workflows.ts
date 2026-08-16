@@ -99,7 +99,11 @@ const student: Flow = {
     // capturing and filing are one gesture here and the path rejoins at
     // Linking.
     { id: "typed", label: "Type the passage in", where: "01 · Reading — a reading with no PDF: a book, a lecture, a card you added yourself" },
-    { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — Your work, slid out over the text" },
+    // Two routes to the same act since 2026-08-16: the margin card beside the
+    // highlight names a concept without leaving the page, and Your work still
+    // does it from the Capture Log. The card is also where the passage's own
+    // note is written — the note is the passage's, so it needs no concept.
+    { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — the margin card beside the highlight, or Your work slid out over the text" },
     { id: "link", label: "Pick two concepts, say the sentence, label the link", where: "02 · Linking" },
     // 03 before 04, in the array and in the edges below. Stations 03 and 04
     // were swapped on 2026-08-08 (TJ) — "you lay the graph out and read it, and

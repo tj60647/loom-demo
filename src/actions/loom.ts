@@ -630,6 +630,30 @@ export async function attributePassages(passageIds: string[], sourceId: string) 
   return updated.length
 }
 
+/**
+ * Write a passage's own margin — its Notes, which the model has always given
+ * the Passage (§Passage: "Characters + Time Stamp + Concept pointers [0..n] +
+ * Notes + Questions …") and which until now only `createPassage` could set.
+ * The note belongs to the passage, not to whatever concepts it points at, so
+ * an Unlabeled Passage can be written in exactly like any other.
+ */
+export async function updatePassage(id: string, data: Partial<{ note: string }>) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+
+  const updated = await db.update(passages).set(data)
+    .where(and(eq(passages.id, id), eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
+    .returning({ id: passages.id, sourceId: passages.sourceId })
+
+  if (updated.length > 0) {
+    // sourceId comes along for the Log's per-reading read (see passage.capture).
+    await recordEvent(userId, courseId, "passage.note", "passage", id, {
+      ...data,
+      sourceId: updated[0].sourceId,
+    })
+  }
+}
+
 export async function deletePassage(id: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)

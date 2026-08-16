@@ -295,11 +295,26 @@ export default function ConceptRails({
 
 /**
  * One margin card, shared by page mode's rails and the spread canvas — the
- * original spread canvas's concept box, rebuilt on the passage card. The
- * NAME and WORKING DEFINITION edit in place, through the same editConcept as
- * every other surface; the corner › is the door to Your work. Local drafts
- * re-adopt the saved value whenever the graph changes underneath (the same
- * concept edited from another card, or from Your work).
+ * original spread canvas's concept box, rebuilt on the passage card.
+ *
+ * THE CARD'S SUBJECT IS THE PASSAGE, not a concept (TJ, PR #9): each card is
+ * paired with a highlight and the highlight is the passage. A Passage carries
+ * Concept pointers [0..n] and its own Notes (model §Passage), so:
+ *
+ *  - the NOTE is always editable — it is the passage's own margin, and an
+ *    Unlabeled Passage may never gain a concept, which is a legal end state
+ *    the card has to work in rather than around;
+ *  - with NO concept the name field coins one and files the passage under it,
+ *    so labelling never means leaving the reading;
+ *  - with EXACTLY ONE the name and gloss edit that concept in place, because
+ *    "the concept" is unambiguous;
+ *  - with SEVERAL they are chips and nothing here edits them. A card that
+ *    silently wrote to `concepts[0]` would be guessing which idea you meant,
+ *    and the passage's several concepts are equals — the corner › is the door
+ *    to Your work, where each is addressable.
+ *
+ * Local drafts re-adopt the saved value whenever the graph changes underneath
+ * (the same concept edited from another card, or from Your work).
  */
 export function RailCard({
   passage,
@@ -314,52 +329,90 @@ export function RailCard({
   registerEl: (el: HTMLElement | null) => void;
   style?: React.CSSProperties;
 }) {
-  const { editConcept } = useLoom();
-  const first: Concept | undefined = concepts[0];
-  const chips = concepts.slice(1);
-  const name = first ? first.label : "Unlabeled passage";
+  const { addConcept, editConcept, editPassage, refilePassage } = useLoom();
+  // Exactly one concept is the only state where "the concept" is unambiguous;
+  // that is what gates the in-place name and gloss.
+  const single: Concept | undefined = concepts.length === 1 ? concepts[0] : undefined;
+  const name = concepts.length ? concepts.map((c) => c.label).join(", ") : "Unlabeled passage";
 
-  const [label, setLabel] = useState(first?.label ?? "");
-  const [def, setDef] = useState(first?.def ?? "");
-  const [prevLabel, setPrevLabel] = useState(first?.label ?? "");
-  const [prevDef, setPrevDef] = useState(first?.def ?? "");
-  if (prevLabel !== (first?.label ?? "")) {
-    setPrevLabel(first?.label ?? "");
-    setLabel(first?.label ?? "");
+  const [label, setLabel] = useState(single?.label ?? "");
+  const [def, setDef] = useState(single?.def ?? "");
+  const [note, setNote] = useState(passage.note ?? "");
+  const [prevLabel, setPrevLabel] = useState(single?.label ?? "");
+  const [prevDef, setPrevDef] = useState(single?.def ?? "");
+  const [prevNote, setPrevNote] = useState(passage.note ?? "");
+  if (prevLabel !== (single?.label ?? "")) {
+    setPrevLabel(single?.label ?? "");
+    setLabel(single?.label ?? "");
   }
-  if (prevDef !== (first?.def ?? "")) {
-    setPrevDef(first?.def ?? "");
-    setDef(first?.def ?? "");
+  if (prevDef !== (single?.def ?? "")) {
+    setPrevDef(single?.def ?? "");
+    setDef(single?.def ?? "");
+  }
+  if (prevNote !== (passage.note ?? "")) {
+    setPrevNote(passage.note ?? "");
+    setNote(passage.note ?? "");
   }
 
-  // The definition saves while you type (700ms pause) — it isn't identity,
-  // so partial states are harmless. The name commits on blur/Enter only:
-  // labels are concept identity (spec §2), and mid-typed names would collide
-  // and spam rename events into the graph history.
+  // The gloss saves while you type (700ms pause) — it isn't identity, so
+  // partial states are harmless. The name commits on blur/Enter only: labels
+  // are concept identity (spec §2), and mid-typed names would collide and
+  // spam rename events into the graph history.
   useEffect(() => {
-    if (!first || def === (first.def ?? "")) return;
-    const t = window.setTimeout(() => void editConcept(first.id, { def }), 700);
+    if (!single || def === (single.def ?? "")) return;
+    const t = window.setTimeout(() => void editConcept(single.id, { def }), 700);
     return () => window.clearTimeout(t);
-  }, [def, first, editConcept]);
+  }, [def, single, editConcept]);
+
+  // The note is the passage's own writing, and on the same 700ms contract as
+  // every other prose field in Loom.
+  useEffect(() => {
+    if (note === (passage.note ?? "")) return;
+    const t = window.setTimeout(() => void editPassage(passage.id, { note }), 700);
+    return () => window.clearTimeout(t);
+  }, [note, passage.id, passage.note, editPassage]);
+
+  // A blur and an Enter can both land on one coining; the second would name a
+  // duplicate concept and file the passage twice.
+  const coining = useRef(false);
+  const coinConcept = async (raw: string) => {
+    const v = raw.trim();
+    if (!v || coining.current) return;
+    coining.current = true;
+    try {
+      const concept = await addConcept(v);
+      await refilePassage(passage.id, concept.id);
+    } catch {
+      setLabel("");
+    } finally {
+      coining.current = false;
+    }
+  };
 
   return (
     <div className="pdf-railcard" ref={registerEl} style={style}>
       <button
         type="button"
         className="pdf-railcard-open"
-        aria-label={`Open ${name} in your work`}
+        aria-label={`Open ${concepts.length === 1 ? concepts[0].label : name} in your work`}
         data-tip="this passage in your work"
         onClick={() => onOpenPassage?.(passage.id)}
       >
         ›
       </button>
-      {first ? (
+      {concepts.length > 1 ? (
+        <div className="pdf-railcard-chips pdf-railcard-chips-only">
+          {concepts.map((c) => (
+            <span key={c.id} className="pdf-railcard-chip">{c.label}</span>
+          ))}
+        </div>
+      ) : (
         <textarea
-          className="pdf-railcard-label"
+          className={`pdf-railcard-label${single ? "" : " unnamed"}`}
           value={label}
           rows={1}
-          aria-label="Concept name"
-          placeholder="concept name"
+          aria-label={single ? "Concept name" : "Name a concept for this passage"}
+          placeholder={single ? "concept name" : "name a concept"}
           onChange={(e) => setLabel(e.target.value.replace(/\n/g, ""))}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -369,21 +422,13 @@ export function RailCard({
           }}
           onBlur={() => {
             const v = label.trim();
-            if (v && v !== first.label) void editConcept(first.id, { label: v });
-            else setLabel(first.label);
+            if (!single) void coinConcept(v);
+            else if (v && v !== single.label) void editConcept(single.id, { label: v });
+            else setLabel(single.label);
           }}
         />
-      ) : (
-        <div className="pdf-railcard-label unlabeled">{name}</div>
       )}
-      {chips.length > 0 && (
-        <div className="pdf-railcard-chips">
-          {chips.map((chip) => (
-            <span key={chip.id} className="pdf-railcard-chip">{chip.label}</span>
-          ))}
-        </div>
-      )}
-      {first ? (
+      {single ? (
         <textarea
           className="pdf-railcard-def"
           value={def}
@@ -392,13 +437,25 @@ export function RailCard({
           placeholder="working definition"
           onChange={(e) => setDef(e.target.value)}
           onBlur={() => {
-            if (first && def !== (first.def ?? "")) void editConcept(first.id, { def });
+            if (def !== (single.def ?? "")) void editConcept(single.id, { def });
           }}
         />
-      ) : (
-        <div className="pdf-railcard-def">{short(passage.content, 110)}</div>
-      )}
-      {passage.note ? <div className="pdf-railcard-note">{short(passage.note, 110)}</div> : null}
+      ) : concepts.length === 0 ? (
+        // Nothing else on an unnamed card says WHICH passage it belongs to —
+        // at fit-all the highlight it points at is a few pixels tall.
+        <div className="pdf-railcard-quote">{short(passage.content, 110)}</div>
+      ) : null}
+      <textarea
+        className="pdf-railcard-note"
+        value={note}
+        rows={1}
+        aria-label="Your note on this passage"
+        placeholder="your note"
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={() => {
+          if (note !== (passage.note ?? "")) void editPassage(passage.id, { note });
+        }}
+      />
     </div>
   );
 }

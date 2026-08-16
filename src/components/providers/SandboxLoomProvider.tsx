@@ -195,6 +195,11 @@ export default function SandboxLoomProvider({
     return p
   }, [uid, sourceId, noted])
 
+  const editPassage = useCallback(async (id: string, data: Partial<{ note: string }>) => {
+    setState((s) => ({ ...s, passages: s.passages.map((p) => (p.id === id ? { ...p, ...data } : p)) }))
+    noted()
+  }, [noted])
+
   const removePassage = useCallback(async (id: string) => {
     setState((s) => ({ ...s, passages: s.passages.filter((p) => p.id !== id) }))
     noted()
@@ -410,6 +415,7 @@ export default function SandboxLoomProvider({
     removeConcept,
     mergeConcepts,
     addPassage,
+    editPassage,
     removePassage,
     attributePassages,
     refilePassage,

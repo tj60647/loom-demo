@@ -32,6 +32,8 @@ export function describeEvent(e: GraphEvent): string {
       return Array.isArray(p.conceptIds) && p.conceptIds.length === 0
         ? "captured an unlabeled passage"
         : "captured a passage"
+    case "passage.note":
+      return typeof p.note === "string" && p.note.trim() ? "wrote a note on a passage" : "cleared a passage's note"
     case "passage.refile": return "filed a passage under a second concept"
     case "passage.unfile": return "unfiled a passage from a concept"
     case "passage.attribute": return "placed passages in their reading"

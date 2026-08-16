@@ -195,6 +195,15 @@ function foldEvents(events: GraphEvent[], upTo: number) {
         }
         break
       }
+      case "passage.note": {
+        // The passage's own margin, rewritten from its card. Replayed like a
+        // concept rename: last write at this point in the history wins, and a
+        // note on a passage the replay has not reached yet is simply dropped
+        // (it can only precede a capture in a history that lost the capture).
+        const b = e.entityId ? passages.get(e.entityId) : undefined
+        if (b && typeof p.note === "string") b.note = p.note
+        break
+      }
       case "passage.delete": {
         if (e.entityId) passages.delete(e.entityId)
         break

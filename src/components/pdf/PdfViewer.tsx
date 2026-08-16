@@ -1736,12 +1736,18 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           border-color: var(--ink-soft);
         }
         .pdf-railcard-label { font-weight: 600; font-size: 13px; }
-        .pdf-railcard-label.unlabeled {
-          font-style: italic;
-          font-weight: 400;
-          color: var(--ink-soft);
-        }
+        /* No concept yet — the name field invites one rather than asserting a
+           label the passage does not have. */
+        .pdf-railcard-label.unnamed { font-weight: 400; font-style: italic; }
         .pdf-railcard-def { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+        /* The passage's own words, on a card that has no concept to head it. */
+        .pdf-railcard-quote {
+          font-size: 12px;
+          color: var(--ink-soft);
+          margin-top: 4px;
+          border-top: 1px dotted var(--rule);
+          padding-top: 4px;
+        }
         /* The editors (Lingxiu, 2026-08-15 — the original spread canvas's
            card fields, on the shared RailCard): bare textareas wearing the
            label/def classes, so the canvas's counter-scale font-size applies
@@ -1768,7 +1774,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           cursor: text;
         }
         .pdf-railcard textarea::placeholder { color: var(--ink-soft); font-weight: 400; }
-        .pdf-railcard textarea.pdf-railcard-def { border-top: 1px dotted var(--rule); padding-top: 4px; }
+        .pdf-railcard textarea.pdf-railcard-def,
+        .pdf-railcard textarea.pdf-railcard-note { border-top: 1px dotted var(--rule); padding-top: 4px; }
         /* The door, out of the fields' way in the top-right corner. */
         .pdf-railcard { padding-right: 24px; }
         .pdf-railcard-open {
@@ -1791,6 +1798,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         }
         .pdf-railcard-open:hover { border-color: var(--ink-soft); color: var(--ink); }
         .pdf-railcard-note { font-size: 11px; font-style: italic; color: var(--ink-soft); margin-top: 4px; }
+        /* Several concepts: chips ARE the card's head, so they carry its top
+           margin instead of hanging under a name. */
+        .pdf-railcard-chips-only { margin-top: 0; }
         .pdf-railcard-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .pdf-railcard-chip {
           font-family: var(--mono);
@@ -2379,7 +2389,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 // An unlabeled capture is a whole act, not a half one (TJ,
                 // 2026-08-12) — so the toast reports it as done rather than
                 // as missing something.
-                : <>Passage captured — <b>unlabeled</b>. Name it in Your work whenever the word arrives.</>}
+                : <>Passage captured — <b>unlabeled</b>. Name it on its card whenever the word arrives.</>}
           </p>
           {/* The seam, in the toast rather than as its own card (TJ,
               2026-08-09: the PDF path should be the QUIETER of the two).

@@ -9,7 +9,7 @@ import { emptyViews } from "@/lib/graphExport"
 import { getUserLoomData } from "@/lib/reads"
 import {
   createConcept, updateConcept, deleteConcept, mergeConcepts as mergeConceptsAction,
-  createPassage, deletePassage, refilePassage as refilePassageAction, unfilePassage as unfilePassageAction, attributePassages as attributePassagesAction,
+  createPassage, updatePassage, deletePassage, refilePassage as refilePassageAction, unfilePassage as unfilePassageAction, attributePassages as attributePassagesAction,
   createEdge, updateEdge, deleteEdge,
   createLink, updateLink, attachLink as attachLinkAction,
   saveView, saveCloth as saveClothAction,
@@ -71,6 +71,12 @@ export interface LoomContextType {
    * capture surface could write until 2026-08-12.
    */
   addPassage: (conceptIds: string[], source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string, note?: string) => Promise<Passage>
+  /**
+   * Write a passage's own margin (its Notes). The passage owns this text, not
+   * its concepts — so an Unlabeled Passage is as writable as any other, which
+   * is what lets a margin card work before any concept is named.
+   */
+  editPassage: (id: string, data: Partial<{ note: string }>) => Promise<void>
   removePassage: (id: string) => Promise<void>
   /** Say which reading passages came from — the student's answer, never a guess. */
   attributePassages: (passageIds: string[], sourceId: string) => Promise<number>
@@ -409,6 +415,19 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       applyLocal(s => ({ ...s, passages: s.passages.filter(b => b.id !== tempId) }))
       throw e
+    }
+  }
+
+  const editPassage = async (id: string, data: Partial<{ note: string }>) => {
+    applyLocal(s => ({
+      ...s,
+      passages: s.passages.map(b => b.id === id ? { ...b, ...data } : b)
+    }))
+    try {
+      await updatePassage(id, data)
+      savedOk()
+    } catch (e) {
+      await resync(e)
     }
   }
 
@@ -958,7 +977,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       state, scope, scoped, scopedState, isLoading,
       studentName: session?.user?.name || "",
       addConcept, editConcept, removeConcept, mergeConcepts,
-      addPassage, removePassage, refilePassage, unfilePassage, attributePassages,
+      addPassage, editPassage, removePassage, refilePassage, unfilePassage, attributePassages,
       activeCloth, updateCloth, flushCloth,
       addEdge, editEdge, removeEdge,
       links: state.links, addLink, editLink, attachLink,
