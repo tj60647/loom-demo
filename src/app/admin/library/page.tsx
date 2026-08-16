@@ -381,7 +381,11 @@ export default async function AdminLibraryPage({
                                 .map((revision, index) => ({ revision, version: index + 2 }))
                                 .reverse()
                                 .map(({ revision, version }) => (
-                                  <div key={revision.id} style={{ display: "grid", gap: "2px" }}>
+                                  <div
+                                    key={revision.id}
+                                    className="revline"
+                                    style={{ display: "grid", gap: "2px" }}
+                                  >
                                     <span
                                       style={{
                                         fontFamily: "var(--mono)",
@@ -396,7 +400,7 @@ export default async function AdminLibraryPage({
                                     </span>
                                   </div>
                                 ))}
-                              <div style={{ display: "grid", gap: "2px" }}>
+                              <div className="revline" style={{ display: "grid", gap: "2px" }}>
                                 <span
                                   style={{
                                     fontFamily: "var(--mono)",
