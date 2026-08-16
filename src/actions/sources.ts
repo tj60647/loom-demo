@@ -9,6 +9,7 @@ import {
   courses,
   sources,
   sourcePages,
+  sourceRevisions,
   sourceScores,
   users,
 } from "@/db/schema"
@@ -90,8 +91,8 @@ export async function getLibrarySources({ includeArchived = false } = {}) {
 
 /**
  * The whole library, course-agnostic, with everything the Readings page needs
- * to render a reading on its own terms: its extraction score, and which
- * courses currently include it.
+ * to render a reading on its own terms: its extraction score, which courses
+ * currently include it, and the lineage of the file it is serving.
  *
  * Deliberately one query per table rather than a join — a reading can be in
  * many courses, and a join would fan the library out into duplicate rows that
@@ -100,7 +101,7 @@ export async function getLibrarySources({ includeArchived = false } = {}) {
 export async function getLibraryOverview({ includeArchived = true } = {}) {
   await requireAdmin()
 
-  const [library, scores, memberships, allCourses] = await Promise.all([
+  const [library, scores, memberships, allCourses, revisions] = await Promise.all([
     db.select().from(sources).orderBy(asc(sources.title)),
     db.select().from(sourceScores),
     db
@@ -113,16 +114,30 @@ export async function getLibraryOverview({ includeArchived = true } = {}) {
       })
       .from(courseSources),
     db.select().from(courses).orderBy(asc(courses.createdAt)),
+    db.select().from(sourceRevisions).orderBy(asc(sourceRevisions.createdAt)),
   ])
 
   const scoreBySource = new Map(scores.map((score) => [score.sourceId, score]))
   const courseById = new Map(allCourses.map((course) => [course.id, course]))
+
+  // A revision row exists only for a file that REPLACED another, so the
+  // original upload has none and a reading's version is its revision count + 1.
+  // (The 0025 backfill wrote a single row for readings repaired before the
+  // table existed, so their history may read shorter than it truly was — the
+  // current version is still right, which is what the badge claims.)
+  const revisionsBySource = new Map<string, typeof revisions>()
+  for (const revision of revisions) {
+    const existing = revisionsBySource.get(revision.sourceId)
+    if (existing) existing.push(revision)
+    else revisionsBySource.set(revision.sourceId, [revision])
+  }
 
   const rows = library
     .filter((source) => includeArchived || !source.isArchived)
     .map((source) => ({
       ...source,
       score: scoreBySource.get(source.id) ?? null,
+      revisions: revisionsBySource.get(source.id) ?? [],
       courses: memberships
         .filter((row) => row.sourceId === source.id)
         .flatMap((row) => {
