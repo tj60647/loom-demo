@@ -1,0 +1,627 @@
+<title>Where Loom Keeps Things</title>
+<style>
+  :root {
+    --ground: #F4F6F7;
+    --surface: #FFFFFF;
+    --surface-2: #EAEEF0;
+    --ink: #16212D;
+    --ink-soft: #4E5C6A;
+    --ink-faint: #7A8794;
+    --rule: #DCE3E7;
+    --rule-strong: #C0CBD2;
+    --data: #1C6B5A;
+    --data-bg: #E4F0EC;
+    --files: #9E5A2A;
+    --files-bg: #F7EBE1;
+    --shadow: 0 1px 2px rgba(22, 33, 45, .05), 0 10px 28px -16px rgba(22, 33, 45, .22);
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #10151B;
+      --surface: #191F27;
+      --surface-2: #212932;
+      --ink: #E6ECF1;
+      --ink-soft: #9AA7B4;
+      --ink-faint: #71808E;
+      --rule: #2B343E;
+      --rule-strong: #3D4854;
+      --data: #5FC0A6;
+      --data-bg: #102C25;
+      --files: #DC9660;
+      --files-bg: #312115;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #10151B;
+    --surface: #191F27;
+    --surface-2: #212932;
+    --ink: #E6ECF1;
+    --ink-soft: #9AA7B4;
+    --ink-faint: #71808E;
+    --rule: #2B343E;
+    --rule-strong: #3D4854;
+    --data: #5FC0A6;
+    --data-bg: #102C25;
+    --files: #DC9660;
+    --files-bg: #312115;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 64px 32px 100px;
+    display: flex;
+    flex-direction: column;
+    gap: 64px;
+  }
+
+  .measure { max-width: 65ch; }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(38px, 5vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -.02em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: clamp(26px, 3vw, 32px);
+    line-height: 1.15;
+    letter-spacing: -.015em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-size: 17px;
+    font-weight: 650;
+    margin: 0;
+    letter-spacing: -.005em;
+  }
+
+  p { margin: 0; }
+
+  .lede {
+    font-size: 20px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    max-width: 60ch;
+  }
+
+  header.masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-bottom: 8px;
+  }
+
+  .kicker {
+    font-size: 13px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-faint);
+  }
+
+  section { display: flex; flex-direction: column; gap: 24px; }
+
+  .sec-intro { display: flex; flex-direction: column; gap: 14px; }
+
+  /* ---- the two kinds ---- */
+
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; }
+
+  .kind {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 26px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .kind.data { border-top: 4px solid var(--data); }
+  .kind.files { border-top: 4px solid var(--files); }
+
+  .kind-tag {
+    font-size: 12px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .kind.data .kind-tag { color: var(--data); }
+  .kind.files .kind-tag { color: var(--files); }
+
+  .kind p { color: var(--ink-soft); font-size: 15.5px; line-height: 1.6; }
+  .kind .holds { color: var(--ink); font-size: 15.5px; }
+
+  .pivot {
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 22px 26px;
+    font-size: 17px;
+    line-height: 1.6;
+  }
+
+  .pivot strong { font-weight: 650; }
+  .em-data { color: var(--data); font-weight: 650; }
+  .em-files { color: var(--files); font-weight: 650; }
+
+  /* ---- copies list ---- */
+
+  .copies { display: flex; flex-direction: column; gap: 2px; border-radius: 6px; overflow: hidden; box-shadow: var(--shadow); }
+
+  .copy {
+    background: var(--surface);
+    display: grid;
+    grid-template-columns: minmax(180px, 1.1fr) minmax(140px, 1fr) minmax(240px, 1.8fr);
+    gap: 20px;
+    padding: 18px 26px;
+    align-items: baseline;
+  }
+
+  .copy.head {
+    background: var(--surface-2);
+    font-size: 12px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ink-faint);
+  }
+
+  .copy-name { font-weight: 650; font-size: 16px; }
+  .copy-name .alias { display: block; font-weight: 400; font-size: 13px; color: var(--ink-faint); font-family: var(--mono); }
+  .copy-who { font-size: 15px; color: var(--ink); }
+  .copy-for { font-size: 15px; color: var(--ink-soft); line-height: 1.5; }
+  .copy.students { background: var(--data-bg); }
+
+  /* ---- diagram ---- */
+
+  .diagram {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 34px 30px 30px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .shelf {
+    background: var(--files-bg);
+    border: 1px solid color-mix(in srgb, var(--files) 35%, transparent);
+    border-radius: 6px;
+    padding: 18px 24px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .shelf-title { font-weight: 650; color: var(--files); font-size: 16px; }
+  .shelf-sub { font-size: 14px; color: var(--ink-soft); }
+
+  .stems {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    height: 26px;
+  }
+
+  .stem { border-right: 2px solid var(--rule-strong); }
+  .stem:last-child { border-right: none; }
+  .stem-row { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .stem-up { height: 26px; border-left: 2px solid var(--rule-strong); margin-left: 50%; }
+
+  .dbs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+
+  .db {
+    border: 1px solid color-mix(in srgb, var(--data) 32%, transparent);
+    background: var(--data-bg);
+    border-radius: 6px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .db-title { font-weight: 650; color: var(--data); font-size: 15px; }
+  .db-users { font-size: 14px; color: var(--ink); line-height: 1.45; }
+  .db-drawer { font-size: 13px; color: var(--ink-soft); border-top: 1px solid color-mix(in srgb, var(--data) 22%, transparent); padding-top: 8px; }
+
+  .diagram-caption { font-size: 14.5px; color: var(--ink-soft); text-align: center; padding-top: 20px; line-height: 1.55; }
+
+  /* ---- versions ---- */
+
+  .versions { display: flex; flex-direction: column; gap: 12px; }
+
+  .version {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid color-mix(in srgb, var(--files) 45%, transparent);
+    border-radius: 6px;
+    padding: 18px 24px;
+    display: grid;
+    grid-template-columns: minmax(110px, .5fr) minmax(200px, 1.4fr) minmax(220px, 1.2fr);
+    gap: 18px;
+    align-items: baseline;
+    box-shadow: var(--shadow);
+  }
+
+  .version.current { border-left-color: var(--files); background: var(--files-bg); }
+
+  .v-tag { font-weight: 700; color: var(--files); font-size: 14px; letter-spacing: .04em; }
+  .v-title { font-size: 16px; color: var(--ink); font-weight: 600; }
+  .v-who { font-size: 14.5px; color: var(--ink-soft); }
+  .v-who strong { color: var(--data); font-weight: 650; }
+
+  @media (max-width: 720px) { .version { grid-template-columns: 1fr; gap: 5px; } }
+
+  /* ---- moves / doesn't ---- */
+
+  .moves { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; }
+
+  .move {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 26px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .move-tag { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--ink-faint); }
+  .move h3 { font-family: var(--serif); font-size: 21px; font-weight: 600; }
+  .move p { font-size: 15.5px; color: var(--ink-soft); line-height: 1.6; }
+
+  .callout {
+    border-left: 3px solid var(--data);
+    padding: 4px 0 4px 20px;
+    font-size: 17px;
+    line-height: 1.6;
+    max-width: 62ch;
+  }
+
+  /* ---- glossary ---- */
+
+  .glossary { display: flex; flex-direction: column; gap: 2px; border-radius: 6px; overflow: hidden; box-shadow: var(--shadow); }
+
+  .term {
+    background: var(--surface);
+    display: grid;
+    grid-template-columns: minmax(150px, .8fr) minmax(280px, 2.2fr);
+    gap: 20px;
+    padding: 14px 26px;
+    align-items: baseline;
+  }
+
+  .term-word { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--ink); }
+  .term-def { font-size: 15px; color: var(--ink-soft); line-height: 1.5; }
+
+  footer {
+    border-top: 1px solid var(--rule-strong);
+    padding-top: 26px;
+    font-size: 14.5px;
+    color: var(--ink-soft);
+    max-width: 65ch;
+    line-height: 1.6;
+  }
+
+  a { color: var(--data); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--data); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  @media (max-width: 720px) {
+    .page { padding: 40px 18px 64px; gap: 48px; }
+    .copy, .term { grid-template-columns: 1fr; gap: 6px; }
+    .copy.head { display: none; }
+    .stems, .stem-row { display: none; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <span class="kicker">Loom · how the back end is put together</span>
+    <h1>Where Loom Keeps Things</h1>
+    <p class="lede">
+      Loom stores two very different kinds of thing, in two very different places. Once you can tell
+      those apart, everything else about the setup follows from it.
+    </p>
+  </header>
+
+  <section>
+    <div class="sec-intro">
+      <h2>Two kinds of storage</h2>
+      <p class="measure">
+        People often say "the database" to mean everything Loom saves. It's worth splitting in two,
+        because the two halves follow opposite rules.
+      </p>
+    </div>
+
+    <div class="two">
+      <div class="kind data">
+        <span class="kind-tag">The database</span>
+        <p class="holds">Everything people write and do.</p>
+        <p>
+          Accounts and course rosters. Which readings belong to which course. Every passage a student
+          marks, every projection they build, every note and link between them.
+        </p>
+        <p>
+          Thousands of small pieces of text, changing every minute someone is working.
+        </p>
+      </div>
+      <div class="kind files">
+        <span class="kind-tag">File storage</span>
+        <p class="holds">The readings themselves.</p>
+        <p>
+          The PDF files students open, plus the pictures Loom generates from them — the cover on each
+          card in the Library, and the page images behind the reading view.
+        </p>
+        <p>
+          A reading's file is never edited in place. Improving one adds a new version alongside the
+          old, so this store only ever grows.
+        </p>
+      </div>
+    </div>
+
+    <div class="pivot measure">
+      The rule worth remembering: <span class="em-data">each copy of Loom has its own database</span>,
+      but <span class="em-files">they all share one set of reading files</span>.
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>Five copies of Loom</h2>
+      <p class="measure">
+        The same app runs in five places at once. They differ only in who is looking at them and how
+        finished the work is — from a single developer's machine through to the site students use.
+      </p>
+    </div>
+
+    <div class="copies">
+      <div class="copy head">
+        <span>The copy</span>
+        <span>Who uses it</span>
+        <span>What it's for</span>
+      </div>
+      <div class="copy">
+        <span class="copy-name">A developer's laptop<span class="alias">local</span></span>
+        <span class="copy-who">One developer</span>
+        <span class="copy-for">Building a change and trying it out, minute by minute.</span>
+      </div>
+      <div class="copy">
+        <span class="copy-name">Automated checks<span class="alias">CI</span></span>
+        <span class="copy-who">Nobody — it runs itself</span>
+        <span class="copy-for">Re-testing the whole app on every proposed change, to catch mistakes before a person has to.</span>
+      </div>
+      <div class="copy">
+        <span class="copy-name">A work-in-progress preview<span class="alias">preview</span></span>
+        <span class="copy-who">The team</span>
+        <span class="copy-for">Looking together at one unfinished change on a real web address, before it's agreed on.</span>
+      </div>
+      <div class="copy">
+        <span class="copy-name">The tester site<span class="alias">dev</span></span>
+        <span class="copy-who">Alpha testers</span>
+        <span class="copy-for">Real use and real feedback on finished work, before students ever see it.</span>
+      </div>
+      <div class="copy students">
+        <span class="copy-name">The student site<span class="alias">production</span></span>
+        <span class="copy-who">Students</span>
+        <span class="copy-for">The real thing. The only place that holds real student work.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>Four databases, one set of files</h2>
+      <p class="measure">
+        Five copies of the app, but only four databases — a developer's laptop works against the same
+        database as the tester site, so anything you make while building shows up there too.
+      </p>
+    </div>
+
+    <div class="diagram">
+      <div class="shelf">
+        <span class="shelf-title">One shelf of reading files</span>
+        <span class="shelf-sub">Shared by every copy of Loom — files are added, never replaced</span>
+      </div>
+
+      <div class="stem-row">
+        <div class="stem-up"></div>
+        <div class="stem-up"></div>
+        <div class="stem-up"></div>
+        <div class="stem-up"></div>
+      </div>
+
+      <div class="dbs">
+        <div class="db">
+          <span class="db-title">Student database</span>
+          <span class="db-users">The student site</span>
+          <span class="db-drawer">Real student work. Nothing else can reach it.</span>
+        </div>
+        <div class="db">
+          <span class="db-title">Tester database</span>
+          <span class="db-users">The tester site · developers' laptops</span>
+          <span class="db-drawer">Its own drawer for pictures it makes</span>
+        </div>
+        <div class="db">
+          <span class="db-title">Preview database</span>
+          <span class="db-users">Work-in-progress previews</span>
+          <span class="db-drawer">Its own drawer for pictures it makes</span>
+        </div>
+        <div class="db">
+          <span class="db-title">Checks database</span>
+          <span class="db-users">The automated checks</span>
+          <span class="db-drawer">Its own drawer for pictures it makes</span>
+        </div>
+      </div>
+
+      <p class="diagram-caption">
+        Each database began as a copy of another, taken once. From that moment on they go their own way.
+      </p>
+    </div>
+
+    <div class="measure" style="display:flex; flex-direction:column; gap:14px;">
+      <p>
+        Storing five copies of every PDF would waste space and let them drift apart, so there is one set
+        and everybody reads from it. But anything a copy of Loom <em>makes</em> — a cover image, a page
+        picture — goes into a drawer labelled with that copy's name.
+      </p>
+      <p>
+        That is what keeps the copies from treading on each other. The student site's covers can't be
+        overwritten by someone's half-finished work, and only the student site can remove a reading's
+        file for good.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>Readings have versions</h2>
+      <p class="measure">
+        Many of our readings are scans, and a scan's words often come through garbled — which means
+        students can't select, search or highlight them properly. Fixing that produces a corrected
+        file. The old one isn't thrown away or written over: the new version is added beside it.
+      </p>
+    </div>
+
+    <div class="versions">
+      <div class="version">
+        <span class="v-tag">Version 1</span>
+        <span class="v-title">The file as first uploaded</span>
+        <span class="v-who">The <strong>student site</strong> still points here</span>
+      </div>
+      <div class="version current">
+        <span class="v-tag">Version 2</span>
+        <span class="v-title">Same reading, words corrected</span>
+        <span class="v-who">The <strong>tester site</strong> points here</span>
+      </div>
+    </div>
+
+    <div class="measure" style="display:flex; flex-direction:column; gap:14px;">
+      <p>
+        Both files sit on the shared shelf, permanently. What differs between copies of Loom is which
+        one each is <em>pointing at</em> — and that pointer lives in the database, which is why it can
+        differ from one copy to the next.
+      </p>
+      <p>
+        So a correction doesn't reach students the moment the work is finished, or even when the code
+        is next updated. The corrected words are content, not code. Someone has to point the student
+        site at the new version deliberately — and Loom keeps a record of every such move: which file,
+        which one it replaced, and why.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>What travels between copies</h2>
+      <p class="measure">
+        This is the part most easily misunderstood, so it's worth being exact: the <em>shape</em> of a
+        database travels, and its <em>contents</em> never do.
+      </p>
+    </div>
+
+    <div class="moves">
+      <div class="move">
+        <span class="move-tag">Travels</span>
+        <h3>The shape</h3>
+        <p>
+          Say we decide readings should carry a due date. Someone writes that down as an instruction —
+          "add a due date to readings" — and that instruction file travels along with the code.
+        </p>
+        <p>
+          It's run against each database in turn: testers first, students last. All four end up built
+          the same way.
+        </p>
+      </div>
+      <div class="move">
+        <span class="move-tag">Never travels</span>
+        <h3>The contents</h3>
+        <p>
+          Student work stays on the student site. Tester work stays on the tester site. Nothing copies
+          one database's contents into another, in either direction.
+        </p>
+        <p>
+          There's no button for it and there shouldn't be — the copies are meant to diverge. They match
+          in construction, not in what's inside.
+        </p>
+        <p>
+          Corrected readings count as contents, not code, which is why they have to be pointed at
+          deliberately on each copy.
+        </p>
+      </div>
+    </div>
+
+    <p class="callout">
+      So "updating the student site" changes how its database is <strong>built</strong>. It never
+      replaces what's <strong>in</strong> it.
+    </p>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>Words you'll hear</h2>
+      <p class="measure">
+        The technical names for the same things, in case they come up in a meeting or a message.
+      </p>
+    </div>
+
+    <div class="glossary">
+      <div class="term"><span class="term-word">environment</span><span class="term-def">One of the five copies of Loom.</span></div>
+      <div class="term"><span class="term-word">production</span><span class="term-def">The student site — the real one.</span></div>
+      <div class="term"><span class="term-word">dev</span><span class="term-def">The tester site.</span></div>
+      <div class="term"><span class="term-word">preview</span><span class="term-def">A temporary copy showing one piece of in-progress work.</span></div>
+      <div class="term"><span class="term-word">deploy</span><span class="term-def">Putting a new version of the code onto one of the copies.</span></div>
+      <div class="term"><span class="term-word">branch</span><span class="term-def">Confusingly, two things: one person's in-progress version of the code, and a separate copy of a database. Worth asking which is meant.</span></div>
+      <div class="term"><span class="term-word">migration</span><span class="term-def">A written instruction that changes the shape of a database.</span></div>
+      <div class="term"><span class="term-word">schema</span><span class="term-def">The shape of a database — what it has room to store.</span></div>
+      <div class="term"><span class="term-word">blob storage</span><span class="term-def">The file storage. "Blob" just means a file the system doesn't look inside.</span></div>
+      <div class="term"><span class="term-word">seed</span><span class="term-def">Filling a database with starter content so there's something to work with.</span></div>
+      <div class="term"><span class="term-word">text layer</span><span class="term-def">The invisible words behind a scanned page that make it selectable and searchable. Fixing a reading usually means fixing this.</span></div>
+      <div class="term"><span class="term-word">OCR</span><span class="term-def">Reading words off a scanned image by machine. Where the text layer comes from, and where its mistakes come from.</span></div>
+      <div class="term"><span class="term-word">revision</span><span class="term-def">One recorded version of a reading's file, with a note of what changed and what it replaced.</span></div>
+    </div>
+  </section>
+
+  <footer>
+    This describes how the setup is meant to work. The working detail — exact names, settings and
+    step-by-step instructions — lives with the code, in <code>docs/data-environments.md</code>, so it
+    changes at the same time the system does.
+  </footer>
+
+</div>

@@ -1,0 +1,505 @@
+<title>How Work Reaches Students</title>
+<style>
+  :root {
+    --ground: #F4F6F7;
+    --surface: #FFFFFF;
+    --surface-2: #EAEEF0;
+    --ink: #16212D;
+    --ink-soft: #4E5C6A;
+    --ink-faint: #7A8794;
+    --rule: #DCE3E7;
+    --rule-strong: #C0CBD2;
+    --data: #1C6B5A;
+    --data-bg: #E4F0EC;
+    --files: #9E5A2A;
+    --files-bg: #F7EBE1;
+    --shadow: 0 1px 2px rgba(22, 33, 45, .05), 0 10px 28px -16px rgba(22, 33, 45, .22);
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #10151B;
+      --surface: #191F27;
+      --surface-2: #212932;
+      --ink: #E6ECF1;
+      --ink-soft: #9AA7B4;
+      --ink-faint: #71808E;
+      --rule: #2B343E;
+      --rule-strong: #3D4854;
+      --data: #5FC0A6;
+      --data-bg: #102C25;
+      --files: #DC9660;
+      --files-bg: #312115;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #10151B;
+    --surface: #191F27;
+    --surface-2: #212932;
+    --ink: #E6ECF1;
+    --ink-soft: #9AA7B4;
+    --ink-faint: #71808E;
+    --rule: #2B343E;
+    --rule-strong: #3D4854;
+    --data: #5FC0A6;
+    --data-bg: #102C25;
+    --files: #DC9660;
+    --files-bg: #312115;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 64px 32px 100px;
+    display: flex;
+    flex-direction: column;
+    gap: 64px;
+  }
+
+  .measure { max-width: 65ch; }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(38px, 5vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -.02em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: clamp(26px, 3vw, 32px);
+    line-height: 1.15;
+    letter-spacing: -.015em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 { font-size: 17px; font-weight: 650; margin: 0; letter-spacing: -.005em; }
+  p { margin: 0; }
+
+  .lede { font-size: 20px; line-height: 1.55; color: var(--ink-soft); max-width: 60ch; }
+
+  header.masthead { display: flex; flex-direction: column; gap: 20px; padding-bottom: 8px; }
+
+  .kicker {
+    font-size: 13px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-faint);
+  }
+
+  section { display: flex; flex-direction: column; gap: 24px; }
+  .sec-intro { display: flex; flex-direction: column; gap: 14px; }
+
+  /* ---- the journey ---- */
+
+  .journey { display: flex; flex-direction: column; }
+
+  .stop {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .rail { display: flex; flex-direction: column; align-items: center; align-self: stretch; }
+
+  .num {
+    width: 42px;
+    height: 42px;
+    flex: none;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    background: var(--surface);
+    color: var(--data);
+    border: 2px solid var(--data);
+  }
+
+  .stop.final .num { background: var(--data); color: var(--surface); }
+
+  .thread { flex: 1; width: 2px; background: var(--rule-strong); min-height: 26px; }
+  .stop:last-child .thread { display: none; }
+
+  .stop-body {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 22px 26px;
+    margin-bottom: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .stop.final .stop-body { border-color: color-mix(in srgb, var(--data) 40%, transparent); background: var(--data-bg); }
+
+  .stop-head { display: flex; flex-direction: column; gap: 3px; }
+  .stop-title { font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+  .stop-alias { font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint); }
+  .stop-body p { font-size: 15.5px; color: var(--ink-soft); line-height: 1.6; }
+
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; padding-top: 4px; }
+  .fact { display: flex; flex-direction: column; gap: 2px; }
+  .fact-label { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--ink-faint); }
+  .fact-value { font-size: 15px; color: var(--ink); line-height: 1.45; }
+
+  /* ---- gates ---- */
+
+  .gates { display: flex; flex-direction: column; gap: 14px; }
+
+  .gate {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--files);
+    border-radius: 6px;
+    padding: 18px 24px;
+    display: grid;
+    grid-template-columns: minmax(200px, .9fr) minmax(280px, 1.6fr);
+    gap: 18px;
+    align-items: baseline;
+    box-shadow: var(--shadow);
+  }
+
+  .gate-when { font-weight: 650; font-size: 15.5px; color: var(--files); }
+  .gate-what { font-size: 15px; color: var(--ink-soft); line-height: 1.5; }
+
+  /* ---- exceptions ---- */
+
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; }
+
+  .kind {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 4px solid var(--files);
+    border-radius: 6px;
+    padding: 26px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .kind h3 { font-family: var(--serif); font-size: 21px; font-weight: 600; }
+  .kind p { font-size: 15.5px; color: var(--ink-soft); line-height: 1.6; }
+
+  .now {
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 18px 24px;
+    font-size: 15px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+
+  .now strong { color: var(--ink); font-weight: 650; }
+
+  .callout {
+    border-left: 3px solid var(--data);
+    padding: 4px 0 4px 20px;
+    font-size: 17px;
+    line-height: 1.6;
+    max-width: 62ch;
+  }
+
+  /* ---- glossary ---- */
+
+  .glossary { display: flex; flex-direction: column; gap: 2px; border-radius: 6px; overflow: hidden; box-shadow: var(--shadow); }
+
+  .term {
+    background: var(--surface);
+    display: grid;
+    grid-template-columns: minmax(150px, .8fr) minmax(280px, 2.2fr);
+    gap: 20px;
+    padding: 14px 26px;
+    align-items: baseline;
+  }
+
+  .term-word { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--ink); }
+  .term-def { font-size: 15px; color: var(--ink-soft); line-height: 1.5; }
+
+  footer {
+    border-top: 1px solid var(--rule-strong);
+    padding-top: 26px;
+    font-size: 14.5px;
+    color: var(--ink-soft);
+    max-width: 65ch;
+    line-height: 1.6;
+  }
+
+  a { color: var(--data); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--data); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  @media (max-width: 720px) {
+    .page { padding: 40px 18px 64px; gap: 48px; }
+    .stop { grid-template-columns: 40px 1fr; gap: 16px; }
+    .num { width: 34px; height: 34px; font-size: 13px; }
+    .gate, .term { grid-template-columns: 1fr; gap: 6px; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <span class="kicker">Loom · how a change travels</span>
+    <h1>How Work Reaches Students</h1>
+    <p class="lede">
+      Every change to Loom takes the same path through five stops. Each one answers a question none
+      of the others can, and nothing skips ahead — including work that's finished and obviously right.
+    </p>
+  </header>
+
+  <section>
+    <div class="sec-intro">
+      <h2>The five stops</h2>
+      <p class="measure">
+        The same change moves along this path, gathering confidence. Early stops are fast and private;
+        later ones are slower and more public. That order is the whole design — a mistake caught at
+        stop two costs minutes, and the same mistake found at stop five costs a student's afternoon.
+      </p>
+    </div>
+
+    <div class="journey">
+
+      <div class="stop">
+        <div class="rail"><span class="num">1</span><span class="thread"></span></div>
+        <div class="stop-body">
+          <div class="stop-head">
+            <span class="stop-title">Someone builds it</span>
+            <span class="stop-alias">a developer's own machine</span>
+          </div>
+          <p>
+            A developer works on one change at a time, running Loom privately and trying it as they go.
+            Nobody else sees anything yet, and nothing they do here can affect anyone.
+          </p>
+          <div class="facts">
+            <div class="fact"><span class="fact-label">Who's watching</span><span class="fact-value">Only them</span></div>
+            <div class="fact"><span class="fact-label">The question</span><span class="fact-value">Does it do what we meant?</span></div>
+            <div class="fact"><span class="fact-label">How long</span><span class="fact-value">Hours to a few days</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stop">
+        <div class="rail"><span class="num">2</span><span class="thread"></span></div>
+        <div class="stop-body">
+          <div class="stop-head">
+            <span class="stop-title">The machines check it</span>
+            <span class="stop-alias">automated checks</span>
+          </div>
+          <p>
+            The change is proposed, and a machine rebuilds Loom from scratch and replays a scripted run
+            through it — signing in, opening a reading, marking a passage, building a projection — to
+            see whether anything that used to work has stopped.
+          </p>
+          <div class="facts">
+            <div class="fact"><span class="fact-label">Who's watching</span><span class="fact-value">Nobody; it reports back</span></div>
+            <div class="fact"><span class="fact-label">The question</span><span class="fact-value">Did this break something that worked?</span></div>
+            <div class="fact"><span class="fact-label">How long</span><span class="fact-value">Minutes, automatically</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stop">
+        <div class="rail"><span class="num">3</span><span class="thread"></span></div>
+        <div class="stop-body">
+          <div class="stop-head">
+            <span class="stop-title">The team looks at it</span>
+            <span class="stop-alias">a preview</span>
+          </div>
+          <p>
+            The unfinished change gets its own web address, so anyone on the team can open it and form
+            an opinion without installing anything. This is where "is this the right thing?" gets
+            settled, while it's still cheap to change the answer.
+          </p>
+          <div class="facts">
+            <div class="fact"><span class="fact-label">Who's watching</span><span class="fact-value">The team</span></div>
+            <div class="fact"><span class="fact-label">The question</span><span class="fact-value">Is this right, and does it look right?</span></div>
+            <div class="fact"><span class="fact-label">How long</span><span class="fact-value">As long as the discussion takes</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stop">
+        <div class="rail"><span class="num">4</span><span class="thread"></span></div>
+        <div class="stop-body">
+          <div class="stop-head">
+            <span class="stop-title">Testers use it</span>
+            <span class="stop-alias">the tester site</span>
+          </div>
+          <p>
+            Once a change is agreed and reviewed, it joins everything else on the tester site, where
+            alpha testers do real work with it. It sits here a while on purpose. Changes that seemed
+            fine on their own often disagree with each other, and only use finds that.
+          </p>
+          <div class="facts">
+            <div class="fact"><span class="fact-label">Who's watching</span><span class="fact-value">Alpha testers</span></div>
+            <div class="fact"><span class="fact-label">The question</span><span class="fact-value">Does it hold up alongside everything else?</span></div>
+            <div class="fact"><span class="fact-label">How long</span><span class="fact-value">Days — deliberately</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stop final">
+        <div class="rail"><span class="num">5</span></div>
+        <div class="stop-body">
+          <div class="stop-head">
+            <span class="stop-title">Students get it</span>
+            <span class="stop-alias">the student site</span>
+          </div>
+          <p>
+            Promotion to students is a separate, deliberate act — never automatic, and never done from
+            somebody's laptop. It asks a different question than the review did: not "is this built
+            well?" but "is this what students should meet?"
+          </p>
+          <div class="facts">
+            <div class="fact"><span class="fact-label">Who's watching</span><span class="fact-value">Students</span></div>
+            <div class="fact"><span class="fact-label">The question</span><span class="fact-value">Is this what students should meet?</span></div>
+            <div class="fact"><span class="fact-label">How long</span><span class="fact-value">Live from the moment it lands</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>What has to be true to move on</h2>
+      <p class="measure">
+        Only two of the four moves are gated, and they're gated differently — because they're
+        protecting different people.
+      </p>
+    </div>
+
+    <div class="gates">
+      <div class="gate">
+        <span class="gate-when">Anyone can make a preview</span>
+        <span class="gate-what">No gate at all. Pushing work up creates its preview automatically — that's what makes stop 3 cheap enough to actually use.</span>
+      </div>
+      <div class="gate">
+        <span class="gate-when">To reach testers</span>
+        <span class="gate-what">The automated checks pass, and another developer has read the change and agreed with it. Two conditions, both mechanical to confirm.</span>
+      </div>
+      <div class="gate">
+        <span class="gate-when">To reach students</span>
+        <span class="gate-what">The checks pass again, and an owner approves. This one is a judgement, not a formality — it's the last point at which "correct" and "right for students" can still come apart.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>Two things that don't ride along</h2>
+      <p class="measure">
+        The path above carries <em>the app</em> — what Loom can do. Two important things travel
+        differently, and expecting them to arrive with a change is the most common way to be surprised.
+      </p>
+    </div>
+
+    <div class="two">
+      <div class="kind">
+        <h3>Corrected readings</h3>
+        <p>
+          Fixing a scan's garbled words produces a corrected file, and that's content rather than code.
+          It doesn't ride along when a change is promoted — each copy of Loom has to be pointed at the
+          corrected version deliberately.
+        </p>
+        <p>
+          So the tester site can be showing readable, searchable text while students are still on the
+          garbled original. Worth checking before a course starts, not after.
+        </p>
+      </div>
+      <div class="kind">
+        <h3>Signing in with GitHub</h3>
+        <p>
+          Real sign-in works on the tester site and the student site. It can't work on a preview: sign-in
+          has to be registered against one fixed web address in advance, and every preview has its own.
+        </p>
+        <p>
+          That's a technical constraint rather than a decision, but it shapes the work — which is why
+          stop 3 is mostly about looking, and stop 4 is where anything involving accounts gets tested.
+        </p>
+      </div>
+    </div>
+
+    <div class="now measure">
+      <strong>Right now</strong>, a preview offers no way to sign in at all, so treat stop 3 as
+      look-don't-touch. Work needing an account is done privately at stop 1 or on the tester site at
+      stop 4. This is being worked on, and this paragraph goes away when it is.
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>The rhythm</h2>
+    </div>
+    <p class="callout">
+      One change per branch, days not weeks. A small change reviewed the same day beats a large one
+      that waits — and a branch that lives for a month turns review into "approve my month".
+    </p>
+    <p class="measure">
+      Branches map to changes, never to people. There's no release schedule and no ceremony: work
+      moves when it's ready and someone has looked at it, which for a small change can be the same
+      afternoon.
+    </p>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>Words you'll hear</h2>
+      <p class="measure">
+        The names people will actually use for the stops and the moves between them.
+      </p>
+    </div>
+
+    <div class="glossary">
+      <div class="term"><span class="term-word">branch</span><span class="term-def">One change being worked on, kept separate from everyone else's until it's ready.</span></div>
+      <div class="term"><span class="term-word">push</span><span class="term-def">Sending work up from a laptop so others can see it. This is what creates a preview.</span></div>
+      <div class="term"><span class="term-word">pull request · PR</span><span class="term-def">The formal proposal to fold a change in, and the place the discussion about it happens.</span></div>
+      <div class="term"><span class="term-word">review</span><span class="term-def">Another developer reading the change and saying yes, or asking for something.</span></div>
+      <div class="term"><span class="term-word">merge</span><span class="term-def">Folding an approved change in with everything else. This is what moves it to the next stop.</span></div>
+      <div class="term"><span class="term-word">CI · checks</span><span class="term-def">The automated re-testing at stop 2. "CI is green" means everything passed.</span></div>
+      <div class="term"><span class="term-word">soak</span><span class="term-def">Deliberately leaving a change on the tester site a while, so real use can find what review couldn't.</span></div>
+      <div class="term"><span class="term-word">deploy</span><span class="term-def">Putting a version of the app onto one of the sites.</span></div>
+      <div class="term"><span class="term-word">rollback</span><span class="term-def">Putting the previous version back, if something reaches students and shouldn't have.</span></div>
+    </div>
+  </section>
+
+  <footer>
+    Companion to <strong>Where Loom Keeps Things</strong>, which covers what the back end holds rather
+    than how work moves through it. The working detail — exact commands, settings and gates — lives
+    with the code in <code>docs/build-and-test-workflow.md</code>, so it changes when the system does.
+  </footer>
+
+</div>
