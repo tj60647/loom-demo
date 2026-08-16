@@ -4,6 +4,15 @@ Three environments, one Vercel project (`loom-demo`), one blob store, one Neon
 project with three branches. The reasoning for the dev setup was worked through
 in the 8/1 session (NEXT_SESSION item 1); this document is its durable form.
 
+**Precedence, since 2026-08-16.** [data-environments.md](data-environments.md)
+is the authority on what each database and the blob store hold, and on who may
+destroy what; [build-and-test-workflow.md](build-and-test-workflow.md) is the
+authority on how work moves through these environments and where each kind of
+testing belongs. This file remains the authority on standing an environment up
+and on the OAuth smoke test. Both were written against the live Vercel and Neon
+configuration and name several hazards this file predates — read them before
+changing environment variables.
+
 | | local | dev (alpha testers) | production (students) |
 | --- | --- | --- | --- |
 | Git | working tree | `dev` branch | `master` |
@@ -114,11 +123,16 @@ a personal long-lived branch drifts for weeks and turns review into "approve
 my month"; a change branch is a ten-minute read.
 
 1. **Cut a branch from `dev`, one per change, days not weeks.** Push it —
-   Vercel builds a throwaway preview. That preview is for *looking at UI*:
-   GitHub sign-in cannot work there (an OAuth app holds exactly one callback
-   URL, and preview URLs are ephemeral), and that is by design, not a bug to
-   fix. Anything needing a session is exercised locally (`next dev` +
-   the test-login backdoor) or on the dev alias after merge.
+   Vercel builds a preview on a **stable branch alias**,
+   `loom-demo-git-<branch>-aroughidea.vercel.app` — only the per-deployment URL
+   is ephemeral. GitHub sign-in still cannot work there: next-auth on Vercel
+   builds `redirect_uri` from the request host, and an OAuth App holds exactly
+   one callback URL, so every branch would need its own app. Today that makes
+   the preview a place for *looking at UI* only, and — until the gaps in
+   [data-environments.md](data-environments.md) close — a **read-only** one,
+   because non-`dev` previews are pointed at the production database and share
+   production's blob objects. Anything needing a session is exercised locally
+   (`next dev` + the test-login backdoor) or on the dev alias after merge.
 2. **PR into `dev`; the other developer reviews.** CI's `checks` job gates
    every PR; `e2e` joins it once its secrets are configured. Keep the PR
    small enough that the review is genuinely a read, and agree on a
