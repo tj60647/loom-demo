@@ -333,7 +333,7 @@ export default async function AdminLibraryPage({
                         <a
                           className="btn ghost mini"
                           href={`/api/readings/${reading.id}?download=1`}
-                          data-tip="Download the original PDF file"
+                          data-tip="Download the PDF this reading currently serves"
                         >
                           Download PDF
                         </a>
@@ -448,7 +448,7 @@ export default async function AdminLibraryPage({
                   <a
                     className="act"
                     href={`/api/readings/${reading.id}?download=1`}
-                    data-tip="Download the original PDF file"
+                    data-tip="Download the PDF this reading currently serves"
                   >
                     download
                   </a>
