@@ -4,6 +4,7 @@ import { users, sessions, courses, courseMemberships } from '@/db/schema';
 import { asc, eq } from 'drizzle-orm';
 import crypto from 'crypto';
 import { ensureFacultySection } from '@/lib/courses';
+import { previewLoginDecision, sessionCookieNames } from '@/lib/previewLogin';
 
 // Non-production test backdoor: mints a session directly, bypassing OAuth.
 //
@@ -24,11 +25,26 @@ const IDENTITIES = {
 } as const;
 
 export async function GET(request: Request) {
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ error: 'Not allowed in production' }, { status: 403 });
+  const url = new URL(request.url);
+
+  // Where this door is open, and on what terms, lives in one place — see
+  // src/lib/previewLogin.ts. The key may travel as ?key= or as a header: the
+  // query string is what a developer can actually paste, and the header is for
+  // anything that would rather not put a secret in a URL (and therefore in the
+  // deployment's request logs).
+  const decision = previewLoginDecision(
+    process.env,
+    url.searchParams.get('key') ?? request.headers.get('x-preview-login')
+  );
+  if (!decision.allowed) {
+    // The reason is logged, never returned: on a public preview URL the
+    // difference between "no secret configured" and "key does not match" is a
+    // hint, and 403 with nothing in it is the same answer to every prod.
+    console.warn(`[test-login] refused: ${decision.why}`);
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
 
-  const asParam = new URL(request.url).searchParams.get('as');
+  const asParam = url.searchParams.get('as');
   const identity =
     asParam === 'testa' ? IDENTITIES.testa
     : asParam === 'faculty' ? IDENTITIES.faculty
@@ -88,23 +104,24 @@ export async function GET(request: Request) {
     expires,
   });
 
-  // 5. Return response with cookies. Different NextAuth/Auth.js versions
-  // may read different cookie names, so set both in non-production test flow.
+  // 5. Return the session cookie under the name next-auth will read back.
+  //    Over https that is the `__Secure-` spelling, and a `__Secure-` cookie
+  //    the browser will only keep if it is also marked secure — which is why
+  //    the old unconditional `secure: false` made this door useless on any
+  //    deployment: the cookie was set, and then never looked at.
+  const isHttps =
+    (request.headers.get('x-forwarded-proto') ?? url.protocol.replace(':', '')) === 'https';
+
   const response = NextResponse.json({ success: true, userId, sessionToken });
-  response.cookies.set('next-auth.session-token', sessionToken, {
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: false,
-    expires,
-  });
-  response.cookies.set('authjs.session-token', sessionToken, {
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: false,
-    expires,
-  });
+  for (const name of sessionCookieNames(isHttps)) {
+    response.cookies.set(name, sessionToken, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: isHttps,
+      expires,
+    });
+  }
 
   return response;
 }
