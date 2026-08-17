@@ -91,6 +91,7 @@ reaches just as well.
 | `NEXTAUTH_SECRET`, `NEXTAUTH_URL` | yes | NextAuth session signing and callback base. |
 | `GITHUB_ID`, `GITHUB_SECRET` | yes | GitHub OAuth app credentials. |
 | `BLOB_READ_WRITE_TOKEN` | local dev | Vercel Blob access. On Vercel this is resolved from the OIDC token + `BLOB_STORE_ID` instead. |
+| `PREVIEW_LOGIN_SECRET` | Vercel Preview | The key `/api/auth/test-login` wants on a branch preview, where OAuth cannot complete. **Unset means the door needs no key at all** — on a public preview URL that is an open session, so set it wherever previews are built. |
 | `OPENROUTER_API_KEY` | no | Enables the reading-quality judge. Absent, readings are still scored deterministically. |
 | `LOOM_JUDGE_MODEL` | no | Judge model override. Defaults to `anthropic/claude-opus-5` — see the note below before changing it. |
 
