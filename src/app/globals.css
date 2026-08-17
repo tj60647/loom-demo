@@ -17,7 +17,7 @@
    away. tab 00 gets back the steady full-height reading area it had when the
    viewer was a fixed takeover, without taking the nav away with it. */
 html{height:100%}
-body{background:radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/26px 26px,var(--paper);
+body{background:var(--paper);
   color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;
   height:100dvh;overflow:hidden;display:flex;flex-direction:column}
 header,.scopebar,nav{flex:0 0 auto}
