@@ -89,7 +89,7 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
         {session && !inAdmin && (
           <span id="saveDot">{flashMsg ? `· ${flashMsg} ·` : "—"}</span>
         )}
-        <AuthButton />
+        <AuthButton deployEnv={deployEnv} />
         <button
           className="btn ghost mini"
           onClick={() => setShowAbout(true)}
