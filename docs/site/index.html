@@ -1,0 +1,115 @@
+<title>Loom, Explained</title>
+<style>
+  :root {
+    --ground: #F4F6F7; --surface: #FFFFFF; --surface-2: #EAEEF0;
+    --ink: #16212D; --ink-soft: #4E5C6A; --ink-faint: #7A8794;
+    --rule: #DCE3E7; --rule-strong: #C0CBD2;
+    --data: #1C6B5A; --files: #9E5A2A; --gate: #4A5C93;
+    --shadow: 0 1px 2px rgba(22, 33, 45, .05), 0 10px 28px -16px rgba(22, 33, 45, .22);
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #10151B; --surface: #191F27; --surface-2: #212932;
+      --ink: #E6ECF1; --ink-soft: #9AA7B4; --ink-faint: #71808E;
+      --rule: #2B343E; --rule-strong: #3D4854;
+      --data: #5FC0A6; --files: #DC9660; --gate: #8FA4DE;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #10151B; --surface: #191F27; --surface-2: #212932;
+    --ink: #E6ECF1; --ink-soft: #9AA7B4; --ink-faint: #71808E;
+    --rule: #2B343E; --rule-strong: #3D4854;
+    --data: #5FC0A6; --files: #DC9660; --gate: #8FA4DE;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .8);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--sans); font-size: 16.5px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 880px; margin: 0 auto; padding: 90px 32px 100px; display: flex; flex-direction: column; gap: 44px; }
+  .kicker { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: var(--ink-faint); }
+  h1 {
+    font-family: var(--serif); font-size: clamp(38px, 5vw, 54px); line-height: 1.05;
+    letter-spacing: -.02em; font-weight: 600; margin: 0; text-wrap: balance;
+  }
+  .lede { font-size: 20px; line-height: 1.55; color: var(--ink-soft); max-width: 58ch; margin: 0; }
+  header { display: flex; flex-direction: column; gap: 18px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+    padding: 28px 30px; display: flex; flex-direction: column; gap: 12px;
+    box-shadow: var(--shadow); text-decoration: none; color: inherit;
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  .card:hover, .card:focus-visible { border-color: var(--data); transform: translateY(-2px); }
+  .card:focus-visible { outline: 2px solid var(--data); outline-offset: 3px; }
+  .card.b { border-top: 4px solid var(--files); }
+  .card.a { border-top: 4px solid var(--data); }
+  .card.c { border-top: 4px solid var(--gate); }
+  .card h2 { font-family: var(--serif); font-size: 25px; font-weight: 600; margin: 0; letter-spacing: -.012em; }
+  .card p { margin: 0; font-size: 15.5px; color: var(--ink-soft); line-height: 1.6; }
+  .go { font-family: var(--mono); font-size: 12.5px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; }
+  .card.a .go { color: var(--data); }
+  .card.b .go { color: var(--files); }
+  .card.c .go { color: var(--gate); }
+  footer {
+    border-top: 1px solid var(--rule-strong); padding-top: 24px;
+    font-size: 14.5px; color: var(--ink-soft); max-width: 62ch; line-height: 1.6;
+  }
+  code { font-family: var(--mono); font-size: 13px; background: var(--surface-2); padding: 1px 5px; border-radius: 3px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 720px) { .page { padding: 48px 18px 64px; } }
+</style>
+
+<div class="page">
+  <header>
+    <span class="kicker">Loom</span>
+    <h1>Loom, Explained</h1>
+    <p class="lede">
+      Three short guides to how Loom is put together behind the scenes — written for anyone on the
+      team, whether or not you work on the code.
+    </p>
+  </header>
+
+  <div class="cards">
+    <a class="card a" href="where-loom-keeps-things.html">
+      <h2>Where Loom Keeps Things</h2>
+      <p>
+        What gets stored and where: the two kinds of storage, the five copies of Loom, and why a
+        corrected reading can look different depending on which one you're on.
+      </p>
+      <span class="go">Read →</span>
+    </a>
+
+    <a class="card c" href="how-signing-in-works.html">
+      <h2>How Signing In Works</h2>
+      <p>
+        Who gets into Loom and where: the two doors, why the course roster is what really decides, and
+        why a work-in-progress preview can't offer sign-in at all.
+      </p>
+      <span class="go">Read →</span>
+    </a>
+
+    <a class="card b" href="how-work-reaches-students.html">
+      <h2>How Work Reaches Students</h2>
+      <p>
+        The path every change takes, through five stops from someone's laptop to a student's screen —
+        what each stop is for, and what has to be true before work moves on.
+      </p>
+      <span class="go">Read →</span>
+    </a>
+  </div>
+
+  <footer>
+    These are the plain-language versions. The working detail — exact names, settings, commands and
+    gates — lives with the code in <code>docs/data-environments.md</code> and
+    <code>docs/build-and-test-workflow.md</code>, so it changes in the same commit as the system it
+    describes.
+  </footer>
+</div>

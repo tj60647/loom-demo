@@ -14,6 +14,7 @@ import RepairPanel from "@/components/library/RepairPanel"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 import UploadReadingsForm from "@/components/library/UploadReadingsForm"
 import { firstParam, getCourse, resolveCourseId } from "@/lib/courses"
+import { timeAgo } from "@/lib/utils"
 
 type AdminLibrarySearchParams = {
   course?: string | string[]
@@ -182,7 +183,36 @@ export default async function AdminLibraryPage({
                           </p>
                         ) : null}
 
-                        <div style={{ marginTop: "10px" }}>
+                        {/* Version sits with the score, not with the course
+                            pills: both are facts about the FILE, and a reading
+                            in four courses would otherwise push it off the end
+                            of the heading row. Two sites showing the same
+                            reading at different versions is the whole point —
+                            it is how you see that a repair has not reached
+                            students yet. */}
+                        <div
+                          style={{
+                            marginTop: "10px",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "10px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span
+                            className={`pill ${reading.revisions.length > 0 ? "beaten" : "loose"}`}
+                            title={
+                              reading.revisions.length === 0
+                                ? "Version 1 — the file as first uploaded"
+                                : `Version ${reading.revisions.length + 1} — this reading's file has been replaced ${
+                                    reading.revisions.length === 1
+                                      ? "once"
+                                      : `${reading.revisions.length} times`
+                                  }`
+                            }
+                          >
+                            v{reading.revisions.length + 1}
+                          </span>
                           <ExtractionScore score={reading.score} />
                         </div>
                       </div>
@@ -330,10 +360,68 @@ export default async function AdminLibraryPage({
                           </form>
                         </details>
 
+                        {/* Only where there is history to read: a reading on
+                            its first file has nothing to disclose that the v1
+                            badge has not already said. `source_revision` has
+                            been written since migration 0025 and read by
+                            nothing — this is the record finally surfacing. */}
+                        {reading.revisions.length > 0 ? (
+                          <details>
+                            <summary
+                              className="btn ghost mini"
+                              data-tip="Every version of this reading's file, and why each replaced the last"
+                            >
+                              File History
+                            </summary>
+                            <div
+                              className="foldout"
+                              style={{ display: "grid", gap: "12px", maxWidth: "560px" }}
+                            >
+                              {reading.revisions
+                                .map((revision, index) => ({ revision, version: index + 2 }))
+                                .reverse()
+                                .map(({ revision, version }) => (
+                                  <div
+                                    key={revision.id}
+                                    className="revline"
+                                    style={{ display: "grid", gap: "2px" }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontFamily: "var(--mono)",
+                                        fontSize: "12px",
+                                        letterSpacing: ".04em",
+                                      }}
+                                    >
+                                      v{version} · {timeAgo(revision.createdAt)}
+                                    </span>
+                                    <span className="hint" style={{ fontSize: "13px" }}>
+                                      {revision.reason || "no reason recorded"}
+                                    </span>
+                                  </div>
+                                ))}
+                              <div className="revline" style={{ display: "grid", gap: "2px" }}>
+                                <span
+                                  style={{
+                                    fontFamily: "var(--mono)",
+                                    fontSize: "12px",
+                                    letterSpacing: ".04em",
+                                  }}
+                                >
+                                  v1 · {timeAgo(reading.createdAt)}
+                                </span>
+                                <span className="hint" style={{ fontSize: "13px" }}>
+                                  added to the library
+                                </span>
+                              </div>
+                            </div>
+                          </details>
+                        ) : null}
+
                         <a
                           className="btn ghost mini"
                           href={`/api/readings/${reading.id}?download=1`}
-                          data-tip="Download the original PDF file"
+                          data-tip="Download the PDF this reading currently serves"
                         >
                           Download PDF
                         </a>
@@ -448,7 +536,7 @@ export default async function AdminLibraryPage({
                   <a
                     className="act"
                     href={`/api/readings/${reading.id}?download=1`}
-                    data-tip="Download the original PDF file"
+                    data-tip="Download the PDF this reading currently serves"
                   >
                     download
                   </a>

@@ -112,6 +112,56 @@ test("the cohort map renders the section's woven concepts", async ({ page }) => 
   await expect(page.locator(".passagequote").first()).toContainText("Test User A")
 })
 
+test("readings say which version of their file they serve", async ({ page }) => {
+  await page.goto("/admin/library")
+  // "Readings" exactly — the page also carries an "All Readings" section head.
+  // Generous: this page queries the whole shared shelf before it renders.
+  await expect(page.getByRole("heading", { name: "Readings", exact: true })).toBeVisible({
+    timeout: 60_000,
+  })
+
+  /**
+   * Two invariants, read off every card at once rather than one card at a
+   * time — the library is the whole shared shelf and iterating it in Playwright
+   * costs a round trip per reading.
+   *
+   * A reading's version is its `source_revision` count + 1, so:
+   *   - history is disclosed exactly where the file has been replaced, and
+   *   - the disclosure holds one line per version, v1 (the upload) included.
+   *
+   * Deliberately not asserting that any particular reading is repaired: the CI
+   * database is seeded, not remediated, so the honest assertion is the relation
+   * between badge and disclosure, which holds at v1 as well as at v6.
+   */
+  const readings = await page.evaluate(() =>
+    [...document.querySelectorAll(".card")].flatMap((card) => {
+      const badge = [...card.querySelectorAll(".pill")].find((pill) =>
+        /^v\d+$/.test(pill.textContent?.trim() ?? "")
+      )
+      if (!badge) return []
+      return [
+        {
+          title: card.querySelector("h3")?.textContent?.trim().slice(0, 40) ?? "?",
+          version: Number(badge.textContent!.trim().slice(1)),
+          hasHistory: [...card.querySelectorAll("summary")].some((summary) =>
+            summary.textContent?.includes("File History")
+          ),
+          lines: card.querySelectorAll(".revline").length,
+        },
+      ]
+    })
+  )
+
+  expect(readings.length, "seed missing — run `npm run seed:sources` first").toBeGreaterThan(0)
+  expect(readings.filter((r) => !Number.isFinite(r.version))).toEqual([])
+
+  // History is disclosed when, and only when, the file has been replaced.
+  expect(readings.filter((r) => r.hasHistory !== r.version > 1)).toEqual([])
+
+  // Where it is disclosed, it accounts for every version including the upload.
+  expect(readings.filter((r) => r.hasHistory && r.lines !== r.version)).toEqual([])
+})
+
 test.describe("authorization boundary", () => {
   test.use({ storageState: "playwright/.auth/testa.json" })
 

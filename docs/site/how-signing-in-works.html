@@ -1,0 +1,416 @@
+<title>How Signing In Works</title>
+<style>
+  :root {
+    --ground: #F4F6F7;
+    --surface: #FFFFFF;
+    --surface-2: #EAEEF0;
+    --ink: #16212D;
+    --ink-soft: #4E5C6A;
+    --ink-faint: #7A8794;
+    --rule: #DCE3E7;
+    --rule-strong: #C0CBD2;
+    --data: #1C6B5A;
+    --data-bg: #E4F0EC;
+    --files: #9E5A2A;
+    --files-bg: #F7EBE1;
+    --shut: #A03C31;
+    --shut-bg: #F8E7E4;
+    --shadow: 0 1px 2px rgba(22, 33, 45, .05), 0 10px 28px -16px rgba(22, 33, 45, .22);
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #10151B;
+      --surface: #191F27;
+      --surface-2: #212932;
+      --ink: #E6ECF1;
+      --ink-soft: #9AA7B4;
+      --ink-faint: #71808E;
+      --rule: #2B343E;
+      --rule-strong: #3D4854;
+      --data: #5FC0A6;
+      --data-bg: #102C25;
+      --files: #DC9660;
+      --files-bg: #312115;
+      --shut: #E58275;
+      --shut-bg: #35191A;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #10151B;
+    --surface: #191F27;
+    --surface-2: #212932;
+    --ink: #E6ECF1;
+    --ink-soft: #9AA7B4;
+    --ink-faint: #71808E;
+    --rule: #2B343E;
+    --rule-strong: #3D4854;
+    --data: #5FC0A6;
+    --data-bg: #102C25;
+    --files: #DC9660;
+    --files-bg: #312115;
+    --shut: #E58275;
+    --shut-bg: #35191A;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -16px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1060px; margin: 0 auto; padding: 64px 32px 100px; display: flex; flex-direction: column; gap: 64px; }
+  .measure { max-width: 65ch; }
+
+  h1 {
+    font-family: var(--serif); font-size: clamp(38px, 5vw, 54px); line-height: 1.05;
+    letter-spacing: -.02em; font-weight: 600; margin: 0; text-wrap: balance;
+  }
+  h2 {
+    font-family: var(--serif); font-size: clamp(26px, 3vw, 32px); line-height: 1.15;
+    letter-spacing: -.015em; font-weight: 600; margin: 0; text-wrap: balance;
+  }
+  h3 { font-size: 17px; font-weight: 650; margin: 0; letter-spacing: -.005em; }
+  p { margin: 0; }
+
+  .lede { font-size: 20px; line-height: 1.55; color: var(--ink-soft); max-width: 60ch; }
+  header.masthead { display: flex; flex-direction: column; gap: 20px; padding-bottom: 8px; }
+  .kicker { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: var(--ink-faint); }
+
+  section { display: flex; flex-direction: column; gap: 24px; }
+  .sec-intro { display: flex; flex-direction: column; gap: 14px; }
+
+  /* ---- the doors ---- */
+
+  .doors { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; }
+
+  .door {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+    padding: 26px 28px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow);
+  }
+  .door.main { border-top: 4px solid var(--data); }
+  .door.side { border-top: 4px solid var(--files); }
+
+  .door-tag { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; }
+  .door.main .door-tag { color: var(--data); }
+  .door.side .door-tag { color: var(--files); }
+  .door h3 { font-family: var(--serif); font-size: 21px; font-weight: 600; }
+  .door p { font-size: 15.5px; color: var(--ink-soft); line-height: 1.6; }
+
+  .status {
+    font-size: 13.5px; font-weight: 600; padding: 8px 12px; border-radius: 4px;
+    background: var(--surface-2); color: var(--ink-soft);
+  }
+  .status.off { background: var(--shut-bg); color: var(--shut); }
+
+  /* ---- gate ---- */
+
+  .gate {
+    background: var(--data-bg);
+    border: 1px solid color-mix(in srgb, var(--data) 30%, transparent);
+    border-radius: 6px; padding: 26px 30px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .gate h3 { font-family: var(--serif); font-size: 22px; font-weight: 600; }
+  .gate p { font-size: 16px; color: var(--ink-soft); line-height: 1.6; max-width: 68ch; }
+  .gate strong { color: var(--ink); font-weight: 650; }
+
+  /* ---- where table ---- */
+
+  .where { display: flex; flex-direction: column; gap: 2px; border-radius: 6px; overflow: hidden; box-shadow: var(--shadow); }
+
+  .row {
+    background: var(--surface); display: grid;
+    grid-template-columns: minmax(190px, 1fr) minmax(190px, 1fr) minmax(240px, 1.6fr);
+    gap: 20px; padding: 17px 26px; align-items: baseline;
+  }
+  .row.head {
+    background: var(--surface-2); font-size: 12px; letter-spacing: .1em;
+    text-transform: uppercase; font-weight: 700; color: var(--ink-faint);
+  }
+  .row-who { font-weight: 650; font-size: 16px; }
+  .row-who .alias { display: block; font-weight: 400; font-size: 13px; color: var(--ink-faint); font-family: var(--mono); }
+  .row-door { font-size: 15px; color: var(--ink); font-weight: 600; }
+  .row-door.none { color: var(--shut); }
+  .row-note { font-size: 15px; color: var(--ink-soft); line-height: 1.5; }
+  .row.blocked { background: var(--shut-bg); }
+
+  /* ---- why ---- */
+
+  .why {
+    background: var(--surface); border: 1px solid var(--rule); border-left: 4px solid var(--shut);
+    border-radius: 6px; padding: 26px 30px; display: flex; flex-direction: column; gap: 14px;
+    box-shadow: var(--shadow);
+  }
+  .why h3 { font-family: var(--serif); font-size: 22px; font-weight: 600; }
+  .why p { font-size: 15.5px; color: var(--ink-soft); line-height: 1.6; max-width: 68ch; }
+
+  .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; padding-top: 4px; }
+  .option {
+    background: var(--surface-2); border-radius: 6px; padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .option h4 { margin: 0; font-size: 15px; font-weight: 650; }
+  .option p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-soft); }
+
+  /* ---- roles ---- */
+
+  .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+  .role {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+    padding: 20px 22px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow);
+  }
+  .role-name { font-weight: 650; font-size: 16px; color: var(--data); }
+  .role p { font-size: 14.5px; color: var(--ink-soft); line-height: 1.5; }
+
+  .callout {
+    border-left: 3px solid var(--data); padding: 4px 0 4px 20px;
+    font-size: 17px; line-height: 1.6; max-width: 62ch;
+  }
+
+  /* ---- glossary ---- */
+
+  .glossary { display: flex; flex-direction: column; gap: 2px; border-radius: 6px; overflow: hidden; box-shadow: var(--shadow); }
+  .term {
+    background: var(--surface); display: grid;
+    grid-template-columns: minmax(160px, .8fr) minmax(280px, 2.2fr);
+    gap: 20px; padding: 14px 26px; align-items: baseline;
+  }
+  .term-word { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--ink); }
+  .term-def { font-size: 15px; color: var(--ink-soft); line-height: 1.5; }
+
+  footer {
+    border-top: 1px solid var(--rule-strong); padding-top: 26px;
+    font-size: 14.5px; color: var(--ink-soft); max-width: 65ch; line-height: 1.6;
+  }
+
+  a { color: var(--data); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--data); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 13px; background: var(--surface-2); padding: 1px 5px; border-radius: 3px; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  @media (max-width: 720px) {
+    .page { padding: 40px 18px 64px; gap: 48px; }
+    .row, .term { grid-template-columns: 1fr; gap: 6px; }
+    .row.head { display: none; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <span class="kicker">Loom · who gets in, and where</span>
+    <h1>How Signing In Works</h1>
+    <p class="lede">
+      Loom has no passwords of its own. Everyone signs in through GitHub, and the course roster — not
+      GitHub — decides who is actually let in.
+    </p>
+  </header>
+
+  <section>
+    <div class="sec-intro">
+      <h2>Two doors</h2>
+      <p class="measure">
+        There are only two ways into Loom, and they both ask the roster the same question at the same
+        moment.
+      </p>
+    </div>
+
+    <div class="doors">
+      <div class="door main">
+        <span class="door-tag">The main door</span>
+        <h3>Sign in with GitHub</h3>
+        <p>
+          You click one button and GitHub confirms who you are. Loom never sees your password and never
+          asks for one.
+        </p>
+        <p>
+          It asks GitHub for one thing only: your confirmed email addresses. If GitHub's consent screen
+          ever asks for more than that, something has gone wrong and it's worth saying so.
+        </p>
+        <span class="status">Working on the tester site and the student site</span>
+      </div>
+
+      <div class="door side">
+        <span class="door-tag">The side door</span>
+        <h3>A link in your inbox</h3>
+        <p>
+          For someone invited to a course who has no GitHub account and won't be getting one. Loom
+          emails a single-use link, good for 24 hours, that signs them in when clicked.
+        </p>
+        <p>
+          It's folded away on the sign-in page rather than offered up front — for almost everyone,
+          GitHub is the right answer and a visible choice is just one more decision.
+        </p>
+        <span class="status off">Built, but not switched on anywhere yet — the sign-in page currently links to it without it being there</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="gate">
+      <h3>The roster decides, and decides first</h3>
+      <p>
+        Having a GitHub account does not get you into Loom. When someone arrives at either door, Loom
+        takes the email address and checks it against the course rosters. <strong>If no course has
+        invited that address, they don't get in</strong> — they get a page telling them so, naming the
+        address they arrived with, so they can see whether it's the one you invited.
+      </p>
+      <p>
+        This runs <strong>before</strong> anything else happens. For the emailed door that means an
+        uninvited address never even receives a link. There is no way to be "signed up but not on a
+        course": in Loom those are the same thing.
+      </p>
+      <p>
+        So adding someone to Loom is always the same act — <strong>invite their email address to a
+        course.</strong> They're enrolled automatically the first time they sign in.
+      </p>
+    </div>
+
+    <p class="callout">
+      One useful detail: people often have several email addresses on their GitHub account. Loom looks
+      at all the confirmed ones and prefers whichever the roster already knows — so a student whose
+      personal address is their main one still gets matched on their university address.
+    </p>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>Which door works where</h2>
+      <p class="measure">
+        Sign-in doesn't work the same way on all five copies of Loom. This is the part that trips
+        people up, and it's the reason previews are for looking rather than doing.
+      </p>
+    </div>
+
+    <div class="where">
+      <div class="row head">
+        <span>The copy</span>
+        <span>How you get in</span>
+        <span>Notes</span>
+      </div>
+      <div class="row">
+        <span class="row-who">A developer's laptop<span class="alias">local</span></span>
+        <span class="row-door">A shortcut</span>
+        <span class="row-note">Developers skip sign-in entirely with a test door that only exists in unfinished builds. It refuses to work anywhere real.</span>
+      </div>
+      <div class="row">
+        <span class="row-who">Automated checks<span class="alias">CI</span></span>
+        <span class="row-door">The same shortcut</span>
+        <span class="row-note">The scripted test run uses it too, which is why the checks can never tell us whether real GitHub sign-in still works.</span>
+      </div>
+      <div class="row">
+        <span class="row-who">A work-in-progress preview<span class="alias">preview</span></span>
+        <span class="row-door">A team door</span>
+        <span class="row-note">GitHub can't work here — see below — so the page says so and offers a door of its own: click <em>Open preview</em> and choose who to be. No password, because a preview holds no real person's work.</span>
+      </div>
+      <div class="row">
+        <span class="row-who">The tester site<span class="alias">dev</span></span>
+        <span class="row-door">Real GitHub sign-in</span>
+        <span class="row-note">The only place, apart from the student site, where the real thing can be tested — including what happens to somebody signing in for the first time.</span>
+      </div>
+      <div class="row">
+        <span class="row-who">The student site<span class="alias">production</span></span>
+        <span class="row-door">Real GitHub sign-in</span>
+        <span class="row-note">Students. Not a place to test anything.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="why">
+      <h3>Why a preview can't offer GitHub sign-in</h3>
+      <p>
+        When you sign in with GitHub, GitHub has to send you back to where you came from. For safety it
+        will only send you to <strong>one fixed web address, registered in advance</strong> — so that
+        nobody can point a copycat site at your account.
+      </p>
+      <p>
+        Every work-in-progress preview has its own web address. None of them is the registered one, so
+        GitHub refuses to send anyone back. That's a safety rule working exactly as intended, not a
+        bug and not an oversight — but it does mean the team can't sign in to review each other's work.
+      </p>
+
+      <div class="options">
+        <div class="option" style="border:1px solid var(--data)">
+          <h4>A team door — what we did</h4>
+          <p>The developers' test door, opened on previews only. It needed the preview database sealed off from real data first, which is why previews now carry the readings and the test accounts and nobody's work.</p>
+        </div>
+        <div class="option">
+          <h4>Use the emailed link</h4>
+          <p>The side door needs no registered address at all — the link simply points back wherever it came from. Switching it on would work on every preview immediately.</p>
+        </div>
+        <div class="option">
+          <h4>Fixed addresses for review</h4>
+          <p>Give a small number of review sites permanent addresses and register each with GitHub. Real sign-in, but one setup per site and it doesn't scale to many.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>What signing in gets you</h2>
+      <p class="measure">
+        Loom doesn't ask anyone to pick a role. What you can do follows from how you were invited.
+      </p>
+    </div>
+
+    <div class="roles">
+      <div class="role">
+        <span class="role-name">A learner</span>
+        <p>Invited to a course. Sees that course's readings, and everything they mark and build is their own.</p>
+      </div>
+      <div class="role">
+        <span class="role-name">Faculty</span>
+        <p>Invited into a course's faculty group. Can see the cohort's work as a whole, without being able to edit it.</p>
+      </div>
+      <div class="role">
+        <span class="role-name">An admin</span>
+        <p>Runs the library and the rosters: uploading readings, inviting people, building courses.</p>
+      </div>
+    </div>
+
+    <p class="measure">
+      Enrolment is automatic and happens the first time someone signs in — Loom looks at every course
+      that invited their address and puts them in all of them. Removing someone from a course removes
+      what that gave them; it doesn't delete the work they did.
+    </p>
+  </section>
+
+  <section>
+    <div class="sec-intro">
+      <h2>Words you'll hear</h2>
+    </div>
+
+    <div class="glossary">
+      <div class="term"><span class="term-word">OAuth</span><span class="term-def">The arrangement that lets you prove who you are to Loom using your GitHub account, without giving Loom a password.</span></div>
+      <div class="term"><span class="term-word">callback URL</span><span class="term-def">The one fixed address GitHub is willing to send people back to. The reason previews can't offer GitHub sign-in.</span></div>
+      <div class="term"><span class="term-word">roster</span><span class="term-def">The list of email addresses invited to a course. The thing that actually decides who gets in.</span></div>
+      <div class="term"><span class="term-word">invitation</span><span class="term-def">Adding an email address to a course's roster, before that person has ever signed in.</span></div>
+      <div class="term"><span class="term-word">enrolment</span><span class="term-def">What happens automatically on someone's first sign-in: they're placed in every course that invited them.</span></div>
+      <div class="term"><span class="term-word">session</span><span class="term-def">The record that you're signed in. Kept by Loom, not by your browser alone, so signing out really does end it.</span></div>
+      <div class="term"><span class="term-word">the backdoor</span><span class="term-def">The developers' shortcut past sign-in. Exists only in unfinished builds and refuses to run anywhere real.</span></div>
+    </div>
+  </section>
+
+  <footer>
+    One of three guides: this one covers who gets in and where, <strong>Where Loom Keeps Things</strong>
+    covers what gets stored, and <strong>How Work Reaches Students</strong> covers the path a change
+    takes. The working detail lives with the code in <code>docs/deployments.md</code>.
+  </footer>
+
+</div>
