@@ -81,7 +81,13 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
           style={{ marginTop: "100px", maxWidth: "680px", marginLeft: "auto", marginRight: "auto" }}
         >
           <h2>Welcome to Loom.</h2>
-          <span className="cap" style={{ textTransform: "none" }}>{SIGN_IN_EXPLANATION}</span>
+          {/* The explanation is about matching a GitHub account to the roster,
+              which is not the question on a preview — leaving it there told the
+              reader to use GitHub in the sentence directly above the one saying
+              GitHub cannot work. */}
+          {!isPreviewDeployment && (
+            <span className="cap" style={{ textTransform: "none" }}>{SIGN_IN_EXPLANATION}</span>
+          )}
 
           {/* On a preview, GitHub sign-in cannot succeed — an OAuth App holds
               one callback URL and every preview has its own address, so GitHub
