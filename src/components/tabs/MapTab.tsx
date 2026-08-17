@@ -778,7 +778,7 @@ export default function MapTab({ practice = false, focusProjectionId }: {
         <p className="hint">Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋮</b> — its description and the passages behind it, on the same card you meet a concept on everywhere else.</p>
 
       {/* position:relative anchors the card menus, which are HTML over the SVG. */}
-      <div id="tableWrap" style={{ position: "relative", overflowX: "auto", border: "1px solid var(--rule)", borderRadius: 4, background: "radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec" }}>
+      <div id="tableWrap" style={{ position: "relative", overflowX: "auto", border: "1px solid var(--rule)", borderRadius: 4, background: "#f4f2ec" }}>
         <svg
           ref={svgRef}
           id="cardTable"
