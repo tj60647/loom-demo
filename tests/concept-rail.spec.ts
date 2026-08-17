@@ -70,23 +70,25 @@ test.describe('Concept rail', () => {
     await expect(page.locator('.pdf-rail-leaders path').first()).toBeAttached();
 
     // Single page → a single rail, and the card survives the re-layout.
-    await page.getByText('2-Page Spread').click();
+    // "1 page" and "2 pages" are one three-state group with Canvas now; the
+    // separate 2-Page Spread checkbox they replaced is gone.
+    await page.getByRole('button', { name: '1 page' }).click();
     await expect(page.locator('.pdf-rail')).toHaveCount(1, { timeout: 5000 });
     await expect(page.locator('.pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 5000 });
 
     // The toggle follows the mode: in the matrix the same capture's card
     // flanks its spread on the canvas (Strip is hidden — TJ 2026-08-10, the
     // canvas supersedes it — so there is no third mode to check).
-    await page.getByRole('button', { name: 'Matrix' }).click();
+    await page.getByRole('button', { name: 'Canvas' }).click();
     await expect(page.locator('.pdf-spread-canvas .pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: 'Strip' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Page', exact: true }).click();
+    await page.getByRole('button', { name: '1 page' }).click();
     await expect(page.locator('.pdf-railcard', { hasText: conceptName }).first()).toBeVisible({ timeout: 10_000 });
 
     // Back to the spread: the capture was on the left page, so its card
     // returns to the left rail — well clear of the search panel about to
     // open at the right edge.
-    await page.getByText('2-Page Spread').click();
+    await page.getByRole('button', { name: '2 pages' }).click();
     await expect(page.locator('.pdf-rail')).toHaveCount(2, { timeout: 5000 });
 
     // The card is a door, not an editor: clicking it opens Your work at the

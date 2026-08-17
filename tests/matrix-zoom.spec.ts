@@ -23,7 +23,7 @@ test.describe('Matrix zoom', () => {
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
 
-    await page.getByRole('button', { name: 'Matrix' }).click();
+    await page.getByRole('button', { name: 'Canvas' }).click();
 
     // The spread canvas is live, and at fit-all it is a contact sheet of
     // pre-rendered images: no page canvas, no text layer, no spans — the
@@ -124,7 +124,7 @@ test.describe('Matrix zoom', () => {
     test.setTimeout(90_000);
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
-    await page.getByRole('button', { name: 'Matrix' }).click();
+    await page.getByRole('button', { name: 'Canvas' }).click();
     await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
 
     const canvasK = () =>

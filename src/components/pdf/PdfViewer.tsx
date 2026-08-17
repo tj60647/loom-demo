@@ -1836,21 +1836,31 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           border-radius: 2px;
           pointer-events: none;
         }
-        .pdf-modes { display: flex; background: var(--paper); border-radius: 4px; padding: 2px; border: 1px solid var(--rule); }
+        .pdf-modes { display: flex; background: var(--paper); border-radius: 4px; padding: 1px; border: 1px solid var(--rule); }
         .pdf-modes button { border: none; margin: 0; padding: 4px 9px; }
+        /* The spread canvas's topbar, to the pixel: 2px 12px around the row,
+           buttons at 4px 9px with .btn.mini's 36px min-height released. That
+           min-height, not padding, is what made this bar tall — at 7px padding
+           a mini button still measures ~29px and the floor was doing the rest,
+           so releasing it takes the button 36px → 23px and the row 63 → 31.
+           Thirty-two pixels of vertical, which is the scarce axis here
+           (contracts.md §2c-iii).
+           .sc-topbar is where these numbers come from and it is no longer in
+           the tree to compare against: added in 4c008ca, reverted off in
+           41d5b50. Read it there rather than assuming this row invented them. */
         .pdf-toolbar {
           display: flex;
           flex-wrap: wrap;
           justify-content: space-between;
           align-items: center;
-          gap: 10px;
-          padding: 10px 20px;
+          gap: 12px;
+          padding: 2px 12px;
           border-bottom: 1px solid var(--rule);
           background-color: var(--paper-2);
-          box-shadow: 0 2px 10px rgba(0,0,0,0.05);
           z-index: 10;
           flex: 0 0 auto;
         }
+        .pdf-toolbar .btn { padding: 4px 9px; min-height: 0; }
 
         @media (max-width: 900px) {
           .pdf-strip-run { gap: 10px; padding: 8px 10px; }
@@ -2007,25 +2017,40 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-          {/* How the pages are laid out. Three ways of holding the same text:
-              one spread, one long run, or the whole thing at once. */}
+          {/* How the pages are laid out — three states in ONE group, where a
+              Page/Canvas pair plus a separate 2-Page Spread checkbox used to
+              say the same thing in two controls a reader had to combine in
+              their head. One page, two pages, or the whole reading at once.
+
+              Strip is HIDDEN, not deleted (TJ, 2026-08-10: "the new view
+              supercedes it") — the canvas is the continuous view now. The
+              render branch and CSS stay, so restoring a button restores it.
+
+              "Canvas" to the reader, `matrix` in the code — the house rule
+              (AGENTS.md): code speaks the July names, UI strings speak the
+              model. "Matrix" named the grid this draws; Canvas names what you
+              do on it, which is what a student is choosing between. The state,
+              the CSS, the render branch and matrix-zoom.spec.ts keep the old
+              word on purpose. */}
           <div className="pdf-modes" role="group" aria-label="Page layout">
             <button
-              className={`btn mini ${viewMode === "page" ? "" : "ghost"}`}
-              onClick={() => setViewMode("page")}
-              data-tip="one spread at a time"
-              aria-pressed={viewMode === "page"}
-            >Page</button>
-            {/* Strip is HIDDEN, not deleted (TJ, 2026-08-10: "the new view
-                supercedes it") — the matrix canvas is the continuous view
-                now, and page mode holds the phone. The render branch and CSS
-                stay, so restoring the button restores the mode. */}
+              className={`btn mini ${viewMode === "page" && !isTwoPage ? "" : "ghost"}`}
+              onClick={() => { setViewMode("page"); setIsTwoPage(false); }}
+              data-tip="one page at a time"
+              aria-pressed={viewMode === "page" && !isTwoPage}
+            >1 page</button>
+            <button
+              className={`btn mini ${viewMode === "page" && isTwoPage ? "" : "ghost"}`}
+              onClick={() => { setViewMode("page"); setIsTwoPage(true); }}
+              data-tip="a two-page spread"
+              aria-pressed={viewMode === "page" && isTwoPage}
+            >2 pages</button>
             <button
               className={`btn mini ${viewMode === "matrix" ? "" : "ghost"}`}
               onClick={() => setViewMode("matrix")}
               data-tip="the whole reading at once — zoom in on any page; hold space to pan from anywhere"
               aria-pressed={viewMode === "matrix"}
-            >Matrix</button>
+            >Canvas</button>
           </div>
 
           {viewMode === "page" && (
@@ -2101,16 +2126,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </div>
           )}
 
-          {viewMode === "page" && !isNarrow && (
-            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }} className="label">
-              <input
-                type="checkbox"
-                checked={isTwoPage}
-                onChange={(e) => setIsTwoPage(e.target.checked)}
-              />
-              2-Page Spread
-            </label>
-          )}
+          {/* The 2-Page Spread checkbox stood here. It is the "2 pages" button
+              in the layout group above now — same `isTwoPage` state, one
+              control instead of two that had to be read together. */}
 
           {/* The margin cards. A display toggle, not a mode: the pages, the
               capture flow and the keyboard are exactly the host view's. In
