@@ -148,7 +148,19 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
         )}
         {/* Beside the guide, per TJ. Hidden where the browser will not grant
             it (an iframe without allowfullscreen, a locked-down kiosk) rather
-            than offered and dead. */}
+            than offered and dead.
+
+            Two different screens-full, and the reading station shows both:
+            this one gives LOOM the whole screen — journey bar, scope bar and
+            all, with only the browser's own chrome dropped — and works on
+            every station. The toolbar's "full screen text" gives the TEXT the
+            whole screen, which means Loom's chrome goes too.
+
+            The qualifier sits on the toolbar's label, not this one, for a
+            measured reason: at the 1280 floor the header has room for an
+            11-character label and no more. "full screen app" is 15 and wraps
+            the header to two rows — 52px on the scarce axis (contracts.md
+            §2c-iii), which costs more than the naming gains. */}
         {session && canFull && (
           <button
             className="btn ghost mini"

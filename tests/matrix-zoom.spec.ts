@@ -23,7 +23,7 @@ test.describe('Matrix zoom', () => {
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
 
-    await page.getByRole('button', { name: 'Matrix' }).click();
+    await page.getByRole('button', { name: 'Canvas' }).click();
 
     // The spread canvas is live, and at fit-all it is a contact sheet of
     // pre-rendered images: no page canvas, no text layer, no spans — the
@@ -124,7 +124,7 @@ test.describe('Matrix zoom', () => {
     test.setTimeout(90_000);
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
-    await page.getByRole('button', { name: 'Matrix' }).click();
+    await page.getByRole('button', { name: 'Canvas' }).click();
     await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
 
     const canvasK = () =>
@@ -187,7 +187,8 @@ test.describe('Matrix zoom', () => {
     // length. This is the concept-map reading of the far zoom: pages as
     // thumbnails, cards at reading size, leaders still drawn. A mounted
     // highlight is exactly what this assertion must NOT wait for.
-    await page.getByRole('button', { name: 'Cards in the margin' }).click();
+    //
+    // No toggle to press: the rails stand permanently (TJ, 2026-08-17).
     await expect(page.locator('.pdf-spread-canvas .pdf-railcard').first()).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.pdf-spread-canvas .pdf-rail-leaders path').first()).toBeAttached();
   });

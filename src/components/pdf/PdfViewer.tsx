@@ -122,9 +122,54 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * the open spread drawn as a card beside its page. Off by default and not
    * persisted — the same standing as viewMode itself.
    */
-  const [railsOn, setRailsOn] = useState(false);
+  // The rails stand permanently (TJ, 2026-08-17). The Cards toggle is gone:
+  // a control that hides the margin is a control that hides where the work
+  // is. Kept as a name rather than inlined `true` so the three places that
+  // ask "are the margins showing?" still read as one decision.
+  const railsOn = true;
   // Covers the whole window, chrome included — the reading takes the screen.
   const [isFullscreen, setIsFullscreen] = useState(false);
+  /**
+   * Enter or leave full screen — both halves of it, together.
+   *
+   * `.pdf-shell.fullscreen` hides LOOM's chrome; the Fullscreen API hides the
+   * BROWSER's. Either alone leaves a bar of something else around the text,
+   * which is why this used to be two buttons in two places.
+   *
+   * The request goes to `documentElement`, not to the shell. Fullscreening
+   * the shell would stop rendering everything outside it — including the
+   * practice guide's mask and rungs, which sit at z-index 6100–6103
+   * deliberately above this mode (globals.css) and which
+   * `check-practice-guide.ts` guards. Rooting it keeps that stack intact and
+   * lets the existing CSS do the chrome-hiding it already does.
+   *
+   * The in-app half is set first and unconditionally: a browser that refuses
+   * the request — a policy, a gesture it did not count — should still give
+   * the reader the larger text, which is the part that matters here.
+   */
+  const setFullscreen = useCallback(async (next: boolean) => {
+    setIsFullscreen(next);
+    try {
+      if (next) {
+        if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Not worth a dialog: the button simply does not carry the browser with it.
+    }
+  }, []);
+  /**
+   * Esc and F11 leave the browser's fullscreen without telling us. Without
+   * this the shell would stay `position:fixed; inset:0` over a window that is
+   * no longer full, and the only way out would be a button the chrome is
+   * covering.
+   */
+  useEffect(() => {
+    const onChange = () => { if (!document.fullscreenElement) setIsFullscreen(false); };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
   // Matrix zoom, as a multiple of the whole-canvas fit: 1 = every spread in
   // view. The − / + buttons and the canvas's own wheel/pinch drive the SAME
   // transform — SpreadCanvasView syncs this back when a gesture settles.
@@ -1260,12 +1305,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         if (highlightTooltip) hideHighlightTooltip();
         else if (searchOpen) closeSearch();
         else if (workOpen) requestToggleWork();
-        else if (isFullscreen) setIsFullscreen(false);
+        else if (isFullscreen) setFullscreen(false);
         return;
       }
 
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        setIsFullscreen((on) => !on);
+        setFullscreen(!isFullscreen);
         return;
       }
 
@@ -1281,7 +1326,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal, viewMode, isFullscreen, highlightTooltip, searchOpen, closeSearch, workOpen, requestToggleWork]);
+  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal, viewMode, isFullscreen, setFullscreen, highlightTooltip, searchOpen, closeSearch, workOpen, requestToggleWork]);
 
   /**
    * Your work is not a dialog: the reading stays live and selectable behind
@@ -1836,15 +1881,24 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           border-radius: 2px;
           pointer-events: none;
         }
-        .pdf-modes { display: flex; background: var(--paper); border-radius: 4px; padding: 2px; border: 1px solid var(--rule); }
+        .pdf-modes { display: flex; background: var(--paper); border-radius: 4px; padding: 1px; border: 1px solid var(--rule); }
         .pdf-modes button { border: none; margin: 0; padding: 4px 9px; }
+        /* .btn.mini carries min-height:36px (globals.css). Against the 4px
+           padding right above, that floor wins and leaves ~7px of empty box
+           above and below an 11px label — the padding never applied. Release
+           it here, scoped to the toolbar, so nothing else wearing .btn.mini
+           moves. Vertical space is the scarce axis on the reading station
+           (contracts.md §2c-iii); the row was 63px of chrome above the text
+           and two thirds of that was nothing.
+           No backticks in this block: it is a styled-jsx template literal. */
+        .pdf-toolbar .btn.mini { min-height: 0; padding: 4px 9px; }
         .pdf-toolbar {
           display: flex;
           flex-wrap: wrap;
           justify-content: space-between;
           align-items: center;
           gap: 10px;
-          padding: 10px 20px;
+          padding: 4px 20px;
           border-bottom: 1px solid var(--rule);
           background-color: var(--paper-2);
           box-shadow: 0 2px 10px rgba(0,0,0,0.05);
@@ -2009,23 +2063,38 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
           {/* How the pages are laid out. Three ways of holding the same text:
               one spread, one long run, or the whole thing at once. */}
+          {/* One control, three states (TJ, 2026-08-17). This used to be a
+              Page/Matrix pair PLUS a separate "2-Page Spread" checkbox, so
+              choosing a spread meant combining two controls in your head.
+              The three ways of holding the text are three buttons; the state
+              underneath is unchanged (viewMode + isTwoPage).
+
+              "Canvas", not "Matrix", in the label only: state, CSS, the render
+              branch and matrix-zoom.spec.ts keep the July name per AGENTS.md.
+              "Matrix" named the grid the view draws; "Canvas" names what you
+              do on it, which is what the student is choosing between.
+
+              Strip stays HIDDEN, not deleted (TJ, 2026-08-10) — no button,
+              but the render branch and CSS remain. */}
           <div className="pdf-modes" role="group" aria-label="Page layout">
             <button
-              className={`btn mini ${viewMode === "page" ? "" : "ghost"}`}
-              onClick={() => setViewMode("page")}
-              data-tip="one spread at a time"
-              aria-pressed={viewMode === "page"}
-            >Page</button>
-            {/* Strip is HIDDEN, not deleted (TJ, 2026-08-10: "the new view
-                supercedes it") — the matrix canvas is the continuous view
-                now, and page mode holds the phone. The render branch and CSS
-                stay, so restoring the button restores the mode. */}
+              className={`btn mini ${viewMode === "page" && !isTwoPage ? "" : "ghost"}`}
+              onClick={() => { setViewMode("page"); setIsTwoPage(false); }}
+              data-tip="one page at a time"
+              aria-pressed={viewMode === "page" && !isTwoPage}
+            >1 page</button>
+            <button
+              className={`btn mini ${viewMode === "page" && isTwoPage ? "" : "ghost"}`}
+              onClick={() => { setViewMode("page"); setIsTwoPage(true); }}
+              data-tip="facing pages, the way the book opens"
+              aria-pressed={viewMode === "page" && isTwoPage}
+            >2 pages</button>
             <button
               className={`btn mini ${viewMode === "matrix" ? "" : "ghost"}`}
               onClick={() => setViewMode("matrix")}
               data-tip="the whole reading at once — zoom in on any page; hold space to pan from anywhere"
               aria-pressed={viewMode === "matrix"}
-            >Matrix</button>
+            >Canvas</button>
           </div>
 
           {viewMode === "page" && (
@@ -2101,31 +2170,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </div>
           )}
 
-          {viewMode === "page" && !isNarrow && (
-            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }} className="label">
-              <input
-                type="checkbox"
-                checked={isTwoPage}
-                onChange={(e) => setIsTwoPage(e.target.checked)}
-              />
-              2-Page Spread
-            </label>
-          )}
-
-          {/* The margin cards. A display toggle, not a mode: the pages, the
-              capture flow and the keyboard are exactly the host view's. In
-              page mode they flank the open spread; in the matrix they flank
-              every spread and counter-scale, so zooming out reads as a
-              concept map. */}
-          {(viewMode === "page" || viewMode === "matrix") && !isNarrow && (
-            <button
-              className={`btn mini ${railsOn ? "" : "ghost"}`}
-              onClick={() => setRailsOn((on) => !on)}
-              aria-pressed={railsOn}
-              aria-label="Cards in the margin"
-              data-tip="your concepts beside the passages they came from"
-            >Cards</button>
-          )}
+          {/* The "2-Page Spread" checkbox and the "Cards" toggle both stood
+              here. The first is now the middle state of the layout group
+              above; the second is gone because the rails stand permanently. */}
 
           {/* Overlay (ruling 28) — a read-only comparison with a discussion
               section or the whole cohort. **Faculty and admins only** (TJ,
@@ -2180,20 +2227,30 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </button>
           )}
 
-          {/* "Just the text", not "full screen" (TJ, 2026-08-12). This has
-              never been the browser's fullscreen — it is an in-app mode:
-              `.pdf-shell.fullscreen` covers Loom's own chrome so the reading
-              fills the window, and Your work still slides over it. The header
-              now carries the REAL full screen, on every page, so this one had
-              to say what it actually does. Same key (f), same Escape. */}
+          {/* Full screen — one control, the whole screen (TJ, 2026-08-17),
+              superseding "Just the text" (TJ, 2026-08-12).
+
+              It used to be an in-app mode ONLY: `.pdf-shell.fullscreen` hid
+              Loom's chrome but left the browser's tab strip and URL bar, so
+              getting the text onto the actual screen took this button AND the
+              header's. Two controls for one intention, and the name had to
+              apologise for it. Now this one does both — the in-app mode plus
+              the browser's Fullscreen API — which is what a document viewer
+              is expected to do, and what makes the name honest.
+
+              "Full screen text", not "Full screen": the header carries "full
+              screen app", which gives LOOM the screen and keeps the journey
+              bar. This one gives the TEXT the screen and takes Loom's chrome
+              with it. Only one of the two is ever visible at a time — this
+              mode covers the header — so the exit label needs no qualifier. */}
           <button
             className="btn ghost mini"
-            onClick={() => setIsFullscreen((on) => !on)}
-            data-tip={isFullscreen ? "back to the journey (esc)" : "hide Loom's chrome — the reading fills the window (f)"}
+            onClick={() => setFullscreen(!isFullscreen)}
+            data-tip={isFullscreen ? "back to the journey (esc)" : "the text fills the screen (f)"}
             aria-pressed={isFullscreen}
-            aria-label={isFullscreen ? "Show the journey" : "Just the text"}
+            aria-label={isFullscreen ? "Exit full screen" : "Full screen text"}
           >
-            {isFullscreen ? (isNarrow ? "↙" : "↙ Show the journey") : (isNarrow ? "⛶" : "⛶ Just the text")}
+            {isFullscreen ? (isNarrow ? "↙" : "↙ Exit full screen") : (isNarrow ? "⛶" : "⛶ Full screen text")}
           </button>
         </div>
       </div>
