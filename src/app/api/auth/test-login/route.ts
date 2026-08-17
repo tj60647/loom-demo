@@ -24,6 +24,17 @@ const IDENTITIES = {
   faculty: { email: 'test-faculty@loom.local', name: 'Test Faculty', role: 'USER', membership: 'FACULTY' },
 } as const;
 
+/**
+ * Where to land after signing in. Same-origin paths only: a `next` that names
+ * another host — or starts `//`, which a URL parser reads as one — would turn
+ * this into an open redirect, and an open redirect on the one route that hands
+ * out sessions is worth more to an attacker than the session is.
+ */
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/';
+  return raw;
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
 
@@ -112,7 +123,16 @@ export async function GET(request: Request) {
   const isHttps =
     (request.headers.get('x-forwarded-proto') ?? url.protocol.replace(':', '')) === 'https';
 
-  const response = NextResponse.json({ success: true, userId, sessionToken });
+  // A person gets taken into the app; a script gets the JSON it has always
+  // had. The suite only reads `response.ok()` and the cookies, so this is
+  // invisible to it — but on a preview the alternative is a page of raw JSON
+  // and a human wondering whether it worked, next to a GitHub button that
+  // cannot work and looks like the way in. `?next=` chooses the landing page.
+  const wantsHtml = (request.headers.get('accept') ?? '').includes('text/html');
+  const response = wantsHtml
+    ? NextResponse.redirect(new URL(safeNext(url.searchParams.get('next')), url))
+    : NextResponse.json({ success: true, userId, sessionToken });
+
   for (const name of sessionCookieNames(isHttps)) {
     response.cookies.set(name, sessionToken, {
       path: '/',
