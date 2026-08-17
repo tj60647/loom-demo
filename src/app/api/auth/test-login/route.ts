@@ -4,7 +4,7 @@ import { users, sessions, courses, courseMemberships } from '@/db/schema';
 import { asc, eq } from 'drizzle-orm';
 import crypto from 'crypto';
 import { ensureFacultySection } from '@/lib/courses';
-import { previewLoginDecision, sessionCookieNames } from '@/lib/previewLogin';
+import { isBranchPreview, previewLoginDecision, sessionCookieNames } from '@/lib/previewLogin';
 
 // Non-production test backdoor: mints a session directly, bypassing OAuth.
 //
@@ -55,10 +55,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
 
+  // On a branch preview the fallback is the learner, never the admin.
+  //
+  // The key gates entry; it does not reduce authority. A preview URL is public
+  // and its key is shared by a whole team, so the bare URL — the one that gets
+  // pasted into chat and bookmarked — must not be the one that hands out an
+  // ADMIN session. That matters here more than the synthetic database suggests:
+  // the blob store is shared with production (deployments.md invariant 4) and
+  // deleting a reading deletes production's copy of the file.
+  //
+  // `?as=admin` still reaches it, because reviewing an admin surface on a
+  // preview is a real need and the door is already keyed. What changes is that
+  // admin is now something you ask for, not something you land on. Locally
+  // nothing moves: the suite's default storage state is still the admin.
   const asParam = url.searchParams.get('as');
   const identity =
     asParam === 'testa' ? IDENTITIES.testa
     : asParam === 'faculty' ? IDENTITIES.faculty
+    : asParam === 'admin' ? IDENTITIES.admin
+    : isBranchPreview() ? IDENTITIES.testa
     : IDENTITIES.admin;
 
   // 1. Find or create the user
