@@ -100,13 +100,36 @@ jobs:
       - name: Apply this branch's migrations
         run: npx drizzle-kit migrate
 
+      # The REST API rather than the CLI. `vercel env` insists on reading
+      # Project Settings first, which a token scoped to one project is not
+      # allowed to do — it failed here twice with "Could not retrieve Project
+      # Settings" even with VERCEL_ORG_ID and VERCEL_PROJECT_ID set. The API
+      # needs only the project-level rights the token actually has.
       - name: Point the preview at it
         run: |
-          npx vercel env rm DATABASE_URL preview --git-branch "$PR_BRANCH" \
-            --token "$VERCEL_TOKEN" --yes 2>/dev/null || true
-          npx vercel env add DATABASE_URL preview --git-branch "$PR_BRANCH" \
-            --value "$DATABASE_URL" --sensitive \
-            --token "$VERCEL_TOKEN" --yes
+          node --input-type=module -e '
+            const { VERCEL_TOKEN: token, VERCEL_ORG_ID: team, VERCEL_PROJECT_ID: project,
+                    PR_BRANCH: ref, DATABASE_URL: url } = process.env;
+            const h = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
+            const q = `teamId=${team}`;
+
+            // Replace rather than duplicate: a re-run must not leave two
+            // variables of the same name pinned to one branch.
+            const list = await fetch(`https://api.vercel.com/v9/projects/${project}/env?${q}`, { headers: h });
+            if (!list.ok) { console.error("list failed", list.status, await list.text()); process.exit(1); }
+            const { envs = [] } = await list.json();
+            for (const e of envs.filter(e => e.key === "DATABASE_URL" && e.gitBranch === ref)) {
+              const d = await fetch(`https://api.vercel.com/v9/projects/${project}/env/${e.id}?${q}`, { method: "DELETE", headers: h });
+              console.log("removed previous:", e.id, d.status);
+            }
+
+            const add = await fetch(`https://api.vercel.com/v10/projects/${project}/env?${q}`, {
+              method: "POST", headers: h,
+              body: JSON.stringify({ key: "DATABASE_URL", value: url, type: "encrypted", target: ["preview"], gitBranch: ref }),
+            });
+            if (!add.ok) { console.error("add failed", add.status, await add.text()); process.exit(1); }
+            console.log("DATABASE_URL pinned to preview branch", ref);
+          '
 
       # Vercel resolves variables when it builds, and it started building on
       # push — before this job existed. Without a redeploy the first preview of
@@ -154,5 +177,15 @@ jobs:
       - name: Unpin the preview variable
         continue-on-error: true
         run: |
-          npx vercel env rm DATABASE_URL preview --git-branch "$PR_BRANCH" \
-            --token "$VERCEL_TOKEN" --yes
+          node --input-type=module -e '
+            const { VERCEL_TOKEN: token, VERCEL_ORG_ID: team, VERCEL_PROJECT_ID: project, PR_BRANCH: ref } = process.env;
+            const h = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
+            const q = `teamId=${team}`;
+            const list = await fetch(`https://api.vercel.com/v9/projects/${project}/env?${q}`, { headers: h });
+            if (!list.ok) { console.log("list failed", list.status); process.exit(0); }
+            const { envs = [] } = await list.json();
+            for (const e of envs.filter(e => e.key === "DATABASE_URL" && e.gitBranch === ref)) {
+              const d = await fetch(`https://api.vercel.com/v9/projects/${project}/env/${e.id}?${q}`, { method: "DELETE", headers: h });
+              console.log("removed", e.id, d.status);
+            }
+          '
