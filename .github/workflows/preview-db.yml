@@ -1,0 +1,151 @@
+# A database per pull request.
+#
+# Every open PR gets its own Neon branch, its own schema and its own data, and
+# loses them when it closes.
+#
+# WHY THIS EXISTS. Preview deployments all shared one database, so two people
+# reviewing two branches edited the same rows — and a branch that reprocesses
+# PDFs rewrites `source_page` wholesale, which silently invalidates every stored
+# passage offset for every other preview at once. Four branches doing that at
+# the same time is not a shared database's failure mode, it is its absence.
+#
+# THE PARENT IS `preview`, NEVER `main`. The template carries the readings and
+# the synthetic cohort and no real person's work. Branching previews from
+# production would copy real student data into a publicly reachable deployment,
+# which is exactly the mistake this repo has already made once.
+#
+# Vercel resolves the most specific variable, so a branch-scoped DATABASE_URL
+# beats the unscoped Preview one. A branch with no PR yet keeps falling through
+# to the template; the moment a PR opens it gets a database of its own.
+
+name: Preview database
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+
+concurrency:
+  # Serialised per PR: two pushes in quick succession must not race to create
+  # and delete the same branch.
+  group: preview-db-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  NEON_PROJECT_ID: raspy-wave-74437268
+  NEON_DATABASE: loom-db
+  PARENT_BRANCH: preview
+  VERCEL_SCOPE: aroughidea
+
+jobs:
+  provision:
+    # Fork PRs never receive secrets, so this would fail for reasons the branch
+    # cannot fix. Skipped rather than red — the same rule the e2e gate follows.
+    if: >-
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+      DB_BRANCH: preview/pr-${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse to run without credentials
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::NEON_API_KEY and VERCEL_TOKEN must be set. See docs/data-environments.md."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+
+      # Idempotent: `synchronize` fires on every push to an open PR, and the
+      # branch will already exist for all but the first.
+      - name: Create the branch if it does not exist
+        run: |
+          if npx neonctl branches get "$DB_BRANCH" --project-id "$NEON_PROJECT_ID" --api-key "$NEON_API_KEY" >/dev/null 2>&1; then
+            echo "branch $DB_BRANCH already exists"
+          else
+            npx neonctl branches create \
+              --project-id "$NEON_PROJECT_ID" \
+              --name "$DB_BRANCH" \
+              --parent "$PARENT_BRANCH" \
+              --api-key "$NEON_API_KEY"
+          fi
+
+      - name: Resolve its connection string
+        run: |
+          URL=$(npx neonctl connection-string "$DB_BRANCH" \
+            --project-id "$NEON_PROJECT_ID" \
+            --database-name "$NEON_DATABASE" \
+            --pooled --api-key "$NEON_API_KEY" | tr -d '\r\n')
+          if [ -z "$URL" ]; then echo "::error::no connection string for $DB_BRANCH"; exit 1; fi
+          echo "::add-mask::$URL"
+          echo "DATABASE_URL=$URL" >> "$GITHUB_ENV"
+
+      # The point of a database per branch: a PR that changes the schema
+      # migrates its own copy, and nothing else is touched by it.
+      - name: Apply this branch's migrations
+        run: npx drizzle-kit migrate
+
+      - name: Point the preview at it
+        run: |
+          npx vercel env rm DATABASE_URL preview --git-branch "$PR_BRANCH" \
+            --token "$VERCEL_TOKEN" --scope "$VERCEL_SCOPE" --yes 2>/dev/null || true
+          npx vercel env add DATABASE_URL preview --git-branch "$PR_BRANCH" \
+            --value "$DATABASE_URL" --sensitive \
+            --token "$VERCEL_TOKEN" --scope "$VERCEL_SCOPE" --yes
+
+      # Vercel resolves variables when it builds, and it started building on
+      # push — before this job existed. Without a redeploy the first preview of
+      # a new PR would quietly use the template.
+      - name: Rebuild so the deployment picks it up
+        continue-on-error: true
+        run: |
+          node --input-type=module -e '
+            const token = process.env.VERCEL_TOKEN, ref = process.env.PR_BRANCH;
+            const h = { Authorization: "Bearer " + token };
+            const r = await fetch("https://api.vercel.com/v6/deployments?app=loom-demo&limit=40&state=READY,BUILDING&teamId=", { headers: h });
+            const { deployments = [] } = await r.json();
+            const mine = deployments.find(d => d.meta?.githubCommitRef === ref);
+            if (!mine) { console.log("no deployment for", ref, "— the next push will pick it up"); process.exit(0); }
+            const re = await fetch("https://api.vercel.com/v13/deployments", {
+              method: "POST", headers: { ...h, "Content-Type": "application/json" },
+              body: JSON.stringify({ name: "loom-demo", deploymentId: mine.uid, target: "preview" }),
+            });
+            console.log("redeploy:", re.status, mine.uid);
+          '
+
+      - name: Say where it landed
+        run: |
+          echo "### Preview database ready" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch \`$DB_BRANCH\`, cut from \`$PARENT_BRANCH\`, migrated." >> "$GITHUB_STEP_SUMMARY"
+          echo "It is deleted when this PR closes." >> "$GITHUB_STEP_SUMMARY"
+
+  teardown:
+    if: >-
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+      DB_BRANCH: preview/pr-${{ github.event.pull_request.number }}
+    steps:
+      # Both are best-effort: a PR closed twice, or one whose branch was removed
+      # by hand, must not leave a red check behind it.
+      - name: Drop the branch's database
+        continue-on-error: true
+        run: npx neonctl branches delete "$DB_BRANCH" --project-id "$NEON_PROJECT_ID" --api-key "$NEON_API_KEY"
+
+      - name: Unpin the preview variable
+        continue-on-error: true
+        run: |
+          npx vercel env rm DATABASE_URL preview --git-branch "$PR_BRANCH" \
+            --token "$VERCEL_TOKEN" --scope "$VERCEL_SCOPE" --yes
