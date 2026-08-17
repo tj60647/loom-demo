@@ -46,9 +46,13 @@ check("no VERCEL_ENV, unbuilt — local dev", allow({ NODE_ENV: "development" })
 check("no VERCEL_ENV, unbuilt — CI", allow({ NODE_ENV: "test" }), true)
 check("nothing set at all", allow({}), true)
 
-console.log("\na preview opens only on a matched secret")
+console.log("\na preview asks for a key only where one is configured")
 const preview = { VERCEL_ENV: "preview", NODE_ENV: "production" }
-check("no secret configured — fails closed", allow(preview), false)
+// The one place this module does not fail closed, and deliberately: the
+// preview database holds no real person's work, and production is refused
+// before this branch is reachable. Setting the variable turns the lock on.
+check("no secret configured — preview is open", allow(preview), true)
+check("...and production is still shut with no secret", allow({ VERCEL_ENV: "production", NODE_ENV: "production" }), false)
 check("secret configured, none supplied", allow({ ...preview, PREVIEW_LOGIN_SECRET: SECRET }), false)
 check("wrong key", allow({ ...preview, PREVIEW_LOGIN_SECRET: SECRET }, "wrong"), false)
 check(
@@ -62,9 +66,18 @@ check(
   allow({ ...preview, PREVIEW_LOGIN_SECRET: SECRET }, `  ${SECRET}  `),
   true
 )
+// A secret of only whitespace is not a secret, so it reads as "none
+// configured" and the preview is open — the same as leaving it unset. It
+// cannot become a lock that any whitespace opens, which is the failure worth
+// ruling out here.
 check(
-  "a secret of only whitespace is not a secret",
-  allow({ ...preview, PREVIEW_LOGIN_SECRET: "   " }, "   "),
+  "a whitespace secret is no secret — preview open",
+  allow({ ...preview, PREVIEW_LOGIN_SECRET: "   " }),
+  true
+)
+check(
+  "a real secret is not opened by whitespace",
+  allow({ ...preview, PREVIEW_LOGIN_SECRET: SECRET }, "   "),
   false
 )
 
@@ -72,6 +85,11 @@ console.log("\nan unrecognised deployment is not a preview")
 check(
   "a built deployment with no VERCEL_ENV",
   allow({ NODE_ENV: "production", PREVIEW_LOGIN_SECRET: SECRET }, SECRET),
+  false
+)
+check(
+  "a built deployment with no VERCEL_ENV and no secret either",
+  allow({ NODE_ENV: "production" }),
   false
 )
 check(

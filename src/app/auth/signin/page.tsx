@@ -2,6 +2,7 @@ import Link from "next/link"
 import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import GuestEmailSignIn from "@/components/ui/GuestEmailSignIn"
 import PreviewDoor from "@/components/ui/PreviewDoor"
+import { previewLoginNeedsKey } from "@/lib/previewLogin"
 import { emailSignInConfigured } from "@/lib/auth"
 import { ROSTER_CONTACT_EMAIL, signInMessage } from "@/lib/signIn"
 
@@ -67,7 +68,9 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
           <Link href="/" className="btn ghost">Back to Loom</Link>
         </div>
 
-        {message.retry && isPreviewDeployment && <PreviewDoor callbackUrl={params?.callbackUrl} />}
+        {message.retry && isPreviewDeployment && (
+          <PreviewDoor callbackUrl={params?.callbackUrl} requiresKey={previewLoginNeedsKey()} />
+        )}
 
         {message.retry && !isPreviewDeployment && emailSignInConfigured() && (
           <GuestEmailSignIn callbackUrl={params?.callbackUrl} />

@@ -15,7 +15,13 @@
  * Rendered only where `VERCEL_ENV === "preview"`. On production this component
  * is never reached, and the route it posts to answers 403 there regardless.
  */
-export default function PreviewDoor({ callbackUrl }: { callbackUrl?: string }) {
+export default function PreviewDoor({
+  callbackUrl,
+  requiresKey = false,
+}: {
+  callbackUrl?: string
+  requiresKey?: boolean
+}) {
   return (
     <div
       className="empty"
@@ -31,7 +37,7 @@ export default function PreviewDoor({ callbackUrl }: { callbackUrl?: string }) {
       <span className="cap" style={{ textTransform: "none" }}>
         <strong>This is a preview of work in progress.</strong> GitHub sign-in cannot work
         here — GitHub only returns people to one registered web address, and every preview
-        has its own. Use the team key instead.
+        has its own. {requiresKey ? "Use the team key instead." : "Pick who to be and open it."}
       </span>
 
       <form
@@ -40,15 +46,17 @@ export default function PreviewDoor({ callbackUrl }: { callbackUrl?: string }) {
         style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}
       >
         <input type="hidden" name="next" value={callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/"} />
-        <input
-          name="key"
-          type="password"
-          required
-          placeholder="team key"
-          autoComplete="off"
-          aria-label="Team key for this preview"
-          style={{ flex: "1 1 220px", minWidth: "180px" }}
-        />
+        {requiresKey && (
+          <input
+            name="key"
+            type="password"
+            required
+            placeholder="team key"
+            autoComplete="off"
+            aria-label="Team key for this preview"
+            style={{ flex: "1 1 220px", minWidth: "180px" }}
+          />
+        )}
         <select name="as" className="tinput" aria-label="Sign in as" defaultValue="">
           <option value="">as admin</option>
           <option value="testa">as a learner</option>
@@ -60,8 +68,9 @@ export default function PreviewDoor({ callbackUrl }: { callbackUrl?: string }) {
       </form>
 
       <span className="cap" style={{ textTransform: "none", fontSize: "12px" }}>
-        the key is shared with the team and can be rotated at any time. it works only on
-        previews — production refuses it.
+        {requiresKey
+          ? "the key is shared with the team and can be rotated at any time. it works only on previews — production refuses it."
+          : "previews carry the readings and the test accounts, and nobody's real work. this door exists only on previews — production refuses it."}
       </span>
     </div>
   )
