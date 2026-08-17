@@ -2,7 +2,7 @@ import Link from "next/link"
 import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import GuestEmailSignIn from "@/components/ui/GuestEmailSignIn"
 import PreviewDoor from "@/components/ui/PreviewDoor"
-import { previewLoginNeedsKey } from "@/lib/previewLogin"
+import { isBranchPreview, previewLoginNeedsKey } from "@/lib/previewLogin"
 import { emailSignInConfigured } from "@/lib/auth"
 import { ROSTER_CONTACT_EMAIL, signInMessage } from "@/lib/signIn"
 
@@ -33,8 +33,9 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   const failed = Boolean(params?.error)
   const message = signInMessage(params?.error)
   // Server-side only, and not NEXT_PUBLIC: which door this page offers is not
-  // a decision to take on a value the client could set.
-  const isPreviewDeployment = process.env.VERCEL_ENV === "preview"
+  // a decision to take on a value the client could set. The tester site is a
+  // Preview deployment too and must keep the GitHub button — see isTesterSite.
+  const isPreviewDeployment = isBranchPreview()
 
   return (
     <main>

@@ -1,4 +1,5 @@
 import Shelf from "@/components/shelf/Shelf"
+import { isBranchPreview } from "@/lib/previewLogin"
 
 /**
  * The shelf is a client component — it needs the session and the loom — so the
@@ -11,5 +12,5 @@ import Shelf from "@/components/shelf/Shelf"
  * place it enters the client bundle.
  */
 export default function Home() {
-  return <Shelf isPreviewDeployment={process.env.VERCEL_ENV === "preview"} />
+  return <Shelf isPreviewDeployment={isBranchPreview()} />
 }

@@ -11,7 +11,7 @@
  * preserve is that **production never appears in that set**, whatever else is
  * set or misspelt around it.
  */
-import { previewLoginDecision, sessionCookieNames } from "../src/lib/previewLogin"
+import { isBranchPreview, isTesterSite, previewLoginDecision, sessionCookieNames } from "../src/lib/previewLogin"
 
 let failures = 0
 const SECRET = "s3cret-of-exactly-some-length"
@@ -80,6 +80,23 @@ check(
   allow({ ...preview, PREVIEW_LOGIN_SECRET: SECRET }, "   "),
   false
 )
+
+console.log("\nthe tester site is a Preview deployment and must not be treated as one")
+// The dev alias builds from `dev` as a Preview, so VERCEL_ENV alone cannot tell
+// it from a throwaway branch. It carries real accounts and a working GitHub
+// door; a backdoor there would be a backdoor onto people's work, and hiding the
+// GitHub button there would lock the alpha testers out of the tester site.
+const tester = { VERCEL_ENV: "preview", NODE_ENV: "production", VERCEL_GIT_COMMIT_REF: "dev" }
+check("the tester site is recognised", isTesterSite(tester), true)
+check("...and is not a branch preview", isBranchPreview(tester), false)
+check("the backdoor is refused there", allow(tester), false)
+check("...even with a key configured and supplied", allow({ ...tester, PREVIEW_LOGIN_SECRET: SECRET }, SECRET), false)
+check(
+  "a branch preview is still one",
+  isBranchPreview({ VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "feat/anything" }),
+  true
+)
+check("production is never a branch preview", isBranchPreview({ VERCEL_ENV: "production" }), false)
 
 console.log("\nan unrecognised deployment is not a preview")
 check(

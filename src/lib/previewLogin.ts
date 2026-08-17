@@ -45,6 +45,29 @@ export function previewLoginNeedsKey(env: Record<string, string | undefined> = p
   return Boolean(env.PREVIEW_LOGIN_SECRET?.trim())
 }
 
+/**
+ * The tester site, which Vercel also calls a preview.
+ *
+ * The dev alias is built from the `dev` branch as a Preview deployment, so
+ * `VERCEL_ENV` says "preview" there exactly as it does on a throwaway branch.
+ * Everything that follows from "this is a preview" is wrong for it: alpha
+ * testers sign in through GitHub against a real OAuth app whose callback is
+ * the alias, its database is the tester branch and still carries real people,
+ * and it is the one deployment where the manual sign-in smoke test happens.
+ *
+ * Treating it as a branch preview would have hidden the button those testers
+ * use and — with no key configured anywhere — opened the backdoor onto their
+ * data. The git ref is what tells the two apart.
+ */
+export function isTesterSite(env: Record<string, string | undefined> = process.env) {
+  return env.VERCEL_ENV === "preview" && env.VERCEL_GIT_COMMIT_REF?.trim() === "dev"
+}
+
+/** A throwaway branch preview: a preview that is not the tester site. */
+export function isBranchPreview(env: Record<string, string | undefined> = process.env) {
+  return env.VERCEL_ENV === "preview" && !isTesterSite(env)
+}
+
 export function previewLoginDecision(
   env: Record<string, string | undefined>,
   suppliedSecret: string | null | undefined
@@ -60,10 +83,12 @@ export function previewLoginDecision(
     return { allowed: true, why: "not-a-deployed-build" }
   }
 
-  // A built, deployed app that is not production — which should mean a preview,
-  // but only Vercel saying so counts.
-  if (env.VERCEL_ENV !== "preview") {
-    return { allowed: false, why: "a deployed build that is not a preview" }
+  // A built, deployed app that is not production — which should mean a branch
+  // preview, but only Vercel saying so counts, and the tester site says the
+  // same thing while being nothing like one. It carries real accounts and a
+  // working GitHub door; a backdoor there is a backdoor onto people's work.
+  if (!isBranchPreview(env)) {
+    return { allowed: false, why: "a deployed build that is not a branch preview" }
   }
 
   // A key is required only where one is configured. The lock existed because
