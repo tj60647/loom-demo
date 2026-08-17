@@ -34,8 +34,16 @@ import { timingSafeEqual } from "crypto"
  *     character at a time from response timings.
  */
 export type PreviewLoginDecision =
-  | { allowed: true; why: "not-a-deployed-build" | "preview-secret-matched" }
+  | {
+      allowed: true
+      why: "not-a-deployed-build" | "preview-secret-matched" | "preview-no-key-required"
+    }
   | { allowed: false; why: string }
+
+/** Whether this deployment will ask for a key — what the sign-in form renders. */
+export function previewLoginNeedsKey(env: Record<string, string | undefined> = process.env) {
+  return Boolean(env.PREVIEW_LOGIN_SECRET?.trim())
+}
 
 export function previewLoginDecision(
   env: Record<string, string | undefined>,
@@ -58,10 +66,18 @@ export function previewLoginDecision(
     return { allowed: false, why: "a deployed build that is not a preview" }
   }
 
+  // A key is required only where one is configured. The lock existed because
+  // the preview database had been branched from dev and so carried six real
+  // people's accounts and their work; scrubbed of those it holds the course
+  // readings and the fixture accounts, and asking a contributor to carry a
+  // secret to look at their own branch bought nothing it cost.
+  //
+  // This is the one place the module does not fail closed, and it is bounded:
+  // production is refused above before this line can be reached, so the worst
+  // an unset variable can do is open a preview. Setting PREVIEW_LOGIN_SECRET
+  // again turns the lock back on with no code change.
   const configured = env.PREVIEW_LOGIN_SECRET?.trim()
-  if (!configured) {
-    return { allowed: false, why: "PREVIEW_LOGIN_SECRET is not set for this deployment" }
-  }
+  if (!configured) return { allowed: true, why: "preview-no-key-required" }
 
   const supplied = suppliedSecret?.trim()
   if (!supplied) return { allowed: false, why: "no key supplied" }
