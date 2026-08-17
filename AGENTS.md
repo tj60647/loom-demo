@@ -95,3 +95,27 @@ the comment say how you know.**
 The same applies to commit messages and to any document proposing work: a
 recommendation inherits the reliability of whatever it was formed from, and a
 branch's own account of itself is evidence, not proof.
+
+# One decision per commit, and say what you removed
+
+A branch here is read decision by decision — taken, refused or changed one at
+a time. A commit carrying six unrelated decisions cannot be answered that way,
+so the good 80% waits on the contested 20%. That has already cost a branch:
+`b8258bd` moved six decisions across 8 files, and its strongest change sat
+blocked behind its weakest for a fortnight.
+
+- **One decision per commit.** If the message needs "and" between two unrelated
+  changes, it is two commits. Splitting later is expensive; splitting as you go
+  is free.
+- **The reasoning goes in the commit message.** Comments explain the code to
+  whoever edits it next; the message explains the *decision* to whoever has to
+  approve it. A reason that exists only in a comment is a reason no reviewer
+  reads before deciding.
+- **Declare removals explicitly.** A `Removes:` line for anything that stops
+  existing — a keyboard shortcut, a control, an affordance, a route. Three
+  removals went unmentioned in one branch: the `f` shortcut, keyboard
+  reachability of highlights, and five header items becoming unreachable. Each
+  was defensible; none was declared, so none was decided.
+- **State the evidence.** Which widths you checked, what you measured, which
+  specs you ran. "Measured at 1280 · 1536 · 1920: row 35px, one row, nothing
+  clipped" is verifiable by a reviewer in seconds. A predicted number is not.
