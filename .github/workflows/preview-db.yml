@@ -34,10 +34,13 @@ env:
   NEON_PROJECT_ID: raspy-wave-74437268
   NEON_DATABASE: loom-db
   PARENT_BRANCH: preview
-  # A runner has no `.vercel` link — nothing here was ever `vercel link`ed — so
-  # every CLI call has to name the project itself. The token is scoped to this
-  # project alone, which is the least it can hold and still do the job:
-  # add and remove one Preview variable, and read deployments to redeploy one.
+  # A runner has no `.vercel` link — the directory is gitignored — so the CLI
+  # cannot work out which project it is acting on, and naming it is not enough:
+  # resolving a project BY NAME needs a team context a project-scoped token
+  # does not carry. These two identifiers are what the CLI reads in CI instead,
+  # and they are identifiers rather than credentials, so they belong here.
+  VERCEL_ORG_ID: team_WHTuarzVIjYTlulj5dUbpOWU
+  VERCEL_PROJECT_ID: prj_sWGtUAmaxWRLEOso9B2CubxXykC4
   VERCEL_PROJECT: loom-demo
 
 jobs:
@@ -100,10 +103,10 @@ jobs:
       - name: Point the preview at it
         run: |
           npx vercel env rm DATABASE_URL preview --git-branch "$PR_BRANCH" \
-            --project "$VERCEL_PROJECT" --token "$VERCEL_TOKEN" --yes 2>/dev/null || true
+            --token "$VERCEL_TOKEN" --yes 2>/dev/null || true
           npx vercel env add DATABASE_URL preview --git-branch "$PR_BRANCH" \
             --value "$DATABASE_URL" --sensitive \
-            --project "$VERCEL_PROJECT" --token "$VERCEL_TOKEN" --yes
+            --token "$VERCEL_TOKEN" --yes
 
       # Vercel resolves variables when it builds, and it started building on
       # push — before this job existed. Without a redeploy the first preview of
@@ -112,13 +115,13 @@ jobs:
         continue-on-error: true
         run: |
           node --input-type=module -e '
-            const token = process.env.VERCEL_TOKEN, ref = process.env.PR_BRANCH, app = process.env.VERCEL_PROJECT;
+            const token = process.env.VERCEL_TOKEN, ref = process.env.PR_BRANCH, app = process.env.VERCEL_PROJECT, team = process.env.VERCEL_ORG_ID;
             const h = { Authorization: "Bearer " + token };
-            const r = await fetch(`https://api.vercel.com/v6/deployments?app=${app}&limit=40&state=READY,BUILDING`, { headers: h });
+            const r = await fetch(`https://api.vercel.com/v6/deployments?app=${app}&limit=40&state=READY,BUILDING&teamId=${team}`, { headers: h });
             const { deployments = [] } = await r.json();
             const mine = deployments.find(d => d.meta?.githubCommitRef === ref);
             if (!mine) { console.log("no deployment for", ref, "— the next push will pick it up"); process.exit(0); }
-            const re = await fetch("https://api.vercel.com/v13/deployments", {
+            const re = await fetch(`https://api.vercel.com/v13/deployments?teamId=${team}`, {
               method: "POST", headers: { ...h, "Content-Type": "application/json" },
               body: JSON.stringify({ name: app, deploymentId: mine.uid, target: "preview" }),
             });
@@ -152,4 +155,4 @@ jobs:
         continue-on-error: true
         run: |
           npx vercel env rm DATABASE_URL preview --git-branch "$PR_BRANCH" \
-            --project "$VERCEL_PROJECT" --token "$VERCEL_TOKEN" --yes
+            --token "$VERCEL_TOKEN" --yes
