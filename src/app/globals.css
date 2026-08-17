@@ -39,6 +39,11 @@ h1,h2,h3{font-family:var(--display);font-weight:500;margin:0}
 .label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
 .cap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--grey)}
 header{border-bottom:1px solid var(--rule);padding:10px 26px 8px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--paper)}
+/* Reading focus (Lingxiu, 2026-08-15): with a text open on 01 · Reading the
+   station is just the text — Workbench sets this attribute and withholds its
+   own scope bar and footer; the header is the root layout's, so it is hidden
+   here. The journey bar and the viewer's toolbar are all that stand. */
+body[data-reading-focus] header{display:none}
 .wordmark{font-family:var(--display);font-size:24px;font-weight:600;line-height:1;display:flex;align-items:center;gap:9px}
 .wordmark small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);font-weight:400;margin-top:3px}
 header .spacer{flex:1}
@@ -95,6 +100,46 @@ nav .staffgroup{margin-left:auto;display:flex;align-items:stretch;flex-wrap:wrap
 nav .station.staff{color:var(--sage);font-size:14.5px;padding-left:11px;padding-right:11px}
 nav .station.staff:hover{color:var(--ink)}
 nav .station.staff.active{color:var(--sage);border-bottom-color:var(--sage)}
+
+/* The mark, left of station 00, in reading focus only (JourneyNav's `mark`
+   slot). Right padding only: it leads the row, so a left inset would push the
+   whole journey off the 26px gutter the bar shares with the header above it. */
+nav .journeymark{display:flex;align-items:center;padding-right:10px;flex:0 0 auto}
+/* The red weft is the environment tell — shown unless <body> says production,
+   so an environment that never set `data-env` wears the dev thread rather than
+   passing itself off as the real site (LoomMark). */
+.loommark .weft{display:none}
+body:not([data-env="production"]) .loommark .weft{display:inline}
+
+/* The header's chrome behind one ☰, at the right-hand end of the journey in
+   reading focus (JourneyNav's `menu` slot). */
+nav .chromemenu{position:relative;margin-left:auto;display:flex;align-items:center;flex:0 0 auto}
+/* One auto margin does the pushing. The search and the staff group each carry
+   their own, and a third would split the free space three ways and strand the
+   search mid-bar — so when either stands to the left of this, it has already
+   moved the whole right-hand group over. */
+nav .stationsearch~.chromemenu,nav .staffgroup~.chromemenu{margin-left:0}
+.chromemenu-toggle{font-size:15px;line-height:1}
+/* Anchored to the button, dropping over the work below — the same reasoning as
+   .stationsearch-panel: `nav` clips nothing and this is a sibling of <main>,
+   whose station-reading variant is overflow:hidden, so it hangs free of the
+   page's own scrolling boxes. z-index 60 to sit with that panel. */
+.chromemenu-panel{position:absolute;top:calc(100% + 6px);right:0;z-index:60;
+  width:min(300px,calc(100vw - 32px));padding:6px;background:var(--paper);
+  border:1px solid var(--ink);border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.18);
+  display:flex;flex-direction:column}
+/* Rows, not buttons in a row: the panel is a list of places to go, and each
+   one carries the tip the header showed on hover — there is room here, and a
+   menu that only works if you already know what "my loom" means is a menu for
+   the person who wrote it. */
+.chromemenu-item{display:flex;flex-direction:column;gap:2px;align-items:flex-start;
+  width:100%;padding:8px 10px;border:none;border-radius:3px;background:none;
+  font-family:var(--body);font-size:15px;color:var(--ink);text-align:left;
+  text-decoration:none;cursor:pointer}
+.chromemenu-item:hover{background:rgba(168,132,63,.10)}
+.chromemenu-item:focus-visible{outline:2px solid var(--ochre);outline-offset:-2px}
+.chromemenu-note{font-size:12px;line-height:1.35;color:var(--ink-soft)}
+.chromemenu-account{margin-top:5px;padding:8px 10px 4px;border-top:1px solid var(--rule)}
 
 /* A button that reads as prose. Used where the action is a tab change the
    Workbench owns, so it cannot be an <a> — see OpenTab's "see them all in

@@ -35,7 +35,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
+      {/* Which deployment this is, published to CSS. The mark's red weft reads
+          it (LoomMark), so every copy of the mark agrees about where it is
+          without `deployEnv` being threaded down two separate prop chains. */}
+      <body data-env={deployEnv}>
         <AuthProvider>
           <LoomProvider>
             <ReadingsProvider>

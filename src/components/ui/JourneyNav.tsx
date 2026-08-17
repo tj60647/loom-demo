@@ -213,6 +213,8 @@ export default function JourneyNav({
   active,
   onStation = {},
   labels = {},
+  mark,
+  menu,
   search,
 }: {
   active: Station | null
@@ -220,6 +222,24 @@ export default function JourneyNav({
   onStation?: Partial<Record<Station, () => void>>
   /** Per-context label overrides, e.g. "Reading" (this text) inside one. */
   labels?: Partial<Record<Station, string>>
+  /**
+   * The Loom mark, drawn left of station 00 — a slot, filled only where the
+   * app header is standing down (reading focus). Everywhere else the header
+   * above carries the mark and a second one here would say it twice.
+   *
+   * Deliberately NOT a link home, even though the Library is home: 00 · Library
+   * is the very next thing in this row, and a mark that also went there would
+   * be a second door to one room (the same reason the scope bar's "‹ library"
+   * went, TJ 2026-08-08).
+   */
+  mark?: React.ReactNode
+  /**
+   * The chrome that the header was carrying — About, My loom, Workflows, the
+   * guide, full screen, the account — folded into one ☰ at the right-hand end.
+   * A slot for the same reason `search` is one: only the surface knows whether
+   * the header is standing down, and this bar should not have to ask.
+   */
+  menu?: React.ReactNode
   /**
    * This station's search (TJ, 2026-08-13), docked right of the journey and
    * left of the staff group. A SLOT rather than something this bar builds:
@@ -234,6 +254,7 @@ export default function JourneyNav({
 }) {
   return (
     <nav aria-label="The journey">
+      {mark ? <span className="journeymark">{mark}</span> : null}
       {VISIBLE_STATIONS.map(({ key, step, label }) => {
         const handler = onStation[key]
         const text = labels[key] ?? label
@@ -284,6 +305,10 @@ export default function JourneyNav({
       <Suspense fallback={null}>
         <StaffGroup />
       </Suspense>
+
+      {/* Last in the row, after the staff group, so the ☰ is the right-hand
+          end of the bar whoever is reading. */}
+      {menu}
     </nav>
   )
 }

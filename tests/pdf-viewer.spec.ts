@@ -22,11 +22,12 @@ test.describe('PDF Viewer and Highlighting', () => {
       // The shelf is the home screen: pick the reading off it, which opens
       // that reading's workbench, and read the text from tab 00 inside it.
       await openReading(page, pdf.cardTitle);
-      // Case-insensitive: shelf titles are the readings' own ("Communities of
-      // practice and social learning systems"), not the test's shorthand.
-      await expect(page.locator('.scopetitle')).toContainText(
-        new RegExp(pdf.expectedText, 'i')
-      );
+      // Reading focus (2026-08-15): with the text open the station is just
+      // the text — the app header and the scope bar (title, Download PDF)
+      // stand down, leaving the journey bar and the viewer's own toolbar.
+      await expect(page.locator('.scopebar')).toHaveCount(0);
+      await expect(page.locator('header')).toBeHidden();
+      await expect(page.locator('.pdf-toolbar')).toBeVisible();
 
       // Wait for the text layer to render on the first page
       const textLayer = page.locator('.react-pdf__Page__textContent');
