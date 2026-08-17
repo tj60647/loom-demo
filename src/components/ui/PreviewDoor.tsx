@@ -57,8 +57,14 @@ export default function PreviewDoor({
             style={{ flex: "1 1 220px", minWidth: "180px" }}
           />
         )}
-        <select name="as" className="tinput" aria-label="Sign in as" defaultValue="">
-          <option value="">as admin</option>
+        {/* Every option carries its own value, admin included. An empty value
+            here would submit `as=`, which the route cannot tell apart from a
+            URL that never named an identity — and on a branch preview that
+            falls back to the learner, so choosing "as admin" would quietly
+            hand you a learner instead. The choice has to travel to be
+            honoured. */}
+        <select name="as" className="tinput" aria-label="Sign in as" defaultValue="admin">
+          <option value="admin">as admin</option>
           <option value="testa">as a learner</option>
           <option value="faculty">as faculty</option>
         </select>
