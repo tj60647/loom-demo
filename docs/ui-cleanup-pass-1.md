@@ -43,14 +43,20 @@ what is here is good.
 | 5 | In-app fullscreen removed | **Superseded** — merged, not removed | `feat/reading-toolbar-cleanup` |
 | 6 | Full screen into the toolbar | **Superseded** — merged, not moved | `feat/reading-toolbar-cleanup` |
 | 4 | Reading focus | **Dropped** | PR #20, closed unmerged |
-| 13 | `isDeletePost` accepts slug ids | **Take** | not started |
+| 13 | `isDeletePost` accepts slug ids | **Refuse** — the bug is not real | nothing to do |
 | 7 | Highlights become paint | **Take with a change** | not started |
 | 8 | Cards edit in place | **Take** | not started |
 | 9 | The card's subject is the passage | **Take** | not started |
 | 11 | Zoom floor and ceiling | **Take** | not started |
 | 12 | Trackpad: scroll pans, pinch zooms | **Refuse as written** | not started |
 
-Six settled, one dropped, five still to take, one refused.
+Six settled, one dropped, four still to take, two refused.
+
+**Read items 7–12 with item 13 in mind.** Every recommendation above that is
+still open was formed the same way this document formed item 13: from the
+branch's own commit messages and code comments. One of those turned out to
+describe a system that does not exist, and it took four checks to see it.
+Verify the premise before implementing the fix.
 
 ---
 
@@ -99,15 +105,44 @@ combine in their head. Same `isTwoPage` state underneath.
 
 *Files:* `PdfViewer.tsx`, `concept-rail.spec.ts`, `matrix-zoom.spec.ts`.
 
-## 13. `isDeletePost` accepts slug reading ids · Take
+## 13. `isDeletePost` accepts slug reading ids · Refuse — the bug is not real
 
-Not a UI change and unrelated to the rest — a test-helper bug worth taking on
-its own. The delete detector required a UUID in the second argument, so
-locally-seeded readings with slug ids (`e2e-object-worlds`) silently never
-matched and every cleanup on them timed out. The first argument stays
-UUID-strict, which is what distinguishes a delete from a create.
+Originally listed here as a free bugfix, on the strength of the code comment
+`c502f7e` shipped with it: *"locally-seeded fixtures carry slug ids
+('e2e-object-worlds'), and the UUID pattern silently never matched there,
+which timed out every cleanup on that one reading."*
 
-*Files:* `tests/helpers.ts`. Minutes of work; take it whenever.
+**No such reading exists.** Four checks, any one of which is enough:
+
+- **A reading's id is always a UUID.** `sources.id` is
+  `text().primaryKey().$defaultFn(() => crypto.randomUUID())`
+  (`src/db/schema.ts`). `atSourceId` is a foreign key to it.
+- **The seed's slug is a different column, deliberately.** `sources.seedKey`
+  holds `object-worlds`, `communities-of-practice`, `boundary-objects`,
+  `practice-loom-reading` (`scripts/seed-sources.ts`). Its schema comment
+  explains at length why seed identity had to stop being the title and become
+  its own column — it was never the id.
+- **`e2e-object-worlds` does not exist.** Not in seeds, tests or fixtures. The
+  only occurrences in the repository are that comment and, until this
+  revision, this document repeating it.
+- **The specs pass without the change.** `concept-rail` and `pdf-viewer` both
+  wait on `isDeletePost`, and both pass against unmodified `dev` (run
+  2026-08-17). A matcher that never matched would time out those waits.
+
+The change itself is inert rather than harmful — every update action posts an
+**object** in the second slot (`updateConcept`, `updateEdge`, `updateLink`,
+`updateMap` are all `(id, data, …)`), so a widened string pattern catches
+nothing new. It is refused for the reason it exists, not for what it does: it
+widens a matcher on a stated fact that is false, and leaves a comment that
+will mislead the next reader.
+
+**Worth knowing about the helper either way.** It already matches several
+non-deletes — `refilePassage`, `unfilePassage`, `attachLink` and two-argument
+`mergeConcepts` all post two UUIDs. It works because the specs only wait on it
+while a delete is the only thing in flight. It is a shape heuristic, not a
+proof, and neither the current pattern nor the proposed one changes that.
+
+*Files:* none. `tests/helpers.ts` stays as it is on `dev`.
 
 ---
 
@@ -401,3 +436,12 @@ Worth recording, because the pattern will repeat on items 7–12:
 - **The best answer to 5 and 6 was in neither column.** Both were framed as
   take-or-refuse on Lingxiu's change; merging was not on the table until the
   two fullscreens were read side by side in the code.
+- **Item 13 was not a bug at all**, and this document recommended it on the
+  strength of a code comment that named a fixture which does not exist. The
+  mechanism was checked — the pattern really does reject slug ids — and the
+  premise was not. Only the premise mattered.
+
+The common thread: this document trusted the branch's own account of itself.
+Where a claim was checked against the repository it held up; where it was
+taken from a comment it was wrong three times out of three. See "Reasons in
+comments are claims" in `AGENTS.md`.
