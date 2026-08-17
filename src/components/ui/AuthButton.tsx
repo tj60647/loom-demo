@@ -2,11 +2,12 @@
 
 import { signOut, useSession } from "next-auth/react"
 import { usePathname, useRouter } from "next/navigation"
+import Link from "next/link"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import { VIEW_AS_STUDENT_COOKIE } from "@/lib/viewAs"
 
-export default function AuthButton() {
+export default function AuthButton({ isBranchPreview = false }: { isBranchPreview?: boolean }) {
   const { data: session, status } = useSession()
   const { course, refresh } = useReadings()
   const router = useRouter()
@@ -104,9 +105,22 @@ export default function AuthButton() {
     )
   }
 
+  // The header's button is the most prominent thing on a signed-out screen, so
+  // on a branch preview it must not be the one door that cannot open. The
+  // tester site is a Preview deployment too and keeps GitHub: its callback is
+  // registered, its testers are real, and its data is theirs. GitHub returns
+  // people only to the single address its OAuth App holds, and a preview has
+  // its own — pressing it lands on GitHub's error page, which reads as a broken
+  // deployment. Send them to the sign-in page, which carries the team-key form.
   return (
     <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-      <GithubSignInButton />
+      {isBranchPreview ? (
+        <Link className="btn" href="/auth/signin" data-tip="This is a preview — sign in with the team key">
+          Open preview
+        </Link>
+      ) : (
+        <GithubSignInButton />
+      )}
     </div>
   )
 }
