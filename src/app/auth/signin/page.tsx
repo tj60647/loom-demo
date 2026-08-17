@@ -1,6 +1,8 @@
 import Link from "next/link"
 import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import GuestEmailSignIn from "@/components/ui/GuestEmailSignIn"
+import PreviewDoor from "@/components/ui/PreviewDoor"
+import { isBranchPreview, previewLoginNeedsKey } from "@/lib/previewLogin"
 import { emailSignInConfigured } from "@/lib/auth"
 import { ROSTER_CONTACT_EMAIL, signInMessage } from "@/lib/signIn"
 
@@ -30,6 +32,10 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   const params = await searchParams
   const failed = Boolean(params?.error)
   const message = signInMessage(params?.error)
+  // Server-side only, and not NEXT_PUBLIC: which door this page offers is not
+  // a decision to take on a value the client could set. The tester site is a
+  // Preview deployment too and must keep the GitHub button — see isTesterSite.
+  const isPreviewDeployment = isBranchPreview()
 
   return (
     <main>
@@ -50,12 +56,24 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
           </span>
         )}
 
+        {/* On a preview the GitHub button is not merely useless, it is
+            misleading: it is the obvious thing to press and it fails on
+            GitHub's own "Be careful!" screen, which reads as the deployment
+            being broken rather than as a door that was never open. So a
+            preview offers the door that does work, and does not offer the one
+            that cannot. */}
         <div style={{ marginTop: "20px", display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap" }}>
-          {message.retry && <GithubSignInButton className="btn" callbackUrl={params?.callbackUrl} />}
+          {message.retry && !isPreviewDeployment && (
+            <GithubSignInButton className="btn" callbackUrl={params?.callbackUrl} />
+          )}
           <Link href="/" className="btn ghost">Back to Loom</Link>
         </div>
 
-        {message.retry && emailSignInConfigured() && (
+        {message.retry && isPreviewDeployment && (
+          <PreviewDoor callbackUrl={params?.callbackUrl} requiresKey={previewLoginNeedsKey()} />
+        )}
+
+        {message.retry && !isPreviewDeployment && emailSignInConfigured() && (
           <GuestEmailSignIn callbackUrl={params?.callbackUrl} />
         )}
       </div>

@@ -14,7 +14,7 @@ const subscribeFullscreen = (onChange: () => void) => {
   return () => document.removeEventListener("fullscreenchange", onChange)
 }
 
-export default function Header({ deployEnv }: { deployEnv?: string }) {
+export default function Header({ deployEnv, isBranchPreview = false }: { deployEnv?: string; isBranchPreview?: boolean }) {
   const { data: session } = useSession()
   const { flashMsg } = useLoom()
   // Masked by the student lens, which is what makes the workflows link below
@@ -89,7 +89,7 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
         {session && !inAdmin && (
           <span id="saveDot">{flashMsg ? `· ${flashMsg} ·` : "—"}</span>
         )}
-        <AuthButton />
+        <AuthButton isBranchPreview={isBranchPreview} />
         <button
           className="btn ghost mini"
           onClick={() => setShowAbout(true)}
