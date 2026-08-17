@@ -82,7 +82,8 @@ line; it is the whole point of it existing.
 
 Vercel also refuses to export values for variables marked **sensitive**: it writes
 the literal string `[SENSITIVE]`. In this project that includes `DATABASE_URL`,
-`NEXTAUTH_SECRET`, `GITHUB_ID`, `GITHUB_SECRET`, `NEXTAUTH_URL` and
+`NEXTAUTH_SECRET`, `GITHUB_ID`, `GITHUB_SECRET`, `NEXTAUTH_URL`,
+`PREVIEW_LOGIN_SECRET` and
 `OPENROUTER_API_KEY` — so a pulled production file is not usable as-is, and the
 connection string has to come from the Neon console. `src/db/index.ts` fails with
 that instruction rather than letting it surface as an opaque driver error.
@@ -127,12 +128,21 @@ my month"; a change branch is a ten-minute read.
    `loom-demo-git-<branch>-aroughidea.vercel.app` — only the per-deployment URL
    is ephemeral. GitHub sign-in still cannot work there: next-auth on Vercel
    builds `redirect_uri` from the request host, and an OAuth App holds exactly
-   one callback URL, so every branch would need its own app. Today that makes
-   the preview a place for *looking at UI* only, and — until the gaps in
-   [data-environments.md](data-environments.md) close — a **read-only** one,
-   because non-`dev` previews are pointed at the production database and share
-   production's blob objects. Anything needing a session is exercised locally
-   (`next dev` + the test-login backdoor) or on the dev alias after merge.
+   one callback URL, so every branch would need its own app.
+
+   **A reviewer gets in through the preview door instead** —
+   `/api/auth/test-login?key=<PREVIEW_LOGIN_SECRET>`, which mints a session
+   without OAuth. See [previewLogin.ts](../src/lib/previewLogin.ts) for where
+   that door is open and on what terms; the key may also travel as an
+   `x-preview-login` header, to keep it out of the deployment's request logs.
+   The bare URL lands a reviewer as the **learner**; `?as=faculty` and
+   `?as=admin` ask for the other two.
+
+   A preview is no longer read-only, and no longer points at production: each
+   open PR gets its own Neon branch, cut from the `preview` template and
+   dropped when the PR closes (`.github/workflows/preview-db.yml`). What it
+   still shares with production is the **blob store** — invariant 4 — which is
+   why the door's default identity is not the admin.
 2. **PR into `dev`; the other developer reviews.** CI's `checks` job gates
    every PR; `e2e` joins it once its secrets are configured. Keep the PR
    small enough that the review is genuinely a read, and agree on a
@@ -156,6 +166,24 @@ my month"; a change branch is a ten-minute read.
    the production `DATABASE_URL` at merge time (next section).
 
 Rhythm in one line: `branch → PR → review → dev alias → soak → PR to master`.
+
+### When production is broken and `dev` cannot ship
+
+The rhythm above routes every change through the soak, which is right for every
+change except one: a bug students are hitting now, while `dev` is carrying work
+that is not ready to go with it. Waiting for the soak ships the half-finished
+work; shipping `dev` early is the thing the soak exists to prevent.
+
+So a hotfix takes the short way round, and it is **three steps, not two**:
+
+1. Cut from `master`, not `dev` — `git switch -c fix/... origin/master`. A
+   branch cut from `dev` carries `dev`'s unshipped work with it, which is the
+   whole problem.
+2. PR into `master`. Same gate as any promotion: green CI plus review.
+3. **Merge `master` back into `dev` immediately.** This is the step that gets
+   forgotten, and forgetting it is silent: `dev` still holds the old broken
+   code, so the next `dev → master` promotion reverts the hotfix and the bug
+   returns wearing a fix's commit message.
 
 ## Onboarding a developer
 
