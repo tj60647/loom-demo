@@ -255,7 +255,7 @@
           It's folded away on the sign-in page rather than offered up front — for almost everyone,
           GitHub is the right answer and a visible choice is just one more decision.
         </p>
-        <span class="status off">Built, but not switched on anywhere yet</span>
+        <span class="status off">Built, but not switched on anywhere yet — the sign-in page currently links to it without it being there</span>
       </div>
     </div>
   </section>
@@ -312,10 +312,10 @@
         <span class="row-door">The same shortcut</span>
         <span class="row-note">The scripted test run uses it too, which is why the checks can never tell us whether real GitHub sign-in still works.</span>
       </div>
-      <div class="row blocked">
+      <div class="row">
         <span class="row-who">A work-in-progress preview<span class="alias">preview</span></span>
-        <span class="row-door none">Nothing, right now</span>
-        <span class="row-note">GitHub can't work here — see below — and the shortcut is switched off in finished builds. So a preview can be looked at but not signed into.</span>
+        <span class="row-door">A team door</span>
+        <span class="row-note">GitHub can't work here — see below — so the page says so and offers a door of its own: click <em>Open preview</em> and choose who to be. No password, because a preview holds no real person's work.</span>
       </div>
       <div class="row">
         <span class="row-who">The tester site<span class="alias">dev</span></span>
@@ -345,9 +345,9 @@
       </p>
 
       <div class="options">
-        <div class="option">
-          <h4>A team-only shortcut</h4>
-          <p>Bring back the developers' test door on previews, behind a shared secret. Fastest to use, and it needs the preview to be sealed off from real data first.</p>
+        <div class="option" style="border:1px solid var(--data)">
+          <h4>A team door — what we did</h4>
+          <p>The developers' test door, opened on previews only. It needed the preview database sealed off from real data first, which is why previews now carry the readings and the test accounts and nobody's work.</p>
         </div>
         <div class="option">
           <h4>Use the emailed link</h4>

@@ -70,22 +70,18 @@ alias; share the alias.
 
 ### 4. QA the preview
 
-This is the step the whole environment story exists to make safe, and today it
-is **only partly usable**:
+Open the branch alias, click **Open preview**, choose an identity — admin,
+learner or faculty. No GitHub account, no key.
 
-- ✅ Visual and layout review, built and deployed.
-- ✅ Anything reachable without a session.
-- ⚠️ **gap** — no sign-in path works on a preview today. OAuth cannot complete
-  (an OAuth App holds one callback URL and the origin is the preview host), the
-  guest email door is unconfigured, and the backdoor 403s on production builds.
-- ⚠️ **gap** — previews are pointed at the **production database** and share
-  production's blob objects. Until [data-environments.md](data-environments.md)
-  gaps 1 and 2 close, treat a preview as **read-only** and do not create,
-  ingest, or delete anything.
+The preview has **its own database** (`preview/pr-<n>`, cut from the `preview`
+template when the PR opened and migrated for that branch) and **its own blob
+drawer** (`env/preview-<branch>/`). Create, edit, delete, reprocess a PDF,
+change the schema: none of it reaches production, the tester site, or another
+PR. It is all deleted when the PR closes.
 
-At **target**, this step becomes: sign in with the secret-gated backdoor, work
-against the `preview` database in your own blob namespace, and break whatever
-you like.
+GitHub sign-in cannot work here and the page says so rather than offering a
+button that fails — an OAuth App holds one callback URL and every preview has
+its own address.
 
 Check layouts at **1280 · 1536 · 1728 · 1920** CSS px. Loom is a desktop tool;
 there are no phone layouts and none should be added. A 1920×1080 panel does not
@@ -141,16 +137,16 @@ The matrix worth internalizing. ✅ do it here · ⬜ possible, not the right pl
 | | local | CI | preview | dev alias | production |
 | --- | --- | --- | --- | --- | --- |
 | Unit-ish assertions (`check:*`) | ✅ | ✅ | ⬜ | ⬜ | ❌ |
-| Playwright journey suite | ✅ | ✅ | ❌ backdoor 403s | ❌ | ❌ |
-| Exploratory clicking | ✅ | ❌ | ✅ **target** | ✅ | ❌ |
+| Playwright journey suite | ✅ | ✅ | ⬜ possible, not the habit | ❌ | ❌ |
+| Exploratory clicking | ✅ | ❌ | ✅ | ✅ | ❌ |
 | Visual / layout at real widths | ⬜ | ❌ | ✅ | ✅ | ❌ |
 | Production build path (`NODE_ENV=production`) | ❌ | ⬜ | ✅ | ✅ | ✅ |
 | Server-side PDF decode (needs Node ≥ 22.7) | ⬜ | ✅ Node 22 | ✅ Node 24 | ✅ Node 24 | ✅ Node 24 |
 | Migration applies cleanly | ✅ | ✅ | ⬜ | ✅ | ✅ |
 | **GitHub OAuth round trip** | ❌ | ❌ | ❌ | ✅ **only here** | ✅ don't |
 | Enrolment on first sign-in | ❌ | ❌ | ❌ | ✅ **only here** | ✅ don't |
-| Guest email door | ❌ | ❌ | ✅ **target** | ✅ **target** | ⬜ |
-| Real-data behavior at scale | ❌ | ❌ | ❌ | ⬜ | observe only |
+| Guest email door | ❌ | ❌ | ❌ unconfigured | ❌ unconfigured | ⬜ |
+| Real-data behaviour at scale | ❌ | ❌ | ❌ synthetic only | ⬜ | observe only |
 
 Two columns of ❌ in the OAuth rows are the point: **the suite structurally
 cannot cover first sign-in and enrolment.** `npm run check:auth` covers
@@ -188,7 +184,7 @@ a generic callback failure.
 | --- | --- | --- |
 | local | `GET /api/auth/test-login[?as=testa\|faculty]` | Dev builds only. |
 | CI | same | The suite's only door. |
-| preview | **gap** — nothing works | **target:** the same route, gated on `VERCEL_ENV === 'preview'` **and** a `PREVIEW_LOGIN_SECRET`, with `__Secure-` cookie naming so it works over https. |
+| preview | the preview door — click **Open preview**, choose an identity | Keyless, because the preview database holds no real work. Set `PREVIEW_LOGIN_SECRET` to require a key again. The tester site is a Preview deployment too and is deliberately excluded. |
 | dev alias | real GitHub OAuth (dev app) | Also the only place to test enrolment. |
 | production | real GitHub OAuth (prod app) | |
 
@@ -257,17 +253,18 @@ nowhere else; never run `seed:demo` against `main`.
 | A script reports on the wrong database | Read the database line it prints. `LOOM_ENV_FILE` redirects it. |
 | `OAuthAccountNotLinked` | Someone used the guest link first, then GitHub, with one address. next-auth won't join them. |
 
-## What changes when the gaps close
+## What changed on 17 August
 
-Three things get materially better, in this order:
+Three things landed together, and step 4 above is the result:
 
-1. **`preview` Neon branch + re-scoped variables** → preview QA stops touching
-   production rows; you can create and edit freely.
-2. **Blob namespacing in `storage.ts`** → preview and dev QA stop overwriting
-   production's objects; delete becomes safe everywhere; the dev alias stops
-   quietly rewriting production covers.
-3. **Secret-gated preview backdoor + Deployment Protection** → step 4 of the
-   lifecycle becomes a real QA step instead of a look-but-don't-touch one.
+1. **A database per pull request** — cut from the `preview` template, migrated
+   for that branch, deleted on close.
+2. **A blob drawer per environment** — so reprocessing PDFs on one branch
+   cannot overwrite another's covers, or production's.
+3. **A door onto previews** that does not depend on GitHub.
 
-Until then, step 4 is **read-only**, and that limitation is the reason this
-document exists rather than an oversight in it.
+What is still open is listed in
+[data-environments.md](data-environments.md) under **Open gaps** — the two that
+touch this workflow are that a PR closed *without merging* can leave its
+database behind, and that the guest email door is advertised on the sign-in
+page while being configured nowhere.
