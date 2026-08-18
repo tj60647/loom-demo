@@ -616,6 +616,41 @@ body[data-reading-focus] header{display:none}
 .iconbtn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .iconbtn:hover,.iconbtn:focus-visible{border-color:var(--ochre);color:var(--ochre);outline:none}
 .cloth-info-btn{flex:0 0 auto;margin-left:2px}
+/* THE CAPTURE CARD, slimmed 2026-08-18 and put in Your work's order (TJ: "the
+   capture passage card needs to keep its content but be slimmer. maybe the
+   order is as is in the your work passage card, and the same format").
+
+   It takes the sheet's type ladder rather than the reading prose's 17px base,
+   which it had been inheriting: measured, this card's content is 400px wide
+   against Your work's 396px, so the same object is at the same measure and the
+   sizes transplant without re-tuning. Scoped to .capturecard because the
+   `.yourwork` scope that defines that ladder cannot reach inside .info-scrim.
+
+   Before: 871px of content in a 734px box at 1536. The quotation was a
+   labelled, bordered panel (176.5px) and citation/location were two labelled
+   columns (82.5px); both are now the plain `.passage` + `.src` pair Your work
+   uses. Card padding 24 -> 16. ConceptNamingAssist is untouched at 248.5px —
+   TJ is keeping it, so the height came from around it. */
+.capturecard{padding:16px 16px 0}
+.capturecard h2{font-size:16px;margin:0 0 10px}
+.capturecard .passage{font-size:13.5px;line-height:1.5;margin:0 0 6px;
+  max-height:150px;overflow-y:auto}
+.capturecard .src{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
+.capturecard .form-row{margin-bottom:0;margin-top:12px}
+.capturecard input,.capturecard textarea{font-size:14px}
+.capturecard textarea{min-height:44px}
+/* The hint's 14px bottom margin was dead space under the citation cells it no
+   longer has; nothing in this card uses .hint now, but the rule is scoped in
+   case one returns. */
+.capturecard .hint{margin:2px 0 6px}
+/* Sticky so the commit cannot scroll away — measured at 1280x800, Save sat
+   191px below the visible bottom of the card, 388px with the naming ladder
+   open, against a comment promising it "must stay reachable". The card's
+   bottom padding lives here so the footer's background covers the content
+   passing under it. */
+.capturefoot{position:sticky;bottom:0;display:flex;gap:10px;justify-content:flex-end;
+  margin-top:14px;padding:10px 0 16px;background:var(--paper);
+  border-top:1px solid var(--rule)}
 .info-scrim{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:22px}
 .info-dialog{position:relative;max-width:520px;width:100%;background:var(--paper);border:1px solid var(--ink);border-radius:6px;box-shadow:0 18px 50px rgba(0,0,0,.3);padding:24px 26px 20px}
 .info-dialog .info-k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ochre)}

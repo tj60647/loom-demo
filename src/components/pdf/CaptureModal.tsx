@@ -127,34 +127,50 @@ export default function CaptureModal({ passage, source, sourceId, location, page
           own text running through the passage you are about to keep.
           Scrolls past the viewport: a full-passage capture grows tall (the
           word chips alone can fill a screen) and Save must stay reachable. */}
-      <div className="card" style={{ width: "100%", maxWidth: "450px", maxHeight: "85vh", overflowY: "auto", padding: "24px", background: "var(--paper)", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
-        <h2 style={{ marginBottom: "16px", fontSize: "18px" }}>Capture Passage</h2>
-        
-        <div style={{ marginBottom: "20px" }}>
-          <span className="label">Passage</span>
-          <div className="passage" style={{ maxHeight: "150px", overflowY: "auto", fontSize: "14px", color: "var(--ink)", padding: "12px", background: "var(--paper-2)", borderRadius: "6px", border: "1px solid var(--rule)" }}>
-            "{passage}"
-          </div>
-        </div>
+      <div className="card capturecard" style={{ width: "100%", maxWidth: "450px", maxHeight: "85vh", overflowY: "auto", background: "var(--paper)", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}>
+        <h2>Capture Passage</h2>
 
-        <div style={{ marginBottom: "20px", display: "flex", gap: "16px" }}>
-          <div style={{ flex: 1 }}>
-            {/* "Citation", matching the hand-capture form since 2026-08-09.
-                Read-only here — a capture off the page is unambiguously from
-                the page, so this path never offered an override to break. */}
-            <span className="label">Citation</span>
-            <div className="hint">{source}</div>
-          </div>
-          <div style={{ flex: 1 }}>
-            <span className="label">Location</span>
-            <div className="hint">{location}</div>
-          </div>
+        {/* THE QUOTATION IS THE SUBJECT, so it carries no caption and no box.
+            It was a labelled panel in --paper-2 with its own border and 12px of
+            padding — 176.5px measured, for the one thing on this card nobody
+            needs told the name of. It now takes the type Your work gives a
+            passage, which is the same object at the same measure (400px of
+            content here against the sheet's 396px). The height cap stays: a
+            full-page capture would otherwise push everything below it away. */}
+        <div className="passage">&quot;{passage}&quot;</div>
+        {/* Citation and location, as one mono line rather than two labelled
+            columns. Read-only: a capture off the page is unambiguously from the
+            page, so this path never offered an override to break. The two-cell
+            version cost 82.5px and two labels to say what Your work says in
+            15px, in the same words and the same order. */}
+        <div className="src">{source}{location ? ` · ${location}` : ""}</div>
+
+        {/* THE NOTE COMES BEFORE THE CONCEPT, matching Your work's order (TJ,
+            2026-08-18). It already had to sit outside the concept block, being
+            the whole of what an Unlabeled capture can say; above it is where
+            that reasoning actually lands, because an Unlabeled capture then
+            reads top to bottom with nothing skipped.
+
+            THIS PASSAGE's own note — why you took these words, what struck you,
+            what to come back to. Distinct from the concept's description below:
+            that one belongs to the idea and travels with it, this one belongs
+            to the quotation. */}
+        <div className="form-row">
+          <span className="label">Note on this passage <span className="labelsay">(optional)</span></span>
+          <textarea
+            id="capturePassageNote"
+            placeholder="why you kept these words — what struck you, what to come back to"
+            title="your note on this quotation, not on the concept"
+            value={passageNote}
+            onChange={(e) => setPassageNote(e.target.value)}
+            rows={2}
+          />
         </div>
 
         <div className="form-row">
           <span className="label">
             Concept — a short noun phrase naming the idea{" "}
-            <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+            <span className="labelsay">(optional)</span>
           </span>
           <input
             list="conceptOptionsModal"
@@ -174,50 +190,47 @@ export default function CaptureModal({ passage, source, sourceId, location, page
 
           {/* Shared with the typed form since 2026-08-13 — this markup was
               copied there and the two had drifted. `conceptOptional` is the one
-              real difference: an Unlabeled capture is a whole act here. */}
+              real difference: an Unlabeled capture is a whole act here.
+
+              It stays directly UNDER the field it coaches (ConceptNamingAssist's
+              own header records why: the typed form had it above, and "forty
+              lines of naming advice sat between the passage and the field they
+              were about"). It is also the tallest thing on this card — 248.5px
+              measured, 422.8 with its ladder open — and it is kept whole on
+              purpose, so the height had to come from everything around it. */}
           <ConceptNamingAssist
             passage={passage}
             value={conceptLabel}
             onChange={setConceptLabel}
             conceptOptional
           />
+
+          {/* The CONCEPT's gloss — one meaning, shared by every passage filed
+              under it. Only asked for when there is a concept to gloss, which
+              practice-guide.spec.ts asserts by its absence. Inside the concept
+              block now rather than after it: it is about the concept, and Your
+              work keeps a concept's description on the concept's own card. */}
+          {conceptLabel.trim() ? (
+            <>
+              <span className="label addlabel">Description — the concept in your own words <span className="labelsay">(optional)</span></span>
+              <input
+                id="captureConceptDef"
+                placeholder="e.g. a thing that means different things to different groups but still holds them together"
+                title="your own-words gloss — a sentence is fine; this is where crude is welcome"
+                value={workingDef}
+                onChange={(e) => setWorkingDef(e.target.value)}
+              />
+            </>
+          ) : null}
         </div>
 
-        {/* The CONCEPT's gloss — one meaning, shared by every passage filed
-            under it. Only asked for when there is a concept to gloss. */}
-        {conceptLabel.trim() ? (
-          <div className="form-row">
-            <span className="label">Description — the concept in your own words <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
-            <input
-              id="captureConceptDef"
-              placeholder="e.g. a thing that means different things to different groups but still holds them together"
-              title="your own-words gloss — a sentence is fine; this is where crude is welcome"
-              value={workingDef}
-              onChange={(e) => setWorkingDef(e.target.value)}
-            />
-          </div>
-        ) : null}
-
-        {/* THIS PASSAGE's own note — why you took these words, what struck you,
-            what to come back to. Distinct from the concept's description above:
-            that one belongs to the idea and travels with it, this one belongs
-            to the quotation. The Capture Log has always had a place for it
-            (model: Passage + Gloss + Concept Label) and nothing could write it
-            until now. It is also the whole of what an unlabeled capture can
-            say, which is why it sits outside the concept block. */}
-        <div className="form-row">
-          <span className="label">Note on this passage <span style={{textTransform: "none", letterSpacing: 0}}>(optional)</span></span>
-          <textarea
-            id="capturePassageNote"
-            placeholder="why you kept these words — what struck you, what to come back to"
-            title="your note on this quotation, not on the concept"
-            value={passageNote}
-            onChange={(e) => setPassageNote(e.target.value)}
-            rows={2}
-          />
-        </div>
-
-        <div style={{ display: "flex", gap: "10px", marginTop: "24px", justifyContent: "flex-end" }}>
+        {/* STICKY, because slimming alone does not keep the promise the old
+            comment made. Measured at 1280x800 before this change: the card's
+            content was 871px inside a 734px box, and Save — being the last
+            child of a scrolling column — sat 191px below the visible bottom,
+            or 388px with the naming ladder open. The card still scrolls; the
+            commit no longer scrolls away. */}
+        <div className="capturefoot">
           <button className="btn ghost" onClick={onClose} disabled={isSubmitting}>Cancel</button>
           <button id="capturePassageSave" className="btn" onClick={handleCapture} disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : conceptLabel.trim() ? "Save Passage" : "Save unlabeled"}
