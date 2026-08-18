@@ -86,7 +86,7 @@ type HighlightEntry = {
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
   onGotoOpenConcept, addConceptPrototype = false, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
-  const { state, scoped, addConcept, refilePassage, unfilePassage } = useLoom();
+  const { state, scoped, addConcept, editConcept, refilePassage, unfilePassage } = useLoom();
   // Drawn only for faculty and admins. Not a guard — `overlayViewer()` re-checks
   // on the server, so a student who forces the request gets an empty overlay.
   const readings = useReadings();
@@ -2688,6 +2688,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 addConceptPrototype={addConceptPrototype}
                 onCreateConcept={addConcept}
                 onAddConcept={refilePassage}
+                onEditConcept={editConcept}
               >
                 <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
                   {/* The same slot the matrix reads through, at native tier:
@@ -2790,6 +2791,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               addConceptPrototype={addConceptPrototype}
               onCreateConcept={addConcept}
               onAddConcept={refilePassage}
+              onEditConcept={editConcept}
               onAspect={acceptAspect}
               manifest={manifest}
               pageImageBase={pageImageBase}

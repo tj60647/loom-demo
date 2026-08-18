@@ -110,6 +110,7 @@ export default function SpreadCanvasView({
   addConceptPrototype = false,
   onCreateConcept,
   onAddConcept,
+  onEditConcept,
   onAspect,
   zoomMultiplier,
   onZoomMultiplier,
@@ -143,6 +144,8 @@ export default function SpreadCanvasView({
   addConceptPrototype?: boolean;
   onCreateConcept?: (label: string, def?: string) => Promise<Concept>;
   onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
+  /** Fill a reused concept's empty description — see AddConceptRailCard. */
+  onEditConcept?: (conceptId: string, data: { def: string }) => Promise<void>;
   onAspect: (a: number) => void;
   /** The toolbar slider's value: 1 = the whole canvas fits the stage. */
   zoomMultiplier: number;
@@ -1229,6 +1232,7 @@ export default function SpreadCanvasView({
                         concepts={concepts}
                         onCreateConcept={onCreateConcept}
                         onAddConcept={onAddConcept}
+                        onEditConcept={onEditConcept}
                         onClose={() => closeAddConcept(id)}
                       />
                     </div>

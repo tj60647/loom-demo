@@ -167,6 +167,7 @@ export default function ConceptRails({
   addConceptPrototype = false,
   onCreateConcept,
   onAddConcept,
+  onEditConcept,
   children,
 }: {
   enabled: boolean;
@@ -184,6 +185,8 @@ export default function ConceptRails({
   addConceptPrototype?: boolean;
   onCreateConcept?: (label: string, def?: string) => Promise<Concept>;
   onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
+  /** Fill a reused concept's empty description — see AddConceptRailCard. */
+  onEditConcept?: (conceptId: string, data: { def: string }) => Promise<void>;
   children: React.ReactNode;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -448,6 +451,7 @@ export default function ConceptRails({
                     concepts={concepts}
                     onCreateConcept={onCreateConcept}
                     onAddConcept={onAddConcept}
+                    onEditConcept={onEditConcept}
                     onClose={() => closeAddConcept(id)}
                   />
                 </div>
