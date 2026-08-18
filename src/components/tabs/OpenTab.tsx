@@ -810,11 +810,8 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                             one never had at all, having been written without
                             it. */}
                         <div className="addconcept" style={{ marginTop: "9px" }}>
-                          <span className="label">
-                            Concept{" "}
-                            <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--ochre)" }}>
-                              — a short noun phrase naming the idea
-                            </span>
+                          <span className="label addlabel">
+                            Add concept to passage <span className="labelsay">— a short noun phrase</span>
                           </span>
                         <div className="quietrow">
                           <input
@@ -833,7 +830,12 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                               which is what the action does too, despite being
                               called refilePassage — see the rename logged in
                               docs/ui-cleanup-pass-1.md. */}
-                          <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept to passage</button>
+                          <button
+                            className="btn ghost mini"
+                            onClick={() => handleRefile(b)}
+                            disabled={!!refileBusy[b.id]}
+                            aria-label="Add concept to passage"
+                          >add</button>
                         </div>
                         </div>
                       </div>
@@ -1001,8 +1003,16 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                       earlier. Two labels, at two levels: the BLOCK is Concepts,
                       plural, what this passage is filed under; the FIELD is
                       Concept, singular, the one you are about to add. */}
+                  {/* The LABEL carries the act and the button is the verb (TJ,
+                      2026-08-17: "the line could be add concept to passage, and
+                      the button is just add"). There is one field in this
+                      block, so its label can say what pressing does — which
+                      leaves the button free to be short instead of a sentence
+                      wider than the input beside it.
+                      The shape of the answer stays on the same line; it is the
+                      one thing a student cannot infer from the act. */}
                   <span className="label addlabel">
-                    Concept <span className="labelsay">— a short noun phrase naming the idea</span>
+                    Add concept to passage <span className="labelsay">— a short noun phrase</span>
                   </span>
                   <div className="quietrow">
                     <input
@@ -1011,7 +1021,12 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                       value={refileInputs[b.id] ?? ""}
                       onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
                     />
-                    <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept to passage</button>
+                    <button
+                      className="btn ghost mini"
+                      onClick={() => handleRefile(b)}
+                      disabled={!!refileBusy[b.id]}
+                      aria-label="Add concept to passage"
+                    >add</button>
                   </div>
                 </div>
 
