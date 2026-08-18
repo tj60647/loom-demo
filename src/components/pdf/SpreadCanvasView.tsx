@@ -20,11 +20,12 @@
  * viewer's one selection handler, one CaptureModal and one ReuseOffer serve
  * this view like every other — the 2.1 invariant).
  *
- * All geometry is derived for display and discarded (red line #7). Cards are
- * read-only doors to Your work, exactly as in page mode.
+ * All geometry is derived for display and discarded (red line #7). The card
+ * body is shared with page mode; this host owns its Canvas threshold,
+ * counter-scale, position and leader.
  */
 
-import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { select, pointer } from "d3-selection";
 import { zoom, zoomIdentity, type ZoomBehavior, type D3ZoomEvent, type ZoomTransform } from "d3-zoom";
 import PageSlot, { type PageTier } from "./PageSlot";
@@ -32,6 +33,7 @@ import { type PdfDoc } from "./PageRaster";
 import { spreadLayout, pageX } from "@/lib/spreadLayout";
 import { layoutRail, railScale } from "@/lib/railLayout";
 import { RailCardBody } from "./ConceptRail";
+import AddConceptRailCard from "./AddConceptRailCard";
 import type { Concept, Passage } from "@/lib/types";
 
 const CARD_GAP = 12;
@@ -105,6 +107,9 @@ export default function SpreadCanvasView({
   onOpenPassage,
   onOpenConcept,
   onUnfile,
+  addConceptPrototype = false,
+  onCreateConcept,
+  onAddConcept,
   onAspect,
   zoomMultiplier,
   onZoomMultiplier,
@@ -134,6 +139,10 @@ export default function SpreadCanvasView({
   onOpenConcept?: (conceptId: string) => void;
   /** Take one concept off this passage, in place — the card's only own act. */
   onUnfile?: (passageId: string, conceptId: string) => void;
+  /** Dev-only prototype: replace the editable card's + trip to Your work with an adjacent card. */
+  addConceptPrototype?: boolean;
+  onCreateConcept?: (label: string, def?: string) => Promise<Concept>;
+  onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
   onAspect: (a: number) => void;
   /** The toolbar slider's value: 1 = the whole canvas fits the stage. */
   zoomMultiplier: number;
@@ -171,6 +180,9 @@ export default function SpreadCanvasView({
    *  them is gone. See the merge in `measure`. */
   const [markRects, setMarkRects] = useState<Record<string, MarkRect[]>>({});
   const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
+  const [passageCardHeights, setPassageCardHeights] = useState<Record<string, number>>({});
+  const [activeAddPassageId, setActiveAddPassageId] = useState<string | null>(null);
+  const restoreAddFocusFor = useRef<string | null>(null);
   // The whole-document sheet 404s until its first compose lands (readings
   // ingested before it existed); the slots' own images carry the view then.
   // Loaded is tracked too: a slot only defers to the sheet once the sheet
@@ -436,7 +448,13 @@ export default function SpreadCanvasView({
       const wide = st.w / t.k > pw * 1.05;
       if (wide !== wideRef.current) {
         wideRef.current = wide;
-        startTransition(() => setSeesMoreThanAPage(wide));
+        startTransition(() => {
+          setSeesMoreThanAPage(wide);
+          if (wide) {
+            restoreAddFocusFor.current = null;
+            setActiveAddPassageId(null);
+          }
+        });
       }
     }
     el.style.transform = `translate(${t.x}px, ${t.y}px) scale(${t.k})`;
@@ -539,7 +557,7 @@ export default function SpreadCanvasView({
         const t = e.target as HTMLElement;
         if (e.type === "mousedown" && spaceHeld.current) return !e.button;
         if (e.type === "mousedown" && t.closest(".react-pdf__Page__textContent")) return false;
-        if ((e.type === "mousedown" || e.type === "touchstart") && t.closest(".pdf-railcard")) return false;
+        if ((e.type === "mousedown" || e.type === "touchstart") && t.closest(".pdf-railcard-stack")) return false;
         return !e.button;
       })
       .on("zoom", (e: D3ZoomEvent<HTMLDivElement, unknown>) => applyTransform(e.transform));
@@ -922,11 +940,21 @@ export default function SpreadCanvasView({
   useEffect(() => {
     const ro = new ResizeObserver(() => {
       const next: Record<string, number> = {};
-      for (const [el, id] of cardIdByEl.current) next[id] = (el as HTMLElement).offsetHeight;
+      const nextPassageCards: Record<string, number> = {};
+      for (const [el, id] of cardIdByEl.current) {
+        const host = el as HTMLElement;
+        next[id] = host.offsetHeight;
+        nextPassageCards[id] = host.querySelector<HTMLElement>(".pdf-railcard")?.offsetHeight ?? CARD_FALLBACK_H;
+      }
       setCardHeights((prev) => {
         const nk = Object.keys(next);
         if (Object.keys(prev).length === nk.length && nk.every((id) => prev[id] === next[id])) return prev;
         return next;
+      });
+      setPassageCardHeights((prev) => {
+        const nk = Object.keys(nextPassageCards);
+        if (Object.keys(prev).length === nk.length && nk.every((id) => prev[id] === nextPassageCards[id])) return prev;
+        return nextPassageCards;
       });
     });
     cardRO.current = ro;
@@ -1031,6 +1059,24 @@ export default function SpreadCanvasView({
     return out.sort((a, b) => a.anchor.midY - b.anchor.midY);
   }, [cardsOn, layout, passages, concepts, mergedAnchors]);
 
+  const closeAddConcept = useCallback((passageId: string) => {
+    restoreAddFocusFor.current = passageId;
+    setActiveAddPassageId(null);
+  }, []);
+
+  const toggleAddConcept = useCallback((passageId: string) => {
+    setActiveAddPassageId((active) => active === passageId ? null : passageId);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (activeAddPassageId || !restoreAddFocusFor.current) return;
+    const passageId = restoreAddFocusFor.current;
+    restoreAddFocusFor.current = null;
+    canvasRef.current
+      ?.querySelector<HTMLButtonElement>(`[data-add-concept-for="${passageId}"]`)
+      ?.focus();
+  }, [activeAddPassageId]);
+
   const placement = useMemo(() => {
     const tops: Record<string, number> = {};
     const scales: Record<string, number> = {};
@@ -1118,7 +1164,7 @@ export default function SpreadCanvasView({
                  SOMETHING was captured here — which the highlight says better.
                  Close in it keeps its + and its invitation, so it stays. */
               if (seesMoreThanAPage && c.concepts.length === 0 && !c.passage.note) return null;
-              const h = (cardHeights[id] ?? CARD_FALLBACK_H) * cs;
+              const h = (passageCardHeights[id] ?? CARD_FALLBACK_H) * cs;
               const x2 = c.anchor.side === "left" ? s.x + layout.railW : s.x + layout.unitW - layout.railW;
               return <path key={id} d={`M ${c.anchor.edgeX} ${c.anchor.midY} L ${x2} ${top + h / 2}`} />;
             })}
@@ -1160,17 +1206,33 @@ export default function SpreadCanvasView({
                 <div
                   key={id}
                   ref={(el) => registerCard(id, el)}
-                  className="pdf-railcard"
+                  className="pdf-railcard-stack"
                   style={style}
                 >
-                  <RailCardBody
-                    passage={c.passage}
-                    concepts={c.concepts}
-                    onOpenPassage={onOpenPassage}
-                    onOpenConcept={onOpenConcept}
-                    onUnfile={onUnfile}
-                    readOnly={seesMoreThanAPage}
-                  />
+                  <div className="pdf-railcard">
+                    <RailCardBody
+                      passage={c.passage}
+                      concepts={c.concepts}
+                      onOpenPassage={onOpenPassage}
+                      onOpenConcept={onOpenConcept}
+                      onAddConcept={addConceptPrototype ? toggleAddConcept : undefined}
+                      addConceptExpanded={addConceptPrototype ? activeAddPassageId === id : undefined}
+                      addConceptControls={addConceptPrototype ? `canvas-add-concept-${id}` : undefined}
+                      onUnfile={onUnfile}
+                      readOnly={seesMoreThanAPage}
+                    />
+                  </div>
+                  {addConceptPrototype && !seesMoreThanAPage && activeAddPassageId === id && onCreateConcept && onAddConcept ? (
+                    <div id={`canvas-add-concept-${id}`} className="pdf-add-concept-host">
+                      <AddConceptRailCard
+                        passage={c.passage}
+                        concepts={concepts}
+                        onCreateConcept={onCreateConcept}
+                        onAddConcept={onAddConcept}
+                        onClose={() => closeAddConcept(id)}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

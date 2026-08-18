@@ -89,6 +89,7 @@ export default function Workbench({
   initialSearch,
   focus,
   practice = false,
+  addConceptPrototype = false,
 }: {
   /**
    * The reading this workbench is for. Not nullable since 2026-08-11: the
@@ -115,6 +116,8 @@ export default function Workbench({
    * server and would show their actual work inside a practice space.
    */
   practice?: boolean
+  /** Dev-only review path for adding a Concept directly beside a Passage card. */
+  addConceptPrototype?: boolean
 }) {
   // `status`, not just `session`: next-auth reports "loading" on every hard
   // load while it fetches /api/auth/session, and during that window `session`
@@ -411,6 +414,7 @@ export default function Workbench({
                     focusPassageId={pdfFocusPassageId}
                     onGotoOpenPassage={handleGotoOpenPassage}
                     onGotoOpenConcept={handleGotoOpenConcept}
+                    addConceptPrototype={addConceptPrototype}
                     onPageChange={handlePageChange}
                     workOpen={workOpen}
                     onToggleWork={toggleWork}

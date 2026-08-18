@@ -52,6 +52,8 @@ interface PdfViewerProps {
   onGotoOpenPassage?: (passageId: string) => void;
   /** Open Your work at a concept — a margin badge's destination. */
   onGotoOpenConcept?: (conceptId: string) => void;
+  /** Dev-only review path: the rail + opens an adjacent add-Concept card. */
+  addConceptPrototype?: boolean;
   /**
    * The page the reader is looking at, as it changes. Capture-by-hand offers
    * it as the location so nobody retypes a page number the viewer already
@@ -83,8 +85,8 @@ type HighlightEntry = {
 };
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
-  onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
-  const { state, scoped, unfilePassage } = useLoom();
+  onGotoOpenConcept, addConceptPrototype = false, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
+  const { state, scoped, addConcept, refilePassage, unfilePassage } = useLoom();
   // Drawn only for faculty and admins. Not a guard — `overlayViewer()` re-checks
   // on the server, so a student who forces the request gets an empty overlay.
   const readings = useReadings();
@@ -1892,7 +1894,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            card growing inward over its own page must cover the page's marks,
            not wear them. */
         .pdf-spread-canvas .pdf-rail-leaders { z-index: 3; }
-        .pdf-spread-canvas .pdf-railcard { z-index: 3; }
+        .pdf-spread-canvas .pdf-railcard-stack { z-index: 3; }
+        .pdf-spread-canvas .pdf-railcard-stack > .pdf-railcard {
+          position: relative;
+          left: auto;
+          right: auto;
+        }
         /* Counter-scaling: card text never shrinks below its reading size as
            the canvas zooms out. Done via font-size — real layout, not a
            transform — so the card grows to hold it and the rail re-stacks. */
@@ -1914,7 +1921,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         /* Space-pan turns the whole canvas into a drag surface. The card's
            controls would otherwise take the press and start an unfile instead
            of a pan — the cursor already says grab, and this makes it true. */
-        .pdf-spread-viewport.space-pan .pdf-railcard button { pointer-events: none; }
+        .pdf-spread-viewport.space-pan .pdf-railcard-stack :is(button, input, textarea) { pointer-events: none; }
         /* The matrix raster path: our canvas below, react-pdf's text layer
            laid absolutely over it — the Page div itself paints nothing. The
            scale wrapper clips to the slot's zoomed footprint so the transform
@@ -2071,6 +2078,16 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           stroke: rgba(255, 204, 0, 0.8);
           stroke-width: 1.5;
           fill: none;
+        }
+        .pdf-railcard-stack {
+          position: absolute;
+          left: 0;
+          right: 0;
+        }
+        .pdf-rail > .pdf-railcard-stack > .pdf-railcard {
+          position: relative;
+          left: auto;
+          right: auto;
         }
         .pdf-railcard {
           position: absolute;
@@ -2668,6 +2685,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 onOpenPassage={gotoOpenPassage}
                 onOpenConcept={gotoOpenConcept}
                 onUnfile={unfilePassage}
+                addConceptPrototype={addConceptPrototype}
+                onCreateConcept={addConcept}
+                onAddConcept={refilePassage}
               >
                 <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
                   {/* The same slot the matrix reads through, at native tier:
@@ -2767,6 +2787,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               onOpenPassage={gotoOpenPassage}
               onOpenConcept={gotoOpenConcept}
               onUnfile={unfilePassage}
+              addConceptPrototype={addConceptPrototype}
+              onCreateConcept={addConcept}
+              onAddConcept={refilePassage}
               onAspect={acceptAspect}
               manifest={manifest}
               pageImageBase={pageImageBase}

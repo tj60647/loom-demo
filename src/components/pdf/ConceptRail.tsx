@@ -20,10 +20,11 @@
  * drift grid is the precedent). Nothing here writes.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Concept, Passage } from "@/lib/types";
 import { layoutRail, railScale } from "@/lib/railLayout";
 import { short } from "@/lib/clothMath";
+import AddConceptRailCard from "./AddConceptRailCard";
 
 export const RAIL_W = 220;
 const CARD_GAP = 12;
@@ -48,6 +49,9 @@ type CardModel = {
   anchor: Anchor;
 };
 
+const railConceptName = (concept: Concept) =>
+  concept.label.trim() || short(concept.def?.trim() || "Concept", 42);
+
 /**
  * Wraps the page-mode spread. Always renders the same wrapper element so the
  * pages inside keep their identity when the rails toggle; the rails, cards
@@ -70,6 +74,9 @@ export function RailCardBody({
   concepts,
   onOpenPassage,
   onOpenConcept,
+  onAddConcept,
+  addConceptExpanded,
+  addConceptControls,
   onUnfile,
   readOnly = false,
 }: {
@@ -77,18 +84,18 @@ export function RailCardBody({
   concepts: Concept[];
   onOpenPassage?: (passageId: string) => void;
   onOpenConcept?: (conceptId: string) => void;
+  onAddConcept?: (passageId: string) => void;
+  addConceptExpanded?: boolean;
+  addConceptControls?: string;
   onUnfile?: (passageId: string, conceptId: string) => void;
   /**
    * No × and no + — the card is only a way IN (TJ, 2026-08-17: "i think that
    * zoomed out editing these things is a bad idea").
    *
-   * The canvas sets it. Its cards are drawn over the whole reading at any
-   * zoom, and at fit-all you are reading a concept map: the controls are
-   * counter-scaled dots over a page thumbnail, and an unfile is one mis-click
-   * from a pan. Unconditional rather than below some zoom, because a control
-   * that appears at one magnification and not another is a control nobody
-   * learns — and every act it offers is a click away in the panel, which is
-   * where the badges and the note already lead.
+   * The canvas sets it while the viewport spans more than one page width. At
+   * that scale you are reading a concept map: the controls are counter-scaled
+   * dots over a page thumbnail, and an unfile is one mis-click from a pan.
+   * Once one page fills the viewport, the same body becomes editable again.
    */
   readOnly?: boolean;
 }) {
@@ -101,15 +108,15 @@ export function RailCardBody({
               type="button"
               className="pdf-chip-open"
               onClick={() => onOpenConcept?.(concept.id)}
-              title={`Open “${concept.label}” in your work`}
-            >{concept.label}</button>
+              title={`Open “${railConceptName(concept)}” in your work`}
+            >{railConceptName(concept)}</button>
             {!readOnly && (
               <button
                 type="button"
                 className="pchip-x"
                 onClick={() => onUnfile?.(passage.id, concept.id)}
-                aria-label={`Remove ${concept.label} from this passage`}
-                title={`Remove “${concept.label}” from this passage. The passage stays.`}
+                aria-label={`Remove ${railConceptName(concept)} from this passage`}
+                title={`Remove “${railConceptName(concept)}” from this passage. The passage stays.`}
               >×</button>
             )}
           </span>
@@ -122,7 +129,10 @@ export function RailCardBody({
           <button
             type="button"
             className="pdf-railcard-add"
-            onClick={() => onOpenPassage?.(passage.id)}
+            onClick={() => (onAddConcept ?? onOpenPassage)?.(passage.id)}
+            aria-expanded={addConceptExpanded}
+            aria-controls={addConceptControls}
+            data-add-concept-for={passage.id}
             aria-label="Add a concept to this passage"
             title="Add a concept to this passage"
           >+</button>
@@ -154,6 +164,9 @@ export default function ConceptRails({
   onOpenPassage,
   onOpenConcept,
   onUnfile,
+  addConceptPrototype = false,
+  onCreateConcept,
+  onAddConcept,
   children,
 }: {
   enabled: boolean;
@@ -167,12 +180,19 @@ export default function ConceptRails({
    *  itself: it changes nothing about the card's height, so it cannot start
    *  the scale-reflow loop that keeps editing out of here. */
   onUnfile?: (passageId: string, conceptId: string) => void;
+  /** Dev-only prototype: replace the + trip to Your work with an adjacent card. */
+  addConceptPrototype?: boolean;
+  onCreateConcept?: (label: string, def?: string) => Promise<Concept>;
+  onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
   children: React.ReactNode;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [anchors, setAnchors] = useState<Record<string, Anchor>>({});
   const [wrapSize, setWrapSize] = useState({ w: 0, h: 0 });
   const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
+  const [passageCardHeights, setPassageCardHeights] = useState<Record<string, number>>({});
+  const [activeAddPassageId, setActiveAddPassageId] = useState<string | null>(null);
+  const restoreAddFocusFor = useRef<string | null>(null);
 
   /**
    * Anchors come off the DOM: the first mark per passage id, in document
@@ -204,6 +224,12 @@ export default function ConceptRails({
         edgeX: (side === "left" ? rect.left : rect.right) - wrapRect.left,
       };
     }
+
+    // A page turn removes the originating highlight and therefore its rail
+    // card. Close the adjacent editor in the same observer callback that
+    // discovered that external DOM change, so it cannot reopen when the page
+    // later comes back into view.
+    setActiveAddPassageId((active) => active && !next[active] ? null : active);
 
     setAnchors((prev) => {
       const pk = Object.keys(prev);
@@ -261,11 +287,21 @@ export default function ConceptRails({
   useEffect(() => {
     const ro = new ResizeObserver(() => {
       const next: Record<string, number> = {};
-      for (const [el, id] of cardIdByEl.current) next[id] = (el as HTMLElement).offsetHeight;
+      const nextPassageCards: Record<string, number> = {};
+      for (const [el, id] of cardIdByEl.current) {
+        const host = el as HTMLElement;
+        next[id] = host.offsetHeight;
+        nextPassageCards[id] = host.querySelector<HTMLElement>(".pdf-railcard")?.offsetHeight ?? CARD_FALLBACK_H;
+      }
       setCardHeights((prev) => {
         const nk = Object.keys(next);
         if (Object.keys(prev).length === nk.length && nk.every((id) => prev[id] === next[id])) return prev;
         return next;
+      });
+      setPassageCardHeights((prev) => {
+        const nk = Object.keys(nextPassageCards);
+        if (Object.keys(prev).length === nk.length && nk.every((id) => prev[id] === nextPassageCards[id])) return prev;
+        return nextPassageCards;
       });
     });
     cardRO.current = ro;
@@ -306,6 +342,24 @@ export default function ConceptRails({
     }
     return out.sort((a, b) => a.anchor.midY - b.anchor.midY);
   }, [enabled, passages, concepts, anchors]);
+
+  const closeAddConcept = useCallback((passageId: string) => {
+    restoreAddFocusFor.current = passageId;
+    setActiveAddPassageId(null);
+  }, []);
+
+  const toggleAddConcept = useCallback((passageId: string) => {
+    setActiveAddPassageId((active) => active === passageId ? null : passageId);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (activeAddPassageId || !restoreAddFocusFor.current) return;
+    const passageId = restoreAddFocusFor.current;
+    restoreAddFocusFor.current = null;
+    wrapRef.current
+      ?.querySelector<HTMLButtonElement>(`[data-add-concept-for="${passageId}"]`)
+      ?.focus();
+  }, [activeAddPassageId]);
 
   const placement = useMemo(() => {
     const tops: Record<string, number> = {};
@@ -366,7 +420,7 @@ export default function ConceptRails({
             <div
               key={id}
               ref={(el) => registerCard(id, el)}
-              className="pdf-railcard"
+              className="pdf-railcard-stack"
               style={{
                 top: placement.tops[id] ?? c.anchor.midY,
                 transform: s < 1 ? `scale(${s})` : undefined,
@@ -375,13 +429,29 @@ export default function ConceptRails({
                 transformOrigin: side === "left" ? "top right" : "top left",
               }}
             >
-              <RailCardBody
-                passage={c.passage}
-                concepts={c.concepts}
-                onOpenPassage={onOpenPassage}
-                onOpenConcept={onOpenConcept}
-                onUnfile={onUnfile}
-              />
+              <div className="pdf-railcard">
+                <RailCardBody
+                  passage={c.passage}
+                  concepts={c.concepts}
+                  onOpenPassage={onOpenPassage}
+                  onOpenConcept={onOpenConcept}
+                  onAddConcept={addConceptPrototype ? toggleAddConcept : undefined}
+                  addConceptExpanded={addConceptPrototype ? activeAddPassageId === id : undefined}
+                  addConceptControls={addConceptPrototype ? `add-concept-${id}` : undefined}
+                  onUnfile={onUnfile}
+                />
+              </div>
+              {addConceptPrototype && activeAddPassageId === id && onCreateConcept && onAddConcept ? (
+                <div id={`add-concept-${id}`} className="pdf-add-concept-host">
+                  <AddConceptRailCard
+                    passage={c.passage}
+                    concepts={concepts}
+                    onCreateConcept={onCreateConcept}
+                    onAddConcept={onAddConcept}
+                    onClose={() => closeAddConcept(id)}
+                  />
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -400,7 +470,7 @@ export default function ConceptRails({
             const top = placement.tops[id];
             if (top == null) return null;
             const s = placement.scales[c.anchor.side];
-            const h = (cardHeights[id] ?? CARD_FALLBACK_H) * s;
+            const h = (passageCardHeights[id] ?? CARD_FALLBACK_H) * s;
             const x2 = c.anchor.side === "left" ? RAIL_W : wrapSize.w - RAIL_W;
             return <path key={id} d={`M ${c.anchor.edgeX} ${c.anchor.midY} L ${x2} ${top + h / 2}`} />;
           })}

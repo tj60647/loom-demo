@@ -10,6 +10,7 @@ import { firstParam } from "@/lib/courses"
 type ReadingPageSearchParams = {
   tab?: string | string[]
   q?: string | string[]
+  prototype?: string | string[]
   concept?: string | string[]
   label?: string | string[]
   passage?: string | string[]
@@ -40,6 +41,12 @@ export default async function ReadingPage({
   const rawTab = firstParam(resolved.tab)
   const initialTab = rawTab && READING_TABS.has(rawTab) ? (rawTab as Tab) : undefined
   const initialSearch = firstParam(resolved.q)?.trim() || undefined
+  // Review-only in local development: this is the real Reading station and PDF
+  // reader, but production builds cannot activate unfinished interaction work
+  // by adding a query string.
+  const addConceptPrototype =
+    process.env.NODE_ENV === "development" &&
+    firstParam(resolved.prototype) === "add-concept-card"
   /**
    * Where inside the station to land (TJ, 2026-08-13: "it seems like the
    * search results could be more specific and contextual… concepts should have
@@ -85,6 +92,7 @@ export default async function ReadingPage({
       key={source.id}
       initialTab={initialTab}
       initialSearch={initialSearch}
+      addConceptPrototype={addConceptPrototype}
       focus={focus}
       source={{
         id: source.id,
