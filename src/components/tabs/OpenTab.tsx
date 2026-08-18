@@ -737,20 +737,28 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                     </div>
                     {conceptPassages.map(b => (
                       <div key={b.id} data-passage-id={b.id} style={{ marginTop: "12px", borderBottom: "1px dotted var(--rule)", paddingBottom: "8px" }}>
-                        <div className="passage">"{b.content}"</div>
+                        {/* The passage is the door here too (TJ, 2026-08-17:
+                            "in the your work panel, concepts view, the passages
+                            should have the same mouseover as in the passages
+                            view and it should take us to the passage"). One
+                            rule for a passage wherever it is drawn — the same
+                            one the margin card follows. Its separate "goto"
+                            goes with it, being the same act twice. */}
+                        <div
+                          className={`passage${b.sourceId || b.source ? " isdoor" : ""}`}
+                          role={b.sourceId || b.source ? "button" : undefined}
+                          tabIndex={b.sourceId || b.source ? 0 : undefined}
+                          aria-label={b.sourceId || b.source ? "Open this passage in the reading" : undefined}
+                          title={b.sourceId || b.source ? "Open this passage in the reading" : undefined}
+                          onClick={() => (b.sourceId || b.source) && onGotoPassage?.(b)}
+                          onKeyDown={(e) => {
+                            if (!(b.sourceId || b.source)) return
+                            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGotoPassage?.(b) }
+                          }}
+                        >"{b.content}"</div>
                         <div className="src">
                           {b.source || "—"}{b.location ? ` · ${b.location}` : ""}
                           <span className="rm-actions" style={{ marginLeft: "8px" }}>
-                            <button
-                              type="button"
-                              className="rm"
-                              style={{ marginRight: "8px", background: "none", border: "none", padding: 0 }}
-                              onClick={() => onGotoPassage?.(b)}
-                              disabled={!b.sourceId && !b.source}
-                              title={b.sourceId || b.source ? "Open this passage in the reading" : "No reading linked to this passage"}
-                            >
-                              goto
-                            </button>
                             {/* BOTH, always (TJ, 2026-08-17). This used to be
                                 a choice made for the student: with several
                                 concepts you were offered "unfile from this
