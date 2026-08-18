@@ -86,6 +86,23 @@ export default function StationSearch({ scope, sourceId }: {
 
       {open && (
         <div className="stationsearch-panel" role="search" aria-label={what}>
+          {/* What this search covers, said in the panel (TJ, 2026-08-17).
+              The button's label carries the SCOPE — this reading, or your
+              loom — which is what stops the two searches on the reading
+              station being confused for each other. It cannot also carry the
+              coverage without becoming a sentence, so the coverage lived in
+              the tooltip and the aria-label: invisible to a mouse user who
+              does not hover, and unavailable to anyone once they start typing.
+
+              Here it stands while you type and while you read the results,
+              which is exactly when "would it have found that?" gets asked.
+              aria-hidden because the panel's own aria-label already says it —
+              a screen reader should not hear the coverage twice. */}
+          <p className="stationsearch-covers" aria-hidden="true">
+            {scope === "loom"
+              ? "your loom — readings · cloths · projections · concepts · link labels · links · passages"
+              : "this reading — pages · cloth · projections · concepts · link labels · links · passages"}
+          </p>
           <ShelfSearch sourceId={sourceId} onClose={() => { setOpen(false); buttonRef.current?.focus() }} />
         </div>
       )}

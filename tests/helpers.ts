@@ -95,7 +95,7 @@ export async function openReading(page: Page, title: string) {
 
   // Scoped to the journey bar. Since the text and capture merged (2026-08-08)
   // the reading station is the DEFAULT tab, so the viewer — and its own
-  // "Search this reading" button — is already on screen; an unscoped
+  // "In the text" button — is already on screen; an unscoped
   // /Reading/i now matches both and is a strict-mode violation.
   await page.locator('nav[aria-label="The journey"] button.station', { hasText: 'Reading' }).click();
   await expect(page.locator('text=Loading PDF...')).toBeHidden({ timeout: 15000 });

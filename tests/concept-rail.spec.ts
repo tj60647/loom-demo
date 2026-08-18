@@ -95,9 +95,10 @@ test.describe('Concept rail', () => {
     // passage's row (red line #5 — the work is never out of reach). And the
     // door closes Find on the way — the sheet and the search panel share the
     // right edge, and a panel left open underneath eats the first Escape.
-    // Scoped to the PDF's own toolbar: since 2026-08-13 the journey bar carries
-    // a search too, and its button is also named for this reading.
-    await page.locator('.pdf-toolbar').getByRole('button', { name: 'Search this reading' }).click();
+    // The toolbar's search is "in the text" since 2026-08-17; the journey
+    // bar's is "this reading". They no longer share a name, but the scope
+    // stays because a bare /search/i would still find both.
+    await page.locator('.pdf-toolbar').getByRole('button', { name: 'Search the text of this reading' }).click();
     await expect(page.locator('.pdf-search-panel')).toBeVisible();
     await page.locator('.pdf-railcard', { hasText: conceptName }).first().click();
     await expect(page.locator('#yourwork')).toBeVisible({ timeout: 5000 });

@@ -2244,11 +2244,22 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 if (workOpen) onToggleWork();
                 setSearchOpen(true);
               }}
-              data-tip="find a word or phrase in this reading"
+              // "In the text", not "Search" (TJ, 2026-08-17). The journey bar
+              // carries a search too, and until now both were named for the
+              // reading — this one "Search this reading", that one "⌕ this
+              // reading" — while covering different things: these are the
+              // PDF's own words, that is the whole record of the reading
+              // (pages, cloth, projections, concepts, links, passages). Their
+              // coverage overlaps on the pages, so neither name helped anyone
+              // choose. The repo had already noticed sideways: concept-rail's
+              // spec has to scope its selector to `.pdf-toolbar` because the
+              // two buttons answered the same name. Each says its own subject
+              // now, and neither needs the other to make sense.
+              data-tip="find a word or phrase on these pages"
               aria-pressed={searchOpen}
-              aria-label="Search this reading"
+              aria-label="Search the text of this reading"
             >
-              {isNarrow ? "⌕" : "⌕ Search"}
+              {isNarrow ? "⌕" : "⌕ In the text"}
             </button>
           )}
 
