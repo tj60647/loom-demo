@@ -1042,7 +1042,33 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     const applyHighlights = (only?: Iterable<Element>) => {
       const passages = passagesRef.current;
       const heatPages = overlayRef.current?.pages ?? [];
-      if (passages.length === 0 && searchTermsRef.current.length === 0 && heatPages.length === 0) return;
+      /**
+       * Nothing to mark is not nothing to DO: the unmark below lives inside
+       * the loop, so returning here also skipped clearing whatever is already
+       * on the page. Turning the passages overlay off left its 16 shaded spans
+       * exactly where they were, for any reader with no passages of their own
+       * in the reading — which is precisely the faculty viewer the overlay
+       * exists for.
+       *
+       * The early return is still right for the case it was written for
+       * (2026-08-15): the matrix mounts every page, the observer fires once
+       * per landing text layer, and re-marking all of them each time was
+       * O(pages²) across the load. That case always passes `only` — a NEW
+       * layer, which by definition has no marks to clear. A sweep with no
+       * `only` is a STATE change, and a state change that removes the last
+       * mark is the one pass that must not be skipped.
+       */
+      if (passages.length === 0 && searchTermsRef.current.length === 0 && heatPages.length === 0) {
+        if (only) return;
+        Array.from(containerRef.current!.querySelectorAll('.react-pdf__Page__textContent'))
+          .forEach((layer) => {
+            const sweep = new Mark(layer as HTMLElement);
+            for (const cls of ["loom-passage-highlight", "loom-overlay-heat", "loom-search-hit"]) {
+              sweep.unmark({ className: cls });
+            }
+          });
+        return;
+      }
 
       const textLayers = only
         ? Array.from(only)
