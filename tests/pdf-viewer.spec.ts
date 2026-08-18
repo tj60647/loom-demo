@@ -77,7 +77,7 @@ test.describe('PDF Viewer and Highlighting', () => {
       // Modal appears, save the passage. Exact match: Your work's own concept
       // input starts with the same words and is mounted behind this at all
       // times now — the sheet is parked off-screen, not unmounted.
-      const conceptInput = page.getByPlaceholder('e.g. boundary objects', { exact: true });
+      const conceptInput = page.locator('.info-scrim').getByPlaceholder('e.g. boundary objects', { exact: true });
       await conceptInput.fill(conceptName);
 
       const saveButton = page.locator('button:has-text("Save Passage")');

@@ -183,7 +183,7 @@ test.describe('Practice loom', () => {
     expect(selected.trim().length).toBeGreaterThan(0);
 
     await page.locator('button:has-text("Capture as Passage")').click();
-    await page.getByPlaceholder('e.g. boundary objects', { exact: true }).fill('practice concept');
+    await page.locator('.info-scrim').getByPlaceholder('e.g. boundary objects', { exact: true }).fill('practice concept');
     await page.locator('button:has-text("Save Passage")').click();
 
     // It really landed: the mark is drawn on the page and the capture is in

@@ -53,7 +53,7 @@ test.describe('Concept rail', () => {
     expect(selected.trim().length).toBeGreaterThanOrEqual(80);
 
     await page.locator('button:has-text("Capture as Passage")').click();
-    await page.getByPlaceholder('e.g. boundary objects', { exact: true }).fill(conceptName);
+    await page.locator('.info-scrim').getByPlaceholder('e.g. boundary objects', { exact: true }).fill(conceptName);
     await page.locator('button:has-text("Save Passage")').click();
     await expect(page.getByRole('heading', { name: 'Capture Passage' })).toBeHidden({ timeout: 30_000 });
     await expect(page.locator('.loom-passage-highlight').first()).toBeVisible({ timeout: 5000 });

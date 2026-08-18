@@ -737,7 +737,16 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                         </div>
                         <div className="quietrow" style={{ marginTop: "9px" }}>
                           <input
-                            placeholder="another concept this passage evidences…"
+                            /* "name another concept", not "another concept
+                               this passage evidences…" (TJ, 2026-08-17: "name
+                               the concept this passage makes no sense as
+                               placeholder text"). It was a whole clause
+                               restating the row it sits in, and the button
+                               beside it already says the act. "another"
+                               because this row's passage already has one —
+                               the twin below, on a passage with none, says
+                               "name the concept". */
+                            placeholder="name another concept"
                             title="one passage can evidence several concepts — add another here; it keeps the ones it has"
                             value={refileInputs[b.id] ?? ""}
                             onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
@@ -849,7 +858,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                   <div className="quietrow">
                     <input
                       list={listId}
-                      placeholder="name the concept this passage evidences…"
+                      placeholder="name the concept"
                       title="optional — a passage can stay unlabeled for as long as you like"
                       value={refileInputs[b.id] ?? ""}
                       onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
@@ -905,11 +914,31 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
             you hunt.
           </p>
           <div className="form-row">
-            <span className="label">Concept</span>
+            {/* The explanation moves INTO the label and the placeholder becomes
+                an example (TJ, 2026-08-17). It was the other way round: the
+                field said "the concept you are looking for…", which is a
+                sentence about the field rather than a picture of the answer,
+                and the shape of a concept — a short noun phrase — was hidden in
+                a `title` nobody hovers. Every other placeholder in Loom is an
+                example ("ch. 3, p. 49", "your word… e.g. leads to").
+
+                NOT marked "(optional)" yet, though the model allows it —
+                §Concept: "Label [< 8 words, may be null at capture]". The
+                button below is still disabled without one, and it has to be:
+                an unnamed concept renders in 67 places that have no rule for
+                what to show, so shipping the word before the display would
+                make the form promise something the app cannot draw. That work
+                is written up, with the "one or the other or both" constraint
+                TJ added, which the model does not yet state. */}
+            <span className="label">
+              Concept{" "}
+              <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--ochre)" }}>
+                — a short noun phrase naming the idea
+              </span>
+            </span>
             <input
               list={listId}
-              placeholder="the concept you are looking for…"
-              title="a noun phrase, not a sentence — the same shape as any other concept"
+              placeholder="e.g. boundary objects"
               value={newConceptOnly}
               onChange={(e) => setNewConceptOnly(e.target.value)}
             />
