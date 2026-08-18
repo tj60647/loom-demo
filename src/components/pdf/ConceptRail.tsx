@@ -53,6 +53,99 @@ type CardModel = {
  * pages inside keep their identity when the rails toggle; the rails, cards
  * and leader lines appear as siblings around the children.
  */
+
+/**
+ * What a margin card SAYS — its concepts and its note — with no opinion about
+ * where it sits.
+ *
+ * Shared because there are two rails: this one, beside a spread in page mode,
+ * and SpreadCanvasView's, which draws the same cards over the whole reading at
+ * any zoom. They held two copies of the markup and the canvas one was still
+ * showing a concept label and a gloss hours after this one stopped. One body,
+ * two hosts: the host owns position, scale and the leader; the body owns what
+ * is written on the card.
+ */
+export function RailCardBody({
+  passage,
+  concepts,
+  onOpenPassage,
+  onOpenConcept,
+  onUnfile,
+  readOnly = false,
+}: {
+  passage: Passage;
+  concepts: Concept[];
+  onOpenPassage?: (passageId: string) => void;
+  onOpenConcept?: (conceptId: string) => void;
+  onUnfile?: (passageId: string, conceptId: string) => void;
+  /**
+   * No × and no + — the card is only a way IN (TJ, 2026-08-17: "i think that
+   * zoomed out editing these things is a bad idea").
+   *
+   * The canvas sets it. Its cards are drawn over the whole reading at any
+   * zoom, and at fit-all you are reading a concept map: the controls are
+   * counter-scaled dots over a page thumbnail, and an unfile is one mis-click
+   * from a pan. Unconditional rather than below some zoom, because a control
+   * that appears at one magnification and not another is a control nobody
+   * learns — and every act it offers is a click away in the panel, which is
+   * where the badges and the note already lead.
+   */
+  readOnly?: boolean;
+}) {
+  return (
+    <>
+      <div className="pdf-railcard-badges">
+        {concepts.map((concept) => (
+          <span key={concept.id} className="pdf-railcard-chip">
+            <button
+              type="button"
+              className="pdf-chip-open"
+              onClick={() => onOpenConcept?.(concept.id)}
+              title={`Open “${concept.label}” in your work`}
+            >{concept.label}</button>
+            {!readOnly && (
+              <button
+                type="button"
+                className="pchip-x"
+                onClick={() => onUnfile?.(passage.id, concept.id)}
+                aria-label={`Remove ${concept.label} from this passage`}
+                title={`Remove “${concept.label}” from this passage. The passage stays.`}
+              >×</button>
+            )}
+          </span>
+        ))}
+        {/* Click-through, not an inline field: cards are CSS-scaled when a
+            side crowds, so a field in here would loop — typing grows the card,
+            height changes the scale, and the scale moves every card on the
+            side including the one under the cursor. */}
+        {!readOnly && (
+          <button
+            type="button"
+            className="pdf-railcard-add"
+            onClick={() => onOpenPassage?.(passage.id)}
+            aria-label="Add a concept to this passage"
+            title="Add a concept to this passage"
+          >+</button>
+        )}
+      </div>
+      {/* An invitation you cannot take is not an invitation (TJ, 2026-08-17:
+          "if no note then hide add a passage"). While the card is read-only the
+          empty state says "add a passage note" over a control that will not
+          add one — so with nothing written, nothing is drawn. */}
+      {(passage.note || !readOnly) && (
+      <button
+        type="button"
+        className={`pdf-railcard-note${passage.note ? "" : " empty"}`}
+        onClick={() => onOpenPassage?.(passage.id)}
+        title={passage.note ? "Open this passage in your work" : "Write a note on this passage"}
+      >
+        {passage.note ? short(passage.note, 140) : "add a passage note"}
+      </button>
+      )}
+    </>
+  );
+}
+
 export default function ConceptRails({
   enabled,
   twoPage,
@@ -282,44 +375,13 @@ export default function ConceptRails({
                 transformOrigin: side === "left" ? "top right" : "top left",
               }}
             >
-              <div className="pdf-railcard-badges">
-                {c.concepts.map((concept) => (
-                  <span key={concept.id} className="pdf-railcard-chip">
-                    <button
-                      type="button"
-                      className="pdf-chip-open"
-                      onClick={() => onOpenConcept?.(concept.id)}
-                      title={`Open “${concept.label}” in your work`}
-                    >{concept.label}</button>
-                    <button
-                      type="button"
-                      className="pchip-x"
-                      onClick={() => onUnfile?.(id, concept.id)}
-                      aria-label={`Remove ${concept.label} from this passage`}
-                      title={`Remove “${concept.label}” from this passage. The passage stays.`}
-                    >×</button>
-                  </span>
-                ))}
-                {/* Click-through, not an inline field, for the reason above. */}
-                <button
-                  type="button"
-                  className="pdf-railcard-add"
-                  onClick={() => onOpenPassage?.(id)}
-                  aria-label="Add a concept to this passage"
-                  title="Add a concept to this passage"
-                >+</button>
-              </div>
-              {/* The note, and an invitation when there is none — an empty note
-                  used to render nothing at all, which is indistinguishable from
-                  a card that does not take one. */}
-              <button
-                type="button"
-                className={`pdf-railcard-note${c.passage.note ? "" : " empty"}`}
-                onClick={() => onOpenPassage?.(id)}
-                title={c.passage.note ? "Open this passage in your work" : "Write a note on this passage"}
-              >
-                {c.passage.note ? short(c.passage.note, 140) : "add a passage note"}
-              </button>
+              <RailCardBody
+                passage={c.passage}
+                concepts={c.concepts}
+                onOpenPassage={onOpenPassage}
+                onOpenConcept={onOpenConcept}
+                onUnfile={onUnfile}
+              />
             </div>
           );
         })}

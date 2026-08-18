@@ -1870,10 +1870,25 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         /* Counter-scaling: card text never shrinks below its reading size as
            the canvas zooms out. Done via font-size — real layout, not a
            transform — so the card grows to hold it and the rail re-stacks. */
-        .pdf-spread-canvas .pdf-railcard-label { font-size: calc(13px * var(--invk, 1)); }
-        .pdf-spread-canvas .pdf-railcard-def { font-size: calc(12px * var(--invk, 1)); }
+        /* COUNTER-SCALE, the canvas's own rule: the whole surface is
+           transformed, so anything meant to stay readable while you zoom out
+           has to grow by the inverse (--invk). The card's parts all carry it —
+           the badges and the note now, where the label and gloss used to.
+           Missing one is how a control ends up a two-pixel dot at fit-all.
+           (No backticks in this block: styled-jsx template literal.) */
         .pdf-spread-canvas .pdf-railcard-note { font-size: calc(11px * var(--invk, 1)); }
         .pdf-spread-canvas .pdf-railcard-chip { font-size: calc(10px * var(--invk, 1)); }
+        .pdf-spread-canvas .pdf-railcard-add {
+          width: calc(18px * var(--invk, 1));
+          height: calc(18px * var(--invk, 1));
+          font-size: calc(12px * var(--invk, 1));
+        }
+        .pdf-spread-canvas .pchip-x { font-size: calc(12px * var(--invk, 1)); }
+        .pdf-spread-canvas .pdf-railcard-badges { gap: calc(4px * var(--invk, 1)); }
+        /* Space-pan turns the whole canvas into a drag surface. The card's
+           controls would otherwise take the press and start an unfile instead
+           of a pan — the cursor already says grab, and this makes it true. */
+        .pdf-spread-viewport.space-pan .pdf-railcard button { pointer-events: none; }
         /* The matrix raster path: our canvas below, react-pdf's text layer
            laid absolutely over it — the Page div itself paints nothing. The
            scale wrapper clips to the slot's zoomed footprint so the transform
@@ -2027,6 +2042,20 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            label/def rules are gone with the markup that used them.
            (No backticks in this block: styled-jsx template literal.) */
         .pdf-railcard-badges { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+        /* A badge is one line. On the canvas the type is counter-scaled, so a
+           long label wrapped INSIDE its own pill and dropped the × onto a
+           second row — a remove control floating under the word it removes.
+           The label truncates instead; the row still wraps between badges. */
+        /* min-width:0 is what actually lets it shrink: a flex item refuses to
+           go below its content width without it, so max-width alone left the
+           badge — and its × — hanging off the card's edge. */
+        .pdf-railcard-chip { white-space: nowrap; max-width: 100%; min-width: 0; }
+        .pdf-chip-open {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
+        }
         .pdf-chip-open {
           background: none; border: none; padding: 0; cursor: pointer;
           font: inherit; color: inherit; letter-spacing: inherit;
@@ -2647,6 +2676,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               passages={scoped.passages}
               concepts={state.concepts}
               onOpenPassage={gotoOpenPassage}
+              onOpenConcept={gotoOpenConcept}
+              onUnfile={unfilePassage}
               onAspect={acceptAspect}
               manifest={manifest}
               pageImageBase={pageImageBase}
