@@ -79,7 +79,7 @@ test("search inside a reading lists matching pages and marks the words on the te
   await expect(page.locator("text=Loading PDF...")).toBeHidden({ timeout: 15_000 })
 
   // The PDF's own find, scoped to its toolbar: the journey bar carries a
-  // search too since 2026-08-13, and its button is named for this reading as
+  // search too since 2026-08-13 — it is "your cloth" now, but a bare
   // well. The two merge in a later commit; until then, say which.
   await page.locator(".pdf-toolbar").getByRole("button", { name: "Search the text of this reading" }).click()
   const box = page.getByRole("searchbox", { name: "Search this reading for a word or phrase" })
