@@ -99,7 +99,14 @@ const student: Flow = {
     // capturing and filing are one gesture here and the path rejoins at
     // Linking.
     { id: "typed", label: "Type the passage in", where: "01 · Reading — a reading with no PDF: a book, a lecture, a card you added yourself" },
-    { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — Your work, slid out over the text" },
+    // Two doors to the same act since 2026-08-18. The margin card's + used to
+    // open Your work and scroll to the passage; it now opens one card beside
+    // the passage instead, which is the smaller act the + was always naming —
+    // file THIS passage under one more concept, without leaving the text.
+    // Your work is still the place to do the rest (revise the note, unfile,
+    // read the whole reading's work), so both are named here rather than one
+    // replacing the other.
+    { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — the card beside the passage, or Your work slid out over the text" },
     { id: "link", label: "Pick two concepts, say the sentence, label the link", where: "02 · Linking" },
     // 03 before 04, in the array and in the edges below. Stations 03 and 04
     // were swapped on 2026-08-08 (TJ) — "you lay the graph out and read it, and

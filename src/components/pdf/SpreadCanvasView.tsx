@@ -107,7 +107,6 @@ export default function SpreadCanvasView({
   onOpenPassage,
   onOpenConcept,
   onUnfile,
-  addConceptPrototype = false,
   onCreateConcept,
   onAddConcept,
   onEditConcept,
@@ -140,8 +139,6 @@ export default function SpreadCanvasView({
   onOpenConcept?: (conceptId: string) => void;
   /** Take one concept off this passage, in place — the card's only own act. */
   onUnfile?: (passageId: string, conceptId: string) => void;
-  /** Dev-only prototype: replace the editable card's + trip to Your work with an adjacent card. */
-  addConceptPrototype?: boolean;
   onCreateConcept?: (label: string, def?: string) => Promise<Concept>;
   onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
   /** Fill a reused concept's empty description — see AddConceptRailCard. */
@@ -1218,14 +1215,14 @@ export default function SpreadCanvasView({
                       concepts={c.concepts}
                       onOpenPassage={onOpenPassage}
                       onOpenConcept={onOpenConcept}
-                      onAddConcept={addConceptPrototype ? toggleAddConcept : undefined}
-                      addConceptExpanded={addConceptPrototype ? activeAddPassageId === id : undefined}
-                      addConceptControls={addConceptPrototype ? `canvas-add-concept-${id}` : undefined}
+                      onAddConcept={toggleAddConcept}
+                      addConceptExpanded={activeAddPassageId === id}
+                      addConceptControls={activeAddPassageId === id ? `canvas-add-concept-${id}` : undefined}
                       onUnfile={onUnfile}
                       readOnly={seesMoreThanAPage}
                     />
                   </div>
-                  {addConceptPrototype && !seesMoreThanAPage && activeAddPassageId === id && onCreateConcept && onAddConcept ? (
+                  {!seesMoreThanAPage && activeAddPassageId === id && onCreateConcept && onAddConcept ? (
                     <div id={`canvas-add-concept-${id}`} className="pdf-add-concept-host">
                       <AddConceptRailCard
                         passage={c.passage}

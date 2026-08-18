@@ -17,7 +17,9 @@
  * nobody else's marks can spawn a card here.
  *
  * All geometry is derived for display and discarded (red line #7; MapTab's
- * drift grid is the precedent). Nothing here writes.
+ * drift grid is the precedent). The geometry still writes nothing; the cards
+ * do, since 2026-08-18 — the + opens one add-concept card beside the passage
+ * (AddConceptRailCard), which coins or reuses a Concept and files it.
  */
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -164,7 +166,6 @@ export default function ConceptRails({
   onOpenPassage,
   onOpenConcept,
   onUnfile,
-  addConceptPrototype = false,
   onCreateConcept,
   onAddConcept,
   onEditConcept,
@@ -177,12 +178,10 @@ export default function ConceptRails({
   onOpenPassage?: (passageId: string) => void;
   /** Open Your work at a concept — the badge's destination. */
   onOpenConcept?: (conceptId: string) => void;
-  /** Take one concept off this passage, in place. The only act the card does
-   *  itself: it changes nothing about the card's height, so it cannot start
-   *  the scale-reflow loop that keeps editing out of here. */
+  /** Take one concept off this passage, in place. Changes nothing about the
+   *  card's own height, so it cannot start a scale reflow — unlike opening the
+   *  add-concept card below it, which does. */
   onUnfile?: (passageId: string, conceptId: string) => void;
-  /** Dev-only prototype: replace the + trip to Your work with an adjacent card. */
-  addConceptPrototype?: boolean;
   onCreateConcept?: (label: string, def?: string) => Promise<Concept>;
   onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
   /** Fill a reused concept's empty description — see AddConceptRailCard. */
@@ -407,13 +406,22 @@ export default function ConceptRails({
              * highlight IS the passage. It carried a concept label, that
              * concept's gloss, and nothing of the student's own.
              *
-             * NOTHING IS EDITED IN HERE, deliberately, and not for want of a
-             * write path — `editPassageNote` exists now. Cards are CSS-scaled
-             * when a side crowds (`railScale` above), so a field in here would
-             * loop: typing grows the card, the height changes the scale, and
-             * the scale moves every card on the side including the one under
-             * the cursor. Each control opens the panel at the right place
-             * instead, where the same edit is a normal field.
+             * THE PASSAGE CARD ITSELF STILL EDITS NOTHING: the note and the
+             * badges are doors to Your work, because cards are CSS-scaled when
+             * a side crowds (`railScale` above) and a field inside this box
+             * would loop — typing grows the card, the height changes the scale,
+             * and the scale moves every card on the side including the one
+             * under the cursor.
+             *
+             * The + is the exception, and it dodges the loop by construction
+             * rather than by argument: its card mounts as a SIBLING inside
+             * `.pdf-railcard-stack`, so the passage card's own height never
+             * changes. The stack's does, which is why `passageCardHeights` is
+             * measured separately for the leader line. The editor's fields are
+             * fixed-height (`AddConceptRailCard.module.css`: the textarea is
+             * `min-height: 52px`, `resize: vertical`, and does not auto-grow),
+             * so typing in it does not reflow the rail either. Opening and
+             * closing it does — a known displacement, not yet fixed.
              *
              * So the card is no longer one door but three, and is therefore no
              * longer a `role="button"` with controls inside it — that was a
@@ -438,13 +446,13 @@ export default function ConceptRails({
                   concepts={c.concepts}
                   onOpenPassage={onOpenPassage}
                   onOpenConcept={onOpenConcept}
-                  onAddConcept={addConceptPrototype ? toggleAddConcept : undefined}
-                  addConceptExpanded={addConceptPrototype ? activeAddPassageId === id : undefined}
-                  addConceptControls={addConceptPrototype ? `add-concept-${id}` : undefined}
+                  onAddConcept={toggleAddConcept}
+                  addConceptExpanded={activeAddPassageId === id}
+                  addConceptControls={activeAddPassageId === id ? `add-concept-${id}` : undefined}
                   onUnfile={onUnfile}
                 />
               </div>
-              {addConceptPrototype && activeAddPassageId === id && onCreateConcept && onAddConcept ? (
+              {activeAddPassageId === id && onCreateConcept && onAddConcept ? (
                 <div id={`add-concept-${id}`} className="pdf-add-concept-host">
                   <AddConceptRailCard
                     passage={c.passage}

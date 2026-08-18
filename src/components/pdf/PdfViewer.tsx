@@ -52,8 +52,6 @@ interface PdfViewerProps {
   onGotoOpenPassage?: (passageId: string) => void;
   /** Open Your work at a concept — a margin badge's destination. */
   onGotoOpenConcept?: (conceptId: string) => void;
-  /** Dev-only review path: the rail + opens an adjacent add-Concept card. */
-  addConceptPrototype?: boolean;
   /**
    * The page the reader is looking at, as it changes. Capture-by-hand offers
    * it as the location so nobody retypes a page number the viewer already
@@ -85,7 +83,7 @@ type HighlightEntry = {
 };
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
-  onGotoOpenConcept, addConceptPrototype = false, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
+  onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
   const { state, scoped, addConcept, editConcept, refilePassage, unfilePassage } = useLoom();
   // Drawn only for faculty and admins. Not a guard — `overlayViewer()` re-checks
   // on the server, so a student who forces the request gets an empty overlay.
@@ -2685,7 +2683,6 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 onOpenPassage={gotoOpenPassage}
                 onOpenConcept={gotoOpenConcept}
                 onUnfile={unfilePassage}
-                addConceptPrototype={addConceptPrototype}
                 onCreateConcept={addConcept}
                 onAddConcept={refilePassage}
                 onEditConcept={editConcept}
@@ -2788,7 +2785,6 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               onOpenPassage={gotoOpenPassage}
               onOpenConcept={gotoOpenConcept}
               onUnfile={unfilePassage}
-              addConceptPrototype={addConceptPrototype}
               onCreateConcept={addConcept}
               onAddConcept={refilePassage}
               onEditConcept={editConcept}
