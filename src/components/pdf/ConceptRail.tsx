@@ -371,13 +371,22 @@ export default function ConceptRails({
       const group = cards.filter((c) => c.anchor.side === side);
       if (group.length === 0) continue;
       const hs = group.map((c) => cardHeights[c.passage.id] ?? CARD_FALLBACK_H);
+      // Centre the PASSAGE card, pack against the whole STACK. One number
+      // until the add-concept card could open below the passage card; then
+      // centring the stack lifted the passage card by half the editor's
+      // height and the leader — which aims at the passage card's middle
+      // (see the leader path below, which already uses passageCardHeights) —
+      // came away bent. Measured at 1536: a 187.8px editor moved the card
+      // 94px up off its own highlight.
+      const ph = group.map((c) => passageCardHeights[c.passage.id] ?? CARD_FALLBACK_H);
       const s = railScale(hs, CARD_GAP, wrapSize.h);
       scales[side] = s;
       const placed = layoutRail(
         group.map((c, i) => ({
-          // Ideal top centers the card on its highlight — horizontal leader.
+          // Ideal top puts the PASSAGE card's middle on the highlight, so the
+          // leader stays horizontal whether or not the editor is open.
           id: c.passage.id,
-          desired: c.anchor.midY - (hs[i] * s) / 2,
+          desired: c.anchor.midY - (ph[i] * s) / 2,
           h: hs[i] * s,
         })),
         wrapSize.h,
@@ -386,7 +395,7 @@ export default function ConceptRails({
       for (const c of group) tops[c.passage.id] = placed[c.passage.id];
     }
     return { tops, scales };
-  }, [cards, cardHeights, wrapSize.h]);
+  }, [cards, cardHeights, passageCardHeights, wrapSize.h]);
 
   const renderRail = (side: Side) => (
     <div className="pdf-rail" aria-label={side === "left" ? "Cards for the left page" : "Cards for this page"}>

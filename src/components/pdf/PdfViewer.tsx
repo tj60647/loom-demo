@@ -411,7 +411,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       if (target.closest("[data-yourwork], .pdf-search-panel, .captoast, .loom-highlight-tooltip")) return;
       if (!pageSpaceHeld.current) {
         if (target.closest(".react-pdf__Page__textContent")) return; // selection's ground
-        if (target.closest("button, a, select, input, textarea, .pdf-railcard")) return;
+        // .pdf-railcard-stack, not .pdf-railcard: the add-concept editor is a
+        // SIBLING of the passage card inside the stack, so naming only the
+        // passage card left the editor's own chrome — its legend, its padding —
+        // starting a stage pan. SpreadCanvasView's d3 filter was widened to the
+        // stack when the stack was introduced; this guard was not.
+        if (target.closest("button, a, select, input, textarea, .pdf-railcard-stack")) return;
       }
       dragging = true;
       startX = e.clientX; startY = e.clientY;

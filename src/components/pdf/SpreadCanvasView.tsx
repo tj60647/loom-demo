@@ -38,6 +38,28 @@ import type { Concept, Passage } from "@/lib/types";
 
 const CARD_GAP = 12;
 const CARD_FALLBACK_H = 88;
+/**
+ * Two thresholds, not one, and the gap between them is the point.
+ *
+ * READ_ONLY_RATIO is the old rule: once the viewport spans more than one page
+ * width you are reading a map, so the card's own controls (× and +) go.
+ *
+ * EDITOR_CLOSE_RATIO is where an OPEN add-concept card is torn down, and it is
+ * deliberately far away. d3's wheel step here is
+ * `2^(-deltaY * 0.002)` = 2^-0.2 = 0.871 for one 100px notch (see the zoom
+ * behaviour below), so one notch multiplies `stage.w / k` by 1/0.871 = 1.149.
+ * From the reading edge (1.05) that is 1.21, then 1.39, then 1.59 — so a single
+ * slip of the wheel cannot cross 1.6, and it takes three deliberate notches.
+ * With one threshold at 1.05 it took exactly one, and the editor went with
+ * whatever the student had typed into it.
+ *
+ * Between the two ratios the card shows no + and no ×, but an editor already
+ * open stays open. That asymmetry is intended: opening new edits out here is
+ * the thing TJ ruled against (2026-08-17, "zoomed out editing these things is
+ * a bad idea"); discarding a half-typed concept is not the same act.
+ */
+const READ_ONLY_RATIO = 1.05;
+const EDITOR_CLOSE_RATIO = 1.6;
 const MEASURE_MS = 120;
 const SETTLE_MS = 200;
 const MAX_RES = 8;
@@ -424,6 +446,8 @@ export default function SpreadCanvasView({
   // Whether more than one page is in view — see applyTransform.
   const wideRef = useRef(true);
   const [seesMoreThanAPage, setSeesMoreThanAPage] = useState(true);
+  /** Tracks EDITOR_CLOSE_RATIO independently of the read-only flip above. */
+  const farOutRef = useRef(true);
 
   const applyTransform = useCallback((t: ZoomTransform) => {
     tref.current = t;
@@ -445,16 +469,20 @@ export default function SpreadCanvasView({
      */
     const { stage: st, basePageWidth: pw } = live.current;
     if (st.w > 0 && pw > 0) {
-      const wide = st.w / t.k > pw * 1.05;
+      const wide = st.w / t.k > pw * READ_ONLY_RATIO;
+      const farOut = st.w / t.k > pw * EDITOR_CLOSE_RATIO;
       if (wide !== wideRef.current) {
         wideRef.current = wide;
-        startTransition(() => {
-          setSeesMoreThanAPage(wide);
-          if (wide) {
+        startTransition(() => setSeesMoreThanAPage(wide));
+      }
+      if (farOut !== farOutRef.current) {
+        farOutRef.current = farOut;
+        if (farOut) {
+          startTransition(() => {
             restoreAddFocusFor.current = null;
             setActiveAddPassageId(null);
-          }
-        });
+          });
+        }
       }
     }
     el.style.transform = `translate(${t.x}px, ${t.y}px) scale(${t.k})`;
@@ -1089,11 +1117,18 @@ export default function SpreadCanvasView({
     for (const group of groups.values()) {
       const spreadY = layout.spreads[group[0].anchor.spreadIdx].y;
       const hs = group.map((c) => cardHeights[c.passage.id] ?? CARD_FALLBACK_H);
+      // The PASSAGE card is centred on the highlight; the stack's full height
+      // is what the rail packs against. Two numbers because they stopped being
+      // the same the moment the editor could open below the card: centring the
+      // stack lifted the passage card by half the editor's height (~95px at
+      // 1536) and bent the leader that the leader path still aims at the
+      // passage card's middle. See passageCardHeights, measured in the same RO.
+      const ph = group.map((c) => passageCardHeights[c.passage.id] ?? CARD_FALLBACK_H);
       const s = railScale(hs, CARD_GAP, layout.unitH);
       const placed = layoutRail(
         group.map((c, i) => ({
           id: c.passage.id,
-          desired: c.anchor.midY - spreadY - (hs[i] * s) / 2,
+          desired: c.anchor.midY - spreadY - (ph[i] * s) / 2,
           h: hs[i] * s,
         })),
         layout.unitH,
@@ -1105,7 +1140,7 @@ export default function SpreadCanvasView({
       }
     }
     return { tops, scales };
-  }, [cards, cardHeights, layout]);
+  }, [cards, cardHeights, passageCardHeights, layout]);
 
   if (!layout) return null;
 
@@ -1223,7 +1258,7 @@ export default function SpreadCanvasView({
                       readOnly={seesMoreThanAPage}
                     />
                   </div>
-                  {!seesMoreThanAPage && activeAddPassageId === id && onCreateConcept && onAddConcept ? (
+                  {activeAddPassageId === id && onCreateConcept && onAddConcept ? (
                     <div id={`canvas-add-concept-${id}`} className="pdf-add-concept-host">
                       <AddConceptRailCard
                         passage={c.passage}
