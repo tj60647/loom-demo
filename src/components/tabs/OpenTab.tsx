@@ -45,7 +45,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
   // naming, dedup and the delete guards must see every concept the student has
   // — otherwise capturing a concept met in an earlier text would mint a
   // duplicate instead of joining its evidence (spec §2 identity).
-  const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, removePassage, refilePassage, unfilePassage, flash } = useLoom()
+  const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, removePassage, refilePassage, unfilePassage, editPassageNote, flash } = useLoom()
   const { byId, titleOf } = useReadings()
   const { confirm, notify } = useDialog()
   const activeSourceId = soleSourceId(scope)
@@ -940,43 +940,69 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                   }}
                 >&quot;{b.content}&quot;</div>
                 <div className="src">{b.source || "—"}{b.location ? ` · ${b.location}` : ""}</div>
-                {b.note ? <div className="passagenote">{b.note}</div> : null}
-                {on.length > 0 && (
-                  <div className="passageconcepts">
-                    {on.map(c => (
-                      <span key={c.id} className="pchip">
-                        {c.label}
-                        {/* The scoped act, per concept, exactly as in the other
-                            view — the chip names which one it takes off. */}
-                        <button
-                          type="button"
-                          className="pchip-x"
-                          onClick={() => unfilePassage(b.id, c.id)}
-                          aria-label={`Remove ${c.label} from this passage`}
-                          title={`Remove “${c.label}” from this passage. The passage stays.`}
-                        >×</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {/* No separate "goto": the passage above is it. */}
-                <div className="src rm-actions" style={{ marginTop: "5px" }}>
-                  <button
-                    type="button"
-                    className="rm"
-                    style={{ background: "none", border: "none", padding: 0 }}
-                    onClick={() => removePassage(b.id)}
-                    title="Delete this capture. Its filings go with it."
-                  >
-                    remove passage
-                  </button>
+
+                {/* THREE BLOCKS, EACH ABOUT ONE THING (TJ, 2026-08-17: "the
+                    passage concepts is a little confusing, there are concept
+                    badges, remove passage, and then add concept. this need
+                    better structure").
+
+                    It was: chips, then "remove passage", then a concept field —
+                    so a destructive act on the PASSAGE sat in the middle of the
+                    concept material and read as part of it. Now the note is its
+                    own labelled block, the concepts are one block (what it is
+                    filed under, and how to add another), and the one
+                    destructive control is last and on its own. */}
+
+                {/* The note, and it is EDITABLE — the first time it has been
+                    (TJ: "i see the passage, but no notes"). It was invisible
+                    when empty, which on a passage captured without one meant
+                    always. Saved on blur, the same contract the concept
+                    description above uses. */}
+                <div className="pblock">
+                  <span className="label">Note <span className="labelsay">— why you kept these words</span></span>
+                  <textarea
+                    className="passagenote-edit"
+                    placeholder="what struck you, what to come back to"
+                    defaultValue={b.note ?? ""}
+                    key={b.id + ":" + (b.note ?? "")}
+                    onBlur={(e) => {
+                      if (e.target.value !== (b.note ?? "")) editPassageNote(b.id, e.target.value)
+                    }}
+                  />
                 </div>
-                <div className="addconcept">
+
+                <div className="pblock">
                   <span className="label">
-                    Concept{" "}
-                    <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--ochre)" }}>
-                      — a short noun phrase naming the idea
+                    Concepts{" "}
+                    <span className="labelsay">
+                      {on.length ? "— what this passage evidences" : "— none yet, which is a legal state"}
                     </span>
+                  </span>
+                  {on.length > 0 && (
+                    <div className="passageconcepts">
+                      {on.map(c => (
+                        <span key={c.id} className="pchip">
+                          {c.label}
+                          <button
+                            type="button"
+                            className="pchip-x"
+                            onClick={() => unfilePassage(b.id, c.id)}
+                            aria-label={`Remove ${c.label} from this passage`}
+                            title={`Remove “${c.label}” from this passage. The passage stays.`}
+                          >×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {/* The shape of the answer, back where it can be read (TJ,
+                      2026-08-17). The restructure above put it in a `title`,
+                      which is the hover nobody hovers — and it was the whole
+                      point of making the three concept fields alike two steps
+                      earlier. Two labels, at two levels: the BLOCK is Concepts,
+                      plural, what this passage is filed under; the FIELD is
+                      Concept, singular, the one you are about to add. */}
+                  <span className="label addlabel">
+                    Concept <span className="labelsay">— a short noun phrase naming the idea</span>
                   </span>
                   <div className="quietrow">
                     <input
@@ -987,6 +1013,20 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                     />
                     <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept to passage</button>
                   </div>
+                </div>
+
+                {/* Last, alone, and quiet: the one act here that destroys
+                    something. It used to sit between the chips and the concept
+                    field. */}
+                <div className="src rm-actions" style={{ marginTop: "8px" }}>
+                  <button
+                    type="button"
+                    className="rm"
+                    onClick={() => removePassage(b.id)}
+                    title="Delete this capture. Its filings go with it."
+                  >
+                    remove passage
+                  </button>
                 </div>
               </div>
             )

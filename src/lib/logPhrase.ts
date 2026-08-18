@@ -28,6 +28,12 @@ export function describeEvent(e: GraphEvent): string {
         : "merged two concepts"
     case "concept.delete": return "removed a concept"
     case "passage.create": return "captured a passage"
+    // The note itself is not in the event — only how long it is. A log that
+    // survives reset should not be carrying the student's prose.
+    case "passage.note":
+      return typeof p.noteChars === "number" && p.noteChars === 0
+        ? "cleared a passage's note"
+        : "wrote a note on a passage"
     case "passage.capture":
       return Array.isArray(p.conceptIds) && p.conceptIds.length === 0
         ? "captured an unlabeled passage"

@@ -282,6 +282,17 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
   box-shadow:inset 0 0 0 0 var(--ochre);transition:background-color .12s ease,box-shadow .12s ease}
 .passage.isdoor:hover{background:var(--paper-2);box-shadow:inset 3px 0 0 0 var(--ochre)}
 .passage.isdoor:focus-visible{background:var(--paper-2);box-shadow:inset 3px 0 0 0 var(--ochre);outline:none}
+/* A passage row's blocks: note, concepts, then the one destructive control.
+   Each is labelled, so nothing has to be inferred from position. */
+.pblock{margin-top:10px}
+.pblock .label{display:block;margin-bottom:4px}
+/* The field's own label inside a block that already has one: quieter than the
+   block heading, and clear of the chips above it. */
+.addlabel{display:block;margin:9px 0 4px}
+.labelsay{text-transform:none;letter-spacing:0;color:var(--ochre)}
+.passagenote-edit{width:100%;min-height:44px;font-family:var(--body);font-size:13.5px;
+  line-height:1.45;background:#fff;border:1px solid var(--rule);border-radius:3px;
+  padding:6px 8px;color:var(--ink);resize:vertical}
 .passagenote{font-size:13px;font-style:italic;color:var(--ink-soft);margin-top:5px;line-height:1.45}
 .passageconcepts{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 .pchip{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;

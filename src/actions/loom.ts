@@ -610,6 +610,41 @@ export async function attributePassages(passageIds: string[], sourceId: string) 
   return updated.length
 }
 
+/**
+ * Revise a passage's note (TJ, 2026-08-17).
+ *
+ * There was no update path for a passage at all: createPassage, refilePassage,
+ * unfilePassage, attributePassages, deletePassage. So a note was written once
+ * in the capture modal — at the moment you have read the passage least — and
+ * could never be changed anywhere in Loom. The model says the passage owns its
+ * Notes; the app let you write them once.
+ *
+ * Ownership is checked the way every other passage act checks it: the row must
+ * be yours and in the active course. `inCourse` matters as much as `userId` —
+ * a passage from another course is not this cloth's to edit.
+ *
+ * The event carries the note's LENGTH, not the note. The Capture Log is a
+ * record of acts, and a student's prose belongs in the passage rather than
+ * copied into an append-only log that survives reset — the same reason
+ * cloth.update records `descriptionChars`.
+ */
+export async function updatePassageNote(id: string, note: string) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+
+  const saved = await db.update(passages)
+    .set({ note })
+    .where(and(eq(passages.id, id), eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
+    .returning()
+  if (!saved.length) throw new Error("Passage not found.")
+
+  await recordEvent(userId, courseId, "passage.note", "passage", id, {
+    noteChars: note.trim().length,
+    sourceId: saved[0].sourceId,
+  })
+  return saved[0]
+}
+
 export async function deletePassage(id: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)

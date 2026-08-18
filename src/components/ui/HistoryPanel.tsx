@@ -276,6 +276,12 @@ function foldEvents(events: GraphEvent[], upTo: number) {
         seedFromSnapshot(p.snapshot, concepts, passages, edges, at)
         break
       }
+      // A note written on a passage. No-op for the fold, like the archive
+      // below: the note is not part of what the cloth draws — no concept,
+      // passage or thread appears or disappears — and the passage row itself
+      // is already in the replay from its capture.
+      case "passage.note":
+        break
       // A reading taken off the shelf. Deliberately a NO-OP for the fold, and
       // written out rather than left to `default` so the reason is on the
       // record: archiving retires the card, not the work. Every passage
