@@ -481,11 +481,12 @@ ruling, or already on `feat/reading-toolbar-cleanup`.
 Every item of PR #10 is decided and most of the takeable ones are committed;
 the branch has since grown a second body of work that came from using the app
 rather than reading the branch, and what is open now is listed under "Still
-open after the second session" — one app bug, two rulings, three small
-decided-but-unbuilt changes, and a test account that wants reseeding. The
-canvas recenter and the cards at full zoom-out are fixed under "The third
-session"; the missing highlights are still open, and an attempt at them was
-withdrawn. Of the three diagnoses this document carried, one survived contact.
+open after the second session" — two rulings, three small decided-but-unbuilt
+changes, and a test account that wants reseeding. All three app bugs are fixed
+under "The third session": the canvas recenter, the cards at full zoom-out and
+the missing highlights. Of the three diagnoses this document carried into that
+session, one survived contact — and the highlights were fixed by a route it
+did not contain, found in TJ's own description of when the thing breaks.
 
 ## The second session — what came out of looking at the app
 
@@ -603,14 +604,11 @@ days in July, arriving through a different door.
 
 ## Still open after the second session
 
-**In the app, found and not built:**
-
-- **Highlights are invisible at full zoom-out.** At fit-all the canvas shows
-  pre-rendered page images with no text layer, so mark.js has nothing to mark.
-  An attempt built on `analyticAnchors`' arithmetic was withdrawn — that
-  formula assumes one column filling the page, and these readings are
-  two-column. See "The third session" for what it costs and what a real fix
-  needs.
+**In the app, found and not built:** nothing — but one remainder. Highlights
+at full zoom-out are fixed for any page the reader has been in close to (see
+"The third session"); a page never promoted this session still has no mark,
+because nothing has measured it yet. Closing that needs the `getTextContent()`
+route recorded there.
 
 **Needs a ruling, and the model doc amended first:**
 
@@ -746,10 +744,11 @@ under the word it removes. In a flex row the × is an item beside the label.
 Measured on "Mythology Construction" at the floor: at 1280 one line showed 9
 characters and two show 19; at 1920, 16 and then all 22.
 
-### Highlights at full zoom-out · Attempted and withdrawn — still open
+### Highlights at full zoom-out · one attempt withdrawn first
 
-**Not built.** An attempt was made, shown to TJ, and taken back out. What it
-learned is worth more than the attempt was.
+**The first attempt was withdrawn**, shown to TJ and taken back out. What it
+learned is worth more than the attempt was, and the fix that landed is in the
+section after this one.
 
 The diagnosis in the bullet above is right as far as it goes: mark.js marks
 *text*, and the impostor tier has none — at fit-all every page is a
@@ -787,16 +786,56 @@ so the collision did not show; his cluster, and it did. Screenshots at three
 widths were taken and proved nothing, because the case that breaks it was not
 in them.
 
-**What a real fix needs.** There is no stored geometry to do better with:
-`sourcePages` keeps `textContent`, `width`, `height` and a hash — nothing per
-line or per item — and `pdfStructure.ts` computes no column geometry. But
-pdf.js is already loaded client-side to render these pages, and
-`SpreadCanvasView` already holds the `pdf` document. `getTextContent()` on the
-few pages that carry passages gives every item's string and transform, and
-accumulating those strings reproduces exactly the DOM string `startOffset`
-indexes into — the equivalence `textLayerProjection` exists to guarantee. That
-gives a true position in the true column, needs no migration, and would fix
-the cards' anchors at the same time. Undecided; TJ's call.
+### Highlights at full zoom-out · Done, by keeping what was measured
+
+TJ, 2026-08-18: it works "at almost 'fit', but zoom out just a touch more and
+it breaks". That sentence is the whole diagnosis, and it pointed at a better
+fix than either the withdrawn arithmetic or the pdf.js route above.
+
+**It is a cliff, not a drift.** `retargetView` promotes nothing at all once
+`t.k * basePageWidth` falls under `TEXT_TIER_MIN_W` (240) — everything that
+mounts a text layer is inside that one `if` — so a single notch takes **every
+page in the document** to the impostor tier at once. Measured on Object Worlds
+at 1920x1080: `basePageWidth` 453, so the threshold sits at k = 0.530 against
+a Fit of k = 0.506. **The cliff is at 1.05x Fit, and Fit is already under it**
+— which is exactly why "almost fit" works and Fit does not. It moves with page
+count and stage size, since both terms do.
+
+**The geometry was already there and was being thrown away.** `measure()`
+reads the real mark.js rectangles out of the DOM and converts them to canvas
+units — transform-independent, as the `Anchor` type has always said. A rect
+measured at reading zoom is still true at fit-all, because the page it sits on
+is a thumbnail of the same plane. But the sweep *replaced* the anchor set
+every time it ran, so the frame after the text layers unmounted it found
+nothing and wrote nothing over everything.
+
+Now it merges rather than replaces, keeps every rectangle of every fragment
+(not just the anchor's first one), and redraws them where no text layer is up.
+So the mark at zoom-out is **the mark**, in the true column, with its real
+multi-line shape — not an approximation of one. The cards' leader lines stop
+degrading to `analyticAnchors` on the way out for the same reason, which
+matters: a kept mark and an arithmetic anchor would visibly disagree.
+
+Measured on Object Worlds at 1920x1080: zoomed in, 9 text layers / 69 mark.js
+rects across 7 passages / 0 redrawn; back at Fit, 0 layers / 0 mark.js / **69
+redrawn**; at the floor, still 69, at byte-identical canvas coordinates.
+
+**What it does not do.** A page never promoted this session has nothing kept,
+so a cold open straight to Canvas at Fit still shows no marks until you have
+been in close once. That is the honest state — nothing has measured it yet —
+and it is where the `getTextContent()` route below would fill in. The kept
+geometry is also cleared on `geomKey`, since a resize re-derives
+`basePageWidth` and every stored coordinate with it.
+
+**The route not taken, kept for the cold case.** There is no stored geometry
+to compute from: `sourcePages` keeps `textContent`, `width`, `height` and a
+hash — nothing per line or per item — and `pdfStructure.ts` computes no column
+geometry. But pdf.js is already loaded client-side, and `SpreadCanvasView`
+already holds the `pdf` document. `getTextContent()` on the few pages that
+carry passages gives every item's string and transform, and accumulating those
+strings reproduces exactly the DOM string `startOffset` indexes into — the
+equivalence `textLayerProjection` exists to guarantee. Still open, and now
+only needed for pages the reader has never zoomed into.
 
 ---
 
