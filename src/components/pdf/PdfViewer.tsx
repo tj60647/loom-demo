@@ -2044,6 +2044,29 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           pointer-events: none;
           overflow: visible;
         }
+        /* The kept mark: the rectangles mark.js painted, redrawn once the
+           text layer that carried them has gone. Same 0.4 yellow fill as
+           .loom-passage-highlight, because it is the same mark and must not
+           read as a second kind of thing.
+           The edge is an outline here rather than that rule's bottom-only
+           border: down at the impostor tier a mark is a few pixels tall over
+           a grey thumbnail, and an underline alone leaves it looking like a
+           smudge. non-scaling-stroke keeps it one device pixel at any zoom,
+           so it never thickens into the mark it is outlining.
+           No pointer events: the real highlight carries a tooltip and a
+           click; this is a picture of one. */
+        .pdf-kept-marks {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          overflow: visible;
+        }
+        .pdf-kept-marks rect {
+          fill: rgba(255, 204, 0, 0.4);
+          stroke: rgba(255, 204, 0, 0.8);
+          stroke-width: 1;
+          vector-effect: non-scaling-stroke;
+        }
         .pdf-rail-leaders path {
           stroke: rgba(255, 204, 0, 0.8);
           stroke-width: 1.5;

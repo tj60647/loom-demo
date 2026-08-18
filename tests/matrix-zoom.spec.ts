@@ -303,4 +303,70 @@ test.describe('Matrix zoom', () => {
     await page.waitForTimeout(1500);
     expect(await overflowing()).toEqual([]);
   });
+
+  /**
+   * A mark measured at reading zoom survives the text layer going away.
+   *
+   * The LOD ladder is a cliff, not a slope: retargetView promotes nothing once
+   * `t.k * basePageWidth` drops under TEXT_TIER_MIN_W, so one notch takes the
+   * whole document to the impostor tier and mark.js loses every mark at once.
+   * Measured on Object Worlds at 1920x1080, that threshold is k = 0.530
+   * against a Fit of k = 0.506 — the cliff sits at 1.05x Fit, which is why it
+   * reads as "fine at almost Fit, broken a touch below" (TJ, 2026-08-18).
+   *
+   * The rects are measured in canvas units, which are transform-independent,
+   * so what was true at reading zoom is still true at fit-all. This asserts
+   * the surviving geometry is the SAME geometry, not merely that something is
+   * drawn — a redraw in the wrong place would pass a count.
+   */
+  test('a mark measured at reading zoom survives the drop to impostors', async ({ page }) => {
+    test.setTimeout(90_000);
+    await openReading(page, 'Object Worlds');
+    await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Canvas' }).click();
+    await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
+    await expect(page.locator('.pdf-slot-img').first()).toBeVisible({ timeout: 10000 });
+
+    const kept = page.locator('.pdf-kept-marks rect');
+    const real = page.locator('.loom-passage-highlight');
+    const boxes = () =>
+      kept.evaluateAll((els) =>
+        els.map((r) => [
+          r.getAttribute('x'),
+          r.getAttribute('y'),
+          r.getAttribute('width'),
+          r.getAttribute('height'),
+        ].join(','))
+      );
+
+    // Above the cliff: the real marks are up, so nothing is redrawn.
+    const zoomIn = page.getByRole('button', { name: 'Zoom in' });
+    for (let i = 0; i < 4; i++) {
+      await zoomIn.click();
+      await page.waitForTimeout(300);
+    }
+    await expect(real.first()).toBeAttached({ timeout: 20_000 });
+    const realCount = await real.count();
+    expect(realCount).toBeGreaterThan(0);
+    await expect(kept).toHaveCount(0);
+
+    // Back to Fit — under the cliff. Every text layer goes, and with it every
+    // mark.js mark; the measured geometry is what is left.
+    await page.getByRole('button', { name: 'Fit the whole reading' }).click();
+    await page.waitForTimeout(2000);
+    await expect(page.locator('.pdf-slot-inner .react-pdf__Page__textContent')).toHaveCount(0);
+    await expect(real).toHaveCount(0);
+    await expect(kept).toHaveCount(realCount);
+    const atFit = await boxes();
+
+    // Further out still: same coordinates, because canvas units do not care
+    // about the transform.
+    const zoomOut = page.getByRole('button', { name: 'Zoom out' });
+    for (let i = 0; i < 4; i++) {
+      await zoomOut.click();
+      await page.waitForTimeout(300);
+    }
+    await page.waitForTimeout(1500);
+    expect(await boxes()).toEqual(atFit);
+  });
 });

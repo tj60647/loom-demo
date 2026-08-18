@@ -85,6 +85,11 @@ type Anchor = {
   edgeX: number;
 };
 
+/** One rectangle mark.js actually painted, in canvas units. A passage that
+ *  crosses lines is several of these, and mark.js may split one passage over
+ *  several elements, so a passage owns a list rather than a box. */
+type MarkRect = { x: number; y: number; w: number; h: number };
+
 export default function SpreadCanvasView({
   pdf,
   numPages,
@@ -162,6 +167,9 @@ export default function SpreadCanvasView({
   const initedRef = useRef(false);
   const [pageView, setPageView] = useState<Record<number, { tier: Exclude<PageTier, "impostor">; res: number }>>({});
   const [anchors, setAnchors] = useState<Record<string, Anchor>>({});
+  /** The rectangles mark.js painted, kept after the text layer that carried
+   *  them is gone. See the merge in `measure`. */
+  const [markRects, setMarkRects] = useState<Record<string, MarkRect[]>>({});
   const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
   // The whole-document sheet 404s until its first compose lands (readings
   // ingested before it existed); the slots' own images carry the view then.
@@ -790,20 +798,36 @@ export default function SpreadCanvasView({
     const k = tref.current.k;
     if (k === 0) return;
     const next: Record<string, Anchor> = {};
+    const nextRects: Record<string, MarkRect[]> = {};
     for (const mark of canvas.querySelectorAll<HTMLElement>(".loom-passage-highlight")) {
       const id = mark.getAttribute("data-loom-passage-id");
-      if (!id || next[id]) continue;
+      if (!id) continue;
       const pageEl = mark.closest<HTMLElement>(".react-pdf__Page");
       const pageNum = Number(pageEl?.getAttribute("data-page-number"));
       if (!pageEl || !pageNum) continue;
-      const rect = mark.getClientRects()[0];
-      if (!rect || (rect.width === 0 && rect.height === 0)) continue;
       const spreadIdx = Math.floor((pageNum - 1) / 2);
       const s = layout.spreads[spreadIdx];
       if (!s) continue;
       const side: Anchor["side"] = pageNum % 2 === 1 ? "left" : "right";
       const pr = pageEl.getBoundingClientRect();
       const px = pageX(layout, s, pageNum, basePageWidth);
+      // EVERY rectangle of every fragment, not just the anchor's first one:
+      // this is the shape the mark actually has, and it is what gets redrawn
+      // once the text layer is gone.
+      for (const r of mark.getClientRects()) {
+        if (r.width === 0 && r.height === 0) continue;
+        (nextRects[id] ??= []).push({
+          x: px + (r.left - pr.left) / k,
+          y: s.y + (r.top - pr.top) / k,
+          w: r.width / k,
+          h: r.height / k,
+        });
+      }
+      // The anchor stays the FIRST fragment's first rect, as it always was:
+      // the leader line has one place to land.
+      if (next[id]) continue;
+      const rect = mark.getClientRects()[0];
+      if (!rect || (rect.width === 0 && rect.height === 0)) continue;
       next[id] = {
         spreadIdx,
         side,
@@ -811,21 +835,48 @@ export default function SpreadCanvasView({
         edgeX: px + ((side === "left" ? rect.left : rect.right) - pr.left) / k,
       };
     }
+    /**
+     * KEEP WHAT WAS MEASURED (TJ, 2026-08-18: it works "at almost 'fit', but
+     * zoom out just a touch more and it breaks").
+     *
+     * The break is a cliff, not a drift: retargetView promotes nothing at all
+     * once `t.k * basePageWidth` falls under TEXT_TIER_MIN_W, so one notch
+     * takes every page in the document to the impostor tier at once. No text
+     * layer means mark.js has nothing to mark, and this sweep — which reads
+     * the DOM — found nothing and REPLACED the anchors with nothing. Measured
+     * on Object Worlds at 1920x1080: basePageWidth 453, so the threshold sits
+     * at k = 0.530 against a Fit of k = 0.506 — 1.05x Fit. Fit itself is
+     * already under it.
+     *
+     * These coordinates are canvas units, and the type says why that matters:
+     * transform-independent. A rect measured at reading zoom is still true at
+     * fit-all — the page it sits on is a thumbnail of the same plane. So the
+     * measurement is kept rather than discarded, and both the mark and the
+     * card's leader line go on using real geometry instead of falling back to
+     * analyticAnchors, whose arithmetic assumes one column filling the sheet
+     * and is wrong on these two-column readings.
+     *
+     * Merge, never replace. An empty sweep is "the text layer went away", not
+     * "the passages went away".
+     */
+    setMarkRects((prev) => (Object.keys(nextRects).length === 0 ? prev : { ...prev, ...nextRects }));
     setAnchors((prev) => {
+      if (Object.keys(next).length === 0) return prev;
+      const merged = { ...prev, ...next };
       const pk = Object.keys(prev);
-      const nk = Object.keys(next);
+      const mk = Object.keys(merged);
       if (
-        pk.length === nk.length &&
-        nk.every((id) => {
+        pk.length === mk.length &&
+        mk.every((id) => {
           const a = prev[id];
-          const b = next[id];
+          const b = merged[id];
           return a && a.side === b.side && a.spreadIdx === b.spreadIdx &&
             Math.abs(a.midY - b.midY) < 0.5 && Math.abs(a.edgeX - b.edgeX) < 0.5;
         })
       ) {
         return prev;
       }
-      return next;
+      return merged;
     });
   }, []);
 
@@ -845,7 +896,25 @@ export default function SpreadCanvasView({
       window.clearTimeout(timer);
       mo.disconnect();
     };
-  }, [cardsOn, measure, passages]);
+  }, [cardsOn, measure, passages, geomKey]);
+
+  /**
+   * A kept measurement is only true while the plane it was measured on is.
+   *
+   * Canvas units survive zoom — that is the whole point of them — but NOT a
+   * change of geometry: a resize or a rail toggle re-derives basePageWidth,
+   * and `layout` with it, so every spread's x and y move and a stored rect
+   * now points somewhere else. geomKey is the same signal the recentre uses.
+   * Cleared rather than rescaled, because the sweep above re-measures on this
+   * key and will refill it from the DOM wherever a text layer is still up.
+   */
+  const prevMeasureGeom = useRef(geomKey);
+  useEffect(() => {
+    if (prevMeasureGeom.current === geomKey) return;
+    prevMeasureGeom.current = geomKey;
+    setMarkRects({});
+    setAnchors({});
+  }, [geomKey]);
 
   const cardEls = useRef(new Map<string, HTMLElement>());
   const cardIdByEl = useRef(new Map<Element, string>());
@@ -918,6 +987,32 @@ export default function SpreadCanvasView({
     () => ({ ...analyticAnchors, ...anchors }),
     [analyticAnchors, anchors]
   );
+
+  /**
+   * The passage's mark, redrawn where the text layer that carried it is gone.
+   *
+   * Not an approximation of one: these are the rectangles mark.js painted,
+   * measured off the real text and kept in canvas units (see `measure`). A
+   * page whose text layer is up needs nothing here — the real highlight is on
+   * screen, and drawing over it would double the wash. `pageView[p]` is
+   * absent exactly when the slot is an impostor, since PageSlot mounts text
+   * for the "reading" and "native" tiers only.
+   *
+   * A passage whose page has never been promoted this session has nothing
+   * kept, so it stays unmarked down here. That is the honest state: nothing
+   * has measured it yet, and the alternative — arithmetic off the manifest's
+   * text length — draws two-column pages in the wrong place.
+   */
+  const keptMarks = useMemo(() => {
+    const out: MarkRect[] = [];
+    for (const passage of passages) {
+      const p = passage.pageNumber;
+      if (!p || pageView[p]) continue;
+      const rects = markRects[passage.id];
+      if (rects) out.push(...rects);
+    }
+    return out;
+  }, [passages, pageView, markRects]);
 
   const cards = useMemo(() => {
     if (!cardsOn || !layout) return [];
@@ -996,6 +1091,18 @@ export default function SpreadCanvasView({
           />
         )}
         {pagesEl}
+
+        {/* Over the pages, under the leaders and the cards: it is a mark ON
+            the page, not furniture above it. aria-hidden like the leaders —
+            the passage is reachable from its card and from Your work, and
+            this is a redraw of a mark, not a second control. */}
+        {keptMarks.length > 0 && (
+          <svg className="pdf-kept-marks" width={layout.canvasW} height={layout.canvasH} aria-hidden="true">
+            {keptMarks.map((m, i) => (
+              <rect key={i} x={m.x} y={m.y} width={m.w} height={m.h} />
+            ))}
+          </svg>
+        )}
 
         {cardsOn && (
           <svg className="pdf-rail-leaders" width={layout.canvasW} height={layout.canvasH} aria-hidden="true">
