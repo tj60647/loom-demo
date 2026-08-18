@@ -308,20 +308,12 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
             query was live its results REPLACED the shelf; both are gone. The
             shelf simply stays put behind the panel. */}
         {(<>
-        {/* The whole weave and Keep were quick links here; they are journey
-            stations now (05 · 06), so the bar carries them and this row keeps
-            only the tally. */}
-        <div className="shelfbar">
-          <span className="cap shelfcount">
-            {isLoading ? "reading your loom…" : (
-              <>
-                {state.concepts.length} concept{state.concepts.length !== 1 ? "s" : ""} ·{" "}
-                {state.passages.length} passage{state.passages.length !== 1 ? "s" : ""} ·{" "}
-                {state.edges.length} thread{state.edges.length !== 1 ? "s" : ""} in all
-              </>
-            )}
-          </span>
-        </div>
+        {/* The tally stood here in a `.shelfbar` row of its own — the whole
+            weave and Keep were quick links beside it once, and when they became
+            journey stations the row was left carrying only the count. It says
+            the same words the footer now says, so it is the footer's (TJ,
+            2026-08-17: "we dont need stats here, correct? is redundant?"). A
+            row back, above the fold, on the page whose job is to show cards. */}
 
         {untethered > 0 && <Untethered readings={sources} />}
 
@@ -396,10 +388,12 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
           {/* The whole loom, in one line (TJ, 2026-08-17). Deliberately NOT a
               count of readings: `sources` is every row this student can open —
               the course's thirty plus every card they have made — and it read
-              "109 readings" on a shelf showing nothing like that many. The
-              three counts here are the student's own work, which is the fact
-              the shelf does not otherwise total: each card carries its own
-              tally and nothing added them up.
+              "109 readings" on a shelf showing nothing like that many.
+
+              These three counts are not new. They were a `.shelfbar` row under
+              the intro, in these exact words, and this footer duplicated them
+              for half a day before anyone noticed. The row is gone; the words
+              live here.
 
               "…" while the loom is in flight, exactly as the cards do. A zero
               is a claim about someone's work, and it would be on screen for
