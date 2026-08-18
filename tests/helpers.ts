@@ -67,12 +67,18 @@ export async function deleteConceptInVocabulary(page: Page, label: string) {
     .locator('.lrow[data-concept-id]', { has: page.locator('.lconcept', { hasText: label }) })
     .first();
   await expect(row).toBeVisible({ timeout: 20000 });
+  // ONE FEWER, not none. Distinct concepts may share a label — homonyms are
+  // legal (ruling 36) and reuse-seam's whole subject is making a pair of them —
+  // so asserting the name is gone fails on the first of two, which is not a
+  // failure of the delete. Counting down proves the same thing and survives it.
+  const before = await page.locator('.lconcept', { hasText: label }).count();
   await row.locator('.lhead').click();
   const deleted = page.waitForResponse((r) => isDeletePost(r.request()));
   await row.getByRole('button', { name: 'remove concept' }).click();
   await page.getByRole('button', { name: 'Delete concept' }).click();
   await deleted;
-  await expect(page.locator('.lconcept', { hasText: label })).toHaveCount(0, { timeout: 15000 });
+  await expect(page.locator('.lconcept', { hasText: label }))
+    .toHaveCount(before - 1, { timeout: 15000 });
 }
 
 /**

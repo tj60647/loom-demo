@@ -23,6 +23,24 @@ import { test, expect } from "@playwright/test"
 import { cardOwnReading, deleteConceptInVocabulary, deletePassageInPassagesView, enterReadingFromCard, isDeletePost, removeOwnReading } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
+
+/**
+ * The eight concepts `seed-demo.ts` gives Test User A. Named here so the
+ * Vocabulary test can assert they are ALL present without also asserting that
+ * nothing else on the account exists — which is a different claim, and one no
+ * spec sharing an account can honestly make.
+ */
+const SEEDED_CONCEPTS = [
+  "object worlds",
+  "design as social process",
+  "artifact as compromise",
+  "community of practice",
+  "legitimate peripheral participation",
+  "reification",
+  "negotiation of meaning",
+  "shared vocabulary",
+] as const
+
 // Each test is independent and removes what it adds — no serial mode, so one
 // failure never hides the rest of the journey. Dev-server compile latency puts
 // several 15s waits in sequence, hence the generous per-test budget.
@@ -203,20 +221,48 @@ test("03 · vocabulary is every word you own, across all your readings", async (
   await enterReadingFromCard(page, card)
   await page.locator("nav button", { hasText: "Vocabulary" }).click()
 
-  // All 8 seeded concepts, not this reading's slice — including the seeded
+  // Every seeded concept, not this reading's slice — including the
   // evidence-less one, which is counted rather than hidden.
+  //
+  // NAMED, not counted (2026-08-17). This asserted `toHaveCount(8)` on every
+  // concept row on the page, which made it a test of the whole ACCOUNT rather
+  // than of this list: any spec that ran earlier in the `write` project and
+  // left a concept behind turned it red, for a reason that had nothing to do
+  // with Vocabulary being unscoped. It failed at 9 in a full run and passed
+  // alone, which is the signature of that mistake.
+  //
+  // What the test is actually for is that Vocabulary shows concepts from
+  // EVERY reading rather than this one's slice — so it names the eight and
+  // checks they are all there. A ninth row from a neighbouring spec is not a
+  // failure of that claim.
   const conceptRows = page.locator(".lrow[data-concept-id]")
-  await expect(conceptRows, "seed missing — run `npm run seed:demo` first").toHaveCount(8, { timeout: 15_000 })
+  await expect(conceptRows.first(), "seed missing — run `npm run seed:demo` first")
+    .toBeVisible({ timeout: 15_000 })
+  for (const label of SEEDED_CONCEPTS) {
+    await expect(
+      page.locator(".lrow[data-concept-id]", { has: page.locator(".lconcept", { hasText: label }) }),
+      `seeded concept missing: ${label}`
+    ).toHaveCount(1, { timeout: 15_000 })
+  }
   await expect(page.locator(".lrow[data-link-label]").first()).toBeVisible()
 
-  // Filtering narrows the list and finding nothing says so.
-  await page.locator("#conceptFilter").fill("object")
-  await expect(conceptRows).toHaveCount(2)
+  // Filtering narrows the list and finding nothing says so. "object" matches
+  // two of the seeded eight; a filter that finds nothing must say so whatever
+  // else the account holds.
+  await page.locator("#conceptFilter").fill("object worlds")
+  await expect(conceptRows).toHaveCount(1)
   await page.locator("#conceptFilter").fill("zzzznothing")
   await expect(conceptRows).toHaveCount(0)
   await expect(page.getByText(/No concept matches/)).toBeVisible()
+  // Clearing the filter restores the list. Counted as "at least the seeded
+  // eight" for the same reason as above: this spec shares an account, so the
+  // total is not its to assert.
   await page.locator("#conceptFilter").fill("")
-  await expect(conceptRows).toHaveCount(8)
+  for (const label of SEEDED_CONCEPTS) {
+    await expect(
+      page.locator(".lrow[data-concept-id]", { has: page.locator(".lconcept", { hasText: label }) })
+    ).toHaveCount(1, { timeout: 15_000 })
+  }
 
   // A concept opens to its description. It opened to a MERGE control too
   // until 2026-08-12, when TJ hid that pending what merge means and what it
