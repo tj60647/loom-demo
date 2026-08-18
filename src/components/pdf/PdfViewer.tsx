@@ -2253,7 +2253,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               // spec has to scope its selector to `.pdf-toolbar` because the
               // two buttons answered the same name. Each says its own subject
               // now, and neither needs the other to make sense.
-              data-tip="find a word or phrase on these pages"
+              // Same shape as the journey bar's tip (TJ, 2026-08-17): the
+              // verb first, then what it reaches. "find a word or phrase on
+              // these pages" said what any magnifier says; this says which
+              // pages, and what you get back — the two things that tell you
+              // whether to press this one or "your cloth" beside it.
+              data-tip="search the text — every page of this reading, marked where it appears"
               aria-pressed={searchOpen}
               aria-label="Search the text of this reading"
             >
