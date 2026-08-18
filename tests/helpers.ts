@@ -18,6 +18,32 @@ export const isDeletePost = (request: Request) =>
   /^\["[0-9a-f-]{36}"(,(null|"[0-9a-f-]{36}"))?\]$/.test(request.postData() ?? '');
 
 /**
+ * Delete a passage — from the PASSAGES view, the only place that does it.
+ *
+ * The concept view lost "remove passage" on 2026-08-17 (TJ): that list is a
+ * concept and its evidence, so the act belonging there is taking one passage
+ * OFF the concept. Destroying the capture reaches every other concept it
+ * evidences, none of which are on that screen to watch go — so it lives where
+ * the passage is the subject.
+ *
+ * Waits on the POST for the reason isDeletePost exists: the row clears
+ * optimistically and ending at the disappearance strands the delete.
+ */
+export async function deletePassageInPassagesView(page: Page, passageId: string) {
+  const panel = page.locator('#yourwork');
+  const inSheet = await panel.isVisible().catch(() => false);
+  const root = inSheet ? panel : page.locator('body');
+  await root.locator('.segmented button', { hasText: 'Passages' }).click();
+  const row = root.locator(`[data-passage-id="${passageId}"]`).first();
+  await expect(row).toBeVisible({ timeout: 15000 });
+  const gone = page.waitForResponse((r) =>
+    r.request().method() === 'POST' && (r.request().postData() ?? '').includes(passageId)
+  );
+  await row.getByRole('button', { name: 'remove passage', exact: true }).click();
+  await gone;
+}
+
+/**
  * Delete a concept — from 04 · Vocabulary, which is the only place that does it.
  *
  * Your work used to carry its own "delete this concept". It went on

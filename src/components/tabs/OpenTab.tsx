@@ -845,56 +845,36 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
                             >
                               remove passage from concept
                             </button>
-                            <button
-                              type="button"
-                              className="rm"
-                              style={{ background: "none", border: "none", padding: 0 }}
-                              onClick={() => removePassage(b.id)}
-                              title="Delete this capture. Its other filings go with it."
-                            >
-                              remove passage
-                            </button>
+                            {/* DELETING THE CAPTURE IS NOT AN ACT OF THIS VIEW
+                                (TJ, 2026-08-17: "in concept view the only
+                                option is remove passage from concept, and in
+                                passage view it is remove concept from passage,
+                                which is the 'x' on concept badges").
+
+                                Same scope argument as concepts and Vocabulary.
+                                This list is a CONCEPT and its evidence, so the
+                                act that belongs here is taking one passage off
+                                it. Destroying the passage reaches every other
+                                concept it evidences — none of which are on this
+                                screen to see go. That act lives in the passage
+                                view, where the passage is the subject. */}
                           </span>
                         </div>
-                        {/* Labelled and placeheld exactly like the coin-a-
-                            concept field (TJ, 2026-08-17: "these need to be the
-                            same: and behave and labelled like this"). Three
-                            fields on this surface take a concept; they said
-                            three different things and only one of them told you
-                            what a concept looks like. The label carries the
-                            shape, the placeholder is an example, and `list`
-                            gives all three the same autocomplete — which this
-                            one never had at all, having been written without
-                            it. */}
-                        <div className="addconcept" style={{ marginTop: "9px" }}>
-                          <span className="label addlabel">
-                            Add concept to passage <span className="labelsay">— a short noun phrase</span>
-                          </span>
-                        <div className="quietrow">
-                          <input
-                            list={listId}
-                            placeholder="e.g. boundary objects"
-                            title="one passage can evidence several concepts — add another here; it keeps the ones it has"
-                            value={refileInputs[b.id] ?? ""}
-                            onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
-                          />
-                          {/* Was "File", beside "remove concept" and
-                              "unfile from this concept" — three verbs for
-                              three different objects in one small area, and
-                              none of them said which (TJ, 2026-08-17: "i dont
-                              know what this means, file this?"). It ADDS a
-                              concept to the passage and keeps the ones it has,
-                              which is what the action does too, despite being
-                              called refilePassage — see the rename logged in
-                              docs/ui-cleanup-pass-1.md. */}
-                          <button
-                            className="btn ghost mini"
-                            onClick={() => handleRefile(b)}
-                            disabled={!!refileBusy[b.id]}
-                            aria-label="Add concept to passage"
-                          >add</button>
-                        </div>
-                        </div>
+                        {/* NO CONCEPT FIELD IN THIS VIEW (TJ, 2026-08-17:
+                            "maybe in concept view there is no add concept to
+                            passage, i guess it would be add passage to concept
+                            but this sounds best done in the text itself").
+
+                            It is, and it already is: a passage joins a concept
+                            by being captured under it, or from the passage
+                            view, where the passage is the subject and the
+                            concept is what you are adding to it. Read from
+                            this end the same field would have to be "add
+                            passage to concept", and there is nothing here to
+                            add — the passages are in the text.
+
+                            So this list does one thing: shows a concept's
+                            evidence, and lets you take a piece of it off. */}
                       </div>
                     ))}
                     {/* "N more passages evidence this concept in your other

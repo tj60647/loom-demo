@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { deleteConceptInVocabulary, openReading, openYourWork } from './helpers';
+import { deleteConceptInVocabulary, deletePassageInPassagesView, openReading, openYourWork } from './helpers';
 
 // Runs as Test User A (see playwright/global-setup.ts): the concepts and passages
 // this spec captures belong to the test account, never to a real person's loom.
@@ -126,18 +126,8 @@ test.describe('Concept rail', () => {
     }
     await expect(pidLoc).toBeVisible({ timeout: 5000 });
     const passageId = await pidLoc.getAttribute('data-passage-id');
-    const passageDeleted = page.waitForResponse((r) =>
-      r.request().method() === 'POST' && (r.request().postData() ?? '').includes(passageId!)
-    );
-    // Scoped to the passage this test made. Every passage row carries a
-    // "remove passage" now that the control is unconditional, so a concept
-    // holding more than one — including residue from an earlier failed run —
-    // made an unscoped match ambiguous.
-    await row.locator(`[data-passage-id="${passageId}"]`)
-      // exact: Playwright matches accessible names by SUBSTRING, and the row
-      // also holds "remove passage from concept" since 2026-08-17.
-      .getByRole('button', { name: 'remove passage', exact: true }).click();
-    await passageDeleted;
+    // The passage goes from the PASSAGES view — the concept view only unfiles.
+    await deletePassageInPassagesView(page, passageId!);
     // The concept itself goes from 04, which is the only station that deletes
     // one since 2026-08-17 — see helpers' deleteConceptInVocabulary.
     await deleteConceptInVocabulary(page, conceptName);

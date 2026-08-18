@@ -20,7 +20,7 @@
  * prompts and the read.
  */
 import { test, expect } from "@playwright/test"
-import { cardOwnReading, deleteConceptInVocabulary, enterReadingFromCard, isDeletePost, removeOwnReading } from "./helpers"
+import { cardOwnReading, deleteConceptInVocabulary, deletePassageInPassagesView, enterReadingFromCard, isDeletePost, removeOwnReading } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 // Each test is independent and removes what it adds — no serial mode, so one
@@ -132,13 +132,8 @@ test("01 · a passage typed into a carded reading lands in the coding log — an
   // resurface on the next load as residue.
   await row.locator(".lhead").click()
   const passageId = await row.locator("[data-passage-id]").first().getAttribute("data-passage-id")
-  const passageDeleted = page.waitForResponse((r) =>
-    r.request().method() === "POST" && (r.request().postData() ?? "").includes(passageId!)
-  )
-  // exact: names match by SUBSTRING, and the row also holds "remove passage
-  // from concept" since 2026-08-17.
-  await row.getByRole("button", { name: "remove passage", exact: true }).click()
-  await passageDeleted
+  // The passage goes from the PASSAGES view — the concept view only unfiles.
+  await deletePassageInPassagesView(page, passageId!)
   // 04 is the only station that deletes a concept since 2026-08-17.
   await deleteConceptInVocabulary(page, "journey test concept")
 
