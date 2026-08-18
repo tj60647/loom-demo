@@ -751,7 +751,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                               which is what the action does too, despite being
                               called refilePassage — see the rename logged in
                               docs/ui-cleanup-pass-1.md. */}
-                          <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept</button>
+                          <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept to passage</button>
                         </div>
                       </div>
                     ))}
@@ -860,7 +860,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                         picks one you already own, and files this passage under
                         it. Same button, same act, as the one on a passage that
                         already has a concept: there is one verb here. */}
-                    <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept</button>
+                    <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept to passage</button>
                   </div>
                 </div>
               ))}
@@ -926,13 +926,31 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
               onChange={(e) => setNewConceptDef(e.target.value)}
             />
           </div>
-          {/* Disabled until there is a name, like Add passage above: the handler
-              already returned early on an empty one, silently. */}
+          {/* "add concept to VOCABULARY", not "to cloth" (TJ proposed the
+              pair; the destination is the correction). A concept coined
+              before its evidence joins nothing here: model §Concept — "A
+              Concept with no Passages therefore belongs to NO Reading, and is
+              in scope EVERYWHERE — it stands in every Reading's warp while the
+              student hunts for what backs it" — and the Concept List "belongs
+              to the User, spans Cloths". It enters THIS cloth the moment a
+              passage here evidences it, which is what the two "add concept to
+              passage" buttons above do.
+
+              The paragraph directly over this input already says as much: "it
+              stays in view in every reading while you hunt". A button reading
+              "to cloth" would have contradicted its own instructions.
+
+              Naming the destination on all three is the point: the same three
+              words, three different objects, was the confusion TJ started
+              from ("i dont know what this means, file this?").
+
+              Disabled until there is a name, like Add passage above: the
+              handler already returned early on an empty one, silently. */}
           <button
             className="btn ghost mini"
             onClick={handleAddConceptOnly}
             disabled={!newConceptOnly.trim()}
-          >Add</button>
+          >add concept to vocabulary</button>
         </div>
       </div>
   )
