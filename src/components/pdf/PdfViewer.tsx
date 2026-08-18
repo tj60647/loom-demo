@@ -1999,7 +1999,25 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           color: var(--ink-soft);
         }
         .pdf-railcard-def { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
-        .pdf-railcard-note { font-size: 11px; font-style: italic; color: var(--ink-soft); margin-top: 4px; }
+        /* .pdf-railcard-note is gone from the margin (TJ, 2026-08-17): the
+           note is the student's writing about the PASSAGE and this card is
+           about the CONCEPT. It is getting a card of its own here later.
+           The rule stays until then only if something still draws it — it does
+           not, so it goes with the markup. */
+        /* The corner mark: this card leads somewhere. Decorative — the card
+           itself is the button — so it is quiet, and it lifts with the card.
+           (No backticks in this block: styled-jsx template literal.) */
+        .pdf-railcard-go {
+          position: absolute;
+          top: 6px;
+          right: 8px;
+          font-family: var(--mono);
+          font-size: 13px;
+          line-height: 1;
+          color: var(--dot);
+          transition: color .12s ease;
+        }
+        .pdf-railcard:hover .pdf-railcard-go { color: var(--ink-soft); }
         .pdf-railcard-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .pdf-railcard-chip {
           font-family: var(--mono);

@@ -158,10 +158,10 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     const nm = (refileInputs[b.id] ?? "").trim()
     if (!nm) {
       await notify({
-        title: first ? "Name the concept first." : "Name the second concept first.",
+        title: first ? "Type a concept first." : "Type the second concept first.",
         body: first
-          ? "Type the concept this passage evidences, then Name it."
-          : "Type the concept this passage also evidences, then File.",
+          ? "Type the concept this passage evidences, then add it."
+          : "Type the concept this passage also evidences, then add it.",
       })
       return
     }
@@ -632,7 +632,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
             return (
               <div key={concept.id} className={`lrow ${isOpen ? "open" : ""}`}>
                 {/* No destructive control here: this header is the row's
-                    expand/collapse target, so "remove concept" lives inside the
+                    expand/collapse target, so "delete this concept" lives inside the
                     opened row next to "remove passage", labelled, as in v14. */}
                 <div className="lhead" onClick={() => toggleRow(concept.id)} style={{ display: "flex", alignItems: "center" }}>
                   <div className="lconcept" style={{flex: 1}}>{concept.label}</div>
@@ -749,12 +749,21 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                         </div>
                         <div className="quietrow" style={{ marginTop: "9px" }}>
                           <input
-                            placeholder="also file this passage under another concept…"
-                            title="one passage can evidence several concepts — name a second one here"
+                            placeholder="another concept this passage evidences…"
+                            title="one passage can evidence several concepts — add another here; it keeps the ones it has"
                             value={refileInputs[b.id] ?? ""}
                             onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
                           />
-                          <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>File</button>
+                          {/* Was "File", beside "remove concept" and
+                              "unfile from this concept" — three verbs for
+                              three different objects in one small area, and
+                              none of them said which (TJ, 2026-08-17: "i dont
+                              know what this means, file this?"). It ADDS a
+                              concept to the passage and keeps the ones it has,
+                              which is what the action does too, despite being
+                              called refilePassage — see the rename logged in
+                              docs/ui-cleanup-pass-1.md. */}
+                          <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept</button>
                         </div>
                       </div>
                     ))}
@@ -779,7 +788,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                       style={{ background: "none", border: "none", padding: 0, marginTop: "12px" }}
                       onClick={() => handleRemoveConcept(concept.id, conceptPassages.length + elsewhere)}
                     >
-                      remove concept
+                      delete this concept
                     </button>
                   </div>
                 )}
@@ -852,7 +861,13 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                       value={refileInputs[b.id] ?? ""}
                       onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
                     />
-                    <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>Name it</button>
+                    {/* "add concept", not "Name it" (TJ, 2026-08-17: "i think
+                        we mean add concept to passage"). It does not name the
+                        passage — a passage has no name. It names a CONCEPT, or
+                        picks one you already own, and files this passage under
+                        it. Same button, same act, as the one on a passage that
+                        already has a concept: there is one verb here. */}
+                    <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept</button>
                   </div>
                 </div>
               ))}

@@ -274,7 +274,20 @@ export default function ConceptRails({
               )}
               {first?.def ? <div className="pdf-railcard-def">{short(first.def, 140)}</div> : null}
               {!first && <div className="pdf-railcard-def">{short(c.passage.content, 110)}</div>}
-              {c.passage.note ? <div className="pdf-railcard-note">{short(c.passage.note, 110)}</div> : null}
+              {/* THE NOTE IS NOT HERE (TJ, 2026-08-17): "the cards should have
+                  concept name, working definition. goto your work button."
+                  A note is the student's writing about the passage, and this
+                  card is about the concept — three kinds of prose stacked in
+                  one 140-character box read as one paragraph in three voices.
+                  It is still in Your work, and it is getting a card of its own
+                  in the margin later, with its own leader.
+
+                  The chevron is DECORATIVE, not a nested button: the whole
+                  card is already the door (role="button" above), and a control
+                  inside a control is unreachable by keyboard in the order it
+                  appears and ambiguous to a screen reader. It says "there is
+                  somewhere to go" without being a second place to press. */}
+              <span className="pdf-railcard-go" aria-hidden="true">›</span>
             </div>
           );
         })}

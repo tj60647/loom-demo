@@ -133,7 +133,7 @@ test("01 · a passage typed into a carded reading lands in the coding log — an
   await row.getByRole("button", { name: "remove passage" }).click()
   await passageDeleted
   const conceptDeleted = page.waitForResponse((r) => isDeletePost(r.request()))
-  await row.getByRole("button", { name: "remove concept" }).click()
+  await row.getByRole("button", { name: "delete this concept" }).click()
   await page.getByRole("button", { name: "Delete concept" }).click()
   await conceptDeleted
   await expect(page.locator(".lrow", { hasText: "journey test concept" })).toHaveCount(0, { timeout: 15_000 })
