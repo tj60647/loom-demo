@@ -599,12 +599,23 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
           {/* Three kinds, never three steps (TJ, 2026-08-09). Headings say what
               a concept IS relative to this reading, not how far along it is —
               see the note above `here`. A group with nothing in it is not
-              drawn, so an empty heading never implies a gap to fill. */}
+              drawn, so an empty heading never implies a gap to fill.
+
+              Each heading NAMES ITS KIND (TJ, 2026-08-17: the labels "are
+              ambiguous"). "In this reading" and "No evidence" said what was
+              true of the rows without saying what the rows were, and the third
+              group below is a list of PASSAGES — so the panel showed two kinds
+              of thing under three headings, none of which said which. The
+              rows have not changed; the headings now say concepts or passages
+              outright.
+
+              "No evidence" survives inside the longer heading because it is
+              the model's own word and carries its own ruling — "a designation,
+              never a warning to act on" — which is also why there is still no
+              "yet" in any of them. */}
           {([
-            ["here", "In this reading", here],
-            // The model's own word for the third, and its own ruling about it:
-            // "No evidence is a designation, never a warning to act on."
-            ["named", "No evidence", namedOnly],
+            ["here", "Concepts in this reading", here],
+            ["named", "Concepts with no evidence", namedOnly],
           ] as const).map(([key, heading, group]) => group.length === 0 ? null : (
           <div key={key}>
           <div className="lgroup">{heading}</div>
@@ -793,7 +804,11 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
               an unlabeled passage may stay one forever. */}
           {unlabeled.length > 0 && (
             <>
-              <div className="lgroup">Unlabeled</div>
+              {/* "Unlabeled passages", not "Unlabeled" — the model's own name
+                  for them, and the one heading in this panel whose rows are
+                  passages rather than concepts. Saying so is the whole point
+                  of naming the kinds. */}
+              <div className="lgroup">Unlabeled passages</div>
               {unlabeled.map(b => (
                 <div key={b.id} data-passage-id={b.id} className="lrow loose">
                   <div className="passage">&quot;{b.content}&quot;</div>
