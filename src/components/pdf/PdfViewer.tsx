@@ -638,6 +638,28 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
           const startPageNode = pageOf(range.startContainer);
           const endPageNode = pageOf(range.endContainer);
+
+          /**
+           * ONLY THE READING OFFERS A CAPTURE (TJ, 2026-08-17: "only text from
+           * the reading should trigger the capture as passage. not text from
+           * the ui").
+           *
+           * This listens on `document`, so any selection anywhere raised the
+           * button — dragging across the teaching copy in Your work, a heading,
+           * a log row — and offered to capture Loom's own words as a passage of
+           * the text. It would have stored them too: the content is whatever
+           * was selected, and with no page to anchor to it went down the fuzzy
+           * path and simply never matched anything on the page.
+           *
+           * Neither boundary inside a `.react-pdf__Page` means the selection is
+           * not in the reading. Either boundary is enough: a drag that begins
+           * on a page caption and ends in the text is a real capture, and the
+           * cross-page case below already handles the rest.
+           */
+          if (!startPageNode && !endPageNode) {
+            setHighlightRect(null);
+            return;
+          }
           /**
            * The anchor is not always inside a page. In the matrix the page
            * caption sits between one page and the next, so a drag begun on it

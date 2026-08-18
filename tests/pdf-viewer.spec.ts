@@ -100,7 +100,7 @@ test.describe('PDF Viewer and Highlighting', () => {
       // concept, through the same UI a student would use — and await each
       // delete's server-action POST: the optimistic UI clears instantly, and
       // ending the test earlier aborts the queued fetches, leaving residue.
-      await openYourWork(page);
+      await openYourWork(page, 'concepts');
       const row = page
         .locator('#yourwork .lrow', { has: page.locator('.lconcept', { hasText: conceptName }) })
         .first();
@@ -110,7 +110,12 @@ test.describe('PDF Viewer and Highlighting', () => {
       const passageDeleted = page.waitForResponse((r) =>
         r.request().method() === 'POST' && (r.request().postData() ?? '').includes(passageId!)
       );
-      await row.getByRole('button', { name: 'remove passage' }).click();
+      // Scoped to the passage this test made. Every passage row carries a
+      // "remove passage" now that the control is unconditional, so a concept
+      // holding more than one — including residue from an earlier failed run —
+      // made an unscoped match ambiguous.
+      await row.locator(`[data-passage-id="${passageId}"]`)
+        .getByRole('button', { name: 'remove passage' }).click();
       await passageDeleted;
       // 04 is the only station that deletes a concept since 2026-08-17.
       await deleteConceptInVocabulary(page, conceptName);
@@ -124,7 +129,7 @@ test.describe('PDF Viewer and Highlighting', () => {
     await openReading(page, 'Object Worlds');
     const stage = page.locator('.pdf-stage');
     const before = await stage.boundingBox();
-    await openYourWork(page);
+    await openYourWork(page, 'concepts');
     // The whole point: the stage keeps its box, so nothing re-fits, nothing
     // re-rasterises, and the words do not move under a selection in progress.
     expect((await stage.boundingBox())?.width).toBe(before?.width);
@@ -132,7 +137,7 @@ test.describe('PDF Viewer and Highlighting', () => {
 
   test('Escape sends Your work back and hands focus to its button', async ({ page }) => {
     await openReading(page, 'Object Worlds');
-    await openYourWork(page);
+    await openYourWork(page, 'concepts');
     await page.keyboard.press('Escape');
     // toBeHidden is honest here only because the sheet goes visibility:hidden
     // at the end of the slide — a transform alone would still read as visible.

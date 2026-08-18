@@ -103,6 +103,9 @@ test.describe('Concept rail', () => {
     await page.locator('.pdf-railcard', { hasText: conceptName }).first().click();
     await expect(page.locator('#yourwork')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('.pdf-search-panel')).toBeHidden();
+    // The card opened the sheet without going through openYourWork, so it
+    // lands on Passages like any other opening. This assertion wants a concept.
+    await page.locator('#yourwork .segmented button', { hasText: 'Concepts' }).click();
     const row = page
       .locator('#yourwork .lrow', { has: page.locator('.lconcept', { hasText: conceptName }) })
       .first();
@@ -122,7 +125,12 @@ test.describe('Concept rail', () => {
     const passageDeleted = page.waitForResponse((r) =>
       r.request().method() === 'POST' && (r.request().postData() ?? '').includes(passageId!)
     );
-    await row.getByRole('button', { name: 'remove passage' }).click();
+    // Scoped to the passage this test made. Every passage row carries a
+    // "remove passage" now that the control is unconditional, so a concept
+    // holding more than one — including residue from an earlier failed run —
+    // made an unscoped match ambiguous.
+    await row.locator(`[data-passage-id="${passageId}"]`)
+      .getByRole('button', { name: 'remove passage' }).click();
     await passageDeleted;
     // The concept itself goes from 04, which is the only station that deletes
     // one since 2026-08-17 — see helpers' deleteConceptInVocabulary.
@@ -147,7 +155,7 @@ test.describe('Concept rail', () => {
     await page.getByRole('button', { name: '1 page' }).click();
     await expect(page.locator('.pdf-rail')).toHaveCount(1, { timeout: 5000 });
     expect((await stage.boundingBox())?.width).toBe(before?.width);
-    await openYourWork(page);
+    await openYourWork(page, 'concepts');
     await expect(page.locator('#yourwork')).toBeVisible();
   });
 });

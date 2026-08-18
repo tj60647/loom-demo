@@ -116,6 +116,11 @@ test("01 · a passage typed into a carded reading lands in the coding log — an
 
   // No `#yourwork` here — that sheet belongs to the PDF station. On a carded
   // reading the log is a card on the page, and it is the only surface with rows.
+  //
+  // The log holds two views since 2026-08-17 and opens on PASSAGES — the right
+  // landing for a student who has just captured one. This assertion is about a
+  // CONCEPT row, so it says which view it wants.
+  await page.locator(".segmented button", { hasText: "Concepts" }).click()
   const row = page.locator(".lrow", { hasText: "journey test concept" })
   await expect(row).toHaveCount(1, { timeout: 15_000 })
 

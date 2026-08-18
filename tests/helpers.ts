@@ -171,7 +171,7 @@ export async function cardOwnReading(page: Page, title: string) {
  * is the only honest reading of whether it is open. Idempotent on purpose — a
  * capture may have opened it already, and a blind click would send it back.
  */
-export async function openYourWork(page: Page) {
+export async function openYourWork(page: Page, view?: 'passages' | 'concepts') {
   // By id, not by role+name: the head bar's close button is named "Close your
   // work", which a /Your work/i role match also finds. `.first()` would work
   // today by DOM order and break the day somebody reorders the toolbar.
@@ -188,5 +188,15 @@ export async function openYourWork(page: Page) {
   await expect
     .poll(() => panel.evaluate((el) => getComputedStyle(el).transform), { timeout: 5000 })
     .toBe('none');
+  // The sheet has held two views since 2026-08-17 and opens on PASSAGES, which
+  // is what a student wants after a capture. A spec hunting a CONCEPT row has
+  // to say so — before that, `.lconcept` simply was not rendered and the
+  // failure read as a missing concept rather than a different view.
+  if (view) {
+    await panel.locator('.segmented button', { hasText: view === 'passages' ? 'Passages' : 'Concepts' }).click();
+    await expect(
+      panel.locator('.segmented button', { hasText: view === 'passages' ? 'Passages' : 'Concepts' })
+    ).toHaveAttribute('aria-pressed', 'true');
+  }
   return panel;
 }

@@ -257,6 +257,34 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    (The fourth group, "in your other readings", is gone: a roll-call of every
    concept from every other text, in the panel that is meant to be this
    reading's own work. Vocabulary holds that view.) */
+/* Two-state switch, the same shape the reading toolbar uses for its layout
+   (TJ, 2026-08-17: "maybe like this in the panel"). One segmented-control
+   pattern in the app, not two — `.pdf-modes` is scoped inside PdfViewer's
+   styled-jsx, so this is its twin for anything outside the viewer. */
+.segmented{display:inline-flex;background:var(--paper);border-radius:4px;
+  padding:1px;border:1px solid var(--rule);margin:0 0 12px}
+.segmented .btn{border:none;margin:0;padding:4px 10px}
+/* The passage view's own rows: the note you wrote, and the concepts it
+   evidences as removable chips. */
+/* A passage that leads somewhere says so on hover (TJ, 2026-08-17: the first
+   attempt was "to subtle" — and it was white-on-white, since the card under it
+   is already rgba(255,255,255,.5)).
+   Paper-2 is a real step down from the card, and the ochre rule down the left
+   is the highlight's own colour: the same mark the passage wears on the page,
+   and the same edge the margin card carries. It says "this is that passage"
+   rather than merely "you are hovering something". */
+.passage.isdoor{cursor:pointer;border-radius:3px;margin:-4px -6px;padding:4px 6px;
+  box-shadow:inset 0 0 0 0 var(--ochre);transition:background-color .12s ease,box-shadow .12s ease}
+.passage.isdoor:hover{background:var(--paper-2);box-shadow:inset 3px 0 0 0 var(--ochre)}
+.passage.isdoor:focus-visible{background:var(--paper-2);box-shadow:inset 3px 0 0 0 var(--ochre);outline:none}
+.passagenote{font-size:13px;font-style:italic;color:var(--ink-soft);margin-top:5px;line-height:1.45}
+.passageconcepts{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.pchip{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.04em;border:1px solid var(--rule);border-radius:999px;padding:2px 5px 2px 8px;
+  background:rgba(255,255,255,.5)}
+.pchip-x{background:none;border:none;padding:0 2px;cursor:pointer;color:var(--grey);
+  font-size:12px;line-height:1;transition:color .12s ease}
+.pchip-x:hover{color:var(--red)}
 .lgroup{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--ochre);padding:14px 12px 5px;border-bottom:1px solid var(--rule)}
 /* An unlabeled capture. Not a concept row — it has no head, because there is
