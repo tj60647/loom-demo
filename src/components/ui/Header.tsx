@@ -3,11 +3,11 @@ import { useState, useSyncExternalStore } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useReadings } from "@/components/providers/ReadingsProvider"
 import AuthButton from "./AuthButton"
 import MyLoomModal from "./MyLoomModal"
 import FullscreenIcon from "./FullscreenIcon"
 import GuideIcon from "./GuideIcon"
+import HeaderMenu from "./HeaderMenu"
 
 /** Module-level so the store identity is stable across renders. */
 const subscribeFullscreen = (onChange: () => void) => {
@@ -17,9 +17,6 @@ const subscribeFullscreen = (onChange: () => void) => {
 
 export default function Header({ deployEnv, isBranchPreview = false }: { deployEnv?: string; isBranchPreview?: boolean }) {
   const { data: session } = useSession()
-  // Masked by the student lens, which is what makes the workflows link below
-  // come back for a staff member viewing as a student.
-  const { course } = useReadings()
   const [showAbout, setShowAbout] = useState(false)
   const [showMyLoom, setShowMyLoom] = useState(false)
   const pathname = usePathname()
@@ -87,46 +84,31 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
             SaveLight.tsx. It has to survive the reading station, and the
             reading station is where this header stands down. */}
         <AuthButton isBranchPreview={isBranchPreview} />
-        <button
-          className="btn ghost mini"
-          onClick={() => setShowAbout(true)}
-          data-tip="what Loom is, and the thinking behind it"
-        >
-          about
-        </button>
-        {/* Between about and workflows (TJ, 2026-08-13). The slot is the
-            argument: a whole-loom surface had nowhere to live once Keep was
-            deleted, and a station is the thing that was deleted — so this is
-            chrome, like About beside it. Session-gated because an empty loom
-            is a fact about a student, and there is no student here without
-            one. See MyLoomModal for why it is a mirror and never a workshop. */}
-        {session && (
-          <button
-            className="btn ghost mini"
-            onClick={() => setShowMyLoom(true)}
-            data-tip="what you have made, and how to start over"
-          >
-            my loom
-          </button>
-        )}
-        {/* Beside About (TJ, 2026-08-08), and reachable from every page — it is
-            not an admin surface: a student reads their own flow there.
-            Since 2026-08-09 it also sits right of Courses in the journey bar's
-            staff group (TJ), so it is drawn HERE only for those who have no
-            staff group to carry it — otherwise the header and the bar would
-            both offer the same link, which is what the Administration and
-            Cohort Map buttons were removed for. A staff member wearing the
-            student lens has `isStaff` masked to false and so gets it back
-            here, which is exactly what a student sees. */}
-        {session && !course?.isStaff && (
-          <Link
-            href="/workflows"
-            className="btn ghost mini"
-            data-tip="how you move through Loom, step by step"
-          >
-            workflows
-          </Link>
-        )}
+        {/* About, My loom and Workflows fold into the menu (TJ, 2026-08-17).
+            None is a control you reach for while working — you open your loom
+            to look at it, read your flow once, or read what Loom is — so
+            three standing buttons was header room spent every second of every
+            session on things pressed a handful of times.
+
+            Their old notes, kept because the reasoning still holds and only
+            the slot changed:
+
+            MY LOOM sat between About and Workflows (TJ, 2026-08-13). The slot
+            was the argument: a whole-loom surface had nowhere to live once
+            Keep was deleted, and a station is the thing that was deleted — so
+            it is chrome, like About beside it. Session-gated, because an
+            empty loom is a fact about a student and there is no student here
+            without one. See MyLoomModal for why it is a mirror, never a
+            workshop.
+
+            WORKFLOWS is no longer offered to students at all (TJ,
+            2026-08-17) — see HeaderMenu. Staff reach it through the journey
+            bar's staff group, which has carried it since 2026-08-09. */}
+        <HeaderMenu
+          onAbout={() => setShowAbout(true)}
+          onMyLoom={() => setShowMyLoom(true)}
+          showMyLoom={!!session}
+        />
         {/* The practice loom, on every page (TJ, 2026-08-11: "the guide should
             always be available, like the tutorials in any game. if the sandbox
             is the guide, then it should be clearly accessible"). It was

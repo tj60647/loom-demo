@@ -94,6 +94,14 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
 .btn.iconly{padding:4px;aspect-ratio:1;display:inline-flex;align-items:center;justify-content:center;
   border-color:transparent;background:transparent;color:var(--ink-soft)}
 .btn.iconly:hover:not(:disabled){background:transparent;border-color:transparent;color:var(--ink)}
+/* The icon buttons are a CLUSTER, not three more items on the header's 16px
+   gap (TJ, 2026-08-17). That gap is sized for bordered buttons with words in
+   them; between three borderless glyphs it read as three unrelated controls
+   that happened to be near each other. Pulled to ~6px they read as one group,
+   which is what they are. The first selector covers the menu, whose button is
+   wrapped in a positioned div for its panel. */
+header .headermenu + .btn.iconly,
+header .btn.iconly + .btn.iconly{margin-left:-10px}
 .btn:disabled{opacity:.35;cursor:default}
 /* HOVER (TJ, 2026-08-17). Every button used to answer the mouse with
    `opacity:.88` — a 12% fade, identical on a solid button and a ghost one, and
@@ -758,6 +766,22 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    overflow:hidden — so it hangs free of the page's own scrolling boxes.
    z-index 60: above the cards and the card menu (6), above .pdf-search-panel
    (20) and Your work (25), and far below the fixed furniture at 8000. */
+/* The header's menu. Same panel as the station search's — one dropdown
+   pattern in the app, not two — but narrower, because these are three names
+   rather than a page of results. */
+.headermenu{position:relative;display:flex;align-items:center}
+.headermenu-panel{position:absolute;top:calc(100% + 6px);right:0;z-index:60;
+  width:min(280px,calc(100vw - 32px));padding:6px;background:var(--paper);
+  border:1px solid var(--ink);border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.18);
+  display:flex;flex-direction:column;gap:2px}
+.headermenu-item{display:block;width:100%;text-align:left;background:none;border:none;cursor:pointer;
+  padding:7px 9px;border-radius:3px;color:var(--ink);text-decoration:none;
+  font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+.headermenu-item:hover{background:var(--paper-2)}
+/* What the item is for, under its name — the same sentence its tooltip used
+   to carry, said outright now there is room for it. */
+.headermenu-say{display:block;margin-top:3px;font-family:var(--body);font-size:12px;
+  letter-spacing:0;text-transform:none;color:var(--ink-soft);line-height:1.35}
 .stationsearch-panel{position:absolute;top:calc(100% + 6px);right:0;z-index:60;
   width:min(420px,calc(100vw - 32px));max-height:min(64vh,560px);overflow:auto;
   padding:12px 13px;background:var(--paper);border:1px solid var(--ink);

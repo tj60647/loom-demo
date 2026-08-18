@@ -51,9 +51,25 @@ export default function StationSearch({ scope, sourceId }: {
    * subject: the words on the page there, the work you made from them here.
    */
   const label = scope === "loom" ? "your loom" : "your cloth"
-  const what = scope === "loom"
-    ? "Search your loom — readings, cloths, projections, concepts, link labels, links and passages"
-    : "Search your cloth — this reading's passages, concepts, link labels, links and projections"
+  /**
+   * ONE sentence about coverage, said in three places (TJ, 2026-08-17: "the
+   * search bar mouseover text should match the text in the popup search. right
+   * now is generic").
+   *
+   * The tip used to say "find a word or phrase anywhere in your loom" — true,
+   * and it told you nothing you could not guess from a magnifier. Meanwhile
+   * the panel listed what is actually searched. A reader who hovered and a
+   * reader who opened were told different things, and only one of them was
+   * told the useful thing.
+   *
+   * So `covers` is the single source: the tip, the accessible name and the
+   * line above the input are all built from it, and they cannot drift because
+   * there is nothing to keep in step.
+   */
+  const covers = scope === "loom"
+    ? "readings · cloths · projections · concepts · link labels · links · passages"
+    : "passages · concepts · link labels · links · projections"
+  const what = `Search ${label} — ${covers.replace(/ · /g, ", ")}`
 
   /**
    * Escape closes and hands focus back to the button that opened it. Pointer
@@ -89,9 +105,11 @@ export default function StationSearch({ scope, sourceId }: {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-label={what}
-        data-tip={scope === "loom"
-          ? "find a word or phrase anywhere in your loom"
-          : "find a word or phrase in the work you have done on this reading"}
+        // "search …", not just the coverage (TJ, 2026-08-17): a tip on a
+        // control should say what pressing it does before it says what it
+        // reaches. The panel's own line drops the verb — by the time you are
+        // reading that, you have already pressed it.
+        data-tip={`search ${label} — ${covers}`}
       >
         ⌕ {label}
       </button>
@@ -111,9 +129,7 @@ export default function StationSearch({ scope, sourceId }: {
               aria-hidden because the panel's own aria-label already says it —
               a screen reader should not hear the coverage twice. */}
           <p className="stationsearch-covers" aria-hidden="true">
-            {scope === "loom"
-              ? "your loom — readings · cloths · projections · concepts · link labels · links · passages"
-              : "your cloth — passages · concepts · link labels · links · projections"}
+            {label} — {covers}
           </p>
           <ShelfSearch sourceId={sourceId} onClose={() => { setOpen(false); buttonRef.current?.focus() }} />
         </div>

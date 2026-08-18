@@ -144,10 +144,12 @@ test("the student lens hides every staff surface, and gives a way back", async (
     .toBeVisible({ timeout: 15_000 })
   await expect(staff).toHaveCount(0)
   await expect(pill).toHaveCount(0)
-  // ...and Workflows comes BACK to the header, because that is where a student
-  // finds it. The lens masks isStaff, and the header draws the link for anyone
-  // without a staff group — so this falls out rather than being special-cased.
-  await expect(page.locator('header a[href="/workflows"]')).toBeVisible()
+  // ...and Workflows does NOT come back to the header. It used to: the lens
+  // masks isStaff, and the header drew the link for anyone without a staff
+  // group. Students do not get Workflows at all since 2026-08-17 (TJ: "it
+  // needs more development anyway"), so wearing the lens now shows what a
+  // student really sees — nothing — rather than a link only the lens produced.
+  await expect(page.locator('header a[href="/workflows"]')).toHaveCount(0)
 
   // Workflows is decided on the SERVER, which is why the flag is a cookie: a
   // client-only mask could not have reached this one. A student reads their

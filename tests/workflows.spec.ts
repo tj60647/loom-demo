@@ -74,7 +74,7 @@ test.describe("who may read the workflows", () => {
 test.describe("a student reads their own flow, and only that", () => {
   test.use({ storageState: "playwright/.auth/testa.json" })
 
-  test("the student flow, no picker, reached from the header", async ({ page }) => {
+  test("the student flow, no picker, and no longer offered in the header", async ({ page }) => {
     // Moved out of /admin (TJ, 2026-08-08): a student may read how they move
     // through Loom. The other two describe surfaces they cannot reach.
     await page.goto("/workflows")
@@ -83,8 +83,13 @@ test.describe("a student reads their own flow, and only that", () => {
     await expect(page.getByRole("tab", { name: "Faculty" })).toHaveCount(0)
     await expect(page.getByRole("tab", { name: "Admin" })).toHaveCount(0)
 
-    // And it is reachable from every page, beside About.
+    // The PAGE still reads for a student — it is the LINK that went (TJ,
+    // 2026-08-17: "students do not get workflow for the moment. perhaps in the
+    // future… it needs more development anyway"). Unlinked, not gated: typing
+    // the URL still works, which is what the assertions above just proved, and
+    // a redirect would be a lock nobody asked for. Staff reach it through the
+    // journey bar's staff group.
     await page.goto("/")
-    await expect(page.locator('header a[href="/workflows"]')).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('header a[href="/workflows"]')).toHaveCount(0)
   })
 })
