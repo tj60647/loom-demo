@@ -251,4 +251,56 @@ test.describe('Matrix zoom', () => {
     await page.waitForTimeout(900);
     expect(await transform()).toBe(pinned);
   });
+
+  /**
+   * A concept label stays inside the card it belongs to, at every zoom.
+   *
+   * The card's width is capped (min(railW * invk, railW + gap + pageW)) but
+   * the type it holds is counter-scaled by --invk with no cap, so far enough
+   * out the label outgrows its box. It was not being clipped either: the
+   * ellipsis sits on .pdf-chip-open, and a button is inline-block, so it
+   * shrink-to-fit its own label and nothing capped it. Measured at the zoom
+   * floor on Object Worlds at 1920x1080 before the fix: four of seven cards
+   * overflowed, the worst at 1301 against a 607-unit box — and cards tile
+   * with 0.02 * pageW between the halves of a spread, so the label landed on
+   * the neighbouring card.
+   *
+   * scrollWidth vs clientWidth is the assertion because it is what overflow
+   * IS, and it needs no viewport arithmetic to be true.
+   */
+  test('a concept label never outgrows its card, at Fit or at the zoom floor', async ({ page }) => {
+    test.setTimeout(90_000);
+    await openReading(page, 'Object Worlds');
+    await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Canvas' }).click();
+    await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
+    await expect(page.locator('.pdf-spread-canvas .pdf-railcard').first()).toBeVisible({ timeout: 10000 });
+
+    // Cards whose content is wider than their own box, and by how much.
+    const overflowing = () =>
+      page.evaluate(() =>
+        Array.from(document.querySelectorAll('.pdf-spread-canvas .pdf-railcard'))
+          .map((c) => ({
+            label: (c.textContent || '').trim().slice(0, 30),
+            over: c.scrollWidth - c.clientWidth,
+          }))
+          // 1px of tolerance: sub-pixel layout rounds, a real overflow here
+          // was 3 to 694 units.
+          .filter((x) => x.over > 1)
+      );
+
+    await page.getByRole('button', { name: 'Fit the whole reading' }).click();
+    await page.waitForTimeout(1500);
+    expect(await overflowing()).toEqual([]);
+
+    // The floor: - clamps at 0.5x fit, so four steps is past it wherever the
+    // reading started. --invk roughly doubles between here and Fit.
+    const zoomOut = page.getByRole('button', { name: 'Zoom out' });
+    for (let i = 0; i < 4; i++) {
+      await zoomOut.click();
+      await page.waitForTimeout(300);
+    }
+    await page.waitForTimeout(1500);
+    expect(await overflowing()).toEqual([]);
+  });
 });

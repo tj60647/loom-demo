@@ -2074,12 +2074,47 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            The label truncates instead; the row still wraps between badges. */
         /* min-width:0 is what actually lets it shrink: a flex item refuses to
            go below its content width without it, so max-width alone left the
-           badge — and its × — hanging off the card's edge. */
-        .pdf-railcard-chip { white-space: nowrap; max-width: 100%; min-width: 0; }
+           badge — and its × — hanging off the card's edge.
+
+           display:flex is the other half, and it was missing. The span is a
+           flex ITEM of .pdf-railcard-badges, so it is blockified and its
+           max-width does bind — measured at the zoom floor on Object Worlds
+           at 1920x1080, chip box 588 canvas units inside a 607-unit card. But
+           a BUTTON is inline-block, so .pdf-chip-open below shrink-to-fit its
+           own label and nothing ever capped it: its overflow and ellipsis
+           could not fire, and the same measurement put it at 1283 units —
+           2.1x the card it lives in. Cards tile with 0.02 * pageW between the
+           two halves of a spread (about 2px down there), so the label ran
+           clean across its neighbour. Four of seven cards overflowed at the
+           floor, two of seven at Fit.
+
+           As a flex container the label becomes a shrinkable item and the
+           ellipsis finally has a width to ellipsise against, which is what
+           the note above this one always claimed. The × keeps its size. */
+        .pdf-railcard-chip {
+          display: flex; align-items: center;
+          white-space: nowrap; max-width: 100%; min-width: 0;
+        }
+        /* Up to two lines, then the ellipsis (TJ, 2026-08-18: "why not wrap a
+           bit?"). One line was the rule for a real reason, and the reason has
+           gone: the chip was an inline box, so the label and the × flowed on
+           the same line and a wrap pushed the × onto a second row, under the
+           word it removes. In the flex row above, the × is an item BESIDE the
+           label, centred against however many lines it takes — the old
+           failure is not reachable. Measured at the zoom floor on Object
+           Worlds, on the label "Mythology Construction": at 1280 one line
+           showed 9 characters of it and two show 19; at 1920, 16 and then all
+           22. The model allows a Label eight words.
+           overflow-wrap:anywhere is for a label with no space to break at —
+           the clamp cannot break a single long word on its own. */
         .pdf-chip-open {
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
+          line-clamp: 2;
           overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          white-space: normal;
+          overflow-wrap: anywhere;
           min-width: 0;
         }
         .pdf-chip-open {
