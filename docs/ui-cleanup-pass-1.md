@@ -47,11 +47,13 @@ what is here is good.
 | 7 | Highlights become paint | **Refuse** — and the real defect is fixed | `feat/reading-toolbar-cleanup` |
 | 8 | Cards edit in place | **Deferred** — "a can of worms" | not started |
 | 9 | The card's subject is the passage | **Deferred with 8** — does not separate | not started |
-| 11 | Zoom floor and ceiling | **Take** | not started |
+| 11 | Zoom floor and ceiling | **Refused** — the current ones are fine | nothing to do |
 | 12 | Trackpad: scroll pans, pinch zooms | **Refuse as written** | not started |
 
-Eight settled, one dropped, two deferred, two refused. Item 11 is the only
-open item left unchecked; item 12 stands refused as written.
+Eight settled, one dropped, two deferred, three refused. **Every item in this
+table has now been decided.** What is open is no longer PR #10's — it is the
+work that came out of looking at the app, listed under "The second session"
+below.
 
 **Read items 7–12 with item 13 in mind.** Every recommendation above that is
 still open was formed the same way this document formed item 13: from the
@@ -258,11 +260,33 @@ therefore sits on the toolbar's label, where there is room, and the comment in
 
 *Files:* `PdfViewer.tsx`, `Header.tsx`.
 
-## 7. Highlights become paint, not controls · Take with a change
+## 7. Highlights become paint, not controls · Refuse — and the real defect fixed
 
-Highlight marks lose `tabindex="0"` and their click binding, gaining a
-`data-loom-passage-id` anchor instead: *"the card in the margin is the door, so
-the mark itself is paint, not a control."* Coherent with 8.
+**Three of this item's claims did not survive checking**, and the fourth was
+smaller than what was actually wrong.
+
+- **The anchor is not gained.** `data-loom-passage-id` already exists on `dev`
+  (`bindHighlightNode`), read in three places. The branch only moves where it
+  is set, because it is deleting the binder that set it. So item 8 needs
+  nothing from item 7.
+- **What goes is not "a click binding" — it is the whole highlight tooltip.**
+  `highlightTooltip`: 9 references on `dev`, 0 on the branch. A MOUSE user
+  loses the hover panel, not only a keyboard user.
+- **So the recommendation reduced to "change nothing":** add an anchor that is
+  there, keep a `tabindex` that is there, keep a binding that is there.
+
+**And the real defect was underneath it, measured rather than read.** Chromium's
+accessibility tree says the marks are live (`role=mark`, `ignored=false`,
+`focusable=true`, named from the aria-label) and Tab reaches one in a single
+press. But mark.js wraps a `<mark>` per text-layer span, and every one carried
+`tabindex="0"` and the SAME label: surveyed across 10 passages, **106 marks and
+106 tab stops**, 23 of them for one passage. Fixed on
+`feat/reading-toolbar-cleanup` — one tab stop per passage, hover preserved on
+every fragment — with a regression test that also asserts fragmentation still
+happens, so it cannot pass for the wrong reason.
+
+The doc's aside that the offsets are noise in the aria-label was right, and is
+also not the point: they are printed in the visible tooltip too.
 
 **But it drops keyboard reachability of highlights**, and the change is not
 mentioned in the commit message. A mouse user gains the margin card; a keyboard
@@ -372,7 +396,10 @@ spec named *"the rail toggle never moves the stage"* became *"the rails never
 move the stage"* and changes the rail count by changing the layout instead —
 same claim, a control that still exists.
 
-## 11. Zoom floor and ceiling · Take
+## 11. Zoom floor and ceiling · Refused
+
+**TJ, 2026-08-17: "i think the current zoom floor and ceiling are fine."**
+Nothing to do. The original write-up follows.
 
 Floor moves from `fitAllK × 0.5` to `fitAllK` exactly, so you can no longer pull
 back past the whole reading — "there is nothing out there past it to zoom to,"
@@ -432,22 +459,184 @@ went missing:
 
 ## Order of work
 
-1. ~~Items 1, 2, 3~~ — **done**, with 10, 5 and 6, on
-   `feat/reading-toolbar-cleanup` (`b42603f`). Unpushed.
-2. **Item 13** — a free bugfix, independent of everything else.
-3. **Items 8 + 9 + 7** — the card work as one branch. The largest piece and the
-   most valuable; 9 is a red-line fix and could go first if it separates
-   cleanly. Item 10 has already landed ahead of them, so 8 arrives into a
-   margin that is always standing.
-4. **Item 11** — any time.
-5. **Item 12** — refuse, or re-tune and revisit.
+**PR #10 is fully decided.** Nothing in its thirteen items is waiting on a
+reading of the branch; what is left is either refused, deferred behind a
+ruling, or already on `feat/reading-toolbar-cleanup`.
+
+1. ~~Items 1, 2, 3, 10, and 5 + 6~~ — **done**, on
+   `feat/reading-toolbar-cleanup`.
+2. ~~Item 7~~ — **refused**, and the real defect underneath it fixed on the
+   same branch.
+3. ~~Items 13 and 11~~ — **refused**: one was not a bug, the other TJ is happy
+   with as it stands.
+4. **Items 8 + 9** — deferred together. Much of what they wanted has arrived by
+   another route (see the second session below): the card is no longer keyed to
+   `concepts[0]`, an unlabeled passage is workable, and a note can be revised —
+   in the panel rather than in the margin card, which is the smaller can of
+   worms and the one write path.
+5. **Item 12** — refuse, or re-tune with `deltaMode` awareness and revisit.
 
 ## Status, in one line
 
-The toolbar work is done and committed but unpushed; reading focus is dropped
-and the two fullscreens merged instead; one free bugfix and the card work
-remain, with one change refused and one refused pending re-tuning. Nothing here
-is blocked on anyone's availability.
+Every item of PR #10 is decided and most of the takeable ones are committed;
+the branch has since grown a second body of work that came from using the app
+rather than reading the branch, and what is open now is listed under "Still
+open after the second session" — two app bugs, two rulings, three small
+decided-but-unbuilt changes, and a test account that wants reseeding.
+
+## The second session — what came out of looking at the app
+
+Everything above is PR #10's. Everything here came from TJ working through the
+running app on 2026-08-17, and none of it was on anyone's list. It is recorded
+because the branch is 33 commits, and a reader who only had this document would
+think the work stopped at item 10.
+
+### The chrome, measured
+
+The reading station carried 223px of chrome above and below a 900px window —
+header, scope bar, journey bar, toolbar, footer — a quarter of the screen.
+
+    reading station chrome          223px -> 83px
+    header                           55px -> 50px
+    journey bar                      51px -> 43px
+    reading toolbar                  63px -> 40px
+    text's share of a 900px window    79% -> ~91%
+
+**The scope bar is gone from every station.** Its contents survive: title,
+author and tallies moved to the footer; Download PDF moved into the reader's
+toolbar, beside the text it downloads.
+
+**The footer says something now.** It read "01 — READING" and "THE TEXT AND
+YOUR CAPTURES" — the station number the bar above already showed, and a gloss
+on it. It carries identity on the left (name, Admin/Faculty badge, Sign out)
+and the subject on the right: the reading and its tallies in the workbench;
+core / supplemental / your own counts plus the loom's totals on the Library;
+"nothing here is kept" in the practice loom.
+
+**The header stands down on the reading station.** The save light moved to the
+journey bar to survive that: 01 is where capture happens, and the highlight
+paints optimistically, so "saved" is the only word that says the mark is real.
+
+**A menu icon** — a 4x4 grid, warp and weft — holds My loom and About.
+Workflows is no longer offered to students at all ("it needs more development
+anyway"), unlinked rather than gated.
+
+**Every mini button lost its 36px floor.** Three places had already opted out
+of it and none had opted in. Released at the source: 25px everywhere.
+
+### Your work, rebuilt
+
+**Two views, Passages and Concepts**, in the reading toolbar's own segmented
+control, opening on Passages — the panel opens over a text you are reading, and
+what you just did was capture a passage.
+
+That dissolved a structural oddity: the "Unlabeled passages" group existed only
+because a list OF CONCEPTS had nowhere to put a passage with none. In the
+passage view it is a row like any other whose chips are absent.
+
+**Each view offers only the acts its own subject owns.** Deleting a concept
+left the reading entirely for 04 · Vocabulary, which already had it. The concept
+view offers "remove passage from concept" and nothing else; the passage view
+carries the × on badges, "remove passage", and the concept field.
+
+**A passage's note can be revised.** There was no passage-update action of any
+kind — a note was written once in the capture modal, at the moment you have read
+the passage least, and was fixed for good. `updatePassageNote` closes it, and
+records a `passage.note` event carrying the note's LENGTH, not the note.
+
+**The panel opens from the left**, 460px wide, with padding cut on two layers —
+its own and the `.card` blocks inside it, which was the larger half.
+
+### The margin card
+
+**One `RailCardBody`, two hosts.** Page mode's rail and the canvas held two
+copies of the markup, and the canvas one was still drawing a concept label and a
+gloss hours after page mode's had stopped.
+
+The card is its concepts and its note — no passage text, because the leader line
+to the highlight IS the passage. Badges open Your work at that concept, the ×
+unfiles, + and the note open the passage view. Nothing is edited in the card:
+cards are CSS-scaled when a side crowds, so a field would loop — typing grows the
+card, height changes the scale, and the scale moves every card on that side
+including the one under the cursor.
+
+**On the canvas, editing stops when more than a page is in view** — the reader's
+own experience rather than a number. Zoomed out there is no ×, no +, no "add a
+passage note", and a card with neither concepts nor a note is not drawn at all.
+
+### Two bugs older than any of this
+
+**Autocomplete had never worked in the sheet.** The `<datalist>` was declared
+inside `captureForm`, which renders ONLY on a reference-only reading, so every
+`list=` in the panel pointed at an element that was not on the page.
+
+**The UI offered itself as a passage.** The selection handler listens on
+`document` and took any selection anywhere, so dragging across the panel's own
+teaching copy raised "Capture as Passage" — and would have stored it, with no
+page to anchor to and nothing on the page to match.
+
+### A student can take a reading off their shelf
+
+There was no way to remove a carded reading: `deleteSource` opens with
+`requireAdmin` and nothing else touched the row. It showed up as a number —
+**80 own readings on the test account, 23 of them titled "A book carded by the
+journey suite"**, from a spec whose own docstring promises it removes everything
+it makes. It could not.
+
+Archive, not delete, and the schema is the argument: `passages.sourceId` is
+`onDelete:"set null"`, so a real delete would untether every passage captured
+from that reading. `sources.isArchived` already existed, and the learner shelf
+query already honoured it.
+
+### What this cost the guards
+
+`recordEvent` moved to `lib/graphEvent.ts` so `actions/sources.ts` could record
+too — and `check-vocabulary` read `loom.ts` ALONE, so it went green without ever
+seeing the new kind. The emitter list is derived from what imports the recorder
+now. That is the same silent pass its own comment describes surviving for six
+days in July, arriving through a different door.
+
+---
+
+## Still open after the second session
+
+**In the app, found and not built:**
+
+- **Highlights are invisible at full zoom-out.** At fit-all the canvas shows
+  pre-rendered page images with no text layer, so mark.js has nothing to mark.
+  The geometry exists: the rail cards already anchor analytically there, off the
+  stored page and offset against the manifest's text length.
+- **Clicking recenters the canvas when zoomed out**, and reaches a state it
+  should not. `dblclick.zoom` is already disabled; the suspect is
+  `applyMultiplier(m, recenter)` — the zoom buttons write a multiplier, the wheel
+  writes a transform, and they reconcile on settle. Reproduce before touching.
+
+**Needs a ruling, and the model doc amended first:**
+
+- **Expected concepts** — a concept in a reading BEFORE evidence. Needs an
+  association (a `cloth_concept` join), a widened `isIn`, and a THIRD grouping.
+  Today "no evidence here" and "no evidence anywhere" are the same set, because
+  `isIn` guarantees it — the code says so in as many words. The moment a concept
+  can be in a reading by intention that invariant breaks and the heading starts
+  lying. `loom-model-build.md` §Concept says a Concept with no Passages "belongs
+  to no Reading"; that sentence changes first.
+- **Optional concept name.** The model already allows it ("Label … may be null at
+  capture"). Needs the "one or the other or both" constraint TJ added — which the
+  model does not state — a validation, and a display decision across 67 label
+  sites.
+
+**Decided, not built:** rename `refilePassage` to `addPassageConcept` (it ADDS a
+filing; the name says it moves one, and it carries a Capture Log consequence via
+the `passage.refile` kind); filter the coin-a-concept list to concepts not
+already in the reading; auto-populate the description when an existing concept is
+picked.
+
+**Housekeeping:** `journey-learner 03` fails on fixture drift (wants 8 seeded
+concepts, the account has 16 — `seed:demo` fixes it and clears the leftover
+carded readings); two dead CSS bits, the `@media (max-width: 900px)` block in
+`PdfViewer.tsx` and `.btn.compact`.
+
+---
 
 ## Future work, found while checking these items
 
@@ -465,7 +654,7 @@ passage has more than one); only the action's name lies. Touches
 event kind — which means `check-vocabulary` and the Capture Log's fold, so it
 is a rename with a history consequence rather than a pure rename.
 
-**`updatePassageNotes` — a passage's note is write-once** (TJ, 2026-08-17).
+**`updatePassageNotes` — BUILT the same day**, on this branch. Kept here because the finding stands: it was true for the whole life of the app until 2026-08-17.
 The passage-mutating actions are `createPassage`, `refilePassage`,
 `unfilePassage`, `attributePassages`, `deletePassage`. There is **no update**,
 and `LoomProvider` exposes exactly that set. So a note is written in the
