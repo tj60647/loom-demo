@@ -1244,15 +1244,20 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
      visibly underneath and behind it, and capped in height so the foot of the
      spread stays in view — a panel that reaches every edge reads as the new
      state of the screen rather than as something resting on top of it. */
-  top: 12px; right: 12px;
+  /* LEFT, not right (TJ, 2026-08-17). It shared the right edge with
+     .pdf-search-panel, which is why the toggle closes Find on the way in —
+     that courtesy stays, but the collision it was avoiding is gone. */
+  top: 12px; left: 12px;
   /* 52 = the 12px inset plus the fixed footer's ~40px. The footer is print,
      not controls (pointer-events:none, z-index 5) — but this card is z-25 and
      would paint straight over "01 — READING", so the one line telling you
      where you are would be covered by the panel you opened. */
   max-height: calc(100% - 52px);
-  /* 380, down from 440: narrow enough to clear most of the right-hand page of
-     a two-page spread, wide enough that the concept rows do not wrap. */
-  width: min(380px, calc(100vw - 32px));
+  /* 460, up from 380 (TJ, 2026-08-17). The old width was set to clear the
+     right-hand page of a spread; from the left edge that constraint is a
+     different one, and the rows inside — a concept, its gloss, its passages —
+     were the thing being squeezed. */
+  width: min(460px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
   border-radius: 6px;
@@ -1293,9 +1298,9 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
      It is delayed by the length of the slide so the sheet does not blink out
      halfway home; on the way in it flips at once, with no delay. Those two
      lines are not symmetrical on purpose, and neither is a typo. */
-  /* Parked clear of its own right inset (the 12px), or a sliver of card sits
+  /* Parked clear of its own left inset (the 12px), or a sliver of card sits
      against the edge of the reading when it is meant to be gone. */
-  transform: translateX(calc(100% + 12px));
+  transform: translateX(calc(-100% - 12px));
   visibility: hidden;
   transition: transform .2s, visibility 0s linear .2s;
 }
@@ -1312,7 +1317,7 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .yourwork-head {
   flex: 0 0 auto;
   display: flex; align-items: baseline; gap: 10px;
-  padding: 11px 12px 10px 16px;
+  padding: 11px 10px 10px 12px;
   border-bottom: 1px solid var(--rule);
   border-radius: 5px 5px 0 0;
   background: var(--paper-2);
@@ -1327,7 +1332,11 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .yourwork-body {
   flex: 1 1 auto; min-height: 0;
   overflow-y: auto; overscroll-behavior: contain;
-  padding: 16px 16px 40px;
+  /* 8px at the sides, down from 16 (TJ, 2026-08-17: "considerably less
+     horizontal padding"). Every row in here is already a bordered card with
+     its own padding, so the sheet's was a second margin around a margin —
+     16px of it, twice, on the axis the rows needed. */
+  padding: 14px 8px 40px;
 }
 .yourwork-body .scrollbox { max-height: none; }
 /* TYPE STEP-DOWN (TJ, 2026-08-13: "the font sizes seem overly large to me").
@@ -1343,6 +1352,11 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    Scoped to .yourwork on purpose. The reading prose is correctly sized and a
    global change would shrink it. The ladder: 17 sheet / 15 card / 14 row /
    13 prose / 11-10 mono, each step big enough to be read as a step. */
+/* The sheet's own padding was only half of it: every block in here is a
+   `.card`, which carries 18px of its own, so the rows sat ~34px in from an
+   edge 12px from the page. Trimmed to 9px, the two insets together are about
+   what one used to be, and the rows get the width back (TJ, 2026-08-17). */
+.yourwork .card { padding: 13px 9px; }
 .yourwork .card h2 { font-size: 15px; }
 .yourwork .lhead .lconcept { font-size: 14px; }
 .yourwork .do { font-size: 13.5px; }
