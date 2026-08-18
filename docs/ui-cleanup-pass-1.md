@@ -483,8 +483,9 @@ the branch has since grown a second body of work that came from using the app
 rather than reading the branch, and what is open now is listed under "Still
 open after the second session" — one app bug, two rulings, three small
 decided-but-unbuilt changes, and a test account that wants reseeding. The
-canvas recenter is fixed (see "The third session"), and the diagnosis this
-document carried for it was wrong: the suspect it named was innocent.
+canvas recenter and the cards at full zoom-out are fixed under "The third
+session"; the missing highlights are still open, and an attempt at them was
+withdrawn. Of the three diagnoses this document carried, one survived contact.
 
 ## The second session — what came out of looking at the app
 
@@ -606,8 +607,11 @@ days in July, arriving through a different door.
 
 - **Highlights are invisible at full zoom-out.** At fit-all the canvas shows
   pre-rendered page images with no text layer, so mark.js has nothing to mark.
-  The geometry exists: the rail cards already anchor analytically there, off the
-  stored page and offset against the manifest's text length.
+  An attempt built on `analyticAnchors`' arithmetic was withdrawn — that
+  formula assumes one column filling the page, and these readings are
+  two-column. See "The third session" for what it costs and what a real fix
+  needs.
+
 **Needs a ruling, and the model doc amended first:**
 
 - **Expected concepts** — a concept in a reading BEFORE evidence. Needs an
@@ -710,6 +714,89 @@ Two things worth keeping, both found by measuring rather than reading:
 Measured and screenshotted at 1280 · 1536 · 1920: band 440px wide, 42px tall,
 identical at all three — the panel is `min(460px, 100vw - 32px)`, so its width
 is not a function of the viewport.
+
+### The cards overlapped at full zoom-out · Done — they didn't
+
+TJ, 2026-08-18, working the canvas: "the cards overlap badly." They were not
+overlapping. Their **labels** were leaving them, and landing on the neighbour.
+
+`.pdf-railcard-chip` is a `<span>`, but it is a flex item of
+`.pdf-railcard-badges`, so it is blockified and its `max-width: 100%` does
+bind — measured at the zoom floor on Object Worlds at 1920x1080, chip box 588
+canvas units inside a 607-unit card. What was never bound is the **button**
+inside it. A button is inline-block, so `.pdf-chip-open` shrink-to-fits its
+own label and nothing capped it, which means the `overflow: hidden` and
+`text-overflow: ellipsis` already sitting on it could never fire. That button
+measured 1283 units: 2.1x the card it lives in. Four of seven cards overflowed
+at the floor, two of seven at Fit.
+
+Cards tile with `0.02 * pageW` between the two halves of a spread — about 2px
+down there — so anything that leaves a card is immediately on its neighbour.
+
+The card's width is capped at `railW + gap + pageW` while the type it holds is
+counter-scaled by `--invk` with no cap, so the two diverge past `invk = 4.09`;
+that is why it showed at the floor (5.98) and barely at Fit (3.05). The fix is
+containment rather than clamping `--invk`, because a label leaving its card is
+wrong at every zoom, not only past a threshold.
+
+**Two lines before the ellipsis** (TJ: "why not wrap a bit?"). One line was
+the rule for a reason that this change removes: the chip was an inline box, so
+label and × flowed on one line and a wrap pushed the × onto a second row,
+under the word it removes. In a flex row the × is an item beside the label.
+Measured on "Mythology Construction" at the floor: at 1280 one line showed 9
+characters and two show 19; at 1920, 16 and then all 22.
+
+### Highlights at full zoom-out · Attempted and withdrawn — still open
+
+**Not built.** An attempt was made, shown to TJ, and taken back out. What it
+learned is worth more than the attempt was.
+
+The diagnosis in the bullet above is right as far as it goes: mark.js marks
+*text*, and the impostor tier has none — at fit-all every page is a
+pre-rendered image, which is what lets a long reading open as a contact sheet.
+Measured on Communities of Practice at 1920x1080: 16 page images, 0 text
+layers, 0 highlights. The canvas draws cards and leader lines pointing at
+nothing.
+
+**Where it went wrong is the sentence "the geometry exists."** It does not.
+What exists is `analyticAnchors`, which maps a passage to a height by
+
+    frac = startOffset / textLength      (fraction through the page's TEXT)
+    y    = pageTop + frac * pageHeight   (fraction down the PAPER)
+
+and that equation is only true if the page's text is a single column running
+the full height of the sheet. Object Worlds and Communities of Practice are
+both **two-column**: the offset runs down column 1 and then down column 2, but
+this spreads it over the page height once, so a passage 60% through the text
+is drawn 60% down the page when it truly sits about 20% down the second
+column. Margins compound it — offset 0 maps to the top edge of the paper
+rather than to the first line of body text.
+
+**The cards have always had this error too.** The leader lines at zoom-out
+have been pointing at the wrong height since the analytic anchors were added;
+drawing a visible mark from the same formula is simply what made it legible.
+The comment on that code calls it "wrong by a line or two", which holds for
+one column and not at all for two.
+
+**Second fault, found by TJ in his own data and not in the test account's:** at
+Fit a card is about one page wide and sits over its own page, so a
+full-page-width band is almost entirely hidden behind the card that points at
+it, leaving a yellow sliver beside the card that reads as a rendering glitch.
+The test account's seven passages are spread over different pages and heights,
+so the collision did not show; his cluster, and it did. Screenshots at three
+widths were taken and proved nothing, because the case that breaks it was not
+in them.
+
+**What a real fix needs.** There is no stored geometry to do better with:
+`sourcePages` keeps `textContent`, `width`, `height` and a hash — nothing per
+line or per item — and `pdfStructure.ts` computes no column geometry. But
+pdf.js is already loaded client-side to render these pages, and
+`SpreadCanvasView` already holds the `pdf` document. `getTextContent()` on the
+few pages that carry passages gives every item's string and transform, and
+accumulating those strings reproduces exactly the DOM string `startOffset`
+indexes into — the equivalence `textLayerProjection` exists to guarantee. That
+gives a true position in the true column, needs no migration, and would fix
+the cards' anchors at the same time. Undecided; TJ's call.
 
 ---
 
