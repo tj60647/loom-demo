@@ -40,7 +40,15 @@ h1,h2,h3{font-family:var(--display);font-weight:500;margin:0}
 .cap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--grey)}
 header{border-bottom:1px solid var(--rule);padding:10px 26px 8px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--paper)}
 .wordmark{font-family:var(--display);font-size:24px;font-weight:600;line-height:1;display:flex;align-items:center;gap:9px}
-.wordmark small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);font-weight:400;margin-top:3px}
+/* The tagline sits BESIDE the name, not under it (TJ, 2026-08-17). Stacked,
+   the mark was 36px — 24px of "Loom" over a 9px line plus its 3px gap — and
+   since the mini buttons came down to 25px the mark was the only thing left
+   setting the header's height. Beside it, the mark is as tall as its own
+   largest type and the header loses 12px on every page.
+   Baseline, not centre: the tagline is a subtitle to the name and reads as
+   one line of type with it, which centring would not give. */
+.wordmark > div{display:flex;align-items:baseline;gap:9px;white-space:nowrap}
+.wordmark small{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);font-weight:400}
 header .spacer{flex:1}
 header .field{display:flex;flex-direction:column;gap:3px}
 header input{font-family:var(--body);font-size:15px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:5px 8px;color:var(--ink)}
@@ -53,8 +61,74 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
    states; only the colour changes. */
 .btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:1px solid transparent;border-radius:3px;padding:7px 11px;cursor:pointer}
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
-.btn.mini{font-size:11px;padding:7px 10px;letter-spacing:.05em;min-height:36px}
-.btn:disabled{opacity:.35;cursor:default} .btn:hover:not(:disabled){opacity:.88}
+/* No min-height (TJ, 2026-08-17). It was 36px, and on an 11px label that is
+   ~7px of empty box above and below the words — which is why every place that
+   cared had already opted out: `.btn.compact` exists only to undo it, the
+   reading toolbar overrode it to get from 63px to 35px, and the workbench
+   footer overrode it again to stop being taller than the band it replaced.
+   Three opt-outs and no opt-ins is a default that is wrong.
+   Released here instead, so the header, the journey bar's search and every
+   mini button elsewhere are sized by their own padding: 25px, not 36. Loom is
+   a desktop tool (AGENTS.md) — there is no touch target to protect. */
+.btn.mini{font-size:11px;padding:5px 10px;letter-spacing:.05em}
+/* A label is one line. Without this a long one wraps inside its own box and
+   the button becomes twice as tall as its neighbours — "download the kit
+   .json" and "download the kit .md" were 38px in a row of 25s, for no reason
+   a reader could see. A control that is wider than its column should overflow
+   its column, not grow downward: the row it sits in is the thing being
+   measured. */
+.btn{white-space:nowrap}
+/* An icon-only button is SQUARE (TJ, 2026-08-17). `.btn.mini` is padded
+   5px 10px, which is right under a word and wrong under a glyph: it drew a
+   lozenge around a square icon. Equal padding and a 1:1 ratio put the four
+   corners of the drawing an equal distance from the four sides of the box. */
+/* An icon-only button is SQUARE and has no box (TJ, 2026-08-17). `.btn.mini`
+   is padded 5px 10px, which is right under a word and wrong under a glyph —
+   it drew a lozenge around a square icon. And the border was drawing a box
+   around a drawing that already has its own edges: two frames, one control.
+   So: equal padding, 1:1, no rule, no fill. The glyph is the button.
+   It runs quieter than the ink around it and comes up to full strength on
+   hover, which is the whole of its answer to the mouse now that there is no
+   border to darken. Placed after the .btn hover rules on purpose — same
+   specificity, so source order is what decides. */
+.btn.iconly{padding:4px;aspect-ratio:1;display:inline-flex;align-items:center;justify-content:center;
+  border-color:transparent;background:transparent;color:var(--ink-soft)}
+.btn.iconly:hover:not(:disabled){background:transparent;border-color:transparent;color:var(--ink)}
+/* The icon buttons are a CLUSTER, not three more items on the header's 16px
+   gap (TJ, 2026-08-17). That gap is sized for bordered buttons with words in
+   them; between three borderless glyphs it read as three unrelated controls
+   that happened to be near each other. Pulled to ~6px they read as one group,
+   which is what they are. The first selector covers the menu, whose button is
+   wrapped in a positioned div for its panel. */
+header .headermenu + .btn.iconly,
+header .btn.iconly + .btn.iconly{margin-left:-10px}
+.btn:disabled{opacity:.35;cursor:default}
+/* HOVER (TJ, 2026-08-17). Every button used to answer the mouse with
+   `opacity:.88` — a 12% fade, identical on a solid button and a ghost one, and
+   on this paper it reads as "slightly further away" rather than "you are on
+   it". A control should say it is a control before you press it.
+   So each kind gets the move that suits its own construction:
+     - a SOLID button lifts off the ink it is made of;
+     - a GHOST button fills, and its rule darkens to ink — the box does not
+       change size, because the border is already there in both states (see
+       the note above .btn);
+     - a PRESSED control (aria-pressed, .active) is already carrying the ink,
+       so it has nothing to fill and only lifts.
+   Colour, not opacity: a faded control on a textured ground reads as
+   disabled, which is the one thing hover must never say. */
+.btn{transition:background-color .12s ease,border-color .12s ease,color .12s ease}
+.btn:hover:not(:disabled){background:#2d2b26}
+.btn.ghost:hover:not(:disabled){background:var(--paper-2);border-color:var(--ink);color:var(--ink)}
+.btn:active:not(:disabled){transform:translateY(.5px)}
+/* The journey's own stations. They are type on paper, not boxes, so the move
+   is the ink coming up to full strength — the same signal the active station
+   already uses, at half its weight. */
+nav .station{transition:color .12s ease,border-color .12s ease}
+nav .station:not(.off):not(.active):hover{color:var(--ink);border-bottom-color:var(--rule)}
+nav .station.staff:not(.active):hover{border-bottom-color:var(--sage)}
+/* `.act` is the same idea outside the journey — a quiet inline verb. */
+.act{transition:color .12s ease}
+.act:hover{color:var(--ink)}
 /* A control's label is not prose. Without this, every button, tab and
    disclosure in the app drag-selects and double-click-highlights like body
    text, which reads as "this is content" exactly where it should read as
@@ -72,7 +146,11 @@ nav{display:flex;border-bottom:1px solid var(--rule);padding:0 26px;background:v
    station since 2026-08-13 — the station's search — and the bare element
    selector was dressing it as an 18px display-font tab. Every station form
    (button, link, inert span) carries the class, so the class is the rule. */
-nav .station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
+/* 7px, not 11px (TJ, 2026-08-17): the station names are 18px display type in
+   a bar whose whole job is to be always in view, and 22px of padding around
+   them was more air than the words. The horizontal 16px stays — that is the
+   gap BETWEEN stations, and closing it would run the journey together. */
+nav .station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:7px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
 nav .station.active{color:var(--ink);border-bottom-color:var(--ochre)}
 /* A station with nowhere to go (JourneyNav's READING_ONLY, TJ 2026-08-09).
    Still drawn and still numbered — the arc is meant to be visible whole — but
@@ -179,6 +257,55 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    (The fourth group, "in your other readings", is gone: a roll-call of every
    concept from every other text, in the panel that is meant to be this
    reading's own work. Vocabulary holds that view.) */
+/* Two-state switch, the same shape the reading toolbar uses for its layout
+   (TJ, 2026-08-17: "maybe like this in the panel"). One segmented-control
+   pattern in the app, not two — `.pdf-modes` is scoped inside PdfViewer's
+   styled-jsx, so this is its twin for anything outside the viewer. */
+.segmented{display:inline-flex;background:var(--paper);border-radius:4px;
+  padding:1px;border:1px solid var(--rule);margin:0 0 12px}
+.segmented .btn{border:none;margin:0;padding:4px 10px}
+/* The passage view's own rows: the note you wrote, and the concepts it
+   evidences as removable chips. */
+/* A passage that leads somewhere says so on hover (TJ, 2026-08-17: the first
+   attempt was "to subtle" — and it was white-on-white, since the card under it
+   is already rgba(255,255,255,.5)).
+   Paper-2 is a real step down from the card, and the ochre rule down the left
+   is the highlight's own colour: the same mark the passage wears on the page,
+   and the same edge the margin card carries. It says "this is that passage"
+   rather than merely "you are hovering something". */
+/* The add-a-concept field, wherever it appears: a label saying what a concept
+   is, then the input and its button on one line. */
+.addconcept{margin-top:9px}
+.addconcept .label{display:block;margin-bottom:4px}
+.addconcept .quietrow{margin-top:0}
+.passage.isdoor{cursor:pointer;border-radius:3px;margin:-4px -6px;padding:4px 6px;
+  box-shadow:inset 0 0 0 0 var(--ochre);transition:background-color .12s ease,box-shadow .12s ease}
+.passage.isdoor:hover{background:var(--paper-2);box-shadow:inset 3px 0 0 0 var(--ochre)}
+.passage.isdoor:focus-visible{background:var(--paper-2);box-shadow:inset 3px 0 0 0 var(--ochre);outline:none}
+/* A passage row's blocks: note, concepts, then the one destructive control.
+   Each is labelled, so nothing has to be inferred from position. */
+.pblock{margin-top:10px}
+.pblock .label{display:block;margin-bottom:4px}
+/* The field's own label inside a block that already has one: quieter than the
+   block heading, and clear of the chips above it. */
+.addlabel{display:block;margin:9px 0 4px}
+.labelsay{text-transform:none;letter-spacing:0;color:var(--ochre)}
+/* A concept's gloss is prose up to 100 words (model §Concept), so it wraps.
+   It was a one-line input, which showed about eight of them. */
+.conceptdef{width:100%;font-family:var(--body);font-size:14px;line-height:1.45;
+  background:#fff;border:1px solid var(--rule);border-radius:3px;padding:6px 8px;
+  color:var(--ink);resize:vertical;min-height:40px}
+.passagenote-edit{width:100%;min-height:44px;font-family:var(--body);font-size:13.5px;
+  line-height:1.45;background:#fff;border:1px solid var(--rule);border-radius:3px;
+  padding:6px 8px;color:var(--ink);resize:vertical}
+.passagenote{font-size:13px;font-style:italic;color:var(--ink-soft);margin-top:5px;line-height:1.45}
+.passageconcepts{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.pchip{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.04em;border:1px solid var(--rule);border-radius:999px;padding:2px 5px 2px 8px;
+  background:rgba(255,255,255,.5)}
+.pchip-x{background:none;border:none;padding:0 2px;cursor:pointer;color:var(--grey);
+  font-size:12px;line-height:1;transition:color .12s ease}
+.pchip-x:hover{color:var(--red)}
 .lgroup{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--ochre);padding:14px 12px 5px;border-bottom:1px solid var(--rule)}
 /* An unlabeled capture. Not a concept row — it has no head, because there is
@@ -349,10 +476,29 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
    strip is a click shield over whatever scrolls beneath it — the shelf's
    file input sat under this band and "Choose file" silently did nothing.
    The footer is print, not controls, so clicks belong to the page below. */
-footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;gap:12px;
-  padding:9px 26px;border-top:1px solid var(--ink);background:var(--paper);z-index:5;pointer-events:none}
+footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:5px 26px;border-top:1px solid var(--ink);background:var(--paper);z-index:5;pointer-events:none}
 footer span{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
 footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
+/* The footer stopped being print on 2026-08-17: its left half carries the
+   signed-in name, the role badge and Sign out. pointer-events stays OFF on the
+   band — it is still a full-width strip over whatever scrolls beneath it, and
+   that is what silently ate the shelf's "Choose file" — and is handed back to
+   the one part that is now a control. */
+footer .footid{display:flex;align-items:center;gap:9px;pointer-events:auto}
+footer .fr{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end;min-width:0}
+/* The reading's own name reads as a title, not as another mono caption: it is
+   the one proper noun in the row. */
+footer .foottitle{font-family:var(--display);font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46ch}
+footer .footmeta{color:var(--ink-soft);white-space:nowrap}
+footer .footrule{width:1px;height:12px;background:var(--rule);display:inline-block;flex:none}
+footer .footid .label{letter-spacing:.1em}
+/* Reading focus (TJ, 2026-08-17): with the text open, the station is the text.
+   The header belongs to the root layout, so the workbench cannot withhold it
+   the way it withholds its own footer — it sets this attribute on <body>
+   instead and one rule does the work from the far side of the tree. */
+body[data-reading-focus] header{display:none}
 
 @media (max-width: 900px){
   header{padding:10px 14px 8px;gap:10px}
@@ -557,8 +703,10 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .scopetitle{font-family:var(--display);font-size:18px}
 .scopemeta{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--grey)}
 
-.shelfbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 20px}
-.shelfbar .shelfcount{margin-left:auto}
+/* `.shelfbar` held the shelf's quick links, then only its tally, and on
+   2026-08-17 the tally moved to the footer — where the same words already
+   were. Nothing renders the class now, so the rules go with it rather than
+   waiting to be found by someone reusing the name for something else. */
 .weekhead{display:flex;align-items:center;gap:12px;margin:0 0 10px}
 .weekrule{flex:1;height:0;border-top:1px solid var(--rule)}
 .shelfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
@@ -667,10 +815,31 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    overflow:hidden — so it hangs free of the page's own scrolling boxes.
    z-index 60: above the cards and the card menu (6), above .pdf-search-panel
    (20) and Your work (25), and far below the fixed furniture at 8000. */
+/* The header's menu. Same panel as the station search's — one dropdown
+   pattern in the app, not two — but narrower, because these are three names
+   rather than a page of results. */
+.headermenu{position:relative;display:flex;align-items:center}
+.headermenu-panel{position:absolute;top:calc(100% + 6px);right:0;z-index:60;
+  width:min(280px,calc(100vw - 32px));padding:6px;background:var(--paper);
+  border:1px solid var(--ink);border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.18);
+  display:flex;flex-direction:column;gap:2px}
+.headermenu-item{display:block;width:100%;text-align:left;background:none;border:none;cursor:pointer;
+  padding:7px 9px;border-radius:3px;color:var(--ink);text-decoration:none;
+  font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+.headermenu-item:hover{background:var(--paper-2)}
+/* What the item is for, under its name — the same sentence its tooltip used
+   to carry, said outright now there is room for it. */
+.headermenu-say{display:block;margin-top:3px;font-family:var(--body);font-size:12px;
+  letter-spacing:0;text-transform:none;color:var(--ink-soft);line-height:1.35}
 .stationsearch-panel{position:absolute;top:calc(100% + 6px);right:0;z-index:60;
   width:min(420px,calc(100vw - 32px));max-height:min(64vh,560px);overflow:auto;
   padding:12px 13px;background:var(--paper);border:1px solid var(--ink);
   border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+/* What the open search covers. Mono caps like every other label in the app,
+   quiet enough to read as a caption rather than as a result, and it stands
+   above the input so it is still there once the placeholder has gone. */
+.stationsearch-covers{margin:0 0 9px;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);line-height:1.5}
 .searchinput{max-width:none}
 .searchresults{margin-top:12px;display:flex;flex-direction:column;gap:10px}
 .searchtally{display:block}
@@ -1124,15 +1293,20 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
      visibly underneath and behind it, and capped in height so the foot of the
      spread stays in view — a panel that reaches every edge reads as the new
      state of the screen rather than as something resting on top of it. */
-  top: 12px; right: 12px;
+  /* LEFT, not right (TJ, 2026-08-17). It shared the right edge with
+     .pdf-search-panel, which is why the toggle closes Find on the way in —
+     that courtesy stays, but the collision it was avoiding is gone. */
+  top: 12px; left: 12px;
   /* 52 = the 12px inset plus the fixed footer's ~40px. The footer is print,
      not controls (pointer-events:none, z-index 5) — but this card is z-25 and
      would paint straight over "01 — READING", so the one line telling you
      where you are would be covered by the panel you opened. */
   max-height: calc(100% - 52px);
-  /* 380, down from 440: narrow enough to clear most of the right-hand page of
-     a two-page spread, wide enough that the concept rows do not wrap. */
-  width: min(380px, calc(100vw - 32px));
+  /* 460, up from 380 (TJ, 2026-08-17). The old width was set to clear the
+     right-hand page of a spread; from the left edge that constraint is a
+     different one, and the rows inside — a concept, its gloss, its passages —
+     were the thing being squeezed. */
+  width: min(460px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
   border-radius: 6px;
@@ -1173,9 +1347,9 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
      It is delayed by the length of the slide so the sheet does not blink out
      halfway home; on the way in it flips at once, with no delay. Those two
      lines are not symmetrical on purpose, and neither is a typo. */
-  /* Parked clear of its own right inset (the 12px), or a sliver of card sits
+  /* Parked clear of its own left inset (the 12px), or a sliver of card sits
      against the edge of the reading when it is meant to be gone. */
-  transform: translateX(calc(100% + 12px));
+  transform: translateX(calc(-100% - 12px));
   visibility: hidden;
   transition: transform .2s, visibility 0s linear .2s;
 }
@@ -1192,7 +1366,7 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .yourwork-head {
   flex: 0 0 auto;
   display: flex; align-items: baseline; gap: 10px;
-  padding: 11px 12px 10px 16px;
+  padding: 11px 10px 10px 12px;
   border-bottom: 1px solid var(--rule);
   border-radius: 5px 5px 0 0;
   background: var(--paper-2);
@@ -1207,7 +1381,11 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .yourwork-body {
   flex: 1 1 auto; min-height: 0;
   overflow-y: auto; overscroll-behavior: contain;
-  padding: 16px 16px 40px;
+  /* 8px at the sides, down from 16 (TJ, 2026-08-17: "considerably less
+     horizontal padding"). Every row in here is already a bordered card with
+     its own padding, so the sheet's was a second margin around a margin —
+     16px of it, twice, on the axis the rows needed. */
+  padding: 14px 8px 40px;
 }
 .yourwork-body .scrollbox { max-height: none; }
 /* TYPE STEP-DOWN (TJ, 2026-08-13: "the font sizes seem overly large to me").
@@ -1223,6 +1401,11 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    Scoped to .yourwork on purpose. The reading prose is correctly sized and a
    global change would shrink it. The ladder: 17 sheet / 15 card / 14 row /
    13 prose / 11-10 mono, each step big enough to be read as a step. */
+/* The sheet's own padding was only half of it: every block in here is a
+   `.card`, which carries 18px of its own, so the rows sat ~34px in from an
+   edge 12px from the page. Trimmed to 9px, the two insets together are about
+   what one used to be, and the rows get the width back (TJ, 2026-08-17). */
+.yourwork .card { padding: 13px 9px; }
 .yourwork .card h2 { font-size: 15px; }
 .yourwork .lhead .lconcept { font-size: 14px; }
 .yourwork .do { font-size: 13.5px; }

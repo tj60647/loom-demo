@@ -38,10 +38,38 @@ export default function StationSearch({ scope, sourceId }: {
   const hostRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
-  const label = scope === "loom" ? "your loom" : "this reading"
-  const what = scope === "loom"
-    ? "Search your loom — readings, cloths, projections, concepts, link labels, links and passages"
-    : "Search this reading — its pages, cloth, projections, concepts, link labels, links and passages"
+  /**
+   * "Your cloth", not "this reading" (TJ, 2026-08-17) — and the rename fixes a
+   * false claim rather than just a name. This panel calls searchReadings and
+   * searchLoom; searchLoom returns concepts, link labels, links, passages,
+   * cloths and projections, and NO pages. The label and the aria-label both
+   * said "its pages" anyway, and the coverage line added below on the same day
+   * repeated it from them without checking.
+   *
+   * The page text is the reading toolbar's "in the text", which is the one
+   * search that really does read the PDF. So the pair now splits cleanly by
+   * subject: the words on the page there, the work you made from them here.
+   */
+  const label = scope === "loom" ? "your loom" : "your cloth"
+  /**
+   * ONE sentence about coverage, said in three places (TJ, 2026-08-17: "the
+   * search bar mouseover text should match the text in the popup search. right
+   * now is generic").
+   *
+   * The tip used to say "find a word or phrase anywhere in your loom" — true,
+   * and it told you nothing you could not guess from a magnifier. Meanwhile
+   * the panel listed what is actually searched. A reader who hovered and a
+   * reader who opened were told different things, and only one of them was
+   * told the useful thing.
+   *
+   * So `covers` is the single source: the tip, the accessible name and the
+   * line above the input are all built from it, and they cannot drift because
+   * there is nothing to keep in step.
+   */
+  const covers = scope === "loom"
+    ? "readings · cloths · projections · concepts · link labels · links · passages"
+    : "passages · concepts · link labels · links · projections"
+  const what = `Search ${label} — ${covers.replace(/ · /g, ", ")}`
 
   /**
    * Escape closes and hands focus back to the button that opened it. Pointer
@@ -77,15 +105,32 @@ export default function StationSearch({ scope, sourceId }: {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-label={what}
-        data-tip={scope === "loom"
-          ? "find a word or phrase anywhere in your loom"
-          : "find a word or phrase in this reading and the work you have done on it"}
+        // "search …", not just the coverage (TJ, 2026-08-17): a tip on a
+        // control should say what pressing it does before it says what it
+        // reaches. The panel's own line drops the verb — by the time you are
+        // reading that, you have already pressed it.
+        data-tip={`search ${label} — ${covers}`}
       >
         ⌕ {label}
       </button>
 
       {open && (
         <div className="stationsearch-panel" role="search" aria-label={what}>
+          {/* What this search covers, said in the panel (TJ, 2026-08-17).
+              The button's label carries the SCOPE — this reading, or your
+              loom — which is what stops the two searches on the reading
+              station being confused for each other. It cannot also carry the
+              coverage without becoming a sentence, so the coverage lived in
+              the tooltip and the aria-label: invisible to a mouse user who
+              does not hover, and unavailable to anyone once they start typing.
+
+              Here it stands while you type and while you read the results,
+              which is exactly when "would it have found that?" gets asked.
+              aria-hidden because the panel's own aria-label already says it —
+              a screen reader should not hear the coverage twice. */}
+          <p className="stationsearch-covers" aria-hidden="true">
+            {label} — {covers}
+          </p>
           <ShelfSearch sourceId={sourceId} onClose={() => { setOpen(false); buttonRef.current?.focus() }} />
         </div>
       )}

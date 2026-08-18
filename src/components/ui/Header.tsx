@@ -3,10 +3,11 @@ import { useState, useSyncExternalStore } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useLoom } from "@/components/providers/LoomProvider"
-import { useReadings } from "@/components/providers/ReadingsProvider"
 import AuthButton from "./AuthButton"
 import MyLoomModal from "./MyLoomModal"
+import FullscreenIcon from "./FullscreenIcon"
+import GuideIcon from "./GuideIcon"
+import HeaderMenu from "./HeaderMenu"
 
 /** Module-level so the store identity is stable across renders. */
 const subscribeFullscreen = (onChange: () => void) => {
@@ -16,16 +17,9 @@ const subscribeFullscreen = (onChange: () => void) => {
 
 export default function Header({ deployEnv, isBranchPreview = false }: { deployEnv?: string; isBranchPreview?: boolean }) {
   const { data: session } = useSession()
-  const { flashMsg } = useLoom()
-  // Masked by the student lens, which is what makes the workflows link below
-  // come back for a staff member viewing as a student.
-  const { course } = useReadings()
   const [showAbout, setShowAbout] = useState(false)
   const [showMyLoom, setShowMyLoom] = useState(false)
-  // Nothing on an admin page writes to a loom, so the save dot sat there as a
-  // bare em dash for the whole visit and read as a stray character.
   const pathname = usePathname()
-  const inAdmin = pathname?.startsWith("/admin") ?? false
   // The practice loom. My Loom still opens here — the Header sits ABOVE
   // SandboxLoomProvider in the tree (layout.tsx wraps it in the real
   // LoomProvider), so the counts shown are the student's actual work and are
@@ -43,11 +37,11 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
    * bar are ~90–120px of what is left. F11 has always done this; almost
    * nobody presses F11.
    *
-   * NOT THE SAME CONTROL as the reading toolbar's "full screen", which is an
-   * in-app mode — `.pdf-shell.fullscreen` covers Loom's own chrome so the text
-   * fills the window. That one is relabelled "just the text" in the same pass,
-   * because two buttons reading "full screen" on one screen, doing different
-   * things, is worse than either name alone.
+   * NOT THE SAME CONTROL as the reading toolbar's "full screen text", which
+   * since 2026-08-17 does BOTH halves — the in-app chrome hiding and the
+   * browser's Fullscreen API — so the text fills the physical screen. This one
+   * gives the whole app the screen and keeps Loom's own chrome. See the note
+   * on the button below for why only that label carries a qualifier.
    *
    * The state is read from the DOCUMENT, never from what we last asked for:
    * Esc, F11 and the browser's own affordances all leave fullscreen without
@@ -86,50 +80,35 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
           </div>
         </div>
         <div className="spacer"></div>
-        {session && !inAdmin && (
-          <span id="saveDot">{flashMsg ? `· ${flashMsg} ·` : "—"}</span>
-        )}
+        {/* The save light moved to the journey bar (TJ, 2026-08-17) — see
+            SaveLight.tsx. It has to survive the reading station, and the
+            reading station is where this header stands down. */}
         <AuthButton isBranchPreview={isBranchPreview} />
-        <button
-          className="btn ghost mini"
-          onClick={() => setShowAbout(true)}
-          data-tip="what Loom is, and the thinking behind it"
-        >
-          about
-        </button>
-        {/* Between about and workflows (TJ, 2026-08-13). The slot is the
-            argument: a whole-loom surface had nowhere to live once Keep was
-            deleted, and a station is the thing that was deleted — so this is
-            chrome, like About beside it. Session-gated because an empty loom
-            is a fact about a student, and there is no student here without
-            one. See MyLoomModal for why it is a mirror and never a workshop. */}
-        {session && (
-          <button
-            className="btn ghost mini"
-            onClick={() => setShowMyLoom(true)}
-            data-tip="what you have made, and how to start over"
-          >
-            my loom
-          </button>
-        )}
-        {/* Beside About (TJ, 2026-08-08), and reachable from every page — it is
-            not an admin surface: a student reads their own flow there.
-            Since 2026-08-09 it also sits right of Courses in the journey bar's
-            staff group (TJ), so it is drawn HERE only for those who have no
-            staff group to carry it — otherwise the header and the bar would
-            both offer the same link, which is what the Administration and
-            Cohort Map buttons were removed for. A staff member wearing the
-            student lens has `isStaff` masked to false and so gets it back
-            here, which is exactly what a student sees. */}
-        {session && !course?.isStaff && (
-          <Link
-            href="/workflows"
-            className="btn ghost mini"
-            data-tip="how you move through Loom, step by step"
-          >
-            workflows
-          </Link>
-        )}
+        {/* About, My loom and Workflows fold into the menu (TJ, 2026-08-17).
+            None is a control you reach for while working — you open your loom
+            to look at it, read your flow once, or read what Loom is — so
+            three standing buttons was header room spent every second of every
+            session on things pressed a handful of times.
+
+            Their old notes, kept because the reasoning still holds and only
+            the slot changed:
+
+            MY LOOM sat between About and Workflows (TJ, 2026-08-13). The slot
+            was the argument: a whole-loom surface had nowhere to live once
+            Keep was deleted, and a station is the thing that was deleted — so
+            it is chrome, like About beside it. Session-gated, because an
+            empty loom is a fact about a student and there is no student here
+            without one. See MyLoomModal for why it is a mirror, never a
+            workshop.
+
+            WORKFLOWS is no longer offered to students at all (TJ,
+            2026-08-17) — see HeaderMenu. Staff reach it through the journey
+            bar's staff group, which has carried it since 2026-08-09. */}
+        <HeaderMenu
+          onAbout={() => setShowAbout(true)}
+          onMyLoom={() => setShowMyLoom(true)}
+          showMyLoom={!!session}
+        />
         {/* The practice loom, on every page (TJ, 2026-08-11: "the guide should
             always be available, like the tutorials in any game. if the sandbox
             is the guide, then it should be clearly accessible"). It was
@@ -140,23 +119,37 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
         {session && (
           <Link
             href="/sandbox"
-            className="btn ghost mini"
+            className="btn ghost mini iconly"
             data-tip="the guide — walk every move on a real reading, nothing is kept"
+            aria-label="The guide — walk every move on a real reading"
           >
-            guide
+            <GuideIcon />
           </Link>
         )}
         {/* Beside the guide, per TJ. Hidden where the browser will not grant
             it (an iframe without allowfullscreen, a locked-down kiosk) rather
-            than offered and dead. */}
+            than offered and dead.
+
+            Two different screens-full, and the reading station shows both:
+            this one gives LOOM the whole screen — journey bar, scope bar and
+            all, with only the browser's own chrome dropped — and works on
+            every station. The toolbar's "full screen text" gives the TEXT the
+            whole screen, which means Loom's chrome goes too.
+
+            The qualifier sits on the toolbar's label, not this one, for a
+            measured reason: at the 1280 floor the header has room for an
+            11-character label and no more. "full screen app" is 15 and wraps
+            the header to two rows — 52px on the scarce axis (contracts.md
+            §2c-iii), which costs more than the naming gains. */}
         {session && canFull && (
           <button
-            className="btn ghost mini"
+            className="btn ghost mini iconly"
             onClick={toggleFull}
             aria-pressed={isFull}
+            aria-label={isFull ? "Exit full screen" : "Full screen — Loom fills the screen"}
             data-tip={isFull ? "back to the browser (esc)" : "give Loom the whole screen"}
           >
-            {isFull ? "exit full screen" : "full screen"}
+            <FullscreenIcon exit={isFull} />
           </button>
         )}
       </header>

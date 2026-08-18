@@ -20,9 +20,27 @@
  * prompts and the read.
  */
 import { test, expect } from "@playwright/test"
-import { cardOwnReading, enterReadingFromCard, isDeletePost } from "./helpers"
+import { cardOwnReading, deleteConceptInVocabulary, deletePassageInPassagesView, enterReadingFromCard, isDeletePost, removeOwnReading } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
+
+/**
+ * The eight concepts `seed-demo.ts` gives Test User A. Named here so the
+ * Vocabulary test can assert they are ALL present without also asserting that
+ * nothing else on the account exists — which is a different claim, and one no
+ * spec sharing an account can honestly make.
+ */
+const SEEDED_CONCEPTS = [
+  "object worlds",
+  "design as social process",
+  "artifact as compromise",
+  "community of practice",
+  "legitimate peripheral participation",
+  "reification",
+  "negotiation of meaning",
+  "shared vocabulary",
+] as const
+
 // Each test is independent and removes what it adds — no serial mode, so one
 // failure never hides the rest of the journey. Dev-server compile latency puts
 // several 15s waits in sequence, hence the generous per-test budget.
@@ -103,7 +121,8 @@ test("01 · a passage typed into a carded reading lands in the coding log — an
   //
   // Every seeded reading carries a file, so this cards its own. On that station
   // the capture form IS the page: no sheet to slide out, no fold to open.
-  await cardOwnReading(page, `A book carded by the journey suite ${Date.now().toString().slice(-6)}`)
+  const ownBook = `A book carded by the journey suite ${Date.now().toString().slice(-6)}`
+  await cardOwnReading(page, ownBook)
   await expect(page.locator("#bText")).toBeVisible({ timeout: 15_000 })
 
   await page.locator("#bText").fill("A passage typed by the journey suite, verbatim enough for the log.")
@@ -115,6 +134,11 @@ test("01 · a passage typed into a carded reading lands in the coding log — an
 
   // No `#yourwork` here — that sheet belongs to the PDF station. On a carded
   // reading the log is a card on the page, and it is the only surface with rows.
+  //
+  // The log holds two views since 2026-08-17 and opens on PASSAGES — the right
+  // landing for a student who has just captured one. This assertion is about a
+  // CONCEPT row, so it says which view it wants.
+  await page.locator(".segmented button", { hasText: "Concepts" }).click()
   const row = page.locator(".lrow", { hasText: "journey test concept" })
   await expect(row).toHaveCount(1, { timeout: 15_000 })
 
@@ -126,16 +150,16 @@ test("01 · a passage typed into a carded reading lands in the coding log — an
   // resurface on the next load as residue.
   await row.locator(".lhead").click()
   const passageId = await row.locator("[data-passage-id]").first().getAttribute("data-passage-id")
-  const passageDeleted = page.waitForResponse((r) =>
-    r.request().method() === "POST" && (r.request().postData() ?? "").includes(passageId!)
-  )
-  await row.getByRole("button", { name: "remove passage" }).click()
-  await passageDeleted
-  const conceptDeleted = page.waitForResponse((r) => isDeletePost(r.request()))
-  await row.getByRole("button", { name: "remove concept" }).click()
-  await page.getByRole("button", { name: "Delete concept" }).click()
-  await conceptDeleted
-  await expect(page.locator(".lrow", { hasText: "journey test concept" })).toHaveCount(0, { timeout: 15_000 })
+  // The passage goes from the PASSAGES view — the concept view only unfiles.
+  await deletePassageInPassagesView(page, passageId!)
+  // 04 is the only station that deletes a concept since 2026-08-17.
+  await deleteConceptInVocabulary(page, "journey test concept")
+
+  // And the reading itself — the one mutation this file could not undo until
+  // 2026-08-17, despite promising at the top that it undoes them all. Archived
+  // rather than deleted, so this takes the card off the shelf and leaves the
+  // row; see helpers' removeOwnReading.
+  await removeOwnReading(page, ownBook)
 })
 
 test("02 · pick two, say the sentence, throw the thread, label the link — then unpick it all", async ({ page }) => {
@@ -185,6 +209,7 @@ test("02 · pick two, say the sentence, throw the thread, label the link — the
   await page.reload()
   await loomLoaded(page)
   await expect(page.locator(".sent", { hasText: "one sustains the other" })).toHaveCount(0, { timeout: 15_000 })
+
 })
 
 test("03 · vocabulary is every word you own, across all your readings", async ({ page }) => {
@@ -196,20 +221,48 @@ test("03 · vocabulary is every word you own, across all your readings", async (
   await enterReadingFromCard(page, card)
   await page.locator("nav button", { hasText: "Vocabulary" }).click()
 
-  // All 8 seeded concepts, not this reading's slice — including the seeded
+  // Every seeded concept, not this reading's slice — including the
   // evidence-less one, which is counted rather than hidden.
+  //
+  // NAMED, not counted (2026-08-17). This asserted `toHaveCount(8)` on every
+  // concept row on the page, which made it a test of the whole ACCOUNT rather
+  // than of this list: any spec that ran earlier in the `write` project and
+  // left a concept behind turned it red, for a reason that had nothing to do
+  // with Vocabulary being unscoped. It failed at 9 in a full run and passed
+  // alone, which is the signature of that mistake.
+  //
+  // What the test is actually for is that Vocabulary shows concepts from
+  // EVERY reading rather than this one's slice — so it names the eight and
+  // checks they are all there. A ninth row from a neighbouring spec is not a
+  // failure of that claim.
   const conceptRows = page.locator(".lrow[data-concept-id]")
-  await expect(conceptRows, "seed missing — run `npm run seed:demo` first").toHaveCount(8, { timeout: 15_000 })
+  await expect(conceptRows.first(), "seed missing — run `npm run seed:demo` first")
+    .toBeVisible({ timeout: 15_000 })
+  for (const label of SEEDED_CONCEPTS) {
+    await expect(
+      page.locator(".lrow[data-concept-id]", { has: page.locator(".lconcept", { hasText: label }) }),
+      `seeded concept missing: ${label}`
+    ).toHaveCount(1, { timeout: 15_000 })
+  }
   await expect(page.locator(".lrow[data-link-label]").first()).toBeVisible()
 
-  // Filtering narrows the list and finding nothing says so.
-  await page.locator("#conceptFilter").fill("object")
-  await expect(conceptRows).toHaveCount(2)
+  // Filtering narrows the list and finding nothing says so. "object" matches
+  // two of the seeded eight; a filter that finds nothing must say so whatever
+  // else the account holds.
+  await page.locator("#conceptFilter").fill("object worlds")
+  await expect(conceptRows).toHaveCount(1)
   await page.locator("#conceptFilter").fill("zzzznothing")
   await expect(conceptRows).toHaveCount(0)
   await expect(page.getByText(/No concept matches/)).toBeVisible()
+  // Clearing the filter restores the list. Counted as "at least the seeded
+  // eight" for the same reason as above: this spec shares an account, so the
+  // total is not its to assert.
   await page.locator("#conceptFilter").fill("")
-  await expect(conceptRows).toHaveCount(8)
+  for (const label of SEEDED_CONCEPTS) {
+    await expect(
+      page.locator(".lrow[data-concept-id]", { has: page.locator(".lconcept", { hasText: label }) })
+    ).toHaveCount(1, { timeout: 15_000 })
+  }
 
   // A concept opens to its description. It opened to a MERGE control too
   // until 2026-08-12, when TJ hid that pending what merge means and what it

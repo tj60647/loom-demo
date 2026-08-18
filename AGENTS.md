@@ -58,3 +58,64 @@ Check a layout at **1280 · 1536 · 1728 · 1920** CSS px. Never assume a 1920×
 panel hands you 1920 CSS pixels: at Windows' default 125% scaling it hands you
 1536, and Apple hardware reports 1512–1728. There are no phone layouts here and
 none should be added.
+
+# Reasons in comments are claims — check them before you write them
+
+This repository comments heavily, and the comments carry reasons: why a floor
+is 36px, why identity moved to its own column, who decided a name. That is
+worth keeping. It also means a wrong reason is indistinguishable from a right
+one at reading distance, and gets believed and built on.
+
+It has already happened. `c502f7e` widened a test matcher and explained
+itself: *"locally-seeded fixtures carry slug ids ('e2e-object-worlds')."* No
+reading has ever had a slug id — `sources.id` defaults to `crypto.randomUUID()`
+and the seed's slug lives in `sources.seedKey`, a separate column added for
+exactly that reason. `e2e-object-worlds` appears nowhere in the repository. The
+comment was believed, written into a planning document as a free bugfix, and
+survived until someone asked when a slug id is ever produced.
+
+**Before a comment states a fact about this system, verify it here, and make
+the comment say how you know.**
+
+- **Name a real thing or name none.** An identifier in a comment
+  (`e2e-object-worlds`, a column, a flag) must exist. Grep for it. An invented
+  example is the most convincing kind of wrong.
+- **Measure, don't estimate.** "63px" beats "about 60px", and only one of them
+  can be checked later. Say where: *"measured on the running app at 1536"*.
+- **Check the premise, not only the mechanism.** That a matcher rejects slug
+  ids is easy to confirm and was true. Whether a slug id is ever produced is
+  the question that mattered, and nobody asked it.
+- **Cite the decision, not your impression of it.** `(TJ, 2026-08-12)`, "red
+  line #5", "ruling 28" are load-bearing and get quoted onward. Point at where
+  it was said. If you cannot, write what you observed instead — *"this appears
+  to be why"* is honest; a fabricated attribution is not.
+- **If it resists checking, say so in the comment.** "Unverified" costs one
+  word and saves the next reader the whole search.
+
+The same applies to commit messages and to any document proposing work: a
+recommendation inherits the reliability of whatever it was formed from, and a
+branch's own account of itself is evidence, not proof.
+
+# One decision per commit, and say what you removed
+
+A branch here is read decision by decision — taken, refused or changed one at
+a time. A commit carrying six unrelated decisions cannot be answered that way,
+so the good 80% waits on the contested 20%. That has already cost a branch:
+`b8258bd` moved six decisions across 8 files, and its strongest change sat
+blocked behind its weakest for a fortnight.
+
+- **One decision per commit.** If the message needs "and" between two unrelated
+  changes, it is two commits. Splitting later is expensive; splitting as you go
+  is free.
+- **The reasoning goes in the commit message.** Comments explain the code to
+  whoever edits it next; the message explains the *decision* to whoever has to
+  approve it. A reason that exists only in a comment is a reason no reviewer
+  reads before deciding.
+- **Declare removals explicitly.** A `Removes:` line for anything that stops
+  existing — a keyboard shortcut, a control, an affordance, a route. Three
+  removals went unmentioned in one branch: the `f` shortcut, keyboard
+  reachability of highlights, and five header items becoming unreachable. Each
+  was defensible; none was declared, so none was decided.
+- **State the evidence.** Which widths you checked, what you measured, which
+  specs you ran. "Measured at 1280 · 1536 · 1920: row 35px, one row, nothing
+  clipped" is verifiable by a reviewer in seconds. A predicted number is not.

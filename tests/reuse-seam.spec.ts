@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { cardOwnReading } from "./helpers"
+import { cardOwnReading, deleteConceptInVocabulary, removeOwnReading } from "./helpers"
 
 /**
  * The seam between readings — naming a concept you already named somewhere else.
@@ -63,9 +63,18 @@ test("a concept met only in THIS reading raises no seam", async ({ page }) => {
   // "the label already exists" rather than "met in another reading".
   await captureByHand(page, label)
   await expect(page.locator(".seam")).toHaveCount(0)
+
+  // Everything this test made, unmade: the concept it minted and the card it
+  // stood on. Left behind, they accumulate on a shared account run after run —
+  // which is what turned journey-learner's Vocabulary count red, three specs
+  // later, for a reason nothing in that file could explain.
+  await deleteConceptInVocabulary(page, label)
+  await removeOwnReading(page, book)
 })
 
 test("the same concept in a second reading offers the way out, and taking it splits them", async ({ page }) => {
+  // Two carded readings, four captures, a split, and cleanup through the UI.
+  test.setTimeout(90_000)
   const label = unique("crossing concept")
   // Two carded books, because the seam is about meeting a concept in ANOTHER
   // reading and typing only happens on a reading with no PDF.
@@ -107,4 +116,27 @@ test("the same concept in a second reading offers the way out, and taking it spl
       { timeout: 25000 }
     )
     .toEqual([1, 1])
+
+  // THE CONCEPTS FIRST, then the cards — and the order is load-bearing.
+  // `removeOwnReading` ends on the shelf, where 04 · Vocabulary is an inert
+  // <span> rather than a button (JourneyNav's READING_ONLY): a station you can
+  // only reach from inside a text. Deleting from there waits 30s for a button
+  // that is not coming.
+  //
+  // Twice, because the split above is the point of the test: two distinct
+  // concepts now share this label, and deleting "the one called X" leaves the
+  // other. Vocabulary is the only station that deletes a concept since
+  // 2026-08-17, so cleanup goes the way a student would.
+  //
+  // This spec minted a concept per run and removed none, so the account grew
+  // one every time the suite ran — which is what turned journey-learner's
+  // Vocabulary count red three specs later, for a reason nothing in that file
+  // could explain.
+  await deleteConceptInVocabulary(page, label)
+  await deleteConceptInVocabulary(page, label)
+
+  // The two cards this test made, off the shelf again. See helpers'
+  // removeOwnReading: archived, not deleted, so this is shelf cleanup.
+  await removeOwnReading(page, first)
+  await removeOwnReading(page, second)
 })

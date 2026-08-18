@@ -17,8 +17,10 @@ import OpenTab from "@/components/tabs/OpenTab"
 import ThrowTab from "@/components/tabs/ThrowTab"
 import VocabularyTab from "@/components/tabs/VocabularyTab"
 import MapTab from "@/components/tabs/MapTab"
-import JourneyNav, { stationNumber, type Station } from "@/components/ui/JourneyNav"
+import JourneyNav, { type Station } from "@/components/ui/JourneyNav"
 import StationSearch from "@/components/ui/StationSearch"
+import SaveLight from "@/components/ui/SaveLight"
+import Identity from "@/components/ui/Identity"
 import type { Passage } from "@/lib/types"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
@@ -41,12 +43,11 @@ export type WorkbenchSource = {
 // two. `?tab=open` still lands here; the URL params are legacy per §F.
 export type Tab = "reading" | "throw" | "read" | "map"
 
-const FOOT: Record<Tab, [string, string]> = {
-  reading: ["READING", "THE TEXT AND YOUR CAPTURES"],
-  throw: ["LINKING", "ONE THREAD AT A TIME"],
-  map: ["KNOWLEDGE GRAPH", "THE LIST AND THE BOARD"],
-  read: ["VOCABULARY", "THE WORDS YOU OWN"],
-}
+// The footer's two halves used to be this table — the station's name and a
+// gloss on it, e.g. "01 — READING" / "THE TEXT AND YOUR CAPTURES". Both
+// restated the journey bar directly above. Since 2026-08-17 the footer carries
+// identity on the left and the reading on the right, which is what the
+// removed scope bar used to say and what nothing else says now.
 
 /** The journey station each workbench tab sits at. */
 const STATION_OF: Record<Tab, Station> = {
@@ -150,6 +151,8 @@ export default function Workbench({
    * OpenTab clears it through `onFocusHandled` once it has scrolled there.
    */
   const [openTargetPassageId, setOpenTargetPassageId] = useState<string | null>(focus?.passage ?? null)
+  /** The mirror, for a margin badge: open Your work AT a concept. */
+  const [openTargetConceptId, setOpenTargetConceptId] = useState<string | null>(null)
   // `searchOpen` lived here to drive the standing band and its narrow-screen
   // toggle. StationSearch owns its own open state now — the panel belongs to
   // the button, and nothing else on this surface needs to know.
@@ -177,6 +180,31 @@ export default function Workbench({
     setActiveTab(tab)
     setVisited((seen) => (seen.has(tab) ? seen : new Set(seen).add(tab)))
   }, [])
+
+  /**
+   * Reading focus (TJ, 2026-08-17): with the text open, the station is the
+   * text. The app header and the footer stand down; the journey bar and the
+   * viewer's own toolbar are what remain, because those two still do work
+   * here. The scope bar is not conditional — it is gone from every station.
+   *
+   * Only where there is a PDF to fill the room. A reading with no file is a
+   * card whose station is mostly empty, and stripping the chrome off an empty
+   * room leaves nothing at all.
+   *
+   * The footer is this component's to withhold, just below. The header belongs
+   * to the root layout, so it goes through a body attribute and one rule in
+   * globals.css — the same mechanism, from the far side of the tree.
+   *
+   * It runs on every activeTab change rather than only on entry, and the
+   * cleanup removes the attribute, so leaving 01 restores the chrome even if
+   * the component never unmounts.
+   */
+  const readingFocus = activeTab === "reading" && source.hasFile
+  useEffect(() => {
+    if (!readingFocus) return
+    document.body.setAttribute("data-reading-focus", "")
+    return () => document.body.removeAttribute("data-reading-focus")
+  }, [readingFocus])
 
   // The practice guide moves the student between stations as its beats change.
   // An event rather than a prop: the guide renders below this component's own
@@ -233,7 +261,18 @@ export default function Workbench({
   // went. The sheet is already mounted, so the row it scrolls to has a real
   // layout box the instant this fires.
   const handleGotoOpenPassage = (passageId: string) => {
+    setOpenTargetConceptId(null)
     setOpenTargetPassageId(passageId)
+    setWorkOpen(true)
+    goTo("reading")
+  }
+
+  // A margin badge names a concept, so it lands on that concept's row. Clearing
+  // the other target matters: both are read by the same panel, and two live
+  // targets would race to decide which view it opens in.
+  const handleGotoOpenConcept = (conceptId: string) => {
+    setOpenTargetPassageId(null)
+    setOpenTargetConceptId(conceptId)
     setWorkOpen(true)
     goTo("reading")
   }
@@ -241,7 +280,10 @@ export default function Workbench({
   // Stable identity again: OpenTab's focus effect lists this in its deps and
   // the sheet is mounted permanently now, so an inline arrow re-ran that
   // effect on every Workbench render while a target was set.
-  const handleFocusHandled = useCallback(() => setOpenTargetPassageId(null), [])
+  const handleFocusHandled = useCallback(() => {
+    setOpenTargetPassageId(null)
+    setOpenTargetConceptId(null)
+  }, [])
 
 
   // "See them all in Vocabulary", from the capture side. The tab is this
@@ -291,29 +333,18 @@ export default function Workbench({
 
   return (
     <>
-      <div className="scopebar">
-        {/* No "‹ library" here (TJ, 2026-08-08): 00 · Library is in the journey
-            bar directly below, so this was a second door to the same place. */}
-        <>
-          <span className="scopetitle">{source.title}</span>
-          {source.author ? <span className="scopemeta">{source.author}</span> : null}
-          <span className="scopemeta">
-            {scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} evidenced here
-            {scoped.bridges.length
-              ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out`
-              : ""}
-          </span>
-          {/* The library card used to carry this; the reading is the library
-              card now, so the affordance moves here rather than disappearing. */}
-          {source.hasFile ? (
-            <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>
-              Download PDF
-            </a>
-          ) : (
-            <span className="scopemeta scopedl">your own card — no pdf here</span>
-          )}
-        </>
-      </div>
+      {/* THE SCOPE BAR IS GONE (TJ, 2026-08-17). It was a 46px band on every
+          station carrying the reading's title, its author, its tallies and
+          Download PDF. All four survive; none of them needed a band:
+
+            title, author, tallies → the footer, which was print restating the
+              journey bar ("01 — READING") and is now the only place either
+              fact is said;
+            Download PDF → the reader's own toolbar, beside the text it
+              downloads.
+
+          That is 46px back on every station, and one fewer horizontal rule
+          between the student and the words. */}
 
       {/* The standing search band stood here, on every station, and the toolbar
           above carried a toggle for it under 900px. Both are gone (TJ,
@@ -346,6 +377,11 @@ export default function Workbench({
             sourceId={activeTab === "read" ? undefined : source.id}
           />
         )}
+        // The save light rides here now the header can stand down (TJ,
+        // 2026-08-17). 01 is where capture happens and the highlight paints
+        // optimistically, so "saved" is the only word that says the mark is
+        // real — it cannot live on a band the reading station hides.
+        status={<SaveLight />}
       />
 
       {/* The text gets the room. On 00 the viewer manages its own scrolling
@@ -374,6 +410,7 @@ export default function Workbench({
                     initialSearch={initialSearch}
                     focusPassageId={pdfFocusPassageId}
                     onGotoOpenPassage={handleGotoOpenPassage}
+                    onGotoOpenConcept={handleGotoOpenConcept}
                     onPageChange={handlePageChange}
                     workOpen={workOpen}
                     onToggleWork={toggleWork}
@@ -383,6 +420,7 @@ export default function Workbench({
                         currentPage={livePdfPage}
                         onGotoPassage={handleGotoPassage}
                         focusPassageId={openTargetPassageId}
+                        focusConceptId={openTargetConceptId}
                         onFocusHandled={handleFocusHandled}
                         onGotoVocabulary={handleGotoVocabulary}
                         openClothFold={focus?.cloth}
@@ -396,6 +434,7 @@ export default function Workbench({
                 <OpenTab
                   onGotoPassage={handleGotoPassage}
                   focusPassageId={openTargetPassageId}
+                  focusConceptId={openTargetConceptId}
                   onFocusHandled={handleFocusHandled}
                   onGotoVocabulary={handleGotoVocabulary}
                   openClothFold={focus?.cloth}
@@ -419,12 +458,33 @@ export default function Workbench({
         </div>
       </main>
 
-      <footer>
-        {/* The number comes from the bar above, so hiding or restoring a
-            station can never leave the footer claiming a different one. */}
-        <span className="fl">{stationNumber(STATION_OF[activeTab])} — {FOOT[activeTab][0]}</span>
-        <span className="fr">{FOOT[activeTab][1]}</span>
-      </footer>
+      {/* The footer says who you are and what you are reading (TJ,
+          2026-08-17). It used to say "01 — READING" and "the text and your
+          captures" — the station number the bar above already showed, and a
+          gloss on it. Both halves restated their neighbours.
+
+          Now it carries the two facts that lost their band when the scope bar
+          went: identity on the left, the reading on the right.
+
+          WITHHELD on the reading station, with the header. With the text open
+          the station is the text: the journey bar and the viewer's toolbar are
+          what remain. You do not need to be told which reading you are in
+          while you are looking at it. */}
+      {!readingFocus && (
+        <footer>
+          <Identity />
+          <span className="fr">
+            <span className="foottitle">{source.title}</span>
+            {source.author ? <span className="footmeta">{source.author}</span> : null}
+            <span className="footmeta">
+              {scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} evidenced here
+              {scoped.bridges.length
+                ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out`
+                : ""}
+            </span>
+          </span>
+        </footer>
+      )}
     </>
   )
 }

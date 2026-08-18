@@ -24,6 +24,7 @@ import PracticeGuide from "@/components/practice/PracticeGuide"
 import PracticeShelf, { type PracticeCard } from "@/components/practice/PracticeShelf"
 import JourneyNav from "@/components/ui/JourneyNav"
 import Workbench, { type WorkbenchSource } from "@/components/Workbench"
+import Identity from "@/components/ui/Identity"
 import type { LoomState } from "@/lib/types"
 
 export default function SandboxWorkbench({
@@ -152,9 +153,16 @@ export default function SandboxWorkbench({
               this place IS gets said by the floating notice above. */}
           <JourneyNav active="readings" />
           <PracticeShelf cards={cards} openableId={sourceId} tally={tally} onOpen={open} />
+          {/* The practice Library's footer, matching the real one's shape
+              (TJ, 2026-08-17) — identity left, subject right. The subject
+              here is the place itself: a tally would be the example's, not
+              the student's, and this is the one fact about the guide that
+              cannot be said too often. */}
           <footer>
-            <span className="fl">00 — LIBRARY</span>
-            <span className="fr">PICK A READING</span>
+            <Identity />
+            <span className="fr">
+              <span className="footmeta">nothing here is kept</span>
+            </span>
           </footer>
         </>
       )}

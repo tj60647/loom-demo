@@ -10,6 +10,7 @@ import { getUserLoomData } from "@/lib/reads"
 import {
   createConcept, updateConcept, deleteConcept, mergeConcepts as mergeConceptsAction,
   createPassage, deletePassage, refilePassage as refilePassageAction, unfilePassage as unfilePassageAction, attributePassages as attributePassagesAction,
+  updatePassageNote as updatePassageNoteAction,
   createEdge, updateEdge, deleteEdge,
   createLink, updateLink, attachLink as attachLinkAction,
   saveView, saveCloth as saveClothAction,
@@ -78,6 +79,8 @@ export interface LoomContextType {
   refilePassage: (passageId: string, conceptId: string) => Promise<Passage>
   /** Remove one concept pointer from a passage — the passage itself survives. */
   unfilePassage: (passageId: string, conceptId: string) => Promise<void>
+  /** Revise a passage's note. The first way to change one after capture. */
+  editPassageNote: (passageId: string, note: string) => Promise<void>
   /** The current scope's cloth (title + description), or null before one is written. */
   activeCloth: Cloth | null
   /**
@@ -448,6 +451,19 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       await resync(e)
       throw e
+    }
+  }
+
+  const editPassageNote = async (passageId: string, note: string) => {
+    applyLocal(s => ({
+      ...s,
+      passages: s.passages.map(b => (b.id === passageId ? { ...b, note } : b)),
+    }))
+    try {
+      await updatePassageNoteAction(passageId, note)
+      savedOk()
+    } catch (e) {
+      await resync(e)
     }
   }
 
@@ -958,7 +974,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       state, scope, scoped, scopedState, isLoading,
       studentName: session?.user?.name || "",
       addConcept, editConcept, removeConcept, mergeConcepts,
-      addPassage, removePassage, refilePassage, unfilePassage, attributePassages,
+      addPassage, removePassage, refilePassage, unfilePassage, attributePassages, editPassageNote,
       activeCloth, updateCloth, flushCloth,
       addEdge, editEdge, removeEdge,
       links: state.links, addLink, editLink, attachLink,

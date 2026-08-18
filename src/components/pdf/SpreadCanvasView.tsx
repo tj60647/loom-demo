@@ -31,7 +31,7 @@ import PageSlot, { type PageTier } from "./PageSlot";
 import { type PdfDoc } from "./PageRaster";
 import { spreadLayout, pageX } from "@/lib/spreadLayout";
 import { layoutRail, railScale } from "@/lib/railLayout";
-import { short } from "@/lib/clothMath";
+import { RailCardBody } from "./ConceptRail";
 import type { Concept, Passage } from "@/lib/types";
 
 const CARD_GAP = 12;
@@ -98,6 +98,8 @@ export default function SpreadCanvasView({
   passages,
   concepts,
   onOpenPassage,
+  onOpenConcept,
+  onUnfile,
   onAspect,
   zoomMultiplier,
   onZoomMultiplier,
@@ -123,6 +125,10 @@ export default function SpreadCanvasView({
   passages: Passage[];
   concepts: Concept[];
   onOpenPassage?: (passageId: string) => void;
+  /** A badge's destination: Your work, at that concept. */
+  onOpenConcept?: (conceptId: string) => void;
+  /** Take one concept off this passage, in place — the card's only own act. */
+  onUnfile?: (passageId: string, conceptId: string) => void;
   onAspect: (a: number) => void;
   /** The toolbar slider's value: 1 = the whole canvas fits the stage. */
   zoomMultiplier: number;
@@ -395,10 +401,36 @@ export default function SpreadCanvasView({
     });
   }, []);
 
+  // Whether more than one page is in view — see applyTransform.
+  const wideRef = useRef(true);
+  const [seesMoreThanAPage, setSeesMoreThanAPage] = useState(true);
+
   const applyTransform = useCallback((t: ZoomTransform) => {
     tref.current = t;
     const el = canvasRef.current;
     if (!el) return;
+    /**
+     * "MORE THAN A PAGE IN VIEW" — the line editing stops at (TJ, 2026-08-17:
+     * "maybe at 'i see more than a page' no editing").
+     *
+     * It is the honest threshold because it is the reader's own experience of
+     * the canvas rather than a number: while one page fills the view you are
+     * reading a text and the card beside it is a margin note; once two pages
+     * are in view you are reading a map, the cards are counter-scaled markers
+     * over thumbnails, and a × is one mis-click from a pan.
+     *
+     * `stage.w / t.k` is the viewport measured in canvas units, so comparing
+     * it to one page's width asks exactly that question. Set through state
+     * only when it flips, because this runs on every pan frame.
+     */
+    const { stage: st, basePageWidth: pw } = live.current;
+    if (st.w > 0 && pw > 0) {
+      const wide = st.w / t.k > pw * 1.05;
+      if (wide !== wideRef.current) {
+        wideRef.current = wide;
+        startTransition(() => setSeesMoreThanAPage(wide));
+      }
+    }
     el.style.transform = `translate(${t.x}px, ${t.y}px) scale(${t.k})`;
     el.style.setProperty("--invk", String(Math.max(1, live.current.spreadFitK / t.k)));
     // The minimap rides the same write: overview + detail must never drift,
@@ -937,6 +969,12 @@ export default function SpreadCanvasView({
               if (top == null) return null;
               const s = layout.spreads[c.anchor.spreadIdx];
               const cs = placement.scales[id] ?? 1;
+              /* A card with nothing on it is not drawn (TJ, 2026-08-17: "if
+                 empty, no note no concept then hide"). Zoomed out it would be
+                 an empty bordered box over a thumbnail, saying only that
+                 SOMETHING was captured here — which the highlight says better.
+                 Close in it keeps its + and its invitation, so it stays. */
+              if (seesMoreThanAPage && c.concepts.length === 0 && !c.passage.note) return null;
               const h = (cardHeights[id] ?? CARD_FALLBACK_H) * cs;
               const x2 = c.anchor.side === "left" ? s.x + layout.railW : s.x + layout.unitW - layout.railW;
               return <path key={id} d={`M ${c.anchor.edgeX} ${c.anchor.midY} L ${x2} ${top + h / 2}`} />;
@@ -950,17 +988,14 @@ export default function SpreadCanvasView({
               const id = c.passage.id;
               const s = layout.spreads[c.anchor.spreadIdx];
               const cs = placement.scales[id] ?? 1;
-              const first = c.concepts[0];
-              const chips = c.concepts.slice(1);
-              const name = first ? first.label : "Unlabeled passage";
-              // Cards keep their rail-edge anchor and grow inward — over their
-              // own page — as the canvas zooms out (width rides --invk), so at
-              // full zoom-out you are reading concepts, not the shrunken text.
-              // Both offsets set explicitly: the shared .pdf-railcard class
-              // says left:0/right:0 (correct inside page mode's rail), and an
-              // over-constrained absolute box resolves left+width and IGNORES
-              // right — which pinned every right-side card to the canvas's
-              // left edge until the unused side was released with "auto".
+              /* A card with nothing on it is not drawn (TJ, 2026-08-17: "if
+                 empty, no note no concept then hide"). Zoomed out it would be
+                 an empty bordered box over a thumbnail, saying only that
+                 SOMETHING was captured here — which the highlight says better.
+                 Close in it keeps its + and its invitation, so it stays. */
+              if (seesMoreThanAPage && c.concepts.length === 0 && !c.passage.note) return null;
+              // No first/chips split: every concept is a badge of equal
+              // weight, the same as page mode's rail and the passage view.
               const style: React.CSSProperties = {
                 top: placement.tops[id] ?? s.y,
                 width: `min(calc(${layout.railW}px * var(--invk, 1)), ${layout.railW + layout.gap + basePageWidth}px)`,
@@ -971,33 +1006,28 @@ export default function SpreadCanvasView({
                   : { right: layout.canvasW - (s.x + layout.unitW), left: "auto" }),
               };
               return (
+                /* The same body as page mode's rail (ConceptRail), so the
+                   two cards cannot drift again — the canvas was still drawing
+                   a concept label and a gloss hours after the other stopped.
+                   The host keeps what is genuinely the canvas's: the anchor,
+                   the counter-scale, and the width that rides --invk. It is no
+                   longer a role="button" wrapper, because the body holds
+                   controls and a control inside a control is unreachable in
+                   keyboard order. */
                 <div
                   key={id}
                   ref={(el) => registerCard(id, el)}
                   className="pdf-railcard"
                   style={style}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Open ${name} in your work`}
-                  onClick={() => onOpenPassage?.(id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onOpenPassage?.(id);
-                    }
-                  }}
                 >
-                  <div className={`pdf-railcard-label${first ? "" : " unlabeled"}`}>{name}</div>
-                  {chips.length > 0 && (
-                    <div className="pdf-railcard-chips">
-                      {chips.map((chip) => (
-                        <span key={chip.id} className="pdf-railcard-chip">{chip.label}</span>
-                      ))}
-                    </div>
-                  )}
-                  {first?.def ? <div className="pdf-railcard-def">{short(first.def, 140)}</div> : null}
-                  {!first && <div className="pdf-railcard-def">{short(c.passage.content, 110)}</div>}
-                  {c.passage.note ? <div className="pdf-railcard-note">{short(c.passage.note, 110)}</div> : null}
+                  <RailCardBody
+                    passage={c.passage}
+                    concepts={c.concepts}
+                    onOpenPassage={onOpenPassage}
+                    onOpenConcept={onOpenConcept}
+                    onUnfile={onUnfile}
+                    readOnly={seesMoreThanAPage}
+                  />
                 </div>
               );
             })}

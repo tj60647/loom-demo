@@ -18,6 +18,115 @@ export const isDeletePost = (request: Request) =>
   /^\["[0-9a-f-]{36}"(,(null|"[0-9a-f-]{36}"))?\]$/.test(request.postData() ?? '');
 
 /**
+ * Delete a passage — from the PASSAGES view, the only place that does it.
+ *
+ * The concept view lost "remove passage" on 2026-08-17 (TJ): that list is a
+ * concept and its evidence, so the act belonging there is taking one passage
+ * OFF the concept. Destroying the capture reaches every other concept it
+ * evidences, none of which are on that screen to watch go — so it lives where
+ * the passage is the subject.
+ *
+ * Waits on the POST for the reason isDeletePost exists: the row clears
+ * optimistically and ending at the disappearance strands the delete.
+ */
+export async function deletePassageInPassagesView(page: Page, passageId: string) {
+  const panel = page.locator('#yourwork');
+  const inSheet = await panel.isVisible().catch(() => false);
+  const root = inSheet ? panel : page.locator('body');
+  await root.locator('.segmented button', { hasText: 'Passages' }).click();
+  const row = root.locator(`[data-passage-id="${passageId}"]`).first();
+  await expect(row).toBeVisible({ timeout: 15000 });
+  const gone = page.waitForResponse((r) =>
+    r.request().method() === 'POST' && (r.request().postData() ?? '').includes(passageId)
+  );
+  await row.getByRole('button', { name: 'remove passage', exact: true }).click();
+  await gone;
+}
+
+/**
+ * Delete a concept — from 04 · Vocabulary, which is the only place that does it.
+ *
+ * Your work used to carry its own "delete this concept". It went on
+ * 2026-08-17 (TJ: "i sense that delete concept should only be in vocabulary.
+ * and that in reading it is remove concept from passage"): a concept belongs
+ * to the student and travels through every text they have read, so destroying
+ * it from inside one reading was a loom-wide act behind a reading-scoped door.
+ *
+ * So cleanup takes the route a student now takes. Slower than the old two
+ * clicks, and it exercises the real path rather than a shortcut that no longer
+ * exists.
+ *
+ * Waits on the POST, not the row: the list clears optimistically, and ending a
+ * test at the disappearance strands the delete for the next run.
+ */
+export async function deleteConceptInVocabulary(page: Page, label: string) {
+  await page
+    .locator('nav[aria-label="The journey"] button.station', { hasText: 'Vocabulary' })
+    .click();
+  const row = page
+    .locator('.lrow[data-concept-id]', { has: page.locator('.lconcept', { hasText: label }) })
+    .first();
+  await expect(row).toBeVisible({ timeout: 20000 });
+  // ONE FEWER, not none. Distinct concepts may share a label — homonyms are
+  // legal (ruling 36) and reuse-seam's whole subject is making a pair of them —
+  // so asserting the name is gone fails on the first of two, which is not a
+  // failure of the delete. Counting down proves the same thing and survives it.
+  const before = await page.locator('.lconcept', { hasText: label }).count();
+  await row.locator('.lhead').click();
+  const deleted = page.waitForResponse((r) => isDeletePost(r.request()));
+  await row.getByRole('button', { name: 'remove concept' }).click();
+  await page.getByRole('button', { name: 'Delete concept' }).click();
+  await deleted;
+  await expect(page.locator('.lconcept', { hasText: label }))
+    .toHaveCount(before - 1, { timeout: 15000 });
+}
+
+/**
+ * Take a reading of your own off the shelf, the way a student does.
+ *
+ * Every spec that cards a reading should end with this. Until 2026-08-17 none
+ * of them could: the only delete in the app was `deleteSource`, which opens
+ * with `requireAdmin` — so `journey-learner` and `reuse-seam` left a card
+ * behind on every run, and 80 of them had piled up on the test account by the
+ * time anyone counted. `journey-learner`'s own docstring said it removed
+ * everything it made; the reading was the one thing it could not.
+ *
+ * Archived, not deleted, so this is cleanup of the SHELF rather than of the
+ * database — which is the honest thing to promise and matches what the button
+ * does.
+ */
+export async function removeOwnReading(page: Page, title: string) {
+  await page.goto('/');
+  const card = page.locator('.shelfcard', { hasText: title }).first();
+  await expect(card).toBeVisible({ timeout: 20000 });
+  await card.locator('.shelfremove').click();
+  await page.getByRole('button', { name: 'Remove from my shelf' }).click();
+  await expect(page.locator('.shelfcard', { hasText: title })).toHaveCount(0, { timeout: 20000 });
+}
+
+/**
+ * Assert which reading is open, from where the title actually lives.
+ *
+ * It was `.scopetitle`, in a band above the journey, until 2026-08-17. That
+ * band is gone and the title is in the footer — and the footer stands down on
+ * the reading station, because with the text open the station is the text. The
+ * workbench also OPENS on the reading station, so there is no moment after
+ * entering when the title is on screen.
+ *
+ * So this steps to 02 · Linking, where the footer stands and names the same
+ * reading, and steps back. The title is the reading's, not the station's.
+ */
+export async function expectReadingTitle(page: Page, title: RegExp) {
+  const station = (name: string) =>
+    page.locator('nav[aria-label="The journey"] button.station', { hasText: name });
+  await station('Linking').click();
+  await expect(page.locator('footer .foottitle')).toContainText(title, { timeout: 10_000 });
+  await station('Reading').click();
+  // Back on the text before the caller carries on with it.
+  await expect(page.locator('.pdf-toolbar')).toBeVisible({ timeout: 15_000 });
+}
+
+/**
  * Reading-first navigation.
  *
  * The shelf is the home screen, so opening a reading means picking its card,
@@ -50,7 +159,7 @@ export async function openReading(page: Page, title: string) {
 
   // Scoped to the journey bar. Since the text and capture merged (2026-08-08)
   // the reading station is the DEFAULT tab, so the viewer — and its own
-  // "Search this reading" button — is already on screen; an unscoped
+  // "In the text" button — is already on screen; an unscoped
   // /Reading/i now matches both and is a strict-mode violation.
   await page.locator('nav[aria-label="The journey"] button.station', { hasText: 'Reading' }).click();
   await expect(page.locator('text=Loading PDF...')).toBeHidden({ timeout: 15000 });
@@ -94,7 +203,7 @@ export async function cardOwnReading(page: Page, title: string) {
  * is the only honest reading of whether it is open. Idempotent on purpose — a
  * capture may have opened it already, and a blind click would send it back.
  */
-export async function openYourWork(page: Page) {
+export async function openYourWork(page: Page, view?: 'passages' | 'concepts') {
   // By id, not by role+name: the head bar's close button is named "Close your
   // work", which a /Your work/i role match also finds. `.first()` would work
   // today by DOM order and break the day somebody reorders the toolbar.
@@ -111,5 +220,15 @@ export async function openYourWork(page: Page) {
   await expect
     .poll(() => panel.evaluate((el) => getComputedStyle(el).transform), { timeout: 5000 })
     .toBe('none');
+  // The sheet has held two views since 2026-08-17 and opens on PASSAGES, which
+  // is what a student wants after a capture. A spec hunting a CONCEPT row has
+  // to say so — before that, `.lconcept` simply was not rendered and the
+  // failure read as a missing concept rather than a different view.
+  if (view) {
+    await panel.locator('.segmented button', { hasText: view === 'passages' ? 'Passages' : 'Concepts' }).click();
+    await expect(
+      panel.locator('.segmented button', { hasText: view === 'passages' ? 'Passages' : 'Concepts' })
+    ).toHaveAttribute('aria-pressed', 'true');
+  }
   return panel;
 }

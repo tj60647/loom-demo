@@ -228,6 +228,16 @@ export default function SandboxLoomProvider({
     return out ?? { ...blank().passages[0] } as Passage
   }, [noted])
 
+  // Local like everything else here: the practice loom keeps nothing, so a
+  // note revised in the guide lives exactly as long as the guide does.
+  const editPassageNote = useCallback(async (passageId: string, note: string) => {
+    setState((s) => ({
+      ...s,
+      passages: s.passages.map((p) => (p.id === passageId ? { ...p, note } : p)),
+    }))
+    noted()
+  }, [noted])
+
   const unfilePassage = useCallback(async (passageId: string, conceptId: string) => {
     setState((s) => ({
       ...s,
@@ -414,6 +424,7 @@ export default function SandboxLoomProvider({
     attributePassages,
     refilePassage,
     unfilePassage,
+    editPassageNote,
     activeCloth,
     updateCloth,
     // Nothing is debounced here because nothing is sent anywhere; the local

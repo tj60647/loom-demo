@@ -1,6 +1,6 @@
 "use client"
 
-import { signOut, useSession } from "next-auth/react"
+import { useSession } from "next-auth/react"
 import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useReadings } from "@/components/providers/ReadingsProvider"
@@ -18,13 +18,10 @@ export default function AuthButton({ isBranchPreview = false }: { isBranchPrevie
   }
 
   if (session) {
-    // From the COURSE, not the session. `session.user.isAdmin` is the site
-    // role and the student lens cannot touch it — which is exactly how a
-    // "viewing as student" header would have kept wearing an Admin pill.
-    // The course carries both grades, so `isStaff && !isAdmin` is Faculty.
-    const isAdmin = !!course?.isAdmin
-    const isStaff = !!course?.isStaff
-    // The one unmasked read in this file: it draws the way back out.
+    // The grades themselves moved out with the pill they drew — Identity.tsx
+    // carries them now, and the note about reading them from the COURSE and
+    // never from the session went with them, because that is where it applies.
+    // The one unmasked read left in this file: it draws the way back out.
     const staffTruly = !!course?.staffTruly
     const asStudent = !!course?.viewingAsStudent
 
@@ -68,12 +65,14 @@ export default function AuthButton({ isBranchPreview = false }: { isBranchPrevie
             />
           </>
         )}
-        <span className="label">{session.user?.name || session.user?.email}</span>
-        {/* The role, and the lens. Roster / Cohort Graph / Readings / Courses
-            used to sit here as an "Administration" and a "Cohort Map" button;
-            since 2026-08-09 they are the journey bar's staff group, on every
-            surface, so the header keeps only who you are. */}
-        {isStaff && <span className="pill beaten">{isAdmin ? "Admin" : "Faculty"}</span>}
+        {/* The NAME, the BADGE and SIGN OUT are not here any more — they are
+            the workbench footer's left half (TJ, 2026-08-17), so that hiding
+            the header on the reading station does not take identity or the way
+            out with it. See Identity.tsx, which carries the same
+            course-not-session derivation this file established.
+
+            The lens stays. It is not identity, it is a mode you are in, and
+            while it is on this button is the only route back. */}
         {staffTruly && (
           asStudent ? (
             /* Loud on purpose. A lens you cannot tell you are wearing is a
@@ -96,11 +95,6 @@ export default function AuthButton({ isBranchPreview = false }: { isBranchPrevie
             </button>
           )
         )}
-        {/* Ghost like its row-mates: in this app a solid button marks where
-            you are or the one primary act, and signing out is neither. */}
-        <button className="btn ghost mini" onClick={() => signOut()} data-tip="sign out of Loom">
-          Sign out
-        </button>
       </div>
     )
   }

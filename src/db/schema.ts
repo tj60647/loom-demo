@@ -712,8 +712,11 @@ export const graphEvents = pgTable("graph_event", {
   // 'passage.capture', 'cloth.update', 'graph.import', 'graph.reset',
   // 'graph.example'.
   kind: text("kind").notNull(),
+  // "reading" joined the seven on 2026-08-17, when removing a reading of your
+  // own became an act a student can take. Free text in the column, like
+  // `kind` — the union is the vocabulary, not a constraint, so no migration.
   entityType: text("entityType")
-    .$type<"concept" | "passage" | "edge" | "link" | "graph" | "map" | "cloth">()
+    .$type<"concept" | "passage" | "edge" | "link" | "graph" | "map" | "cloth" | "reading">()
     .notNull(),
   entityId: text("entityId"),
   // Enough of the entity to replay the graph at any point in the timeline.

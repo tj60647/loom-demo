@@ -191,8 +191,31 @@ assert(
 
 console.log("\ncapture log — every event emitted is an event replayed")
 
-const loom = readFileSync(join(root, "src/actions/loom.ts"), "utf8")
+/**
+ * EVERY file that emits, not just loom.ts.
+ *
+ * This read `src/actions/loom.ts` alone until 2026-08-17, which was true for
+ * as long as that file was the only one calling `recordEvent`. On the day
+ * `recordEvent` moved to `src/lib/graphEvent.ts` so that `actions/sources.ts`
+ * could record a reading being taken off a shelf, this guard went green
+ * without seeing the new kind at all — the same silent pass its own note
+ * above describes, arriving by a different door.
+ *
+ * So the emitter list is DERIVED: any file importing the recorder is a file
+ * that can emit, and gets read. Adding a third emitter needs no edit here.
+ */
+const emitters = walk(join(root, "src"))
+  .filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"))
+  .map((f) => ({ f, src: readFileSync(f, "utf8") }))
+  .filter(({ src }) => /from\s+"@\/lib\/graphEvent"/.test(src))
+const loom = emitters.map(({ src }) => src).join("\n")
 const history = readFileSync(join(root, "src/components/ui/HistoryPanel.tsx"), "utf8")
+
+assert(
+  emitters.length > 0,
+  `found the files that emit events (${emitters.length})`,
+  "nothing imports @/lib/graphEvent — the recorder moved, and this guard is now reading nothing"
+)
 
 /**
  * The FOLD's cases, not every `case` in the file.

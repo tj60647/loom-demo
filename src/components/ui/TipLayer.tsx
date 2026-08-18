@@ -45,16 +45,37 @@ import { useEffect, useRef } from "react"
 
 const GAP = 7   // control → bubble
 const EDGE = 8  // bubble → viewport
+/**
+ * How long the pointer must rest on a control before its tip appears (TJ,
+ * 2026-08-17).
+ *
+ * With no delay every crossing of a toolbar fired a bubble, so moving from
+ * "Your work" to "Full screen text" — eleven controls in one row — flashed a
+ * run of them at the reader. A tip is for the pointer that STOPPED, and
+ * stopping is the signal we were ignoring.
+ *
+ * It applies to the first tip only. Once one is open, moving along the row
+ * swaps the text immediately: the reader has already declared they are reading
+ * tips, and re-waiting at every neighbour reads as lag rather than restraint.
+ */
+const DELAY = 450
 
 export default function TipLayer() {
   const tipRef = useRef<HTMLDivElement>(null)
   const hostRef = useRef<HTMLElement | null>(null)
+  const timerRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     const tip = tipRef.current
     if (!tip) return
 
+    const cancel = () => {
+      window.clearTimeout(timerRef.current)
+      timerRef.current = undefined
+    }
+
     const hide = () => {
+      cancel()
       hostRef.current = null
       if (tip.matches(":popover-open")) tip.hidePopover()
     }
@@ -92,10 +113,18 @@ export default function TipLayer() {
       const text = host.getAttribute("data-tip")
       if (!text) return
       hostRef.current = host
-      tip.textContent = text
-      if (!tip.matches(":popover-open")) tip.showPopover()
-      // After showPopover, so offsetWidth/Height are real numbers.
-      place()
+      const show = () => {
+        // The pointer may have left, or the control gone, while we waited.
+        if (hostRef.current !== host || !host.isConnected) return
+        tip.textContent = text
+        if (!tip.matches(":popover-open")) tip.showPopover()
+        // After showPopover, so offsetWidth/Height are real numbers.
+        place()
+      }
+      cancel()
+      // Already reading tips: swap now. Otherwise the pointer has to rest.
+      if (tip.matches(":popover-open")) show()
+      else timerRef.current = window.setTimeout(show, DELAY)
     }
 
     const out = (e: PointerEvent) => {
@@ -125,6 +154,7 @@ export default function TipLayer() {
       window.removeEventListener("resize", place)
       document.removeEventListener("pointerdown", hide, true)
       document.removeEventListener("keydown", hide, true)
+      cancel()
     }
   }, [])
 

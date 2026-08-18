@@ -296,7 +296,7 @@ export type GraphEvent = {
   courseId: string | null
   userId: string
   kind: string
-  entityType: "concept" | "passage" | "edge" | "link" | "graph" | "map" | "cloth"
+  entityType: "concept" | "passage" | "edge" | "link" | "graph" | "map" | "cloth" | "reading"
   entityId: string | null
   payload: Record<string, unknown> | null
   at: Date

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { isDeletePost, openReading, openYourWork } from './helpers';
+import { deleteConceptInVocabulary, deletePassageInPassagesView, expectReadingTitle, openReading, openYourWork } from './helpers';
 
 // Runs as Test User A (see playwright/global-setup.ts): the concepts and passages
 // this spec captures belong to the test account, never to a real person's loom.
@@ -22,15 +22,16 @@ test.describe('PDF Viewer and Highlighting', () => {
       // The shelf is the home screen: pick the reading off it, which opens
       // that reading's workbench, and read the text from tab 00 inside it.
       await openReading(page, pdf.cardTitle);
-      // Case-insensitive: shelf titles are the readings' own ("Communities of
-      // practice and social learning systems"), not the test's shorthand.
-      await expect(page.locator('.scopetitle')).toContainText(
-        new RegExp(pdf.expectedText, 'i')
-      );
 
       // Wait for the text layer to render on the first page
       const textLayer = page.locator('.react-pdf__Page__textContent');
       await expect(textLayer.first()).toBeAttached({ timeout: 10000 });
+
+      // Case-insensitive: shelf titles are the readings' own ("Communities of
+      // practice and social learning systems"), not the test's shorthand.
+      // Checked from 02, where the footer that carries the title stands — the
+      // reading station withholds it (helpers.ts).
+      await expectReadingTitle(page, new RegExp(pdf.expectedText, 'i'));
 
       // Go to Page 2 (simulating user turning page)
       await page.getByRole('button', { name: 'Next Page' }).click();
@@ -76,7 +77,7 @@ test.describe('PDF Viewer and Highlighting', () => {
       // Modal appears, save the passage. Exact match: Your work's own concept
       // input starts with the same words and is mounted behind this at all
       // times now — the sheet is parked off-screen, not unmounted.
-      const conceptInput = page.getByPlaceholder('e.g. boundary objects', { exact: true });
+      const conceptInput = page.locator('.info-scrim').getByPlaceholder('e.g. boundary objects', { exact: true });
       await conceptInput.fill(conceptName);
 
       const saveButton = page.locator('button:has-text("Save Passage")');
@@ -99,23 +100,17 @@ test.describe('PDF Viewer and Highlighting', () => {
       // concept, through the same UI a student would use — and await each
       // delete's server-action POST: the optimistic UI clears instantly, and
       // ending the test earlier aborts the queued fetches, leaving residue.
-      await openYourWork(page);
+      await openYourWork(page, 'concepts');
       const row = page
         .locator('#yourwork .lrow', { has: page.locator('.lconcept', { hasText: conceptName }) })
         .first();
       await expect(row).toBeVisible({ timeout: 5000 });
       await row.locator('.lhead').click();
       const passageId = await row.locator('[data-passage-id]').first().getAttribute('data-passage-id');
-      const passageDeleted = page.waitForResponse((r) =>
-        r.request().method() === 'POST' && (r.request().postData() ?? '').includes(passageId!)
-      );
-      await row.getByRole('button', { name: 'remove passage' }).click();
-      await passageDeleted;
-      const conceptDeleted = page.waitForResponse((r) => isDeletePost(r.request()));
-      await row.getByRole('button', { name: 'remove concept' }).click();
-      await page.getByRole('button', { name: 'Delete concept' }).click();
-      await conceptDeleted;
-      await expect(page.locator('.lconcept', { hasText: conceptName })).toHaveCount(0, { timeout: 5000 });
+      // The passage goes from the PASSAGES view — the concept view only unfiles.
+      await deletePassageInPassagesView(page, passageId!);
+      // 04 is the only station that deletes a concept since 2026-08-17.
+      await deleteConceptInVocabulary(page, conceptName);
     });
   }
 
@@ -126,7 +121,7 @@ test.describe('PDF Viewer and Highlighting', () => {
     await openReading(page, 'Object Worlds');
     const stage = page.locator('.pdf-stage');
     const before = await stage.boundingBox();
-    await openYourWork(page);
+    await openYourWork(page, 'concepts');
     // The whole point: the stage keeps its box, so nothing re-fits, nothing
     // re-rasterises, and the words do not move under a selection in progress.
     expect((await stage.boundingBox())?.width).toBe(before?.width);
@@ -134,12 +129,54 @@ test.describe('PDF Viewer and Highlighting', () => {
 
   test('Escape sends Your work back and hands focus to its button', async ({ page }) => {
     await openReading(page, 'Object Worlds');
-    await openYourWork(page);
+    await openYourWork(page, 'concepts');
     await page.keyboard.press('Escape');
     // toBeHidden is honest here only because the sheet goes visibility:hidden
     // at the end of the slide — a transform alone would still read as visible.
     await expect(page.locator('#yourwork')).toBeHidden({ timeout: 5000 });
     await expect(page.locator('#yourwork-toggle')).toHaveAttribute('aria-expanded', 'false');
     await expect(page.locator('#yourwork-toggle')).toBeFocused();
+  });
+
+  /**
+   * A passage is ONE tab stop, however many fragments it is drawn in.
+   *
+   * mark.js wraps a <mark> per text-layer span a passage crosses, and the
+   * seeded readings run 3–23 fragments per passage. Every fragment used to
+   * carry tabindex="0" and the same aria-label, so a keyboard user crossing
+   * one highlighted sentence stopped on it up to 23 times and heard the
+   * identical citation each time.
+   *
+   * This is asserted rather than eyeballed because it is invisible: the marks
+   * butt together at 0px, so nothing on screen shows that a passage is drawn
+   * in twenty-three pieces. It regressed silently once and would again.
+   */
+  test('a passage is one tab stop, however many fragments it is drawn in', async ({ page }) => {
+    await openReading(page, 'Object Worlds');
+    await expect(page.locator('.loom-passage-highlight').first()).toBeVisible({ timeout: 15000 });
+
+    const byPassage = await page.evaluate(() => {
+      const rows: Record<string, { marks: number; tabStops: number; labelled: number }> = {};
+      for (const m of Array.from(document.querySelectorAll('.loom-passage-highlight'))) {
+        const id = m.getAttribute('data-loom-passage-id') ?? '?';
+        const row = (rows[id] ||= { marks: 0, tabStops: 0, labelled: 0 });
+        row.marks++;
+        if (m.getAttribute('tabindex') === '0') row.tabStops++;
+        if (m.getAttribute('aria-label')) row.labelled++;
+      }
+      return rows;
+    });
+
+    const rows = Object.values(byPassage);
+    expect(rows.length).toBeGreaterThan(0);
+    // Guard the guard: if a future change stopped fragmenting passages, the
+    // assertions below would pass for the wrong reason and stop testing this.
+    expect(rows.some((r) => r.marks > 1)).toBe(true);
+    // Every fragment keeps the anchor — the rails resolve their cards off it.
+    expect(Object.keys(byPassage)).not.toContain('?');
+    for (const row of rows) {
+      expect(row.tabStops).toBe(1);
+      expect(row.labelled).toBe(1);
+    }
   });
 });

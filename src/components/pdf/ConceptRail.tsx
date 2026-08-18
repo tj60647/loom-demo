@@ -53,12 +53,107 @@ type CardModel = {
  * pages inside keep their identity when the rails toggle; the rails, cards
  * and leader lines appear as siblings around the children.
  */
+
+/**
+ * What a margin card SAYS — its concepts and its note — with no opinion about
+ * where it sits.
+ *
+ * Shared because there are two rails: this one, beside a spread in page mode,
+ * and SpreadCanvasView's, which draws the same cards over the whole reading at
+ * any zoom. They held two copies of the markup and the canvas one was still
+ * showing a concept label and a gloss hours after this one stopped. One body,
+ * two hosts: the host owns position, scale and the leader; the body owns what
+ * is written on the card.
+ */
+export function RailCardBody({
+  passage,
+  concepts,
+  onOpenPassage,
+  onOpenConcept,
+  onUnfile,
+  readOnly = false,
+}: {
+  passage: Passage;
+  concepts: Concept[];
+  onOpenPassage?: (passageId: string) => void;
+  onOpenConcept?: (conceptId: string) => void;
+  onUnfile?: (passageId: string, conceptId: string) => void;
+  /**
+   * No × and no + — the card is only a way IN (TJ, 2026-08-17: "i think that
+   * zoomed out editing these things is a bad idea").
+   *
+   * The canvas sets it. Its cards are drawn over the whole reading at any
+   * zoom, and at fit-all you are reading a concept map: the controls are
+   * counter-scaled dots over a page thumbnail, and an unfile is one mis-click
+   * from a pan. Unconditional rather than below some zoom, because a control
+   * that appears at one magnification and not another is a control nobody
+   * learns — and every act it offers is a click away in the panel, which is
+   * where the badges and the note already lead.
+   */
+  readOnly?: boolean;
+}) {
+  return (
+    <>
+      <div className="pdf-railcard-badges">
+        {concepts.map((concept) => (
+          <span key={concept.id} className="pdf-railcard-chip">
+            <button
+              type="button"
+              className="pdf-chip-open"
+              onClick={() => onOpenConcept?.(concept.id)}
+              title={`Open “${concept.label}” in your work`}
+            >{concept.label}</button>
+            {!readOnly && (
+              <button
+                type="button"
+                className="pchip-x"
+                onClick={() => onUnfile?.(passage.id, concept.id)}
+                aria-label={`Remove ${concept.label} from this passage`}
+                title={`Remove “${concept.label}” from this passage. The passage stays.`}
+              >×</button>
+            )}
+          </span>
+        ))}
+        {/* Click-through, not an inline field: cards are CSS-scaled when a
+            side crowds, so a field in here would loop — typing grows the card,
+            height changes the scale, and the scale moves every card on the
+            side including the one under the cursor. */}
+        {!readOnly && (
+          <button
+            type="button"
+            className="pdf-railcard-add"
+            onClick={() => onOpenPassage?.(passage.id)}
+            aria-label="Add a concept to this passage"
+            title="Add a concept to this passage"
+          >+</button>
+        )}
+      </div>
+      {/* An invitation you cannot take is not an invitation (TJ, 2026-08-17:
+          "if no note then hide add a passage"). While the card is read-only the
+          empty state says "add a passage note" over a control that will not
+          add one — so with nothing written, nothing is drawn. */}
+      {(passage.note || !readOnly) && (
+      <button
+        type="button"
+        className={`pdf-railcard-note${passage.note ? "" : " empty"}`}
+        onClick={() => onOpenPassage?.(passage.id)}
+        title={passage.note ? "Open this passage in your work" : "Write a note on this passage"}
+      >
+        {passage.note ? short(passage.note, 140) : "add a passage note"}
+      </button>
+      )}
+    </>
+  );
+}
+
 export default function ConceptRails({
   enabled,
   twoPage,
   passages,
   concepts,
   onOpenPassage,
+  onOpenConcept,
+  onUnfile,
   children,
 }: {
   enabled: boolean;
@@ -66,6 +161,12 @@ export default function ConceptRails({
   passages: Passage[];
   concepts: Concept[];
   onOpenPassage?: (passageId: string) => void;
+  /** Open Your work at a concept — the badge's destination. */
+  onOpenConcept?: (conceptId: string) => void;
+  /** Take one concept off this passage, in place. The only act the card does
+   *  itself: it changes nothing about the card's height, so it cannot start
+   *  the scale-reflow loop that keeps editing out of here. */
+  onUnfile?: (passageId: string, conceptId: string) => void;
   children: React.ReactNode;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -238,10 +339,30 @@ export default function ConceptRails({
         .map((c) => {
           const id = c.passage.id;
           const s = placement.scales[side];
-          const first = c.concepts[0];
-          const chips = c.concepts.slice(1);
-          const name = first ? first.label : "Unlabeled passage";
+          // No `first`/`chips` split any more: the card shows every concept
+          // as a badge of equal weight. Promoting concepts[0] to a heading was
+          // the asymmetry the passage view was built to stop — earliest-filed
+          // is not most important, and the model has them as equals.
           return (
+            /**
+             * THE CARD IS ITS CONCEPTS AND ITS NOTE (TJ, 2026-08-17) — the
+             * passage card without the passage, because the leader line to the
+             * highlight IS the passage. It carried a concept label, that
+             * concept's gloss, and nothing of the student's own.
+             *
+             * NOTHING IS EDITED IN HERE, deliberately, and not for want of a
+             * write path — `editPassageNote` exists now. Cards are CSS-scaled
+             * when a side crowds (`railScale` above), so a field in here would
+             * loop: typing grows the card, the height changes the scale, and
+             * the scale moves every card on the side including the one under
+             * the cursor. Each control opens the panel at the right place
+             * instead, where the same edit is a normal field.
+             *
+             * So the card is no longer one door but three, and is therefore no
+             * longer a `role="button"` with controls inside it — that was a
+             * control within a control. The badges, the +, and the note are
+             * each their own target.
+             */
             <div
               key={id}
               ref={(el) => registerCard(id, el)}
@@ -253,28 +374,14 @@ export default function ConceptRails({
                 // line arrives.
                 transformOrigin: side === "left" ? "top right" : "top left",
               }}
-              role="button"
-              tabIndex={0}
-              aria-label={`Open ${name} in your work`}
-              onClick={() => onOpenPassage?.(id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onOpenPassage?.(id);
-                }
-              }}
             >
-              <div className={`pdf-railcard-label${first ? "" : " unlabeled"}`}>{name}</div>
-              {chips.length > 0 && (
-                <div className="pdf-railcard-chips">
-                  {chips.map((chip) => (
-                    <span key={chip.id} className="pdf-railcard-chip">{chip.label}</span>
-                  ))}
-                </div>
-              )}
-              {first?.def ? <div className="pdf-railcard-def">{short(first.def, 140)}</div> : null}
-              {!first && <div className="pdf-railcard-def">{short(c.passage.content, 110)}</div>}
-              {c.passage.note ? <div className="pdf-railcard-note">{short(c.passage.note, 110)}</div> : null}
+              <RailCardBody
+                passage={c.passage}
+                concepts={c.concepts}
+                onOpenPassage={onOpenPassage}
+                onOpenConcept={onOpenConcept}
+                onUnfile={onUnfile}
+              />
             </div>
           );
         })}

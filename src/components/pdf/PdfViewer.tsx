@@ -9,6 +9,7 @@ import { type PdfDoc } from './PageRaster';
 import SpreadCanvasView from './SpreadCanvasView';
 import ConceptRails, { RAIL_W } from './ConceptRail';
 import ReuseOffer from '@/components/ui/ReuseOffer';
+import FullscreenIcon from '@/components/ui/FullscreenIcon';
 import { useLoom } from '@/components/providers/LoomProvider';
 import { useReadings } from '@/components/providers/ReadingsProvider';
 import { searchReading, getPassagesOverlay, getReadingPageManifest } from '@/lib/reads';
@@ -49,6 +50,8 @@ interface PdfViewerProps {
       query into the text it matched. */
   initialSearch?: string;
   onGotoOpenPassage?: (passageId: string) => void;
+  /** Open Your work at a concept — a margin badge's destination. */
+  onGotoOpenConcept?: (conceptId: string) => void;
   /**
    * The page the reader is looking at, as it changes. Capture-by-hand offers
    * it as the location so nobody retypes a page number the viewer already
@@ -79,8 +82,9 @@ type HighlightEntry = {
   endOffset: number | null;
 };
 
-export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
-  const { state, scoped } = useLoom();
+export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
+  onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
+  const { state, scoped, unfilePassage } = useLoom();
   // Drawn only for faculty and admins. Not a guard — `overlayViewer()` re-checks
   // on the server, so a student who forces the request gets an empty overlay.
   const readings = useReadings();
@@ -122,9 +126,54 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * the open spread drawn as a card beside its page. Off by default and not
    * persisted — the same standing as viewMode itself.
    */
-  const [railsOn, setRailsOn] = useState(false);
+  // The rails stand permanently (TJ, 2026-08-17). The Cards toggle is gone:
+  // a control that hides the margin is a control that hides where the work
+  // is. Kept as a name rather than inlined `true` so the three places that
+  // ask "are the margins showing?" still read as one decision.
+  const railsOn = true;
   // Covers the whole window, chrome included — the reading takes the screen.
   const [isFullscreen, setIsFullscreen] = useState(false);
+  /**
+   * Enter or leave full screen — both halves of it, together.
+   *
+   * `.pdf-shell.fullscreen` hides LOOM's chrome; the Fullscreen API hides the
+   * BROWSER's. Either alone leaves a bar of something else around the text,
+   * which is why this used to be two buttons in two places.
+   *
+   * The request goes to `documentElement`, not to the shell. Fullscreening
+   * the shell would stop rendering everything outside it — including the
+   * practice guide's mask and rungs, which sit at z-index 6100–6103
+   * deliberately above this mode (globals.css) and which
+   * `check-practice-guide.ts` guards. Rooting it keeps that stack intact and
+   * lets the existing CSS do the chrome-hiding it already does.
+   *
+   * The in-app half is set first and unconditionally: a browser that refuses
+   * the request — a policy, a gesture it did not count — should still give
+   * the reader the larger text, which is the part that matters here.
+   */
+  const setFullscreen = useCallback(async (next: boolean) => {
+    setIsFullscreen(next);
+    try {
+      if (next) {
+        if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Not worth a dialog: the button simply does not carry the browser with it.
+    }
+  }, []);
+  /**
+   * Esc and F11 leave the browser's fullscreen without telling us. Without
+   * this the shell would stay `position:fixed; inset:0` over a window that is
+   * no longer full, and the only way out would be a button the chrome is
+   * covering.
+   */
+  useEffect(() => {
+    const onChange = () => { if (!document.fullscreenElement) setIsFullscreen(false); };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
   // Matrix zoom, as a multiple of the whole-canvas fit: 1 = every spread in
   // view. The − / + buttons and the canvas's own wheel/pinch drive the SAME
   // transform — SpreadCanvasView syncs this back when a gesture settles.
@@ -592,6 +641,28 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
           const startPageNode = pageOf(range.startContainer);
           const endPageNode = pageOf(range.endContainer);
+
+          /**
+           * ONLY THE READING OFFERS A CAPTURE (TJ, 2026-08-17: "only text from
+           * the reading should trigger the capture as passage. not text from
+           * the ui").
+           *
+           * This listens on `document`, so any selection anywhere raised the
+           * button — dragging across the teaching copy in Your work, a heading,
+           * a log row — and offered to capture Loom's own words as a passage of
+           * the text. It would have stored them too: the content is whatever
+           * was selected, and with no page to anchor to it went down the fuzzy
+           * path and simply never matched anything on the page.
+           *
+           * Neither boundary inside a `.react-pdf__Page` means the selection is
+           * not in the reading. Either boundary is enough: a drag that begins
+           * on a page caption and ends in the text is a real capture, and the
+           * cross-page case below already handles the rest.
+           */
+          if (!startPageNode && !endPageNode) {
+            setHighlightRect(null);
+            return;
+          }
           /**
            * The anchor is not always inside a page. In the matrix the page
            * caption sits between one page and the next, so a drag begun on it
@@ -869,6 +940,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     onGotoOpenPassage?.(passageId);
   }, [searchOpen, closeSearch, onGotoOpenPassage]);
 
+  /** The badge's destination: Your work, at that concept. Same courtesy. */
+  const gotoOpenConcept = useCallback((conceptId: string) => {
+    if (searchOpen) closeSearch();
+    onGotoOpenConcept?.(conceptId);
+  }, [searchOpen, closeSearch, onGotoOpenConcept]);
+
   /**
    * Every way of opening or closing Your work goes through here: the toolbar
    * button, the ✕ in its head bar, and Escape. Two things have to happen on
@@ -965,7 +1042,33 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     const applyHighlights = (only?: Iterable<Element>) => {
       const passages = passagesRef.current;
       const heatPages = overlayRef.current?.pages ?? [];
-      if (passages.length === 0 && searchTermsRef.current.length === 0 && heatPages.length === 0) return;
+      /**
+       * Nothing to mark is not nothing to DO: the unmark below lives inside
+       * the loop, so returning here also skipped clearing whatever is already
+       * on the page. Turning the passages overlay off left its 16 shaded spans
+       * exactly where they were, for any reader with no passages of their own
+       * in the reading — which is precisely the faculty viewer the overlay
+       * exists for.
+       *
+       * The early return is still right for the case it was written for
+       * (2026-08-15): the matrix mounts every page, the observer fires once
+       * per landing text layer, and re-marking all of them each time was
+       * O(pages²) across the load. That case always passes `only` — a NEW
+       * layer, which by definition has no marks to clear. A sweep with no
+       * `only` is a STATE change, and a state change that removes the last
+       * mark is the one pass that must not be skipped.
+       */
+      if (passages.length === 0 && searchTermsRef.current.length === 0 && heatPages.length === 0) {
+        if (only) return;
+        Array.from(containerRef.current!.querySelectorAll('.react-pdf__Page__textContent'))
+          .forEach((layer) => {
+            const sweep = new Mark(layer as HTMLElement);
+            for (const cls of ["loom-passage-highlight", "loom-overlay-heat", "loom-search-hit"]) {
+              sweep.unmark({ className: cls });
+            }
+          });
+        return;
+      }
 
       const textLayers = only
         ? Array.from(only)
@@ -1028,6 +1131,43 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 passage.pageContentHash == null || passage.pageContentHash === liveHash
               );
 
+              /**
+               * ONE TAB STOP PER PASSAGE, not one per fragment.
+               *
+               * mark.js wraps a <mark> around each text-layer span the passage
+               * crosses, and a passage crosses a lot of them: surveyed on the
+               * seeded readings, 10 passages produced 106 marks — 3 at the
+               * mildest, 23 at the worst. Every one of them used to carry
+               * `tabindex="0"` and the SAME `aria-label`, so a keyboard user
+               * crossing one highlighted sentence stopped on it up to 23 times
+               * and heard the identical citation each time. Chromium's a11y
+               * tree confirms these are live nodes (role=mark, not ignored,
+               * focusable) — so this was the dominant experience of the
+               * feature, not a theoretical one.
+               *
+               * mark.js walks the DOM forward and this call is scoped to ONE
+               * passage, so the first node it hands us is the visually first:
+               * that one is the door, and it alone is named and focusable.
+               */
+              const concept = state.concepts.find((c) => c.id === passage.conceptIds[0]);
+              const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
+              let isEntryPoint = true;
+              const dressMark = (node: HTMLElement) => {
+                // EVERY fragment gets these two. The rails resolve their cards
+                // off `data-loom-passage-id` (ConceptRail, SpreadCanvasView),
+                // and the tooltip has to open from wherever the pointer
+                // actually is — hovering the fifth line of a passage is not a
+                // different intention from hovering the first.
+                bindHighlightNode(node, passage.id);
+                if (!isEntryPoint) return;
+                isEntryPoint = false;
+                // The first fragment alone is named and reachable. A later one
+                // keeping the label would make a browse-mode reader announce
+                // the whole citation again in the middle of the sentence.
+                node.setAttribute("aria-label", a11y);
+                node.setAttribute("tabindex", "0");
+              };
+
               if (offsetsTrusted) {
                 // Precision mode!
                 instance.markRanges([{
@@ -1035,13 +1175,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   length: passage.endOffset! - passage.startOffset!
                 }], {
                   className: "loom-passage-highlight",
-                  each: (node) => {
-                    const concept = state.concepts.find((c) => c.id === passage.conceptIds[0]);
-                    const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
-                    (node as HTMLElement).setAttribute("aria-label", a11y);
-                    (node as HTMLElement).setAttribute("tabindex", "0");
-                    bindHighlightNode(node as HTMLElement, passage.id);
-                  },
+                  each: (node) => dressMark(node as HTMLElement),
                   done: (count) => matches += count
                 });
               } else {
@@ -1057,13 +1191,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   diacritics: true,
                   ignoreJoiners: true,
                   ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
-                  each: (node) => {
-                    const concept = state.concepts.find((c) => c.id === passage.conceptIds[0]);
-                    const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
-                    (node as HTMLElement).setAttribute("aria-label", a11y);
-                    (node as HTMLElement).setAttribute("tabindex", "0");
-                    bindHighlightNode(node as HTMLElement, passage.id);
-                  },
+                  each: (node) => dressMark(node as HTMLElement),
                   done: (count) => matches += count
                 });
               }
@@ -1260,12 +1388,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         if (highlightTooltip) hideHighlightTooltip();
         else if (searchOpen) closeSearch();
         else if (workOpen) requestToggleWork();
-        else if (isFullscreen) setIsFullscreen(false);
+        else if (isFullscreen) setFullscreen(false);
         return;
       }
 
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        setIsFullscreen((on) => !on);
+        setFullscreen(!isFullscreen);
         return;
       }
 
@@ -1281,7 +1409,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal, viewMode, isFullscreen, highlightTooltip, searchOpen, closeSearch, workOpen, requestToggleWork]);
+  }, [canGoPrev, canGoNext, handlePrev, handleNext, hideHighlightTooltip, showCaptureModal, viewMode, isFullscreen, setFullscreen, highlightTooltip, searchOpen, closeSearch, workOpen, requestToggleWork]);
 
   /**
    * Your work is not a dialog: the reading stays live and selectable behind
@@ -1768,10 +1896,25 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         /* Counter-scaling: card text never shrinks below its reading size as
            the canvas zooms out. Done via font-size — real layout, not a
            transform — so the card grows to hold it and the rail re-stacks. */
-        .pdf-spread-canvas .pdf-railcard-label { font-size: calc(13px * var(--invk, 1)); }
-        .pdf-spread-canvas .pdf-railcard-def { font-size: calc(12px * var(--invk, 1)); }
+        /* COUNTER-SCALE, the canvas's own rule: the whole surface is
+           transformed, so anything meant to stay readable while you zoom out
+           has to grow by the inverse (--invk). The card's parts all carry it —
+           the badges and the note now, where the label and gloss used to.
+           Missing one is how a control ends up a two-pixel dot at fit-all.
+           (No backticks in this block: styled-jsx template literal.) */
         .pdf-spread-canvas .pdf-railcard-note { font-size: calc(11px * var(--invk, 1)); }
         .pdf-spread-canvas .pdf-railcard-chip { font-size: calc(10px * var(--invk, 1)); }
+        .pdf-spread-canvas .pdf-railcard-add {
+          width: calc(18px * var(--invk, 1));
+          height: calc(18px * var(--invk, 1));
+          font-size: calc(12px * var(--invk, 1));
+        }
+        .pdf-spread-canvas .pchip-x { font-size: calc(12px * var(--invk, 1)); }
+        .pdf-spread-canvas .pdf-railcard-badges { gap: calc(4px * var(--invk, 1)); }
+        /* Space-pan turns the whole canvas into a drag surface. The card's
+           controls would otherwise take the press and start an unfile instead
+           of a pan — the cursor already says grab, and this makes it true. */
+        .pdf-spread-viewport.space-pan .pdf-railcard button { pointer-events: none; }
         /* The matrix raster path: our canvas below, react-pdf's text layer
            laid absolutely over it — the Page div itself paints nothing. The
            scale wrapper clips to the slot's zoomed footprint so the transform
@@ -1836,15 +1979,21 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           border-radius: 2px;
           pointer-events: none;
         }
-        .pdf-modes { display: flex; background: var(--paper); border-radius: 4px; padding: 2px; border: 1px solid var(--rule); }
+        .pdf-modes { display: flex; background: var(--paper); border-radius: 4px; padding: 1px; border: 1px solid var(--rule); }
         .pdf-modes button { border: none; margin: 0; padding: 4px 9px; }
+        /* The floor this used to release is gone: .btn.mini carries no
+           min-height since 2026-08-17, so a scoped override here would only
+           shave a pixel of padding — and it outranked .btn.iconly, which
+           turned the square full-screen button into a 34px box and put 7px
+           back on the row it had been removed from.
+           (No backticks in this block: styled-jsx template literal.) */
         .pdf-toolbar {
           display: flex;
           flex-wrap: wrap;
           justify-content: space-between;
           align-items: center;
           gap: 10px;
-          padding: 10px 20px;
+          padding: 4px 20px;
           border-bottom: 1px solid var(--rule);
           background-color: var(--paper-2);
           box-shadow: 0 2px 10px rgba(0,0,0,0.05);
@@ -1915,6 +2064,47 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         .pdf-railcard:hover, .pdf-railcard:focus-visible {
           border-color: var(--ink-soft);
         }
+        /* The card is badges and a note now (TJ, 2026-08-17), so its old
+           label/def rules are gone with the markup that used them.
+           (No backticks in this block: styled-jsx template literal.) */
+        .pdf-railcard-badges { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+        /* A badge is one line. On the canvas the type is counter-scaled, so a
+           long label wrapped INSIDE its own pill and dropped the × onto a
+           second row — a remove control floating under the word it removes.
+           The label truncates instead; the row still wraps between badges. */
+        /* min-width:0 is what actually lets it shrink: a flex item refuses to
+           go below its content width without it, so max-width alone left the
+           badge — and its × — hanging off the card's edge. */
+        .pdf-railcard-chip { white-space: nowrap; max-width: 100%; min-width: 0; }
+        .pdf-chip-open {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
+        }
+        .pdf-chip-open {
+          background: none; border: none; padding: 0; cursor: pointer;
+          font: inherit; color: inherit; letter-spacing: inherit;
+        }
+        /* A hover, not an underline (TJ, 2026-08-17): underline reads as a
+           link inside a pill that is already a control, and it moved the
+           baseline by a hair on every hover. The badge lifts instead. */
+        .pdf-railcard-chip:has(.pdf-chip-open:hover) { background: var(--paper-2); border-color: var(--ink-soft); }
+        .pdf-chip-open:hover { color: var(--ink); }
+        .pdf-railcard-add {
+          background: none; border: 1px dashed var(--rule); border-radius: 999px;
+          width: 18px; height: 18px; line-height: 1; padding: 0; cursor: pointer;
+          color: var(--ink-soft); font-family: var(--mono); font-size: 12px;
+        }
+        .pdf-railcard-add:hover { border-color: var(--ink); color: var(--ink); }
+        .pdf-railcard-note {
+          display: block; width: 100%; margin-top: 6px; padding: 4px 5px;
+          background: none; border: none; border-radius: 3px; cursor: pointer;
+          text-align: left; font-family: var(--body); font-size: 11.5px;
+          line-height: 1.4; color: var(--ink-soft); font-style: italic;
+        }
+        .pdf-railcard-note:hover { background: var(--paper-2); color: var(--ink); }
+        .pdf-railcard-note.empty { color: var(--dot); }
         .pdf-railcard-label { font-weight: 600; font-size: 13px; }
         .pdf-railcard-label.unlabeled {
           font-style: italic;
@@ -1922,7 +2112,25 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           color: var(--ink-soft);
         }
         .pdf-railcard-def { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
-        .pdf-railcard-note { font-size: 11px; font-style: italic; color: var(--ink-soft); margin-top: 4px; }
+        /* .pdf-railcard-note is gone from the margin (TJ, 2026-08-17): the
+           note is the student's writing about the PASSAGE and this card is
+           about the CONCEPT. It is getting a card of its own here later.
+           The rule stays until then only if something still draws it — it does
+           not, so it goes with the markup. */
+        /* The corner mark: this card leads somewhere. Decorative — the card
+           itself is the button — so it is quiet, and it lifts with the card.
+           (No backticks in this block: styled-jsx template literal.) */
+        .pdf-railcard-go {
+          position: absolute;
+          top: 6px;
+          right: 8px;
+          font-family: var(--mono);
+          font-size: 13px;
+          line-height: 1;
+          color: var(--dot);
+          transition: color .12s ease;
+        }
+        .pdf-railcard:hover .pdf-railcard-go { color: var(--ink-soft); }
         .pdf-railcard-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .pdf-railcard-chip {
           font-family: var(--mono);
@@ -2009,23 +2217,38 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
           {/* How the pages are laid out. Three ways of holding the same text:
               one spread, one long run, or the whole thing at once. */}
+          {/* One control, three states (TJ, 2026-08-17). This used to be a
+              Page/Matrix pair PLUS a separate "2-Page Spread" checkbox, so
+              choosing a spread meant combining two controls in your head.
+              The three ways of holding the text are three buttons; the state
+              underneath is unchanged (viewMode + isTwoPage).
+
+              "Canvas", not "Matrix", in the label only: state, CSS, the render
+              branch and matrix-zoom.spec.ts keep the July name per AGENTS.md.
+              "Matrix" named the grid the view draws; "Canvas" names what you
+              do on it, which is what the student is choosing between.
+
+              Strip stays HIDDEN, not deleted (TJ, 2026-08-10) — no button,
+              but the render branch and CSS remain. */}
           <div className="pdf-modes" role="group" aria-label="Page layout">
             <button
-              className={`btn mini ${viewMode === "page" ? "" : "ghost"}`}
-              onClick={() => setViewMode("page")}
-              data-tip="one spread at a time"
-              aria-pressed={viewMode === "page"}
-            >Page</button>
-            {/* Strip is HIDDEN, not deleted (TJ, 2026-08-10: "the new view
-                supercedes it") — the matrix canvas is the continuous view
-                now, and page mode holds the phone. The render branch and CSS
-                stay, so restoring the button restores the mode. */}
+              className={`btn mini ${viewMode === "page" && !isTwoPage ? "" : "ghost"}`}
+              onClick={() => { setViewMode("page"); setIsTwoPage(false); }}
+              data-tip="one page at a time"
+              aria-pressed={viewMode === "page" && !isTwoPage}
+            >1 page</button>
+            <button
+              className={`btn mini ${viewMode === "page" && isTwoPage ? "" : "ghost"}`}
+              onClick={() => { setViewMode("page"); setIsTwoPage(true); }}
+              data-tip="facing pages, the way the book opens"
+              aria-pressed={viewMode === "page" && isTwoPage}
+            >2 pages</button>
             <button
               className={`btn mini ${viewMode === "matrix" ? "" : "ghost"}`}
               onClick={() => setViewMode("matrix")}
               data-tip="the whole reading at once — zoom in on any page; hold space to pan from anywhere"
               aria-pressed={viewMode === "matrix"}
-            >Matrix</button>
+            >Canvas</button>
           </div>
 
           {viewMode === "page" && (
@@ -2101,31 +2324,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </div>
           )}
 
-          {viewMode === "page" && !isNarrow && (
-            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }} className="label">
-              <input
-                type="checkbox"
-                checked={isTwoPage}
-                onChange={(e) => setIsTwoPage(e.target.checked)}
-              />
-              2-Page Spread
-            </label>
-          )}
-
-          {/* The margin cards. A display toggle, not a mode: the pages, the
-              capture flow and the keyboard are exactly the host view's. In
-              page mode they flank the open spread; in the matrix they flank
-              every spread and counter-scale, so zooming out reads as a
-              concept map. */}
-          {(viewMode === "page" || viewMode === "matrix") && !isNarrow && (
-            <button
-              className={`btn mini ${railsOn ? "" : "ghost"}`}
-              onClick={() => setRailsOn((on) => !on)}
-              aria-pressed={railsOn}
-              aria-label="Cards in the margin"
-              data-tip="your concepts beside the passages they came from"
-            >Cards</button>
-          )}
+          {/* The "2-Page Spread" checkbox and the "Cards" toggle both stood
+              here. The first is now the middle state of the layout group
+              above; the second is gone because the rails stand permanently. */}
 
           {/* Overlay (ruling 28) — a read-only comparison with a discussion
               section or the whole cohort. **Faculty and admins only** (TJ,
@@ -2172,28 +2373,83 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 if (workOpen) onToggleWork();
                 setSearchOpen(true);
               }}
-              data-tip="find a word or phrase in this reading"
+              // "In the text", not "Search" (TJ, 2026-08-17). The journey bar
+              // carries a search too, and until now both were named for the
+              // reading — this one "Search this reading", that one "⌕ this
+              // reading" — while covering different things: these are the
+              // PDF's own words, that is the whole record of the reading
+              // (pages, cloth, projections, concepts, links, passages). Their
+              // coverage overlaps on the pages, so neither name helped anyone
+              // choose. The repo had already noticed sideways: concept-rail's
+              // spec has to scope its selector to `.pdf-toolbar` because the
+              // two buttons answered the same name. Each says its own subject
+              // now, and neither needs the other to make sense.
+              // Same shape as the journey bar's tip (TJ, 2026-08-17): the
+              // verb first, then what it reaches. "find a word or phrase on
+              // these pages" said what any magnifier says; this says which
+              // pages, and what you get back — the two things that tell you
+              // whether to press this one or "your cloth" beside it.
+              data-tip="search the text — every page of this reading, marked where it appears"
               aria-pressed={searchOpen}
-              aria-label="Search this reading"
+              aria-label="Search the text of this reading"
             >
-              {isNarrow ? "⌕" : "⌕ Search"}
+              {isNarrow ? "⌕" : "⌕ In the text"}
             </button>
           )}
 
-          {/* "Just the text", not "full screen" (TJ, 2026-08-12). This has
-              never been the browser's fullscreen — it is an in-app mode:
-              `.pdf-shell.fullscreen` covers Loom's own chrome so the reading
-              fills the window, and Your work still slides over it. The header
-              now carries the REAL full screen, on every page, so this one had
-              to say what it actually does. Same key (f), same Escape. */}
+          {/* Download PDF, rehomed from the scope bar when that band went
+              (TJ, 2026-08-17). It belongs beside the text it downloads more
+              than it belonged in a strip above the journey — and it is only
+              ever drawn where there is a file, which is the one condition the
+              old band had to spell out ("your own card — no pdf here").
+
+              An <a download>, not a button: the route sets the disposition,
+              and a link is the thing a browser already knows how to resume,
+              copy and open in a new tab. `.btn.mini` so it sits in the row as
+              a peer of its neighbours rather than as prose wearing a border. */}
+          {sourceId && (
+            <a
+              className="btn ghost mini"
+              href={`/api/readings/${sourceId}?download=1`}
+              data-tip="the original file, as it was uploaded"
+              // The visible label is a glyph and two letters, so the
+              // accessible name has to be the whole act — "down arrow PDF" is
+              // what a screen reader made of it otherwise. library-verify
+              // looks for this name too, and was right to.
+              aria-label="Download PDF"
+            >
+              {isNarrow ? "↓" : "↓ PDF"}
+            </a>
+          )}
+
+          {/* Full screen — one control, the whole screen (TJ, 2026-08-17),
+              superseding "Just the text" (TJ, 2026-08-12).
+
+              It used to be an in-app mode ONLY: `.pdf-shell.fullscreen` hid
+              Loom's chrome but left the browser's tab strip and URL bar, so
+              getting the text onto the actual screen took this button AND the
+              header's. Two controls for one intention, and the name had to
+              apologise for it. Now this one does both — the in-app mode plus
+              the browser's Fullscreen API — which is what a document viewer
+              is expected to do, and what makes the name honest.
+
+              "Full screen text", not "Full screen": the header carries "full
+              screen app", which gives LOOM the screen and keeps the journey
+              bar. This one gives the TEXT the screen and takes Loom's chrome
+              with it. Only one of the two is ever visible at a time — this
+              mode covers the header — so the exit label needs no qualifier. */}
           <button
-            className="btn ghost mini"
-            onClick={() => setIsFullscreen((on) => !on)}
-            data-tip={isFullscreen ? "back to the journey (esc)" : "hide Loom's chrome — the reading fills the window (f)"}
+            className="btn ghost mini iconly"
+            onClick={() => setFullscreen(!isFullscreen)}
+            data-tip={isFullscreen ? "back to the journey (esc)" : "the text fills the screen (f)"}
             aria-pressed={isFullscreen}
-            aria-label={isFullscreen ? "Show the journey" : "Just the text"}
+            // Icon only (TJ, 2026-08-17), so the words live here and in the
+            // tip. The header's control wears the same glyph and means the
+            // app rather than the text — they never share a screen, because
+            // the reading station is exactly where the header stands down.
+            aria-label={isFullscreen ? "Exit full screen" : "Full screen — the text fills the screen"}
           >
-            {isFullscreen ? (isNarrow ? "↙" : "↙ Show the journey") : (isNarrow ? "⛶" : "⛶ Just the text")}
+            <FullscreenIcon exit={isFullscreen} />
           </button>
         </div>
       </div>
@@ -2352,6 +2608,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 passages={scoped.passages}
                 concepts={state.concepts}
                 onOpenPassage={gotoOpenPassage}
+                onOpenConcept={gotoOpenConcept}
+                onUnfile={unfilePassage}
               >
                 <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
                   {/* The same slot the matrix reads through, at native tier:
@@ -2449,6 +2707,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               passages={scoped.passages}
               concepts={state.concepts}
               onOpenPassage={gotoOpenPassage}
+              onOpenConcept={gotoOpenConcept}
+              onUnfile={unfilePassage}
               onAspect={acceptAspect}
               manifest={manifest}
               pageImageBase={pageImageBase}

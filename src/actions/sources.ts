@@ -13,11 +13,12 @@ import {
   sourceScores,
   users,
 } from "@/db/schema"
-import { and, asc, count, eq, inArray, isNull } from "drizzle-orm"
+import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { after } from "next/server"
 import { authOptions, isAdminUser } from "@/lib/auth"
 import { readingStorage } from "@/lib/storage"
+import { recordEvent } from "@/lib/graphEvent"
 import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
 import { renderSourcePageImages } from "@/lib/pdfPages"
 import { extractPdfPageText, textLayerProjection } from "@/lib/pdfText"
@@ -265,12 +266,23 @@ export async function getSources(courseIdRaw?: string | null) {
   const courseIds = new Set(rows.map((row) => row.source.id))
 
   return [
-    ...rows.map((row) => ({ ...row.source, isVisible: row.link.isVisible, week: row.link.week })),
+    ...rows.map((row) => ({
+      ...row.source,
+      isVisible: row.link.isVisible,
+      week: row.link.week,
+      // Core or supplemental is a fact about the reading IN THIS COURSE, so it
+      // lives on the join and has to be carried across with the week. The
+      // shelf groups by week and never showed it; the footer counts it.
+      isCore: row.link.isCore,
+    })),
     // A reading of the student's own that an instructor has since added to the
     // course is the course's copy — don't list it twice.
     ...mine
       .filter((source) => !courseIds.has(source.id))
-      .map((source) => ({ ...source, isVisible: true, week: null as number | null })),
+      // A reading of your own is neither core nor supplemental — those are
+      // the syllabus's words for the course's own list, and this card is on
+      // nobody else's shelf. `isOwn` is what sorts it.
+      .map((source) => ({ ...source, isVisible: true, week: null as number | null, isCore: false })),
   ].sort((a, b) => {
     const aWeek = a.week ?? Number.MAX_SAFE_INTEGER
     const bWeek = b.week ?? Number.MAX_SAFE_INTEGER
@@ -318,6 +330,74 @@ export async function createOwnReading(data: {
     .returning()
 
   revalidatePath("/")
+  return { id: source.id, title: source.title }
+}
+
+/**
+ * Take a reading of your own off your shelf (TJ, 2026-08-17).
+ *
+ * Until now a student could card a reading and never remove it: `deleteSource`
+ * opens with `requireAdmin`, and nothing else touched the row. So the shelf
+ * only ever grew — a mistyped title, or a book carded to try something, stayed
+ * forever. (It also meant the e2e suite could not clean up after itself: 80
+ * own readings had accumulated on the test account by the time this was found,
+ * 23 of them from one spec whose own docstring says it removes everything it
+ * makes. It could not.)
+ *
+ * ARCHIVE, NOT DELETE, and the distinction is load-bearing:
+ *
+ *   - `passages.sourceId` is `onDelete: "set null"`, so really deleting the
+ *     row would untether every passage captured from it — they would survive
+ *     but lose which reading they came from, landing in the same bucket
+ *     `attributePassages` exists to repair. `sourcePages`, `sourceScores` and
+ *     `sourceRepairs` cascade, so the page text and any repair decisions would
+ *     go too.
+ *   - `isArchived` already existed and the learner shelf query already honours
+ *     it, so this is a new act rather than a new state to filter for.
+ *
+ * The student's work is therefore untouched: the passages, their concepts and
+ * the threads between them stay exactly where they were, and Vocabulary is
+ * unscoped so the concepts remain in plain sight. What goes is the card, and
+ * with it the door to that reading's own Capture Log — which is why the shelf
+ * warns before doing it when there is work behind the card, and says how much.
+ *
+ * The file is NOT purged here. That stays an admin act (`deleteSource`
+ * removes the row and the blob together), because a purge is the irreversible
+ * half and an archive is meant to be undoable.
+ *
+ * Owner-gated on exactly the rule `updateOwnReadingMetadata` uses: your own
+ * card, and yours. A course reading is not yours to retire.
+ */
+export async function archiveOwnReading(sourceId: string) {
+  const session = await getServerSession(authOptions)
+  const userId = session?.user?.id
+  if (!userId) throw new Error("Unauthorized")
+
+  const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
+  const source = rows[0]
+  if (!source || !source.isOwn || source.createdByUserId !== userId) {
+    throw new Error("Reading not found")
+  }
+  // Idempotent: a double-submit should not write a second event saying it
+  // happened twice.
+  if (source.isArchived) return { id: source.id, title: source.title }
+
+  await db.update(sources).set({ isArchived: true }).where(eq(sources.id, source.id))
+
+  // Recorded like every other act. The payload carries the title because the
+  // row it names may later be purged by an admin, and a log line reading
+  // "removed a reading" with nothing to point at is not history.
+  const kept = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(passages)
+    .where(and(eq(passages.sourceId, source.id), eq(passages.userId, userId)))
+  await recordEvent(userId, null, "reading.archive", "reading", source.id, {
+    title: source.title,
+    passages: kept[0]?.n ?? 0,
+  })
+
+  revalidatePath("/")
+  revalidateLibrary()
   return { id: source.id, title: source.title }
 }
 

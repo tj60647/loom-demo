@@ -75,6 +75,13 @@ test.describe('Practice loom', () => {
     await page.locator('nav button', { hasText: 'Linking' }).click();
     await expect(page.locator('.crow')).toHaveCount(3);
     await expect(page.locator('.thread')).toHaveCount(2);
+    // The concept tally, read WHILE the footer is standing. It used to be
+    // `.scopemeta` in a band above the journey; that band went on 2026-08-17
+    // and the tally is in the footer now, which the reading station withholds.
+    // Read here, on a visit the spec was already making, and re-read later on
+    // another station that shows it — the number is the reading's, not the
+    // station's, so the test keeps its exact meaning: nothing was written.
+    const exampleScope = await page.locator('footer .footmeta').last().textContent();
     await page.locator('nav button.station', { hasText: 'Reading' }).click();
 
     // What the example puts on the page, so everything below asserts the
@@ -86,7 +93,6 @@ test.describe('Practice loom', () => {
     };
     const exampleWork = await workCount();
     expect(exampleWork, 'the worked example put no passages on the page').toBeGreaterThan(0);
-    const exampleScope = await page.locator('.scopemeta').nth(1).textContent();
 
     // Search is withheld here: it reads the student's real rows over its own
     // route, bypassing the provider entirely.
@@ -177,7 +183,7 @@ test.describe('Practice loom', () => {
     expect(selected.trim().length).toBeGreaterThan(0);
 
     await page.locator('button:has-text("Capture as Passage")').click();
-    await page.getByPlaceholder('e.g. boundary objects', { exact: true }).fill('practice concept');
+    await page.locator('.info-scrim').getByPlaceholder('e.g. boundary objects', { exact: true }).fill('practice concept');
     await page.locator('button:has-text("Save Passage")').click();
 
     // It really landed: the mark is drawn on the page and the capture is in
@@ -205,8 +211,9 @@ test.describe('Practice loom', () => {
     await page.reload();
     await enterPracticeLoom(page);
     await expect.poll(workCount, { timeout: 20_000 }).toBe(exampleWork);
-    await expect(page.locator('.scopemeta').nth(1)).toHaveText(exampleScope ?? '');
     await page.locator('nav button', { hasText: 'Vocabulary' }).click();
+    // Same tally, same number, on a station whose footer stands.
+    await expect(page.locator('footer .footmeta').last()).toHaveText(exampleScope ?? '');
     await expect(page.locator('.lrow', { hasText: 'practice concept' })).toHaveCount(0);
   });
 });

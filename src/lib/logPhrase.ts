@@ -28,6 +28,12 @@ export function describeEvent(e: GraphEvent): string {
         : "merged two concepts"
     case "concept.delete": return "removed a concept"
     case "passage.create": return "captured a passage"
+    // The note itself is not in the event — only how long it is. A log that
+    // survives reset should not be carrying the student's prose.
+    case "passage.note":
+      return typeof p.noteChars === "number" && p.noteChars === 0
+        ? "cleared a passage's note"
+        : "wrote a note on a passage"
     case "passage.capture":
       return Array.isArray(p.conceptIds) && p.conceptIds.length === 0
         ? "captured an unlabeled passage"
@@ -58,6 +64,12 @@ export function describeEvent(e: GraphEvent): string {
       return typeof p.descriptionChars === "number" ? "revised a cloth's description" : "titled a cloth"
     case "graph.reset": return "reset the cloth"
     case "reading.reset": return "started this reading over"
+    // "took off the shelf", not "deleted": the row is archived, the passages
+    // captured from it are untouched, and an admin can put it back.
+    case "reading.archive":
+      return typeof p.title === "string" && p.title
+        ? `took "${p.title}" off their shelf`
+        : "took a reading of their own off their shelf"
     case "graph.import": return "imported a cloth"
     case "graph.example": return "loaded the worked example"
     default: return "one more act on the record"

@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/db"
+import { recordEvent } from "@/lib/graphEvent"
 import { concepts, passages, passageConcepts, edges, links, users, sourcePages, cloths, views, graphEvents, maps } from "@/db/schema"
 import { and, asc, eq, inArray, isNull, like, or, sql, type SQL } from "drizzle-orm"
 import type { PgColumn } from "drizzle-orm/pg-core"
@@ -74,27 +75,6 @@ function inCourse(column: PgColumn, courseId: string | null): SQL {
   return courseId ? eq(column, courseId) : isNull(column)
 }
 
-/**
- * Append one student act to the graph's development history. Best-effort by
- * design: neon-http has no cross-call transactions, so the graph tables stay
- * the source of truth and a lost event never fails the mutation it describes.
- * History is an exploratory record (rendered as counts and replay, never
- * judgment) and deliberately survives reset and import.
- */
-async function recordEvent(
-  userId: string,
-  courseId: string | null,
-  kind: string,
-  entityType: "concept" | "passage" | "edge" | "link" | "graph" | "map" | "cloth",
-  entityId: string | null,
-  payload?: Record<string, unknown>
-) {
-  try {
-    await db.insert(graphEvents).values({ userId, courseId, kind, entityType, entityId, payload })
-  } catch (e) {
-    console.warn(`[recordEvent] failed to record ${kind}`, e)
-  }
-}
 
 /**
  * Drop deleted entities' geometry from every view row — the legacy cardTable
@@ -628,6 +608,41 @@ export async function attributePassages(passageIds: string[], sourceId: string) 
     })
   }
   return updated.length
+}
+
+/**
+ * Revise a passage's note (TJ, 2026-08-17).
+ *
+ * There was no update path for a passage at all: createPassage, refilePassage,
+ * unfilePassage, attributePassages, deletePassage. So a note was written once
+ * in the capture modal — at the moment you have read the passage least — and
+ * could never be changed anywhere in Loom. The model says the passage owns its
+ * Notes; the app let you write them once.
+ *
+ * Ownership is checked the way every other passage act checks it: the row must
+ * be yours and in the active course. `inCourse` matters as much as `userId` —
+ * a passage from another course is not this cloth's to edit.
+ *
+ * The event carries the note's LENGTH, not the note. The Capture Log is a
+ * record of acts, and a student's prose belongs in the passage rather than
+ * copied into an append-only log that survives reset — the same reason
+ * cloth.update records `descriptionChars`.
+ */
+export async function updatePassageNote(id: string, note: string) {
+  const userId = await getUserId()
+  const courseId = await resolveActiveCourseId(userId)
+
+  const saved = await db.update(passages)
+    .set({ note })
+    .where(and(eq(passages.id, id), eq(passages.userId, userId), inCourse(passages.courseId, courseId)))
+    .returning()
+  if (!saved.length) throw new Error("Passage not found.")
+
+  await recordEvent(userId, courseId, "passage.note", "passage", id, {
+    noteChars: note.trim().length,
+    sourceId: saved[0].sourceId,
+  })
+  return saved[0]
 }
 
 export async function deletePassage(id: string) {
