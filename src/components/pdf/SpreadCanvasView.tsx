@@ -460,6 +460,39 @@ export default function SpreadCanvasView({
     }, SETTLE_MS);
   }, [retargetView]);
 
+  /**
+   * The ONE way this component writes a transform.
+   *
+   * `zb.transform()` does NOT run the behaviour's `constrain` — only the
+   * gesture handlers do. In the installed d3-zoom (3.0.0, `src/zoom.js`)
+   * every `constrain(` call site is inside `wheeled`, `mousemoved`,
+   * `touchmoved` or the `scaleBy`/`scaleTo`/`translateBy` helpers;
+   * `zoom.transform` goes straight to `gesture.zoom`, whose whole body is
+   * `this.that.__zoom = transform` and an emit. So Fit, − / +, "go to this
+   * page" and the wheel's own chase loop could each park the canvas where no
+   * drag is able to put it, and where the next drag hauls it back in a frame.
+   *
+   * Measured on the running app at 1536x900 (Object Worlds, canvas plane
+   * 2970x953, stage 1536x816): zoomed out to 0.51x fit the plane is 777x249,
+   * smaller than the stage on both axes, so the translate extent allows
+   * exactly one position — x=379.5 y=283.3. Clicking a passage row in Your
+   * work left it at x=688.6 y=347.6, and the next drag snapped it back 300px.
+   *
+   * Passing every write through the behaviour's own constrain — with the
+   * extent d3 computes for this element, since `.extent()` is never set here
+   * and the default reads clientWidth/clientHeight — makes that position
+   * unreachable instead of merely unlikely.
+   */
+  const writeTransform = useCallback((t: ZoomTransform) => {
+    const el = viewportRef.current;
+    const zb = zbRef.current;
+    if (!el || !zb) return;
+    zb.transform(
+      select(el),
+      zb.constrain()(t, [[0, 0], [el.clientWidth, el.clientHeight]], zb.translateExtent())
+    );
+  }, []);
+
   // --- the zoom behaviour: always freeform ---
   // will-change lives only around movement: standing, it makes Chrome scale
   // a once-rasterized bitmap of the whole canvas (pixelated cards and
@@ -557,7 +590,7 @@ export default function SpreadCanvasView({
           const k = done ? target : next;
           const [px, py] = wheelAnchor.current;
           // The canvas point under the cursor stays under the cursor.
-          zbNow.transform(select(elNow), zoomIdentity
+          writeTransform(zoomIdentity
             .translate(px - (px - t.x) * (k / t.k), py - (py - t.y) * (k / t.k))
             .scale(k));
           wheelFrame.current = done ? 0 : requestAnimationFrame(tick);
@@ -585,9 +618,12 @@ export default function SpreadCanvasView({
   /**
    * Click (or drag) the overview: the view centre goes to that canvas point
    * at the CURRENT zoom — navigation, never a zoom change. Driven through
-   * zb.transform so the translate extent still constrains it and every
-   * consumer of the transform (raster retarget, slider sync, the capture
-   * button's reposition) hears about it the ordinary way.
+   * writeTransform, so the translate extent constrains it and every consumer
+   * of the transform (raster retarget, slider sync, the capture button's
+   * reposition) hears about it the ordinary way.
+   *
+   * This comment used to say `zb.transform` was what kept the extent honest.
+   * It never did — see writeTransform for the d3 source that shows why.
    */
   const onMinimapPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const el = minimapRef.current;
@@ -603,7 +639,7 @@ export default function SpreadCanvasView({
       const cy = (clientY - r.top) / mm.scale;
       const { stage } = live.current;
       const k = tref.current.k;
-      zb.transform(select(vp), zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k));
+      writeTransform(zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k));
     };
     moveTo(e.clientX, e.clientY);
     el.setPointerCapture(e.pointerId);
@@ -616,7 +652,7 @@ export default function SpreadCanvasView({
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerup", done);
     el.addEventListener("pointercancel", done);
-  }, [cancelWheel]);
+  }, [cancelWheel, writeTransform]);
 
   /** Set k = m·fitAllK, keeping the canvas point at the stage centre fixed. */
   const applyMultiplier = useCallback((m: number, recenter = false) => {
@@ -637,8 +673,8 @@ export default function SpreadCanvasView({
       const cy = (stage.h / 2 - t.y) / t.k;
       t2 = zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k);
     }
-    zb.transform(select(el), t2);
-  }, [cancelWheel]);
+    writeTransform(t2);
+  }, [cancelWheel, writeTransform]);
 
   // First fit, and the toolbar's − / + / Fit. The 0.05 tolerance breaks the
   // loop with the settle-time sync above. Fit (exactly 1) recenters: "1 =
@@ -694,8 +730,8 @@ export default function SpreadCanvasView({
     const cx = pageX(layout, s, focusPage, basePageWidth) + basePageWidth / 2;
     const cy = s.y + layout.unitH / 2;
     cancelWheel();
-    zb.transform(select(el), zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k));
-  }, [focusPage, layout, cancelWheel]);
+    writeTransform(zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k));
+  }, [focusPage, layout, cancelWheel, writeTransform]);
 
   /** Render-queue priority: this page's distance from the CURRENT viewport
    *  centre, in canvas units — sampled when a render slot frees, so the

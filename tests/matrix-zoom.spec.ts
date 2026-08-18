@@ -192,4 +192,63 @@ test.describe('Matrix zoom', () => {
     await expect(page.locator('.pdf-spread-canvas .pdf-railcard').first()).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.pdf-spread-canvas .pdf-rail-leaders path').first()).toBeAttached();
   });
+
+  /**
+   * "Go to this passage" cannot park the canvas where a drag would haul it
+   * back from.
+   *
+   * d3's `zb.transform()` writes `__zoom` without running the behaviour's
+   * `constrain` — only the gesture handlers call that. So every programmatic
+   * move here (Fit, − / +, this goto, the wheel's chase loop) used to be able
+   * to leave the plane outside the translate extent, and the next drag closed
+   * the gap in one frame. Measured before the fix at 1536x900: zoomed out to
+   * 0.51x fit, the goto left the canvas 309px outside, and the following drag
+   * jumped it back 300px.
+   *
+   * Asserted as the reader experiences it rather than by re-deriving d3's
+   * constraint: zoom out until the whole reading is in view, take the door,
+   * then drag. A drag that moves the canvas at all means the goto left it
+   * somewhere the extent forbids.
+   */
+  test('a passage door cannot leave the canvas outside the translate extent', async ({ page }) => {
+    test.setTimeout(90_000);
+    await openReading(page, 'Object Worlds');
+    await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Canvas' }).click();
+    await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
+    await expect(page.locator('.pdf-slot-img').first()).toBeVisible({ timeout: 10000 });
+
+    const transform = () =>
+      page.locator('.pdf-spread-canvas').evaluate((el) => (el as HTMLElement).style.transform);
+
+    // Below fit-all, so the plane is smaller than the stage on both axes and
+    // the extent allows exactly one position. Nothing here can legally move.
+    const zoomOut = page.getByRole('button', { name: 'Zoom out' });
+    await zoomOut.click();
+    await zoomOut.click();
+    await page.waitForTimeout(900);
+    const pinned = await transform();
+
+    // The door: a passage row in Your work sets the reading's page, which the
+    // canvas answers by centring that page.
+    await page.locator('#yourwork-toggle').click();
+    const doors = page.locator('#yourwork .passage.isdoor');
+    await expect(doors.first()).toBeVisible({ timeout: 15000 });
+    await doors.first().click();
+    await page.waitForTimeout(1200);
+
+    // Everything is already in view, so the goto has nowhere to go.
+    expect(await transform()).toBe(pinned);
+
+    // And the drag that used to expose it finds nothing to correct.
+    const box = (await page.locator('.pdf-spread-viewport').boundingBox())!;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    await page.mouse.move(cx - 220, cy - 140, { steps: 12 });
+    await page.mouse.up();
+    await page.waitForTimeout(900);
+    expect(await transform()).toBe(pinned);
+  });
 });
