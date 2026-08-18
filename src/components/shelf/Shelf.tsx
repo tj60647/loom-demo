@@ -398,21 +398,27 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
               "…" while the loom is in flight, exactly as the cards do. A zero
               is a claim about someone's work, and it would be on screen for
               the whole first load. */}
-          {/* Assigned and your own, counted apart (TJ, 2026-08-17). Together
-              they were the "109 readings" that gave this away: the shelf lays
-              them out as two different things — the syllabus by week, and a
-              "your own readings" section under it — so one total was a number
-              matching nothing on the page. Two numbers, in the shelf's own
-              words. */}
+          {/* Three kinds, counted apart (TJ, 2026-08-17). They were one
+              number once — the "109 readings" that gave the problem away —
+              then two, and the syllabus actually has three: `course_source`
+              carries `isCore`, so a course reading is core or supplemental,
+              and a reading of your own is neither. */}
           <span className="footmeta">
             {loadingShelf ? (
               "…"
             ) : (
               <>
-                {courseReadings.length} assigned · {ownReadings.length} your own
+                {courseReadings.filter((r) => r.isCore).length} core ·{" "}
+                {courseReadings.filter((r) => !r.isCore).length} supplemental ·{" "}
+                {ownReadings.length} your own
               </>
             )}
           </span>
+          {/* A rule between the shelf's counts and the student's own work
+              (TJ, 2026-08-17). Two different subjects, and mono caps with only
+              a gap between them read as one run of text — the same reason the
+              header already rules the course off from the account. */}
+          <span className="footrule" aria-hidden="true" />
           <span className="footmeta">
             {isLoading ? (
               "…"

@@ -266,12 +266,23 @@ export async function getSources(courseIdRaw?: string | null) {
   const courseIds = new Set(rows.map((row) => row.source.id))
 
   return [
-    ...rows.map((row) => ({ ...row.source, isVisible: row.link.isVisible, week: row.link.week })),
+    ...rows.map((row) => ({
+      ...row.source,
+      isVisible: row.link.isVisible,
+      week: row.link.week,
+      // Core or supplemental is a fact about the reading IN THIS COURSE, so it
+      // lives on the join and has to be carried across with the week. The
+      // shelf groups by week and never showed it; the footer counts it.
+      isCore: row.link.isCore,
+    })),
     // A reading of the student's own that an instructor has since added to the
     // course is the course's copy — don't list it twice.
     ...mine
       .filter((source) => !courseIds.has(source.id))
-      .map((source) => ({ ...source, isVisible: true, week: null as number | null })),
+      // A reading of your own is neither core nor supplemental — those are
+      // the syllabus's words for the course's own list, and this card is on
+      // nobody else's shelf. `isOwn` is what sorts it.
+      .map((source) => ({ ...source, isVisible: true, week: null as number | null, isCore: false })),
   ].sort((a, b) => {
     const aWeek = a.week ?? Number.MAX_SAFE_INTEGER
     const bWeek = b.week ?? Number.MAX_SAFE_INTEGER

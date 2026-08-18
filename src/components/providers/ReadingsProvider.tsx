@@ -21,6 +21,13 @@ export type ReadingMeta = {
   week: number | null
   /** A card the student minted for themselves; on nobody else's shelf. */
   isOwn: boolean
+  /**
+   * Core or supplemental, per the syllabus. A fact about the reading in THIS
+   * course — it lives on `course_source`, not on the reading — so a text can
+   * be core in one course and supplemental in another. Always false for an
+   * own reading, which is neither.
+   */
+  isCore: boolean
   /** Null when the card is reference-only — a citation with no PDF behind it. */
   storageKey: string | null
 }
