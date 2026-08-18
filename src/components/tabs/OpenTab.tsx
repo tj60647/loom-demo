@@ -791,18 +791,27 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                             </button>
                           </span>
                         </div>
-                        <div className="quietrow" style={{ marginTop: "9px" }}>
+                        {/* Labelled and placeheld exactly like the coin-a-
+                            concept field (TJ, 2026-08-17: "these need to be the
+                            same: and behave and labelled like this"). Three
+                            fields on this surface take a concept; they said
+                            three different things and only one of them told you
+                            what a concept looks like. The label carries the
+                            shape, the placeholder is an example, and `list`
+                            gives all three the same autocomplete — which this
+                            one never had at all, having been written without
+                            it. */}
+                        <div className="addconcept" style={{ marginTop: "9px" }}>
+                          <span className="label">
+                            Concept{" "}
+                            <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--ochre)" }}>
+                              — a short noun phrase naming the idea
+                            </span>
+                          </span>
+                        <div className="quietrow">
                           <input
-                            /* "name another concept", not "another concept
-                               this passage evidences…" (TJ, 2026-08-17: "name
-                               the concept this passage makes no sense as
-                               placeholder text"). It was a whole clause
-                               restating the row it sits in, and the button
-                               beside it already says the act. "another"
-                               because this row's passage already has one —
-                               the twin below, on a passage with none, says
-                               "name the concept". */
-                            placeholder="name another concept"
+                            list={listId}
+                            placeholder="e.g. boundary objects"
                             title="one passage can evidence several concepts — add another here; it keeps the ones it has"
                             value={refileInputs[b.id] ?? ""}
                             onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
@@ -817,6 +826,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                               called refilePassage — see the rename logged in
                               docs/ui-cleanup-pass-1.md. */}
                           <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept to passage</button>
+                        </div>
                         </div>
                       </div>
                     ))}
@@ -953,14 +963,22 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                     remove passage
                   </button>
                 </div>
-                <div className="quietrow">
-                  <input
-                    list={listId}
-                    placeholder={on.length ? "name another concept" : "name the concept"}
-                    value={refileInputs[b.id] ?? ""}
-                    onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
-                  />
-                  <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept to passage</button>
+                <div className="addconcept">
+                  <span className="label">
+                    Concept{" "}
+                    <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--ochre)" }}>
+                      — a short noun phrase naming the idea
+                    </span>
+                  </span>
+                  <div className="quietrow">
+                    <input
+                      list={listId}
+                      placeholder="e.g. boundary objects"
+                      value={refileInputs[b.id] ?? ""}
+                      onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
+                    />
+                    <button className="btn ghost mini" onClick={() => handleRefile(b)} disabled={!!refileBusy[b.id]}>add concept to passage</button>
+                  </div>
                 </div>
               </div>
             )
