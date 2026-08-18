@@ -481,8 +481,10 @@ ruling, or already on `feat/reading-toolbar-cleanup`.
 Every item of PR #10 is decided and most of the takeable ones are committed;
 the branch has since grown a second body of work that came from using the app
 rather than reading the branch, and what is open now is listed under "Still
-open after the second session" — two app bugs, two rulings, three small
-decided-but-unbuilt changes, and a test account that wants reseeding.
+open after the second session" — one app bug, two rulings, three small
+decided-but-unbuilt changes, and a test account that wants reseeding. The
+canvas recenter is fixed (see "The third session"), and the diagnosis this
+document carried for it was wrong: the suspect it named was innocent.
 
 ## The second session — what came out of looking at the app
 
@@ -606,11 +608,6 @@ days in July, arriving through a different door.
   pre-rendered page images with no text layer, so mark.js has nothing to mark.
   The geometry exists: the rail cards already anchor analytically there, off the
   stored page and offset against the manifest's text length.
-- **Clicking recenters the canvas when zoomed out**, and reaches a state it
-  should not. `dblclick.zoom` is already disabled; the suspect is
-  `applyMultiplier(m, recenter)` — the zoom buttons write a multiplier, the wheel
-  writes a transform, and they reconcile on settle. Reproduce before touching.
-
 **Needs a ruling, and the model doc amended first:**
 
 - **Expected concepts** — a concept in a reading BEFORE evidence. Needs an
@@ -635,6 +632,84 @@ picked.
 concepts, the account has 16 — `seed:demo` fixes it and clears the leftover
 carded readings); two dead CSS bits, the `@media (max-width: 900px)` block in
 `PdfViewer.tsx` and `.btn.compact`.
+
+---
+
+## The third session — 2026-08-18
+
+Two items off the list above, one of which this document had diagnosed wrongly.
+
+### The canvas recenter · Done — and the suspect was innocent
+
+This document named `applyMultiplier(m, recenter)` and the multiplier-versus-
+transform reconciliation on settle. Neither was involved. The settle sync
+rounds to one decimal and its 0.05 tolerance covers exactly that rounding, so
+it never fires a correction it did not mean; `recenter` is only ever true when
+the multiplier is exactly 1, which is Fit doing what Fit says.
+
+What was actually wrong is one line lower down and applies to **every**
+programmatic move: **`zb.transform()` does not run the behaviour's
+`constrain`.** In d3-zoom 3.0.0 (`src/zoom.js`) every `constrain(` call site
+is inside `wheeled`, `mousemoved`, `touchmoved` or the `scaleBy`/`scaleTo`/
+`translateBy` helpers. `zoom.transform` reaches `gesture.zoom`, whose body is
+`this.that.__zoom = transform` and an emit. So Fit, − / +, "go to this page"
+and the wheel's own chase loop could all park the plane outside the translate
+extent — a position no drag can produce, and one the next drag corrects in a
+single frame.
+
+Reproduced before anything was changed, at 1536x900 on Object Worlds (canvas
+plane 2970x953, stage 1536x816). Zoomed out to 0.51x fit the plane is 777x249,
+smaller than the stage on both axes, so the extent allows exactly one
+position: x=379.5 y=283.3. **Clicking a passage row in Your work** — the goto
+door, which sets the reading's page, which the canvas answers by centring that
+page — left it at x=688.6 y=347.6, and the next drag snapped it back 300px. At
+fit-all the same door left it 606px and 126px outside, and it stayed there
+through an entire wheel gesture.
+
+So "clicking" was a passage door, not a bare click on the canvas: a plain
+click, a double-click, a click on a rail card and a click on a page image were
+all measured and none of them writes a transform at all.
+
+Fixed by routing all four writes through one `writeTransform`, which applies
+the behaviour's own constrain with the extent d3 computes for the element.
+Zoomed out, the goto now writes nothing — the honest answer to "go to this
+passage" when the whole reading is already on screen.
+
+`tests/matrix-zoom.spec.ts` gains a case that takes the door at zoom-out and
+then drags; it fails on the parent commit and passes on the fix.
+
+*Costs:* the canvas can no longer be wheeled past the edge of the extent. The
+chase loop was the one gesture that bypassed the constraint, so at the
+boundary the point under the cursor may now drift rather than the plane
+continuing to travel.
+
+*Still open, and untouched:* highlights invisible at full zoom-out, above.
+
+### The Passages/Concepts switch scrolled away · Done
+
+TJ, 2026-08-18: it "should remain visible". `.yourwork-body` is the sheet's
+one scroller and the card inside it is as tall as the list — 3829px of scroll
+on the test account's 11 passages at 1536x900 — so the switch left the top of
+the panel on the first wheel notch, and changing which end of the join you
+read from meant scrolling back up to reach the control that does it.
+
+Sticky, not moved into `.yourwork-head`: the head bar is the sheet's name and
+its way out; the switch belongs to the rows.
+
+Two things worth keeping, both found by measuring rather than reading:
+
+- `.segmented` is an **inline-flex pill**, so stuck at the top it lets rows
+  slide past on either side of it. Hence a full-bleed `.viewswitch` band,
+  painted in the colour the card actually paints.
+- **A sticky child bottoms out at the scroller's CONTENT box**, not its
+  padding box. With `padding: 14px 8px 40px` on the body the band parked at
+  y=158.5 while the body's own top edge was y=144.5, and rows scrolled visibly
+  through the 14px strip above it. That 14px now sits on `.onecol` inside the
+  scrollport, and the band sticks at the real top.
+
+Measured and screenshotted at 1280 · 1536 · 1920: band 440px wide, 42px tall,
+identical at all three — the panel is `min(460px, 100vw - 32px)`, so its width
+is not a function of the viewport.
 
 ---
 
