@@ -20,7 +20,7 @@
  * prompts and the read.
  */
 import { test, expect } from "@playwright/test"
-import { cardOwnReading, enterReadingFromCard, isDeletePost, removeOwnReading } from "./helpers"
+import { cardOwnReading, deleteConceptInVocabulary, enterReadingFromCard, isDeletePost, removeOwnReading } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 // Each test is independent and removes what it adds — no serial mode, so one
@@ -132,11 +132,8 @@ test("01 · a passage typed into a carded reading lands in the coding log — an
   )
   await row.getByRole("button", { name: "remove passage" }).click()
   await passageDeleted
-  const conceptDeleted = page.waitForResponse((r) => isDeletePost(r.request()))
-  await row.getByRole("button", { name: "delete this concept" }).click()
-  await page.getByRole("button", { name: "Delete concept" }).click()
-  await conceptDeleted
-  await expect(page.locator(".lrow", { hasText: "journey test concept" })).toHaveCount(0, { timeout: 15_000 })
+  // 04 is the only station that deletes a concept since 2026-08-17.
+  await deleteConceptInVocabulary(page, "journey test concept")
 
   // And the reading itself — the one mutation this file could not undo until
   // 2026-08-17, despite promising at the top that it undoes them all. Archived

@@ -45,7 +45,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
   // naming, dedup and the delete guards must see every concept the student has
   // — otherwise capturing a concept met in an earlier text would mint a
   // duplicate instead of joining its evidence (spec §2 identity).
-  const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, removeConcept, removePassage, refilePassage, unfilePassage, flash } = useLoom()
+  const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, removePassage, refilePassage, unfilePassage, flash } = useLoom()
   const { byId, titleOf } = useReadings()
   const { confirm, notify } = useDialog()
   const activeSourceId = soleSourceId(scope)
@@ -190,34 +190,10 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     }
   }
 
-  const handleRemoveConcept = async (conceptId: string, passageCount: number) => {
-    // Threads first: a concept woven into one cannot be deleted out from under
-    // it. The server enforces this too — this is the readable version.
-    if (state.edges.some(e => e.fromId === conceptId || e.toId === conceptId)) {
-      await notify({
-        title: "This concept is woven into a thread.",
-        body: "Remove the thread on 02 · Linking first — deleting the concept now would take your thread with it.",
-      })
-      return
-    }
-    // Always confirm, and name what happens. Since 0021 the passages survive
-    // the concept (P0.1): only the label and its pointers go.
-    const label = state.concepts.find(c => c.id === conceptId)?.label ?? "this concept"
-    const ok = await confirm({
-      title: `Delete “${label}”?`,
-      // Names where the passages GO, because since merge went behind a
-      // curtain this delete is half of the duplicate repair, and the other
-      // half is finding them again: they land in Unlabeled, in this list.
-      // ("Export from Keep first" stood here until 2026-08-12, four days
-      // after Keep was deleted; download lives at each object now.)
-      body: passageCount
-        ? `Its ${passageCount} captured passage${passageCount !== 1 ? "s" : ""} stay${passageCount !== 1 ? "" : "s"} in your work, under Unlabeled — file them under another concept whenever you like. Download your cloth first if you might want the concept itself back.`
-        : "Download your cloth first if you might want this back.",
-      confirmLabel: "Delete concept",
-      danger: true,
-    })
-    if (ok) removeConcept(conceptId)
-  }
+  /* handleRemoveConcept lived here. It moved out with the button on
+     2026-08-17: deleting a concept is 04 · Vocabulary's act, and VocabularyTab
+     has carried its own copy — same thread guard, same confirmation — all
+     along. What was here was the second one. */
 
   const handleAddConceptOnly = async () => {
     // Trim ONCE, at the top, and compare the trimmed value. This used to match
@@ -625,9 +601,6 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
             // earlier text keeps that evidence — it is counted below rather
             // than shown here, so the log stays this reading's own work.
             const conceptPassages = scoped.passages.filter(b => b.conceptIds.includes(concept.id))
-            const elsewhere = state.passages.filter(
-              b => b.conceptIds.includes(concept.id) && !conceptPassages.some(x => x.id === b.id)
-            ).length
             
             return (
               <div key={concept.id} className={`lrow ${isOpen ? "open" : ""}`}>
@@ -722,29 +695,44 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                             >
                               goto
                             </button>
-                            {b.conceptIds.length > 1 ? (
-                              // A multi-filed passage: this row's control removes
-                              // only THIS filing — deleting the passage here would
-                              // silently take every other concept's evidence too.
-                              <button
-                                type="button"
-                                className="rm"
-                                style={{ background: "none", border: "none", padding: 0 }}
-                                onClick={() => unfilePassage(b.id, concept.id)}
-                                title="Filed under several concepts — this removes it from this one only."
-                              >
-                                unfile from this concept
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="rm"
-                                style={{ background: "none", border: "none", padding: 0 }}
-                                onClick={() => removePassage(b.id)}
-                              >
-                                remove passage
-                              </button>
-                            )}
+                            {/* BOTH, always (TJ, 2026-08-17). This used to be
+                                a choice made for the student: with several
+                                concepts you were offered "unfile from this
+                                concept", and with one you were offered only
+                                "remove passage" — so the scoped act was
+                                withheld exactly where it is most wanted, and
+                                the only thing on offer was destroying the
+                                capture.
+
+                                Unfiling the last concept leaves an Unlabeled
+                                Passage, which is a legal end state by the
+                                model ("It may never gain a Concept, which is
+                                fine") and now has a visible home in the panel
+                                above. Nothing is lost and nothing is orphaned:
+                                the passage keeps its text, its page and its
+                                note. */}
+                            <button
+                              type="button"
+                              className="rm"
+                              style={{ marginRight: "8px", background: "none", border: "none", padding: 0 }}
+                              onClick={() => unfilePassage(b.id, concept.id)}
+                              title={
+                                b.conceptIds.length > 1
+                                  ? "Filed under several concepts — this removes it from this one only."
+                                  : "The passage stays, with no concept on it, under Unlabeled passages."
+                              }
+                            >
+                              remove concept from passage
+                            </button>
+                            <button
+                              type="button"
+                              className="rm"
+                              style={{ background: "none", border: "none", padding: 0 }}
+                              onClick={() => removePassage(b.id)}
+                              title="Delete this capture. Its other filings go with it."
+                            >
+                              remove passage
+                            </button>
                           </span>
                         </div>
                         <div className="quietrow" style={{ marginTop: "9px" }}>
@@ -776,20 +764,25 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                         reading-scoped record of what you captured here — the
                         division 04's own header draws. Nothing was moved; a
                         thinner copy of it stopped being shown twice. */}
-                    {/* Deleting is the only repair on this row, and since
-                        migration 0021 it is a soft one: the passages survive
-                        and land in Unlabeled above. 04 · Vocabulary is still
-                        where you see every concept you own at once — which is
-                        what you need to judge whether two are really one —
-                        but its one-act merge is hidden (2026-08-12). */}
-                    <button
-                      type="button"
-                      className="rm"
-                      style={{ background: "none", border: "none", padding: 0, marginTop: "12px" }}
-                      onClick={() => handleRemoveConcept(concept.id, conceptPassages.length + elsewhere)}
-                    >
-                      delete this concept
-                    </button>
+                    {/* DELETING A CONCEPT IS NOT AN ACT OF THIS STATION (TJ,
+                        2026-08-17: "i sense that delete concept should only be
+                        in vocabulary. and that in reading it is remove concept
+                        from passage").
+
+                        The scope argument is the whole of it. This panel is one
+                        reading's record; a concept belongs to the student and
+                        travels through every text they have read. Offering its
+                        destruction from inside one reading put a loom-wide act
+                        behind a reading-scoped door — and the passages it would
+                        have taken with it are not all on this page to see.
+
+                        04 · Vocabulary already holds it, with the same
+                        confirmation, and 04 is where you see every concept you
+                        own at once — which is what you need in order to judge
+                        whether one should go at all.
+
+                        What remains here is the scoped act: remove this concept
+                        from this passage, on each row above. */}
                   </div>
                 )}
               </div>

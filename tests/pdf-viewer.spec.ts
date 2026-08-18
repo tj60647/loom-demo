@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { expectReadingTitle, isDeletePost, openReading, openYourWork } from './helpers';
+import { deleteConceptInVocabulary, expectReadingTitle, openReading, openYourWork } from './helpers';
 
 // Runs as Test User A (see playwright/global-setup.ts): the concepts and passages
 // this spec captures belong to the test account, never to a real person's loom.
@@ -112,11 +112,8 @@ test.describe('PDF Viewer and Highlighting', () => {
       );
       await row.getByRole('button', { name: 'remove passage' }).click();
       await passageDeleted;
-      const conceptDeleted = page.waitForResponse((r) => isDeletePost(r.request()));
-      await row.getByRole('button', { name: 'delete this concept' }).click();
-      await page.getByRole('button', { name: 'Delete concept' }).click();
-      await conceptDeleted;
-      await expect(page.locator('.lconcept', { hasText: conceptName })).toHaveCount(0, { timeout: 5000 });
+      // 04 is the only station that deletes a concept since 2026-08-17.
+      await deleteConceptInVocabulary(page, conceptName);
     });
   }
 

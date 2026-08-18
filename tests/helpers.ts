@@ -18,6 +18,38 @@ export const isDeletePost = (request: Request) =>
   /^\["[0-9a-f-]{36}"(,(null|"[0-9a-f-]{36}"))?\]$/.test(request.postData() ?? '');
 
 /**
+ * Delete a concept — from 04 · Vocabulary, which is the only place that does it.
+ *
+ * Your work used to carry its own "delete this concept". It went on
+ * 2026-08-17 (TJ: "i sense that delete concept should only be in vocabulary.
+ * and that in reading it is remove concept from passage"): a concept belongs
+ * to the student and travels through every text they have read, so destroying
+ * it from inside one reading was a loom-wide act behind a reading-scoped door.
+ *
+ * So cleanup takes the route a student now takes. Slower than the old two
+ * clicks, and it exercises the real path rather than a shortcut that no longer
+ * exists.
+ *
+ * Waits on the POST, not the row: the list clears optimistically, and ending a
+ * test at the disappearance strands the delete for the next run.
+ */
+export async function deleteConceptInVocabulary(page: Page, label: string) {
+  await page
+    .locator('nav[aria-label="The journey"] button.station', { hasText: 'Vocabulary' })
+    .click();
+  const row = page
+    .locator('.lrow[data-concept-id]', { has: page.locator('.lconcept', { hasText: label }) })
+    .first();
+  await expect(row).toBeVisible({ timeout: 20000 });
+  await row.locator('.lhead').click();
+  const deleted = page.waitForResponse((r) => isDeletePost(r.request()));
+  await row.getByRole('button', { name: 'remove concept' }).click();
+  await page.getByRole('button', { name: 'Delete concept' }).click();
+  await deleted;
+  await expect(page.locator('.lconcept', { hasText: label })).toHaveCount(0, { timeout: 15000 });
+}
+
+/**
  * Take a reading of your own off the shelf, the way a student does.
  *
  * Every spec that cards a reading should end with this. Until 2026-08-17 none

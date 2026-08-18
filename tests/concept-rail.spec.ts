@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { isDeletePost, openReading, openYourWork } from './helpers';
+import { deleteConceptInVocabulary, openReading, openYourWork } from './helpers';
 
 // Runs as Test User A (see playwright/global-setup.ts): the concepts and passages
 // this spec captures belong to the test account, never to a real person's loom.
@@ -124,11 +124,9 @@ test.describe('Concept rail', () => {
     );
     await row.getByRole('button', { name: 'remove passage' }).click();
     await passageDeleted;
-    const conceptDeleted = page.waitForResponse((r) => isDeletePost(r.request()));
-    await row.getByRole('button', { name: 'delete this concept' }).click();
-    await page.getByRole('button', { name: 'Delete concept' }).click();
-    await conceptDeleted;
-    await expect(page.locator('.lconcept', { hasText: conceptName })).toHaveCount(0, { timeout: 5000 });
+    // The concept itself goes from 04, which is the only station that deletes
+    // one since 2026-08-17 — see helpers' deleteConceptInVocabulary.
+    await deleteConceptInVocabulary(page, conceptName);
 
     // With its passage gone, the card goes too — the rail draws only what the
     // loom still holds.
