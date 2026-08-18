@@ -151,6 +151,8 @@ export default function Workbench({
    * OpenTab clears it through `onFocusHandled` once it has scrolled there.
    */
   const [openTargetPassageId, setOpenTargetPassageId] = useState<string | null>(focus?.passage ?? null)
+  /** The mirror, for a margin badge: open Your work AT a concept. */
+  const [openTargetConceptId, setOpenTargetConceptId] = useState<string | null>(null)
   // `searchOpen` lived here to drive the standing band and its narrow-screen
   // toggle. StationSearch owns its own open state now — the panel belongs to
   // the button, and nothing else on this surface needs to know.
@@ -259,7 +261,18 @@ export default function Workbench({
   // went. The sheet is already mounted, so the row it scrolls to has a real
   // layout box the instant this fires.
   const handleGotoOpenPassage = (passageId: string) => {
+    setOpenTargetConceptId(null)
     setOpenTargetPassageId(passageId)
+    setWorkOpen(true)
+    goTo("reading")
+  }
+
+  // A margin badge names a concept, so it lands on that concept's row. Clearing
+  // the other target matters: both are read by the same panel, and two live
+  // targets would race to decide which view it opens in.
+  const handleGotoOpenConcept = (conceptId: string) => {
+    setOpenTargetPassageId(null)
+    setOpenTargetConceptId(conceptId)
     setWorkOpen(true)
     goTo("reading")
   }
@@ -267,7 +280,10 @@ export default function Workbench({
   // Stable identity again: OpenTab's focus effect lists this in its deps and
   // the sheet is mounted permanently now, so an inline arrow re-ran that
   // effect on every Workbench render while a target was set.
-  const handleFocusHandled = useCallback(() => setOpenTargetPassageId(null), [])
+  const handleFocusHandled = useCallback(() => {
+    setOpenTargetPassageId(null)
+    setOpenTargetConceptId(null)
+  }, [])
 
 
   // "See them all in Vocabulary", from the capture side. The tab is this
@@ -394,6 +410,7 @@ export default function Workbench({
                     initialSearch={initialSearch}
                     focusPassageId={pdfFocusPassageId}
                     onGotoOpenPassage={handleGotoOpenPassage}
+                    onGotoOpenConcept={handleGotoOpenConcept}
                     onPageChange={handlePageChange}
                     workOpen={workOpen}
                     onToggleWork={toggleWork}
@@ -403,6 +420,7 @@ export default function Workbench({
                         currentPage={livePdfPage}
                         onGotoPassage={handleGotoPassage}
                         focusPassageId={openTargetPassageId}
+                        focusConceptId={openTargetConceptId}
                         onFocusHandled={handleFocusHandled}
                         onGotoVocabulary={handleGotoVocabulary}
                         openClothFold={focus?.cloth}
@@ -416,6 +434,7 @@ export default function Workbench({
                 <OpenTab
                   onGotoPassage={handleGotoPassage}
                   focusPassageId={openTargetPassageId}
+                  focusConceptId={openTargetConceptId}
                   onFocusHandled={handleFocusHandled}
                   onGotoVocabulary={handleGotoVocabulary}
                   openClothFold={focus?.cloth}

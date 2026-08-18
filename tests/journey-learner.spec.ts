@@ -135,7 +135,9 @@ test("01 · a passage typed into a carded reading lands in the coding log — an
   const passageDeleted = page.waitForResponse((r) =>
     r.request().method() === "POST" && (r.request().postData() ?? "").includes(passageId!)
   )
-  await row.getByRole("button", { name: "remove passage" }).click()
+  // exact: names match by SUBSTRING, and the row also holds "remove passage
+  // from concept" since 2026-08-17.
+  await row.getByRole("button", { name: "remove passage", exact: true }).click()
   await passageDeleted
   // 04 is the only station that deletes a concept since 2026-08-17.
   await deleteConceptInVocabulary(page, "journey test concept")

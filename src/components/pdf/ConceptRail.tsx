@@ -59,6 +59,8 @@ export default function ConceptRails({
   passages,
   concepts,
   onOpenPassage,
+  onOpenConcept,
+  onUnfile,
   children,
 }: {
   enabled: boolean;
@@ -66,6 +68,12 @@ export default function ConceptRails({
   passages: Passage[];
   concepts: Concept[];
   onOpenPassage?: (passageId: string) => void;
+  /** Open Your work at a concept — the badge's destination. */
+  onOpenConcept?: (conceptId: string) => void;
+  /** Take one concept off this passage, in place. The only act the card does
+   *  itself: it changes nothing about the card's height, so it cannot start
+   *  the scale-reflow loop that keeps editing out of here. */
+  onUnfile?: (passageId: string, conceptId: string) => void;
   children: React.ReactNode;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -238,10 +246,30 @@ export default function ConceptRails({
         .map((c) => {
           const id = c.passage.id;
           const s = placement.scales[side];
-          const first = c.concepts[0];
-          const chips = c.concepts.slice(1);
-          const name = first ? first.label : "Unlabeled passage";
+          // No `first`/`chips` split any more: the card shows every concept
+          // as a badge of equal weight. Promoting concepts[0] to a heading was
+          // the asymmetry the passage view was built to stop — earliest-filed
+          // is not most important, and the model has them as equals.
           return (
+            /**
+             * THE CARD IS ITS CONCEPTS AND ITS NOTE (TJ, 2026-08-17) — the
+             * passage card without the passage, because the leader line to the
+             * highlight IS the passage. It carried a concept label, that
+             * concept's gloss, and nothing of the student's own.
+             *
+             * NOTHING IS EDITED IN HERE, deliberately, and not for want of a
+             * write path — `editPassageNote` exists now. Cards are CSS-scaled
+             * when a side crowds (`railScale` above), so a field in here would
+             * loop: typing grows the card, the height changes the scale, and
+             * the scale moves every card on the side including the one under
+             * the cursor. Each control opens the panel at the right place
+             * instead, where the same edit is a normal field.
+             *
+             * So the card is no longer one door but three, and is therefore no
+             * longer a `role="button"` with controls inside it — that was a
+             * control within a control. The badges, the +, and the note are
+             * each their own target.
+             */
             <div
               key={id}
               ref={(el) => registerCard(id, el)}
@@ -253,41 +281,45 @@ export default function ConceptRails({
                 // line arrives.
                 transformOrigin: side === "left" ? "top right" : "top left",
               }}
-              role="button"
-              tabIndex={0}
-              aria-label={`Open ${name} in your work`}
-              onClick={() => onOpenPassage?.(id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onOpenPassage?.(id);
-                }
-              }}
             >
-              <div className={`pdf-railcard-label${first ? "" : " unlabeled"}`}>{name}</div>
-              {chips.length > 0 && (
-                <div className="pdf-railcard-chips">
-                  {chips.map((chip) => (
-                    <span key={chip.id} className="pdf-railcard-chip">{chip.label}</span>
-                  ))}
-                </div>
-              )}
-              {first?.def ? <div className="pdf-railcard-def">{short(first.def, 140)}</div> : null}
-              {!first && <div className="pdf-railcard-def">{short(c.passage.content, 110)}</div>}
-              {/* THE NOTE IS NOT HERE (TJ, 2026-08-17): "the cards should have
-                  concept name, working definition. goto your work button."
-                  A note is the student's writing about the passage, and this
-                  card is about the concept — three kinds of prose stacked in
-                  one 140-character box read as one paragraph in three voices.
-                  It is still in Your work, and it is getting a card of its own
-                  in the margin later, with its own leader.
-
-                  The chevron is DECORATIVE, not a nested button: the whole
-                  card is already the door (role="button" above), and a control
-                  inside a control is unreachable by keyboard in the order it
-                  appears and ambiguous to a screen reader. It says "there is
-                  somewhere to go" without being a second place to press. */}
-              <span className="pdf-railcard-go" aria-hidden="true">›</span>
+              <div className="pdf-railcard-badges">
+                {c.concepts.map((concept) => (
+                  <span key={concept.id} className="pdf-railcard-chip">
+                    <button
+                      type="button"
+                      className="pdf-chip-open"
+                      onClick={() => onOpenConcept?.(concept.id)}
+                      title={`Open “${concept.label}” in your work`}
+                    >{concept.label}</button>
+                    <button
+                      type="button"
+                      className="pchip-x"
+                      onClick={() => onUnfile?.(id, concept.id)}
+                      aria-label={`Remove ${concept.label} from this passage`}
+                      title={`Remove “${concept.label}” from this passage. The passage stays.`}
+                    >×</button>
+                  </span>
+                ))}
+                {/* Click-through, not an inline field, for the reason above. */}
+                <button
+                  type="button"
+                  className="pdf-railcard-add"
+                  onClick={() => onOpenPassage?.(id)}
+                  aria-label="Add a concept to this passage"
+                  title="Add a concept to this passage"
+                >+</button>
+              </div>
+              {/* The note, and an invitation when there is none — an empty note
+                  used to render nothing at all, which is indistinguishable from
+                  a card that does not take one. */}
+              <button
+                type="button"
+                className={`pdf-railcard-note${c.passage.note ? "" : " empty"}`}
+                onClick={() => onOpenPassage?.(id)}
+                title={c.passage.note ? "Open this passage in your work" : "Write a note on this passage"}
+              >
+                {c.passage.note ? short(c.passage.note, 140) : "add a passage note"}
+              </button>
             </div>
           );
         })}

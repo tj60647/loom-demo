@@ -50,6 +50,8 @@ interface PdfViewerProps {
       query into the text it matched. */
   initialSearch?: string;
   onGotoOpenPassage?: (passageId: string) => void;
+  /** Open Your work at a concept — a margin badge's destination. */
+  onGotoOpenConcept?: (conceptId: string) => void;
   /**
    * The page the reader is looking at, as it changes. Capture-by-hand offers
    * it as the location so nobody retypes a page number the viewer already
@@ -80,8 +82,9 @@ type HighlightEntry = {
   endOffset: number | null;
 };
 
-export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
-  const { state, scoped } = useLoom();
+export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
+  onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
+  const { state, scoped, unfilePassage } = useLoom();
   // Drawn only for faculty and admins. Not a guard — `overlayViewer()` re-checks
   // on the server, so a student who forces the request gets an empty overlay.
   const readings = useReadings();
@@ -936,6 +939,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     if (searchOpen) closeSearch();
     onGotoOpenPassage?.(passageId);
   }, [searchOpen, closeSearch, onGotoOpenPassage]);
+
+  /** The badge's destination: Your work, at that concept. Same courtesy. */
+  const gotoOpenConcept = useCallback((conceptId: string) => {
+    if (searchOpen) closeSearch();
+    onGotoOpenConcept?.(conceptId);
+  }, [searchOpen, closeSearch, onGotoOpenConcept]);
 
   /**
    * Every way of opening or closing Your work goes through here: the toolbar
@@ -2014,6 +2023,33 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         .pdf-railcard:hover, .pdf-railcard:focus-visible {
           border-color: var(--ink-soft);
         }
+        /* The card is badges and a note now (TJ, 2026-08-17), so its old
+           label/def rules are gone with the markup that used them.
+           (No backticks in this block: styled-jsx template literal.) */
+        .pdf-railcard-badges { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+        .pdf-chip-open {
+          background: none; border: none; padding: 0; cursor: pointer;
+          font: inherit; color: inherit; letter-spacing: inherit;
+        }
+        /* A hover, not an underline (TJ, 2026-08-17): underline reads as a
+           link inside a pill that is already a control, and it moved the
+           baseline by a hair on every hover. The badge lifts instead. */
+        .pdf-railcard-chip:has(.pdf-chip-open:hover) { background: var(--paper-2); border-color: var(--ink-soft); }
+        .pdf-chip-open:hover { color: var(--ink); }
+        .pdf-railcard-add {
+          background: none; border: 1px dashed var(--rule); border-radius: 999px;
+          width: 18px; height: 18px; line-height: 1; padding: 0; cursor: pointer;
+          color: var(--ink-soft); font-family: var(--mono); font-size: 12px;
+        }
+        .pdf-railcard-add:hover { border-color: var(--ink); color: var(--ink); }
+        .pdf-railcard-note {
+          display: block; width: 100%; margin-top: 6px; padding: 4px 5px;
+          background: none; border: none; border-radius: 3px; cursor: pointer;
+          text-align: left; font-family: var(--body); font-size: 11.5px;
+          line-height: 1.4; color: var(--ink-soft); font-style: italic;
+        }
+        .pdf-railcard-note:hover { background: var(--paper-2); color: var(--ink); }
+        .pdf-railcard-note.empty { color: var(--dot); }
         .pdf-railcard-label { font-weight: 600; font-size: 13px; }
         .pdf-railcard-label.unlabeled {
           font-style: italic;
@@ -2512,6 +2548,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 passages={scoped.passages}
                 concepts={state.concepts}
                 onOpenPassage={gotoOpenPassage}
+                onOpenConcept={gotoOpenConcept}
+                onUnfile={unfilePassage}
               >
                 <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
                   {/* The same slot the matrix reads through, at native tier:

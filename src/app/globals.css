@@ -290,6 +290,11 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    block heading, and clear of the chips above it. */
 .addlabel{display:block;margin:9px 0 4px}
 .labelsay{text-transform:none;letter-spacing:0;color:var(--ochre)}
+/* A concept's gloss is prose up to 100 words (model §Concept), so it wraps.
+   It was a one-line input, which showed about eight of them. */
+.conceptdef{width:100%;font-family:var(--body);font-size:14px;line-height:1.45;
+  background:#fff;border:1px solid var(--rule);border-radius:3px;padding:6px 8px;
+  color:var(--ink);resize:vertical;min-height:40px}
 .passagenote-edit{width:100%;min-height:44px;font-family:var(--body);font-size:13.5px;
   line-height:1.45;background:#fff;border:1px solid var(--rule);border-radius:3px;
   padding:6px 8px;color:var(--ink);resize:vertical}

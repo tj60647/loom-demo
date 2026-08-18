@@ -100,7 +100,11 @@ test.describe('Concept rail', () => {
     // stays because a bare /search/i would still find both.
     await page.locator('.pdf-toolbar').getByRole('button', { name: 'Search the text of this reading' }).click();
     await expect(page.locator('.pdf-search-panel')).toBeVisible();
-    await page.locator('.pdf-railcard', { hasText: conceptName }).first().click();
+    // The card is three doors now, not one (TJ, 2026-08-17): a badge opens
+    // Your work at that CONCEPT, the note opens it at the PASSAGE. The card
+    // itself is no longer a button, so this presses the badge it means.
+    await page.locator('.pdf-railcard', { hasText: conceptName }).first()
+      .locator('.pdf-chip-open').first().click();
     await expect(page.locator('#yourwork')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('.pdf-search-panel')).toBeHidden();
     // The card opened the sheet without going through openYourWork, so it
@@ -130,7 +134,9 @@ test.describe('Concept rail', () => {
     // holding more than one — including residue from an earlier failed run —
     // made an unscoped match ambiguous.
     await row.locator(`[data-passage-id="${passageId}"]`)
-      .getByRole('button', { name: 'remove passage' }).click();
+      // exact: Playwright matches accessible names by SUBSTRING, and the row
+      // also holds "remove passage from concept" since 2026-08-17.
+      .getByRole('button', { name: 'remove passage', exact: true }).click();
     await passageDeleted;
     // The concept itself goes from 04, which is the only station that deletes
     // one since 2026-08-17 — see helpers' deleteConceptInVocabulary.

@@ -115,7 +115,9 @@ test.describe('PDF Viewer and Highlighting', () => {
       // holding more than one — including residue from an earlier failed run —
       // made an unscoped match ambiguous.
       await row.locator(`[data-passage-id="${passageId}"]`)
-        .getByRole('button', { name: 'remove passage' }).click();
+        // exact: Playwright matches accessible names by SUBSTRING, and the row
+      // also holds "remove passage from concept" since 2026-08-17.
+      .getByRole('button', { name: 'remove passage', exact: true }).click();
       await passageDeleted;
       // 04 is the only station that deletes a concept since 2026-08-17.
       await deleteConceptInVocabulary(page, conceptName);

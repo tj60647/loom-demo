@@ -15,6 +15,12 @@ import ConceptNamingAssist from "@/components/ui/ConceptNamingAssist"
 type OpenTabProps = {
   onGotoPassage?: (passage: Passage) => void
   focusPassageId?: string | null
+  /**
+   * Open at a CONCEPT, the mirror of `focusPassageId` (TJ, 2026-08-17): a
+   * margin card's badge names a concept, and pressing it should land on that
+   * concept's row rather than merely on the panel.
+   */
+  focusConceptId?: string | null
   onFocusHandled?: () => void
   /**
    * The page the reader is on, when there is a text beside this. Offered as
@@ -39,7 +45,7 @@ type OpenTabProps = {
   openClothFold?: boolean
 }
 
-export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled, compact, currentPage, onGotoVocabulary, openClothFold }: OpenTabProps) {
+export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId, onFocusHandled, compact, currentPage, onGotoVocabulary, openClothFold }: OpenTabProps) {
   // `state` is the WHOLE graph and `scoped` is this reading's slice of it. The
   // split is load-bearing: the log renders what this reading evidences, but
   // naming, dedup and the delete guards must see every concept the student has
@@ -81,6 +87,10 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
   } | null>(null)
   const [refileInputs, setRefileInputs] = useState<Record<string, string>>({})
   const [refileBusy, setRefileBusy] = useState<Record<string, boolean>>({})
+  /** Which end of the join this panel is reading from — see the note by
+   *  `passagesAZ`. Declared with the rest of the state because two focus
+   *  effects set it, and both run above where the list is built. */
+  const [view, setView] = useState<"concepts" | "passages">("passages")
   const closeCaptureInfoButtonRef = useRef<HTMLButtonElement>(null)
 
   const [openLogRows, setOpenLogRows] = useState<Record<string, boolean>>({})
@@ -263,6 +273,36 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [showCaptureInfo])
 
+  /**
+   * Open at a concept: switch to the view that lists concepts, expand its row,
+   * and scroll to it. Same shape as the passage effect below, including its
+   * "not here YET is not not here" patience — a concept can be targeted before
+   * the loom has arrived.
+   */
+  useEffect(() => {
+    if (!focusConceptId) return
+    const target = state.concepts.find((c) => c.id === focusConceptId)
+    if (!target) {
+      if (!isLoading) onFocusHandled?.()
+      return
+    }
+    // Deferred, not synchronous: setting state in an effect body cascades a
+    // render, and the passage effect below already takes this shape.
+    const rowTimer = window.setTimeout(() => {
+      setView("concepts")
+      setOpenLogRows((prev) => ({ ...prev, [focusConceptId]: true }))
+    }, 0)
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector(`[data-concept-id="${focusConceptId}"]`) as HTMLElement | null
+      el?.scrollIntoView({ behavior: "smooth", block: "center" })
+      onFocusHandled?.()
+    }, 40)
+    return () => {
+      window.clearTimeout(rowTimer)
+      window.clearTimeout(timer)
+    }
+  }, [focusConceptId, onFocusHandled, state.concepts, isLoading])
+
   useEffect(() => {
     if (!focusPassageId) return
     const targetPassage = state.passages.find((b) => b.id === focusPassageId)
@@ -278,6 +318,11 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
     }
 
     const rowTimer = window.setTimeout(() => {
+      // The panel has two views since 2026-08-17. A passage target belongs in
+      // the one that lists passages — landing on the concept list and expanding
+      // a row there is the old behaviour of a panel that had nowhere else to
+      // go. The concept row is still expanded, so switching back finds it open.
+      setView("passages")
       const firstConcept = targetPassage.conceptIds[0]
       if (firstConcept) setOpenLogRows((prev) => ({ ...prev, [firstConcept]: true }))
     }, 0)
@@ -569,7 +614,6 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
    * concepts. Neither is derived from the other on the server — the join is
    * symmetric, and only the client's `Passage.conceptIds` flattening is not.
    */
-  const [view, setView] = useState<"concepts" | "passages">("passages")
   const passagesAZ = [...scoped.passages].sort((a, b) =>
     (a.source ?? "").localeCompare(b.source ?? "") || (a.location ?? "").localeCompare(b.location ?? "")
   )
@@ -659,7 +703,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
             const conceptPassages = scoped.passages.filter(b => b.conceptIds.includes(concept.id))
             
             return (
-              <div key={concept.id} className={`lrow ${isOpen ? "open" : ""}`}>
+              <div key={concept.id} data-concept-id={concept.id} className={`lrow ${isOpen ? "open" : ""}`}>
                 {/* No destructive control here: this header is the row's
                     expand/collapse target, so "delete this concept" lives inside the
                     opened row next to "remove passage", labelled, as in v14. */}
@@ -725,7 +769,14 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                     </div>
                     <div className="defrow">
                       <span className="label">Description</span>
-                      <input
+                      {/* A textarea, not an input (TJ, 2026-08-17: "the
+                          description should wrap so we can read it all"). A
+                          gloss is up to 100 words by the model; on one line
+                          you could read about eight of them, and the rest
+                          scrolled sideways out of view. */}
+                      <textarea
+                        className="conceptdef"
+                        rows={2}
                         placeholder="in your words; same sense across your sources?"
                         defaultValue={concept.def ?? ""}
                         onBlur={(e) => {
@@ -780,13 +831,19 @@ export default function OpenTab({ onGotoPassage, focusPassageId, onFocusHandled,
                               className="rm"
                               style={{ marginRight: "8px", background: "none", border: "none", padding: 0 }}
                               onClick={() => unfilePassage(b.id, concept.id)}
+                              /* "remove PASSAGE from CONCEPT" here, and
+                                 "remove concept from passage" on the chip in
+                                 the passage view (TJ, 2026-08-17). One act,
+                                 named from whichever subject you are standing
+                                 in: this list is a concept and its passages,
+                                 that one is a passage and its concepts. */
                               title={
                                 b.conceptIds.length > 1
                                   ? "Filed under several concepts — this removes it from this one only."
                                   : "The passage stays, with no concept on it, under Unlabeled passages."
                               }
                             >
-                              remove concept from passage
+                              remove passage from concept
                             </button>
                             <button
                               type="button"
