@@ -44,13 +44,14 @@ what is here is good.
 | 6 | Full screen into the toolbar | **Superseded** — merged, not moved | `feat/reading-toolbar-cleanup` |
 | 4 | Reading focus | **Dropped** | PR #20, closed unmerged |
 | 13 | `isDeletePost` accepts slug ids | **Refuse** — the bug is not real | nothing to do |
-| 7 | Highlights become paint | **Take with a change** | not started |
-| 8 | Cards edit in place | **Take** | not started |
-| 9 | The card's subject is the passage | **Take** | not started |
+| 7 | Highlights become paint | **Refuse** — and the real defect is fixed | `feat/reading-toolbar-cleanup` |
+| 8 | Cards edit in place | **Deferred** — "a can of worms" | not started |
+| 9 | The card's subject is the passage | **Deferred with 8** — does not separate | not started |
 | 11 | Zoom floor and ceiling | **Take** | not started |
 | 12 | Trackpad: scroll pans, pinch zooms | **Refuse as written** | not started |
 
-Six settled, one dropped, four still to take, two refused.
+Eight settled, one dropped, two deferred, two refused. Item 11 is the only
+open item left unchecked; item 12 stands refused as written.
 
 **Read items 7–12 with item 13 in mind.** Every recommendation above that is
 still open was formed the same way this document formed item 13: from the
@@ -296,7 +297,32 @@ silently contradicted by a diff.
 *Files:* `ConceptRail.tsx` (+166), `PdfViewer.tsx`, `SpreadCanvasView.tsx`,
 `concept-rail.spec.ts`.
 
-## 9. The card's subject is the passage · Take
+## 9. The card's subject is the passage · Deferred with 8 — it does not separate
+
+**It cannot ship without item 8.** Every one of its four behaviours is an edit:
+the note becomes editable, the name field coins a concept, name and gloss edit
+in place, chips do not. There is no editable field on a `dev` card for any of
+that to apply to — the card is `role="button"` with an `onClick` that opens
+Your work, per the 2026-08-09 ruling. The commit order says the same:
+`c502f7e` (item 8) then `1f1f8cb` (item 9), and 9's own message reads "name and
+gloss edit in place, **as before**". This document's claim that "9 could go
+first if it separates cleanly" is wrong. TJ passed on 8 on 2026-08-17 ("that is
+a can of worms"), so 9 is deferred with it.
+
+**And it is not a red-line fix.** Red line #4 is verbatim as quoted
+(`loom-model-build.md`), but the Unlabeled Passage **is** visible on the card
+today: it is named "Unlabeled passage", shows an excerpt of its own text
+instead of a concept definition, and is still a door to Your work. The empty
+state is neither hidden nor blocked. Item 9 improves this surface; governance
+does not compel it.
+
+**What is true, and separable, is that the note cannot be revised at all** —
+see Future work below. That is the part worth taking, and it needs neither
+item 8 nor a reversal.
+
+The original write-up follows.
+
+### The original proposal
 
 Both card fields keyed off `concepts[0]`, which left a passage with no concept
 unworkable and rendered its notes as truncated read-only text. Since the
@@ -422,6 +448,44 @@ The toolbar work is done and committed but unpushed; reading focus is dropped
 and the two fullscreens merged instead; one free bugfix and the card work
 remain, with one change refused and one refused pending re-tuning. Nothing here
 is blocked on anyone's availability.
+
+## Future work, found while checking these items
+
+None of these are in this pass. They are recorded because each was found by
+measuring rather than reading, and would otherwise have to be found again.
+
+**Rename `refilePassage` → `addPassageConcept`** (TJ, 2026-08-17). The name
+says the opposite of what it does: it does not move a passage from one concept
+to another, it **adds** a filing — inserts a `passage_concept` row and returns
+`[...existing, conceptId]`, throwing only if that pair already exists. The UI
+around it already speaks correctly (*"also file this passage under another
+concept…"*, and "unfile from this concept" rather than "remove passage" when a
+passage has more than one); only the action's name lies. Touches
+`src/actions/loom.ts`, both providers, `OpenTab.tsx`, and the `passage.refile`
+event kind — which means `check-vocabulary` and the Capture Log's fold, so it
+is a rename with a history consequence rather than a pure rename.
+
+**`updatePassageNotes` — a passage's note is write-once** (TJ, 2026-08-17).
+The passage-mutating actions are `createPassage`, `refilePassage`,
+`unfilePassage`, `attributePassages`, `deletePassage`. There is **no update**,
+and `LoomProvider` exposes exactly that set. So a note is written in the
+capture modal, at the moment you have read the passage least, and after that
+there is nowhere in Loom to change it. Same for the passage's question, tier
+and pull-quote flag. Model §Passage says the passage owns its Notes; the app
+lets you write them once. This is the separable half of item 9 — it needs no
+ruling reversed and does not require cards to become editors, since Your work
+and the Capture Log are already editing surfaces.
+
+**The card makes a passage's concepts unequal.** Not filed as work, but the
+finding behind item 9's fourth bullet. Verified by filing a passage under a
+second concept through the student's own flow and photographing the card:
+`concepts[0]` renders as a bold serif heading with its definition beneath,
+while every other concept is a small mono pill with no definition, and the
+card's `aria-label` names only the first — so a screen reader never learns the
+other filings exist. The model has them as equals (0..n per Passage). At the
+time of checking, **no passage in the dev database had more than one concept**
+— 90 passages, 84 with one, 6 unlabeled — so this branch of the card had never
+rendered for anyone.
 
 ## What the first session changed about this document
 
