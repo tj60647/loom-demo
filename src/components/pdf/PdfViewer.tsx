@@ -2082,6 +2082,15 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           left: 0;
           right: 0;
         }
+        /* The open editor is flush against the card above it, so the card's
+           bottom corners square off and the two read as one object with a
+           rule across it. Set here rather than in the CSS module because the
+           element that has to change is the PASSAGE card, which the module
+           does not own. */
+        .pdf-railcard-stack[data-add-open="true"] > .pdf-railcard {
+          border-bottom-left-radius: 0;
+          border-bottom-right-radius: 0;
+        }
         .pdf-rail > .pdf-railcard-stack > .pdf-railcard {
           position: relative;
           left: auto;

@@ -432,6 +432,7 @@ export default function ConceptRails({
               key={id}
               ref={(el) => registerCard(id, el)}
               className="pdf-railcard-stack"
+              data-add-open={activeAddPassageId === id ? "true" : undefined}
               style={{
                 top: placement.tops[id] ?? c.anchor.midY,
                 transform: s < 1 ? `scale(${s})` : undefined,

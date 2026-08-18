@@ -1,10 +1,23 @@
 .card {
   position: relative;
-  margin-top: 7px;
+  /* Flush with the passage card, not floating below it (TJ, 2026-08-18:
+     "should not have a gap between itself and the passage card it is
+     associated with ... it is confusing"). The gap was this rule: measured on
+     the running app at 1536, editor top 326.6 against card bottom 319.6 —
+     exactly the 7px margin that used to be here, with .pdf-add-concept-host
+     contributing 0 (no margin, no padding, no border).
+
+     -1px pulls the two 1px borders into ONE shared line rather than stacking
+     them into a 2px seam. The top corners square, and the passage card's
+     bottom corners are squared to match by the [data-add-open] rule in
+     PdfViewer's sheet — otherwise its 4px radius leaves a notch at each end
+     of the join. The 3px ochre left border is the same colour on both, so it
+     runs unbroken down the pair. */
+  margin-top: -1px;
   padding: 9px 10px 10px;
   border: 1px solid var(--rule);
   border-left: 3px solid rgba(255, 204, 0, .8);
-  border-radius: 4px;
+  border-radius: 0 0 4px 4px;
   background: var(--paper);
   box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
   color: var(--ink);

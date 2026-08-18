@@ -1207,6 +1207,7 @@ export default function SpreadCanvasView({
                   key={id}
                   ref={(el) => registerCard(id, el)}
                   className="pdf-railcard-stack"
+                  data-add-open={activeAddPassageId === id ? "true" : undefined}
                   style={style}
                 >
                   <div className="pdf-railcard">
