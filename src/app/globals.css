@@ -82,7 +82,18 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
    5px 10px, which is right under a word and wrong under a glyph: it drew a
    lozenge around a square icon. Equal padding and a 1:1 ratio put the four
    corners of the drawing an equal distance from the four sides of the box. */
-.btn.iconly{padding:5px;aspect-ratio:1;display:inline-flex;align-items:center;justify-content:center}
+/* An icon-only button is SQUARE and has no box (TJ, 2026-08-17). `.btn.mini`
+   is padded 5px 10px, which is right under a word and wrong under a glyph —
+   it drew a lozenge around a square icon. And the border was drawing a box
+   around a drawing that already has its own edges: two frames, one control.
+   So: equal padding, 1:1, no rule, no fill. The glyph is the button.
+   It runs quieter than the ink around it and comes up to full strength on
+   hover, which is the whole of its answer to the mouse now that there is no
+   border to darken. Placed after the .btn hover rules on purpose — same
+   specificity, so source order is what decides. */
+.btn.iconly{padding:4px;aspect-ratio:1;display:inline-flex;align-items:center;justify-content:center;
+  border-color:transparent;background:transparent;color:var(--ink-soft)}
+.btn.iconly:hover:not(:disabled){background:transparent;border-color:transparent;color:var(--ink)}
 .btn:disabled{opacity:.35;cursor:default}
 /* HOVER (TJ, 2026-08-17). Every button used to answer the mouse with
    `opacity:.88` — a 12% fade, identical on a solid button and a ghost one, and

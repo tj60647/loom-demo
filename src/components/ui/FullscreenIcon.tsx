@@ -24,8 +24,8 @@ export default function FullscreenIcon({ exit = false }: { exit?: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="1.3em"
-      height="1.3em"
+      width="1.95em"
+      height="1.95em"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"

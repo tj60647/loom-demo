@@ -7,6 +7,7 @@ import { useReadings } from "@/components/providers/ReadingsProvider"
 import AuthButton from "./AuthButton"
 import MyLoomModal from "./MyLoomModal"
 import FullscreenIcon from "./FullscreenIcon"
+import GuideIcon from "./GuideIcon"
 
 /** Module-level so the store identity is stable across renders. */
 const subscribeFullscreen = (onChange: () => void) => {
@@ -136,10 +137,11 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
         {session && (
           <Link
             href="/sandbox"
-            className="btn ghost mini"
+            className="btn ghost mini iconly"
             data-tip="the guide — walk every move on a real reading, nothing is kept"
+            aria-label="The guide — walk every move on a real reading"
           >
-            guide
+            <GuideIcon />
           </Link>
         )}
         {/* Beside the guide, per TJ. Hidden where the browser will not grant
