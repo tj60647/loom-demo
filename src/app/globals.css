@@ -53,7 +53,23 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
    states; only the colour changes. */
 .btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:1px solid transparent;border-radius:3px;padding:7px 11px;cursor:pointer}
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
-.btn.mini{font-size:11px;padding:7px 10px;letter-spacing:.05em;min-height:36px}
+/* No min-height (TJ, 2026-08-17). It was 36px, and on an 11px label that is
+   ~7px of empty box above and below the words — which is why every place that
+   cared had already opted out: `.btn.compact` exists only to undo it, the
+   reading toolbar overrode it to get from 63px to 35px, and the workbench
+   footer overrode it again to stop being taller than the band it replaced.
+   Three opt-outs and no opt-ins is a default that is wrong.
+   Released here instead, so the header, the journey bar's search and every
+   mini button elsewhere are sized by their own padding: 25px, not 36. Loom is
+   a desktop tool (AGENTS.md) — there is no touch target to protect. */
+.btn.mini{font-size:11px;padding:5px 10px;letter-spacing:.05em}
+/* A label is one line. Without this a long one wraps inside its own box and
+   the button becomes twice as tall as its neighbours — "download the kit
+   .json" and "download the kit .md" were 38px in a row of 25s, for no reason
+   a reader could see. A control that is wider than its column should overflow
+   its column, not grow downward: the row it sits in is the thing being
+   measured. */
+.btn{white-space:nowrap}
 .btn:disabled{opacity:.35;cursor:default}
 /* HOVER (TJ, 2026-08-17). Every button used to answer the mouse with
    `opacity:.88` — a 12% fade, identical on a solid button and a ghost one, and
