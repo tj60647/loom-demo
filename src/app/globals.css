@@ -78,6 +78,11 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
    its column, not grow downward: the row it sits in is the thing being
    measured. */
 .btn{white-space:nowrap}
+/* An icon-only button is SQUARE (TJ, 2026-08-17). `.btn.mini` is padded
+   5px 10px, which is right under a word and wrong under a glyph: it drew a
+   lozenge around a square icon. Equal padding and a 1:1 ratio put the four
+   corners of the drawing an equal distance from the four sides of the box. */
+.btn.iconly{padding:5px;aspect-ratio:1;display:inline-flex;align-items:center;justify-content:center}
 .btn:disabled{opacity:.35;cursor:default}
 /* HOVER (TJ, 2026-08-17). Every button used to answer the mouse with
    `opacity:.88` — a 12% fade, identical on a solid button and a ghost one, and
@@ -122,7 +127,11 @@ nav{display:flex;border-bottom:1px solid var(--rule);padding:0 26px;background:v
    station since 2026-08-13 — the station's search — and the bare element
    selector was dressing it as an 18px display-font tab. Every station form
    (button, link, inert span) carries the class, so the class is the rule. */
-nav .station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
+/* 7px, not 11px (TJ, 2026-08-17): the station names are 18px display type in
+   a bar whose whole job is to be always in view, and 22px of padding around
+   them was more air than the words. The horizontal 16px stays — that is the
+   gap BETWEEN stations, and closing it would run the journey together. */
+nav .station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:7px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
 nav .station.active{color:var(--ink);border-bottom-color:var(--ochre)}
 /* A station with nowhere to go (JourneyNav's READING_ONLY, TJ 2026-08-09).
    Still drawn and still numbered — the arc is meant to be visible whole — but
@@ -415,6 +424,7 @@ footer .fr{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-conte
 footer .foottitle{font-family:var(--display);font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46ch}
 footer .footmeta{color:var(--ink-soft);white-space:nowrap}
+footer .footrule{width:1px;height:12px;background:var(--rule);display:inline-block;flex:none}
 footer .footid .label{letter-spacing:.1em}
 /* Reading focus (TJ, 2026-08-17): with the text open, the station is the text.
    The header belongs to the root layout, so the workbench cannot withhold it

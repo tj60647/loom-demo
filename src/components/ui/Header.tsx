@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import AuthButton from "./AuthButton"
 import MyLoomModal from "./MyLoomModal"
+import FullscreenIcon from "./FullscreenIcon"
 
 /** Module-level so the store identity is stable across renders. */
 const subscribeFullscreen = (onChange: () => void) => {
@@ -158,12 +159,13 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
             §2c-iii), which costs more than the naming gains. */}
         {session && canFull && (
           <button
-            className="btn ghost mini"
+            className="btn ghost mini iconly"
             onClick={toggleFull}
             aria-pressed={isFull}
+            aria-label={isFull ? "Exit full screen" : "Full screen — Loom fills the screen"}
             data-tip={isFull ? "back to the browser (esc)" : "give Loom the whole screen"}
           >
-            {isFull ? "exit full screen" : "full screen"}
+            <FullscreenIcon exit={isFull} />
           </button>
         )}
       </header>

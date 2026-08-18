@@ -9,6 +9,7 @@ import { type PdfDoc } from './PageRaster';
 import SpreadCanvasView from './SpreadCanvasView';
 import ConceptRails, { RAIL_W } from './ConceptRail';
 import ReuseOffer from '@/components/ui/ReuseOffer';
+import FullscreenIcon from '@/components/ui/FullscreenIcon';
 import { useLoom } from '@/components/providers/LoomProvider';
 import { useReadings } from '@/components/providers/ReadingsProvider';
 import { searchReading, getPassagesOverlay, getReadingPageManifest } from '@/lib/reads';
@@ -1908,15 +1909,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         }
         .pdf-modes { display: flex; background: var(--paper); border-radius: 4px; padding: 1px; border: 1px solid var(--rule); }
         .pdf-modes button { border: none; margin: 0; padding: 4px 9px; }
-        /* .btn.mini carries min-height:36px (globals.css). Against the 4px
-           padding right above, that floor wins and leaves ~7px of empty box
-           above and below an 11px label — the padding never applied. Release
-           it here, scoped to the toolbar, so nothing else wearing .btn.mini
-           moves. Vertical space is the scarce axis on the reading station
-           (contracts.md §2c-iii); the row was 63px of chrome above the text
-           and two thirds of that was nothing.
-           No backticks in this block: it is a styled-jsx template literal. */
-        .pdf-toolbar .btn.mini { min-height: 0; padding: 4px 9px; }
+        /* The floor this used to release is gone: .btn.mini carries no
+           min-height since 2026-08-17, so a scoped override here would only
+           shave a pixel of padding — and it outranked .btn.iconly, which
+           turned the square full-screen button into a 34px box and put 7px
+           back on the row it had been removed from.
+           (No backticks in this block: styled-jsx template literal.) */
         .pdf-toolbar {
           display: flex;
           flex-wrap: wrap;
@@ -2300,13 +2298,17 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               with it. Only one of the two is ever visible at a time — this
               mode covers the header — so the exit label needs no qualifier. */}
           <button
-            className="btn ghost mini"
+            className="btn ghost mini iconly"
             onClick={() => setFullscreen(!isFullscreen)}
             data-tip={isFullscreen ? "back to the journey (esc)" : "the text fills the screen (f)"}
             aria-pressed={isFullscreen}
-            aria-label={isFullscreen ? "Exit full screen" : "Full screen text"}
+            // Icon only (TJ, 2026-08-17), so the words live here and in the
+            // tip. The header's control wears the same glyph and means the
+            // app rather than the text — they never share a screen, because
+            // the reading station is exactly where the header stands down.
+            aria-label={isFullscreen ? "Exit full screen" : "Full screen — the text fills the screen"}
           >
-            {isFullscreen ? (isNarrow ? "↙" : "↙ Exit full screen") : (isNarrow ? "⛶" : "⛶ Full screen text")}
+            <FullscreenIcon exit={isFullscreen} />
           </button>
         </div>
       </div>
