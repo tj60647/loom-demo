@@ -276,6 +276,15 @@ function foldEvents(events: GraphEvent[], upTo: number) {
         seedFromSnapshot(p.snapshot, concepts, passages, edges, at)
         break
       }
+      // A reading taken off the shelf. Deliberately a NO-OP for the fold, and
+      // written out rather than left to `default` so the reason is on the
+      // record: archiving retires the card, not the work. Every passage
+      // captured from that reading keeps its id, its concepts and its threads
+      // — `isArchived` touches the source row only — so a replay that dropped
+      // anything here would show less than the student still has. It belongs
+      // in the log as a line you can read; it changes nothing to redraw.
+      case "reading.archive":
+        break
       // concept.update (def/note) doesn't change what the cloth draws.
       default:
         break

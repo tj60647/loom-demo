@@ -18,6 +18,29 @@ export const isDeletePost = (request: Request) =>
   /^\["[0-9a-f-]{36}"(,(null|"[0-9a-f-]{36}"))?\]$/.test(request.postData() ?? '');
 
 /**
+ * Take a reading of your own off the shelf, the way a student does.
+ *
+ * Every spec that cards a reading should end with this. Until 2026-08-17 none
+ * of them could: the only delete in the app was `deleteSource`, which opens
+ * with `requireAdmin` — so `journey-learner` and `reuse-seam` left a card
+ * behind on every run, and 80 of them had piled up on the test account by the
+ * time anyone counted. `journey-learner`'s own docstring said it removed
+ * everything it made; the reading was the one thing it could not.
+ *
+ * Archived, not deleted, so this is cleanup of the SHELF rather than of the
+ * database — which is the honest thing to promise and matches what the button
+ * does.
+ */
+export async function removeOwnReading(page: Page, title: string) {
+  await page.goto('/');
+  const card = page.locator('.shelfcard', { hasText: title }).first();
+  await expect(card).toBeVisible({ timeout: 20000 });
+  await card.locator('.shelfremove').click();
+  await page.getByRole('button', { name: 'Remove from my shelf' }).click();
+  await expect(page.locator('.shelfcard', { hasText: title })).toHaveCount(0, { timeout: 20000 });
+}
+
+/**
  * Assert which reading is open, from where the title actually lives.
  *
  * It was `.scopetitle`, in a band above the journey, until 2026-08-17. That

@@ -58,6 +58,12 @@ export function describeEvent(e: GraphEvent): string {
       return typeof p.descriptionChars === "number" ? "revised a cloth's description" : "titled a cloth"
     case "graph.reset": return "reset the cloth"
     case "reading.reset": return "started this reading over"
+    // "took off the shelf", not "deleted": the row is archived, the passages
+    // captured from it are untouched, and an admin can put it back.
+    case "reading.archive":
+      return typeof p.title === "string" && p.title
+        ? `took "${p.title}" off their shelf`
+        : "took a reading of their own off their shelf"
     case "graph.import": return "imported a cloth"
     case "graph.example": return "loaded the worked example"
     default: return "one more act on the record"

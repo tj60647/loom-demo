@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { cardOwnReading } from "./helpers"
+import { cardOwnReading, removeOwnReading } from "./helpers"
 
 /**
  * The seam between readings — naming a concept you already named somewhere else.
@@ -107,4 +107,9 @@ test("the same concept in a second reading offers the way out, and taking it spl
       { timeout: 25000 }
     )
     .toEqual([1, 1])
+
+  // The two cards this test made, off the shelf again. See helpers'
+  // removeOwnReading: archived, not deleted, so this is shelf cleanup.
+  await removeOwnReading(page, first)
+  await removeOwnReading(page, second)
 })

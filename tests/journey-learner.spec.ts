@@ -20,7 +20,7 @@
  * prompts and the read.
  */
 import { test, expect } from "@playwright/test"
-import { cardOwnReading, enterReadingFromCard, isDeletePost } from "./helpers"
+import { cardOwnReading, enterReadingFromCard, isDeletePost, removeOwnReading } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 // Each test is independent and removes what it adds — no serial mode, so one
@@ -103,7 +103,8 @@ test("01 · a passage typed into a carded reading lands in the coding log — an
   //
   // Every seeded reading carries a file, so this cards its own. On that station
   // the capture form IS the page: no sheet to slide out, no fold to open.
-  await cardOwnReading(page, `A book carded by the journey suite ${Date.now().toString().slice(-6)}`)
+  const ownBook = `A book carded by the journey suite ${Date.now().toString().slice(-6)}`
+  await cardOwnReading(page, ownBook)
   await expect(page.locator("#bText")).toBeVisible({ timeout: 15_000 })
 
   await page.locator("#bText").fill("A passage typed by the journey suite, verbatim enough for the log.")
@@ -136,6 +137,12 @@ test("01 · a passage typed into a carded reading lands in the coding log — an
   await page.getByRole("button", { name: "Delete concept" }).click()
   await conceptDeleted
   await expect(page.locator(".lrow", { hasText: "journey test concept" })).toHaveCount(0, { timeout: 15_000 })
+
+  // And the reading itself — the one mutation this file could not undo until
+  // 2026-08-17, despite promising at the top that it undoes them all. Archived
+  // rather than deleted, so this takes the card off the shelf and leaves the
+  // row; see helpers' removeOwnReading.
+  await removeOwnReading(page, ownBook)
 })
 
 test("02 · pick two, say the sentence, throw the thread, label the link — then unpick it all", async ({ page }) => {
@@ -185,6 +192,7 @@ test("02 · pick two, say the sentence, throw the thread, label the link — the
   await page.reload()
   await loomLoaded(page)
   await expect(page.locator(".sent", { hasText: "one sustains the other" })).toHaveCount(0, { timeout: 15_000 })
+
 })
 
 test("03 · vocabulary is every word you own, across all your readings", async ({ page }) => {

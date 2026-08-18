@@ -13,7 +13,7 @@ import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings, type ReadingMeta } from "@/components/providers/ReadingsProvider"
-import { createOwnReading, updateOwnReadingMetadata } from "@/actions/sources"
+import { archiveOwnReading, createOwnReading, updateOwnReadingMetadata } from "@/actions/sources"
 import { draftMetadataForOwnSource } from "@/lib/reads"
 import { uploadOwnReading } from "@/lib/readingUploadClient"
 import { MAX_READING_BYTES, MAX_READING_LABEL, formatBytes } from "@/lib/readingUpload"
@@ -25,6 +25,7 @@ import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import JourneyNav from "@/components/ui/JourneyNav"
 import StationSearch from "@/components/ui/StationSearch"
 import Identity from "@/components/ui/Identity"
+import { useDialog } from "@/components/providers/DialogProvider"
 import { SIGN_IN_EXPLANATION } from "@/lib/signIn"
 
 export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeployment?: boolean }) {
@@ -34,6 +35,8 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
   const { state, isLoading } = useLoom()
   const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
   const tallies = useMemo(() => tallyByReading(state), [state])
+  const { confirm, notify } = useDialog()
+  const [removing, setRemoving] = useState<string | null>(null)
 
   // Syllabus order, with unscheduled readings after the weeks rather than
   // sorted into week 0.
@@ -56,6 +59,60 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
   }, [courseReadings])
 
   const untethered = state.passages.filter((b) => !b.sourceId).length
+
+  /**
+   * Take a reading of your own off the shelf.
+   *
+   * Allowed even when there is work behind the card (TJ, 2026-08-17), but
+   * never silently: the warning says exactly what stays and what goes. What
+   * goes is the card and the door to that reading's own Capture Log; what
+   * stays is every passage, concept and thread, which is why this is worth
+   * doing at all rather than refusing.
+   *
+   * `refresh()` rather than optimistic removal: the shelf reads its readings
+   * from the server, and a card that vanished before the write landed would
+   * come back on the next load looking like the removal had failed.
+   */
+  const removeOwn = async (s: ReadingMeta) => {
+    const tally = tallies.get(s.id)
+    const work = tally
+      ? [
+          tally.passages ? `${tally.passages} passage${tally.passages !== 1 ? "s" : ""}` : "",
+          tally.concepts ? `${tally.concepts} concept${tally.concepts !== 1 ? "s" : ""}` : "",
+          tally.threads ? `${tally.threads} thread${tally.threads !== 1 ? "s" : ""}` : "",
+        ].filter(Boolean)
+      : []
+    const ok = await confirm({
+      title: `Take “${short(s.title, 60)}” off your shelf?`,
+      body: work.length ? (
+        <>
+          You have {work.join(" · ")} on this reading. <b>None of it is deleted</b> — your
+          passages keep their concepts and stay in Vocabulary. What goes is the card, and
+          with it the way back to this reading&rsquo;s own Capture Log.
+        </>
+      ) : (
+        <>Nothing has been captured here, so nothing is lost. The card goes off your shelf.</>
+      ),
+      confirmLabel: "Remove from my shelf",
+      danger: true,
+      // NOT "this cannot be undone": the row is archived, not deleted, and the
+      // passages are untouched. The red button is right; that sentence is not.
+      eyebrow: work.length ? "your work is kept" : "the card goes, nothing else",
+    })
+    if (!ok) return
+    setRemoving(s.id)
+    try {
+      await archiveOwnReading(s.id)
+      await refresh()
+    } catch {
+      await notify({
+        title: "That reading is still on your shelf.",
+        body: "The removal did not reach the server. Try again.",
+      })
+    } finally {
+      setRemoving(null)
+    }
+  }
 
   if (status === "loading") {
     return (
@@ -209,6 +266,25 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
                 <span className="clothmeta">nothing written here yet</span>
               )}
             </span>
+            {/* Only on a reading of your OWN, and only yours (TJ, 2026-08-17).
+                Until now nothing could take a carded reading off a shelf — the
+                only delete in the app is admin's — so a mistyped title stayed
+                for good. "Remove", not "delete": the row is archived and every
+                passage captured from it is untouched.
+
+                In the cloth row rather than on the card face: the card is the
+                door to the reading, and a destructive control inside a door is
+                a mis-click waiting to happen. */}
+            {s.isOwn && (
+              <button
+                className="btn ghost mini compact shelfremove"
+                onClick={() => removeOwn(s)}
+                disabled={removing === s.id}
+                data-tip="take this reading off your shelf — your passages stay"
+              >
+                {removing === s.id ? "removing…" : "remove"}
+              </button>
+            )}
           </div>
         )}
       </div>

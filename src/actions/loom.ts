@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/db"
+import { recordEvent } from "@/lib/graphEvent"
 import { concepts, passages, passageConcepts, edges, links, users, sourcePages, cloths, views, graphEvents, maps } from "@/db/schema"
 import { and, asc, eq, inArray, isNull, like, or, sql, type SQL } from "drizzle-orm"
 import type { PgColumn } from "drizzle-orm/pg-core"
@@ -74,27 +75,6 @@ function inCourse(column: PgColumn, courseId: string | null): SQL {
   return courseId ? eq(column, courseId) : isNull(column)
 }
 
-/**
- * Append one student act to the graph's development history. Best-effort by
- * design: neon-http has no cross-call transactions, so the graph tables stay
- * the source of truth and a lost event never fails the mutation it describes.
- * History is an exploratory record (rendered as counts and replay, never
- * judgment) and deliberately survives reset and import.
- */
-async function recordEvent(
-  userId: string,
-  courseId: string | null,
-  kind: string,
-  entityType: "concept" | "passage" | "edge" | "link" | "graph" | "map" | "cloth",
-  entityId: string | null,
-  payload?: Record<string, unknown>
-) {
-  try {
-    await db.insert(graphEvents).values({ userId, courseId, kind, entityType, entityId, payload })
-  } catch (e) {
-    console.warn(`[recordEvent] failed to record ${kind}`, e)
-  }
-}
 
 /**
  * Drop deleted entities' geometry from every view row — the legacy cardTable
