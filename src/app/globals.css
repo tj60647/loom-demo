@@ -1385,9 +1385,46 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
      horizontal padding"). Every row in here is already a bordered card with
      its own padding, so the sheet's was a second margin around a margin —
      16px of it, twice, on the axis the rows needed. */
-  padding: 14px 8px 40px;
+  /* Top padding 0, and .onecol below carries the 14px instead. A sticky child
+     bottoms out at the SCROLLER'S CONTENT BOX, so while the 14px lived here
+     the view switch parked 14px low and rows slid visibly through the strip
+     above it (measured on the running app at 1536: band stuck at y=158.5 with
+     the body's content starting at y=144.5). Moving the same 14px inside the
+     scrollport costs nothing at rest and gives the switch the real top edge. */
+  padding: 0 8px 40px;
 }
+.yourwork-body .onecol { padding-top: 14px; }
 .yourwork-body .scrollbox { max-height: none; }
+/* The switch stays on screen while the list moves under it (TJ, 2026-08-18).
+   .yourwork-body is the sheet's one scroller and the card inside it is as tall
+   as the list, so PASSAGES/CONCEPTS scrolled off the top with everything else:
+   changing which end of the join you are reading from meant scrolling back up
+   to find the control that does it. Sticky rather than moved into
+   .yourwork-head, because the head bar is the sheet's name and its way out —
+   the switch belongs to the list.
+
+   Full-bleed, because .segmented is an inline-flex pill: stuck at the top it
+   would let rows slide past on either side of it. -9px is .yourwork .card's
+   own horizontal padding, so the band reaches the card's padding edge and
+   stops inside its 1px border.
+
+   The background must be opaque and must match what the card paints, which is
+   rgba(255,255,255,.5) over the panel's --paper. color-mix says exactly that
+   and keeps saying it if --paper moves. */
+.yourwork-body .viewswitch {
+  position: sticky;
+  top: 0;
+  /* Under .cardmenu (6), the concept popover a top row can open upward into. */
+  z-index: 2;
+  margin: 0 -9px 12px;
+  /* 6px above the pill rather than 2: stuck, the band's top IS the top of the
+     panel body, and the switch sat against the head bar's rule with nothing
+     between them. At rest it costs 6px. */
+  padding: 6px 9px 8px;
+  background: color-mix(in srgb, #fff 50%, var(--paper));
+  border-bottom: 1px solid var(--rule);
+}
+.yourwork-body .viewswitch .segmented { margin-bottom: 0; }
 /* TYPE STEP-DOWN (TJ, 2026-08-13: "the font sizes seem overly large to me").
    They were, and not by taste. The app's base is 17px Newsreader — right for
    60-75ch of prose on a full-width page, which is what a reading tool should

@@ -642,7 +642,11 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
         {/* Which end of the join you are reading from. Hidden when there is
             nothing yet: a switch between two empty lists is a control that
             cannot do anything. */}
+        {/* The band exists so the switch can stay put while the list scrolls
+            under it — see .yourwork-body .viewswitch. It is a bare wrapper
+            everywhere else: nothing styles it outside the sheet. */}
         {(scoped.concepts.length > 0 || unlabeled.length > 0) && (
+          <div className="viewswitch">
           <div className="segmented" role="group" aria-label="Read your work by">
             {/* Passages first, and the view you land on (TJ, 2026-08-17).
                 This panel opens over a text you are reading: what you just did
@@ -660,6 +664,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
               aria-pressed={view === "concepts"}
               data-tip="your concepts, each with the passages that evidence it"
             >Concepts</button>
+          </div>
           </div>
         )}
 
