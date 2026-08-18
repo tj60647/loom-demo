@@ -40,7 +40,15 @@ h1,h2,h3{font-family:var(--display);font-weight:500;margin:0}
 .cap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--grey)}
 header{border-bottom:1px solid var(--rule);padding:10px 26px 8px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--paper)}
 .wordmark{font-family:var(--display);font-size:24px;font-weight:600;line-height:1;display:flex;align-items:center;gap:9px}
-.wordmark small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);font-weight:400;margin-top:3px}
+/* The tagline sits BESIDE the name, not under it (TJ, 2026-08-17). Stacked,
+   the mark was 36px — 24px of "Loom" over a 9px line plus its 3px gap — and
+   since the mini buttons came down to 25px the mark was the only thing left
+   setting the header's height. Beside it, the mark is as tall as its own
+   largest type and the header loses 12px on every page.
+   Baseline, not centre: the tagline is a subtitle to the name and reads as
+   one line of type with it, which centring would not give. */
+.wordmark > div{display:flex;align-items:baseline;gap:9px;white-space:nowrap}
+.wordmark small{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);font-weight:400}
 header .spacer{flex:1}
 header .field{display:flex;flex-direction:column;gap:3px}
 header input{font-family:var(--body);font-size:15px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:5px 8px;color:var(--ink)}
