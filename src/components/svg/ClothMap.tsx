@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import type { LoomState } from "@/lib/types"
 import { adjacency, componentOf } from "@/lib/clothMath"
+import { conceptNameText } from "@/lib/conceptName"
 
 type ReadSel = { type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean } | null
 
@@ -270,8 +271,9 @@ export default function ClothMap({
               cursor="pointer"
               onClick={handleSelect}
             >
-              <title>{c.label + (c.def ? ` — ${c.def}` : '')}</title>
-              {c.label.length > 34 ? c.label.slice(0, 33) + '…' : c.label}
+              <title>{conceptNameText(c) + (c.def ? ` — ${c.def}` : '')}</title>
+              {/* fill, not a class: `color` is inert on SVG text. */}
+              {(() => { const n = conceptNameText(c); return n.length > 34 ? n.slice(0, 33) + '…' : n })()}
             </text>
           </g>
         )

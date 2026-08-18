@@ -8,6 +8,7 @@ import PageSlot from './PageSlot';
 import { type PdfDoc } from './PageRaster';
 import SpreadCanvasView from './SpreadCanvasView';
 import ConceptRails, { RAIL_W } from './ConceptRail';
+import { conceptNameText } from "@/lib/conceptName";
 import ReuseOffer from '@/components/ui/ReuseOffer';
 import FullscreenIcon from '@/components/ui/FullscreenIcon';
 import { useLoom } from '@/components/providers/LoomProvider';
@@ -519,7 +520,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       const concept = conceptsRef.current.find((c) => c.id === passage.conceptIds[0]);
       return [{
         passageId: passage.id,
-        conceptLabel: concept?.label || "Unlabeled passage",
+        // An Unlabeled PASSAGE is one filed under nothing. A passage filed
+        // under a Concept that has a Description and no Label is not that, and
+        // saying so named the wrong object — so the concept's own placeholder
+        // is used when a concept exists, and "Unlabeled passage" only when one
+        // does not.
+        conceptLabel: concept ? conceptNameText(concept) : "Unlabeled passage",
         source: passage.source || sourceName,
         location: passage.location || "",
         startOffset: passage.startOffset ?? null,
@@ -1155,7 +1161,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                * that one is the door, and it alone is named and focusable.
                */
               const concept = state.concepts.find((c) => c.id === passage.conceptIds[0]);
-              const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
+              const a11y = `${concept ? conceptNameText(concept) : "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
               let isEntryPoint = true;
               const dressMark = (node: HTMLElement) => {
                 // EVERY fragment gets these two. The rails resolve their cards

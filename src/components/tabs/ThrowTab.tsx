@@ -12,6 +12,8 @@ import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import ConceptCard from "@/components/cards/ConceptCard"
 import type { Passage } from "@/lib/types"
+import ConceptName from "@/components/ui/ConceptName"
+import { conceptNameText } from "@/lib/conceptName"
 
 const PLAIN_VERBS = ['leads to','depends on','is part of','goes against','is the same as','sets up'];
 
@@ -440,7 +442,7 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
         onClick={() => togglePick(c.id)}
         title="tap to load into the bench"
       >
-        <div className="clabel">{c.label}</div>
+        <div className="clabel"><ConceptName concept={c} /></div>
         {isPicked
           ? <div className="pickedtag">PICK {pairA === c.id ? 1 : 2}</div>
           : (noev && <div className="pickedtag" style={{ color: "var(--ink-soft)" }} title="no passage backs this yet — you may have named it ahead of its evidence, which is allowed">no evidence</div>)}
@@ -451,7 +453,7 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
         <button
           type="button"
           className="cdot"
-          aria-label={`Show the concept card for ${c.label}`}
+          aria-label={`Show the concept card for ${conceptNameText(c)}`}
           data-tip="see this concept — its meaning and evidence"
           aria-expanded={cardFor === c.id}
           onClick={(e) => {
@@ -480,11 +482,11 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
     return (
       <div key={e.id} className={`thread ${sel || edt ? "sel" : ""}`}>
         <div className="trip">
-          <b>{fromC ? short(fromC.label, 30) : "?"}</b>{' '}
+          <b>{fromC ? short(conceptNameText(fromC), 30) : "?"}</b>{' '}
           {e.handle
             ? <span className="v">{e.handle}</span>
             : <span className="v loosev">{short(e.sentence, 38)}</span>}{' '}
-          <b>{toC ? short(toC.label, 30) : "?"}</b>
+          <b>{toC ? short(conceptNameText(toC), 30) : "?"}</b>
         </div>
         <div className="sent">“{e.sentence}”</div>
         <div className="tmeta">
@@ -606,7 +608,7 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
         popover="auto"
         className="cpop"
         role="dialog"
-        aria-label={cardConcept ? `${cardConcept.label} — concept card` : "Concept card"}
+        aria-label={cardConcept ? `${conceptNameText(cardConcept)} — concept card` : "Concept card"}
       >
         {cardConcept && (
           <>
@@ -696,7 +698,7 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
               {c1 ? (
                 <>
                   <span className="clear" onClick={() => handleClearSlot('A')}>✕</span>
-                  {c1.label}
+                  <ConceptName concept={c1} />
                 </>
               ) : <span className="ph">tap a concept on the left</span>}
             </div>
@@ -711,7 +713,7 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
               {c2 ? (
                 <>
                   <span className="clear" onClick={() => handleClearSlot('B')}>✕</span>
-                  {c2.label}
+                  <ConceptName concept={c2} />
                 </>
               ) : <span className="ph">tap a concept on the left</span>}
             </div>

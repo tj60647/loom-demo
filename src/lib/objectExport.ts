@@ -24,6 +24,7 @@ import { describeEvent, TIER_WORD } from "./logPhrase"
 import { scopeLabelOf } from "./graphExport"
 import { usesOf } from "./linkResolve"
 import type { GraphEvent, LoomExport, LoomState, Tier } from "./types"
+import { conceptNameText } from "@/lib/conceptName"
 
 export const LOOM_CLOTH_FORMAT = "loom-cloth"
 export const LOOM_THREADS_FORMAT = "loom-threads"
@@ -157,7 +158,8 @@ export function buildClothMarkdown(
   titleOfSource?: (id: string) => string
 ): string {
   const data = buildClothExport(state, scopeKey, provenance, titleOfSource)
-  const labelOf = new Map(data.graph.concepts.map((c) => [c.id, c.label]))
+  // Markdown is prose; the .json beside it keeps `label` raw so it round-trips.
+  const labelOf = new Map(data.graph.concepts.map((c) => [c.id, conceptNameText(c)]))
   const out: string[] = []
   const where = provenance.course ? ` · ${provenance.course}` : ""
 
@@ -171,7 +173,7 @@ export function buildClothMarkdown(
   // student wrote on a capture — all of which the .json has carried all along.
   out.push(`## Concepts (${data.graph.concepts.length})`, "")
   for (const c of data.graph.concepts) {
-    out.push(`- **${c.label}**${c.def ? ` — ${c.def}` : ""}${c.note ? ` _(${c.note})_` : ""}`)
+    out.push(`- **${conceptNameText(c)}**${c.def ? ` — ${c.def}` : ""}${c.note ? ` _(${c.note})_` : ""}`)
     for (const p of data.graph.passages.filter((b) => b.conceptIds.includes(c.id))) {
       out.push(...passageLines(p, "  "))
     }
@@ -201,7 +203,7 @@ export function buildClothMarkdown(
     if (tiered.length) {
       for (const [tier, name] of TIER_ORDER) {
         const group = tiered.filter((c) => p.tiers[c.id] === tier)
-        if (group.length) out.push(`- **${name}**: ${group.map((c) => c.label).join(" · ")}`)
+        if (group.length) out.push(`- **${name}**: ${group.map((c) => conceptNameText(c)).join(" · ")}`)
       }
       out.push("")
     }
@@ -249,7 +251,7 @@ export function buildThreadsExport(
   titleOfSource?: (id: string) => string
 ): LoomThreadsExport {
   const scoped = scopedGraph(state, scopeFromKey(scopeKey))
-  const labelOf = new Map(state.concepts.map((c) => [c.id, c.label]))
+  const labelOf = new Map(state.concepts.map((c) => [c.id, conceptNameText(c)]))
   return {
     format: LOOM_THREADS_FORMAT,
     provenance,
@@ -335,7 +337,7 @@ export function buildVocabularyMarkdown(state: LoomState, provenance: ExportProv
   out.push(`## Concepts (${data.concepts.length})`, "")
   for (const c of [...data.concepts].sort((a, b) => a.label.localeCompare(b.label))) {
     const counted = `${c.passages} passage${c.passages !== 1 ? "s" : ""} · ${c.readings} reading${c.readings !== 1 ? "s" : ""}`
-    out.push(`- **${c.label}** (${counted})${c.def ? ` — ${c.def}` : ""}`)
+    out.push(`- **${conceptNameText(c)}** (${counted})${c.def ? ` — ${c.def}` : ""}`)
   }
   out.push("", `## Link labels (${data.linkLabels.length})`, "")
   if (!data.linkLabels.length) out.push("_None yet._")

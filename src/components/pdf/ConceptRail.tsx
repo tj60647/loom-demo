@@ -26,6 +26,8 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import type { Concept, Passage } from "@/lib/types";
 import { layoutRail, railScale } from "@/lib/railLayout";
 import { short } from "@/lib/clothMath";
+import ConceptName from "@/components/ui/ConceptName";
+import { conceptNameText } from "@/lib/conceptName";
 import AddConceptRailCard from "./AddConceptRailCard";
 
 export const RAIL_W = 220;
@@ -51,8 +53,6 @@ type CardModel = {
   anchor: Anchor;
 };
 
-const railConceptName = (concept: Concept) =>
-  concept.label.trim() || short(concept.def?.trim() || "Concept", 42);
 
 /**
  * Wraps the page-mode spread. Always renders the same wrapper element so the
@@ -110,15 +110,15 @@ export function RailCardBody({
               type="button"
               className="pdf-chip-open"
               onClick={() => onOpenConcept?.(concept.id)}
-              title={`Open “${railConceptName(concept)}” in your work`}
-            >{railConceptName(concept)}</button>
+              title={`Open “${conceptNameText(concept)}” in your work`}
+            ><ConceptName concept={concept} /></button>
             {!readOnly && (
               <button
                 type="button"
                 className="pchip-x"
                 onClick={() => onUnfile?.(passage.id, concept.id)}
-                aria-label={`Remove ${railConceptName(concept)} from this passage`}
-                title={`Remove “${railConceptName(concept)}” from this passage. The passage stays.`}
+                aria-label={`Remove ${conceptNameText(concept)} from this passage`}
+                title={`Remove “${conceptNameText(concept)}” from this passage. The passage stays.`}
               >×</button>
             )}
           </span>

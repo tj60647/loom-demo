@@ -7,6 +7,8 @@ import { useDialog } from "@/components/providers/DialogProvider"
 import type { Passage } from "@/lib/types"
 import { readingsOf, soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
+import ConceptName from "@/components/ui/ConceptName"
+import { conceptNameText } from "@/lib/conceptName"
 import { tidy } from "@/lib/clothMath"
 import ClothFold from "@/components/tabs/ClothFold"
 import ReuseOffer from "@/components/ui/ReuseOffer"
@@ -115,7 +117,11 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
    */
   const conceptOptions = (
     <datalist id={listId}>
-      {sortedByLabel(state.concepts).map(c => <option key={c.id} value={c.label} />)}
+      {/* Blank labels are FILTERED, never placeheld: an <option value> is what
+          lands in the field and is then matched by findConcept to reuse or coin,
+          so "(unlabeled concept)" here would mint a Concept by that name. Same
+          guard, same reason, as AddConceptRailCard.tsx. */}
+      {sortedByLabel(state.concepts).filter(c => c.label.trim()).map(c => <option key={c.id} value={c.label} />)}
     </datalist>
   )
 
@@ -713,7 +719,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
                     expand/collapse target, so "delete this concept" lives inside the
                     opened row next to "remove passage", labelled, as in v14. */}
                 <div className="lhead" onClick={() => toggleRow(concept.id)} style={{ display: "flex", alignItems: "center" }}>
-                  <div className="lconcept" style={{flex: 1}}>{concept.label}</div>
+                  <div className="lconcept" style={{flex: 1}}><ConceptName concept={concept} /></div>
                   {/* No "0 passages" under a heading that already reads NO
                       EVIDENCE: it says the same thing twice, and the zero is
                       the more judgemental of the two. A count belongs where
@@ -1026,13 +1032,13 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
                     <div className="passageconcepts">
                       {on.map(c => (
                         <span key={c.id} className="pchip">
-                          {c.label}
+                          <ConceptName concept={c} />
                           <button
                             type="button"
                             className="pchip-x"
                             onClick={() => unfilePassage(b.id, c.id)}
-                            aria-label={`Remove ${c.label} from this passage`}
-                            title={`Remove “${c.label}” from this passage. The passage stays.`}
+                            aria-label={`Remove ${conceptNameText(c)} from this passage`}
+                            title={`Remove “${conceptNameText(c)}” from this passage. The passage stays.`}
                           >×</button>
                         </span>
                       ))}

@@ -2,6 +2,8 @@ import { getStaffViewer, getUserLoomDataAsAdmin } from "@/actions/admin"
 import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
 import { firstParam } from "@/lib/courses"
 import type { LoomState } from "@/lib/types"
+import ConceptName from "@/components/ui/ConceptName"
+import { conceptNameText } from "@/lib/conceptName"
 
 // Route segment params and searchParams are promises (Next 16 async request APIs).
 type UserLoomSearchParams = {
@@ -47,7 +49,7 @@ export default async function UserLoomPage({
           <div className="scrollbox">
             {concepts.map(c => (
               <div key={c.id} className="crow">
-                <div className="clabel">{c.label}</div>
+                <div className="clabel"><ConceptName concept={c} /></div>
               </div>
             ))}
           </div>
@@ -61,7 +63,7 @@ export default async function UserLoomPage({
               return (
                 <div key={e.id} className="thread">
                   <div className="trip">
-                    {from?.label} <span className="v">{e.handle || "→"}</span> {to?.label}
+                    {from ? conceptNameText(from) : "?"} <span className="v">{e.handle || "→"}</span> {to ? conceptNameText(to) : "?"}
                   </div>
                   <div className="sent">{e.sentence}</div>
                 </div>

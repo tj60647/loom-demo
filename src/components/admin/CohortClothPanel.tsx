@@ -10,6 +10,8 @@
 import { useMemo, useState } from "react"
 import ClothMap from "@/components/svg/ClothMap"
 import type { Passage, Edge, LoomState } from "@/lib/types"
+import ConceptName from "@/components/ui/ConceptName"
+import { conceptNameText } from "@/lib/conceptName"
 
 type ReadSel = { type: "concept" | "edge" | "hub"; id?: string; ids?: string[] } | null
 
@@ -65,9 +67,9 @@ export default function CohortClothPanel({
     const to = conceptById.get(e.toId)
     return (
       <>
-        <b>{from?.label ?? "?"}</b>{" "}
+        <b>{from ? conceptNameText(from) : "?"}</b>{" "}
         {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">description</span>}{" "}
-        <b>{to?.label ?? "?"}</b>
+        <b>{to ? conceptNameText(to) : "?"}</b>
       </>
     )
   }
@@ -84,7 +86,7 @@ export default function CohortClothPanel({
       pane = (
         <div style={{ marginTop: "16px" }}>
           <div className="threadhead">
-            <span className="red">{concept.label}</span>
+            <span className="red">{conceptNameText(concept)}</span>
             <span className="n">
               {" "}· {who(concept.userId)} · {crossings.length} crossing{crossings.length !== 1 ? "s" : ""} ·{" "}
               {conceptPassages.length} passage{conceptPassages.length !== 1 ? "s" : ""}
@@ -128,9 +130,9 @@ export default function CohortClothPanel({
       pane = (
         <div style={{ marginTop: "16px" }}>
           <div className="threadhead">
-            <span className="red">{ends[0]?.label ?? "?"}</span>{" "}
+            <span className="red">{ends[0] ? conceptNameText(ends[0]) : "?"}</span>{" "}
             {edge.handle ? <span className="vpill">{edge.handle}</span> : <span className="vpill loosev">description</span>}{" "}
-            <span className="red">{ends[1]?.label ?? "?"}</span>
+            <span className="red">{ends[1] ? conceptNameText(ends[1]) : "?"}</span>
             <span className="n"> · {who(edge.userId)}</span>
           </div>
           <p style={{ fontSize: "15.5px", fontStyle: "italic", margin: "8px 0 14px" }}>
@@ -138,7 +140,7 @@ export default function CohortClothPanel({
           </p>
           {ends.map((c) => (
             <div key={c.id} style={{ marginBottom: "16px" }}>
-              <div className="label" style={{ marginTop: "8px" }}>{c.label}</div>
+              <div className="label" style={{ marginTop: "8px" }}><ConceptName concept={c} /></div>
               {c.def ? (
                 <div style={{ fontSize: "13.5px", color: "var(--ink-soft)" }}>{c.def}</div>
               ) : null}
@@ -193,7 +195,7 @@ export default function CohortClothPanel({
                     className={`crow${readSel?.type === "concept" && readSel.id === c.id ? " picked" : ""}`}
                     onClick={() => selectConcept(c.id)}
                   >
-                    <span className="clabel">{c.label}</span>
+                    <span className="clabel"><ConceptName concept={c} /></span>
                     <span className="cap" style={{ whiteSpace: "nowrap" }}>
                       {who(c.userId)} · {count} passage{count !== 1 ? "s" : ""}
                     </span>

@@ -25,6 +25,8 @@ import { soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { usesOf } from "@/lib/linkResolve"
 import ObjectDownload from "@/components/ui/ObjectDownload"
+import ConceptName from "@/components/ui/ConceptName"
+import { conceptNameText } from "@/lib/conceptName"
 import { buildVocabularyExport, buildVocabularyMarkdown } from "@/lib/objectExport"
 import VocabularyOverlay from "@/components/tabs/VocabularyOverlay"
 
@@ -182,7 +184,12 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
   // carry a legacy label with no linkId and is not loose.
   const looseLinks = state.edges.filter((e) => !e.linkId && !(e.handle ?? "").trim())
 
-  const labelOf = (id: string) => state.concepts.find((c) => c.id === id)?.label ?? "?"
+  // "?" still means NOT FOUND; a concept that exists but has no Label gets
+  // the placeholder instead, because those are different stories.
+  const labelOf = (id: string) => {
+    const c = state.concepts.find((x) => x.id === id)
+    return c ? conceptNameText(c) : "?"
+  }
 
   const visibleConcepts = sortedByLabel(state.concepts).filter(
     (c) => matches(c.label, cq) || matches(c.def, cq)
@@ -235,7 +242,7 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
     }
     // Always confirm: the source concept goes away, and there is no unmerge.
     const ok = await confirm({
-      title: `Merge “${source.label}” into “${target.label}”?`,
+      title: `Merge “${conceptNameText(source)}” into “${conceptNameText(target)}”?`,
       body: "Every passage and thread of the first will point at the second, and the first goes away. There is no unmerge.",
       confirmLabel: "Merge",
       danger: true,
@@ -269,7 +276,7 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
     // attached. It said "Export from Keep first" until 2026-08-12, four days
     // after Keep was deleted; the vocabulary downloads at the head of this tab.
     const ok = await confirm({
-      title: `Delete “${concept.label}”?`,
+      title: `Delete “${conceptNameText(concept)}”?`,
       body: passages
         ? `Its ${passages} captured passage${passages !== 1 ? "s" : ""} stay${passages !== 1 ? "" : "s"} in your work on ${passages !== 1 ? "their readings" : "its reading"}, under Unlabeled — file them under another concept whenever you like. Download your vocabulary first if you might want the concept itself back.`
         : "Download your vocabulary first if you might want this back.",
@@ -345,7 +352,7 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                     onClick={() => setOpenConcepts((p) => ({ ...p, [concept.id]: !p[concept.id] }))}
                     style={{ display: "flex", alignItems: "center" }}
                   >
-                    <div className="lconcept" style={{ flex: 1 }}>{concept.label}</div>
+                    <div className="lconcept" style={{ flex: 1 }}><ConceptName concept={concept} /></div>
                     <div className="lsrc">
                       {stats.passages} passage{stats.passages !== 1 ? "s" : ""}
                       {stats.readings.length > 1 ? ` · ${stats.readings.length} readings` : ""}
@@ -403,7 +410,7 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                         <select
                           className="tinput inline"
                           style={{ flex: 1 }}
-                          aria-label={`Merge “${concept.label}” into`}
+                          aria-label={`Merge “${conceptNameText(concept)}” into`}
                           title="the same idea captured twice? pick the concept to keep — this one's passages and threads move onto it"
                           value={mergeInputs[concept.id] ?? ""}
                           onChange={(e) =>

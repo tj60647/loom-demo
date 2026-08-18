@@ -12,6 +12,7 @@
 import type { CardTableView, LoomExport, LoomMap, LoomState, LoomViews, Tier } from "./types"
 import { scopeFromKey, scopedGraph } from "./scope"
 import { fileStamp } from "./objectExport"
+import { conceptNameText } from "@/lib/conceptName"
 
 const TIER_GROUPS: [Tier, string][] = [
   ["p", "Primary"],
@@ -164,7 +165,13 @@ export function buildMapMarkdown(
   titleOfSource?: (id: string) => string
 ): string {
   const scoped = scopedGraph(state, scopeFromKey(map.scopeKey))
-  const label = (id: string) => state.concepts.find((c) => c.id === id)?.label ?? "?"
+  // Markdown is prose a person reads, so an unnamed Concept gets its
+  // placeholder here. The JSON export keeps `label` raw — that field
+  // round-trips, and a placeholder in it would come back as a name.
+  const label = (id: string) => {
+    const c = state.concepts.find((x) => x.id === id)
+    return c ? conceptNameText(c) : "?"
+  }
   const lines: string[] = []
 
   lines.push(`# ${map.name} — a projection of ${scopeLabelOf(map.scopeKey, titleOfSource)}`, "")
@@ -177,7 +184,7 @@ export function buildMapMarkdown(
     if (!group.length) return
     lines.push(`## ${name}`, "")
     group.forEach((c) => {
-      lines.push(`- **${c.label}**${c.def ? ` — ${c.def}` : ""}${c.note ? ` _(${c.note})_` : ""}`)
+      lines.push(`- **${conceptNameText(c)}**${c.def ? ` — ${c.def}` : ""}${c.note ? ` _(${c.note})_` : ""}`)
       state.passages
         .filter((b) => b.conceptIds.includes(c.id))
         .forEach((b) => {

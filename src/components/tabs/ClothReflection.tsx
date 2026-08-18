@@ -18,6 +18,8 @@ import type { Edge, Tier } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
 import ClothMap from "@/components/svg/ClothMap"
 import { useCaptureLog, CaptureLogScrubber, CaptureLogRows, CaptureLogDownload } from "@/components/ui/HistoryPanel"
+import ConceptName from "@/components/ui/ConceptName"
+import { conceptNameText } from "@/lib/conceptName"
 
 /**
  * "What the cloth shows you" — the counted prompts, the threads they lay out,
@@ -148,7 +150,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
       const top = degs[0]
       const tied = degs.filter(o => o.d === top.d).slice(0, 2)
       const names = tied.map((o, i) => (
-        <Fragment key={o.c.id}>{i > 0 && ' and '}<b>{short(o.c.label, 40)}</b></Fragment>
+        <Fragment key={o.c.id}>{i > 0 && ' and '}<b>{short(conceptNameText(o.c), 40)}</b></Fragment>
       ))
       readPrompts.push({
         key: 'the centre', rep: top.c.id, repHub: tied.map(o => o.c.id), gap: false,
@@ -167,14 +169,14 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
       readPrompts.push({
         key: 'the gap', rep: [...isl.nodes][0], gap: true,
         q: <>{names.map((c, i) => (
-          <Fragment key={c!.id}>{i > 0 && ' and '}<b>{short(c!.label, 28)}</b></Fragment>
+          <Fragment key={c!.id}>{i > 0 && ' and '}<b>{short(conceptNameText(c!), 28)}</b></Fragment>
         ))} tie to each other but to nothing else. The sharpest question on the cloth: should they?</>,
         move: 'note the question →'
       })
     } else if (unwoven.length) {
       readPrompts.push({
         key: 'the gap', rep: unwoven[0].id, gap: true,
-        q: <><b>{short(unwoven[0].label, 38)}</b>{unwoven.length > 1 ? ` and ${unwoven.length - 1} other${unwoven.length - 1 !== 1 ? 's' : ''}` : ''} cross nothing yet — warp with no weft. The sharpest question: where {unwoven.length > 1 ? 'do they' : 'does it'} belong?</>,
+        q: <><b>{short(conceptNameText(unwoven[0]), 38)}</b>{unwoven.length > 1 ? ` and ${unwoven.length - 1} other${unwoven.length - 1 !== 1 ? 's' : ''}` : ''} cross nothing yet — warp with no weft. The sharpest question: where {unwoven.length > 1 ? 'do they' : 'does it'} belong?</>,
         move: 'note the question →'
       })
     }
@@ -263,7 +265,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
     return (
       <div key={e.id} className="readitem">
         <div className="trip">
-          <b>{f?.label || "?"}</b> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">description</span>} <b>{t?.label || "?"}</b>
+          <b>{f ? conceptNameText(f) : "?"}</b> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">description</span>} <b>{t ? conceptNameText(t) : "?"}</b>
         </div>
         <div className="sent">&ldquo;{e.sentence}&rdquo;</div>
       </div>
@@ -280,7 +282,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
       readingPane = (
         <div id="readingPane" style={{ marginTop: "16px" }}>
           <div className="threadhead">
-            {names.map((n, i) => <span key={n!.id}><span className="red">{n!.label}</span>{i < names.length - 1 ? " · " : ""}</span>)}
+            {names.map((n, i) => <span key={n!.id}><span className="red">{conceptNameText(n!)}</span>{i < names.length - 1 ? " · " : ""}</span>)}
             <span className="n"> · {inc.length} thread{inc.length !== 1 ? 's' : ''} meet here</span>
           </div>
           <p className="hint" style={{ margin: "4px 0 9px" }}>
@@ -307,12 +309,12 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
         readingPane = (
           <div id="readingPane" style={{ marginTop: "16px" }}>
             <div className="threadhead">
-              <span className="red">{f?.label || "?"}</span> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">description</span>} <span className="red">{t?.label || "?"}</span>
+              <span className="red">{f ? conceptNameText(f) : "?"}</span> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">description</span>} <span className="red">{t ? conceptNameText(t) : "?"}</span>
             </div>
             <p style={{ fontSize: "15.5px", fontStyle: "italic", margin: "8px 0 14px" }}>&ldquo;{e.sentence}&rdquo;</p>
             {[f, t].filter(Boolean).map(c => (
               <div key={c!.id} style={{ marginBottom: "16px" }}>
-                <div className="label" style={{ marginTop: "8px" }}>{c!.label}</div>
+                <div className="label" style={{ marginTop: "8px" }}><ConceptName concept={c!} /></div>
                 {c!.def && <div style={{ fontSize: "13.5px", color: "var(--ink-soft)" }}>{c!.def}</div>}
                 {(c === f ? fromPassages : toPassages).map(b => (
                   <div key={b.id} className="passagequote">
@@ -332,7 +334,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
         if (comp.edges.length === 0) {
           readingPane = (
             <div id="readingPane" style={{ marginTop: "16px" }}>
-              <div className="threadhead"><span className="red">{c.label}</span></div>
+              <div className="threadhead"><span className="red">{conceptNameText(c)}</span></div>
               <p className="empty" style={{ marginTop: "8px" }}>This thread crosses nothing yet — warp waiting for weft. Take it to 02 — Linking.</p>
             </div>
           );
@@ -340,7 +342,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
           readingPane = (
             <div id="readingPane" style={{ marginTop: "16px" }}>
               <div className="threadhead">
-                <span className="red">{c.label}</span> <span className="n"> · {comp.edges.length} crossing{comp.edges.length !== 1 ? 's' : ''}</span>
+                <span className="red">{conceptNameText(c)}</span> <span className="n"> · {comp.edges.length} crossing{comp.edges.length !== 1 ? 's' : ''}</span>
               </div>
               <p className="hint" style={{ margin: "4px 0 9px" }}>
                 Your threads, in walking order — your own sentences, laid out as raw material. <b>You</b> weave them into a read below, in your own words.

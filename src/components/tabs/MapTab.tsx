@@ -25,6 +25,8 @@ import { downloadText } from "@/lib/download"
 import ConceptCard from "@/components/cards/ConceptCard"
 import ObjectDownload from "@/components/ui/ObjectDownload"
 import ClothReflection from "@/components/tabs/ClothReflection"
+import ConceptName from "@/components/ui/ConceptName"
+import { conceptName, conceptNameText } from "@/lib/conceptName"
 
 const TIERS: [Tier, string][] = [["p", "PRIMARY"], ["s", "SECONDARY"], ["t", "TERTIARY"]]
 const TABLE_H = 560
@@ -233,7 +235,10 @@ export default function MapTab({ practice = false, focusProjectionId }: {
   const isPinned = (c: Concept) => !!c.def && pins.includes(c.id)
   const cardW = (c: Concept) => {
     const dl = isPinned(c) ? Math.min(c.def!.length, 46) * 5.2 + 22 : 0
-    return Math.min(240, Math.max(90, Math.max(c.label.length * 6.4 + 22, dl)))
+    // Measured off the NAME as drawn, not the raw label: a label-less concept
+    // renders the placeholder, and sizing the box from "" put a 19-character
+    // string in a 90px card.
+    return Math.min(240, Math.max(90, Math.max(conceptNameText(c).length * 6.4 + 22, dl)))
   }
   /**
    * The pinned description, wrapped to the card rather than cut (TJ,
@@ -738,7 +743,7 @@ export default function MapTab({ practice = false, focusProjectionId }: {
                 className="thandle"
                 role="button"
                 tabIndex={0}
-                aria-label={`Reorder ${c.label}`}
+                aria-label={`Reorder ${conceptNameText(c)}`}
                 title="drag to re-order — or press ↑ / ↓"
                 draggable
                 onDragStart={e => {
@@ -761,7 +766,7 @@ export default function MapTab({ practice = false, focusProjectionId }: {
                   ))}
                 </svg>
               </span>
-              <span className="tlabel">{c.label}</span>
+              <span className="tlabel"><ConceptName concept={c} /></span>
               <span className="tierchips">
                 {TIERS.map(([k, name]) => (
                   <span key={k} className={`tchip${tierOf(c.id) === k ? " on" : ""}`} title={name.toLowerCase()} onClick={() => setTier(c, k)}>{k.toUpperCase()}</span>
@@ -862,9 +867,9 @@ export default function MapTab({ practice = false, focusProjectionId }: {
             return (
               <g key={c.id} cursor="grab" data-card={c.id}>
                 <rect x={pos.x} y={pos.y} width={w} height={h} rx={4} fill="#fff" stroke="var(--ochre)" strokeWidth={1.2} />
-                <text x={pos.x + w / 2} y={pos.y + (twoLine ? 19 : h / 2 + 4)} textAnchor="middle" fontFamily='"Newsreader",Georgia,serif' fontSize={12.5} fill="var(--ink)">
-                  {short(c.label, Math.floor(w / 6.4))}
-                  <title>{c.label}</title>
+                <text x={pos.x + w / 2} y={pos.y + (twoLine ? 19 : h / 2 + 4)} textAnchor="middle" fontFamily='"Newsreader",Georgia,serif' fontSize={12.5} fill={conceptName(c).unlabeled ? "var(--ink-soft)" : "var(--ink)"}>
+                  {short(conceptNameText(c), Math.floor(w / 6.4))}
+                  <title>{conceptNameText(c)}</title>
                 </text>
                 {twoLine && (
                   <text x={pos.x + w / 2} y={pos.y + 36} textAnchor="middle" fontFamily='"Newsreader",Georgia,serif' fontSize={10} fontStyle="italic" fill="var(--ink-soft)">
@@ -880,7 +885,7 @@ export default function MapTab({ practice = false, focusProjectionId }: {
                   data-cardmenu={c.id}
                   role="button"
                   tabIndex={0}
-                  aria-label={`What ${c.label} is made of`}
+                  aria-label={`What ${conceptNameText(c)} is made of`}
                   aria-expanded={menuFor === c.id}
                   cursor="pointer"
                   onPointerEnter={() => holdMenu(c.id)}

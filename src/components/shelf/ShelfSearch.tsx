@@ -14,6 +14,7 @@ import Link from "next/link"
 import { searchReadings, searchLoom } from "@/lib/reads"
 import type { ReadingSearchHit, LoomSearchResult } from "@/actions/search"
 import Snippet from "@/components/ui/Snippet"
+import ConceptName from "@/components/ui/ConceptName"
 
 /**
  * One result. A door when there is a reading to open, a plain row when there
@@ -272,7 +273,9 @@ export default function ShelfSearch({
                   href={vocabHref(sourceId ?? hit.sourceId, "concept", hit.label)}
                   nowhere="named, with no passage behind it yet"
                 >
-                  <div className="searchhithead"><h3>{hit.label}</h3></div>
+                  {/* The href above keeps hit.label RAW: it round-trips through the URL into
+     VocabularyTab's concept filter, which matches on the stored string. */}
+                  <div className="searchhithead"><h3><ConceptName concept={hit} /></h3></div>
                   <p className="searchsnip"><Snippet text={hit.snippet} /></p>
                 </Hit>
               ))}

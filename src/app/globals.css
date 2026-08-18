@@ -317,6 +317,15 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .lrow.loose .src{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
 .lrow.loose .pnote{font-size:13px;font-style:italic;color:var(--ink-soft);margin:0 0 6px}
 .lrow.loose .quietrow{margin-top:9px;padding-top:9px}
+/* A Concept with a Description and no Label (TJ, 2026-08-18: "a concept needs
+   either or both a description and a label"). Dark grey so it reads as an
+   absence rather than as somebody's chosen word. text-transform and
+   letter-spacing are reset because this string lands inside mono-uppercase
+   contexts too — .pchip (303), .ocard-chip (363) and .label (39) — where
+   "(UNLABELED CONCEPT)" would read as a heading rather than as a note.
+   Emitted only by ui/ConceptName.tsx; SVG sites set fill instead. */
+.unlabeled{color:var(--ink-soft);text-transform:none;letter-spacing:normal}
+
 /* coding log */
 .lrow{border-bottom:1px dotted var(--rule)}
 .lhead{display:flex;gap:10px;align-items:baseline;padding:9px 12px;cursor:pointer}

@@ -24,6 +24,7 @@ import { eventsForReading } from "@/lib/logScope"
 import { describeEvent, TIER_WORD } from "@/lib/logPhrase"
 import { buildLogExport, buildLogMarkdown } from "@/lib/objectExport"
 import type { Passage, Concept, Edge, GraphEvent, LoomState } from "@/lib/types"
+import { conceptNameText } from "@/lib/conceptName"
 
 // Events arrive through a server-action boundary; be tolerant of a Date that
 // serialized to a string.
@@ -541,8 +542,14 @@ export function CaptureLogRows({ log, onShowCloth }: {
    * deleted — so they are shown when they resolve and simply absent when they
    * do not, which is the honest state for a log that outlives its rows.
    */
-  const conceptLabel = (id: unknown): string | null =>
-    typeof id === "string" ? state.concepts.find((c) => c.id === id)?.label ?? null : null
+  // null still means NO SUCH CONCEPT — callers .filter(Boolean) on it. A
+  // concept that exists but carries no Label is not that case and gets the
+  // placeholder, so the log stops silently dropping the object it is about.
+  const conceptLabel = (id: unknown): string | null => {
+    if (typeof id !== "string") return null
+    const c = state.concepts.find((x) => x.id === id)
+    return c ? conceptNameText(c) : null
+  }
   const contextOf = (e: GraphEvent): ReactNode => {
     const p = (e.payload ?? {}) as Record<string, unknown>
     const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null)

@@ -23,6 +23,7 @@
  */
 
 import type { Concept, Passage } from "@/lib/types"
+import ConceptName from "@/components/ui/ConceptName"
 
 export type PassageCardMode =
   /** Shown, never changed — the warp popover, and anywhere quoting evidence. */
@@ -91,7 +92,7 @@ export default function PassageCard({
       {filedUnder.length > 0 && (
         <div className="ocard-chips">
           {filedUnder.map((c) => (
-            <span key={c.id} className="ocard-chip">{c.label}</span>
+            <span key={c.id} className="ocard-chip"><ConceptName concept={c} /></span>
           ))}
         </div>
       )}

@@ -22,6 +22,7 @@
 
 import type { Concept, Passage } from "@/lib/types"
 import PassageCard from "./PassageCard"
+import ConceptName from "@/components/ui/ConceptName"
 
 export type ConceptCardMode =
   /** Shown, never changed — the warp popover at 02. */
@@ -50,7 +51,7 @@ export default function ConceptCard({
   return (
     <div className="ocard oconcept" data-mode={mode}>
       <div className="lhead oconcept-head">
-        <div className="lconcept">{concept.label}</div>
+        <div className="lconcept"><ConceptName concept={concept} /></div>
         {(passages.length > 0 || elsewhere > 0) && (
           <div className="lsrc">
             {passages.length} passage{passages.length !== 1 ? "s" : ""}

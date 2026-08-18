@@ -166,7 +166,10 @@ export default function CaptureModal({ passage, source, sourceId, location, page
             autoFocus
           />
           <datalist id="conceptOptionsModal">
-            {state.concepts.map(c => <option key={c.id} value={c.label} />)}
+            {/* Blanks filtered, not placeheld: this option's VALUE is typed into
+                the field above and then matched to reuse or coin a Concept, so
+                "(unlabeled concept)" here would mint one by that name. */}
+            {state.concepts.filter(c => c.label.trim()).map(c => <option key={c.id} value={c.label} />)}
           </datalist>
 
           {/* Shared with the typed form since 2026-08-13 — this markup was
