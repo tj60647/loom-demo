@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
-import type { Passage } from "@/lib/types"
+import type { Concept, Passage } from "@/lib/types"
 import { readingsOf, soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
-import ConceptName from "@/components/ui/ConceptName"
-import { conceptNameText } from "@/lib/conceptName"
+import PassageCard from "@/components/cards/PassageCard"
+import ConceptCard from "@/components/cards/ConceptCard"
 import { tidy } from "@/lib/clothMath"
 import ClothFold from "@/components/tabs/ClothFold"
 import ReuseOffer from "@/components/ui/ReuseOffer"
@@ -186,6 +186,142 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
   // concept a passage evidences. The difference is only how many it already
   // had — a passage filed nowhere is being named for the first time, so the
   // copy says that rather than "a second concept" (TJ, 2026-08-12).
+  /**
+   * Rename a concept from Your work's row.
+   *
+   * Kept in OpenTab, not in the card, because it can ROLL THE INPUT BACK: the
+   * field is uncontrolled, and a declined homonym confirm has to put the old
+   * label into the DOM node itself. That is why the callback takes the input.
+   */
+  const handleRename = async (concept: Concept, input: HTMLInputElement) => {
+    const v = input.value.trim()
+    if (!v || v === concept.label) return
+    const clash = state.concepts.find(
+      c => c.id !== concept.id && c.label.toLowerCase() === v.toLowerCase()
+    )
+    if (clash) {
+      // Warned, never forbidden (ruling 36): homonyms are legal. What the
+      // second sentence offers is the repair that EXISTS — merge is hidden
+      // while TJ resolves what it means (VocabularyTab's MERGE_VISIBLE), and a
+      // dialog is a bad place to learn that the way out it named is not there.
+      const ok = await confirm({
+        title: `You already have a concept named “${v}”.`,
+        body: "Rename anyway? The two stay distinct concepts sharing a name — if they are one idea, file this one's passages under the other and remove it.",
+        confirmLabel: "Rename anyway",
+      })
+      if (!ok) {
+        input.value = concept.label
+        return
+      }
+    }
+    editConcept(concept.id, { label: v })
+    flash("renamed")
+  }
+
+  /**
+   * ONE PIECE OF A CONCEPT'S EVIDENCE, in the concepts view.
+   *
+   * Still drawn here rather than by PassageCard: this row carries acts that
+   * belong to the CONCEPT — "remove passage from concept" and nothing that
+   * destroys the capture — whose wording and scope are settled (TJ,
+   * 2026-08-17) and differ from the passage view's on purpose. It moves into
+   * the card when that difference has a mode of its own.
+   *
+   * It had no class at all before 2026-08-18, only three inline styles, which
+   * is why it was the third separate drawing of a Passage in one file.
+   */
+  const renderEvidence = (concept: Concept, b: Passage) => (
+                <div key={b.id} data-passage-id={b.id} className="ywevidence">
+                  {/* The passage is the door here too (TJ, 2026-08-17:
+                      "in the your work panel, concepts view, the passages
+                      should have the same mouseover as in the passages
+                      view and it should take us to the passage"). One
+                      rule for a passage wherever it is drawn — the same
+                      one the margin card follows. Its separate "goto"
+                      goes with it, being the same act twice. */}
+                  <div
+                    className={`passage${b.sourceId || b.source ? " isdoor" : ""}`}
+                    role={b.sourceId || b.source ? "button" : undefined}
+                    tabIndex={b.sourceId || b.source ? 0 : undefined}
+                    aria-label={b.sourceId || b.source ? "Open this passage in the reading" : undefined}
+                    title={b.sourceId || b.source ? "Open this passage in the reading" : undefined}
+                    onClick={() => (b.sourceId || b.source) && onGotoPassage?.(b)}
+                    onKeyDown={(e) => {
+                      if (!(b.sourceId || b.source)) return
+                      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGotoPassage?.(b) }
+                    }}
+                  >"{b.content}"</div>
+                  <div className="src">
+                    {b.source || "—"}{b.location ? ` · ${b.location}` : ""}
+                    <span className="rm-actions" style={{ marginLeft: "8px" }}>
+                      {/* BOTH, always (TJ, 2026-08-17). This used to be
+                          a choice made for the student: with several
+                          concepts you were offered "unfile from this
+                          concept", and with one you were offered only
+                          "remove passage" — so the scoped act was
+                          withheld exactly where it is most wanted, and
+                          the only thing on offer was destroying the
+                          capture.
+
+                          Unfiling the last concept leaves an Unlabeled
+                          Passage, which is a legal end state by the
+                          model ("It may never gain a Concept, which is
+                          fine") and now has a visible home in the panel
+                          above. Nothing is lost and nothing is orphaned:
+                          the passage keeps its text, its page and its
+                          note. */}
+                      <button
+                        type="button"
+                        className="rm"
+                        style={{ marginRight: "8px", background: "none", border: "none", padding: 0 }}
+                        onClick={() => unfilePassage(b.id, concept.id)}
+                        /* "remove PASSAGE from CONCEPT" here, and
+                           "remove concept from passage" on the chip in
+                           the passage view (TJ, 2026-08-17). One act,
+                           named from whichever subject you are standing
+                           in: this list is a concept and its passages,
+                           that one is a passage and its concepts. */
+                        title={
+                          b.conceptIds.length > 1
+                            ? "Filed under several concepts — this removes it from this one only."
+                            : "The passage stays, with no concept on it, under Unlabeled passages."
+                        }
+                      >
+                        remove passage from concept
+                      </button>
+                      {/* DELETING THE CAPTURE IS NOT AN ACT OF THIS VIEW
+                          (TJ, 2026-08-17: "in concept view the only
+                          option is remove passage from concept, and in
+                          passage view it is remove concept from passage,
+                          which is the 'x' on concept badges").
+
+                          Same scope argument as concepts and Vocabulary.
+                          This list is a CONCEPT and its evidence, so the
+                          act that belongs here is taking one passage off
+                          it. Destroying the passage reaches every other
+                          concept it evidences — none of which are on this
+                          screen to see go. That act lives in the passage
+                          view, where the passage is the subject. */}
+                    </span>
+                  </div>
+                  {/* NO CONCEPT FIELD IN THIS VIEW (TJ, 2026-08-17:
+                      "maybe in concept view there is no add concept to
+                      passage, i guess it would be add passage to concept
+                      but this sounds best done in the text itself").
+
+                      It is, and it already is: a passage joins a concept
+                      by being captured under it, or from the passage
+                      view, where the passage is the subject and the
+                      concept is what you are adding to it. Read from
+                      this end the same field would have to be "add
+                      passage to concept", and there is nothing here to
+                      add — the passages are in the text.
+
+                      So this list does one thing: shows a concept's
+                      evidence, and lets you take a piece of it off. */}
+                </div>  )
+
+
   const handleRefile = async (b: Passage) => {
     if (refileBusy[b.id]) return
     const first = b.conceptIds.length === 0
@@ -714,211 +850,22 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
             const conceptPassages = scoped.passages.filter(b => b.conceptIds.includes(concept.id))
             
             return (
-              <div key={concept.id} data-concept-id={concept.id} className={`lrow ${isOpen ? "open" : ""}`}>
-                {/* No destructive control here: this header is the row's
-                    expand/collapse target, so "delete this concept" lives inside the
-                    opened row next to "remove passage", labelled, as in v14. */}
-                <div className="lhead" onClick={() => toggleRow(concept.id)} style={{ display: "flex", alignItems: "center" }}>
-                  <div className="lconcept" style={{flex: 1}}><ConceptName concept={concept} /></div>
-                  {/* No "0 passages" under a heading that already reads NO
-                      EVIDENCE: it says the same thing twice, and the zero is
-                      the more judgemental of the two. A count belongs where
-                      there is something to count. */}
-                  {/* This reading's evidence, and only this reading's (TJ,
-                      2026-08-13: "the header is 'in this reading' … only count
-                      the concept in this reading"). The row used to carry
-                      "· N elsewhere" as well — passages for the same concept in
-                      your other readings — and under a heading that says IN
-                      THIS READING that is a second scope in the same line: one
-                      number the heading governs, one it does not. The
-                      cross-reading fact is not lost, it is just not counted
-                      here — open the row and it is said in full.
-
-                      The count is still passages, not readings. */}
-                  {conceptPassages.length > 0 && (
-                    <div className="lsrc">
-                      {conceptPassages.length} passage{conceptPassages.length !== 1 ? "s" : ""}
-                    </div>
-                  )}
-                </div>
-                {isOpen && (
-                  <div className="lbody">
-                    <div className="defrow">
-                      <span className="label">Concept</span>
-                      <input
-                        key={concept.label}
-                        placeholder="concept label…"
-                        defaultValue={concept.label}
-                        onBlur={async (e) => {
-                          const input = e.target
-                          const v = input.value.trim()
-                          if (!v || v === concept.label) return
-                          const clash = state.concepts.find(
-                            c => c.id !== concept.id && c.label.toLowerCase() === v.toLowerCase()
-                          )
-                          if (clash) {
-                            // Warned, never forbidden (ruling 36): homonyms
-                            // are legal. What the second sentence offers is
-                            // the repair that EXISTS — merge is hidden while
-                            // TJ resolves what it means (VocabularyTab's
-                            // MERGE_VISIBLE), and a dialog is a bad place to
-                            // learn that the way out it named is not there.
-                            const ok = await confirm({
-                              title: `You already have a concept named “${v}”.`,
-                              body: "Rename anyway? The two stay distinct concepts sharing a name — if they are one idea, file this one's passages under the other and remove it.",
-                              confirmLabel: "Rename anyway",
-                            })
-                            if (!ok) {
-                              input.value = concept.label
-                              return
-                            }
-                          }
-                          editConcept(concept.id, { label: v })
-                          flash("renamed")
-                        }}
-                      />
-                    </div>
-                    <div className="defrow">
-                      <span className="label">Description</span>
-                      {/* A textarea, not an input (TJ, 2026-08-17: "the
-                          description should wrap so we can read it all"). A
-                          gloss is up to 100 words by the model; on one line
-                          you could read about eight of them, and the rest
-                          scrolled sideways out of view. */}
-                      <textarea
-                        className="conceptdef"
-                        rows={2}
-                        placeholder="in your words; same sense across your sources?"
-                        defaultValue={concept.def ?? ""}
-                        onBlur={(e) => {
-                          if (e.target.value !== (concept.def ?? "")) {
-                            editConcept(concept.id, { def: e.target.value })
-                          }
-                        }}
-                      />
-                    </div>
-                    {conceptPassages.map(b => (
-                      <div key={b.id} data-passage-id={b.id} style={{ marginTop: "12px", borderBottom: "1px dotted var(--rule)", paddingBottom: "8px" }}>
-                        {/* The passage is the door here too (TJ, 2026-08-17:
-                            "in the your work panel, concepts view, the passages
-                            should have the same mouseover as in the passages
-                            view and it should take us to the passage"). One
-                            rule for a passage wherever it is drawn — the same
-                            one the margin card follows. Its separate "goto"
-                            goes with it, being the same act twice. */}
-                        <div
-                          className={`passage${b.sourceId || b.source ? " isdoor" : ""}`}
-                          role={b.sourceId || b.source ? "button" : undefined}
-                          tabIndex={b.sourceId || b.source ? 0 : undefined}
-                          aria-label={b.sourceId || b.source ? "Open this passage in the reading" : undefined}
-                          title={b.sourceId || b.source ? "Open this passage in the reading" : undefined}
-                          onClick={() => (b.sourceId || b.source) && onGotoPassage?.(b)}
-                          onKeyDown={(e) => {
-                            if (!(b.sourceId || b.source)) return
-                            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGotoPassage?.(b) }
-                          }}
-                        >"{b.content}"</div>
-                        <div className="src">
-                          {b.source || "—"}{b.location ? ` · ${b.location}` : ""}
-                          <span className="rm-actions" style={{ marginLeft: "8px" }}>
-                            {/* BOTH, always (TJ, 2026-08-17). This used to be
-                                a choice made for the student: with several
-                                concepts you were offered "unfile from this
-                                concept", and with one you were offered only
-                                "remove passage" — so the scoped act was
-                                withheld exactly where it is most wanted, and
-                                the only thing on offer was destroying the
-                                capture.
-
-                                Unfiling the last concept leaves an Unlabeled
-                                Passage, which is a legal end state by the
-                                model ("It may never gain a Concept, which is
-                                fine") and now has a visible home in the panel
-                                above. Nothing is lost and nothing is orphaned:
-                                the passage keeps its text, its page and its
-                                note. */}
-                            <button
-                              type="button"
-                              className="rm"
-                              style={{ marginRight: "8px", background: "none", border: "none", padding: 0 }}
-                              onClick={() => unfilePassage(b.id, concept.id)}
-                              /* "remove PASSAGE from CONCEPT" here, and
-                                 "remove concept from passage" on the chip in
-                                 the passage view (TJ, 2026-08-17). One act,
-                                 named from whichever subject you are standing
-                                 in: this list is a concept and its passages,
-                                 that one is a passage and its concepts. */
-                              title={
-                                b.conceptIds.length > 1
-                                  ? "Filed under several concepts — this removes it from this one only."
-                                  : "The passage stays, with no concept on it, under Unlabeled passages."
-                              }
-                            >
-                              remove passage from concept
-                            </button>
-                            {/* DELETING THE CAPTURE IS NOT AN ACT OF THIS VIEW
-                                (TJ, 2026-08-17: "in concept view the only
-                                option is remove passage from concept, and in
-                                passage view it is remove concept from passage,
-                                which is the 'x' on concept badges").
-
-                                Same scope argument as concepts and Vocabulary.
-                                This list is a CONCEPT and its evidence, so the
-                                act that belongs here is taking one passage off
-                                it. Destroying the passage reaches every other
-                                concept it evidences — none of which are on this
-                                screen to see go. That act lives in the passage
-                                view, where the passage is the subject. */}
-                          </span>
-                        </div>
-                        {/* NO CONCEPT FIELD IN THIS VIEW (TJ, 2026-08-17:
-                            "maybe in concept view there is no add concept to
-                            passage, i guess it would be add passage to concept
-                            but this sounds best done in the text itself").
-
-                            It is, and it already is: a passage joins a concept
-                            by being captured under it, or from the passage
-                            view, where the passage is the subject and the
-                            concept is what you are adding to it. Read from
-                            this end the same field would have to be "add
-                            passage to concept", and there is nothing here to
-                            add — the passages are in the text.
-
-                            So this list does one thing: shows a concept's
-                            evidence, and lets you take a piece of it off. */}
-                      </div>
-                    ))}
-                    {/* "N more passages evidence this concept in your other
-                        readings" stood here until 2026-08-13 (TJ: "i think that
-                        belongs in vocabulary, not 'in this reading'"). It does,
-                        and it is already there, said better: 04 counts the
-                        readings a concept travels through and NAMES them, which
-                        is the number that means something. This panel is the
-                        reading-scoped record of what you captured here — the
-                        division 04's own header draws. Nothing was moved; a
-                        thinner copy of it stopped being shown twice. */}
-                    {/* DELETING A CONCEPT IS NOT AN ACT OF THIS STATION (TJ,
-                        2026-08-17: "i sense that delete concept should only be
-                        in vocabulary. and that in reading it is remove concept
-                        from passage").
-
-                        The scope argument is the whole of it. This panel is one
-                        reading's record; a concept belongs to the student and
-                        travels through every text they have read. Offering its
-                        destruction from inside one reading put a loom-wide act
-                        behind a reading-scoped door — and the passages it would
-                        have taken with it are not all on this page to see.
-
-                        04 · Vocabulary already holds it, with the same
-                        confirmation, and 04 is where you see every concept you
-                        own at once — which is what you need in order to judge
-                        whether one should go at all.
-
-                        What remains here is the scoped act: remove this concept
-                        from this passage, on each row above. */}
-                  </div>
-                )}
-              </div>
+              <ConceptCard
+                key={concept.id}
+                concept={concept}
+                passages={conceptPassages}
+                concepts={state.concepts}
+                titleOf={titleOf}
+                mode="edit"
+                onGotoPassage={onGotoPassage}
+                edit={{
+                  isOpen: !!isOpen,
+                  onToggle: () => toggleRow(concept.id),
+                  onRename: (input) => handleRename(concept, input),
+                  onEditDef: (def) => editConcept(concept.id, { def }),
+                  renderEvidence: (b) => renderEvidence(concept, b),
+                }}
+              />
             )
           })}
           </div>
@@ -963,137 +910,26 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
               view still owes: there is no updatePassage action in the app at
               all, so a note is written once in the capture modal and cannot be
               revised anywhere. That is logged as its own piece of work. */}
-          {view === "passages" && passagesAZ.map(b => {
-            const on = b.conceptIds
-              .map(id => state.concepts.find(c => c.id === id))
-              .filter((c): c is NonNullable<typeof c> => !!c)
-            return (
-              <div key={b.id} data-passage-id={b.id} className="lrow loose">
-                {/* The passage IS the door (TJ, 2026-08-17: "clicking on a
-                    passage in the your work panel should be the 'goto
-                    passage'") — the same rule the margin card follows.
-
-                    The TEXT, not the whole row: the row also holds buttons and
-                    an input, and a control inside a control is out of order for
-                    the keyboard and ambiguous to a screen reader. This way the
-                    door is one element and its neighbours are their own. */}
-                <div
-                  className={`passage${b.sourceId || b.source ? " isdoor" : ""}`}
-                  role={b.sourceId || b.source ? "button" : undefined}
-                  tabIndex={b.sourceId || b.source ? 0 : undefined}
-                  aria-label={b.sourceId || b.source ? "Open this passage in the reading" : undefined}
-                  title={b.sourceId || b.source ? "Open this passage in the reading" : undefined}
-                  onClick={() => (b.sourceId || b.source) && onGotoPassage?.(b)}
-                  onKeyDown={(e) => {
-                    if (!(b.sourceId || b.source)) return
-                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGotoPassage?.(b) }
-                  }}
-                >&quot;{b.content}&quot;</div>
-                <div className="src">{b.source || "—"}{b.location ? ` · ${b.location}` : ""}</div>
-
-                {/* THREE BLOCKS, EACH ABOUT ONE THING (TJ, 2026-08-17: "the
-                    passage concepts is a little confusing, there are concept
-                    badges, remove passage, and then add concept. this need
-                    better structure").
-
-                    It was: chips, then "remove passage", then a concept field —
-                    so a destructive act on the PASSAGE sat in the middle of the
-                    concept material and read as part of it. Now the note is its
-                    own labelled block, the concepts are one block (what it is
-                    filed under, and how to add another), and the one
-                    destructive control is last and on its own. */}
-
-                {/* The note, and it is EDITABLE — the first time it has been
-                    (TJ: "i see the passage, but no notes"). It was invisible
-                    when empty, which on a passage captured without one meant
-                    always. Saved on blur, the same contract the concept
-                    description above uses. */}
-                <div className="pblock">
-                  <span className="label">Note <span className="labelsay">— why you kept these words</span></span>
-                  <textarea
-                    className="passagenote-edit"
-                    placeholder="what struck you, what to come back to"
-                    defaultValue={b.note ?? ""}
-                    key={b.id + ":" + (b.note ?? "")}
-                    onBlur={(e) => {
-                      if (e.target.value !== (b.note ?? "")) editPassageNote(b.id, e.target.value)
-                    }}
-                  />
-                </div>
-
-                <div className="pblock">
-                  <span className="label">
-                    Concepts{" "}
-                    <span className="labelsay">
-                      {on.length ? "— what this passage evidences" : "— none yet, which is a legal state"}
-                    </span>
-                  </span>
-                  {on.length > 0 && (
-                    <div className="passageconcepts">
-                      {on.map(c => (
-                        <span key={c.id} className="pchip">
-                          <ConceptName concept={c} />
-                          <button
-                            type="button"
-                            className="pchip-x"
-                            onClick={() => unfilePassage(b.id, c.id)}
-                            aria-label={`Remove ${conceptNameText(c)} from this passage`}
-                            title={`Remove “${conceptNameText(c)}” from this passage. The passage stays.`}
-                          >×</button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {/* The shape of the answer, back where it can be read (TJ,
-                      2026-08-17). The restructure above put it in a `title`,
-                      which is the hover nobody hovers — and it was the whole
-                      point of making the three concept fields alike two steps
-                      earlier. Two labels, at two levels: the BLOCK is Concepts,
-                      plural, what this passage is filed under; the FIELD is
-                      Concept, singular, the one you are about to add. */}
-                  {/* The LABEL carries the act and the button is the verb (TJ,
-                      2026-08-17: "the line could be add concept to passage, and
-                      the button is just add"). There is one field in this
-                      block, so its label can say what pressing does — which
-                      leaves the button free to be short instead of a sentence
-                      wider than the input beside it.
-                      The shape of the answer stays on the same line; it is the
-                      one thing a student cannot infer from the act. */}
-                  <span className="label addlabel">
-                    Add concept to passage <span className="labelsay">— a short noun phrase</span>
-                  </span>
-                  <div className="quietrow">
-                    <input
-                      list={listId}
-                      placeholder="e.g. boundary objects"
-                      value={refileInputs[b.id] ?? ""}
-                      onChange={(e) => setRefileInputs(prev => ({ ...prev, [b.id]: e.target.value }))}
-                    />
-                    <button
-                      className="btn ghost mini"
-                      onClick={() => handleRefile(b)}
-                      disabled={!!refileBusy[b.id]}
-                      aria-label="Add concept to passage"
-                    >add</button>
-                  </div>
-                </div>
-
-                {/* Last, alone, and quiet: the one act here that destroys
-                    something. It used to sit between the chips and the concept
-                    field. */}
-                <div className="src rm-actions" style={{ marginTop: "8px" }}>
-                  <button
-                    type="button"
-                    className="rm"
-                    onClick={() => removePassage(b.id)}
-                    title="Delete this capture. Its filings go with it."
-                  >
-                    remove passage
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+          {view === "passages" && passagesAZ.map(b => (
+            <PassageCard
+              key={b.id}
+              passage={b}
+              concepts={state.concepts}
+              titleOf={titleOf}
+              mode="edit"
+              onGoto={onGotoPassage}
+              edit={{
+                listId,
+                refileValue: refileInputs[b.id] ?? "",
+                refileBusy: !!refileBusy[b.id],
+                onRefileChange: (v) => setRefileInputs(prev => ({ ...prev, [b.id]: v })),
+                onRefile: () => handleRefile(b),
+                onEditNote: (note) => editPassageNote(b.id, note),
+                onUnfile: (conceptId) => unfilePassage(b.id, conceptId),
+                onRemove: () => removePassage(b.id),
+              }}
+            />
+          ))}
         </div>
 
         {/* Each note goes to the view it is about (TJ, 2026-08-17: "some of it

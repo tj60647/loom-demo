@@ -312,6 +312,43 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    nothing folded under it — so it carries its own padding, and it borrows the
    opened row's typography so a quote reads the same wherever your work shows
    one. */
+/* YOUR WORK'S ROWS ARE CARDS (TJ, 2026-08-18: "the passages in the 'your work'
+   panel need to be clearly differentiated, perhaps a your work passage card is
+   needed, the same for concepts").
+
+   Measured before this rule, in the 460px sheet: passage rows ran 327-618px
+   tall and the only thing between one and the next was `.lrow`'s 1px dotted
+   line — while `.quietrow` drew an IDENTICAL 1px dotted line two-thirds of the
+   way down each row. Interior and boundary were the same mark, so a 5344px
+   list read as one undifferentiated column.
+
+   Its own class, never a redefinition of `.lrow`: that class is shared with 04
+   Vocabulary's concept and link rows and two admin pages, and eleven spec files
+   bind to it. Applied by cards/PassageCard and cards/ConceptCard in edit mode,
+   so both of the panel's homes get it — the sheet and the full-page variant on
+   a reference-only reading.
+
+   The treatment is the margin rail card's, deliberately: a passage looks the
+   same beside the page as it does in the panel. Left border by object — the
+   highlight's yellow for a passage, ochre (the warp) for a concept. */
+.ywcard{background:var(--paper);border:1px solid var(--rule);
+  border-bottom:1px solid var(--rule);border-radius:4px;
+  box-shadow:0 1px 4px rgba(0,0,0,.06);margin:0 0 10px}
+.ywcard.ywpassage{border-left:3px solid rgba(255,204,0,.8)}
+.ywcard.ywconcept{border-left:3px solid var(--ochre)}
+/* One piece of a concept's evidence, inside an opened concept card. Carried
+   three inline styles and no class until 2026-08-18. Dotted, not boxed: these
+   are parts of the card they sit in, not cards themselves — the card's own
+   border is what separates one concept from the next. */
+.ywevidence{margin-top:12px;padding-bottom:8px;border-bottom:1px dotted var(--rule)}
+.ywevidence:last-child{border-bottom:0;padding-bottom:0}
+/* The interior rule that read as a boundary. The block above it is already
+   separated by its own label and spacing. */
+.ywcard .quietrow{border-top:0;padding-top:0}
+/* A collapsed concept card is its head, so the head takes the card's corners
+   rather than sitting in a box with a gap around it. */
+.ywcard.ywconcept > .lhead{border-radius:3px}
+.ywcard.ywconcept.open > .lhead{border-radius:3px 3px 0 0}
 .lrow.loose{padding:10px 12px}
 .lrow.loose .passage{font-size:13.5px;margin:0 0 6px}
 .lrow.loose .src{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
