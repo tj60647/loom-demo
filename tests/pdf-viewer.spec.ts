@@ -142,4 +142,46 @@ test.describe('PDF Viewer and Highlighting', () => {
     await expect(page.locator('#yourwork-toggle')).toHaveAttribute('aria-expanded', 'false');
     await expect(page.locator('#yourwork-toggle')).toBeFocused();
   });
+
+  /**
+   * A passage is ONE tab stop, however many fragments it is drawn in.
+   *
+   * mark.js wraps a <mark> per text-layer span a passage crosses, and the
+   * seeded readings run 3–23 fragments per passage. Every fragment used to
+   * carry tabindex="0" and the same aria-label, so a keyboard user crossing
+   * one highlighted sentence stopped on it up to 23 times and heard the
+   * identical citation each time.
+   *
+   * This is asserted rather than eyeballed because it is invisible: the marks
+   * butt together at 0px, so nothing on screen shows that a passage is drawn
+   * in twenty-three pieces. It regressed silently once and would again.
+   */
+  test('a passage is one tab stop, however many fragments it is drawn in', async ({ page }) => {
+    await openReading(page, 'Object Worlds');
+    await expect(page.locator('.loom-passage-highlight').first()).toBeVisible({ timeout: 15000 });
+
+    const byPassage = await page.evaluate(() => {
+      const rows: Record<string, { marks: number; tabStops: number; labelled: number }> = {};
+      for (const m of Array.from(document.querySelectorAll('.loom-passage-highlight'))) {
+        const id = m.getAttribute('data-loom-passage-id') ?? '?';
+        const row = (rows[id] ||= { marks: 0, tabStops: 0, labelled: 0 });
+        row.marks++;
+        if (m.getAttribute('tabindex') === '0') row.tabStops++;
+        if (m.getAttribute('aria-label')) row.labelled++;
+      }
+      return rows;
+    });
+
+    const rows = Object.values(byPassage);
+    expect(rows.length).toBeGreaterThan(0);
+    // Guard the guard: if a future change stopped fragmenting passages, the
+    // assertions below would pass for the wrong reason and stop testing this.
+    expect(rows.some((r) => r.marks > 1)).toBe(true);
+    // Every fragment keeps the anchor — the rails resolve their cards off it.
+    expect(Object.keys(byPassage)).not.toContain('?');
+    for (const row of rows) {
+      expect(row.tabStops).toBe(1);
+      expect(row.labelled).toBe(1);
+    }
+  });
 });

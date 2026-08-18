@@ -1073,6 +1073,43 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 passage.pageContentHash == null || passage.pageContentHash === liveHash
               );
 
+              /**
+               * ONE TAB STOP PER PASSAGE, not one per fragment.
+               *
+               * mark.js wraps a <mark> around each text-layer span the passage
+               * crosses, and a passage crosses a lot of them: surveyed on the
+               * seeded readings, 10 passages produced 106 marks — 3 at the
+               * mildest, 23 at the worst. Every one of them used to carry
+               * `tabindex="0"` and the SAME `aria-label`, so a keyboard user
+               * crossing one highlighted sentence stopped on it up to 23 times
+               * and heard the identical citation each time. Chromium's a11y
+               * tree confirms these are live nodes (role=mark, not ignored,
+               * focusable) — so this was the dominant experience of the
+               * feature, not a theoretical one.
+               *
+               * mark.js walks the DOM forward and this call is scoped to ONE
+               * passage, so the first node it hands us is the visually first:
+               * that one is the door, and it alone is named and focusable.
+               */
+              const concept = state.concepts.find((c) => c.id === passage.conceptIds[0]);
+              const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
+              let isEntryPoint = true;
+              const dressMark = (node: HTMLElement) => {
+                // EVERY fragment gets these two. The rails resolve their cards
+                // off `data-loom-passage-id` (ConceptRail, SpreadCanvasView),
+                // and the tooltip has to open from wherever the pointer
+                // actually is — hovering the fifth line of a passage is not a
+                // different intention from hovering the first.
+                bindHighlightNode(node, passage.id);
+                if (!isEntryPoint) return;
+                isEntryPoint = false;
+                // The first fragment alone is named and reachable. A later one
+                // keeping the label would make a browse-mode reader announce
+                // the whole citation again in the middle of the sentence.
+                node.setAttribute("aria-label", a11y);
+                node.setAttribute("tabindex", "0");
+              };
+
               if (offsetsTrusted) {
                 // Precision mode!
                 instance.markRanges([{
@@ -1080,13 +1117,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   length: passage.endOffset! - passage.startOffset!
                 }], {
                   className: "loom-passage-highlight",
-                  each: (node) => {
-                    const concept = state.concepts.find((c) => c.id === passage.conceptIds[0]);
-                    const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
-                    (node as HTMLElement).setAttribute("aria-label", a11y);
-                    (node as HTMLElement).setAttribute("tabindex", "0");
-                    bindHighlightNode(node as HTMLElement, passage.id);
-                  },
+                  each: (node) => dressMark(node as HTMLElement),
                   done: (count) => matches += count
                 });
               } else {
@@ -1102,13 +1133,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   diacritics: true,
                   ignoreJoiners: true,
                   ignorePunctuation: [":", ";", ",", ".", "-", "—", " ", "\n", "\r", "\t", "”", "“", '"', "'", "(", ")", "[", "]"],
-                  each: (node) => {
-                    const concept = state.concepts.find((c) => c.id === passage.conceptIds[0]);
-                    const a11y = `${concept?.label || "Unlabeled passage"}. ${passage.source || sourceName}${passage.location ? `, ${passage.location}` : ""}. Characters ${passage.startOffset ?? "?"}-${passage.endOffset ?? "?"}.`;
-                    (node as HTMLElement).setAttribute("aria-label", a11y);
-                    (node as HTMLElement).setAttribute("tabindex", "0");
-                    bindHighlightNode(node as HTMLElement, passage.id);
-                  },
+                  each: (node) => dressMark(node as HTMLElement),
                   done: (count) => matches += count
                 });
               }
