@@ -125,7 +125,12 @@ test("the student lens hides every staff surface, and gives a way back", async (
   // asserts the absence, not just the presence.
   await page.goto("/")
   const nav = page.locator('nav[aria-label="The journey"]')
-  const pill = page.locator("header .pill.beaten")
+  // The role pill moved to the footer on 2026-08-17, with the name and Sign
+  // out, so that hiding the header on the reading station does not take
+  // identity with it. The lens still masks it the same way — by masking the
+  // COURSE's isStaff/isAdmin rather than each consumer — which is what the
+  // disappearance below is really testing.
+  const pill = page.locator("footer .pill.beaten")
   const staff = nav.locator(".staffgroup a")
 
   await expect(pill).toHaveText("Faculty", { timeout: 15_000 })

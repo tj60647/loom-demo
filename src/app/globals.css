@@ -54,7 +54,33 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
 .btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:1px solid transparent;border-radius:3px;padding:7px 11px;cursor:pointer}
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
 .btn.mini{font-size:11px;padding:7px 10px;letter-spacing:.05em;min-height:36px}
-.btn:disabled{opacity:.35;cursor:default} .btn:hover:not(:disabled){opacity:.88}
+.btn:disabled{opacity:.35;cursor:default}
+/* HOVER (TJ, 2026-08-17). Every button used to answer the mouse with
+   `opacity:.88` — a 12% fade, identical on a solid button and a ghost one, and
+   on this paper it reads as "slightly further away" rather than "you are on
+   it". A control should say it is a control before you press it.
+   So each kind gets the move that suits its own construction:
+     - a SOLID button lifts off the ink it is made of;
+     - a GHOST button fills, and its rule darkens to ink — the box does not
+       change size, because the border is already there in both states (see
+       the note above .btn);
+     - a PRESSED control (aria-pressed, .active) is already carrying the ink,
+       so it has nothing to fill and only lifts.
+   Colour, not opacity: a faded control on a textured ground reads as
+   disabled, which is the one thing hover must never say. */
+.btn{transition:background-color .12s ease,border-color .12s ease,color .12s ease}
+.btn:hover:not(:disabled){background:#2d2b26}
+.btn.ghost:hover:not(:disabled){background:var(--paper-2);border-color:var(--ink);color:var(--ink)}
+.btn:active:not(:disabled){transform:translateY(.5px)}
+/* The journey's own stations. They are type on paper, not boxes, so the move
+   is the ink coming up to full strength — the same signal the active station
+   already uses, at half its weight. */
+nav .station{transition:color .12s ease,border-color .12s ease}
+nav .station:not(.off):not(.active):hover{color:var(--ink);border-bottom-color:var(--rule)}
+nav .station.staff:not(.active):hover{border-bottom-color:var(--sage)}
+/* `.act` is the same idea outside the journey — a quiet inline verb. */
+.act{transition:color .12s ease}
+.act:hover{color:var(--ink)}
 /* A control's label is not prose. Without this, every button, tab and
    disclosure in the app drag-selects and double-click-highlights like body
    text, which reads as "this is content" exactly where it should read as
@@ -349,10 +375,28 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
    strip is a click shield over whatever scrolls beneath it — the shelf's
    file input sat under this band and "Choose file" silently did nothing.
    The footer is print, not controls, so clicks belong to the page below. */
-footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;gap:12px;
-  padding:9px 26px;border-top:1px solid var(--ink);background:var(--paper);z-index:5;pointer-events:none}
+footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:5px 26px;border-top:1px solid var(--ink);background:var(--paper);z-index:5;pointer-events:none}
 footer span{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
 footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
+/* The footer stopped being print on 2026-08-17: its left half carries the
+   signed-in name, the role badge and Sign out. pointer-events stays OFF on the
+   band — it is still a full-width strip over whatever scrolls beneath it, and
+   that is what silently ate the shelf's "Choose file" — and is handed back to
+   the one part that is now a control. */
+footer .footid{display:flex;align-items:center;gap:9px;pointer-events:auto}
+footer .fr{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end;min-width:0}
+/* The reading's own name reads as a title, not as another mono caption: it is
+   the one proper noun in the row. */
+footer .foottitle{font-family:var(--display);font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46ch}
+footer .footmeta{color:var(--ink-soft);white-space:nowrap}
+footer .footid .label{letter-spacing:.1em}
+/* Reading focus (TJ, 2026-08-17): with the text open, the station is the text.
+   The header belongs to the root layout, so the workbench cannot withhold it
+   the way it withholds its own footer — it sets this attribute on <body>
+   instead and one rule does the work from the far side of the tree. */
+body[data-reading-focus] header{display:none}
 
 @media (max-width: 900px){
   header{padding:10px 14px 8px;gap:10px}

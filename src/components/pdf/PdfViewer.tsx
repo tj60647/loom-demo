@@ -2252,6 +2252,26 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </button>
           )}
 
+          {/* Download PDF, rehomed from the scope bar when that band went
+              (TJ, 2026-08-17). It belongs beside the text it downloads more
+              than it belonged in a strip above the journey — and it is only
+              ever drawn where there is a file, which is the one condition the
+              old band had to spell out ("your own card — no pdf here").
+
+              An <a download>, not a button: the route sets the disposition,
+              and a link is the thing a browser already knows how to resume,
+              copy and open in a new tab. `.btn.mini` so it sits in the row as
+              a peer of its neighbours rather than as prose wearing a border. */}
+          {sourceId && (
+            <a
+              className="btn ghost mini"
+              href={`/api/readings/${sourceId}?download=1`}
+              data-tip="the original file, as it was uploaded"
+            >
+              {isNarrow ? "↓" : "↓ PDF"}
+            </a>
+          )}
+
           {/* Full screen — one control, the whole screen (TJ, 2026-08-17),
               superseding "Just the text" (TJ, 2026-08-12).
 

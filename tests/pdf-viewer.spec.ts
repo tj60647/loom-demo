@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { isDeletePost, openReading, openYourWork } from './helpers';
+import { expectReadingTitle, isDeletePost, openReading, openYourWork } from './helpers';
 
 // Runs as Test User A (see playwright/global-setup.ts): the concepts and passages
 // this spec captures belong to the test account, never to a real person's loom.
@@ -22,15 +22,16 @@ test.describe('PDF Viewer and Highlighting', () => {
       // The shelf is the home screen: pick the reading off it, which opens
       // that reading's workbench, and read the text from tab 00 inside it.
       await openReading(page, pdf.cardTitle);
-      // Case-insensitive: shelf titles are the readings' own ("Communities of
-      // practice and social learning systems"), not the test's shorthand.
-      await expect(page.locator('.scopetitle')).toContainText(
-        new RegExp(pdf.expectedText, 'i')
-      );
 
       // Wait for the text layer to render on the first page
       const textLayer = page.locator('.react-pdf__Page__textContent');
       await expect(textLayer.first()).toBeAttached({ timeout: 10000 });
+
+      // Case-insensitive: shelf titles are the readings' own ("Communities of
+      // practice and social learning systems"), not the test's shorthand.
+      // Checked from 02, where the footer that carries the title stands — the
+      // reading station withholds it (helpers.ts).
+      await expectReadingTitle(page, new RegExp(pdf.expectedText, 'i'));
 
       // Go to Page 2 (simulating user turning page)
       await page.getByRole('button', { name: 'Next Page' }).click();

@@ -24,6 +24,7 @@ import SourceThumbnail from "@/components/library/SourceThumbnail"
 import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import JourneyNav from "@/components/ui/JourneyNav"
 import StationSearch from "@/components/ui/StationSearch"
+import Identity from "@/components/ui/Identity"
 import { SIGN_IN_EXPLANATION } from "@/lib/signIn"
 
 export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeployment?: boolean }) {
@@ -304,9 +305,56 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
         </>)}
       </main>
 
+      {/* Same footer as the workbench's (TJ, 2026-08-17): who you are on the
+          left, what you are looking at on the right. It said "00 — LIBRARY"
+          and "PICK A READING" — the station number the bar above already
+          shows, and an instruction for anyone who could not work out what a
+          shelf of readings is for.
+
+          The subject here is the loom rather than one reading, so the right
+          half counts it. Those numbers are not on this page anywhere else:
+          the cards carry per-reading tallies, and nothing added them up. */}
       <footer>
-        <span className="fl">00 — LIBRARY</span>
-        <span className="fr">PICK A READING</span>
+        <Identity />
+        <span className="fr">
+          {/* The whole loom, in one line (TJ, 2026-08-17). Deliberately NOT a
+              count of readings: `sources` is every row this student can open —
+              the course's thirty plus every card they have made — and it read
+              "109 readings" on a shelf showing nothing like that many. The
+              three counts here are the student's own work, which is the fact
+              the shelf does not otherwise total: each card carries its own
+              tally and nothing added them up.
+
+              "…" while the loom is in flight, exactly as the cards do. A zero
+              is a claim about someone's work, and it would be on screen for
+              the whole first load. */}
+          {/* Assigned and your own, counted apart (TJ, 2026-08-17). Together
+              they were the "109 readings" that gave this away: the shelf lays
+              them out as two different things — the syllabus by week, and a
+              "your own readings" section under it — so one total was a number
+              matching nothing on the page. Two numbers, in the shelf's own
+              words. */}
+          <span className="footmeta">
+            {loadingShelf ? (
+              "…"
+            ) : (
+              <>
+                {courseReadings.length} assigned · {ownReadings.length} your own
+              </>
+            )}
+          </span>
+          <span className="footmeta">
+            {isLoading ? (
+              "…"
+            ) : (
+              <>
+                {state.concepts.length} concept{state.concepts.length !== 1 ? "s" : ""} ·{" "}
+                {state.passages.length} passage{state.passages.length !== 1 ? "s" : ""} ·{" "}
+                {state.edges.length} thread{state.edges.length !== 1 ? "s" : ""} in all
+              </>
+            )}
+          </span>
+        </span>
       </footer>
     </>
   )

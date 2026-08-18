@@ -3,7 +3,6 @@ import { useState, useSyncExternalStore } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import AuthButton from "./AuthButton"
 import MyLoomModal from "./MyLoomModal"
@@ -16,16 +15,12 @@ const subscribeFullscreen = (onChange: () => void) => {
 
 export default function Header({ deployEnv, isBranchPreview = false }: { deployEnv?: string; isBranchPreview?: boolean }) {
   const { data: session } = useSession()
-  const { flashMsg } = useLoom()
   // Masked by the student lens, which is what makes the workflows link below
   // come back for a staff member viewing as a student.
   const { course } = useReadings()
   const [showAbout, setShowAbout] = useState(false)
   const [showMyLoom, setShowMyLoom] = useState(false)
-  // Nothing on an admin page writes to a loom, so the save dot sat there as a
-  // bare em dash for the whole visit and read as a stray character.
   const pathname = usePathname()
-  const inAdmin = pathname?.startsWith("/admin") ?? false
   // The practice loom. My Loom still opens here — the Header sits ABOVE
   // SandboxLoomProvider in the tree (layout.tsx wraps it in the real
   // LoomProvider), so the counts shown are the student's actual work and are
@@ -43,11 +38,11 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
    * bar are ~90–120px of what is left. F11 has always done this; almost
    * nobody presses F11.
    *
-   * NOT THE SAME CONTROL as the reading toolbar's "full screen", which is an
-   * in-app mode — `.pdf-shell.fullscreen` covers Loom's own chrome so the text
-   * fills the window. That one is relabelled "just the text" in the same pass,
-   * because two buttons reading "full screen" on one screen, doing different
-   * things, is worse than either name alone.
+   * NOT THE SAME CONTROL as the reading toolbar's "full screen text", which
+   * since 2026-08-17 does BOTH halves — the in-app chrome hiding and the
+   * browser's Fullscreen API — so the text fills the physical screen. This one
+   * gives the whole app the screen and keeps Loom's own chrome. See the note
+   * on the button below for why only that label carries a qualifier.
    *
    * The state is read from the DOCUMENT, never from what we last asked for:
    * Esc, F11 and the browser's own affordances all leave fullscreen without
@@ -86,9 +81,9 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
           </div>
         </div>
         <div className="spacer"></div>
-        {session && !inAdmin && (
-          <span id="saveDot">{flashMsg ? `· ${flashMsg} ·` : "—"}</span>
-        )}
+        {/* The save light moved to the journey bar (TJ, 2026-08-17) — see
+            SaveLight.tsx. It has to survive the reading station, and the
+            reading station is where this header stands down. */}
         <AuthButton isBranchPreview={isBranchPreview} />
         <button
           className="btn ghost mini"

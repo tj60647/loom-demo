@@ -18,6 +18,28 @@ export const isDeletePost = (request: Request) =>
   /^\["[0-9a-f-]{36}"(,(null|"[0-9a-f-]{36}"))?\]$/.test(request.postData() ?? '');
 
 /**
+ * Assert which reading is open, from where the title actually lives.
+ *
+ * It was `.scopetitle`, in a band above the journey, until 2026-08-17. That
+ * band is gone and the title is in the footer — and the footer stands down on
+ * the reading station, because with the text open the station is the text. The
+ * workbench also OPENS on the reading station, so there is no moment after
+ * entering when the title is on screen.
+ *
+ * So this steps to 02 · Linking, where the footer stands and names the same
+ * reading, and steps back. The title is the reading's, not the station's.
+ */
+export async function expectReadingTitle(page: Page, title: RegExp) {
+  const station = (name: string) =>
+    page.locator('nav[aria-label="The journey"] button.station', { hasText: name });
+  await station('Linking').click();
+  await expect(page.locator('footer .foottitle')).toContainText(title, { timeout: 10_000 });
+  await station('Reading').click();
+  // Back on the text before the caller carries on with it.
+  await expect(page.locator('.pdf-toolbar')).toBeVisible({ timeout: 15_000 });
+}
+
+/**
  * Reading-first navigation.
  *
  * The shelf is the home screen, so opening a reading means picking its card,

@@ -214,6 +214,7 @@ export default function JourneyNav({
   onStation = {},
   labels = {},
   search,
+  status,
 }: {
   active: Station | null
   /** Stations handled in place (workbench tabs) — rendered as buttons. */
@@ -231,6 +232,20 @@ export default function JourneyNav({
    * standing band it replaces and costs none of the height.
    */
   search?: React.ReactNode
+  /**
+   * The save light (TJ, 2026-08-17), drawn at the end of the station run.
+   *
+   * A slot rather than something this bar reads for itself: JourneyNav also
+   * stands on /admin and on the meta pages, where the old header suppressed
+   * this deliberately and where there is no loom to report on. Passing it in
+   * keeps those surfaces exactly as they were.
+   *
+   * Placed BEFORE `search` and with no auto margin of its own, so it sits
+   * beside the last station and nothing already in this row moves: both
+   * `.stationsearch` and `.staffgroup` push right with `margin-left:auto`, and
+   * a third one would have re-split the free space between all three.
+   */
+  status?: React.ReactNode
 }) {
   return (
     <nav aria-label="The journey">
@@ -276,6 +291,8 @@ export default function JourneyNav({
           </Link>
         )
       })}
+
+      {status}
 
       {search}
 
