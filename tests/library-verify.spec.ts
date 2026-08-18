@@ -45,7 +45,10 @@ test.describe('Library verification', () => {
 
     await enterReadingFromCard(page, firstCard);
     await expect(page).toHaveURL(/\/reading\//, { timeout: 15000 });
-    // Download moved off the library card onto the reading's scope bar.
+    // Download moved off the library card onto the reading's scope bar, and
+    // off THAT onto the reader's own toolbar when the scope bar went
+    // (2026-08-17). It reads "↓ PDF" now and carries its full act as an
+    // accessible name, which is what this has always matched on.
     await expect(page.getByRole('link', { name: /Download PDF/i })).toBeVisible();
     // Scoped to the workbench nav: the station is "01 — Reading" since the
     // text and capture merged (2026-08-08), and an unscoped match would also

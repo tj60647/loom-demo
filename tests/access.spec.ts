@@ -10,9 +10,13 @@ test("a student who types /access is returned to the shelf", async ({ page }) =>
   await expect(page).toHaveURL(/\/$/, { timeout: 15_000 })
 })
 
-test("a student sees no Access tab, and keeps their Workflows link", async ({ page }) => {
+test("a student sees no Access tab, and no Workflows link either", async ({ page }) => {
   await page.goto("/")
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
   await expect(page.locator('nav[aria-label="The journey"] .staffgroup')).toHaveCount(0)
-  await expect(page.locator('header a[href="/workflows"]')).toBeVisible()
+  // Students stopped being offered Workflows on 2026-08-17 (TJ: "students do
+  // not get workflow for the moment… it needs more development anyway"). The
+  // PAGE still reads for them — see workflows.spec, which navigates there
+  // directly — so this is the link going, not a gate arriving.
+  await expect(page.locator('header a[href="/workflows"]')).toHaveCount(0)
 })

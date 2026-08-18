@@ -2386,6 +2386,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               className="btn ghost mini"
               href={`/api/readings/${sourceId}?download=1`}
               data-tip="the original file, as it was uploaded"
+              // The visible label is a glyph and two letters, so the
+              // accessible name has to be the whole act — "down arrow PDF" is
+              // what a screen reader made of it otherwise. library-verify
+              // looks for this name too, and was right to.
+              aria-label="Download PDF"
             >
               {isNarrow ? "↓" : "↓ PDF"}
             </a>
