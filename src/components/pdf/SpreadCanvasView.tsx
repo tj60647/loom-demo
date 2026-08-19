@@ -41,25 +41,44 @@ const CARD_FALLBACK_H = 88;
 /**
  * Two thresholds, not one, and the gap between them is the point.
  *
- * READ_ONLY_RATIO is the old rule: once the viewport spans more than one page
- * width you are reading a map, so the card's own controls (× and +) go.
+ * READ_ONLY_RATIO is where the card's own controls (+, × and remove) go: once
+ * the viewport spans more than this many page widths you are reading a map,
+ * not a page.
+ *
+ * IT IS 1.6 BECAUSE A PAGE AND ITS RAIL ARE 1.35 WIDE. spreadLayout puts the
+ * rail at `pageW * 0.33` with a `pageW * 0.02` gap, so a page plus the cards
+ * that annotate it spans 1.35 page widths — and a threshold below that makes
+ * "read this page and edit its cards" a thing the geometry forbids rather than
+ * a thing the reader chose. At 1.05 it did forbid it. Measured on the running
+ * app at 1536x960 (Object Worlds), stepping the toolbar's + through the range:
+ *
+ *   ratio 1.559 -> page 985px, card 325px  ... no controls
+ *   ratio 1.114 -> page 1379px             ... no controls
+ *   ratio 0.796 -> page 1930px             ... controls appear
+ *
+ * The controls arrived only once the page was WIDER THAN THE VIEWPORT (1930px
+ * in 1536) — you could edit a card or see the page it belongs to, never both
+ * (TJ, 2026-08-19: "right now it seems way too close. i want to be able to see
+ * the page, read the page, and edit the rail cards"). 1.6 clears 1.35 with room
+ * for the leader and the gutter, and leaves the page ~985px wide at 1536 —
+ * comfortably readable, and still well inside the 2.72 a whole spread needs.
  *
  * EDITOR_CLOSE_RATIO is where an OPEN add-concept card is torn down, and it is
- * deliberately far away. d3's wheel step here is
- * `2^(-deltaY * 0.002)` = 2^-0.2 = 0.871 for one 100px notch (see the zoom
- * behaviour below), so one notch multiplies `stage.w / k` by 1/0.871 = 1.149.
- * From the reading edge (1.05) that is 1.21, then 1.39, then 1.59 — so a single
- * slip of the wheel cannot cross 1.6, and it takes three deliberate notches.
- * With one threshold at 1.05 it took exactly one, and the editor went with
- * whatever the student had typed into it.
+ * deliberately far away. One clamped pinch notch multiplies `k` by 2^0.2 =
+ * 1.149 (measured — see ZOOM_STEP_CLAMP), so it multiplies `stage.w / k` by
+ * 1.149 on the way out. From the reading edge that is 1.84, then 2.11, then
+ * 2.43 — so a single slip cannot cross 2.4, and it takes three deliberate
+ * notches. That is the same three the old pair bought at 1.05/1.6: both moved
+ * together, and the RATIO between them (1.149^3 = 1.517) is what carries the
+ * rule.
  *
  * Between the two ratios the card shows no + and no ×, but an editor already
  * open stays open. That asymmetry is intended: opening new edits out here is
  * the thing TJ ruled against (2026-08-17, "zoomed out editing these things is
  * a bad idea"); discarding a half-typed concept is not the same act.
  */
-const READ_ONLY_RATIO = 1.05;
-const EDITOR_CLOSE_RATIO = 1.6;
+const READ_ONLY_RATIO = 1.6;
+const EDITOR_CLOSE_RATIO = 2.4;
 const MEASURE_MS = 120;
 const SETTLE_MS = 200;
 const MAX_RES = 8;

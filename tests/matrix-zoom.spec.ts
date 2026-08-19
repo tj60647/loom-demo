@@ -247,6 +247,100 @@ test.describe('Matrix zoom', () => {
   });
 
   /**
+   * You can read a page and edit its cards AT THE SAME TIME.
+   *
+   * This is a geometry rule, not a preference. spreadLayout puts the rail at
+   * pageW * 0.33 with a pageW * 0.02 gap, so a page plus the cards annotating
+   * it spans 1.35 page widths; READ_ONLY_RATIO has to clear that or the two
+   * halves of "annotate this page" can never be on screen together. At 1.05 it
+   * did not clear it — measured at 1536x960, the controls first appeared at
+   * ratio 0.796, where the page rendered 1930px wide in a 1536px viewport.
+   *
+   * The assertion is deliberately phrased as the requirement rather than as
+   * the constant: at the FIRST zoom where a whole page fits the viewport, a
+   * card must be fully in view and carry its +. A future change to railW or to
+   * the ratio that breaks the pairing fails here, whatever the number is.
+   */
+  test('the closest zoom that still shows a page AND its rail can edit the card', async ({ page }) => {
+    test.setTimeout(90_000);
+    await openReading(page, 'Object Worlds');
+    await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Canvas' }).click();
+    await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
+
+    // A page plus the rail that annotates it, in page widths — the same
+    // numbers spreadLayout lays out with, so this moves if the layout does.
+    const RAIL = 0.33, GAP = 0.02;
+    const PAGE_AND_RAIL = 1 + RAIL + GAP; // 1.35
+
+    // `ratio` is the viewport measured in page widths. Bigger = zoomed further
+    // out = a smaller, less readable page.
+    const geom = () =>
+      page.evaluate(() => {
+        const vp = document.querySelector('.pdf-spread-viewport')?.getBoundingClientRect();
+        const pg = document.querySelector('.pdf-slot-inner, .pdf-slot-img')?.getBoundingClientRect();
+        return vp && pg ? { vpW: vp.width, pageW: pg.width, ratio: vp.width / pg.width } : null;
+      });
+    await expect.poll(async () => (await geom())?.pageW ?? 0, { timeout: 8000 }).toBeGreaterThan(0);
+
+    // Wind in past the pairing, then come back one step: that lands on the
+    // CLOSEST toolbar stop that still fits a page and its rail side by side —
+    // the most readable zoom at which annotating this page is possible at all.
+    const zoomIn = page.getByRole('button', { name: 'Zoom in' });
+    let g = await geom();
+    for (let i = 0; i < 12 && g && g.ratio > PAGE_AND_RAIL; i++) {
+      await zoomIn.click();
+      await page.waitForTimeout(500);
+      g = await geom();
+    }
+    await page.getByRole('button', { name: 'Zoom out' }).click();
+    await page.waitForTimeout(600);
+    g = await geom();
+    expect(g).toBeTruthy();
+    expect(g!.ratio, 'never found a stop that fits a page and its rail').toBeGreaterThanOrEqual(PAGE_AND_RAIL);
+    // And the page is genuinely readable there, not a thumbnail that "fits"
+    // the way fit-all does — at 1536 this measures ~985px against ~768.
+    expect(g!.pageW, 'the page is too small to call this reading').toBeGreaterThan(g!.vpW / 2);
+
+    // Bring a card to the middle, through the two-finger pan — 1:1 in screen
+    // px, so the delta IS the distance the card has to travel.
+    const d = await page.evaluate(() => {
+      const vp = document.querySelector('.pdf-spread-viewport')!.getBoundingClientRect();
+      const cards = Array.from(document.querySelectorAll('.pdf-railcard-stack'));
+      if (!cards.length) return null;
+      const c = cards[Math.floor(cards.length / 2)].getBoundingClientRect();
+      return { dx: c.left + c.width / 2 - (vp.left + vp.width / 2), dy: c.top + c.height / 2 - (vp.top + vp.height / 2) };
+    });
+    expect(d, 'no rail card was drawn').toBeTruthy();
+    for (let i = 0; i < 20; i++) {
+      await page.locator('.pdf-spread-viewport').evaluate((el, o) => {
+        el.dispatchEvent(new WheelEvent('wheel', { deltaX: o.dx / 20, deltaY: o.dy / 20, bubbles: true, cancelable: true }));
+      }, d!);
+      await page.waitForTimeout(16);
+    }
+    await page.waitForTimeout(400);
+
+    // THE RULE: a card wholly on screen beside a readable page carries its own
+    // controls. With READ_ONLY_RATIO below the pairing this cannot hold at any
+    // zoom, which is what it was set to before 2026-08-19.
+    const seen = await page.evaluate(() => {
+      const vp = document.querySelector('.pdf-spread-viewport')!.getBoundingClientRect();
+      const whole = Array.from(document.querySelectorAll('.pdf-railcard-stack')).filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.left >= vp.left - 1 && r.right <= vp.right + 1 && r.bottom > vp.top && r.top < vp.bottom;
+      });
+      return { whole: whole.length, editable: whole.filter((el) => el.querySelector('.pdf-railcard-add')).length };
+    });
+    expect(seen.whole, 'no card sat wholly inside the viewport').toBeGreaterThan(0);
+    expect(seen.editable, 'a card was in view beside a readable page but read-only').toBe(seen.whole);
+
+    // The other half of the pair still holds: wound back out, the controls go.
+    await page.getByRole('button', { name: 'Fit the whole reading' }).click();
+    await page.waitForTimeout(800);
+    await expect(page.locator('.pdf-railcard-add')).toHaveCount(0);
+  });
+
+  /**
    * "Go to this passage" cannot park the canvas where a drag would haul it
    * back from.
    *
