@@ -9,8 +9,8 @@
  * What carries over from the branch: spreadLayout's grid, the imperative
  * transform (pan/zoom never re-renders forty pdf pages per frame), the
  * Figma-style trackpad wheel handling, the settle-then-retarget rastering,
- * and the counter-scaling cards — `--invk` keeps concept titles at reading
- * size however far out you zoom, and cards grow inward over their own pages,
+ * and the counter-scaling cards — `--k` holds a card at the size page mode
+ * draws it however far you zoom, and cards grow inward over their own pages,
  * so at full zoom-out you are reading concepts, not the shrunken text.
  *
  * What deliberately does NOT carry over: the single/spread reading modes,
@@ -32,53 +32,54 @@ import PageSlot, { type PageTier } from "./PageSlot";
 import { type PdfDoc } from "./PageRaster";
 import { spreadLayout, pageX } from "@/lib/spreadLayout";
 import { layoutRail, railScale } from "@/lib/railLayout";
-import { RailCardBody } from "./ConceptRail";
+import { RailCardBody, RAIL_W } from "./ConceptRail";
 import AddConceptCard from "@/components/cards/AddConceptCard";
 import type { Concept, Passage } from "@/lib/types";
 
 const CARD_GAP = 12;
 const CARD_FALLBACK_H = 88;
 /**
- * Two thresholds, not one, and the gap between them is the point.
+ * WHERE EDITING STOPS, MEASURED AGAINST THE SPREAD — not against one page.
  *
- * READ_ONLY_RATIO is where the card's own controls (+, × and remove) go: once
- * the viewport spans more than this many page widths you are reading a map,
- * not a page.
+ * TJ, 2026-08-19: "here I am in canvas mode looking at a 2 page spread, I
+ * expect the passage cards to look just as they would in the 2 page view in
+ * terms of detail and editability and text selection. what am I missing?"
  *
- * IT IS 1.6 BECAUSE A PAGE AND ITS RAIL ARE 1.35 WIDE. spreadLayout puts the
- * rail at `pageW * 0.33` with a `pageW * 0.02` gap, so a page plus the cards
- * that annotate it spans 1.35 page widths — and a threshold below that makes
- * "read this page and edit its cards" a thing the geometry forbids rather than
- * a thing the reader chose. At 1.05 it did forbid it. Measured on the running
- * app at 1536x960 (Object Worlds), stepping the toolbar's + through the range:
+ * Nothing — this was wrong. It was set earlier the same day against a page and
+ * the rail beside it (1.35 page widths, so the line went at 1.6), which fixed
+ * the case it was looking at: you could not read a page and edit its cards at
+ * once. But a SPREAD with its two rails is `layout.unitW` = 2.72 page widths,
+ * so viewing the thing this canvas is built out of still landed outside the
+ * editable band. The unit was the mistake, not the margin.
  *
- *   ratio 1.559 -> page 985px, card 325px  ... no controls
- *   ratio 1.114 -> page 1379px             ... no controls
- *   ratio 0.796 -> page 1930px             ... controls appear
+ * So the test is now against `spreadFitK` — the scale at which one spread
+ * fills the stage — and that is a better rule than either number, for a reason
+ * neither of them had: it is the SAME line `--invk` already turns on at.
+ * Counter-scaling begins the moment you zoom out past spread-fit, so the
+ * invariant is now legible in one sentence — a card is editable exactly while
+ * it is not being shrunk to stay readable. A counter-scaled card is a marker
+ * on a map; a full-size one is a card beside a page, and page mode's 2-page
+ * view is that same view by another route.
  *
- * The controls arrived only once the page was WIDER THAN THE VIEWPORT (1930px
- * in 1536) — you could edit a card or see the page it belongs to, never both
- * (TJ, 2026-08-19: "right now it seems way too close. i want to be able to see
- * the page, read the page, and edit the rail cards"). 1.6 clears 1.35 with room
- * for the leader and the gutter, and leaves the page ~985px wide at 1536 —
- * comfortably readable, and still well inside the 2.72 a whole spread needs.
+ * It also fixes a case the width test could not express at all. spreadFitK is
+ * `min(width fit, height fit)`, so on a tall page the spread fits by HEIGHT and
+ * the viewport is then wider than unitW — the old comparison called that
+ * zoomed-out and locked the cards, at the exact zoom the reader would call a
+ * two-page spread.
  *
- * EDITOR_CLOSE_RATIO is where an OPEN add-concept card is torn down, and it is
- * deliberately far away. One clamped pinch notch multiplies `k` by 2^0.2 =
- * 1.149 (measured — see ZOOM_STEP_CLAMP), so it multiplies `stage.w / k` by
- * 1.149 on the way out. From the reading edge that is 1.84, then 2.11, then
- * 2.43 — so a single slip cannot cross 2.4, and it takes three deliberate
- * notches. That is the same three the old pair bought at 1.05/1.6: both moved
- * together, and the RATIO between them (1.149^3 = 1.517) is what carries the
- * rule.
+ * EDIT_FROM_SPREAD is a hair inside the fit, because landing exactly on a
+ * threshold is how a card ends up read-only on one frame and editable the next.
+ * EDITOR_CLOSE_AT keeps the old gap: one clamped pinch notch scales k by 1.149
+ * (measured — see ZOOM_STEP_CLAMP), so 0.95 / 1.149^3 = 0.63 is three
+ * deliberate notches, and a single slip cannot tear down an open editor.
  *
- * Between the two ratios the card shows no + and no ×, but an editor already
- * open stays open. That asymmetry is intended: opening new edits out here is
- * the thing TJ ruled against (2026-08-17, "zoomed out editing these things is
- * a bad idea"); discarding a half-typed concept is not the same act.
+ * Between the two, a card shows no + and no ×, but an editor already open stays
+ * open. That asymmetry is intended: opening new edits out there is the thing TJ
+ * ruled against (2026-08-17, "zoomed out editing these things is a bad idea");
+ * discarding a half-typed concept is not the same act.
  */
-const READ_ONLY_RATIO = 1.6;
-const EDITOR_CLOSE_RATIO = 2.4;
+const EDIT_FROM_SPREAD = 0.95;
+const EDITOR_CLOSE_AT = 0.63;
 const MEASURE_MS = 120;
 const SETTLE_MS = 200;
 const MAX_RES = 8;
@@ -520,7 +521,7 @@ export default function SpreadCanvasView({
 
   // Whether more than one page is in view — see applyTransform.
   const wideRef = useRef(true);
-  const [seesMoreThanAPage, setSeesMoreThanAPage] = useState(true);
+  const [seesMoreThanASpread, setSeesMoreThanAPage] = useState(true);
   /** Tracks EDITOR_CLOSE_RATIO independently of the read-only flip above. */
   const farOutRef = useRef(true);
 
@@ -529,7 +530,7 @@ export default function SpreadCanvasView({
     const el = canvasRef.current;
     if (!el) return;
     /**
-     * "MORE THAN A PAGE IN VIEW" — the line editing stops at (TJ, 2026-08-17:
+     * "MORE THAN A SPREAD IN VIEW" — the line editing stops at (TJ, 2026-08-17:
      * "maybe at 'i see more than a page' no editing").
      *
      * It is the honest threshold because it is the reader's own experience of
@@ -542,10 +543,10 @@ export default function SpreadCanvasView({
      * it to one page's width asks exactly that question. Set through state
      * only when it flips, because this runs on every pan frame.
      */
-    const { stage: st, basePageWidth: pw } = live.current;
-    if (st.w > 0 && pw > 0) {
-      const wide = st.w / t.k > pw * READ_ONLY_RATIO;
-      const farOut = st.w / t.k > pw * EDITOR_CLOSE_RATIO;
+    const { spreadFitK: sfk } = live.current;
+    if (sfk > 0) {
+      const wide = t.k < sfk * EDIT_FROM_SPREAD;
+      const farOut = t.k < sfk * EDITOR_CLOSE_AT;
       if (wide !== wideRef.current) {
         wideRef.current = wide;
         startTransition(() => setSeesMoreThanAPage(wide));
@@ -561,19 +562,32 @@ export default function SpreadCanvasView({
       }
     }
     el.style.transform = `translate(${t.x}px, ${t.y}px) scale(${t.k})`;
-    el.style.setProperty("--invk", String(Math.max(1, live.current.spreadFitK / t.k)));
-    // The raw scale, for anything that must come out a CONSTANT SIZE ON SCREEN
-    // rather than a constant size on the plane. --invk cannot serve that: it is
-    // clamped at 1, because its job is to stop card TEXT shrinking below
-    // reading size as you zoom out, and it deliberately does nothing as you
-    // zoom in. The draft card is the opposite case — it is a form you type
-    // into, not part of the document, so it should be the same size in the
-    // hand at every zoom. See .pdf-draftcard in PdfViewer.
+    /**
+     * THE SCALE, and the only counter-scaling variable left.
+     *
+     * There were two. `--invk` was max(1, spreadFitK / k): clamped at 1, so it
+     * held card text at reading size as you zoomed OUT and did nothing at all
+     * as you zoomed IN — which is how a card on a spread came to be twice the
+     * size of the identical card in page mode (TJ, 2026-08-19). Everything that
+     * rode it now divides by `--k` instead, which governs both halves with one
+     * rule: a length written in screen px stays that many screen px.
+     *
+     * So --invk had no consumers left and is gone rather than kept as a second
+     * way to say a worse version of the same thing.
+     */
     el.style.setProperty("--k", String(t.k));
     // The minimap rides the same write: overview + detail must never drift,
     // so the view-rect is imperative like the canvas — zero React per frame.
-    // Visible only when there is somewhere else to be: at fit-all the rect
-    // IS the map, and a map of where-you-already-are is furniture.
+    //
+    // IT STANDS AT EVERY ZOOM (TJ, 2026-08-19: "can we keep min map always
+    // visible?"). It used to hide itself at fit-all, on the reasoning that the
+    // rect then IS the map and a map of where-you-already-are is furniture.
+    // True as far as it goes, and it cost more than it saved: the control
+    // appeared and vanished as you crossed a threshold you could not see, so
+    // the one surface that says where you are was missing exactly when a
+    // reader new to the canvas went looking for it. A standing inset also
+    // reads as part of the furniture rather than as a thing that comes and
+    // goes, which is what it is.
     const mm = live.current.minimap;
     const mapEl = minimapRef.current;
     const viewEl = minimapViewRef.current;
@@ -584,7 +598,7 @@ export default function SpreadCanvasView({
       viewEl.style.transform = `translate(${(-t.x / t.k) * mm.scale}px, ${(-t.y / t.k) * mm.scale}px)`;
       viewEl.style.width = `${vw}px`;
       viewEl.style.height = `${vh}px`;
-      mapEl.style.visibility = vw >= mm.w - 1 && vh >= mm.h - 1 ? "hidden" : "visible";
+      mapEl.style.visibility = "visible";
     }
     live.current.onTransform?.();
     window.clearTimeout(settleTimer.current);
@@ -912,10 +926,14 @@ export default function SpreadCanvasView({
     if (prevDraft.current === draftId) return;
     prevDraft.current = draftId;
     if (!draftId || !layout || !initedRef.current) return;
-    const { stage, basePageWidth, fitAllK, maxMultiplier } = live.current;
-    if (stage.w === 0 || basePageWidth === 0 || fitAllK === 0) return;
+    const { stage, fitAllK, maxMultiplier, spreadFitK } = live.current;
+    if (stage.w === 0 || fitAllK === 0 || spreadFitK === 0) return;
     const k = tref.current.k;
-    const needed = stage.w / (READ_ONLY_RATIO * 0.95 * basePageWidth);
+    // Spread-fit exactly: the state the reader calls "a two-page spread", and
+    // since 2026-08-19 the state in which cards are full-size and editable. It
+    // sits a hair above EDIT_FROM_SPREAD rather than on it, so the draft never
+    // opens on the threshold itself.
+    const needed = spreadFitK;
     if (k >= needed) return; // already close enough to write
     const to = Math.min(needed, fitAllK * maxMultiplier);
     // Through the multiplier, not writeTransform: the toolbar's − / + / Fit and
@@ -1403,7 +1421,7 @@ export default function SpreadCanvasView({
                  SOMETHING was captured here — which the highlight says better.
                  Close in it keeps its + and its invitation, so it stays. */
               if (!(draft && c.passage.id === draft.passage.id)
-                  && seesMoreThanAPage && c.concepts.length === 0 && !c.passage.note) return null;
+                  && seesMoreThanASpread && c.concepts.length === 0) return null;
               const h = (passageCardHeights[id] ?? CARD_FALLBACK_H) * cs;
               const x2 = c.anchor.side === "left" ? s.x + layout.railW : s.x + layout.unitW - layout.railW;
               return <path key={id} d={`M ${c.anchor.edgeX} ${c.anchor.midY} L ${x2} ${top + h / 2}`} />;
@@ -1427,12 +1445,24 @@ export default function SpreadCanvasView({
               // and no note BY DEFINITION — that is what the reader is about
               // to supply — so the test that hides an empty card would hide
               // the one card that must be on screen.
-              if (!isDraft && seesMoreThanAPage && c.concepts.length === 0 && !c.passage.note) return null;
+              //
+              // The note no longer counts as content out here (TJ, 2026-08-19),
+              // because RailCardBody stopped drawing it at this threshold. A
+              // card with a note and no concepts would otherwise pass this test
+              // and then render as an empty bordered box over a thumbnail —
+              // saying only that SOMETHING was captured here, which the
+              // highlight says better. Zoomed out, a card IS its concepts.
+              if (!isDraft && seesMoreThanASpread && c.concepts.length === 0) return null;
               // No first/chips split: every concept is a badge of equal
               // weight, the same as page mode's rail and the passage view.
               const style: React.CSSProperties = {
                 top: placement.tops[id] ?? s.y,
-                width: `min(calc(${layout.railW}px * var(--invk, 1)), ${layout.railW + layout.gap + basePageWidth}px)`,
+                // RAIL_W, page mode's own rail, divided by the zoom: the card is
+                // then that many SCREEN px wide at any k — the same box page mode
+                // draws. Capped as before, because 220/k grows without bound as
+                // you zoom out and a card may grow inward over its own page, no
+                // further.
+                width: `min(calc(${RAIL_W}px / var(--k, 1)), ${layout.railW + layout.gap + basePageWidth}px)`,
                 // railScale shrinks a crowded side so every card stays visible.
                 // The DRAFT is exempt: it is the thing being written, and
                 // shrinking it because its neighbours are crowded is the one
@@ -1453,7 +1483,7 @@ export default function SpreadCanvasView({
                    two cards cannot drift again — the canvas was still drawing
                    a concept label and a gloss hours after the other stopped.
                    The host keeps what is genuinely the canvas's: the anchor,
-                   the counter-scale, and the width that rides --invk. It is no
+                   the counter-scale, and the width that rides --k. It is no
                    longer a role="button" wrapper, because the body holds
                    controls and a control inside a control is unreachable in
                    keyboard order. */
@@ -1479,7 +1509,7 @@ export default function SpreadCanvasView({
                       onUnfile={onUnfile}
                       onRemovePassage={onRemovePassage}
                       onEditNote={onEditNote}
-                      readOnly={seesMoreThanAPage}
+                      readOnly={seesMoreThanASpread}
                     />
                   </div>
                   )}

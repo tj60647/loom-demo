@@ -155,11 +155,20 @@ export function RailCardBody({
           >+</button>
         )}
       </div>
-      {/* An invitation you cannot take is not an invitation (TJ, 2026-08-17:
-          "if no note then hide add a passage"). While the card is read-only the
-          empty state says "add a passage note" over a control that will not
-          add one — so with nothing written, nothing is drawn. */}
-      {(passage.note || !readOnly) && (
+      {/* NO NOTE AT ALL WHILE THE CARD IS READ-ONLY (TJ, 2026-08-19: "when
+          zoomed out passage cards need not show their notes").
+          Two reasons it went, and they arrive from opposite directions. The
+          empty state was already suppressed out here, because "add a passage
+          note" over a control that will not add one is an invitation you cannot
+          take (TJ, 2026-08-17). And a WRITTEN note out here is prose at marker
+          size over a page thumbnail — the zoom where you are reading a concept
+          map, and the concepts are what the card is for. Zoom in far enough to
+          edit and the note comes back with the controls.
+
+          This is why the host's empty-card test drops its note clause at the
+          same threshold: a card carrying only a note now draws nothing, so it
+          must not be drawn at all. See SpreadCanvasView. */}
+      {!readOnly && (
         editingNote ? (
           /* WRITTEN HERE, not in Your work (TJ, 2026-08-19: "the passage rail
              card passage note should be editable in place"). Same contract as

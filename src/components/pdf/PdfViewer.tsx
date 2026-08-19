@@ -2069,26 +2069,80 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         /* Counter-scaling: card text never shrinks below its reading size as
            the canvas zooms out. Done via font-size — real layout, not a
            transform — so the card grows to hold it and the rail re-stacks. */
-        /* COUNTER-SCALE, the canvas's own rule: the whole surface is
-           transformed, so anything meant to stay readable while you zoom out
-           has to grow by the inverse (--invk). The card's parts all carry it —
-           the badges and the note now, where the label and gloss used to.
-           Missing one is how a control ends up a two-pixel dot at fit-all.
-           (No backticks in this block: styled-jsx template literal.) */
-        .pdf-spread-canvas .pdf-railcard-note { font-size: calc(11px * var(--invk, 1)); }
+        /* A CARD IS THE SAME SIZE IN THE HAND AT EVERY ZOOM (TJ, 2026-08-19: "why do
+           the cards appear bigger on the canvas view showing a spread than they
+           do in the 2 pages showing a spread?").
+
+           Because they were drawn in CANVAS units and then scaled by the
+           transform, while page mode's are plain screen px. Measured at
+           1536x960, spread-fit (k = 1.97): the boxes matched almost exactly —
+           232px against page mode's 220 — but the type did not, 21.7px against
+           11.5px. Same box, twice the type, so every label wrapped and the card
+           came out 275px tall against 87. One step further in it was worse
+           still: 325px wide, 30px type, 386px tall.
+
+           --invk could not fix it and was never meant to. It is
+           max(1, spreadFitK / k) — clamped at 1 — so it holds type at reading
+           size as you zoom OUT and does nothing at all as you zoom IN. This is
+           the zoom-in half, which nothing governed.
+
+           Dividing by --k instead governs both halves with one rule: every
+           length here is screen px, so a card is the size page mode draws it,
+           always. The base sizes are page mode's own (see .pdf-railcard-note
+           and friends below) so the two cannot drift apart by a rounding.
+
+           The WIDTH keeps its cap. 220/k grows without bound as k falls, and at
+           fit-all that would be a card several times the spread it annotates;
+           railW + gap + basePageWidth is the old ceiling and still the right one
+           — a card may grow inward over its own page and no further. */
+        .pdf-spread-canvas .pdf-railcard-note { font-size: calc(11.5px / var(--k, 1)); }
         .pdf-spread-canvas .pdf-railcard-note-edit {
-          font-size: calc(11px * var(--invk, 1));
-          height: calc(68px * var(--invk, 1));
+          font-size: calc(11.5px / var(--k, 1));
+          height: calc(68px / var(--k, 1));
         }
-        .pdf-spread-canvas .pdf-railcard-rm { font-size: calc(9.5px * var(--invk, 1)); }
-        .pdf-spread-canvas .pdf-railcard-chip { font-size: calc(10px * var(--invk, 1)); }
+        .pdf-spread-canvas .pdf-railcard-rm { font-size: calc(9.5px / var(--k, 1)); }
+        .pdf-spread-canvas .pdf-railcard-chip { font-size: calc(10px / var(--k, 1)); }
         .pdf-spread-canvas .pdf-railcard-add {
-          width: calc(18px * var(--invk, 1));
-          height: calc(18px * var(--invk, 1));
-          font-size: calc(12px * var(--invk, 1));
+          width: calc(18px / var(--k, 1));
+          height: calc(18px / var(--k, 1));
+          font-size: calc(12px / var(--k, 1));
         }
-        .pdf-spread-canvas .pchip-x { font-size: calc(12px * var(--invk, 1)); }
-        .pdf-spread-canvas .pdf-railcard-badges { gap: calc(4px * var(--invk, 1)); }
+        .pdf-spread-canvas .pchip-x { font-size: calc(12px / var(--k, 1)); }
+        .pdf-spread-canvas .pdf-railcard { padding: calc(8px / var(--k, 1)) calc(10px / var(--k, 1)); }
+        .pdf-spread-canvas .pdf-railcard-badges { gap: calc(4px / var(--k, 1)); }
+        /* The lengths BETWEEN the type, which are as much of a card's size as
+           the type is. Dividing only the font-sizes got the width exactly right
+           (220px at every zoom, matching page mode) and left the heights
+           drifting — measured 19px / 22.9px / 26px for the same chip at
+           2-page, spread-fit and one step in, because every padding was still
+           a canvas length multiplied by k. Anything that contributes to a
+           card's box has to be in the same unit as the box. */
+        .pdf-spread-canvas .pdf-railcard-chip { padding: calc(1px / var(--k, 1)) calc(7px / var(--k, 1)); }
+        .pdf-spread-canvas .pdf-railcard-note {
+          margin-top: calc(6px / var(--k, 1));
+          padding: calc(4px / var(--k, 1)) calc(5px / var(--k, 1));
+        }
+        .pdf-spread-canvas .pdf-railcard-note-edit {
+          margin-top: calc(6px / var(--k, 1));
+          padding: calc(4px / var(--k, 1)) calc(5px / var(--k, 1));
+        }
+        .pdf-spread-canvas .pdf-railcard-stack { border-radius: calc(4px / var(--k, 1)); }
+        .pdf-spread-canvas .pdf-railcard {
+          border-radius: calc(4px / var(--k, 1));
+          /* All four, not just the accent edge: a 1px rule drawn in canvas
+             units is 2.8px on screen at capture zoom, and four of them is most
+             of the height a chip was gaining. */
+          border-width: calc(1px / var(--k, 1));
+          border-left-width: calc(3px / var(--k, 1));
+          /* The card's OWN size, which everything inside inherits unless it
+             says otherwise — the badges row does not, and neither does a bare
+             text node. Left alone it inherited the canvas's, which is the
+             page's size: 46.9px on screen against page mode's 17. 17px is what
+             page mode computes here, matched rather than guessed (measured by
+             diffing computed styles across the two views). */
+          font-size: calc(17px / var(--k, 1));
+        }
+        .pdf-spread-canvas .pdf-railcard-chip { border-width: calc(1px / var(--k, 1)); }
         /* Space-pan turns the whole canvas into a drag surface. The card's
            controls would otherwise take the press and start an unfile instead
            of a pan — the cursor already says grab, and this makes it true. */
@@ -2443,9 +2497,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            bottom of the viewport.
 
            Dividing by --k (set in applyTransform) makes it land at 340px in the
-           hand whatever the zoom. --invk is the wrong variable and cannot be
-           made to work here: it is clamped at 1 precisely so that zooming IN
-           does not shrink card text, which is the half of the range this needs.
+           hand whatever the zoom. This was the first thing to need --k; the
+           passage cards followed on 2026-08-19, when the clamped --invk they
+           had been riding turned out to have the same defect in the same
+           direction, and --invk went with it.
 
            The origin is the edge nearest the page, so shrinking pulls the card
            toward the words its leader points at rather than away from them. */

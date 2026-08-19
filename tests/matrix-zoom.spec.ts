@@ -212,8 +212,9 @@ test.describe('Matrix zoom', () => {
 
     // The overview inset, while zoomed: visible, and clicking it MOVES the
     // view — the jump goes through the same zb.transform, same extents, so
-    // nothing else needs to know a minimap exists. (At fit-all it hides: a
-    // map of where-you-already-are is furniture, asserted after Fit below.)
+    // nothing else needs to know a minimap exists. It stands at every zoom
+    // now (2026-08-19); what changes with the zoom is the view-rect, which is
+    // asserted after Fit below.
     const minimap = page.getByTestId('matrix-minimap');
     await expect(minimap).toBeVisible({ timeout: 5000 });
     const beforeJump = await page
@@ -232,7 +233,21 @@ test.describe('Matrix zoom', () => {
     await expect
       .poll(async () => Math.abs((await canvasK()) - atFit.k), { timeout: 5000 })
       .toBeLessThan(atFit.k * 0.06);
-    await expect(minimap).toBeHidden({ timeout: 5000 });
+    // The inset STAYS — it no longer vanishes at fit-all — and what says you
+    // are at fit-all is its rect, which now covers the whole map. Asserting
+    // the rect rather than the visibility keeps the real invariant under test:
+    // the overview tracks the view. A bare "still visible" would pass just as
+    // well if the rect had stopped moving altogether.
+    await expect(minimap).toBeVisible({ timeout: 5000 });
+    await expect
+      .poll(async () =>
+        minimap.evaluate((el) => {
+          const map = el.getBoundingClientRect();
+          const view = el.querySelector('.pdf-minimap-view')!.getBoundingClientRect();
+          // How much of the map the view-rect covers, on the tighter axis.
+          return Math.min(view.width / map.width, view.height / map.height);
+        }), { timeout: 5000 })
+      .toBeGreaterThan(0.9);
 
     // Cards in the matrix, AT FIT-ALL: no text layer is mounted down here —
     // fit-all is the impostor tier — so the card anchors analytically, off
@@ -247,97 +262,71 @@ test.describe('Matrix zoom', () => {
   });
 
   /**
-   * You can read a page and edit its cards AT THE SAME TIME.
+   * A CARD IS EDITABLE EXACTLY WHILE IT IS NOT BEING SHRUNK.
    *
-   * This is a geometry rule, not a preference. spreadLayout puts the rail at
-   * pageW * 0.33 with a pageW * 0.02 gap, so a page plus the cards annotating
-   * it spans 1.35 page widths; READ_ONLY_RATIO has to clear that or the two
-   * halves of "annotate this page" can never be on screen together. At 1.05 it
-   * did not clear it — measured at 1536x960, the controls first appeared at
-   * ratio 0.796, where the page rendered 1930px wide in a 1536px viewport.
+   * TJ, 2026-08-19: looking at a two-page spread in canvas, he expected the
+   * cards to behave as they do in 2-page view — detail, editability, selection.
+   * They did not, because the threshold was expressed against ONE page and its
+   * rail (1.35 page widths) while a spread with its rails is 2.72. Viewing the
+   * thing the canvas is built out of fell outside the editable band.
    *
-   * The assertion is deliberately phrased as the requirement rather than as
-   * the constant: at the FIRST zoom where a whole page fits the viewport, a
-   * card must be fully in view and carry its +. A future change to railW or to
-   * the ratio that breaks the pairing fails here, whatever the number is.
+   * It is now spreadFitK, which is also the scale --invk starts counter-scaling
+   * at — so the rule and the test are the same sentence: a card carries its
+   * controls exactly while --invk is 1. That is what this asserts, at every
+   * zoom stop rather than at one chosen number, so it holds whatever railW,
+   * the page aspect or the stage size do to the arithmetic.
+   *
+   * Measured at 1536x960 on Object Worlds before the change: controls first
+   * appeared at ratio 1.56 (page 985px), three stops inside the spread. After:
+   * ratio 2.18 (page 703px), the stop where --invk reaches 1.
    */
-  test('the closest zoom that still shows a page AND its rail can edit the card', async ({ page }) => {
+  test('a rail is all editable or all read-only, and the note goes with the controls', async ({ page }) => {
     test.setTimeout(90_000);
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
     await page.getByRole('button', { name: 'Canvas' }).click();
     await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
 
-    // A page plus the rail that annotates it, in page widths — the same
-    // numbers spreadLayout lays out with, so this moves if the layout does.
-    const RAIL = 0.33, GAP = 0.02;
-    const PAGE_AND_RAIL = 1 + RAIL + GAP; // 1.35
-
-    // `ratio` is the viewport measured in page widths. Bigger = zoomed further
-    // out = a smaller, less readable page.
-    const geom = () =>
+    const snap = () =>
       page.evaluate(() => {
-        const vp = document.querySelector('.pdf-spread-viewport')?.getBoundingClientRect();
-        const pg = document.querySelector('.pdf-slot-inner, .pdf-slot-img')?.getBoundingClientRect();
-        return vp && pg ? { vpW: vp.width, pageW: pg.width, ratio: vp.width / pg.width } : null;
+        const cards = Array.from(document.querySelectorAll('.pdf-spread-canvas .pdf-railcard'));
+        return {
+          cards: cards.length,
+          plus: document.querySelectorAll('.pdf-spread-canvas .pdf-railcard-add').length,
+          notes: document.querySelectorAll('.pdf-spread-canvas .pdf-railcard-note').length,
+          empty: cards.filter((c) => !c.querySelector('.pdf-railcard-chip')).length,
+        };
       });
-    await expect.poll(async () => (await geom())?.pageW ?? 0, { timeout: 8000 }).toBeGreaterThan(0);
+    await expect.poll(async () => (await snap()).cards, { timeout: 8000 }).toBeGreaterThan(0);
 
-    // Wind in past the pairing, then come back one step: that lands on the
-    // CLOSEST toolbar stop that still fits a page and its rail side by side —
-    // the most readable zoom at which annotating this page is possible at all.
+    // Nothing internal is read here — not --k, not spreadFitK, not a ratio.
+    // The rule is a PAIRING between things the reader can see, so the test
+    // asserts the pairing and lets the implementation move under it. An earlier
+    // version keyed off --invk and quietly stopped testing anything the day
+    // that variable was deleted: parseFloat('') is NaN, the fallback said 1,
+    // and every stop looked full-size.
     const zoomIn = page.getByRole('button', { name: 'Zoom in' });
-    let g = await geom();
-    for (let i = 0; i < 12 && g && g.ratio > PAGE_AND_RAIL; i++) {
-      await zoomIn.click();
-      await page.waitForTimeout(500);
-      g = await geom();
+    let sawReadOnly = false;
+    let sawEditable = false;
+    for (let i = 0; i < 6; i++) {
+      await page.waitForTimeout(700);
+      const s = await snap();
+      const where = `stop ${i}: ${s.cards} cards, ${s.plus} plus, ${s.notes} notes`;
+      // A rail is all one thing or all the other — never half-editable.
+      expect([0, s.cards], `some cards editable and some not (${where})`).toContain(s.plus);
+      // The note appears with the controls and goes with them (TJ, 2026-08-19).
+      expect(s.notes, `notes and controls disagree (${where})`).toBe(s.plus);
+      if (s.plus === 0 && s.cards > 0) {
+        sawReadOnly = true;
+        // Out here a card IS its concepts: nothing empty is drawn.
+        expect(s.empty, `an empty card was drawn while read-only (${where})`).toBe(0);
+      } else if (s.cards > 0) {
+        sawEditable = true;
+      }
+      if (i < 5) await zoomIn.click();
     }
-    await page.getByRole('button', { name: 'Zoom out' }).click();
-    await page.waitForTimeout(600);
-    g = await geom();
-    expect(g).toBeTruthy();
-    expect(g!.ratio, 'never found a stop that fits a page and its rail').toBeGreaterThanOrEqual(PAGE_AND_RAIL);
-    // And the page is genuinely readable there, not a thumbnail that "fits"
-    // the way fit-all does — at 1536 this measures ~985px against ~768.
-    expect(g!.pageW, 'the page is too small to call this reading').toBeGreaterThan(g!.vpW / 2);
-
-    // Bring a card to the middle, through the two-finger pan — 1:1 in screen
-    // px, so the delta IS the distance the card has to travel.
-    const d = await page.evaluate(() => {
-      const vp = document.querySelector('.pdf-spread-viewport')!.getBoundingClientRect();
-      const cards = Array.from(document.querySelectorAll('.pdf-railcard-stack'));
-      if (!cards.length) return null;
-      const c = cards[Math.floor(cards.length / 2)].getBoundingClientRect();
-      return { dx: c.left + c.width / 2 - (vp.left + vp.width / 2), dy: c.top + c.height / 2 - (vp.top + vp.height / 2) };
-    });
-    expect(d, 'no rail card was drawn').toBeTruthy();
-    for (let i = 0; i < 20; i++) {
-      await page.locator('.pdf-spread-viewport').evaluate((el, o) => {
-        el.dispatchEvent(new WheelEvent('wheel', { deltaX: o.dx / 20, deltaY: o.dy / 20, bubbles: true, cancelable: true }));
-      }, d!);
-      await page.waitForTimeout(16);
-    }
-    await page.waitForTimeout(400);
-
-    // THE RULE: a card wholly on screen beside a readable page carries its own
-    // controls. With READ_ONLY_RATIO below the pairing this cannot hold at any
-    // zoom, which is what it was set to before 2026-08-19.
-    const seen = await page.evaluate(() => {
-      const vp = document.querySelector('.pdf-spread-viewport')!.getBoundingClientRect();
-      const whole = Array.from(document.querySelectorAll('.pdf-railcard-stack')).filter((el) => {
-        const r = el.getBoundingClientRect();
-        return r.left >= vp.left - 1 && r.right <= vp.right + 1 && r.bottom > vp.top && r.top < vp.bottom;
-      });
-      return { whole: whole.length, editable: whole.filter((el) => el.querySelector('.pdf-railcard-add')).length };
-    });
-    expect(seen.whole, 'no card sat wholly inside the viewport').toBeGreaterThan(0);
-    expect(seen.editable, 'a card was in view beside a readable page but read-only').toBe(seen.whole);
-
-    // The other half of the pair still holds: wound back out, the controls go.
-    await page.getByRole('button', { name: 'Fit the whole reading' }).click();
-    await page.waitForTimeout(800);
-    await expect(page.locator('.pdf-railcard-add')).toHaveCount(0);
+    expect(sawReadOnly, 'never saw a read-only card — the ladder did not cover the range').toBe(true);
+    expect(sawEditable, 'never saw an editable card — editing is unreachable from Fit').toBe(true);
   });
 
   /**
