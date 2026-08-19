@@ -394,6 +394,10 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    are parts of the card they sit in, not cards themselves — the card's own
    border is what separates one concept from the next. */
 .ywevidence{margin-top:12px;padding-bottom:8px;border-bottom:1px dotted var(--rule)}
+/* "remove passage from concept" gets its own line (TJ, 2026-08-18). It sat
+   inline after the citation, so the one act on an evidence row that changes
+   anything read as part of the reference to the text it changes. */
+.ywevidence .src .rm-actions{display:block;margin:5px 0 0}
 .ywevidence:last-child{border-bottom:0;padding-bottom:0}
 /* A collapsed concept card is its head, so the head takes the card's corners
    rather than sitting in a box with a gap around it. */
@@ -420,6 +424,19 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .lhead .lconcept{font-size:15.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lhead .lsrc{font-family:var(--mono);font-size:10px;color:var(--ink-soft);white-space:nowrap}
 .lbody{padding:2px 12px 12px 22px;border-left:2px solid var(--rule);margin:0 12px 10px}
+/* THE OPENED CONCEPT CARD KEEPS ITS FULL WIDTH (TJ, 2026-08-18: "the concept
+   card formatting when open should be more like the warp version, i like that
+   there is little wasted space on either side of text, whereas the your work
+   version has all kinds of indentions").
+
+   `.lbody` was indented three times over — a 12px side margin, 12px of padding
+   and another 10px of left padding past a 2px rule — so an opened concept's
+   description and evidence sat ~36px in from a card edge that is itself inset
+   in a 460px sheet. The rule and the margins go; the padding matches the head
+   above it, which is what the warp card already does. Scoped to the card, so
+   04 · Vocabulary's rows and the two admin pages keep the indented `.lbody`
+   they were drawn for. */
+.ywcard.ywconcept > .lbody{border-left:0;margin:0;padding:0 12px 12px}
 .lbody .passage{font-size:13.5px;margin:4px 0 8px}
 .lbody .src{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
 .lbody .defrow{margin:7px 0 5px}

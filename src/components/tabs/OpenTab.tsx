@@ -257,7 +257,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
                   >"{b.content}"</div>
                   <div className="src">
                     {b.source || "—"}{b.location ? ` · ${b.location}` : ""}
-                    <span className="rm-actions" style={{ marginLeft: "8px" }}>
+                    <span className="rm-actions">
                       {/* BOTH, always (TJ, 2026-08-17). This used to be
                           a choice made for the student: with several
                           concepts you were offered "unfile from this
