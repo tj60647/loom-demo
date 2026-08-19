@@ -50,10 +50,10 @@ export type ConceptCardEdit = {
    */
   onRename?: (input: HTMLInputElement) => void
   onEditDef: (def: string) => void
-  /** The evidence rows, one per passage. Your work draws these: they carry an
-   *  unfile and a remove whose wording is settled (TJ, 2026-08-17, "BOTH,
-   *  always"). Absent in Vocabulary, which speaks in readings, not passages. */
-  renderEvidence?: (passage: Passage) => React.ReactNode
+  /** Take one passage off this concept, worded from the subject you are
+   *  standing in. Absent at 02, where the card is a pick target and a filing
+   *  is not the business. */
+  onUnfilePassage?: (passageId: string) => void
   /** Anything the host wants under the fields — Vocabulary's "Evidenced in …"
    *  line, its merge picker and its "remove concept". */
   body?: React.ReactNode
@@ -70,6 +70,7 @@ export default function ConceptCard({
   elsewhere = 0,
   allPassages,
   readings = 0,
+  evidenceSay = "— in this reading",
   edit,
   pick = null,
   onPick,
@@ -107,6 +108,9 @@ export default function ConceptCard({
    * has a second number worth showing, and only when it is more than one.
    */
   readings?: number
+  /** What the Evidence label says after the dash. 04 spans every reading; the
+   *  reading-scoped stations speak for the one that is open. */
+  evidenceSay?: string
   /** Required by `mode="edit"`; ignored otherwise. */
   edit?: ConceptCardEdit
   /** Required by `mode="pick"`; which slot this concept is loaded into. */
@@ -166,6 +170,114 @@ export default function ConceptCard({
       </div>
     )
 
+  /**
+   * ONE BODY FOR EVERY CONCEPT CARD (TJ, 2026-08-18: "apply the concept,
+   * description, evidence citation with expandable passage to the your work
+   * concept cards, and the warp concept cards"). Three sections, in this
+   * order, wherever a concept opens: what it is called, what you take it to
+   * mean, and what backs it.
+   *
+   * The evidence is CITATIONS, with the passage one disclosure down — TJ's
+   * shape, first built in 04 and now the card's own. `<details>` brings its
+   * keyboard and its expanded state, so no host keeps a second open-map.
+   *
+   * `passages` is whatever the host's scope hands over: this reading's at 01
+   * and 02, every reading's at 04. The card does not decide that; it only
+   * says so in the label.
+   */
+  const cardBody = edit ? (
+    <div className="lbody">
+      {edit.onRename && (
+        <div className="defrow">
+          <span className="label">Concept</span>
+          {/* Uncontrolled and keyed on the label: the rename can be rolled back
+              by the host when the homonym confirm is declined. */}
+          <input
+            key={concept.label}
+            placeholder="concept label…"
+            defaultValue={concept.label}
+            onBlur={(e) => edit.onRename!(e.target)}
+          />
+        </div>
+      )}
+      <div className="defrow">
+        <span className="label">Description</span>
+        {/* A textarea, not an input (TJ, 2026-08-17: "the description should
+            wrap so we can read it all"). A gloss is up to 100 words by the
+            model; on one line you could read about eight of them. */}
+        <textarea
+          className="conceptdef conceptDescription"
+          rows={2}
+          placeholder="in your words; same sense across your sources?"
+          defaultValue={concept.def ?? ""}
+          onBlur={(e) => {
+            if (e.target.value !== (concept.def ?? "")) edit.onEditDef(e.target.value)
+          }}
+        />
+      </div>
+
+      {here > 0 ? (
+        <div className="citelist">
+          <span className="label">
+            Evidence <span className="labelsay">{evidenceSay}</span>
+          </span>
+          {passages.map((b) => {
+            const isDoor = !!onGotoPassage && (!!b.sourceId || !!b.source)
+            return (
+              <details key={b.id} className="citerow">
+                <summary>
+                  <span className="citewhere">
+                    {b.sourceId ? titleOf(b.sourceId) : b.source || "no reading yet"}
+                  </span>
+                  {b.location ? <span className="citeloc"> · {b.location}</span> : null}
+                </summary>
+                {/* The passage is the door, as it is everywhere else a Passage
+                    is drawn (TJ, 2026-08-17) — and at 04 it can cross to
+                    another reading, which is the host's business, not this
+                    card's. */}
+                <div
+                  className={`passage${isDoor ? " isdoor" : ""}`}
+                  role={isDoor ? "button" : undefined}
+                  tabIndex={isDoor ? 0 : undefined}
+                  aria-label={isDoor ? "Open this passage in its reading" : undefined}
+                  title={isDoor ? "Open this passage in its reading" : undefined}
+                  onClick={() => isDoor && onGotoPassage?.(b)}
+                  onKeyDown={(e) => {
+                    if (!isDoor) return
+                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGotoPassage?.(b) }
+                  }}
+                >&quot;{b.content}&quot;</div>
+                {edit.onUnfilePassage && (
+                  <div className="src rm-actions" style={{ marginTop: "6px" }}>
+                    <button
+                      type="button"
+                      className="rm"
+                      onClick={() => edit.onUnfilePassage!(b.id)}
+                      title={
+                        b.conceptIds.length > 1
+                          ? "Filed under several concepts — this removes it from this one only."
+                          : "The passage stays, with no concept on it, under Unlabeled passages."
+                      }
+                    >remove passage from concept</button>
+                  </div>
+                )}
+              </details>
+            )
+          })}
+        </div>
+      ) : (
+        /* A designation, never a warning ("a Concept may precede its
+           evidence", TJ 2026-08-08; red line 4). */
+        <p className="oconcept-def empty">
+          {loom === 0
+            ? "No passage backs this yet. You may have named it ahead of its evidence, which is allowed."
+            : `Backed in your other readings, not in this one — ${loom} passage${loom !== 1 ? "s" : ""} elsewhere.`}
+        </p>
+      )}
+      {edit.body}
+    </div>
+  ) : null
+
   if (mode === "pick" && onPick) {
     return (
       <div
@@ -209,45 +321,11 @@ export default function ConceptCard({
             </svg>
           </button>
         </div>
-        {openHere && (
-          /* What the ● used to show, in place: the gloss first, because half
-             the time it is the whole answer, then the evidence. Read-only —
-             02 is where you link concepts, not where you rename them. */
-          <div className="lbody cbody">
-            {concept.def
-              ? <p className="oconcept-def">{concept.def}</p>
-              : <p className="oconcept-def empty">no working description yet</p>}
-            {passages.length > 0 ? (
-              <div className="oconcept-evidence">
-                <div className="lgroup">Evidence in this reading</div>
-                {passages.map((p) => (
-                  <PassageCard
-                    key={p.id}
-                    passage={p}
-                    concepts={concepts}
-                    titleOf={titleOf}
-                    onGoto={onGotoPassage}
-                    hideConceptId={concept.id}
-                  />
-                ))}
-                {/* Said plainly, because it is true and not obvious: stations
-                    unmount, so leaving 02 drops the picks on the bench. This
-                    was the popover's own warning and it outlived it. */}
-                {onGotoPassage && (
-                  <p className="oconcept-def empty">
-                    Opening a passage goes to 01 · Reading and lets go of your picks here.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="oconcept-def empty">
-                {loom === 0
-                  ? "No passage backs this yet. You may have named it ahead of its evidence, which is allowed."
-                  : `Backed in your other readings, not in this one — ${loom} passage${loom !== 1 ? "s" : ""} elsewhere.`}
-              </p>
-            )}
-          </div>
-        )}
+        {/* The same body every concept card opens to. 02 gained the
+            Concept and Description fields with it (TJ, 2026-08-18) — the card
+            is one card, and withholding two of its three sections here was the
+            distinction that made the ● necessary in the first place. */}
+        {openHere && cardBody}
       </div>
     )
   }
@@ -267,68 +345,7 @@ export default function ConceptCard({
               the row and it is said in full. */}
           {headTag}
         </div>
-        {edit.isOpen && (
-          <div className="lbody">
-            {edit.onRename && (
-              <div className="defrow">
-                <span className="label">Concept</span>
-                {/* Uncontrolled and keyed on the label: the rename can be rolled
-                    back by the host when the homonym confirm is declined. */}
-                <input
-                  key={concept.label}
-                  placeholder="concept label…"
-                  defaultValue={concept.label}
-                  onBlur={(e) => edit.onRename!(e.target)}
-                />
-              </div>
-            )}
-            <div className="defrow">
-              <span className="label">Description</span>
-              {/* A textarea, not an input (TJ, 2026-08-17: "the description
-                  should wrap so we can read it all"). A gloss is up to 100
-                  words by the model; on one line you could read about eight of
-                  them, and the rest scrolled sideways out of view. */}
-              <textarea
-                className="conceptdef conceptDescription"
-                rows={2}
-                placeholder="in your words; same sense across your sources?"
-                defaultValue={concept.def ?? ""}
-                onBlur={(e) => {
-                  if (e.target.value !== (concept.def ?? "")) edit.onEditDef(e.target.value)
-                }}
-              />
-            </div>
-            {edit.renderEvidence && passages.map((b) => edit.renderEvidence!(b))}
-            {edit.body}
-            {/* "N more passages evidence this concept in your other readings"
-                stood here until 2026-08-13 (TJ: "i think that belongs in
-                vocabulary, not 'in this reading'"). It does, and it is already
-                there, said better: 04 counts the readings a concept travels
-                through and NAMES them, which is the number that means
-                something. This panel is the reading-scoped record of what you
-                captured here — the division 04's own header draws. Nothing was
-                moved; a thinner copy of it stopped being shown twice. */}
-            {/* DELETING A CONCEPT IS NOT AN ACT OF THIS STATION (TJ,
-                2026-08-17: "i sense that delete concept should only be in
-                vocabulary. and that in reading it is remove concept from
-                passage").
-
-                The scope argument is the whole of it. This panel is one
-                reading's record; a concept belongs to the student and travels
-                through every text they have read. Offering its destruction
-                from inside one reading put a loom-wide act behind a
-                reading-scoped door — and the passages it would have taken with
-                it are not all on this page to see.
-
-                04 · Vocabulary already holds it, with the same confirmation,
-                and 04 is where you see every concept you own at once — which
-                is what you need in order to judge whether one should go at
-                all.
-
-                What remains here is the scoped act: remove this concept from
-                this passage, on each row above. */}
-          </div>
-        )}
+        {edit.isOpen && cardBody}
       </div>
     )
   }

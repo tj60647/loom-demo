@@ -364,6 +364,8 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                   passages={state.passages.filter((b) => b.conceptIds.includes(concept.id))}
                   allPassages={state.passages}
                   readings={stats.readings.length}
+                  evidenceSay="— across every reading"
+                  onGotoPassage={onGotoPassage}
                   concepts={state.concepts}
                   titleOf={readingName}
                   mode="edit"
@@ -375,6 +377,7 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                        dialog is the shared one, so the homonym warning reads
                        the same here as it does in Your work. */
                     onRename: (input: HTMLInputElement) => renameConcept(concept, input),
+                    onUnfilePassage: (passageId: string) => unfilePassage(passageId, concept.id),
                     onEditDef: (def: string) => { editConcept(concept.id, { def }); flash("description saved") },
                     body: (
                       <>
@@ -385,82 +388,9 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                             `.conceptDescription` moved onto the card's textarea
                             so journey-learner's assertion still finds it. */}
 
-                    {/* EVERY CITATION, AND THE PASSAGE UNDER IT (TJ,
-                        2026-08-18: "nor passages, nor all citations. one
-                        approach is to have the citation, and then an expansion
-                        of the citation is the passage").
-
-                        04 is the loom-wide station, so this is every passage in
-                        every reading that backs the concept — the list that was
-                        missing. The citation leads because it is what you scan
-                        for; the words are one disclosure away.
-
-                        `<details>` rather than state: it brings its own
-                        keyboard, its own expanded/collapsed semantics and its
-                        own toggle, so there is no second `openConcepts`-shaped
-                        map to keep. It replaces "Evidenced in X and Y", which
-                        named the readings without ever showing what was in
-                        them — every citation names its own reading now. */}
-                    {stats.passages > 0 ? (
-                      <div className="citelist">
-                        <span className="label">
-                          Evidence <span className="labelsay">— across every reading</span>
-                        </span>
-                        {state.passages
-                          .filter((b) => b.conceptIds.includes(concept.id))
-                          .map((b) => (
-                            <details key={b.id} className="citerow">
-                              <summary>
-                                <span className="citewhere">
-                                  {b.sourceId ? readingName(b.sourceId) : b.source || "no reading yet"}
-                                </span>
-                                {b.location ? <span className="citeloc"> · {b.location}</span> : null}
-                              </summary>
-                              {/* The passage is the door, as it is everywhere
-                                  else a Passage is drawn (TJ, 2026-08-17) —
-                                  here it can cross to another reading. */}
-                              <div
-                                className={`passage${onGotoPassage && (b.sourceId || b.source) ? " isdoor" : ""}`}
-                                role={onGotoPassage && (b.sourceId || b.source) ? "button" : undefined}
-                                tabIndex={onGotoPassage && (b.sourceId || b.source) ? 0 : undefined}
-                                aria-label={onGotoPassage && (b.sourceId || b.source) ? "Open this passage in its reading" : undefined}
-                                title={onGotoPassage && (b.sourceId || b.source) ? "Open this passage in its reading" : undefined}
-                                onClick={() => (b.sourceId || b.source) && onGotoPassage?.(b)}
-                                onKeyDown={(e) => {
-                                  if (!onGotoPassage || !(b.sourceId || b.source)) return
-                                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGotoPassage(b) }
-                                }}
-                              >&quot;{b.content}&quot;</div>
-                              {/* 04's scoped act on a piece of evidence, worded
-                                  from the subject you are standing in — this
-                                  list is a CONCEPT and its evidence, so what
-                                  belongs here is taking one passage off it. The
-                                  capture itself is destroyed where the passage
-                                  is the subject, in 01 · Reading. */}
-                              <div className="src rm-actions" style={{ marginTop: "6px" }}>
-                                <button
-                                  type="button"
-                                  className="rm"
-                                  onClick={() => unfilePassage(b.id, concept.id)}
-                                  title={
-                                    b.conceptIds.length > 1
-                                      ? "Filed under several concepts — this removes it from this one only."
-                                      : "The passage stays, with no concept on it, under Unlabeled passages."
-                                  }
-                                >remove passage from concept</button>
-                              </div>
-                            </details>
-                          ))}
-                      </div>
-                    ) : (
-                      /* A designation, not a warning (TJ, 2026-08-08: "a
-                         Concept may precede its evidence"; red line 4:
-                         "empty states are visible, not blocked"). */
-                      <p className="ghostnote" style={{ marginTop: "10px" }}>
-                        No passage evidences this yet. You may have named it ahead of
-                        finding it, or its passages may have moved on.
-                      </p>
-                    )}
+                    {/* The citation list moved onto ConceptCard on
+                        2026-08-18, so 01, 02 and 04 all open to the same three
+                        sections. What stays here is 04's own act. */}
 
                     {MERGE_VISIBLE && <div className="quietrow" style={{ marginTop: "12px" }}>
                       {/* A picker, not a text field. Typing a NAME to choose

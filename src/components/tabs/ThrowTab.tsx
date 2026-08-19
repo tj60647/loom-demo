@@ -14,6 +14,7 @@ import ConceptCard from "@/components/cards/ConceptCard"
 import ConceptName from "@/components/ui/ConceptName"
 import { conceptNameText } from "@/lib/conceptName"
 import type { Passage } from "@/lib/types"
+import { useRenameConcept } from "@/components/cards/useRenameConcept"
 
 const PLAIN_VERBS = ['leads to','depends on','is part of','goes against','is the same as','sets up'];
 
@@ -76,7 +77,7 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
   // 2026-08-09 only that — while the evidence check, the duplicate-pair guard
   // and the coined-label vocabulary all read the whole graph, because those
   // are facts about the student rather than about this bench.
-  const { state, scoped, scope, addEdge, editEdge, removeEdge, attachLink, flash, setUndoStack, setRedoStack } = useLoom()
+  const { state, scoped, scope, addEdge, editEdge, removeEdge, attachLink, flash, setUndoStack, setRedoStack , editConcept } = useLoom()
   const { byId: readingsById } = useReadings()
   const titleOf = (id: string) => readingsById.get(id)?.title ?? id
   /* The warp's concept popover lived here — state, a top-layer element and the
@@ -376,6 +377,7 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
    * now the reading's evidence, as in Your work, and `allPassages` is what
    * lets the card tell "nothing anywhere" from "not in this one".
    */
+  const renameConcept = useRenameConcept()
   const conceptRow = (c: typeof state.concepts[number]) => (
     <ConceptCard
       key={c.id}
@@ -386,6 +388,14 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
       titleOf={titleOf}
       mode="pick"
       onGotoPassage={onGotoPassage}
+      /* 02 opens to the same three sections as 01 and 04 (TJ, 2026-08-18). No
+         unfile: this station links concepts, it does not keep their filings. */
+      edit={{
+        isOpen: false,
+        onToggle: () => {},
+        onRename: (input) => renameConcept(c, input),
+        onEditDef: (def) => editConcept(c.id, { def }),
+      }}
       pick={pairA === c.id ? 1 : pairB === c.id ? 2 : null}
       onPick={() => togglePick(c.id)}
     />
