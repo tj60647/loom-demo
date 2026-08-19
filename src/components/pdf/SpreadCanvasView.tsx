@@ -93,6 +93,47 @@ const TEXT_MOUNT_PAGES = 1.5;
 const DEMOTE_MARGIN_PAGES = 6;
 const RASTER_BUDGET = 72e6;
 
+/**
+ * Trackpad normalisation, for the wheel handler below.
+ *
+ * A WheelEvent's units are not pixels by contract — they depend on
+ * `deltaMode` — and the same physical gesture reports differently per
+ * browser. One mouse notch is deltaMode 0 deltaY 100 in Chrome and Edge and
+ * deltaMode 1 deltaY 3 in Firefox on Windows, which is why a line is worth
+ * 100/3 px here rather than a text line's height: the point of the constant
+ * is that one notch moves the canvas the same distance in both browsers, not
+ * that a line is 33px of anything. A trackpad reports in pixel mode too,
+ * but as many small deltas per second rather than one large one per notch.
+ *
+ * ZOOM_STEP_CLAMP is the largest normalised delta ONE event may zoom by. It
+ * exists for the wheel: a notch normalises to ~100, and unclamped that is a
+ * 4x jump out of a single click of it — the defect that got the first
+ * attempt at this idiom refused (docs/ui-cleanup-pass-1.md, item 12).
+ *
+ * It does not have to tell a pinch from a wheel to be safe for both, which
+ * is why it is a clamp and not a device test. A pinch under the clamp passes
+ * through untouched; a fast one above it is capped PER EVENT and still
+ * compounds over the dozens of events a gesture sends, so it reaches the
+ * ceiling in a fraction of a second either way. What a real trackpad's
+ * per-frame deltas actually are is NOT verified here — this harness
+ * synthesises wheel events and has no trackpad — and the clamp is chosen so
+ * that it does not need to be.
+ *
+ * ZOOM_PER_PX is unchanged from the wheel-zoom this replaces, whose ctrl
+ * branch was `2^(-deltaY × 0.002 × 10)` — so the pinch feel is the one that
+ * was already here, and a clamped mouse notch lands on 2^0.2, the same ~15%
+ * per notch that idiom gave a bare wheel.
+ *
+ * Both numbers are measured, not predicted: matrix-zoom.spec.ts was run with
+ * the clamp in place and with it raised out of reach, and one deltaY-100 notch
+ * moved the scale 1.149× clamped and 4.000× unclamped. The spec asserts the
+ * clamped figure, so the 4× is a regression the suite catches rather than a
+ * number in a comment.
+ */
+const LINE_PX = 100 / 3;
+const ZOOM_STEP_CLAMP = 10;
+const ZOOM_PER_PX = 0.02;
+
 /** One page's manifest facts, as the viewer's props carry them. */
 export type ManifestPage = {
   pageNumber: number;
@@ -614,19 +655,49 @@ export default function SpreadCanvasView({
     const sel = select(el);
     sel.call(zb);
     sel.on("dblclick.zoom", null); // double-click zoom jumps are hostile mid-reading
-    // Wheel = zoom at the cursor, drag = pan — the map-canvas idiom (TJ,
-    // 2026-08-10). But NOT d3's default wheel handler: that one applies each
-    // wheel notch instantly, a ~15% scale snap per click of the wheel, which
-    // reads as jerky. Each notch here moves a TARGET; a rAF loop eases the
-    // real transform toward it, anchored at the cursor — the Google-Maps
-    // feel. A trackpad pinch (ctrl+wheel by convention) rides the same path
-    // with d3's own 10x factor so pinching stays 1:1 rather than glacial.
+    // Figma-style trackpad (TJ, 2026-08-19, taking docs/ui-cleanup-pass-1.md
+    // §12 — which refused the first attempt "as written", not the idiom):
+    // two-finger scroll PANS, and only a pinch — ctrl/meta+wheel, which is how
+    // every browser reports one — ZOOMS at the cursor. d3-zoom's own wheel
+    // handler treats every wheel event as a zoom, so it is unbound.
+    //
+    // Both paths normalise deltaMode before reading a delta; see LINE_PX and
+    // ZOOM_STEP_CLAMP above for why raw deltaY cannot be trusted and what the
+    // clamp is protecting.
     sel.on("wheel.zoom", null);
-    sel.on("wheel.smooth", (e: WheelEvent) => {
+    sel.on("wheel.figma", (e: WheelEvent) => {
       e.preventDefault();
-      const { fitAllK, maxMultiplier } = live.current;
-      const mult = e.deltaMode === 1 ? 0.05 : 0.002; // line-scrolling mice report lines
-      const factor = Math.pow(2, -e.deltaY * mult * (e.ctrlKey || e.metaKey ? 10 : 1));
+      const { fitAllK, maxMultiplier, stage } = live.current;
+      const unit = e.deltaMode === 1 ? LINE_PX : e.deltaMode === 2 ? stage.h : 1;
+
+      if (!(e.ctrlKey || e.metaKey)) {
+        // PAN — 1:1 and deliberately NOT eased. A two-finger drag is direct
+        // manipulation: the canvas has to sit under the fingers, and the chase
+        // loop the zoom uses below would leave it a frame or two behind them,
+        // which is the "floaty" feel easing a pan always buys. A mouse notch
+        // moves ~100px at once here, exactly as it does in any scroll
+        // container; that is a scroll, not a jerk.
+        //
+        // Through the behaviour's own translateBy, so the translate extent
+        // constrains it (writeTransform documents why bypassing it is a bug),
+        // applyTransform still runs, and the will-change raster hint still
+        // rides the start/end pair translateBy emits. At fit-all the extent
+        // pins the plane — everything is already in view, there is nowhere to
+        // pan to — so nothing moves until a pinch has zoomed in.
+        const k = tref.current.k;
+        zb.translateBy(sel, (-e.deltaX * unit) / k, (-e.deltaY * unit) / k);
+        return;
+      }
+
+      // ZOOM. Clamp the step, not the coefficient: a real pinch is already
+      // under the clamp and keeps the feel it had, while every mouse notch is
+      // capped at 2^0.2 = 1.15× however large its delta claims to be.
+      const step = Math.max(-ZOOM_STEP_CLAMP, Math.min(ZOOM_STEP_CLAMP, e.deltaY * unit));
+      const factor = Math.pow(2, -step * ZOOM_PER_PX);
+      // Each event moves a TARGET; a rAF loop eases the real transform toward
+      // it, anchored at the cursor. That is what keeps zoom smooth rather than
+      // abrupt: a discrete mouse notch lands over ~10 frames instead of one,
+      // and a continuous pinch pays about two frames of lag for it.
       if (!wheelFrame.current) wheelTarget.current = tref.current.k;
       wheelTarget.current = Math.max(
         fitAllK * 0.5,
@@ -639,6 +710,9 @@ export default function SpreadCanvasView({
           const zbNow = zbRef.current;
           const elNow = viewportRef.current;
           if (!zbNow || !elNow) { wheelFrame.current = 0; return; }
+          // Read fresh every frame. A pan that landed between two frames is
+          // already in tref, and deriving the new x/y from it is what lets a
+          // pan and a still-easing zoom compose instead of fighting.
           const t = tref.current;
           const target = wheelTarget.current;
           // Exponential chase: ~4 frames to close most of the gap.
@@ -658,7 +732,7 @@ export default function SpreadCanvasView({
     });
     return () => {
       sel.on(".zoom", null);
-      sel.on("wheel.smooth", null);
+      sel.on("wheel.figma", null);
       cancelAnimationFrame(wheelFrame.current);
       wheelFrame.current = 0;
     };

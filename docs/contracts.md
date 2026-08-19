@@ -107,9 +107,10 @@
 > **The matrix IS the spread canvas now** (2026-08-10, TJ: "rebuild Matrix as
 > the canvas"): every 2-page spread on one near-square plane
 > (`src/lib/spreadLayout.ts`, asserted by `check:spread`) under ONE transform
-> (`SpreadCanvasView`, d3-zoom back in package.json) — the wheel zooms at the
-> cursor and drag pans (the map idiom; TJ 2026-08-10, replacing first the
-> branch's scroll-pans scheme and then the slider), pinch zooms, and
+> (`SpreadCanvasView`, d3-zoom back in package.json) — a two-finger scroll
+> pans and a pinch zooms at the cursor (the Figma idiom; TJ 2026-08-19,
+> taking ui-cleanup-pass-1 §12 with the deltaMode tuning that item required,
+> after the map idiom held the view from 2026-08-10), drag pans, and
 > **− / + / Fit** buttons drive the same transform (Fit = everything in view,
 > recentred; a settled gesture syncs the multiplier back).
 > Pages are the raster/text-layer split from the stamp above, retargeted

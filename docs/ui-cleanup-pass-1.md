@@ -48,12 +48,12 @@ what is here is good.
 | 8 | Cards edit in place | **Deferred** — "a can of worms" | not started |
 | 9 | The card's subject is the passage | **Deferred with 8** — does not separate | not started |
 | 11 | Zoom floor and ceiling | **Refused** — the current ones are fine | nothing to do |
-| 12 | Trackpad: scroll pans, pinch zooms | **Refuse as written** | not started |
+| 12 | Trackpad: scroll pans, pinch zooms | **Taken, retuned** (TJ, 2026-08-19) | `SpreadCanvasView.tsx` |
 
-Eight settled, one dropped, two deferred, three refused. **Every item in this
-table has now been decided.** What is open is no longer PR #10's — it is the
-work that came out of looking at the app, listed under "The second session"
-below.
+Eight settled, one dropped, two deferred, two refused, one taken with
+changes. **Every item in this table has now been decided.** What is open is no
+longer PR #10's — it is the work that came out of looking at the app, listed
+under "The second session" below.
 
 **Read items 7–12 with item 13 in mind.** Every recommendation above that is
 still open was formed the same way this document formed item 13: from the
@@ -406,7 +406,7 @@ back past the whole reading — "there is nothing out there past it to zoom to,"
 which is true. Ceiling doubles, 8× to 16×, so an eighth of a spread can fill the
 stage. Small, and independent of 12 despite living in the same file.
 
-## 12. Trackpad: two-finger scroll pans, pinch zooms · Refuse as written
+## 12. Trackpad: two-finger scroll pans, pinch zooms · Taken, retuned
 
 d3-zoom's wheel handler is unbound and replaced. Plain wheel/two-finger scroll
 **pans**; ctrl/cmd+wheel or a pinch **zooms** at the cursor. Today on `dev` a
@@ -443,7 +443,39 @@ If you decide you want the Figma idiom after using it, it is takeable — but on
 with `deltaMode`-aware tuning like the handler it replaced had. Do not take it
 as written.
 
-*Files:* `SpreadCanvasView.tsx`, `matrix-zoom.spec.ts`.
+**TJ, 2026-08-19: "take the figma idiom properly in canvas mode, and make sure
+the zoom is smooth not abrupt."** Taken on that condition, not as written — the
+preference was decided in its favour, the defect was not accepted with it.
+
+What landed, and how it differs from PR #10's version:
+
+- **Normalise `deltaMode` before reading any delta.** `LINE_PX = 100/3`, so the
+  notch Chrome reports as pixel-mode 100 and Firefox reports as line-mode 3 pans
+  the canvas the same distance. PR #10 used 16, which made Firefox pan at ~half
+  Chrome's rate.
+- **Clamp the zoom STEP, not the coefficient** — `ZOOM_STEP_CLAMP = 10` on the
+  normalised delta. This is the whole fix for the table above: a pinch's
+  per-frame delta is already under the clamp and keeps the feel it had, while a
+  mouse notch is capped however large its delta claims to be. Measured in
+  `matrix-zoom.spec.ts`: **1.149× per notch clamped, 4.000× unclamped** — the
+  test was run both ways, and the unclamped run is what the spec now guards.
+- **The zoom keeps the rAF chase loop.** PR #10 deleted it along with the idiom
+  that motivated it, which is what would have made a notch snap. Each event
+  moves a target and the loop eases toward it — a notch lands over ~10 frames
+  (0.65^10 of the gap left) instead of one.
+- **The pan does NOT get the chase loop**, deliberately. A two-finger drag is
+  direct manipulation and has to sit under the fingers; easing it buys the
+  floaty feel instead of a smooth one. A mouse notch pans ~100px at once, which
+  is what every scroll container does.
+
+Both paths still route through the d3 behaviour (`translateBy` / the constrained
+`writeTransform`), so the translate extent, the settle sync and the will-change
+raster hint are unchanged. One consequence worth knowing: **at fit-all a
+two-finger scroll does nothing**, because the extent correctly pins a plane that
+is entirely in view. Panning starts once a pinch has zoomed in.
+
+*Files:* `SpreadCanvasView.tsx`, `matrix-zoom.spec.ts`, and the Canvas button's
+tip in `PdfViewer.tsx` (the sentence that taught the old gesture).
 
 ---
 

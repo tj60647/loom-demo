@@ -120,42 +120,95 @@ test.describe('Matrix zoom', () => {
     await expect(page.locator('button:has-text("Capture as Passage")')).toBeVisible({ timeout: 5000 });
   });
 
-  test('wheel and pinch drive the transform, Fit restores it, Cards flank the spreads', async ({ page }) => {
+  test('scroll pans, pinch zooms smoothly, Fit restores it, Cards flank the spreads', async ({ page }) => {
     test.setTimeout(90_000);
     await openReading(page, 'Object Worlds');
     await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 10000 });
     await page.getByRole('button', { name: 'Canvas' }).click();
     await expect(page.locator('.pdf-spread-canvas')).toBeAttached({ timeout: 10000 });
 
-    const canvasK = () =>
+    const canvasT = () =>
       page.locator('.pdf-spread-canvas').evaluate((el) => {
-        const m = /scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform ?? '');
-        return m ? parseFloat(m[1]) : 0;
+        // DOMMatrix, not a regex over the inline style: a and e/f ARE the
+        // scale and the translate, whatever form the browser serialised.
+        const m = new DOMMatrix(getComputedStyle(el as HTMLElement).transform);
+        return { x: m.e, y: m.f, k: m.a };
       });
+    const canvasK = async () => (await canvasT()).k;
     await expect.poll(canvasK, { timeout: 5000 }).toBeGreaterThan(0);
-    const atFit = await canvasK();
+    const atFit = await canvasT();
 
-    // The wheel zooms at the cursor — the map idiom (TJ, 2026-08-10) — and a
-    // trackpad pinch arrives as ctrl+wheel and zooms too.
-    const wheelAtCenter = (opts: { ctrlKey?: boolean; deltaY: number }) =>
+    // The Figma idiom (TJ, 2026-08-19): a plain wheel — a trackpad's
+    // two-finger drag — PANS, and only a pinch, which every browser reports as
+    // ctrl+wheel, ZOOMS at the cursor.
+    const wheelAtCenter = (opts: { ctrlKey?: boolean; deltaY?: number; deltaX?: number; deltaMode?: number }) =>
       page.locator('.pdf-spread-viewport').evaluate((el, o) => {
         const b = el.getBoundingClientRect();
         el.dispatchEvent(new WheelEvent('wheel', {
-          deltaY: o.deltaY, ctrlKey: !!o.ctrlKey, bubbles: true, cancelable: true,
+          deltaY: o.deltaY ?? 0, deltaX: o.deltaX ?? 0, deltaMode: o.deltaMode ?? 0,
+          ctrlKey: !!o.ctrlKey, bubbles: true, cancelable: true,
           clientX: b.left + el.clientWidth / 2,
           clientY: b.top + el.clientHeight / 2,
         }));
       }, opts);
-    // Poll-and-nudge: each iteration scrolls again, so a first event lost to
+
+
+    /**
+     * The tuning, which is why the first attempt at this idiom was refused
+     * (docs/ui-cleanup-pass-1.md §12): ONE mouse notch must not overshoot. A
+     * notch is deltaY 100 in Chrome/Edge and deltaY 3 deltaMode 1 in Firefox,
+     * and ZOOM_STEP_CLAMP caps both at 2^0.2 = 1.15x. Unclamped it is
+     * 2^(-100 x 0.02) = 4x out of a single click of the wheel.
+     *
+     * This runs FIRST, from fit-all, and that placement is the assertion's
+     * teeth: the ceiling is maxMultiplier (>= 8) x fit-all from here, so a 4x
+     * step lands intact and trips the upper bound. Run it after the pinch
+     * below and the scale extent absorbs the overshoot into a 1.000x no-op —
+     * the test still fails, but for the wrong reason, which is how it was
+     * first written here.
+     *
+     * The settle wait is the smoothness half: the step is eased by a rAF
+     * chase loop, so 1.15x is where the loop LANDS. Read a frame in, it is
+     * smaller — that is the easing, and it is why this waits rather than
+     * asserting on the next tick.
+     */
+    for (const notch of [{ deltaY: -100 }, { deltaY: -3, deltaMode: 1 }]) {
+      const before = await canvasK();
+      await wheelAtCenter({ ...notch, ctrlKey: true });
+      await page.waitForTimeout(500);
+      const ratio = (await canvasK()) / before;
+      const said = `one notch ${JSON.stringify(notch)} zoomed ${ratio.toFixed(3)}x`;
+      expect(ratio, said).toBeGreaterThan(1.08);
+      expect(ratio, said).toBeLessThan(1.25);
+    }
+
+    // Pinch first, and far enough in that the plane is bigger than the stage:
+    // at fit-all the translate extent correctly PINS the canvas — everything
+    // is in view, so there is nowhere to pan to — and a pan can only be
+    // observed once there is somewhere to go.
+    //
+    // Poll-and-nudge: each iteration pinches again, so a first event lost to
     // an attach race cannot strand the assertion — and repeated notches ARE
-    // how a wheel is really used.
+    // how a trackpad is really used.
     await expect
-      .poll(async () => { await wheelAtCenter({ deltaY: -240 }); return canvasK(); }, { timeout: 8000 })
-      .toBeGreaterThan(atFit);
-    const afterWheel = await canvasK();
-    await expect
-      .poll(async () => { await wheelAtCenter({ deltaY: -240, ctrlKey: true }); return canvasK(); }, { timeout: 8000 })
-      .toBeGreaterThan(afterWheel * 1.05);
+      .poll(async () => { await wheelAtCenter({ deltaY: -240, ctrlKey: true }); return canvasK(); }, { timeout: 10000 })
+      .toBeGreaterThan(atFit.k * 2);
+    await page.waitForTimeout(400); // let the chase loop below settle before measuring
+    const afterPinch = await canvasT();
+
+    // A two-finger drag pans, on BOTH axes, and never touches the zoom. The
+    // sign is the scroll convention: fingers up (deltaY > 0) sends the canvas
+    // up, so the translate DEcreases.
+    await wheelAtCenter({ deltaY: 200 });
+    await page.waitForTimeout(200);
+    const afterPanY = await canvasT();
+    expect(afterPanY.y).toBeLessThan(afterPinch.y);
+    await wheelAtCenter({ deltaX: 200 });
+    await page.waitForTimeout(200);
+    const afterPanX = await canvasT();
+    expect(afterPanX.x).toBeLessThan(afterPanY.x);
+    // Neither pan moved the zoom.
+    expect(Math.abs(afterPanX.k - afterPinch.k)).toBeLessThan(afterPinch.k * 0.01);
 
     // The overview inset, while zoomed: visible, and clicking it MOVES the
     // view — the jump goes through the same zb.transform, same extents, so
@@ -177,8 +230,8 @@ test.describe('Matrix zoom', () => {
     // Fit takes it back to everything-in-view — and sends the overview away.
     await page.getByRole('button', { name: 'Fit the whole reading' }).click();
     await expect
-      .poll(async () => Math.abs((await canvasK()) - atFit), { timeout: 5000 })
-      .toBeLessThan(atFit * 0.06);
+      .poll(async () => Math.abs((await canvasK()) - atFit.k), { timeout: 5000 })
+      .toBeLessThan(atFit.k * 0.06);
     await expect(minimap).toBeHidden({ timeout: 5000 });
 
     // Cards in the matrix, AT FIT-ALL: no text layer is mounted down here —

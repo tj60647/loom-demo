@@ -180,7 +180,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
   // Matrix zoom, as a multiple of the whole-canvas fit: 1 = every spread in
-  // view. The − / + buttons and the canvas's own wheel/pinch drive the SAME
+  // view. The − / + buttons and the canvas's own pinch drive the SAME
   // transform — SpreadCanvasView syncs this back when a gesture settles.
   // Fit has its own nonce: state alone can be stale mid-gesture, and a
   // panned view at multiplier 1 still needs recentring.
@@ -2356,7 +2356,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             <button
               className={`btn mini ${viewMode === "matrix" ? "" : "ghost"}`}
               onClick={() => setViewMode("matrix")}
-              data-tip="the whole reading at once — zoom in on any page; hold space to pan from anywhere"
+              data-tip="the whole reading at once — two-finger scroll or drag to pan, pinch to zoom; hold space to pan from anywhere"
               aria-pressed={viewMode === "matrix"}
             >Canvas</button>
           </div>
@@ -2385,8 +2385,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
           {/* Map-canvas zoom controls (TJ, 2026-08-10, replacing the slider):
               − / + step multiplicatively about the view centre, Fit returns
-              to everything-in-view. The wheel and pinch drive the same
-              transform; these are the keyboard-and-tap path. Page mode holds
+              to everything-in-view. The trackpad — two-finger scroll to pan,
+              pinch to zoom — drives the same transform; these are the
+              keyboard-and-tap path. Page mode holds
               the same three buttons over its own zoom — 1 = the fitted
               spread, Fit returns to it — so zoom means one thing everywhere. */}
           {viewMode === "matrix" && (
@@ -2395,13 +2396,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 className="btn mini ghost"
                 onClick={() => setZoom((z) => Math.max(0.5, Math.round((z / 1.4) * 100) / 100))}
                 aria-label="Zoom out"
-                data-tip="zoom out"
+                data-tip="zoom out (pinch or ctrl+scroll)"
               >−</button>
               <button
                 className="btn mini ghost"
                 onClick={() => setZoom((z) => Math.min(zoomMax, Math.round((z * 1.4) * 100) / 100))}
                 aria-label="Zoom in"
-                data-tip="zoom in"
+                data-tip="zoom in (pinch or ctrl+scroll)"
               >+</button>
               <button
                 className="btn mini ghost"
