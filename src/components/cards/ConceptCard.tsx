@@ -224,7 +224,11 @@ export default function ConceptCard({
           {passages.map((b) => {
             const isDoor = !!onGotoPassage && (!!b.sourceId || !!b.source)
             return (
-              <details key={b.id} className="citerow">
+              /* `data-passage-id` because a citation IS its passage: OpenTab's
+                 focus effects query by it, and journey-learner reads it off a
+                 concept row to find the capture it then deletes. Your work's
+                 old evidence row carried it and the citation must too. */
+              <details key={b.id} data-passage-id={b.id} className="citerow">
                 <summary>
                   <span className="citewhere">
                     {b.sourceId ? titleOf(b.sourceId) : b.source || "no reading yet"}

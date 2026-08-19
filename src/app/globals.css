@@ -499,6 +499,11 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .citerow .citewhere{font-style:normal}
 .citerow .passage{font-size:13px;line-height:1.5;margin:4px 0 6px 11px;color:var(--ink)}
 
+/* A card heading that carries an action at its right end — the + that coins a
+   concept ahead of its evidence, in the two stations where the form is behind
+   one rather than always on screen. */
+.cardhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+
 /* coding log */
 .lrow{border-bottom:1px dotted var(--rule)}
 .lhead{display:flex;gap:10px;align-items:baseline;padding:9px 12px;cursor:pointer}

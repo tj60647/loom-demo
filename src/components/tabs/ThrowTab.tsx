@@ -15,6 +15,8 @@ import ConceptName from "@/components/ui/ConceptName"
 import { conceptNameText } from "@/lib/conceptName"
 import type { Passage } from "@/lib/types"
 import { useRenameConcept } from "@/components/cards/useRenameConcept"
+import { useCoinConcept } from "@/components/cards/useCoinConcept"
+import NameConceptCard from "@/components/cards/NameConceptCard"
 
 const PLAIN_VERBS = ['leads to','depends on','is part of','goes against','is the same as','sets up'];
 
@@ -378,6 +380,8 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
    * lets the card tell "nothing anywhere" from "not in this one".
    */
   const renameConcept = useRenameConcept()
+  const coinConcept = useCoinConcept()
+  const [coining, setCoining] = useState(false)
   const conceptRow = (c: typeof state.concepts[number]) => (
     <ConceptCard
       key={c.id}
@@ -562,7 +566,27 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
       <p className="hint steprailnote">{STEPS[railN]?.says}</p>
       <div className="three">
         <div className="card" id="warp">
-          <h2>The warp <span className="n">{scoped.concepts.length ? `(${scoped.concepts.length})` : ''}</span></h2>
+          <h2 className="cardhead">
+            <span>The warp <span className="n">{scoped.concepts.length ? `(${scoped.concepts.length})` : ''}</span></span>
+            {/* The same + as the passage card's, for the same kind of act:
+                one more concept, coined where you are looking at concepts (TJ,
+                2026-08-18). It opens the shared NameConceptCard rather than a
+                field of its own, so the three homes cannot drift. */}
+            <button
+              type="button"
+              className="pchip-add"
+              onClick={() => setCoining((v) => !v)}
+              aria-expanded={coining}
+              aria-label="Name a concept before its evidence"
+              title="Name a concept before its evidence"
+            >+</button>
+          </h2>
+          {coining && (
+            <NameConceptCard
+              onAdd={coinConcept}
+              onDone={() => setCoining(false)}
+            />
+          )}
           <p className="do">{doLine}</p>
           <p className="hint">
             The concepts <b>this reading</b> evidences — the ones you captured a

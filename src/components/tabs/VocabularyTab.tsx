@@ -27,6 +27,8 @@ import { usesOf } from "@/lib/linkResolve"
 import ObjectDownload from "@/components/ui/ObjectDownload"
 import ConceptCard from "@/components/cards/ConceptCard"
 import { useRenameConcept } from "@/components/cards/useRenameConcept"
+import { useCoinConcept } from "@/components/cards/useCoinConcept"
+import NameConceptCard from "@/components/cards/NameConceptCard"
 import { conceptNameText } from "@/lib/conceptName"
 import { buildVocabularyExport, buildVocabularyMarkdown } from "@/lib/objectExport"
 import VocabularyOverlay from "@/components/tabs/VocabularyOverlay"
@@ -86,6 +88,10 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
   const { confirm, notify } = useDialog()
   // Shared with Your work, so one homonym dialog serves both.
   const renameConcept = useRenameConcept()
+  const coinConcept = useCoinConcept()
+  /* `coiningConcept`, not `coining`: this file already had one — the busy flag
+     on coining a LINK LABEL, further down. Two different objects, two names. */
+  const [coiningConcept, setCoiningConcept] = useState(false)
 
   /**
    * Pre-filled when a search hit sent you here (TJ, 2026-08-13: "concepts
@@ -317,12 +323,33 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
 
       <div className="two">
         <div className="card">
-          <h2>
-            Concepts{" "}
-            <span className="n">
-              {state.concepts.length ? `(${state.concepts.length})` : ""}
+          <h2 className="cardhead">
+            <span>
+              Concepts{" "}
+              <span className="n">
+                {state.concepts.length ? `(${state.concepts.length})` : ""}
+              </span>
             </span>
+            {/* The same + as the passage card's, for the same kind of act:
+                one more concept, coined where you are looking at concepts (TJ,
+                2026-08-18). It opens the shared NameConceptCard rather than a
+                field of its own, so the three homes cannot drift. */}
+            <button
+              type="button"
+              className="pchip-add"
+              onClick={() => setCoiningConcept((v) => !v)}
+              aria-expanded={coiningConcept}
+              aria-label="Name a concept before its evidence"
+              title="Name a concept before its evidence"
+            >+</button>
           </h2>
+          {coiningConcept && (
+            <NameConceptCard
+              listId="conceptOptions"
+              onAdd={coinConcept}
+              onDone={() => setCoiningConcept(false)}
+            />
+          )}
           <p className="hint">
             Click a concept to open it — edit its description, and see which readings
             evidence it. Two rows with the same name are two concepts, which is legal:

@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
-import { useDialog } from "@/components/providers/DialogProvider"
 import type { Passage } from "@/lib/types"
 import { readingsOf, soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import PassageCard from "@/components/cards/PassageCard"
 import ConceptCard from "@/components/cards/ConceptCard"
+import NameConceptCard from "@/components/cards/NameConceptCard"
+import { useCoinConcept } from "@/components/cards/useCoinConcept"
 import { useRemovePassage } from "@/components/cards/useRemovePassage"
 import { useRenameConcept } from "@/components/cards/useRenameConcept"
 import { tidy } from "@/lib/clothMath"
@@ -57,7 +58,6 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
   // duplicate instead of joining its evidence (spec §2 identity).
   const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, refilePassage, unfilePassage, editPassageNote, flash } = useLoom()
   const { byId, titleOf } = useReadings()
-  const { confirm } = useDialog()
   // Shared with the margin rail card, so the two dialogs cannot drift apart.
   const removePassageWithConfirm = useRemovePassage()
   const activeSourceId = soleSourceId(scope)
@@ -78,8 +78,6 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
   const [content, setContent] = useState("")
   const [conceptLabel, setConceptLabel] = useState("")
   const [workingDef, setWorkingDef] = useState("")
-  const [newConceptOnly, setNewConceptOnly] = useState("")
-  const [newConceptDef, setNewConceptDef] = useState("")
   const [showCaptureInfo, setShowCaptureInfo] = useState(false)
   // Carries the passage and concept ids now, not just the copy: the note has
   // an action in it since 2026-08-09 ("make it a separate concept"), and that
@@ -219,36 +217,10 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
      has carried its own copy — same thread guard, same confirmation — all
      along. What was here was the second one. */
 
-  const handleAddConceptOnly = async () => {
-    // Trim ONCE, at the top, and compare the trimmed value. This used to match
-    // untrimmed and write trimmed, so "boundary objects " missed the homonym
-    // check entirely and minted a second concept with a passage-identical stored
-    // label — silently, at the exact gesture designed to ask. A trailing space
-    // is what a paste leaves, and what a tapped suggestion can leave.
-    // It also stops " " reaching addConcept, which does not validate.
-    const name = newConceptOnly.trim()
-    if (!name) return
-    const existing = state.concepts.find(c => c.label.toLowerCase() === name.toLowerCase())
-    if (existing) {
-      // Homonyms are warned, never forbidden (ruling 36): a shared name can
-      // be two distinct ideas. Same idea → reuse the one you have.
-      const ok = await confirm({
-        title: `You already have a concept named “${existing.label}”.`,
-        body: "Make a second, distinct concept with the same name? They stay separate (homonyms) — if they turn out to be one idea, file the passages under the one you keep and remove the other.",
-        confirmLabel: "Make a homonym",
-      })
-      if (!ok) {
-        setNewConceptOnly("")
-        return
-      }
-    }
-    // The gloss travels with the naming: it is the reason you expect to find
-    // this, and it is what you will read the candidate passage against.
-    await addConcept(name, newConceptDef.trim() || undefined)
-    setNewConceptOnly("")
-    setNewConceptDef("")
-    flash("named — it shows as no evidence until a passage backs it")
-  }
+  /* handleAddConceptOnly moved into cards/useCoinConcept on 2026-08-18, when
+     the warp and 04 gained the same form. One homonym warning, worded once —
+     and the trim-once rule it carried travelled with it. */
+  const handleAddConceptOnly = useCoinConcept()
 
   const toggleRow = (id: string) => {
     setOpenLogRows(prev => ({ ...prev, [id]: !prev[id] }))
@@ -850,82 +822,13 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
             on this page — under a list of passages it read as a form belonging
             to the row above it. */}
         {view === "concepts" && (
-        <div className="aheadofit">
-          <span className="label">Name a concept before its evidence</span>
-          <p className="hint" style={{ marginTop: 2 }}>
-            Expecting an idea before you have found it in the text? Name it, say what you
-            think it is, and go looking. It shows as <b>no evidence</b> until a passage
-            backs it — a state, not a fault — and it stays in view in every reading while
-            you hunt.
-          </p>
-          <div className="form-row">
-            {/* The explanation moves INTO the label and the placeholder becomes
-                an example (TJ, 2026-08-17). It was the other way round: the
-                field said "the concept you are looking for…", which is a
-                sentence about the field rather than a picture of the answer,
-                and the shape of a concept — a short noun phrase — was hidden in
-                a `title` nobody hovers. Every other placeholder in Loom is an
-                example ("ch. 3, p. 49", "your word… e.g. leads to").
-
-                NOT marked "(optional)" yet, though the model allows it —
-                §Concept: "Label [< 8 words, may be null at capture]". The
-                button below is still disabled without one, and it has to be:
-                an unnamed concept renders in 67 places that have no rule for
-                what to show, so shipping the word before the display would
-                make the form promise something the app cannot draw. That work
-                is written up, with the "one or the other or both" constraint
-                TJ added, which the model does not yet state. */}
-            <span className="label">
-              Concept{" "}
-              <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--ochre)" }}>
-                — a short noun phrase naming the idea
-              </span>
-            </span>
-            <input
-              list={listId}
-              placeholder="e.g. boundary objects"
-              value={newConceptOnly}
-              onChange={(e) => setNewConceptOnly(e.target.value)}
-            />
-          </div>
-          <div className="form-row">
-            <span className="label">
-              Description{" "}
-              <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span>
-            </span>
-            <input
-              placeholder="what you take it to mean, in your own words"
-              title="the reason you expect to find this — what you will read the candidate passage against"
-              value={newConceptDef}
-              onChange={(e) => setNewConceptDef(e.target.value)}
-            />
-          </div>
-          {/* "add concept to VOCABULARY", not "to cloth" (TJ proposed the
-              pair; the destination is the correction). A concept coined
-              before its evidence joins nothing here: model §Concept — "A
-              Concept with no Passages therefore belongs to NO Reading, and is
-              in scope EVERYWHERE — it stands in every Reading's warp while the
-              student hunts for what backs it" — and the Concept List "belongs
-              to the User, spans Cloths". It enters THIS cloth the moment a
-              passage here evidences it, which is what the two "add concept to
-              passage" buttons above do.
-
-              The paragraph directly over this input already says as much: "it
-              stays in view in every reading while you hunt". A button reading
-              "to cloth" would have contradicted its own instructions.
-
-              Naming the destination on all three is the point: the same three
-              words, three different objects, was the confusion TJ started
-              from ("i dont know what this means, file this?").
-
-              Disabled until there is a name, like Add passage above: the
-              handler already returned early on an empty one, silently. */}
-          <button
-            className="btn ghost mini"
-            onClick={handleAddConceptOnly}
-            disabled={!newConceptOnly.trim()}
-          >add concept to vocabulary</button>
-        </div>
+        <NameConceptCard
+          listId={listId}
+          /* The homonym confirm rides with the act, in useCoinConcept — it
+             warns and offers "Make a homonym" before coining (ruling 36), the
+             same words from all three homes. */
+          onAdd={handleAddConceptOnly}
+        />
         )}
       </div>
   )
