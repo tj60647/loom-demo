@@ -67,6 +67,20 @@ async function openRow(row: import("@playwright/test").Locator) {
  * loom finishes loading a beat before the threads render, and a count taken
  * in that gap reads zero and strands the very row it came to remove.
  */
+/**
+ * The thread CARD a sentence belongs to, by the card's own id.
+ *
+ * This was `sent.locator("..")` in three places until 2026-08-18, which made
+ * the row's internal shape a contract nobody had agreed to: any wrapper between
+ * the card's root and its `.sent` re-pointed every following assertion at the
+ * wrapper, silently and with the classes still matching. `.thread` and `.sent`
+ * are exactly where they were; this only stops the test caring how far apart
+ * they sit (ThreadCard.tsx, docs/thread-card.md).
+ */
+function threadOf(sent: import("@playwright/test").Locator) {
+  return sent.locator("xpath=ancestor::*[@data-edge-id][1]")
+}
+
 async function removeThread(page: import("@playwright/test").Page, mustExist = false) {
   await openStation(page, "Linking")
   const sent = page.locator(".sent", { hasText: "holds the other open" })
@@ -76,7 +90,9 @@ async function removeThread(page: import("@playwright/test").Page, mustExist = f
     await expect(page.locator(".thread").first()).toBeVisible({ timeout: 15_000 })
     if ((await sent.count()) === 0) return
   }
-  await sent.first().locator("..").locator(".rm", { hasText: "remove" }).click()
+  // The card by its own id, not `.sent`'s parent — see the note in
+  // journey-learner where the same hop was rewritten.
+  await threadOf(sent.first()).locator(".rm", { hasText: "remove" }).click()
   // The row goes optimistically while the delete is still in flight; ending
   // the test there closes the browser mid-action and strands the thread for
   // the next run.
@@ -156,7 +172,8 @@ test("a label coined with no thread is a row, and tapping it labels a thread", a
 
   const sent = page.locator(".sent", { hasText: "holds the other open" })
   await expect(sent).toHaveCount(1, { timeout: 15_000 })
-  const thread = sent.locator("..")
+  const thread = threadOf(sent)
+  await expect(thread).toHaveCount(1)
   await expect(thread.locator(".pill", { hasText: "description" })).toBeVisible()
 
   // "edit label" whether the thread carries one or not since 2026-08-12 — the

@@ -12,11 +12,11 @@ import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import ConceptCard from "@/components/cards/ConceptCard"
 import ConceptName from "@/components/ui/ConceptName"
-import { conceptNameText } from "@/lib/conceptName"
 import type { Passage } from "@/lib/types"
 import { useRenameConcept } from "@/components/cards/useRenameConcept"
 import { useCoinConcept } from "@/components/cards/useCoinConcept"
 import NameConceptCard from "@/components/cards/NameConceptCard"
+import ThreadCard from "@/components/cards/ThreadCard"
 
 const PLAIN_VERBS = ['leads to','depends on','is part of','goes against','is the same as','sets up'];
 
@@ -455,57 +455,57 @@ export default function ThrowTab({ onGotoPassage, pair }: {
     />
   )
 
+  /**
+   * THE ROW IS THE THREAD CARD (docs/thread-card.md). It was hand-rolled here,
+   * and six other places hand-rolled their own — three different stand-ins for
+   * an unlabelled thread between them, and two pill vocabularies for one fact.
+   * This station keeps the whole of what it had: the card draws the trip, the
+   * sentence and the meta line, and the two folds stay HERE because their
+   * fields, their chips and their undo stack are 02's and not a card's.
+   *
+   * Two things changed in the drawing, both because the card refuses to keep
+   * them. The ends are no longer cut at 30 characters — the trip wraps
+   * instead. And the label now resolves through `linkId` before the legacy
+   * `handle` (`labelOf`), so a thread carrying a Link object and an empty
+   * handle stops reading as unlabelled here while 04 · Vocabulary calls it
+   * labelled.
+   */
   const threadRow = (e: typeof state.edges[number]) => {
-    const fromC = conceptById(e.fromId)
-    const toC = conceptById(e.toId)
-    // v14 renders a dangling end as "?" rather than dropping the row:
-    // a thread the student threw should stay visible and removable,
-    // not vanish silently because one end went missing.
     const sel = namingFor === e.id
     const edt = editingFor === e.id
     // No far-end pill any more: with the bridges band gone, every row here has
     // both ends in scope, so there is never a reading to name.
 
     return (
-      <div key={e.id} className={`thread ${sel || edt ? "sel" : ""}`}>
-        <div className="trip">
-          <b>{fromC ? short(conceptNameText(fromC), 30) : "?"}</b>{' '}
-          {e.handle
-            ? <span className="v">{e.handle}</span>
-            : <span className="v loosev">{short(e.sentence, 38)}</span>}{' '}
-          <b>{toC ? short(conceptNameText(toC), 30) : "?"}</b>
-        </div>
-        <div className="sent">“{e.sentence}”</div>
-        <div className="tmeta">
-          {e.handle
-            ? <span className="pill beaten">label</span>
-            : <span className="pill loose">description</span>}
-          {/* Description before label, in the row as in the ruled order. */}
-          <span className="act" onClick={() => toggleEditor(e.id, e.sentence)}>
-            {edt ? 'close' : 'edit description'}
-          </span>
-          {/* One word for one control (TJ, 2026-08-12). It read "coin a label"
-              on a thread with none and "edit label" on one with a label — the
-              pill beside it already says which of the two this thread is. */}
-          <span className="act" onClick={() => toggleNamer(e.id, e.handle)}>
-            {sel ? 'close' : 'edit label'}
-          </span>
-          <span
-            className="rm"
-            onClick={async () => {
-              const ok = await confirm({
-                title: "Remove this thread?",
-                body: <>The description goes with it: <i>&ldquo;{short(e.sentence, 120)}&rdquo;</i> Both concepts stay.</>,
-                confirmLabel: "Remove thread",
-                danger: true,
-              })
-              if (!ok) return
-              if (namingFor === e.id) setNamingFor(null)
-              if (editingFor === e.id) setEditingFor(null)
-              removeEdge(e.id)
-            }}
-          >remove</span>
-        </div>
+      <ThreadCard
+        key={e.id}
+        thread={e}
+        // Whole-graph, not scoped: a dangling end is drawn "?" by the card, and
+        // it should only ever be "?" when the concept is genuinely gone.
+        from={conceptById(e.fromId)}
+        to={conceptById(e.toId)}
+        links={state.links}
+        mode="edit"
+        selected={sel || edt}
+        edit={{
+          editing: edt,
+          naming: sel,
+          // Description before label, in the row as in the ruled order.
+          onToggleEdit: () => toggleEditor(e.id, e.sentence),
+          onToggleName: () => toggleNamer(e.id, labelOfEdge(e, state.links)),
+          onRemove: async () => {
+            const ok = await confirm({
+              title: "Remove this thread?",
+              body: <>The description goes with it: <i>&ldquo;{short(e.sentence, 120)}&rdquo;</i> Both concepts stay.</>,
+              confirmLabel: "Remove thread",
+              danger: true,
+            })
+            if (!ok) return
+            if (namingFor === e.id) setNamingFor(null)
+            if (editingFor === e.id) setEditingFor(null)
+            removeEdge(e.id)
+          },
+          folds: (<>
         {edt && (
           <div className="distill">
             <div className="rnote">
@@ -577,11 +577,13 @@ export default function ThrowTab({ onGotoPassage, pair }: {
               ))}
             </div>
             <div style={{ marginTop: "10px" }}>
-              <button className="btn mini" onClick={() => handleSaveName(e.id, e.handle)}>Save label</button>
+              <button className="btn mini" onClick={() => handleSaveName(e.id, labelOfEdge(e, state.links) || null)}>Save label</button>
             </div>
           </div>
         )}
-      </div>
+          </>),
+        }}
+      />
     )
   }
 

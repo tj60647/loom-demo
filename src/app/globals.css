@@ -390,6 +390,12 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
   box-shadow:0 1px 4px rgba(0,0,0,.06);margin:0 0 10px}
 .ywcard.ywpassage{border-left:3px solid rgba(255,204,0,.8)}
 .ywcard.ywconcept{border-left:3px solid var(--ochre)}
+/* The third object, and the palette had already named its colour: --sage is
+   "weft — beaten (distilled) threads" (line 8), the same green the cloth draws
+   a labelled arc in and the same one the legend teaches under it. Nothing is
+   invented here — ochre is the warp, sage is the weft, and the yellow is the
+   highlighter. */
+.ywcard.ywthread{border-left:3px solid var(--sage)}
 /* Concept cards tile, passage cards do not (TJ, 2026-08-18: "the concept cards
    in the 'your work' panel can also lose the spacing between cards"). A
    collapsed concept is one 40px line, so a 10px gap between each was more gap
@@ -637,8 +643,36 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .readsas b{font-style:normal;color:var(--ink);font-weight:500}
 /* thread list */
 .thread{padding:11px 13px;border-bottom:1px dotted var(--rule)}
+/* AS A CARD (ThreadCard.tsx). The dotted separator is what a list of rows
+   wants and a card does not, so the card's own edge replaces it. `.ywcard`
+   supplies paper, the 1px rule, the radius and the shadow; `.ywthread` the
+   sage spine. Threads TILE, as concept cards do and passage cards do not: a
+   collapsed thread is two short lines, so a 10px gap between each was more gap
+   than card. */
+.thread.ywcard{border-bottom:1px solid var(--rule);margin-bottom:0}
+.thread.ywcard + .thread.ywcard{margin-top:-1px}
+/* A selectable card says so under the hand — /admin/aggregate's list, where
+   pressing a thread reads it out above. `.sel` keeps the red inset it has
+   always had: it is "the one selected thing", which is what the palette
+   reserves that colour for. */
+.thread.ispick{cursor:pointer}
+.thread.ispick:hover{background:rgba(111,125,92,.07)}
+.thread.ispick:focus-visible{outline:2px solid var(--sage);outline-offset:-2px}
 .thread.sel{box-shadow:inset 3px 0 var(--red);background:rgba(178,58,43,.05)}
-.thread .trip{font-size:15px}
+/* AS A CARD the spine itself turns, rather than a red bar being laid over the
+   sage one: two colours on one 3px edge read as a smudge, and the object's
+   colour and its state are not both edges. Red because that is what the
+   palette reserves — "the one selected thing" — and an open editor is exactly
+   that. */
+.thread.ywcard.sel{border-left-color:var(--red);box-shadow:0 1px 4px rgba(0,0,0,.06)}
+/* Direction, not a label. Quiet and unbordered on purpose: the bordered sage
+   pill beside it means BEATEN, so an arrow drawn in one would say a loose
+   thread had been labelled. */
+.thread .tarrow{font-family:var(--mono);font-size:12px;color:var(--grey)}
+/* The trip wraps as a row rather than one line: the card no longer truncates
+   its ends at 30 characters (the 02 column did), so two long concept names
+   have to be able to sit over two lines with the pill between them. */
+.thread .trip{font-size:15px;display:flex;flex-wrap:wrap;gap:4px 7px;align-items:baseline}
 .thread .v{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--sage);border:1px solid var(--sage);border-radius:10px;padding:1px 8px}
 .thread .v.loosev{color:var(--grey);border-color:var(--grey);border-style:dashed;font-style:italic}
 .thread .sent{font-size:13px;font-style:italic;color:var(--ink-soft);margin-top:4px}

@@ -185,11 +185,16 @@ test("02 · pick two, say the sentence, throw the thread, label the link — the
   await page.getByPlaceholder("…or just start typing. Long and awkward is fine.").fill(SENTENCE)
   await page.getByRole("button", { name: "Throw it" }).click()
 
-  // The .trip head truncates the sentence with an ellipsis; the full text
-  // lives in the sibling .sent — anchor there and walk up to the row.
+  // Anchor on the sentence, then take the CARD it belongs to by its own id.
+  // This walked up with `.locator("..")` until 2026-08-18, which made the row's
+  // internal shape a contract: any wrapper between the card's root and its
+  // sentence silently re-pointed eight assertions at the wrapper. `.thread` and
+  // `.sent` are still exactly where they were — this only stops the test caring
+  // how far apart they sit (ThreadCard.tsx, docs/thread-card.md).
   const sent = page.locator(".sent", { hasText: "one sustains the other" })
   await expect(sent).toHaveCount(1, { timeout: 15_000 })
-  const thread = sent.locator("..")
+  const thread = sent.locator("xpath=ancestor::*[@data-edge-id][1]")
+  await expect(thread, "the thread card must carry data-edge-id").toHaveCount(1)
   await expect(thread.locator(".pill", { hasText: "description" })).toBeVisible()
 
   // Coin a label on the new thread. The control says "edit label" either way
