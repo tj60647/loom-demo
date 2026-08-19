@@ -379,10 +379,21 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    row hinging rather than as a box sitting on top. The card's own radius is
    4px, so the button's right corners take 3px — the inside of a 1px border. */
 .ywcard.ywpick > .lhead{padding-right:0}
-.cselect{flex:0 0 auto;align-self:stretch;display:flex;align-items:center;gap:5px;
+.cselect{flex:0 0 auto;align-self:stretch;display:flex;align-items:center;
+  justify-content:space-between;gap:5px;
+  /* ONE WIDTH FOR BOTH CAPTIONS (TJ, 2026-08-18: "the button size should not
+     change as text does so select and picked x should have same size button").
+     "SELECT" and "PICKED 1" are 6 and 8 mono characters, so the button grew
+     when you pressed it and the evidence count beside it jumped left. Sized to
+     the longer of the two and left there. */
+  min-width:92px;
   background:none;border:0;border-left:1px solid var(--rule);border-radius:0 3px 3px 0;
   padding:0 10px;margin:-9px 0;cursor:pointer;font-family:var(--mono);font-size:9.5px;
   letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);white-space:nowrap}
+/* The ochre it always had (TJ liked it): ochre type on hover, ochre fill when
+   picked. What changed with the full-height button is that the outline became
+   the row's own edge, so the hover reads as a tint behind ochre text rather
+   than as a pill outlining itself. */
 .cselect:hover,.cselect:focus-visible{background:rgba(168,132,63,.12);color:var(--ochre)}
 .ywcard.ywpick.picked .cselect{background:var(--ochre);color:var(--paper);border-left-color:var(--ochre)}
 /* Open, the head is no longer the card's bottom edge, so the button squares
