@@ -11,7 +11,6 @@ import { scopeLabelOf } from "@/lib/graphExport"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import ConceptCard from "@/components/cards/ConceptCard"
-import type { Passage } from "@/lib/types"
 import ConceptName from "@/components/ui/ConceptName"
 import { conceptNameText } from "@/lib/conceptName"
 
@@ -65,7 +64,12 @@ const STEPS: { label: string; says: string }[] = [
   },
 ]
 
-export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: Passage) => void } = {}) {
+/* `onGotoPassage` was ThrowTab's prop until 2026-08-18. Its only consumer was
+   the concept popover, which offered a door into 01 · Reading from each
+   evidence passage it listed; with the popover gone nothing here opens a
+   passage, so the prop went too rather than sit wired to nothing. Workbench
+   still holds `handleGotoPassage` for the two tabs that do use it. */
+export default function ThrowTab() {
   // Scoped for what this reading is about; whole for anything that has to be
   // TRUE. The thread lists are `scoped` — this reading's own work, and since
   // 2026-08-09 only that — while the evidence check, the duplicate-pair guard
@@ -74,81 +78,9 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
   const { state, scoped, scope, addEdge, editEdge, removeEdge, attachLink, flash, setUndoStack, setRedoStack } = useLoom()
   const { byId: readingsById } = useReadings()
   const titleOf = (id: string) => readingsById.get(id)?.title ?? id
-  /**
-   * Which warp concept has its card open, or null. A POPOVER rather than an
-   * inline expansion (TJ, 2026-08-13: "popover is better"): the warp is a list
-   * being scanned for a second pick, and a row that grows in place reflows
-   * everything under the cursor mid-scan.
-   */
-  const [cardFor, setCardFor] = useState<string | null>(null)
-  const popRef = useRef<HTMLDivElement>(null)
-  const popAnchor = useRef<HTMLElement | null>(null)
-
-  /**
-   * The card rides the browser's TOP LAYER, via the native popover API — the
-   * same escape TipLayer takes, and for the same reason.
-   *
-   * The first cut was an absolutely-positioned div inside the warp, and it was
-   * invisible: `.scrollbox` is `overflow:auto`, which CLIPPED it, and the
-   * scrollbox's stacking context meant its own click-away scrim painted over
-   * it. Every assertion passed — the element existed, had a sane rect and
-   * reported visible — and the screenshot showed nothing at all. The top layer
-   * is clipped by nothing and outranks every z-index in the app.
-   *
-   * `popover="auto"` also brings light-dismiss and Escape with it, so there is
-   * no scrim to maintain and no key handler to write.
-   */
-  const placeCard = useCallback(() => {
-    const pop = popRef.current
-    const host = popAnchor.current
-    if (!pop || !host?.isConnected) return
-    const r = host.getBoundingClientRect()
-    if (!r.width && !r.height) { setCardFor(null); return }
-    const w = pop.offsetWidth || 320
-    const h = pop.offsetHeight
-    const GAP = 10, EDGE = 12
-    // Beside the row by preference, flipped when the right-hand side has no
-    // room — the warp is the leftmost column, so that is the common case.
-    const right = r.right + GAP
-    const left = right + w + EDGE <= window.innerWidth ? right : Math.max(r.left - GAP - w, EDGE)
-    pop.style.left = `${Math.round(left)}px`
-    pop.style.top = `${Math.round(
-      Math.min(Math.max(r.top - 8, EDGE), Math.max(window.innerHeight - h - EDGE, EDGE))
-    )}px`
-  }, [])
-
-  useEffect(() => {
-    const pop = popRef.current
-    if (!pop) return
-    if (!cardFor) {
-      if (pop.matches(":popover-open")) pop.hidePopover()
-      return
-    }
-    if (!pop.matches(":popover-open")) pop.showPopover()
-    placeCard()
-    // A scroll inside the warp, or a resize, must move the card with its row —
-    // capture:true so the scrollbox's own scroll is seen, not just the page's.
-    window.addEventListener("scroll", placeCard, true)
-    window.addEventListener("resize", placeCard)
-    return () => {
-      window.removeEventListener("scroll", placeCard, true)
-      window.removeEventListener("resize", placeCard)
-    }
-  }, [cardFor, placeCard])
-
-  // Light-dismiss and Escape close it without going through React, so the
-  // state has to follow the element rather than the other way round.
-  useEffect(() => {
-    const pop = popRef.current
-    if (!pop) return
-    const onToggle = (e: Event) => {
-      if ((e as ToggleEvent).newState === "closed") setCardFor(null)
-    }
-    pop.addEventListener("toggle", onToggle)
-    return () => pop.removeEventListener("toggle", onToggle)
-  }, [])
-
-  const cardConcept = cardFor ? state.concepts.find((c) => c.id === cardFor) ?? null : null
+  /* The warp's concept popover lived here — state, a top-layer element and the
+     geometry that kept it beside its row — until 2026-08-18. Removed with the ●
+     that opened it; see the tombstone in the JSX below for what went with it. */
   const { confirm, notify } = useDialog()
   const [pairA, setPairA] = useState<string | null>(null)
   const [pairB, setPairB] = useState<string | null>(null)
@@ -432,41 +364,28 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
   // Both bands are lists you SEARCH for a concept to pick, so both are A-Z.
   const warp = sortedByLabel(scoped.concepts)
 
-  const conceptRow = (c: typeof state.concepts[number]) => {
-    const isPicked = pairA === c.id || pairB === c.id
-    const noev = passagesOf(c.id).length === 0
-    return (
-      <div
-        key={c.id}
-        className={`crow ${isPicked ? "picked" : ""}`}
-        onClick={() => togglePick(c.id)}
-        title="tap to load into the bench"
-      >
-        <div className="clabel"><ConceptName concept={c} /></div>
-        {isPicked
-          ? <div className="pickedtag">PICK {pairA === c.id ? 1 : 2}</div>
-          : (noev && <div className="pickedtag" style={{ color: "var(--ink-soft)" }} title="no passage backs this yet — you may have named it ahead of its evidence, which is allowed">no evidence</div>)}
-        {/* The dot: "what was this grounded in?", answered without leaving 02.
-            stopPropagation because the whole row is already a click target
-            that loads the bench — a small control inside a big button is an
-            accidental-pick generator otherwise. */}
-        <button
-          type="button"
-          className="cdot"
-          aria-label={`Show the concept card for ${conceptNameText(c)}`}
-          data-tip="see this concept — its meaning and evidence"
-          aria-expanded={cardFor === c.id}
-          onClick={(e) => {
-            e.stopPropagation()
-            popAnchor.current = e.currentTarget.closest(".crow") as HTMLElement
-            setCardFor((cur) => (cur === c.id ? null : c.id))
-          }}
-        >
-          ●
-        </button>
-      </div>
-    )
-  }
+  /**
+   * THE WARP ROW IS THE CONCEPT CARD (TJ, 2026-08-18: "we need to update the
+   * warp list to use the concept cards from the 'your work' concepts panel …
+   * they could be the same card with different color and formatting").
+   *
+   * `passages` is the whole loom here because 02 is not reading-scoped, and
+   * `allPassages` goes too so the card's own reckoning of what backs a concept
+   * is the same sum it makes in Your work.
+   */
+  const conceptRow = (c: typeof state.concepts[number]) => (
+    <ConceptCard
+      key={c.id}
+      concept={c}
+      passages={passagesOf(c.id)}
+      allPassages={state.passages}
+      concepts={state.concepts}
+      titleOf={titleOf}
+      mode="pick"
+      pick={pairA === c.id ? 1 : pairB === c.id ? 2 : null}
+      onPick={() => togglePick(c.id)}
+    />
+  )
 
   const threadRow = (e: typeof state.edges[number]) => {
     const fromC = conceptById(e.fromId)
@@ -600,41 +519,18 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
 
   return (
     <>
-      {/* ONE card element for the whole warp, not one per row: it lives in the
-          top layer, so there is nothing for a per-row instance to anchor to
-          and every extra one would be a second thing to keep positioned. */}
-      <div
-        ref={popRef}
-        popover="auto"
-        className="cpop"
-        role="dialog"
-        aria-label={cardConcept ? `${conceptNameText(cardConcept)} — concept card` : "Concept card"}
-      >
-        {cardConcept && (
-          <>
-            <button
-              type="button"
-              className="btn ghost mini info-close"
-              onClick={() => setCardFor(null)}
-              aria-label="Close"
-            >✕</button>
-            <ConceptCard
-              concept={cardConcept}
-              passages={passagesOf(cardConcept.id)}
-              concepts={state.concepts}
-              titleOf={titleOf}
-              onGotoPassage={onGotoPassage && ((p) => { setCardFor(null); onGotoPassage(p) })}
-            />
-            {onGotoPassage && (
-              // Said plainly, because it is true and not obvious: stations
-              // unmount, so leaving drops the picks.
-              <p className="cpop-cost">
-                Opening a passage goes to <b>01 · Reading</b> and lets go of your picks here.
-              </p>
-            )}
-          </>
-        )}
-      </div>
+      {/* The warp's concept POPOVER stood here until 2026-08-18, opened by a ●
+          on every row (TJ: "the dot on the existing warp concept card is
+          unnecessary"). The row IS a ConceptCard now, so the dot opened a
+          ConceptCard from inside one.
+
+          DECLARED, because it is more than a dot: the popover carried the
+          concept's Description and its evidence passages, each a door into
+          01 · Reading, and it was the only route to either from 02. The row
+          card shows the name and what backs it, not the gloss. Restoring that
+          reach means a disclosure on the card that does not fight the row's own
+          tap-to-pick — the card is shared with Your work, which expands in
+          place, so the mechanism already exists. */}
 
       {/* Four pills reading "pick · pick · say · throw" said the shape of the
           move but not the move. Numbered, named, and with the current step

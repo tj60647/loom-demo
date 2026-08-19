@@ -350,6 +350,33 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
   box-shadow:0 1px 4px rgba(0,0,0,.06);margin:0 0 10px}
 .ywcard.ywpassage{border-left:3px solid rgba(255,204,0,.8)}
 .ywcard.ywconcept{border-left:3px solid var(--ochre)}
+/* Concept cards tile, passage cards do not (TJ, 2026-08-18: "the concept cards
+   in the 'your work' panel can also lose the spacing between cards"). A
+   collapsed concept is one 40px line, so a 10px gap between each was more gap
+   than card and the list read as scattered rather than as a vocabulary. A
+   passage card is 300px+ and needs the air. */
+.ywcard.ywconcept{margin-bottom:0}
+.ywcard.ywconcept + .ywcard.ywconcept{margin-top:-1px}
+/* 02 · Linking's warp: the same card, in the warp's own register (TJ: "they
+   could be the same card with different color and formatting"). Bigger name,
+   because this column is scanned rather than read, and the picked state keeps
+   the inset ochre bar it always had. */
+/* .crow's own layout is neutralised, not deleted: six spec files select the
+   warp by that class, and the admin and faculty read-only views still use the
+   plain row. The card supplies the flex row and the padding through .lhead,
+   exactly as it does in Your work — otherwise .crow's own
+   display:flex;justify-content:space-between wraps the head and the evidence
+   tag sits against the name instead of at the right edge. */
+.crow.ywcard{display:block;padding:0;border-bottom:0}
+.ywcard.ywpick{cursor:pointer}
+.ywcard.ywpick .lhead{cursor:pointer}
+.ywcard.ywpick .clabel{font-size:16px}
+.ywcard.ywpick:hover{background:rgba(168,132,63,.08)}
+.ywcard.ywpick.picked{box-shadow:inset 3px 0 var(--ochre);background:rgba(168,132,63,.1)}
+/* "no evidence" is a designation, not a warning — so it is the quiet grey of
+   a count, never the red of a problem. It replaced a bare empty slot, which
+   read the same as a concept whose evidence is simply in another reading. */
+.pickedtag.noevidence{color:var(--ink-soft)}
 /* One piece of a concept's evidence, inside an opened concept card. Carried
    three inline styles and no class until 2026-08-18. Dotted, not boxed: these
    are parts of the card they sit in, not cards themselves — the card's own

@@ -831,6 +831,10 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
                 key={concept.id}
                 concept={concept}
                 passages={conceptPassages}
+                /* This reading's evidence above, the whole loom here — the
+                   card tells "nothing backs this anywhere" from "backed, but
+                   not in this text" itself. */
+                allPassages={state.passages}
                 concepts={state.concepts}
                 titleOf={titleOf}
                 mode="edit"

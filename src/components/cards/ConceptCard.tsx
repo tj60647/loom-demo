@@ -33,6 +33,8 @@ export type ConceptCardMode =
   | "read"
   /** Your work's row: rename, describe, and the evidence under it. */
   | "edit"
+  /** 02 · Linking's warp list: the same card as a pick target. */
+  | "pick"
 
 export type ConceptCardEdit = {
   isOpen: boolean
@@ -56,10 +58,14 @@ export default function ConceptCard({
   onGotoPassage,
   /** Evidence from OTHER readings, counted rather than listed. */
   elsewhere = 0,
+  allPassages,
   edit,
+  pick = null,
+  onPick,
 }: {
   concept: Concept
-  /** This concept's evidence, in capture order. */
+  /** This concept's evidence, in capture order — SCOPED by the caller. See
+   *  `noEvidence`, which is not derived from this. */
   passages: Passage[]
   /** The whole concept list, so a passage can name its other filings. */
   concepts: Concept[]
@@ -67,9 +73,87 @@ export default function ConceptCard({
   mode?: ConceptCardMode
   onGotoPassage?: (passage: Passage) => void
   elsewhere?: number
+  /**
+   * EVERY passage in the loom, so the card can work out for itself what it is
+   * looking at (TJ, 2026-08-18: "maybe behind the scenes a card knows if there
+   * is evidence in the loom and evidence in the reading?").
+   *
+   * It has to be the card's own sum, not a flag from the caller. `passages` is
+   * SCOPED — Your work hands it this reading's evidence — so a concept carried
+   * in from another text arrives with an empty list while being nothing like
+   * evidence-less. A caller computing "no evidence" off that list tells a lie
+   * the card cannot detect, and the two hosts had two different predicates for
+   * it before this prop existed: 02 counted the whole loom, Your work counted
+   * the reading.
+   *
+   * Omitted, the card falls back to `passages` and says only what it can see.
+   */
+  allPassages?: Passage[]
   /** Required by `mode="edit"`; ignored otherwise. */
   edit?: ConceptCardEdit
+  /** Required by `mode="pick"`; which slot this concept is loaded into. */
+  pick?: 1 | 2 | null
+  onPick?: () => void
 }) {
+  /**
+   * WHAT THIS CONCEPT IS BACKED BY, worked out here rather than asked for.
+   * `here` is what the host gave us — this reading, or the whole loom if the
+   * host is not reading-scoped. `loom` is every text the student has read.
+   */
+  const here = passages.length
+  const loom = allPassages
+    ? allPassages.filter((p) => p.conceptIds.includes(concept.id)).length
+    : here
+
+  /**
+   * THE HEAD'S RIGHT-HAND SLOT, shared by every mode so the cards say the same
+   * things in the same order, and there are three things to say, not two:
+   *
+   *  - PICK n — which bench slot, the most local fact there is.
+   *  - no evidence — nothing anywhere backs it. A designation, never a warning:
+   *    "a Concept may precede its evidence" (TJ, 2026-08-08; red line 4, "empty
+   *    states are visible, not blocked").
+   *  - elsewhere — backed, but not in the text you are reading. This used to
+   *    render as nothing at all, which read identically to evidence-less.
+   */
+  const headTag =
+    pick ? <div className="pickedtag">PICK {pick}</div>
+    : loom === 0 ? (
+      <div
+        className="pickedtag noevidence"
+        title="no passage backs this yet — you may have named it ahead of its evidence, which is allowed"
+      >no evidence</div>
+    )
+    : here === 0 ? (
+      <div
+        className="lsrc"
+        title={`Backed by ${loom} passage${loom !== 1 ? "s" : ""} in your other readings, none in this one.`}
+      >{loom} elsewhere</div>
+    )
+    : (
+      <div className="lsrc">
+        {here} passage{here !== 1 ? "s" : ""}
+      </div>
+    )
+
+  if (mode === "pick" && onPick) {
+    return (
+      <div
+        data-concept-id={concept.id}
+        className={`crow ywcard ywconcept ywpick ${pick ? "picked" : ""}`}
+        onClick={onPick}
+        title="tap to load into the bench"
+      >
+        <div className="lhead">
+          {/* .clabel as well as .lconcept: six spec files select the warp by
+              `.crow` and its name by `.clabel`, and the admin and faculty
+              read-only views use `.clabel` for the same object. */}
+          <div className="lconcept clabel"><ConceptName concept={concept} /></div>
+          {headTag}
+        </div>
+      </div>
+    )
+  }
   if (mode === "edit" && edit) {
     return (
       <div data-concept-id={concept.id} className={`lrow ywcard ywconcept ${edit.isOpen ? "open" : ""}`}>
@@ -84,11 +168,7 @@ export default function ConceptCard({
               EVIDENCE: it says the same thing twice, and the zero is the more
               judgemental of the two. The cross-reading fact is not lost — open
               the row and it is said in full. */}
-          {passages.length > 0 && (
-            <div className="lsrc">
-              {passages.length} passage{passages.length !== 1 ? "s" : ""}
-            </div>
-          )}
+          {headTag}
         </div>
         {edit.isOpen && (
           <div className="lbody">

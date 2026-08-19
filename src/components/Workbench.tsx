@@ -443,7 +443,7 @@ export default function Workbench({
           </div>
         )}
         <div className={`panel ${activeTab === "throw" ? "active" : ""}`}>
-          {shouldRender("throw") && <ThrowTab onGotoPassage={handleGotoPassage} />}
+          {shouldRender("throw") && <ThrowTab />}
         </div>
         <div className={`panel ${activeTab === "read" ? "active" : ""}`}>
           {/* The station key stays "read" (and so does ?tab=read) — the URL
