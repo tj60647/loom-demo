@@ -147,7 +147,19 @@ export default function ThreadCard({
         <b>{end(to)}</b>
       </div>
 
-      <div className="sent">&ldquo;{thread.sentence}&rdquo;</div>
+      {/* A THROWN THREAD NEED NOT BE DESCRIBED YET (P0.3: "the description is
+          the thread, and you can throw now and write it later"), so the empty
+          case is a designation and not a warning — the same rule ConceptCard
+          states about a concept named ahead of its evidence. It drew as a pair
+          of quote marks with nothing between them until 2026-08-18, which on
+          /admin/aggregate was two of the first three cards and read as broken
+          rather than as unfinished. `.sent` stays the element either way: it is
+          the row's handle for three specs. */}
+      <div className={`sent${thread.sentence.trim() ? "" : " empty"}`}>
+        {thread.sentence.trim()
+          ? <>&ldquo;{thread.sentence}&rdquo;</>
+          : "thrown, not yet described — which is allowed"}
+      </div>
 
       <div className="tmeta">
         {/* WHAT THIS THREAD IS, in one word. Sage and solid once a label has

@@ -17,6 +17,7 @@ import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import type { Edge, Tier } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
 import ClothMap, { SHOW_TRACE } from "@/components/svg/ClothMap"
+import ThreadCard from "@/components/cards/ThreadCard"
 import { useCaptureLog, CaptureLogScrubber, CaptureLogRows, CaptureLogDownload } from "@/components/ui/HistoryPanel"
 import ConceptName from "@/components/ui/ConceptName"
 import { conceptNameText } from "@/lib/conceptName"
@@ -455,21 +456,22 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
     }
   }
 
-  // v14's tripleHtml + .readitem. Sizes come from globals.css (.threadhead is
-  // 19px display, .trip 15px, .sent 14.5px) — this pane is material to read
-  // from, and the inline overrides that used to sit here shrank it to 12-14px.
-  const threadItem = (e: Edge) => {
-    const f = state.concepts.find(c => c.id === e.fromId)
-    const t = state.concepts.find(c => c.id === e.toId)
-    return (
-      <div key={e.id} className="readitem">
-        <div className="trip">
-          <b>{f ? conceptNameText(f) : "?"}</b> {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">description</span>} <b>{t ? conceptNameText(t) : "?"}</b>
-        </div>
-        <div className="sent">&ldquo;{e.sentence}&rdquo;</div>
-      </div>
-    )
-  }
+  // v14's tripleHtml. The inline type overrides that used to sit here shrank
+  // this pane to 12-14px; the sizes are globals.css's, and since 2026-08-18 the
+  // row's are ThreadCard's.
+  /* THE SHARED CARD (docs/thread-card.md). Hand-rolled as a `.readitem` until
+     2026-08-18, with its own third stand-in for an unlabelled thread — the
+     literal word "description" inside the pill, where 02 put a truncated
+     sentence and /admin/user/[id] put an arrow. */
+  const threadItem = (e: Edge) => (
+    <ThreadCard
+      key={e.id}
+      thread={e}
+      from={state.concepts.find((c) => c.id === e.fromId)}
+      to={state.concepts.find((c) => c.id === e.toId)}
+      links={state.links}
+    />
+  )
 
   // Generate reading pane content
   let readingPane = null;

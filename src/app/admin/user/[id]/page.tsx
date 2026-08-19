@@ -3,7 +3,7 @@ import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
 import { firstParam } from "@/lib/courses"
 import type { LoomState } from "@/lib/types"
 import ConceptName from "@/components/ui/ConceptName"
-import { conceptNameText } from "@/lib/conceptName"
+import ThreadCard from "@/components/cards/ThreadCard"
 
 // Route segment params and searchParams are promises (Next 16 async request APIs).
 type UserLoomSearchParams = {
@@ -57,18 +57,28 @@ export default async function UserLoomPage({
         <div className="card">
           <h2>Threads</h2>
           <div className="scrollbox">
-            {edges.map(e => {
-              const from = concepts.find(c => c.id === e.fromId)
-              const to = concepts.find(c => c.id === e.toId)
-              return (
-                <div key={e.id} className="thread">
-                  <div className="trip">
-                    {from ? conceptNameText(from) : "?"} <span className="v">{e.handle || "→"}</span> {to ? conceptNameText(to) : "?"}
-                  </div>
-                  <div className="sent">{e.sentence}</div>
-                </div>
-              )
-            })}
+            {/* THE SHARED CARD (docs/thread-card.md). Hand-rolled here until
+                2026-08-18, and wrong in three ways at once: it put `→` inside
+                the SOLID `.v` pill — the cloth's mark for a beaten thread — so
+                every unlabelled thread on this page read as labelled; it left
+                the ends unbolded, which no other drawing did; and it printed
+                the sentence without quotation marks. All three go with the
+                hand-rolling.
+
+                `state.links` is `[]` on this route (built above from what
+                `getUserLoomDataAsAdmin` returns), which is exactly the input
+                that makes `labelOf` fall back to the legacy `handle` — the
+                same label this page was already showing, resolved by the one
+                function that decides what a label is. */}
+            {edges.map((e) => (
+              <ThreadCard
+                key={e.id}
+                thread={e}
+                from={concepts.find((c) => c.id === e.fromId)}
+                to={concepts.find((c) => c.id === e.toId)}
+                links={state.links}
+              />
+            ))}
           </div>
         </div>
       </div>

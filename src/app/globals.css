@@ -676,6 +676,8 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .thread .v{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--sage);border:1px solid var(--sage);border-radius:10px;padding:1px 8px}
 .thread .v.loosev{color:var(--grey);border-color:var(--grey);border-style:dashed;font-style:italic}
 .thread .sent{font-size:13px;font-style:italic;color:var(--ink-soft);margin-top:4px}
+/* Quieter still when there is nothing to quote — a state, not a quotation. */
+.thread .sent.empty{color:var(--grey)}
 /* Wraps as a row of whole phrases, never inside one: in a third of the width
    "edit description" broke across two lines and read as two controls. */
 .thread .tmeta{font-family:var(--mono);font-size:10px;margin-top:6px;display:flex;

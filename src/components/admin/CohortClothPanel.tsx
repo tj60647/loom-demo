@@ -16,8 +16,10 @@
 
 import { useMemo, useState } from "react"
 import ClothMap from "@/components/svg/ClothMap"
-import type { Passage, Edge, LoomState } from "@/lib/types"
+import type { Passage, LoomState } from "@/lib/types"
 import ConceptName from "@/components/ui/ConceptName"
+import ThreadCard from "@/components/cards/ThreadCard"
+import { labelOf } from "@/lib/linkResolve"
 import { conceptNameText } from "@/lib/conceptName"
 
 type ReadSel = { type: "concept" | "edge" | "hub"; id?: string; ids?: string[] } | null
@@ -69,17 +71,6 @@ export default function CohortClothPanel({
     </div>
   )
 
-  const threadTrip = (e: Edge) => {
-    const from = conceptById.get(e.fromId)
-    const to = conceptById.get(e.toId)
-    return (
-      <>
-        <b>{from ? conceptNameText(from) : "?"}</b>{" "}
-        {e.handle ? <span className="vpill">{e.handle}</span> : <span className="vpill loosev">description</span>}{" "}
-        <b>{to ? conceptNameText(to) : "?"}</b>
-      </>
-    )
-  }
 
   // What is selected, read out under the map — the student idiom, admin-voiced.
   let pane = null
@@ -117,11 +108,20 @@ export default function CohortClothPanel({
               <span className="cap" style={{ display: "block", marginTop: "10px" }}>
                 the threads through it
               </span>
+              {/* The same card as the list below the map — these ARE those
+                  threads, seen from one of their ends, and drawing them a
+                  second way was how `.readitem` and `.thread` came to say the
+                  same thing differently. */}
               {crossings.map((e) => (
-                <div key={e.id} className="readitem" style={{ cursor: "pointer" }} onClick={() => selectEdge(e.id)}>
-                  <div className="trip">{threadTrip(e)}</div>
-                  <div className="sent">&ldquo;{e.sentence}&rdquo;</div>
-                </div>
+                <ThreadCard
+                  key={e.id}
+                  thread={e}
+                  from={conceptById.get(e.fromId)}
+                  to={conceptById.get(e.toId)}
+                  links={state.links}
+                  by={who(e.userId)}
+                  onSelect={() => selectEdge(e.id)}
+                />
               ))}
             </>
           )}
@@ -136,9 +136,17 @@ export default function CohortClothPanel({
       )
       pane = (
         <div style={{ marginTop: "16px" }}>
+          {/* The pane's HEADING, not a card: it names what is being read out
+              below it, in the red the panel uses for a selection, and the card
+              for this same thread is already lit in the list. Its label is
+              resolved the card's way though — `labelOf` first, the legacy
+              `handle` only as a fallback — because a thread carrying a Link
+              object and an empty handle used to read as unlabelled here. */}
           <div className="threadhead">
             <span className="red">{ends[0] ? conceptNameText(ends[0]) : "?"}</span>{" "}
-            {edge.handle ? <span className="vpill">{edge.handle}</span> : <span className="vpill loosev">description</span>}{" "}
+            {labelOf(edge, state.links)
+              ? <span className="vpill">{labelOf(edge, state.links)}</span>
+              : <span className="vpill loosev">description</span>}{" "}
             <span className="red">{ends[1] ? conceptNameText(ends[1]) : "?"}</span>
             <span className="n"> · {who(edge.userId)}</span>
           </div>
@@ -228,19 +236,23 @@ export default function CohortClothPanel({
             <p className="empty">Nothing thrown yet.</p>
           ) : (
             <div className="scrollbox">
+              {/* THE SHARED CARD (docs/thread-card.md). `by` and `onSelect`
+                  are props rather than a mode of their own: this is the only
+                  surface with more than one student in it, and the only one
+                  where pressing a thread reads it out — neither makes it a
+                  different card. It also picks up the keyboard for free, which
+                  a bare div with an onClick never had. */}
               {state.edges.map((e) => (
-                <div
+                <ThreadCard
                   key={e.id}
-                  className={`thread${readSel?.type === "edge" && readSel.id === e.id ? " sel" : ""}`}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => selectEdge(e.id)}
-                >
-                  <div className="trip">{threadTrip(e)}</div>
-                  <div className="sent">&ldquo;{e.sentence}&rdquo;</div>
-                  <div className="tmeta">
-                    <span className="cap">{who(e.userId)}</span>
-                  </div>
-                </div>
+                  thread={e}
+                  from={conceptById.get(e.fromId)}
+                  to={conceptById.get(e.toId)}
+                  links={state.links}
+                  by={who(e.userId)}
+                  selected={readSel?.type === "edge" && readSel.id === e.id}
+                  onSelect={() => selectEdge(e.id)}
+                />
               ))}
             </div>
           )}
