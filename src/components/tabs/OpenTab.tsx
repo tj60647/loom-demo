@@ -695,15 +695,16 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
    * own word for the third, and it is "a designation, never a warning".
    *
    * A concept in `scoped.concepts` with no passage HERE can only be one with
-   * no passage anywhere — anything evidenced elsewhere is in `scoped.outside`
-   * by construction — so the split below needs no extra query.
+   * no passage anywhere — `scope.ts`'s `isIn` is `evidenced.has(id) ||
+   * !hasPassage.has(id)`, so anything evidenced elsewhere is in
+   * `scoped.outside`. That is why the card's "no evidence" tag is true in this
+   * panel without a second query, and why its "N elsewhere" branch cannot fire
+   * here at all.
+   *
+   * The `here`/`namedOnly` split that used to stand here went on 2026-08-18
+   * with the two headings it fed; the kinds above are still the kinds, they
+   * are just said on the row now.
    */
-  const here = sortedByLabel(scoped.concepts).filter(c =>
-    scoped.passages.some(b => b.conceptIds.includes(c.id))
-  )
-  const namedOnly = sortedByLabel(scoped.concepts).filter(c =>
-    !scoped.passages.some(b => b.conceptIds.includes(c.id))
-  )
   /**
    * The captures with no name on them (TJ, 2026-08-12). An unlabeled passage
    * is a whole act, not half of one — the capture toast says so, and says
@@ -813,13 +814,28 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
               the model's own word and carries its own ruling — "a designation,
               never a warning to act on" — which is also why there is still no
               "yet" in any of them. */}
-          {view === "concepts" && ([
-            ["here", "Concepts in this reading", here],
-            ["named", "Concepts with no evidence", namedOnly],
-          ] as const).map(([key, heading, group]) => group.length === 0 ? null : (
-          <div key={key}>
-          <div className="lgroup">{heading}</div>
-          {group.map(concept => {
+          {/* ONE LIST, AND THE CARD SAYS WHAT BACKS IT (TJ, 2026-08-18: "in
+              'your work' we should handle the concepts with no evidence like
+              we do in the warp"). The warp has always been one A-Z list with
+              the fact on the row; this panel split the same concepts under
+              "Concepts in this reading" and "Concepts with no evidence".
+
+              The heading was not WRONG — `scope.ts`'s `isIn` is
+              `evidenced.has(id) || !hasPassage.has(id)`, so a concept
+              evidenced only in another text is in `scoped.outside` and never
+              in this list, and "no evidence" here did mean nowhere. It was
+              redundant, and it moved things: a concept jumped from one
+              heading to the other the moment you filed a passage under it,
+              which is a row changing place under the cursor at the instant
+              you acted on it. The card carries the same fact without moving
+              the row.
+
+              "No evidence" is not lost, it moved onto the card — still the
+              model's own word, still "a designation, never a warning to act
+              on", still with no "yet" in it. */}
+          {view === "concepts" && (
+          <div>
+          {sortedByLabel(scoped.concepts).map(concept => {
             const isOpen = openLogRows[concept.id]
             // This reading's evidence for the concept. A concept met in an
             // earlier text keeps that evidence — it is counted below rather
@@ -850,7 +866,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
             )
           })}
           </div>
-          ))}
+          )}
 
           {/* Your work is THIS reading's work (TJ, 2026-08-12). What used to
               close the list was a third group, "In your other readings" —
