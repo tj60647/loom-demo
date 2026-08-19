@@ -11,6 +11,7 @@
 
 import { useCallback, useState, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import OpenTab from "@/components/tabs/OpenTab"
@@ -249,7 +250,19 @@ export default function Workbench({
   // most of a two-page spread, so the panel vanished whether or not it was in
   // the way. Where it does overlap, the student can close it themselves — the
   // toggle is right there, and it is their call rather than ours.
+  const router = useRouter()
   const handleGotoPassage = (passage: Passage) => {
+    /* A CITATION CAN POINT AT ANOTHER READING. 04 · Vocabulary is the
+       loom-wide station — "your vocabulary is across all readings" (TJ,
+       2026-08-18) — so a passage under a concept there may belong to a text
+       that is not open. That is a different ROUTE, not a different page
+       number: `?passage=` is already a first-class deep link on the reading
+       page, read into `focus.passage`, so the hop lands on the passage rather
+       than on the reading's first page. */
+    if (passage.sourceId && passage.sourceId !== source.id) {
+      router.push(`/reading/${passage.sourceId}?passage=${passage.id}`)
+      return
+    }
     if (!source.hasFile) return
     setPdfPage(passage.pageNumber && passage.pageNumber > 0 ? passage.pageNumber : 1)
     setPdfFocusPassageId(passage.id)
@@ -450,7 +463,7 @@ export default function Workbench({
               params are deliberately legacy per refactor spec §F. What it
               renders is now the model's Vocabulary tab. */}
           {shouldRender("read") && (
-            <VocabularyTab initialConceptFilter={focus?.concept} initialLabelFilter={focus?.label} />
+            <VocabularyTab initialConceptFilter={focus?.concept} initialLabelFilter={focus?.label} onGotoPassage={handleGotoPassage} />
           )}
         </div>
         <div className={`panel ${activeTab === "map" ? "active" : ""}`}>

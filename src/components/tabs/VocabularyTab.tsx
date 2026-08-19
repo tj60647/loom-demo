@@ -20,7 +20,7 @@ import { useMemo, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
-import type { Concept } from "@/lib/types"
+import type { Concept, Passage } from "@/lib/types"
 import { soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { usesOf } from "@/lib/linkResolve"
@@ -67,15 +67,18 @@ function matches(haystack: string | null | undefined, needle: string) {
   return (haystack ?? "").toLowerCase().replace(/\s+/g, " ").includes(needle)
 }
 
-export default function VocabularyTab({ initialConceptFilter, initialLabelFilter }: {
+export default function VocabularyTab({ initialConceptFilter, initialLabelFilter, onGotoPassage }: {
   /** A concept's label, from a search hit's deep link. */
   initialConceptFilter?: string
   /** A Link Label, from a search hit's deep link. */
   initialLabelFilter?: string
+  /** Open a citation's passage where it was captured — which, on this station,
+   *  may be a reading that is not the one open. Workbench routes it. */
+  onGotoPassage?: (passage: Passage) => void
 } = {}) {
   const {
     state, scope, scoped,
-    editConcept, removeConcept, mergeConcepts, editEdge, flash,
+    editConcept, removeConcept, mergeConcepts, editEdge, flash, unfilePassage,
     addLink, editLink,
   } = useLoom()
   const { titleOf, course } = useReadings()
@@ -413,7 +416,39 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                                 </span>
                                 {b.location ? <span className="citeloc"> · {b.location}</span> : null}
                               </summary>
-                              <div className="passage">&quot;{b.content}&quot;</div>
+                              {/* The passage is the door, as it is everywhere
+                                  else a Passage is drawn (TJ, 2026-08-17) —
+                                  here it can cross to another reading. */}
+                              <div
+                                className={`passage${onGotoPassage && (b.sourceId || b.source) ? " isdoor" : ""}`}
+                                role={onGotoPassage && (b.sourceId || b.source) ? "button" : undefined}
+                                tabIndex={onGotoPassage && (b.sourceId || b.source) ? 0 : undefined}
+                                aria-label={onGotoPassage && (b.sourceId || b.source) ? "Open this passage in its reading" : undefined}
+                                title={onGotoPassage && (b.sourceId || b.source) ? "Open this passage in its reading" : undefined}
+                                onClick={() => (b.sourceId || b.source) && onGotoPassage?.(b)}
+                                onKeyDown={(e) => {
+                                  if (!onGotoPassage || !(b.sourceId || b.source)) return
+                                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGotoPassage(b) }
+                                }}
+                              >&quot;{b.content}&quot;</div>
+                              {/* 04's scoped act on a piece of evidence, worded
+                                  from the subject you are standing in — this
+                                  list is a CONCEPT and its evidence, so what
+                                  belongs here is taking one passage off it. The
+                                  capture itself is destroyed where the passage
+                                  is the subject, in 01 · Reading. */}
+                              <div className="src rm-actions" style={{ marginTop: "6px" }}>
+                                <button
+                                  type="button"
+                                  className="rm"
+                                  onClick={() => unfilePassage(b.id, concept.id)}
+                                  title={
+                                    b.conceptIds.length > 1
+                                      ? "Filed under several concepts — this removes it from this one only."
+                                      : "The passage stays, with no concept on it, under Unlabeled passages."
+                                  }
+                                >remove passage from concept</button>
+                              </div>
                             </details>
                           ))}
                       </div>
