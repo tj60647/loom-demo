@@ -15,6 +15,29 @@ type ReadSel = { type: "concept" | "edge" | "hub", id?: string, ids?: string[], 
  */
 export type ClothGlow = { id: string; seq: number } | null
 
+/**
+ * TRACING IS HIDDEN ON EVERY CLOTH (TJ, 2026-08-18: "all cloths hide/disable
+ * trace"), and hidden rather than deleted — flip this to true and it returns
+ * whole, on all four surfaces at once.
+ *
+ * Clicking a concept lit its full connected component in red and faded
+ * everything else; clicking an arc lit that one thread. It went off on the
+ * student's cloth first (75e005c, a flag in ClothReflection) because it was
+ * unused and it owned the click the pair needed. The other three kept it, and
+ * TJ has now ruled the same for them.
+ *
+ * IT LIVES HERE, in the renderer, and not in the four callers. The trace is
+ * drawn by this file — the component lighting, the dimming, the red arc — so a
+ * per-caller flag would be four chances for one surface to keep tracing after
+ * the others stopped, which is exactly the state this replaces.
+ *
+ * Turning it off does NOT take a selection away from anyone: `CohortClothPanel`
+ * still reads out whichever concept or thread is chosen, from the lists that
+ * sit under the drawing. What goes is the drawing as a way to choose (see the
+ * Removes: line of the commit that did this).
+ */
+export const SHOW_TRACE: boolean = false
+
 export default function ClothMap({
   state,
   readSel,
@@ -39,10 +62,10 @@ export default function ClothMap({
    * the node was aimed at, so a popover can hang off the drawing rather than
    * off whichever glyph took the click.
    *
-   * PASSING THIS TAKES THE CLICK. A node then picks instead of tracing, which
-   * is only safe because the student's cloth has `SHOW_TRACE` off
-   * (ClothReflection) and hands `setReadSel` a no-op. `CohortClothPanel` — the
-   * other call site — passes nothing here and traces as before.
+   * PASSING THIS IS THE ONLY THING A NODE CLICK DOES NOW. With `SHOW_TRACE`
+   * off there is no other candidate for it, on any cloth. The two staff
+   * surfaces — `CohortClothPanel` and `ReadOnlyClothMap` — pass nothing here,
+   * so their nodes are drawing and tooltip and nothing else.
    */
   onPickConcept?: (id: string, additive: boolean, anchor: SVGCircleElement | null) => void,
 }) {
@@ -113,12 +136,14 @@ export default function ClothMap({
   let selEdges: Set<string> | null = null
   let selEdgeId: string | null = null
 
-  if (readSel?.type === "concept" && readSel.id) {
+  // Everything below is the trace, and with the flag off all three stay null —
+  // no component lit, nothing faded, no red arc.
+  if (SHOW_TRACE && readSel?.type === "concept" && readSel.id) {
     // Pulling a thread lights the FULL connected component, as in v14.
     const comp = componentOf(readSel.id, adjacency(state.edges))
     selNodes = comp.nodes
     selEdges = new Set(comp.edges.map(e => e.id))
-  } else if (readSel?.type === "hub" && readSel.ids) {
+  } else if (SHOW_TRACE && readSel?.type === "hub" && readSel.ids) {
     const ids = readSel.ids
     const nodes = new Set(ids)
     const edgeIds = new Set<string>()
@@ -131,7 +156,7 @@ export default function ClothMap({
     })
     selNodes = nodes
     selEdges = edgeIds
-  } else if (readSel?.type === "edge" && readSel.id) {
+  } else if (SHOW_TRACE && readSel?.type === "edge" && readSel.id) {
     selEdgeId = readSel.id
   }
 
@@ -198,13 +223,18 @@ export default function ClothMap({
         if (selEdgeId && !isSel) op = 0.18
         else if (selEdges && !selEdges.has(e.id)) op = 0.15
 
-        const handleSelect = () => {
-          if (readSel?.type === "edge" && readSel.id === e.id) {
-            setReadSel(null)
-          } else {
-            setReadSel({ type: "edge", id: e.id })
-          }
-        }
+        // Tracing was the arc's only gesture, so with the flag off it has none.
+        // The twin below stays — it is what carries the sentence as a tooltip,
+        // which is not a trace and is the one thing an arc could always say.
+        const handleSelect = SHOW_TRACE
+          ? () => {
+              if (readSel?.type === "edge" && readSel.id === e.id) {
+                setReadSel(null)
+              } else {
+                setReadSel({ type: "edge", id: e.id })
+              }
+            }
+          : undefined
 
         const d = `M ${fx} ${baseY - 6} A ${span / 2} ${h} 0 0 ${fx < tx ? 1 : 0} ${tx} ${baseY - 6}`
 
@@ -222,7 +252,7 @@ export default function ClothMap({
               fill="none"
               stroke="rgba(0,0,0,0)"
               strokeWidth={14}
-              cursor="pointer"
+              cursor={handleSelect ? "pointer" : undefined}
               onClick={handleSelect}
             >
               <title>{`"${e.sentence}"`}</title>
@@ -264,7 +294,7 @@ export default function ClothMap({
               paintOrder="stroke"
               letterSpacing=".04em"
               opacity={op}
-              cursor="pointer"
+              cursor={handleSelect ? "pointer" : undefined}
               onClick={handleSelect}
             >
               {e.handle || (e.sentence.length > 34 ? e.sentence.slice(0, 33) + '…' : e.sentence)}
@@ -276,21 +306,30 @@ export default function ClothMap({
       {/* Nodes */}
       {cs.map((c, i) => {
         const x = X(i)
-        const isSel = readSel?.type === "concept" && readSel.id === c.id
+        const isSel = SHOW_TRACE && readSel?.type === "concept" && readSel.id === c.id
         const picked = pair.includes(c.id)
         const op = (selNodes && !selNodes.has(c.id)) ? 0.3 : 1
         // Deliberately NOT dimmed while a pair is being gathered: the whole
         // point of the second pick is that you are still reading the warp for
         // it, and fading the candidates is the opposite of that.
 
+        // Pick if somebody is gathering a pair, trace if tracing is on, and
+        // otherwise nothing at all — in which case the cursor must not promise
+        // a press either, and the handler is not attached below.
+        //
+        // Declared unconditionally rather than as a ternary of two arrows:
+        // `react-hooks/refs` reads a ref access inside a conditionally-created
+        // closure as a render-phase access and fails the build for it, which is
+        // what the first cut of this did.
         const handleSelect = (ev: { shiftKey: boolean }) => {
           if (onPickConcept) {
             onPickConcept(c.id, ev.shiftKey, nodeHits.current.get(c.id) ?? null)
             return
           }
-          if (isSel) setReadSel(null)
-          else setReadSel({ type: "concept", id: c.id })
+          setReadSel(isSel ? null : { type: "concept", id: c.id })
         }
+        const pressable = !!onPickConcept || SHOW_TRACE
+        const nodeCursor = pressable ? "pointer" : undefined
 
         return (
           <g key={`node-${c.id}`}>
@@ -330,8 +369,8 @@ export default function ClothMap({
               fontSize={11.5}
               fill={isSel || picked ? "var(--red)" : "var(--ink)"}
               opacity={op}
-              cursor="pointer"
-              onClick={handleSelect}
+              cursor={nodeCursor}
+              onClick={pressable ? handleSelect : undefined}
             >
               <title>{conceptNameText(c) + (c.def ? ` — ${c.def}` : '')}</title>
               {/* fill, not a class: `color` is inert on SVG text. */}
@@ -349,8 +388,8 @@ export default function ClothMap({
               }}
               cx={x} cy={baseY} r={hitR}
               fill="rgba(0,0,0,0)"
-              cursor="pointer"
-              onClick={handleSelect}
+              cursor={nodeCursor}
+              onClick={pressable ? handleSelect : undefined}
             >
               <title>{conceptNameText(c) + (c.def ? ` — ${c.def}` : '')}</title>
             </circle>

@@ -16,7 +16,7 @@ import { useLoom } from "@/components/providers/LoomProvider"
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type { Edge, Tier } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
-import ClothMap from "@/components/svg/ClothMap"
+import ClothMap, { SHOW_TRACE } from "@/components/svg/ClothMap"
 import { useCaptureLog, CaptureLogScrubber, CaptureLogRows, CaptureLogDownload } from "@/components/ui/HistoryPanel"
 import ConceptName from "@/components/ui/ConceptName"
 import { conceptNameText } from "@/lib/conceptName"
@@ -34,20 +34,14 @@ import { conceptNameText } from "@/lib/conceptName"
  */
 const SHOW_PROMPTS = false
 /**
- * TRACING IS HIDDEN, NOT GONE (TJ, 2026-08-18: "maybe just hide the tracing
- * then, we arent really using it yet").
- *
- * Clicking a concept or an arc on the cloth selected a path and drew it in
- * red, with a legend swatch naming it and a panel offering to make a
- * projection from it. Unused, and it owns the cloth's click — which is the
- * gesture the pair-and-throw is going to want.
- *
- * A flag rather than a deletion, matching SHOW_PROMPTS directly above: the
- * machinery is 36 references across four files, two of them the faculty and
- * admin cloths, and none of that is worth unpicking for a feature that may
- * come back. Flip this to true and the trace returns whole.
+ * `SHOW_TRACE` USED TO BE DECLARED HERE, and it was this station's alone
+ * (2026-08-18: "maybe just hide the tracing then, we arent really using it
+ * yet"). It moved into `ClothMap` when TJ extended the ruling to the other
+ * three cloths — the trace is drawn by the renderer, so one flag there cannot
+ * leave a surface behind. Imported rather than re-declared for the same
+ * reason. It still gates what this file owns: the legend's red swatch, and the
+ * prompts panel's trace-a-prompt behaviour under SHOW_PROMPTS above.
  */
-const SHOW_TRACE: boolean = false
 
 export default function ClothReflection({ onProjectionCreated, showLog = false, sourceId, scopeLabel, onThrowPair }: {
   /**

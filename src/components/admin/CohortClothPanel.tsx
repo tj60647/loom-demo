@@ -6,6 +6,13 @@
 // opens the passages behind it, an arc opens its thread, and the full concept
 // and thread lists sit below the map. Every quote and sentence is shown as
 // the student's own, with attribution — counted and quoted, never judged.
+//
+// SINCE 2026-08-18 THE CHOOSING IS DONE FROM THE LISTS, not from the drawing
+// (TJ: "all cloths hide/disable trace"). `readSel` still does everything it
+// did — the read-out below, the lit row in each list — but the cloth no longer
+// sets it, because setting it was tracing. The lists carry every concept and
+// every thread, so nothing became unreachable; the copy on this page said
+// "click a concept on the cloth" in four places and now says where to click.
 
 import { useMemo, useState } from "react"
 import ClothMap from "@/components/svg/ClothMap"
@@ -153,7 +160,7 @@ export default function CohortClothPanel({
   } else {
     pane = (
       <p className="empty" style={{ marginTop: "16px" }}>
-        Click a concept to open the passages behind it, or an arc to read its thread.
+        Pick a concept or a thread from the lists below to read it out here.
       </p>
     )
   }
@@ -165,11 +172,14 @@ export default function CohortClothPanel({
           <span className="label">The collective cloth</span>
           <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
             {state.concepts.length} concepts, {state.edges.length} threads, {state.passages.length} passages.
-            Click a concept to open its passages; click an arc to read the thread.
+            Pick a concept or a thread from the lists below to read it out here.
           </span>
         </div>
         <div id="mapWrap">
-          <ClothMap state={state} readSel={readSel} setReadSel={setReadSel} />
+          {/* The drawing, and only the drawing. `readSel` is still this
+              panel's — it lights a row in each list below and fills the
+              read-out — but the cloth neither draws it nor sets it. */}
+          <ClothMap state={state} readSel={null} setReadSel={() => {}} />
         </div>
         {pane}
       </div>
@@ -180,8 +190,8 @@ export default function CohortClothPanel({
             Concepts <span className="n">{state.concepts.length}</span>
           </h2>
           <p className="hint">
-            Every concept in the cohort&apos;s weave, in projection order. Click one to light it on the
-            cloth and open the passages behind it.
+            Every concept in the cohort&apos;s weave, in projection order. Click one to open the
+            passages behind it.
           </p>
           {state.concepts.length === 0 ? (
             <p className="empty">Nothing woven yet.</p>
@@ -212,7 +222,7 @@ export default function CohortClothPanel({
           </h2>
           <p className="hint">
             Every thread thrown across the cohort — each in its student&apos;s own sentence. Click
-            one to trace it on the cloth.
+            one to read it out above.
           </p>
           {state.edges.length === 0 ? (
             <p className="empty">Nothing thrown yet.</p>
