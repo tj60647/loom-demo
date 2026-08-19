@@ -197,6 +197,46 @@ main.station-work{--measure:1680px}
 .panel{display:none} .panel.active{display:block}
 /* 00 · Reading hands its whole height to the viewer, which scrolls itself.
    No padding, no page scroll — the text is the thing on this station. */
+/* THE STATION DOES NOT SCROLL; ITS COLUMNS DO (TJ, 2026-08-18: "the main
+   window should not scroll, that the warp, throw a thread, and threads in this
+   reading cards all fit in the window, and they may have panels that scroll",
+   and "same with vocabulary").
+
+   Two things scrolled at once before this. Measured at 1280x800: the station
+   was 707px tall against 845px of content — 138px of it, and 86px of that is
+   `main`'s own bottom padding (line 193) — while each column ALSO scrolled
+   inside a `.scrollbox` whose height is a fixed clamp (238), 52vh here,
+   independent of the room actually available. So the page scrolled to reveal
+   boxes that were themselves scrolling.
+
+   The arrangement is the one 01 · Reading already uses two rules below: the
+   panel takes the station's height, the grid takes what the header leaves, and
+   each scrollbox takes what its own column head leaves.
+
+   `:has()` keeps this off 03 · Knowledge Graph, whose panel is a board and not
+   a column grid — it opts in by containing `.three` or `.two`, so nothing else
+   on the station has to know about it. */
+main.station-work:has(> .panel.active > .three, > .panel.active > .two){
+  overflow:hidden;padding-bottom:24px}
+main.station-work > .panel.active:has(> .three, > .two){
+  display:flex;flex-direction:column;height:100%;min-height:0}
+main.station-work > .panel.active > .three,
+main.station-work > .panel.active > .two{flex:1 1 auto;min-height:0}
+main.station-work > .panel.active > .three > *,
+main.station-work > .panel.active > .two > *{
+  display:flex;flex-direction:column;min-height:0}
+/* The box gives up its clamp and takes the room its column has left. */
+main.station-work > .panel.active > .three .scrollbox,
+main.station-work > .panel.active > .two .scrollbox{
+  flex:1 1 auto;min-height:120px;max-height:none}
+/* The bench is the one column with no scrollbox — its tail is `.sleeper`, the
+   sentence field and the throw controls, 460px of it measured at 1280x800
+   against a column with 588px to give. It takes the remainder and scrolls
+   itself, like the boxes beside it; without this the whole station scrolled by
+   131px at the desktop floor and nowhere above it, which is the worst kind of
+   layout bug to catch by eye. */
+main.station-work > .panel.active > .three > #throwBench > .sleeper{
+  flex:1 1 auto;min-height:0;overflow-y:auto}
 main.station-reading{padding:0;overflow:hidden}
 main.station-reading>.panel.active{height:100%}
 /* Both grids fold on the COLUMN's own minimum, not on a device width
@@ -389,12 +429,17 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
   min-width:92px;
   background:none;border:0;border-left:1px solid var(--rule);border-radius:0 3px 3px 0;
   padding:0 10px;margin:-9px 0;cursor:pointer;font-family:var(--mono);font-size:9.5px;
-  letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);white-space:nowrap}
+  letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;
+  /* A HINT OF OCHRE at rest (TJ, 2026-08-18), not only on hover: ochre is the
+     warp's colour and this button is the warp's one act, so the end of the row
+     should read as belonging to it before you touch it. Faint enough that the
+     picked state — a solid ochre fill — is still the loud one. */
+  background:rgba(168,132,63,.07);color:#8a7647}
 /* The ochre it always had (TJ liked it): ochre type on hover, ochre fill when
    picked. What changed with the full-height button is that the outline became
    the row's own edge, so the hover reads as a tint behind ochre text rather
    than as a pill outlining itself. */
-.cselect:hover,.cselect:focus-visible{background:rgba(168,132,63,.12);color:var(--ochre)}
+.cselect:hover,.cselect:focus-visible{background:rgba(168,132,63,.18);color:var(--ochre)}
 .ywcard.ywpick.picked .cselect{background:var(--ochre);color:var(--paper);border-left-color:var(--ochre)}
 /* Open, the head is no longer the card's bottom edge, so the button squares
    off with it. */
