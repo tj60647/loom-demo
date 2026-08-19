@@ -77,6 +77,9 @@ export default defineConfig({
   
   /* Global setup to handle authentication bypass */
   globalSetup: require.resolve('./playwright/global-setup'),
+  // Runs whatever happened — the failing run is the one that skipped its own
+  // cleanup, so this is the only place the sweep can be reliable.
+  globalTeardown: require.resolve('./playwright/global-teardown'),
   
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {

@@ -39,7 +39,8 @@
     "check:auth:db": "tsx scripts/check-auth.ts --db",
     "check:crops": "tsx scripts/check-crops.ts",
     "check:overlay": "tsx scripts/check-overlay.ts",
-    "check:workflows": "tsx scripts/check-workflows.ts"
+    "check:workflows": "tsx scripts/check-workflows.ts",
+    "clean:fixtures": "tsx scripts/clean-fixtures.ts"
   },
   "dependencies": {
     "@auth/core": "^0.34.3",
