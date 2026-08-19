@@ -394,28 +394,54 @@ export default function SpreadCanvasView({
    * unfocused reading surface gives space to the hand.
    */
   const spaceHeld = useRef(false);
+  /** Is the pointer on the canvas? See the space guard below. */
+  const overRef = useRef(false);
   useEffect(() => {
     const setHeld = (on: boolean) => {
       if (spaceHeld.current === on) return;
       spaceHeld.current = on;
       viewportRef.current?.classList.toggle("space-pan", on);
     };
+    /**
+     * SPACE PANS WHEN THE POINTER IS ON THE READING (TJ, 2026-08-19: "when I
+     * am over selectable text and press spacebar I should see the drag icon,
+     * right? not the cursor?").
+     *
+     * It did not, and the CSS was never the reason — the .space-pan rules were
+     * always there. The class simply never went on, because this guard treated
+     * a focused BUTTON as "somebody is using the keyboard". Measured: on
+     * arrival document.activeElement is the station nav button, so space-pan
+     * was dead from the moment the reading opened and stayed dead until you
+     * happened to click something that took focus to BODY. With focus blurred
+     * it worked perfectly, which is why it looked intermittent rather than
+     * broken.
+     *
+     * Text entry still wins outright and always will: a space typed into a
+     * note is a space, never a pan. What changed is the button half. Space on
+     * a focused control is a real activation and a keyboard user needs it, so
+     * it is not simply dropped — it yields only while the POINTER is over the
+     * reading surface, which is the one moment the reader has plainly said
+     * where their attention is. A keyboard user with the mouse parked
+     * elsewhere keeps space for the button, as they should.
+     */
+    const typing = (el: Element | null) =>
+      !!el &&
+      (el.tagName === "INPUT" ||
+        el.tagName === "TEXTAREA" ||
+        el.tagName === "SELECT" ||
+        (el as HTMLElement).isContentEditable);
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== " " || e.repeat) return;
-      const active = document.activeElement as HTMLElement | null;
-      const interactive =
-        !!active &&
-        (active.tagName === "INPUT" ||
-          active.tagName === "TEXTAREA" ||
-          active.tagName === "SELECT" ||
-          active.tagName === "BUTTON" ||
-          active.tagName === "A" ||
-          active.tagName === "SUMMARY" ||
-          active.isContentEditable);
-      if (interactive) return;
+      if (typing(document.activeElement)) return;
+      if (!overRef.current) return;
       e.preventDefault();
       setHeld(true);
     };
+    const el = viewportRef.current;
+    const onEnter = () => { overRef.current = true; };
+    const onLeave = () => { overRef.current = false; setHeld(false); };
+    el?.addEventListener("pointerenter", onEnter);
+    el?.addEventListener("pointerleave", onLeave);
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === " ") setHeld(false);
     };
@@ -426,6 +452,8 @@ export default function SpreadCanvasView({
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
     return () => {
+      el?.removeEventListener("pointerenter", onEnter);
+      el?.removeEventListener("pointerleave", onLeave);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);

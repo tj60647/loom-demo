@@ -420,6 +420,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * scrolls; this gives the scroll a hand.
    */
   const pageSpaceHeld = useRef(false);
+  /** Is the pointer on the stage? See the space guard below. */
+  const pageOverRef = useRef(false);
   useEffect(() => {
     if (viewMode !== "page") return;
     const setHeld = (on: boolean) => {
@@ -427,19 +429,36 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       pageSpaceHeld.current = on;
       stageRef.current?.classList.toggle("space-pan", on);
     };
+    /**
+     * SPACE PANS WHEN THE POINTER IS ON THE PAGE — the same rule the canvas
+     * uses, and it moved for the same measured reason (TJ, 2026-08-19: "when I
+     * am over selectable text and press spacebar I should see the drag icon").
+     *
+     * The .space-pan CSS was always right; the class never went on. This guard
+     * counted a focused BUTTON as keyboard use, and on arrival
+     * document.activeElement IS the station nav button — so space-pan was dead
+     * from the moment the reading opened until something happened to move focus
+     * to BODY. Blurred, it worked perfectly, which is why it read as flaky.
+     *
+     * Text entry still wins outright: a space typed into a note is a space.
+     * Space on a focused button is a real activation too, so it is not dropped
+     * — it yields only while the pointer is over the stage, which is the reader
+     * saying where they are looking.
+     */
+    const typing = (el: Element | null) =>
+      !!el &&
+      (el.tagName === "INPUT" ||
+        el.tagName === "TEXTAREA" ||
+        el.tagName === "SELECT" ||
+        (el as HTMLElement).isContentEditable);
+    const onEnter = () => { pageOverRef.current = true; };
+    const onLeave = () => { pageOverRef.current = false; setHeld(false); };
+    stageRef.current?.addEventListener("pointerenter", onEnter);
+    stageRef.current?.addEventListener("pointerleave", onLeave);
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== " " || e.repeat) return;
-      const active = document.activeElement as HTMLElement | null;
-      const interactive =
-        !!active &&
-        (active.tagName === "INPUT" ||
-          active.tagName === "TEXTAREA" ||
-          active.tagName === "SELECT" ||
-          active.tagName === "BUTTON" ||
-          active.tagName === "A" ||
-          active.tagName === "SUMMARY" ||
-          active.isContentEditable);
-      if (interactive) return;
+      if (typing(document.activeElement)) return;
+      if (!pageOverRef.current) return;
       e.preventDefault();
       setHeld(true);
     };
@@ -449,6 +468,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
     return () => {
+      stageRef.current?.removeEventListener("pointerenter", onEnter);
+      stageRef.current?.removeEventListener("pointerleave", onLeave);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
