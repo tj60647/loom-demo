@@ -23,7 +23,7 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
  * exact case this spec is trying to tell apart.
  */
 test.describe('Add concept beside the passage', () => {
-  test('the + opens a card in the margin, files a concept, refuses a duplicate, and the card deletes itself only when asked', async ({ page }) => {
+  test('the + opens a card in the margin, files a concept, refuses a duplicate, takes a note in place, and the card deletes itself only when asked', async ({ page }) => {
     // One journey: capture → rail → open the card → coin → reuse-refusal →
     // dismissal → cleanup, against a dev server that compiles on demand.
     test.setTimeout(120_000);
@@ -129,6 +129,50 @@ test.describe('Add concept beside the passage', () => {
     await editor.getByLabel('Concept label').press('Escape');
     await expect(editor).toBeHidden({ timeout: 5000 });
     await expect(stack.locator('.pdf-railcard-chip')).toHaveCount(2);
+
+    /**
+     * THE NOTE IS WRITTEN ON THE CARD (TJ, 2026-08-19: "the passage rail card
+     * passage note should be editable in place"). It used to be a door: the
+     * only way to write one was to click through to Your work.
+     *
+     * The height assertion is the one that matters and it is not incidental.
+     * The rails measure card heights and re-pack — railScale shrinks a crowded
+     * side — so a field that grew as you typed would move and rescale the very
+     * card under the cursor. That loop is why the concept editor is a separate
+     * card rather than an inline field (see the comment on the + above), and a
+     * fixed-height note is what buys the exception. If someone makes this
+     * field auto-grow, this is the line that says why they should not.
+     */
+    const noteButton = stack.locator('.pdf-railcard-note');
+    await expect(noteButton).toHaveText('add a passage note');
+    await noteButton.click();
+    const noteField = stack.locator('.pdf-railcard-note-edit');
+    await expect(noteField).toBeFocused({ timeout: 5000 });
+
+    const stackHeight = () => stack.evaluate((el) => (el as HTMLElement).offsetHeight);
+    const hOpen = await stackHeight();
+    await noteField.fill('one line');
+    await noteField.press('End');
+    await page.keyboard.type(' and then several more words, enough to wrap this field past the line it opened on');
+    expect(await stackHeight(), 'typing resized the card — the rail will re-pack under the cursor').toBe(hOpen);
+
+    // Escape abandons it: the field closes and nothing was written.
+    await noteField.press('Escape');
+    await expect(noteField).toBeHidden({ timeout: 5000 });
+    await expect(stack.locator('.pdf-railcard-note')).toHaveText('add a passage note');
+
+    // Blur writes it. Awaiting the POST matters for the same reason the delete
+    // below does: LoomProvider applies the note optimistically, so ending at
+    // the rendered text would let the run tear the passage down mid-write.
+    const noteText = `kept because ${stamp}`;
+    await stack.locator('.pdf-railcard-note').click();
+    const written = page.waitForResponse((r) =>
+      r.request().method() === 'POST' && (r.request().postData() ?? '').includes(noteText)
+    );
+    await stack.locator('.pdf-railcard-note-edit').fill(noteText);
+    await page.keyboard.press('Tab'); // blur without clicking the page under it
+    await written;
+    await expect(stack.locator('.pdf-railcard-note')).toHaveText(noteText, { timeout: 10_000 });
 
     // TEARDOWN THROUGH THE CARD'S OWN "remove passage", which is also the test
     // of it. The rail card gained that control on 2026-08-18 and it asks first

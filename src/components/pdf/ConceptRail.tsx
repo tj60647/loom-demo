@@ -81,6 +81,7 @@ export function RailCardBody({
   addConceptControls,
   onUnfile,
   onRemovePassage,
+  onEditNote,
   readOnly = false,
 }: {
   passage: Passage;
@@ -94,6 +95,11 @@ export function RailCardBody({
   /** Delete the capture, after the shared confirm — see useRemovePassage. */
   onRemovePassage?: (passage: Passage) => void;
   /**
+   * Write the passage's note from the card itself. Given, the note stops being
+   * a door to Your work and becomes a field — see the note block below.
+   */
+  onEditNote?: (passageId: string, note: string) => void;
+  /**
    * No × and no + — the card is only a way IN (TJ, 2026-08-17: "i think that
    * zoomed out editing these things is a bad idea").
    *
@@ -104,6 +110,12 @@ export function RailCardBody({
    */
   readOnly?: boolean;
 }) {
+  const [editingNote, setEditingNote] = useState(false);
+  /** Escape must not save. The field unmounts on cancel, and React does not
+   *  guarantee a blur event on an unmounting node, so the flag is read by the
+   *  blur we trigger ourselves rather than by a race. */
+  const cancelNote = useRef(false);
+  const canEditNote = !readOnly && !!onEditNote;
   return (
     <>
       <div className="pdf-railcard-badges">
@@ -148,14 +160,62 @@ export function RailCardBody({
           empty state says "add a passage note" over a control that will not
           add one — so with nothing written, nothing is drawn. */}
       {(passage.note || !readOnly) && (
-      <button
-        type="button"
-        className={`pdf-railcard-note${passage.note ? "" : " empty"}`}
-        onClick={() => onOpenPassage?.(passage.id)}
-        title={passage.note ? "Open this passage in your work" : "Write a note on this passage"}
-      >
-        {passage.note ? short(passage.note, 140) : "add a passage note"}
-      </button>
+        editingNote ? (
+          /* WRITTEN HERE, not in Your work (TJ, 2026-08-19: "the passage rail
+             card passage note should be editable in place"). Same contract as
+             Your work's field in cards/PassageCard: uncontrolled, saved on
+             blur, and keyed on the SAVED value so the optimistic write cannot
+             go stale without fighting the caret.
+
+             The height is FIXED, and that is the whole reason an inline field
+             is safe here where the concept editor was not. The rails measure
+             card heights and re-pack — railScale shrinks a crowded side — so a
+             field that grew as you typed would move and rescale the very card
+             under the cursor. This one changes the card's height once when it
+             opens and once when it closes, which is the same event the
+             add-concept editor already causes. */
+          <textarea
+            className="pdf-railcard-note-edit"
+            defaultValue={passage.note ?? ""}
+            key={passage.id + ":" + (passage.note ?? "")}
+            placeholder="what struck you, what to come back to"
+            aria-label="Note on this passage"
+            autoFocus
+            onBlur={(e) => {
+              const cancelled = cancelNote.current;
+              cancelNote.current = false;
+              setEditingNote(false);
+              if (!cancelled && e.target.value !== (passage.note ?? "")) {
+                onEditNote?.(passage.id, e.target.value);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                // Stop here: the viewer listens for Escape to leave fullscreen
+                // and to shut the sheet, and neither should happen because
+                // somebody abandoned a note.
+                e.stopPropagation();
+                cancelNote.current = true;
+                e.currentTarget.blur();
+              }
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className={`pdf-railcard-note${passage.note ? "" : " empty"}`}
+            onClick={() => (canEditNote ? setEditingNote(true) : onOpenPassage?.(passage.id))}
+            title={
+              canEditNote
+                ? "Write a note on this passage"
+                : passage.note
+                  ? "Open this passage in your work"
+                  : "Write a note on this passage"
+            }
+          >
+            {passage.note ? short(passage.note, 140) : "add a passage note"}
+          </button>
+        )
       )}
       {/* LAST, SMALLEST, AND IT ASKS (TJ, 2026-08-18: "we should add the small
           remove passage to the passage rail cards with the standard 'are you
@@ -193,6 +253,7 @@ export default function ConceptRails({
   onCreateConcept,
   onAddConcept,
   onEditConcept,
+  onEditNote,
   children,
 }: {
   enabled: boolean;
@@ -212,6 +273,9 @@ export default function ConceptRails({
   onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
   /** Fill a reused concept's empty description — see cards/AddConceptCard. */
   onEditConcept?: (conceptId: string, data: { def: string }) => Promise<void>;
+  /** Write the passage's note from the card. Changes the card's height when it
+   *  opens and closes, like the add-concept editor, and not while typing. */
+  onEditNote?: (passageId: string, note: string) => void;
   children: React.ReactNode;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -487,6 +551,7 @@ export default function ConceptRails({
                   addConceptControls={activeAddPassageId === id ? `add-concept-${id}` : undefined}
                   onUnfile={onUnfile}
                   onRemovePassage={onRemovePassage}
+                  onEditNote={onEditNote}
                 />
               </div>
               {activeAddPassageId === id && onCreateConcept && onAddConcept ? (

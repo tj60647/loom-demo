@@ -193,6 +193,7 @@ export default function SpreadCanvasView({
   onCreateConcept,
   onAddConcept,
   onEditConcept,
+  onEditNote,
   onAspect,
   zoomMultiplier,
   onZoomMultiplier,
@@ -228,6 +229,9 @@ export default function SpreadCanvasView({
   onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
   /** Fill a reused concept's empty description — see cards/AddConceptCard. */
   onEditConcept?: (conceptId: string, data: { def: string }) => Promise<void>;
+  /** Write the passage's note from the card. Changes a card's height when it
+   *  opens and closes, so the rail re-packs then and not while typing. */
+  onEditNote?: (passageId: string, note: string) => void;
   onAspect: (a: number) => void;
   /** The toolbar slider's value: 1 = the whole canvas fits the stage. */
   zoomMultiplier: number;
@@ -1352,6 +1356,7 @@ export default function SpreadCanvasView({
                       addConceptControls={activeAddPassageId === id ? `canvas-add-concept-${id}` : undefined}
                       onUnfile={onUnfile}
                       onRemovePassage={onRemovePassage}
+                      onEditNote={onEditNote}
                       readOnly={seesMoreThanAPage}
                     />
                   </div>

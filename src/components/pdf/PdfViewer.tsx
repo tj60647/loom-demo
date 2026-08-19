@@ -86,7 +86,7 @@ type HighlightEntry = {
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
   onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
-  const { state, scoped, addConcept, editConcept, refilePassage, unfilePassage } = useLoom();
+  const { state, scoped, addConcept, editConcept, refilePassage, unfilePassage, editPassageNote } = useLoom();
   // The confirm and its wording live in the hook, so this button and Your
   // work's make the same promise about what a delete takes with it.
   const removePassageWithConfirm = useRemovePassage();
@@ -1923,6 +1923,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            Missing one is how a control ends up a two-pixel dot at fit-all.
            (No backticks in this block: styled-jsx template literal.) */
         .pdf-spread-canvas .pdf-railcard-note { font-size: calc(11px * var(--invk, 1)); }
+        .pdf-spread-canvas .pdf-railcard-note-edit {
+          font-size: calc(11px * var(--invk, 1));
+          height: calc(68px * var(--invk, 1));
+        }
         .pdf-spread-canvas .pdf-railcard-rm { font-size: calc(9.5px * var(--invk, 1)); }
         .pdf-spread-canvas .pdf-railcard-chip { font-size: calc(10px * var(--invk, 1)); }
         .pdf-spread-canvas .pdf-railcard-add {
@@ -2202,6 +2206,24 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           line-height: 1.4; color: var(--ink-soft); font-style: italic;
         }
         .pdf-railcard-note:hover { background: var(--paper-2); color: var(--ink); }
+        /* The note, being written. Same type and metrics as the resting state
+           so opening the field does not re-set the words, and a FIXED height —
+           see the field's own comment in ConceptRail: a note that grew while
+           you typed would re-pack the rail and rescale the card under the
+           cursor. 68px is four lines at this line-height, which is about what
+           the resting card shows before short() truncates at 140 chars, so the
+           card barely moves when the field opens. */
+        .pdf-railcard-note-edit {
+          display: block; width: 100%; margin-top: 6px; padding: 4px 5px;
+          height: 68px; resize: none; overflow: auto;
+          background: var(--paper-2); color: var(--ink);
+          border: 1px solid var(--rule); border-radius: 3px;
+          font-family: var(--body); font-size: 11.5px; line-height: 1.4;
+          font-style: italic;
+        }
+        .pdf-railcard-note-edit:focus {
+          outline: 2px solid rgba(255, 204, 0, 0.8); outline-offset: -1px;
+        }
         /* Smaller than the note above it and quieter than the badges: the one
            act on this card that destroys something should be the last thing
            the eye reaches, not a target it lands on. The same quiet mono
@@ -2725,6 +2747,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 onCreateConcept={addConcept}
                 onAddConcept={refilePassage}
                 onEditConcept={editConcept}
+                onEditNote={editPassageNote}
               >
                 <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
                   {/* The same slot the matrix reads through, at native tier:
@@ -2828,6 +2851,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               onCreateConcept={addConcept}
               onAddConcept={refilePassage}
               onEditConcept={editConcept}
+              onEditNote={editPassageNote}
               onAspect={acceptAspect}
               manifest={manifest}
               pageImageBase={pageImageBase}
