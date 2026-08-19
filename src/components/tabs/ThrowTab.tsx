@@ -48,7 +48,7 @@ function EmptyState({ caption }: { caption: string }) {
 const STEPS: { label: string; says: string }[] = [
   {
     label: "Pick a concept",
-    says: "Tap a concept in the warp on the left — one you have evidence for in this reading.",
+    says: "Press Select on a concept in the warp — one you have evidence for in this reading.",
   },
   {
     label: "Pick a second",
@@ -166,7 +166,6 @@ export default function ThrowTab() {
 
   // Whole-graph: a concept evidenced in an earlier reading is not evidence-less
   // just because this reading has not quoted it.
-  const passagesOf = (conceptId: string) => state.passages.filter(b => b.conceptIds.includes(conceptId))
   const conceptById = (id: string) => state.concepts.find(c => c.id === id)
 
   const togglePick = (id: string) => {
@@ -326,7 +325,7 @@ export default function ThrowTab() {
   const sent = sentence.trim()
   const railN = (!pairA && !pairB) ? 0 : (!both ? 1 : (!sent ? 2 : 3))
   const doLine = (!pairA && !pairB)
-    ? 'Tap two of your concepts to connect them.'
+    ? 'Select two of your concepts to connect them.'
     : (both ? 'Two picked — now say how they relate, on the right. →' : 'Good — now tap a second.')
 
   const byNamed = (a: { handle: string | null }, b: { handle: string | null }) =>
@@ -369,15 +368,18 @@ export default function ThrowTab() {
    * warp list to use the concept cards from the 'your work' concepts panel …
    * they could be the same card with different color and formatting").
    *
-   * `passages` is the whole loom here because 02 is not reading-scoped, and
-   * `allPassages` goes too so the card's own reckoning of what backs a concept
-   * is the same sum it makes in Your work.
+   * BOTH LISTS ARE ABOUT THE READING (TJ, 2026-08-18: "your work concepts and
+   * the warp concepts are both about the reading"). The warp already listed
+   * `scoped.concepts`, but counted `state.passages` — the whole loom — so the
+   * list was this reading's and the number beside it was not. `passages` is
+   * now the reading's evidence, as in Your work, and `allPassages` is what
+   * lets the card tell "nothing anywhere" from "not in this one".
    */
   const conceptRow = (c: typeof state.concepts[number]) => (
     <ConceptCard
       key={c.id}
       concept={c}
-      passages={passagesOf(c.id)}
+      passages={scoped.passages.filter((b) => b.conceptIds.includes(c.id))}
       allPassages={state.passages}
       concepts={state.concepts}
       titleOf={titleOf}
@@ -552,7 +554,7 @@ export default function ThrowTab() {
           <p className="do">{doLine}</p>
           <p className="hint">
             The concepts <b>this reading</b> evidences — the ones you captured a
-            passage for here. Tap one, then a second.
+            passage for here. Select one, then a second — or tap a name to open it.
           </p>
           {/* Ruled 2026-08-08 (TJ): linking works on this reading's concepts.
               A concept you met elsewhere joins the warp the honest way — you

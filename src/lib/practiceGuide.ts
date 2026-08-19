@@ -171,7 +171,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     moves: [
       {
         sel: "#warp",
-        say: "Tap a concept in the warp, then a second one.",
+        say: "Press Select on a concept in the warp, then on a second one.",
         // The bench says this itself: `.sleeper.asleep` fades and blocks it
         // until both slots are filled.
         done: (doc) => !!doc.querySelector("#throwBench .sleeper:not(.asleep)"),
@@ -188,7 +188,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     ],
     overlay: "mask",
     say:
-      "Tap two concepts in the warp. The bench wakes: say how they hang together — long and awkward is fine — and throw it.",
+      "Select two concepts in the warp. The bench wakes: say how they hang together — long and awkward is fine — and throw it.",
     why: "The sentence IS the thread. A label is a convenience that lets one of your words recur; the claim is the sentence.",
   },
   {

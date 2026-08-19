@@ -174,8 +174,12 @@ test("02 · pick two, say the sentence, throw the thread, label the link — the
 
   const warp = page.locator(".crow")
   await expect(warp.first(), "seed missing — run `npm run seed:demo` first").toBeVisible({ timeout: 15_000 })
-  await warp.filter({ hasText: "object worlds" }).first().click()
-  await warp.filter({ hasText: "artifact as compromise" }).first().click()
+  // Picking is its own control since 2026-08-18: clicking the row OPENS the
+  // concept card, as it does in Your work, and the "select" button loads it
+  // into the bench. One tap used to do both, which is why a dot had to exist
+  // to reach the card at all.
+  await warp.filter({ hasText: "object worlds" }).first().getByRole("button", { name: /select/i }).click()
+  await warp.filter({ hasText: "artifact as compromise" }).first().getByRole("button", { name: /select/i }).click()
   await expect(page.locator(".slot.filled")).toHaveCount(2)
 
   await page.getByPlaceholder("…or just start typing. Long and awkward is fine.").fill(SENTENCE)

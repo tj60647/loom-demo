@@ -147,10 +147,12 @@ test.describe("The guide", () => {
     const warp = page.locator("#warp .crow")
     await expect(warp.first()).toBeVisible({ timeout: 20_000 })
     await ringSits(page, "#warp")
-    expect(await says(page)).toContain("Tap a concept in the warp")
+    expect(await says(page)).toContain("Press Select on a concept in the warp")
 
-    await warp.nth(0).click()
-    await warp.nth(1).click()
+    // Select, not the row: since 2026-08-18 clicking a warp row OPENS the
+    // concept card, as it does in Your work, and picking has its own button.
+    await warp.nth(0).getByRole("button", { name: /select/i }).click()
+    await warp.nth(1).getByRole("button", { name: /select/i }).click()
     await ringSits(page, "#throwBench .form-row")
     expect(await says(page)).toContain("The bench is awake")
 

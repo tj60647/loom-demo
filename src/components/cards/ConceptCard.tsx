@@ -24,9 +24,11 @@
  * sheet, a margin rail and a popover without being re-tuned for each.
  */
 
+import { useState } from "react"
 import type { Concept, Passage } from "@/lib/types"
 import PassageCard from "./PassageCard"
 import ConceptName from "@/components/ui/ConceptName"
+import { conceptNameText } from "@/lib/conceptName"
 
 export type ConceptCardMode =
   /** Shown, never changed — the warp popover at 02. */
@@ -96,6 +98,14 @@ export default function ConceptCard({
   onPick?: () => void
 }) {
   /**
+   * The warp card opens in place, like Your work's (TJ, 2026-08-18: "the dot
+   * isn't needed because, if we are using the same card as in your work,
+   * clicking on the concept opens it"). Held locally because nothing outside
+   * needs to force it — Your work's equivalent lives in OpenTab only because
+   * a refile has to open the row it just filed into.
+   */
+  const [openHere, setOpenHere] = useState(false)
+  /**
    * WHAT THIS CONCEPT IS BACKED BY, worked out here rather than asked for.
    * `here` is what the host gave us — this reading, or the whole loom if the
    * host is not reading-scoped. `loom` is every text the student has read.
@@ -140,17 +150,60 @@ export default function ConceptCard({
     return (
       <div
         data-concept-id={concept.id}
-        className={`crow ywcard ywconcept ywpick ${pick ? "picked" : ""}`}
-        onClick={onPick}
-        title="tap to load into the bench"
+        className={`crow ywcard ywconcept ywpick ${pick ? "picked" : ""} ${openHere ? "open" : ""}`}
       >
-        <div className="lhead">
+        {/* THE HEAD OPENS THE CARD; THE BUTTON PICKS IT. The row used to do
+            both jobs with one tap, which is why a ● had to exist to reach the
+            concept's own card at all. Splitting them lets the warp behave like
+            Your work — click the name, it opens — and gives picking a control
+            that says what it does (TJ, 2026-08-18: "a button pointing to the
+            right that says 'select' or something, and changes the row
+            colour"). */}
+        <div className="lhead" onClick={() => setOpenHere((v) => !v)} aria-expanded={openHere}>
           {/* .clabel as well as .lconcept: six spec files select the warp by
               `.crow` and its name by `.clabel`, and the admin and faculty
               read-only views use `.clabel` for the same object. */}
           <div className="lconcept clabel"><ConceptName concept={concept} /></div>
           {headTag}
+          <button
+            type="button"
+            className="cselect"
+            aria-pressed={!!pick}
+            aria-label={pick ? `Unpick ${conceptNameText(concept)}` : `Select ${conceptNameText(concept)} for the bench`}
+            title={pick ? "take it off the bench" : "load it into the bench"}
+            onClick={(e) => { e.stopPropagation(); onPick() }}
+          >{pick ? "picked" : "select"} <span aria-hidden="true">→</span></button>
         </div>
+        {openHere && (
+          /* What the ● used to show, in place: the gloss first, because half
+             the time it is the whole answer, then the evidence. Read-only —
+             02 is where you link concepts, not where you rename them. */
+          <div className="lbody cbody">
+            {concept.def
+              ? <p className="oconcept-def">{concept.def}</p>
+              : <p className="oconcept-def empty">no working definition yet</p>}
+            {passages.length > 0 ? (
+              <div className="oconcept-evidence">
+                <div className="lgroup">Evidence in this reading</div>
+                {passages.map((p) => (
+                  <PassageCard
+                    key={p.id}
+                    passage={p}
+                    concepts={concepts}
+                    titleOf={titleOf}
+                    hideConceptId={concept.id}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="oconcept-def empty">
+                {loom === 0
+                  ? "No passage backs this yet. You may have named it ahead of its evidence, which is allowed."
+                  : `Backed in your other readings, not in this one — ${loom} passage${loom !== 1 ? "s" : ""} elsewhere.`}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     )
   }

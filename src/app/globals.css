@@ -368,8 +368,20 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    display:flex;justify-content:space-between wraps the head and the evidence
    tag sits against the name instead of at the right edge. */
 .crow.ywcard{display:block;padding:0;border-bottom:0}
-.ywcard.ywpick{cursor:pointer}
 .ywcard.ywpick .lhead{cursor:pointer}
+/* SELECT loads the concept into the bench; the head opens the card. Two jobs,
+   two targets — the row used to do both with one tap, which is why a ● had to
+   exist to reach the card at all. The arrow points at the bench, which is to
+   the right of this column. */
+.cselect{flex:0 0 auto;background:none;border:1px solid var(--rule);border-radius:3px;
+  padding:2px 7px;cursor:pointer;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);white-space:nowrap}
+.cselect:hover,.cselect:focus-visible{border-color:var(--ochre);color:var(--ochre)}
+.ywcard.ywpick.picked .cselect{border-color:var(--ochre);background:var(--ochre);color:var(--paper)}
+/* The opened warp card's body: the gloss and this reading's evidence, which is
+   what the ● used to show in a popover. */
+.ywcard.ywpick .cbody{border-left:0;margin:0;padding:0 12px 12px}
+.ywcard.ywpick .cbody .oconcept-def{font-size:13px;margin:0 0 8px}
 .ywcard.ywpick .clabel{font-size:16px}
 .ywcard.ywpick:hover{background:rgba(168,132,63,.08)}
 .ywcard.ywpick.picked{box-shadow:inset 3px 0 var(--ochre);background:rgba(168,132,63,.1)}
