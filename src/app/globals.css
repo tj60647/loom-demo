@@ -1792,7 +1792,23 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .steprailnote { margin: -8px 0 16px; font-size: 13px; }
 /* Naming a concept before its evidence — a first-class move, so it reads as a
    block with its own label rather than a stray input (TJ, 2026-08-08). */
-.aheadofit { margin-top: 14px; padding-top: 12px; border-top: 1px dotted var(--rule); }
+/* A CARD, not a hairline (TJ, 2026-08-18: "the 'name a concept before its
+   evidence card needs a border to distinguish it from its context, not unlike
+   the other borders throughout the my work and other panels").
+
+   It was a dotted top rule — the same mark `.lrow` used as a row separator, so
+   in Your work's concepts view a FORM was divided from the list above it by the
+   line that means "next row". Behind the two new + controls it had no edge at
+   all and simply began.
+
+   The treatment is `.ywcard`'s, deliberately: paper, a 1px rule, 4px radius and
+   the soft shadow every other card in these panels wears. The 3px spine is
+   ochre — the warp's colour, the one the concept cards already use — because
+   what this coins is a Concept. */
+.aheadofit{margin-top:14px;padding:12px;background:var(--paper);
+  border:1px solid var(--rule);border-left:3px solid var(--ochre);
+  border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.aheadofit > .label:first-child{display:block;margin-bottom:2px}
 
 /* The reading card's cloth row, reworked 2026-08-08 (TJ): the cloth's NAME is
    the affordance, not a count with the name hidden on hover, and "edited …"
