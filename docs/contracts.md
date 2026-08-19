@@ -115,9 +115,12 @@
 > recentred; a settled gesture syncs the multiplier back).
 > Pages are the raster/text-layer split from the stamp above, retargeted
 > analytically off the layout. **Cards follow the toggle into the matrix**:
-> rails flank every spread, and `--invk` counter-scales card text against the
-> two-page fit while cards grow inward over their own pages — at full
-> zoom-out you are reading concepts, not the shrunken text. **Strip is
+> rails flank every spread, and `--k` counter-scales the whole card — text,
+> padding and borders — so it is the size page mode draws it at every zoom,
+> while cards grow inward over their own pages; at full zoom-out you are
+> reading concepts, not the shrunken text. (It was `--invk` until 2026-08-19,
+> which clamped at 1 and so governed only the zoom-out half: a card on a
+> spread came out twice the size of the same card in page mode.) **Strip is
 > hidden** (TJ, 2026-08-10: "the new view supercedes it") — no button sets
 > it; the render branch stays for cheap restoration; page mode holds the
 > phone. Same ground rules: one capture path, display-only, nothing
@@ -366,7 +369,10 @@
 > began". An absolute test would tick the whole guide green on load, which is
 > the specific bug `scripts/check-practice-guide.ts` exists to catch.
 > Two beats cannot be seen in the state and are raised by the interface:
-> `loom:capture-open` from `CaptureModal` (the dialog only opens from a
+> `loom:capture-open` from `CaptureFields` (2026-08-19: the form moved out of
+> the modal so the rail could draw the same one, and the signals went with it —
+> the check reads that file now, because a shell can keep the events while the
+> form the reader uses has lost them) (the form only opens from a
 > selection, so its appearance IS the highlight) and `loom:mapkit-copied` from
 > `MapTab`.
 >
@@ -404,8 +410,8 @@
 > a concept is not mistaken for sorting. `name` demanded a NEW concept, so
 > reusing one — which the dialog's own datalist invites — could never finish
 > it; a passage landing is the test. `capture` latched on the dialog opening,
-> so cancelling left it green; the signal tracks the dialog's life and
-> `CaptureModal` says when it closes. And the 900ms auto-advance is gone: it
+> so cancelling left it green; the signal tracks the capture form's life and
+> `CaptureFields` says when it closes. And the 900ms auto-advance is gone: it
 > re-armed on any state change and threw you forward again whenever you pressed
 > Back.
 >
@@ -491,9 +497,12 @@
 >
 > **A passage does not require a concept** (TJ, 2026-08-12). The model has
 > always said so — an Unlabeled Passage is a legal, first-class state — and
-> `CaptureModal` was the one surface in the app that refused it, holding Save
+> the capture form was the one surface in the app that refused it, holding Save
 > disabled until a name was typed. Save is now always live and reads **"Save
-> unlabeled"** when the field is blank; the concept's own description is not
+> without concept"** when the field is blank — it said "Save unlabeled" until
+> 2026-08-19, which reads as a claim about the whole capture to someone who has
+> just typed a note, and the concept block it refers to is titled "Add a
+> concept"; the concept's own description is not
 > asked for when there is no concept; and the passage carries **its own note**
 > (`#capturePassageNote` → `passage.note`), so what you have to say about the
 > words is not forced through a concept you may not have yet. The toast says
@@ -711,8 +720,8 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | `mergeConcepts` | `sourceId, targetId` | fresh `getUserLoomData()` | one batch: pointers repoint (collisions dropped), edges repoint, target inherits missing def/note, source deleted; prunes views/tiers; `concept.merge` {fromId, fromLabel, intoLabel, pointersMoved} |
 | `deleteConcept` | `id` | void | refuses while an edge endpoint; **passages survive** — join rows cascade, they become Unlabeled; prunes views + map tiers; `concept.delete` |
 | `createPassage` | `{conceptIds?, source, sourceId?, location, content, anchor fields?, note?, question?, isPullQuote?, tier?}` | inserted `Passage` (+`conceptIds`) | zero conceptIds = Unlabeled Passage; passage + pointers land in one `db.batch`; verifies concept ownership; reconciles offsets against `source_page` when hashes agree; `passage.capture` (fires for every capture, named or not — `passage.create` is a historical kind) |
-| `refilePassage` | `passageId, conceptId` | the same `Passage` with the pointer added | inserts one `passage_concept` row (ruling 37 — never copies); throws if already filed; `passage.refile` |
-| `unfilePassage` | `passageId, conceptId` | void | removes one pointer — refilePassage's inverse; the passage survives (possibly as an Unlabeled Passage); OpenTab shows this instead of "remove passage" when a passage has >1 filing; `passage.unfile` |
+| `addPassageConcept` | `passageId, conceptId` | the same `Passage` with the pointer added | inserts one `passage_concept` row (ruling 37 — never copies); throws if already filed; `passage.refile` |
+| `unfilePassage` | `passageId, conceptId` | void | removes one pointer — addPassageConcept's inverse; the passage survives (possibly as an Unlabeled Passage); OpenTab shows this instead of "remove passage" when a passage has >1 filing; `passage.unfile` |
 | `attributePassages` | `passageIds[], sourceId` | count updated | fills `sourceId` **only where NULL**, only by student act, and only to a reading the student may see — `authorizeSourceAccess`. Until 0016-era it checked merely that the id existed, which admitted another student's private upload; `passage.attribute` |
 | `deletePassage` | `id` | void | `passage.delete` |
 | `createEdge` | `{fromId, toId, sentence?}` | inserted `Edge` | sentence defaults `''` (P0.3 — connect first, describe when ready); `edge.throw` |
@@ -1295,6 +1304,6 @@ delete or replace anything.
   the debounced ones flush on `pagehide`, so no known user path hits it — but
   it is Next's bug to fix, not ours to paper over further.
 - ~~Unlabeled Passages are representable and survive import/delete, but no UI creates
-  or displays them yet~~ — **closed 2026-08-12**: `CaptureModal` saves with the
-  concept field blank ("Save unlabeled"), and the map view shows Unlabeled
+  or displays them yet~~ — **closed 2026-08-12**: the capture form saves with the
+  concept field blank ("Save without concept"), and the map view shows Unlabeled
   Passages as a nameable group. The graph-view unattached group is still P1.9.

@@ -45,7 +45,7 @@ what is here is good.
 | 4 | Reading focus | **Dropped** | PR #20, closed unmerged |
 | 13 | `isDeletePost` accepts slug ids | **Refuse** — the bug is not real | nothing to do |
 | 7 | Highlights become paint | **Refuse** — and the real defect is fixed | `feat/reading-toolbar-cleanup` |
-| 8 | Cards edit in place | **Deferred** — "a can of worms" | not started |
+| 8 | Cards edit in place | **Deferred**, then taken in part | the NOTE ships; the concept does not |
 | 9 | The card's subject is the passage | **Deferred with 8** — does not separate | not started |
 | 11 | Zoom floor and ceiling | **Refused** — the current ones are fine | nothing to do |
 | 12 | Trackpad: scroll pans, pinch zooms | **Taken, retuned** (TJ, 2026-08-19) | `SpreadCanvasView.tsx` |
@@ -298,7 +298,24 @@ binding. The card being the primary door does not require the mark to stop being
 a door. Dropping the character offsets from the `aria-label` is fine — offsets
 are noise read aloud.
 
-## 8. Cards edit in place · Take
+## 8. Cards edit in place · Take — half of it shipped 2026-08-19
+
+**TJ, 2026-08-19: "the passage rail card passage note should be editable in
+place."** So the note is written on the card now, in page mode and on the
+canvas, and the reversal this section asked to be recorded IS recorded — at the
+head of `ConceptRail.tsx`, where the 2026-08-09 read-only ruling is written
+down, rather than left to be contradicted by a diff.
+
+What shipped is the NOTE only. The concept's label and description are still
+edited in Your work and in the add-concept card and nowhere else, so concept
+identity keeps the single editing surface the ruling was protecting — a note
+belongs to one passage and can have no such problem. The loop this section's
+own argument turns on is dodged the way the + dodges it, by construction: the
+field is fixed height, so typing changes no height at all, and only opening and
+closing it re-packs the rail. Asserted in `add-concept-card.spec.ts`, which
+fails if the field is ever made to auto-grow.
+
+The original proposal follows.
 
 One shared `RailCard` in both page mode and the canvas. The name commits on
 blur/Enter, the definition saves on a 700ms pause — the original card's save
@@ -656,16 +673,25 @@ route recorded there.
   model does not state — a validation, and a display decision across 67 label
   sites.
 
-**Decided, not built:** rename `refilePassage` to `addPassageConcept` (it ADDS a
-filing; the name says it moves one, and it carries a Capture Log consequence via
-the `passage.refile` kind); filter the coin-a-concept list to concepts not
-already in the reading; auto-populate the description when an existing concept is
-picked.
+**Decided, not built:** ~~rename `refilePassage` to `addPassageConcept`~~ —
+**done 2026-08-19**, 19 sites. The persisted `passage.refile` event kind is
+deliberately NOT renamed: rows already carry that string and HistoryPanel and
+logPhrase read it, so changing it is a migration rather than a rename. Still to
+do: filter the coin-a-concept list to concepts not already in the reading;
+auto-populate the description when an existing concept is picked.
 
-**Housekeeping:** `journey-learner 03` fails on fixture drift (wants 8 seeded
-concepts, the account has 16 — `seed:demo` fixes it and clears the leftover
-carded readings); two dead CSS bits, the `@media (max-width: 900px)` block in
-`PdfViewer.tsx` and `.btn.compact`.
+**Housekeeping**, re-checked 2026-08-19:
+
+- ~~`journey-learner 03` fails on fixture drift~~ — it passes, in three full
+  suite runs on 2026-08-19. Either `seed:demo` was run or the drift cleared;
+  either way the entry no longer describes the repo.
+- `@media (max-width: 900px)` in `PdfViewer.tsx` — still there, and still dead
+  by contracts §2c-iii, which puts the floor at 1280.
+- ~~`.btn.compact`~~ — **not dead.** Grepped 2026-08-19: three live uses in
+  `src/app/admin/page.tsx` (lines 121, 132, 146). Removing it on this line's
+  say-so would have broken the admin roster's buttons. The entry is the kind
+  AGENTS.md warns about — a plausible claim about the system that nobody
+  checked.
 
 ---
 

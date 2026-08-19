@@ -8,9 +8,20 @@
  * reverted off master by 41d5b50 for deploy hygiene); this rebuild keeps its
  * layout algorithm and drops its parallel rendering and capture paths.
  *
- * Read-only by ruling (TJ, 2026-08-09): a card displays and clicks through to
- * Your work — it edits nothing, so concept identity keeps a single editing
- * surface. Anchors are read off the mark.js highlight layer
+ * READ-ONLY BY RULING (TJ, 2026-08-09) — SUPERSEDED IN PART, 2026-08-19. The
+ * ruling was that a card displays and clicks through to Your work, editing
+ * nothing, so concept identity keeps a single editing surface. The passage's
+ * NOTE is now written here (TJ: "the passage rail card passage note should be
+ * editable in place"), which is the reversal ui-cleanup-pass-1.md §8 asked to
+ * be "marked superseded where it is written down, not silently contradicted by
+ * a diff" — this is that mark.
+ *
+ * What the ruling still holds over is the CONCEPT: its label and its
+ * description are edited in Your work and in the add-concept card, nowhere
+ * else, so concept identity keeps its single surface. A note belongs to one
+ * passage and can have no such problem.
+ *
+ * Anchors are read off the mark.js highlight layer
  * (`.loom-passage-highlight`), never re-resolved from offsets: whatever the
  * applier drew — precision or fuzzy — is what a card points at, and the
  * peer-overlay wash (`.loom-overlay-heat`) is deliberately not consulted, so
@@ -100,12 +111,16 @@ export function RailCardBody({
    */
   onEditNote?: (passageId: string, note: string) => void;
   /**
-   * No × and no + — the card is only a way IN (TJ, 2026-08-17: "i think that
-   * zoomed out editing these things is a bad idea").
+   * No ×, no +, no note — out here the card is only a way IN (TJ, 2026-08-17:
+   * "i think that zoomed out editing these things is a bad idea"; and
+   * 2026-08-19, "when zoomed out passage cards need not show their notes").
    *
-   * The canvas sets it while the viewport spans more than one page width. At
-   * that scale you are reading a concept map: the controls are counter-scaled
-   * dots over a page thumbnail, and an unfile is one mis-click from a pan.
+   * The canvas sets it while the viewport spans more than ONE SPREAD — since
+   * 2026-08-19 the test is spreadFitK, not a page width, because a spread with
+   * its rails is 2.72 page widths and the old line put a two-page view outside
+   * the editable band. At that scale you are reading a concept map: the
+   * controls are counter-scaled dots over a page thumbnail, and an unfile is
+   * one mis-click from a pan.
    * Once one page fills the viewport, the same body becomes editable again.
    */
   readOnly?: boolean;
@@ -527,12 +542,16 @@ export default function ConceptRails({
              * highlight IS the passage. It carried a concept label, that
              * concept's gloss, and nothing of the student's own.
              *
-             * THE PASSAGE CARD ITSELF STILL EDITS NOTHING: the note and the
-             * badges are doors to Your work, because cards are CSS-scaled when
-             * a side crowds (`railScale` above) and a field inside this box
-             * would loop — typing grows the card, the height changes the scale,
-             * and the scale moves every card on the side including the one
-             * under the cursor.
+             * THE CARD EDITS ITS NOTE, AND NOTHING ELSE (2026-08-19). The
+             * badges are still doors to Your work. The loop this paragraph
+             * used to give as the reason nothing could be edited here is
+             * real — cards are CSS-scaled when a side crowds (`railScale`
+             * above), so a field that GREW as you typed would move and
+             * rescale the card under the cursor — and the note dodges it the
+             * same way the + does, by construction: the field is
+             * fixed-height, so typing changes no height at all. Opening and
+             * closing it does, which is the same event the editor below
+             * already causes.
              *
              * The + is the exception, and it dodges the loop by construction
              * rather than by argument: its card mounts as a SIBLING inside

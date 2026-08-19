@@ -406,11 +406,18 @@ gaps are now demonstrable rather than suspected:
   the branch's zoomable spread grid now (`spreadLayout.ts` +
   `SpreadCanvasView.tsx`, d3-zoom restored): one transform, Figma-style
   trackpad, slider on the same transform, cards flanking every spread with
-  `--invk` counter-scaling. That closes the "freeform transform canvas +
+  counter-scaling. That closes the "freeform transform canvas +
   counter-scaling" item that 5.5 listed as gated — struck from its list
   below. What remains unported from the spread canvas: the single/spread
   reading sub-modes with masks and snap (page mode already is the focused
-  spread) and the inline draft-card capture (2.1 invariant).
+  spread). **The inline draft-card capture is BUILT, 2026-08-19** — see the
+  note on 5.7 below for why it turned out not to conflict with the 2.1
+  invariant after all.
+  **Counter-scaling is `--k`, not `--invk`, since 2026-08-19.** `--invk` was
+  `max(1, spreadFitK / k)` — clamped at 1, so it held card text at reading size
+  zooming OUT and did nothing zooming IN, and a card on a spread came out twice
+  the size of the identical card in page mode. Dividing by `--k` governs both
+  directions; `--invk` has no consumers and is gone.
 - **5.5 "Spatial" — an EXPERIMENTAL projection kind** (TJ, 2026-08-09: *"put
   the spatial graph view on the pipeline, make it a prototype view"*;
   re-framed under the 2026-08-10 kind-per-projection ruling: Spatial would
@@ -440,9 +447,17 @@ gaps are now demonstrable rather than suspected:
   Connect up / shared layer / discussion) is the Quilt and co-authorship,
   gated by Phase 1's ruling and `overlays.ts` decisions 0/2/3;
   embedding-based placement is red line #6 territory (the prototypes
-  themselves shipped topology stand-ins); the spread canvas's inline
+  themselves shipped topology stand-ins); ~~the spread canvas's inline
   draft-card capture conflicts with the 2.1 invariant (one shared ReuseOffer
-  on all three capture paths); ~~its freeform transform canvas and
+  on all three capture paths)~~ — **built 2026-08-19, and the conflict was not
+  real.** The invariant is ONE SHARED ReuseOffer, not one modal: an inline
+  draft conflicts with it only if it grows its own reuse notice. The rail's
+  draft card ends in the same `addPassage` and reports through the same
+  `onCaptured`, so the one ReuseOffer still sees every capture. The form itself
+  is shared too (`CaptureFields`, rendered by both `CaptureModal` and
+  `DraftCard`), so the two paths cannot drift into asking different questions.
+  The modal survives where there is no rail to draw on — the strip, and page
+  mode below the width that hides rails; ~~its freeform transform canvas and
   counter-scaling zoom-out~~ **built 2026-08-10** — the matrix is that canvas
   now (see 5.4's note); a weekly
   multi-reading scope is representable today (`scopeOf(sourceIds[])`,
