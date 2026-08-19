@@ -33,6 +33,21 @@ import { conceptNameText } from "@/lib/conceptName"
  * a rewrite.
  */
 const SHOW_PROMPTS = false
+/**
+ * TRACING IS HIDDEN, NOT GONE (TJ, 2026-08-18: "maybe just hide the tracing
+ * then, we arent really using it yet").
+ *
+ * Clicking a concept or an arc on the cloth selected a path and drew it in
+ * red, with a legend swatch naming it and a panel offering to make a
+ * projection from it. Unused, and it owns the cloth's click — which is the
+ * gesture the pair-and-throw is going to want.
+ *
+ * A flag rather than a deletion, matching SHOW_PROMPTS directly above: the
+ * machinery is 36 references across four files, two of them the faculty and
+ * admin cloths, and none of that is worth unpicking for a feature that may
+ * come back. Flip this to true and the trace returns whole.
+ */
+const SHOW_TRACE: boolean = false
 
 export default function ClothReflection({ onProjectionCreated, showLog = false, sourceId, scopeLabel }: {
   /**
@@ -434,8 +449,8 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
         ) : (
           <ClothMap
             state={drawn}
-            readSel={readSel}
-            setReadSel={setReadSel}
+            readSel={SHOW_TRACE ? readSel : null}
+            setReadSel={SHOW_TRACE ? setReadSel : () => {}}
             glow={showLog && log.scrubbed && log.glowId ? { id: log.glowId, seq: log.pulse } : null}
           />
         )}
@@ -445,7 +460,9 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
         <span><span className="sw" style={{borderTop: "2px solid var(--ochre)"}}></span>warp — concept</span>
         <span><span className="sw" style={{borderTop: "2px solid var(--sage)"}}></span>labelled link</span>
         <span><span className="sw" style={{borderTop: "2px dashed var(--grey)"}}></span>unlabelled — description only</span>
-        <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>what you&apos;re tracing</span>
+        {SHOW_TRACE && (
+          <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>what you&apos;re tracing</span>
+        )}
       </div>
 
       {/* The log, in the same card as the cloth it describes (TJ, 2026-08-13).
