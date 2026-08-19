@@ -49,7 +49,7 @@ const SHOW_PROMPTS = false
  */
 const SHOW_TRACE: boolean = false
 
-export default function ClothReflection({ onProjectionCreated, showLog = false, sourceId, scopeLabel }: {
+export default function ClothReflection({ onProjectionCreated, showLog = false, sourceId, scopeLabel, onThrowPair }: {
   /**
    * Take the student to the projection they just made (TJ, 2026-08-12:
    * "clicking the create projection button should also navigate us to the new
@@ -70,6 +70,13 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
   sourceId?: string
   /** Readable name for the scope, for the log download's filename. */
   scopeLabel?: string
+  /**
+   * Take a pair picked on the cloth to 02 · Linking, loaded (TJ, 2026-08-18:
+   * "the throw navigate to 02 immediately on clicking the popup"). Without it
+   * the pair is still gathered and drawn — the offer is what disappears,
+   * because a popup whose one button has nowhere to go is a dead control.
+   */
+  onThrowPair?: (fromId: string, toId: string) => void
 } = {}) {
   // The cloth and the counted report are this scope's — the scoped graph's
   // edges have both ends in scope by construction, so every concept lookup
@@ -116,6 +123,133 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
       return [id]
     })
   }, [])
+
+  /** Two picked is the whole condition for the offer. */
+  const offering = pair.length === 2
+  // Off `state`, not `drawn`: a concept the scrubber has folded away is not on
+  // the drawing to be picked, and everything that IS drawn is a live object.
+  const pairName = (id: string) => {
+    const c = state.concepts.find((x) => x.id === id)
+    return c ? conceptNameText(c) : "?"
+  }
+  const popRef = useRef<HTMLDivElement>(null)
+  /** Which pair the open offer is about — read by the toggle listener below. */
+  const shownFor = useRef<string[] | null>(null)
+
+  /**
+   * THE OFFER RIDES THE BROWSER'S TOP LAYER, via the native popover API.
+   *
+   * The lesson is second-hand and paid for: 02's warp popover (`.cpop`, gone
+   * in 14e42ce) was first written as an absolutely-positioned div inside the
+   * list, and it was INVISIBLE — the scrollbox's `overflow:auto` clipped it
+   * and the scrollbox's stacking context painted over it, while every
+   * assertion passed and the screenshot showed nothing. The cloth sits inside
+   * `#mapWrap`, which is `overflow-x:auto` (globals.css), so it is the same
+   * trap. The top layer is clipped by nothing and outranks every z-index.
+   *
+   * `popover="auto"` brings light-dismiss and Escape with it, so there is no
+   * scrim to maintain and no key handler to write — the × below is TJ's, and
+   * additional to both ("there is a 'cancel' x in the popup").
+   *
+   * Positioned from JS, so the UA's centring margin has to go (see .pairpop).
+   */
+  const placePop = useCallback(() => {
+    const pop = popRef.current
+    const host = pairAnchor.current
+    // `isConnected` is the guard that matters: flipping the card to "the
+    // record" unmounts the whole SVG, and the anchor would otherwise be a
+    // detached node reporting a 0,0 rect.
+    if (!pop || !host?.isConnected) return
+    const r = host.getBoundingClientRect()
+    if (!r.width && !r.height) { setPair([]); return }
+    const w = pop.offsetWidth
+    const h = pop.offsetHeight
+    const GAP = 12, EDGE = 12
+    // Centred on the node and ABOVE it: the warp's labels are drawn from each
+    // node down and to the right, so anything hung below covers the names of
+    // the pair it is asking about. Flipped below only when the node sits too
+    // near the top of the window for the card to fit.
+    const left = Math.min(
+      Math.max(r.left + r.width / 2 - w / 2, EDGE),
+      Math.max(window.innerWidth - w - EDGE, EDGE)
+    )
+    const above = r.top - GAP - h
+    const top = above >= EDGE
+      ? above
+      : Math.min(r.bottom + GAP, Math.max(window.innerHeight - h - EDGE, EDGE))
+    pop.style.left = `${Math.round(left)}px`
+    pop.style.top = `${Math.round(top)}px`
+  }, [])
+
+  useEffect(() => {
+    const pop = popRef.current
+    if (!pop) return
+    if (!offering) {
+      if (pop.matches(":popover-open")) pop.hidePopover()
+      return
+    }
+    // Which pair this showing is ABOUT — see the toggle listener below.
+    shownFor.current = pair
+    if (!pop.matches(":popover-open")) pop.showPopover()
+    placePop()
+    // Focus goes INTO the card. Showing a popover from script does not move it
+    // — measured: with the offer up, the first Tab landed on the replay
+    // scrubber below the cloth, so the × and the action were both past the
+    // whole rest of the station. The container takes it (tabIndex -1) rather
+    // than the action button, because a primary action under the cursor that
+    // also answers to Enter is too eager for something that navigates.
+    pop.focus()
+    // Capture:true so the scroll of an ancestor — the station's own `main`, or
+    // `#mapWrap` sideways — is seen, not only the window's.
+    window.addEventListener("scroll", placePop, true)
+    window.addEventListener("resize", placePop)
+    /* AND THE NODE ITSELF MOVING UNDER IT. A window resize re-lays the warp:
+       ClothMap's own ResizeObserver sets a new width and every X is recomputed,
+       which happens in a React render AFTER the resize event this listener
+       hears. Measured at 1280 → 1920 with the offer up: the card stayed put
+       while its node travelled, ending 150px off it. The circle's `cx` is
+       exactly what React rewrites when that lands, so watching the attribute
+       puts the card back at the moment the node arrives — no delay to guess
+       at, and nothing fires when the warp has not moved. */
+    const anchor = pairAnchor.current
+    const moved = anchor ? new MutationObserver(placePop) : null
+    if (anchor && moved) moved.observe(anchor, { attributes: true, attributeFilter: ["cx", "cy", "r"] })
+    return () => {
+      window.removeEventListener("scroll", placePop, true)
+      window.removeEventListener("resize", placePop)
+      moved?.disconnect()
+    }
+  }, [offering, pair, placePop])
+
+  /**
+   * Light-dismiss and Escape close the ELEMENT without going through React, so
+   * the state has to follow the element rather than the other way round.
+   * Closing puts the whole pair down: cancelling is starting over, not
+   * half-remembering one concept you have stopped looking at.
+   *
+   * BUT ONLY THE PAIR THIS SHOWING WAS ABOUT. Clicking a THIRD concept while
+   * the offer is up both light-dismisses and picks, and a bare `setPair([])`
+   * here threw the new pick away — measured in Chromium on the running app:
+   * `click on circle @6110`, then `TOGGLE -> closed @6127`, 17ms later and in
+   * its own task, so the clear always landed last and the first click on a
+   * third node did nothing at all.
+   *
+   * Comparing identity rather than counting or timing makes that
+   * order-independent: every pick mints a new array, so if the pair has moved
+   * on since this showing began it is not this listener's to clear, whichever
+   * of the two events the browser chooses to fire first.
+   */
+  useEffect(() => {
+    const pop = popRef.current
+    if (!pop) return
+    const onToggle = (e: Event) => {
+      if ((e as ToggleEvent).newState !== "closed") return
+      setPair((prev) => (prev === shownFor.current ? [] : prev))
+    }
+    pop.addEventListener("toggle", onToggle)
+    return () => pop.removeEventListener("toggle", onToggle)
+  }, [])
+
   const [drafted, setDrafted] = useState("")
   const [showClothInfo, setShowClothInfo] = useState(false)
   const closeInfoButtonRef = useRef<HTMLButtonElement>(null)
@@ -421,6 +555,54 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
 
   return (
     <>
+      {/* ONE popover element for the whole cloth, not one per node: it lives in
+          the top layer, so there is nothing for a per-node instance to anchor
+          to and every extra one would be a second thing to keep positioned.
+          It renders empty and closed until a pair is complete. */}
+      <div
+        ref={popRef}
+        popover="auto"
+        className="pairpop"
+        role="dialog"
+        aria-label="Link these two concepts"
+        tabIndex={-1}
+      >
+        {offering && (
+          <>
+            {/* TJ asked for this as well as light-dismiss, 2026-08-18: "there
+                is a 'cancel' x in the popup". Escape and a click away already
+                close it; a visible way out is what says so. */}
+            <button
+              type="button"
+              className="iconbtn pairpop-x"
+              aria-label="Cancel — put this pair down"
+              title="put this pair down"
+              onClick={() => setPair([])}
+            >✕</button>
+            {/* The pair, in the order it will arrive in — first picked is the
+                From. Nothing else on screen says which way the thread runs,
+                and the cloth's two rings are deliberately identical. */}
+            <p className="pairpop-pair">
+              <b>{pairName(pair[0])}</b>
+              <span className="pairpop-arr">→</span>
+              <b>{pairName(pair[1])}</b>
+            </p>
+            {onThrowPair && (
+              <button
+                type="button"
+                className="btn mini pairpop-go"
+                onClick={() => {
+                  const [a, b] = pair
+                  setPair([])
+                  onThrowPair(a, b)
+                }}
+              >Link these two on 02 · Linking →</button>
+            )}
+            <p className="pairpop-note">opens with the pair loaded · say how they hang together first</p>
+          </>
+        )}
+      </div>
+
       {/* A note counting the bridges — threads running out of this reading to
           concepts met elsewhere — stood above the card until 2026-08-13 (TJ:
           "i dont think this adds value"). It explained an absence: why the
@@ -451,7 +633,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
             /* It said "Click a concept or arc to trace it" until 2026-08-18,
                which stopped being true the moment SHOW_TRACE went off: the
                click did nothing at all. Now it picks. */
-            : " Click a concept, then shift-click a second, to pick a pair."}
+            : " Click a concept, then shift-click a second, to link them on 02."}
           {showLog && " Scrub below to see how it grew."}
         </span>
         {showLog && log.ready && (

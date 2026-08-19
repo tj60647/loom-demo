@@ -86,7 +86,7 @@ const sortOrder = (concepts: Concept[], order?: string[]): Concept[] => {
   return out
 }
 
-export default function MapTab({ practice = false, focusProjectionId }: {
+export default function MapTab({ practice = false, focusProjectionId, onThrowPair }: {
   /** The practice loom: no Capture Log, which reads the student's real
    *  record over its own route rather than through the provider. */
   practice?: boolean
@@ -96,6 +96,12 @@ export default function MapTab({ practice = false, focusProjectionId }: {
    * happened to be active (TJ, 2026-08-13).
    */
   focusProjectionId?: string
+  /**
+   * Passed straight through to the cloth: a pair picked there goes to 02 ·
+   * Linking, loaded. Threaded rather than handled here because the stations
+   * are the Workbench's tabs, and this component is one of them.
+   */
+  onThrowPair?: (fromId: string, toId: string) => void
 } = {}) {
   const {
     state, scopedState, scope,
@@ -691,6 +697,7 @@ export default function MapTab({ practice = false, focusProjectionId }: {
         showLog={!practice}
         sourceId={soleSourceId(scope) ?? undefined}
         scopeLabel={scopeLabelOf(scope.key, titleOf)}
+        onThrowPair={onThrowPair}
       />
 
       <h2 className="sectionhead" id="projections" ref={projectionsRef} style={{ marginTop: 34 }}>

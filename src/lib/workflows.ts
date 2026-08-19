@@ -118,12 +118,13 @@ const student: Flow = {
     { id: "sort", label: "Sort into tiers, arrange the cards", where: "03 · Knowledge Graph" },
     // "Trace the prompts" until 2026-08-13, when TJ hid the counted-prompts
     // panel so the cloth could take the full column (ClothReflection's
-    // SHOW_PROMPTS). Tracing did not go away — you click a concept or an arc on
-    // the cloth itself — but the prompts that used to name what to trace are
-    // not on screen, and the same rule as the merge control below applies: a
-    // step the student can no longer take would simply be drawn, wrongly,
-    // forever.
-    { id: "write", label: "Trace the cloth, write the one-line and the read", where: "03 · Knowledge Graph" },
+    // SHOW_PROMPTS). Then "Trace the cloth" until 2026-08-18, when tracing
+    // itself went behind SHOW_TRACE (75e005c, 22:21) and the cloth's click
+    // became the pair. That commit did not come here, so between it and this
+    // one the box named a step nobody could take — the exact rot the header of
+    // this file exists to prevent, caught within the day only because the same
+    // feature came back to the same drawing.
+    { id: "write", label: "Pick a pair on the cloth, write the one-line and the read", where: "03 · Knowledge Graph" },
     // "merge duplicates" was the second half of this step until 2026-08-12,
     // when TJ hid the merge control pending what it means and what it costs
     // (VocabularyTab's MERGE_VISIBLE). The diagram is generated, so a step the
@@ -167,6 +168,13 @@ const student: Flow = {
     { from: "typed", to: "link" },
     { from: "link", to: "sort" },
     { from: "sort", to: "write" },
+    // BACK TO 02 FROM THE CLOTH (TJ, 2026-08-18). The picture had one arrow
+    // into Linking, from filing a passage — so 02 read as a station you pass
+    // through once. The cloth is where you SEE two concepts that never
+    // crossed, and since today it can send that pair to the bench with both
+    // ends loaded. A return, so `back`: the checker insists a back edge
+    // actually run uphill, and `write` sits two rows below `link`.
+    { from: "write", to: "link", label: "a pair off the cloth", back: true },
     { from: "write", to: "vocab" },
     { from: "vocab", to: "overlay" },
     // The loop lives at the END of the arc now, not in the middle of it: you go

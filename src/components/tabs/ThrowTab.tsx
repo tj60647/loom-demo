@@ -73,7 +73,15 @@ const STEPS: { label: string; says: string }[] = [
    quoted passage you cannot open is a worse version of the popover it
    replaced (TJ: "clicking on the passage in a concept card should take you to
    the reading passage"). */
-export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: Passage) => void } = {}) {
+export default function ThrowTab({ onGotoPassage, pair }: {
+  onGotoPassage?: (passage: Passage) => void
+  /**
+   * A pair picked on 03's cloth and sent here (TJ, 2026-08-18: "put you in
+   * linking with the 2 concept nodes populating the 'throw a thread'"). In
+   * pick order — first picked is the From.
+   */
+  pair?: readonly [string, string] | null
+} = {}) {
   // Scoped for what this reading is about; whole for anything that has to be
   // TRUE. The thread lists are `scoped` — this reading's own work, and since
   // 2026-08-09 only that — while the evidence check, the duplicate-pair guard
@@ -171,6 +179,42 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
   // Whole-graph: a concept evidenced in an earlier reading is not evidence-less
   // just because this reading has not quoted it.
   const conceptById = (id: string) => state.concepts.find(c => c.id === id)
+
+  /**
+   * THE PAIR ARRIVING FROM THE CLOTH. Loaded into the same two slots the warp
+   * list fills, because it is the same act — the cloth is only a second place
+   * to see which two concepts have never crossed.
+   *
+   * DURING RENDER, not in an effect. React's own "adjusting state when a prop
+   * changes" pattern, and here it is also the only one the lint allows:
+   * `react-hooks/set-state-in-effect` rejects the effect version outright, and
+   * an effect would paint an empty bench for a frame before filling it.
+   *
+   * BY IDENTITY, not by contents. The Workbench mints a fresh tuple on every
+   * press, so picking the same two concepts a second time loads them again,
+   * while merely walking back into 02 does not reload the bench over whatever
+   * the student has picked since.
+   *
+   * The sentence in progress is left alone. Replacing the pair by hand does
+   * not clear it either, and a half-written claim is the student's.
+   */
+  const sentenceRef = useRef<HTMLTextAreaElement>(null)
+  const [loadedPair, setLoadedPair] = useState<readonly [string, string] | null>(null)
+  if (pair && pair !== loadedPair) {
+    setLoadedPair(pair)
+    setPairA(pair[0])
+    setPairB(pair[1])
+    setDrawn(false)
+  }
+  // The popup on the cloth promises "say how they hang together first", so
+  // land in the field that asks for it. After the paint that makes this
+  // station's panel visible — `.panel` hides the others with `display`, and
+  // focus on a display:none element is silently dropped. `preventScroll`
+  // because `main` scrolls here and the bench is already in view.
+  useEffect(() => {
+    if (!loadedPair) return
+    window.setTimeout(() => sentenceRef.current?.focus({ preventScroll: true }), 0)
+  }, [loadedPair])
 
   const togglePick = (id: string) => {
     if (pairA === id) setPairA(null)
@@ -676,6 +720,7 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
                 ))}
               </div>
               <textarea
+                ref={sentenceRef}
                 placeholder="…or just start typing. Long and awkward is fine."
                 value={sentence}
                 onChange={(e) => setSentence(e.target.value)}

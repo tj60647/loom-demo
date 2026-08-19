@@ -678,6 +678,35 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
    broken at exactly the moment the pick landed. The cloth is a picture; the
    names it draws are readable in three other places. */
 #map{display:block;width:100%;height:400px;touch-action:none;user-select:none;-webkit-user-select:none}
+/* The pair's offer. TOP LAYER, via popover="auto" — #mapWrap directly above
+   is overflow-x:auto and would clip an absolutely-positioned card, and its
+   stacking context would let the card's own neighbours paint over it. That is
+   not a prediction: it is what happened to 02's warp popover before it was
+   moved here (the note in ClothReflection's placePop). Positioned from JS, so
+   the UA's centring margin has to go. */
+.pairpop{position:fixed;margin:0;inset:auto;width:290px;max-width:calc(100vw - 24px);
+  /* The two names wrap and nothing truncates them — this is the one place the
+     pair is spelled out in full — so a card is as tall as its concepts are
+     long. The cap is what keeps a pathological pair inside the window. */
+  max-height:70vh;overflow-y:auto;
+  background:var(--paper);color:var(--ink);border:1px solid var(--ink);border-radius:6px;
+  box-shadow:0 12px 34px rgba(0,0,0,.22);padding:13px 15px 12px;font-size:15px}
+.pairpop::backdrop{background:none}
+.pairpop:not(:popover-open){display:none}
+/* `.pairpop .pairpop-x`, not the bare class: `.iconbtn` is defined further
+   down this file (line 815 as this lands), so at equal specificity IT wins and
+   the button goes back to the standing bordered circle. Measured on the
+   running app at 1536: with the bare-class version, 30x30 and a 1px
+   var(--rule) ring (rgb(203,199,186)); with this one, 22x22 and no border. */
+.pairpop .pairpop-x{position:absolute;top:6px;right:6px;width:22px;height:22px;
+  border:none;font-family:var(--mono);font-size:12px}
+/* Room for the ✕ on the first line, so a long concept name does not run under
+   it. The names wrap — this is the one place the pair is named in full, and a
+   truncated name is the thing the card exists to confirm. */
+.pairpop-pair{margin:0 22px 9px 0;font-size:15px;line-height:1.35}
+.pairpop-arr{font-family:var(--mono);color:var(--ochre);margin:0 6px}
+.pairpop-go{width:100%;text-align:center}
+.pairpop-note{margin:8px 0 0;font-size:.72em;line-height:1.4;color:var(--ink-soft)}
 .readitem{padding:10px 0;border-bottom:1px dotted var(--rule)}
 .readitem .trip{font-size:15px;margin-bottom:2px}
 .vpill{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--sage);border:1px solid var(--sage);border-radius:10px;padding:1px 8px}

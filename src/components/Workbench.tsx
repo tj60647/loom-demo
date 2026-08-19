@@ -298,6 +298,38 @@ export default function Workbench({
     setOpenTargetConceptId(null)
   }, [])
 
+  /**
+   * A PAIR PICKED ON 03's CLOTH, ARRIVING AT 02's BENCH (TJ, 2026-08-18: "a
+   * select 2 nodes and throw them which would put you in linking with the 2
+   * concept nodes populating the 'throw a thread'").
+   *
+   * LIFTED STATE, NOT A URL PARAM, and the split this file already draws is
+   * the reason. `handleGotoPassage` above does both in one function: a passage
+   * in ANOTHER reading is `router.push(?passage=…)`, because that is a
+   * different route; a passage in THIS one is local state plus `goTo`. Every
+   * in-workbench station hop takes the second road — this, the two
+   * `handleGotoOpen*` above, `handleGotoVocabulary` — because the stations are
+   * this component's tabs and moving between them is not a navigation.
+   *
+   * 03 → 02 is always the same reading, so it is the second case. Two facts
+   * settle it beyond consistency. `initialTab` seeds `useState` and nothing
+   * syncs it, and `<Workbench>` is keyed by `source.id`, so a same-route push
+   * would re-render the server component without remounting this one and the
+   * station would not change. And a page reading `searchParams` is rendered
+   * dynamically (Next 16 docs, use-search-params.md; `staleTimes.dynamic`
+   * defaults to 0 and is unset in next.config.ts), so every such push is a
+   * server round-trip — against TJ's "navigate to 02 immediately".
+   *
+   * A FRESH TUPLE EVERY PRESS, and that is load-bearing: ThrowTab consumes the
+   * pair by IDENTITY, so pressing the popup twice on the same two concepts
+   * loads the bench twice, while merely walking back into 02 leaves whatever
+   * the student has picked since alone.
+   */
+  const [benchPair, setBenchPair] = useState<readonly [string, string] | null>(null)
+  const handleThrowPair = useCallback((fromId: string, toId: string) => {
+    setBenchPair([fromId, toId])
+    goTo("throw")
+  }, [goTo])
 
   // "See them all in Vocabulary", from the capture side. The tab is this
   // component's state, so it has to be moved from here.
@@ -456,7 +488,9 @@ export default function Workbench({
           </div>
         )}
         <div className={`panel ${activeTab === "throw" ? "active" : ""}`}>
-          {shouldRender("throw") && <ThrowTab onGotoPassage={handleGotoPassage} />}
+          {shouldRender("throw") && (
+            <ThrowTab onGotoPassage={handleGotoPassage} pair={benchPair} />
+          )}
         </div>
         <div className={`panel ${activeTab === "read" ? "active" : ""}`}>
           {/* The station key stays "read" (and so does ?tab=read) — the URL
@@ -467,7 +501,13 @@ export default function Workbench({
           )}
         </div>
         <div className={`panel ${activeTab === "map" ? "active" : ""}`}>
-          {shouldRender("map") && <MapTab practice={practice} focusProjectionId={focus?.projection} />}
+          {shouldRender("map") && (
+            <MapTab
+              practice={practice}
+              focusProjectionId={focus?.projection}
+              onThrowPair={handleThrowPair}
+            />
+          )}
         </div>
       </main>
 
