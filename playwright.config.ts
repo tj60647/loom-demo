@@ -40,6 +40,7 @@ const READ_ONLY = [
   'object-download.spec.ts', // downloads what already exists
   'overlay.spec.ts',         // "Read-only throughout: nothing here writes"
   'pair-and-throw.spec.ts',  // picks, offers, loads the bench — never presses #throwIt
+  'thread-card.spec.ts',     // counts classes on rendered lists; opens no editor
   'pdf-fit.spec.ts',         // fit modes
   'practice-guide.spec.ts',  // "Requires seed:demo. Writes nothing"
   'reading-search.spec.ts',  // "Search is read-only: nothing to clean up"
