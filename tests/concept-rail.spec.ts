@@ -62,7 +62,7 @@ test.describe('Concept rail', () => {
     // has to be opened before the field exists to fill.
     await page.locator('#captureConceptToggle').click();
     await page.locator('#captureConcept').fill(conceptName);
-    await page.locator('button:has-text("Save Passage")').click();
+    await page.locator('#capturePassageSave').click();
     // Wait for the capture FORM to go, not for its heading. The heading only
     // exists in the modal shell, and capture is on the rail here — so a
     // heading matcher would report hidden instantly and hand the rest of the

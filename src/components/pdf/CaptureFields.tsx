@@ -22,7 +22,8 @@
  *     Rename one and the guide highlights nothing, silently.
  *   - `#captureConceptDef` is asserted ABSENT on the unlabeled path
  *     (practice-guide.spec.ts).
- *   - "Save Passage" / "Save unlabeled" are matched as button text by specs.
+ *   - "Save passage" / "Save without concept" are matched as button text by
+ *     specs (practice-guide asserts the second one exactly).
  *   - `loom:capture-open` / `loom:capture-close` are how PracticeGuide knows a
  *     capture is being written. They fire from HERE now, not from the modal,
  *     so the guide keeps working on whichever path the reader is on.
@@ -353,7 +354,17 @@ export default function CaptureFields({
       <div className={variant === "rail" ? "capturefoot capturefoot-rail" : "capturefoot"}>
         <button className="btn ghost" onClick={onClose} disabled={isSubmitting}>Cancel</button>
         <button id="capturePassageSave" className="btn" onClick={handleCapture} disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : conceptLabel.trim() ? "Save Passage" : "Save unlabeled"}
+          {/* WHAT IT LACKS IS A CONCEPT, NOT A LABEL (TJ, 2026-08-19: "save
+              unlabeled seems weird when i type in a note").
+              "Unlabeled" is the model's word for a Passage with no Concepts,
+              and it is right there — but on a button it reads as a claim about
+              the whole capture, and a reader who has just written a note has
+              plainly labelled something. It says which thing is missing now,
+              in the SAME words as the control it refers to: the block above is
+              "Add a concept", so "Save without concept" is the same sentence
+              finished. The toast and Your work keep the model's term, where it
+              names an object rather than describing a keystroke. */}
+          {isSubmitting ? "Saving..." : conceptLabel.trim() ? "Save passage" : "Save without concept"}
         </button>
       </div>
     </>

@@ -86,12 +86,12 @@ test.describe('PDF Viewer and Highlighting', () => {
       await page.locator('#captureConceptToggle').click();
       await page.locator('#captureConcept').fill(conceptName);
 
-      const saveButton = page.locator('button:has-text("Save Passage")');
+      const saveButton = page.locator('#capturePassageSave');
       await saveButton.click();
 
       // Wait for the capture FORM to go, not for the button's text: while the
       // save is in flight the button reads "Saving..." — which makes a
-      // "Save Passage" locator report hidden while the form is still up,
+      // a text locator report hidden while the form is still up,
       // swallowing every click that follows. And not for the heading either:
       // that belongs to the modal shell alone, so it reports hidden instantly
       // on the rail path and proves nothing. #capturePassageSave unmounts only

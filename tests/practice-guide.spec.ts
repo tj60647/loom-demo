@@ -450,7 +450,11 @@ test.describe("The guide", () => {
     // No concept. The button says so, and the note is the whole of what this
     // capture carries.
     await expect(page.locator("#capturePassageSave")).toBeEnabled()
-    await expect(page.locator("#capturePassageSave")).toHaveText("Save unlabeled")
+    // It names the ONE thing this capture is going without, in the same words
+    // as the disclosure it refers to (2026-08-19). Not "unlabeled": the reader
+    // has a note typed by now, so a button calling the whole thing unlabelled
+    // is describing something that is not true of what is on screen.
+    await expect(page.locator("#capturePassageSave")).toHaveText("Save without concept")
     // The concept's own description is not asked for when there is no concept.
     // Twice over now: it renders only once a label is typed, AND it sits inside
     // the closed disclosure. Count, not visibility, so this keeps meaning what
