@@ -55,7 +55,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
   // duplicate instead of joining its evidence (spec §2 identity).
   const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, removePassage, refilePassage, unfilePassage, editPassageNote, flash } = useLoom()
   const { byId, titleOf } = useReadings()
-  const { confirm, notify } = useDialog()
+  const { confirm } = useDialog()
   const activeSourceId = soleSourceId(scope)
   const activeReading = activeSourceId ? byId.get(activeSourceId) : undefined
   // Working inside a reading, the citation is already known — offer it rather
@@ -87,8 +87,9 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
     where: string[]
     filledDescription: string
   } | null>(null)
-  const [refileInputs, setRefileInputs] = useState<Record<string, string>>({})
-  const [refileBusy, setRefileBusy] = useState<Record<string, boolean>>({})
+  /** Which passage's add-concept card is open. One at a time across the whole
+   *  list: several open editors in a scrolling column is a form, not a card. */
+  const [addConceptFor, setAddConceptFor] = useState<string | null>(null)
   /** Which end of the join this panel is reading from — see the note by
    *  `passagesAZ`. Declared with the rest of the state because two focus
    *  effects set it, and both run above where the list is built. */
@@ -120,7 +121,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
       {/* Blank labels are FILTERED, never placeheld: an <option value> is what
           lands in the field and is then matched by findConcept to reuse or coin,
           so "(unlabeled concept)" here would mint a Concept by that name. Same
-          guard, same reason, as AddConceptRailCard.tsx. */}
+          guard, same reason, as cards/AddConceptCard.tsx. */}
       {sortedByLabel(state.concepts).filter(c => c.label.trim()).map(c => <option key={c.id} value={c.label} />)}
     </datalist>
   )
@@ -322,43 +323,16 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
                 </div>  )
 
 
-  const handleRefile = async (b: Passage) => {
-    if (refileBusy[b.id]) return
-    const first = b.conceptIds.length === 0
-    const nm = (refileInputs[b.id] ?? "").trim()
-    if (!nm) {
-      await notify({
-        title: first ? "Type a concept first." : "Type the second concept first.",
-        body: first
-          ? "Type the concept this passage evidences, then add it."
-          : "Type the concept this passage also evidences, then add it.",
-      })
-      return
-    }
-    let concept = findConcept(nm)
-    if (concept && b.conceptIds.includes(concept.id)) {
-      await notify({
-        title: "Already filed under that concept.",
-        body: `This passage is already evidence for “${concept.label}”.`,
-      })
-      return
-    }
-    setRefileBusy(prev => ({ ...prev, [b.id]: true }))
-    try {
-      if (!concept) {
-        concept = await addConcept(nm)
-      }
-      await refilePassage(b.id, concept.id)
-      setRefileInputs(prev => ({ ...prev, [b.id]: "" }))
-      setOpenLogRows(prev => ({ ...prev, [concept!.id]: true }))
-      flash(first ? `named — filed under “${concept.label}”` : "filed under a second concept")
-    } catch {
-      // refilePassage resyncs and flashes the server message before rethrowing;
-      // swallow here to avoid an unhandled rejection.
-    } finally {
-      setRefileBusy(prev => ({ ...prev, [b.id]: false }))
-    }
-  }
+  /* handleRefile lived here until 2026-08-18. It backed the labelled text
+     input and `add` button in the passage row — a second, thinner way to do
+     what the margin card already did with a + and a card: no description
+     field, no picker, and it told you a concept was already filed only after
+     you had pressed. Both are now one AddConceptCard (TJ: "use the add concept
+     to passage card when + is pressed"). Two behaviours went with it and are
+     not missed here: its own flash ("named — filed under X"), since
+     refilePassage already flashes through LoomProvider; and forcing the new
+     concept's row open in the CONCEPTS view, which is a different view than
+     the one the act now happens in. */
 
   /* handleRemoveConcept lived here. It moved out with the button on
      2026-08-17: deleting a concept is 04 · Vocabulary's act, and VocabularyTab
@@ -919,14 +893,15 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
               mode="edit"
               onGoto={onGotoPassage}
               edit={{
-                listId,
-                refileValue: refileInputs[b.id] ?? "",
-                refileBusy: !!refileBusy[b.id],
-                onRefileChange: (v) => setRefileInputs(prev => ({ ...prev, [b.id]: v })),
-                onRefile: () => handleRefile(b),
                 onEditNote: (note) => editPassageNote(b.id, note),
                 onUnfile: (conceptId) => unfilePassage(b.id, conceptId),
                 onRemove: () => removePassage(b.id),
+                addOpen: addConceptFor === b.id,
+                onToggleAdd: () => setAddConceptFor(cur => cur === b.id ? null : b.id),
+                onCloseAdd: () => setAddConceptFor(null),
+                onCreateConcept: addConcept,
+                onAddConcept: refilePassage,
+                onEditConcept: editConcept,
               }}
             />
           ))}

@@ -19,7 +19,7 @@
  * All geometry is derived for display and discarded (red line #7; MapTab's
  * drift grid is the precedent). The geometry still writes nothing; the cards
  * do, since 2026-08-18 — the + opens one add-concept card beside the passage
- * (AddConceptRailCard), which coins or reuses a Concept and files it.
+ * (cards/AddConceptCard), which coins or reuses a Concept and files it.
  */
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -28,7 +28,7 @@ import { layoutRail, railScale } from "@/lib/railLayout";
 import { short } from "@/lib/clothMath";
 import ConceptName from "@/components/ui/ConceptName";
 import { conceptNameText } from "@/lib/conceptName";
-import AddConceptRailCard from "./AddConceptRailCard";
+import AddConceptCard from "@/components/cards/AddConceptCard";
 
 export const RAIL_W = 220;
 const CARD_GAP = 12;
@@ -184,7 +184,7 @@ export default function ConceptRails({
   onUnfile?: (passageId: string, conceptId: string) => void;
   onCreateConcept?: (label: string, def?: string) => Promise<Concept>;
   onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
-  /** Fill a reused concept's empty description — see AddConceptRailCard. */
+  /** Fill a reused concept's empty description — see cards/AddConceptCard. */
   onEditConcept?: (conceptId: string, data: { def: string }) => Promise<void>;
   children: React.ReactNode;
 }) {
@@ -427,7 +427,7 @@ export default function ConceptRails({
              * `.pdf-railcard-stack`, so the passage card's own height never
              * changes. The stack's does, which is why `passageCardHeights` is
              * measured separately for the leader line. The editor's fields are
-             * fixed-height (`AddConceptRailCard.module.css`: the textarea is
+             * fixed-height (`cards/AddConceptCard.module.css`: the textarea is
              * `min-height: 52px`, `resize: vertical`, and does not auto-grow),
              * so typing in it does not reflow the rail either. Opening and
              * closing it does — a known displacement, not yet fixed.
@@ -464,13 +464,14 @@ export default function ConceptRails({
               </div>
               {activeAddPassageId === id && onCreateConcept && onAddConcept ? (
                 <div id={`add-concept-${id}`} className="pdf-add-concept-host">
-                  <AddConceptRailCard
+                  <AddConceptCard
                     passage={c.passage}
                     concepts={concepts}
                     onCreateConcept={onCreateConcept}
                     onAddConcept={onAddConcept}
                     onEditConcept={onEditConcept}
                     onClose={() => closeAddConcept(id)}
+                    joined
                   />
                 </div>
               ) : null}

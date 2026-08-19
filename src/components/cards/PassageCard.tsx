@@ -19,14 +19,16 @@
  * every block that row carried — TJ asked for the panel's "more verbose form"
  * expressly — and it keeps `.lrow.loose` on the wrapper, which is not
  * decoration: `.passage` and `.src` have NO base rule in globals.css, only the
- * descendant selectors `.lrow.loose .passage` (316) and `.lrow.loose .src`
- * (317), so dropping that class would strip the type silently. Eleven spec
- * files also bind to `.lrow`, `.passage.isdoor` and `data-passage-id`.
+ * descendant selectors `.lrow.loose .passage` and `.lrow.loose .src`, so
+ * dropping that class would strip the type silently. (Grep the selectors, not
+ * a line number — the numbers here were already 37 off before this file was
+ * touched again.) Eleven spec files also bind to `.lrow`, `.passage.isdoor`
+ * and `data-passage-id`.
  *
- * State stays in OpenTab. This card takes values and callbacks, because the
- * row's state is not the row's: `handleRefile` runs a duplicate check and a
- * create-if-missing, the note is optimistic in LoomProvider while the refile
- * is not, and OpenTab's focus effects reach in by `[data-passage-id]`.
+ * State stays in OpenTab. This card takes callbacks, because the row's state
+ * is not the row's: the note is written optimistically by LoomProvider while
+ * the refile is not, only one add-concept card may stand open across the whole
+ * list, and OpenTab's focus effects reach in by `[data-passage-id]`.
  *
  * Deliberately width-fluid, with no fixed type sizes of its own. These homes
  * are at very different measures (a 460px sheet, a margin rail, a popover in
@@ -34,8 +36,10 @@
  * narrowest of them.
  */
 
+import { useId, useLayoutEffect, useRef } from "react"
 import type { Concept, Passage } from "@/lib/types"
 import ConceptName from "@/components/ui/ConceptName"
+import AddConceptCard from "./AddConceptCard"
 import { conceptNameText } from "@/lib/conceptName"
 
 export type PassageCardMode =
@@ -45,17 +49,17 @@ export type PassageCardMode =
   | "edit"
 
 export type PassageCardEdit = {
-  /** The shared concept datalist. A PROP, never hardcoded: OpenTab uses two
-   *  different ids because VocabularyTab declares one of the same name and
-   *  both tabs are kept alive — a bug that already shipped once. */
-  listId: string
-  refileValue: string
-  refileBusy: boolean
-  onRefileChange: (value: string) => void
-  onRefile: () => void
   onEditNote: (note: string) => void
   onUnfile: (conceptId: string) => void
   onRemove: () => void
+  /** The + beside the chips is a toggle, and only one card is open at a time —
+   *  the list would otherwise grow several editors deep. */
+  addOpen: boolean
+  onToggleAdd: () => void
+  onCloseAdd: () => void
+  onCreateConcept: (label: string, def?: string) => Promise<Concept>
+  onAddConcept: (passageId: string, conceptId: string) => Promise<Passage>
+  onEditConcept?: (conceptId: string, data: { def: string }) => Promise<void>
 }
 
 export default function PassageCard({
@@ -89,6 +93,26 @@ export default function PassageCard({
   /** Required by `mode="edit"`; ignored otherwise. */
   edit?: PassageCardEdit
 }) {
+  /**
+   * The + gets focus back when the card it opened goes away — the same restore
+   * the margin rail does with `restoreAddFocusFor` (ConceptRail.tsx), written
+   * locally here because this card owns exactly one +. Without it a keyboard
+   * user who pressed Escape or committed was returned to <body>, at the top of
+   * a panel they had scrolled down.
+   *
+   * `wasOpen` is what keeps this from stealing focus on mount: the effect must
+   * fire on the true -> false transition only, not on every render with the
+   * card shut.
+   */
+  const addButtonRef = useRef<HTMLButtonElement | null>(null)
+  const wasOpen = useRef(false)
+  const addCardId = useId()
+  const addOpen = mode === "edit" && !!edit?.addOpen
+  useLayoutEffect(() => {
+    if (wasOpen.current && !addOpen) addButtonRef.current?.focus()
+    wasOpen.current = addOpen
+  }, [addOpen])
+
   const filedUnder = concepts.filter(
     (c) => passage.conceptIds.includes(c.id) && c.id !== hideConceptId
   )
@@ -131,16 +155,17 @@ export default function PassageCard({
             typed reading has no page at all. */}
         <div className="src">{passage.source || "—"}{passage.location ? ` · ${passage.location}` : ""}</div>
 
-        {/* THREE BLOCKS, EACH ABOUT ONE THING (TJ, 2026-08-17: "the passage
-            concepts is a little confusing, there are concept badges, remove
-            passage, and then add concept. this need better structure").
+        {/* BLOCKS, EACH ABOUT ONE THING (TJ, 2026-08-17: "the passage concepts
+            is a little confusing, there are concept badges, remove passage, and
+            then add concept. this need better structure").
 
             It was: chips, then "remove passage", then a concept field — so a
             destructive act on the PASSAGE sat in the middle of the concept
-            material and read as part of it. Now the note is its own labelled
-            block, the concepts are one block (what it is filed under, and how
-            to add another), and the one destructive control is last and on its
-            own. */}
+            material and read as part of it. The order TJ drew on 2026-08-18
+            keeps them apart the other way round: the quotation, its note and
+            the act that destroys it are the passage's own material, and the
+            concepts — what it evidences, and the + that files one more — come
+            after, as the thing said ABOUT it. */}
 
         {/* The note, and it is EDITABLE (TJ: "i see the passage, but no
             notes"). It was invisible when empty, which on a passage captured
@@ -163,57 +188,10 @@ export default function PassageCard({
           />
         </div>
 
-        <div className="pblock">
-          <span className="label">
-            Concepts{" "}
-            <span className="labelsay">
-              {filedUnder.length ? "— what this passage evidences" : "— none yet, which is a legal state"}
-            </span>
-          </span>
-          {filedUnder.length > 0 && (
-            <div className="passageconcepts">
-              {filedUnder.map((c) => (
-                <span key={c.id} className="pchip">
-                  <ConceptName concept={c} />
-                  <button
-                    type="button"
-                    className="pchip-x"
-                    onClick={() => edit.onUnfile(c.id)}
-                    aria-label={`Remove ${conceptNameText(c)} from this passage`}
-                    title={`Remove “${conceptNameText(c)}” from this passage. The passage stays.`}
-                  >×</button>
-                </span>
-              ))}
-            </div>
-          )}
-          {/* Two labels, at two levels: the BLOCK is Concepts, plural, what
-              this passage is filed under; the FIELD is Concept, singular, the
-              one you are about to add. The LABEL carries the act and the
-              button is the verb (TJ, 2026-08-17: "the line could be add
-              concept to passage, and the button is just add"). The shape of
-              the answer stays on the same line; it is the one thing a student
-              cannot infer from the act. */}
-          <span className="label addlabel">
-            Add concept to passage <span className="labelsay">— a short noun phrase</span>
-          </span>
-          <div className="quietrow">
-            <input
-              list={edit.listId}
-              placeholder="e.g. boundary objects"
-              value={edit.refileValue}
-              onChange={(e) => edit.onRefileChange(e.target.value)}
-            />
-            <button
-              className="btn ghost mini"
-              onClick={edit.onRefile}
-              disabled={edit.refileBusy}
-              aria-label="Add concept to passage"
-            >add</button>
-          </div>
-        </div>
-
-        {/* Last, alone, and quiet: the one act here that destroys something.
-            It used to sit between the chips and the concept field. */}
+        {/* The destructive act sits with the PASSAGE's own material — its
+            quotation and its note — and above the concepts, which are a
+            different subject (TJ, 2026-08-18, showing the order he wants).
+            Quiet, and still the only thing here that destroys anything. */}
         <div className="src rm-actions" style={{ marginTop: "8px" }}>
           <button
             type="button"
@@ -223,6 +201,62 @@ export default function PassageCard({
           >
             remove passage
           </button>
+        </div>
+
+        <div className="pblock">
+          <span className="label">
+            Concepts{" "}
+            <span className="labelsay">
+              {filedUnder.length ? "— what this passage evidences" : "— none yet, which is a legal state"}
+            </span>
+          </span>
+          {/* THE CHIPS AND THE + ARE ONE ROW, as they are on the margin card.
+              This block used to end in a labelled text field and an `add`
+              button — a second way to do what the margin already did with a +
+              and a card, and a lesser one: it had no description field, no
+              picker, and it told you a concept was already filed only after
+              you pressed. One act, one control, one card (TJ, 2026-08-18:
+              "use the add concept to passage card when + is pressed"). */}
+          <div className="passageconcepts">
+            {filedUnder.map((c) => (
+              <span key={c.id} className="pchip">
+                <ConceptName concept={c} />
+                <button
+                  type="button"
+                  className="pchip-x"
+                  onClick={() => edit.onUnfile(c.id)}
+                  aria-label={`Remove ${conceptNameText(c)} from this passage`}
+                  title={`Remove “${conceptNameText(c)}” from this passage. The passage stays.`}
+                >×</button>
+              </span>
+            ))}
+            <button
+              type="button"
+              ref={addButtonRef}
+              className="pchip-add"
+              onClick={edit.onToggleAdd}
+              aria-expanded={edit.addOpen}
+              /* Named only while the card exists — an aria-controls pointing at
+                 an absent id is a dangling reference, and aria-expanded already
+                 carries the state on its own. */
+              aria-controls={edit.addOpen ? addCardId : undefined}
+              aria-label="Add a concept to this passage"
+              title="Add a concept to this passage"
+              data-add-concept-for={passage.id}
+            >+</button>
+          </div>
+          {edit.addOpen && (
+            <div id={addCardId}>
+            <AddConceptCard
+              passage={passage}
+              concepts={concepts}
+              onCreateConcept={edit.onCreateConcept}
+              onAddConcept={edit.onAddConcept}
+              onEditConcept={edit.onEditConcept}
+              onClose={edit.onCloseAdd}
+            />
+            </div>
+          )}
         </div>
       </div>
     )

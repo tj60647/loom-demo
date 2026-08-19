@@ -33,7 +33,7 @@ type Named = Pick<Concept, "label">
  * entry, not a URL parameter, not an export field, not a match or sort key.
  * Those stay raw. A placeholder in a value coins a Concept literally named
  * "(unlabeled concept)" the first time somebody picks it from a list —
- * AddConceptRailCard.tsx already filters blanks out of its datalist for the
+ * cards/AddConceptCard.tsx already filters blanks out of its datalist for the
  * neighbouring reason, and its comment records the bug that taught us.
  */
 export function conceptName(concept: Named): { text: string; unlabeled: boolean } {

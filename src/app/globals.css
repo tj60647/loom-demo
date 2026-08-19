@@ -306,6 +306,16 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .pchip-x{background:none;border:none;padding:0 2px;cursor:pointer;color:var(--grey);
   font-size:12px;line-height:1;transition:color .12s ease}
 .pchip-x:hover{color:var(--red)}
+/* The + that opens an AddConceptCard, sitting in the chips row as one more
+   badge-sized target. Same shape and same act as the margin card's + — that
+   one is `.pdf-railcard-add`, declared in PdfViewer's own <style> block, which
+   only renders inside the viewer and so cannot reach Your work. Kept in step
+   by hand; the two are 18px dashed circles because a + that looks like one
+   thing beside the page and another in the panel is two controls to learn. */
+.pchip-add{background:none;border:1px dashed var(--rule);border-radius:999px;
+  width:18px;height:18px;line-height:1;padding:0;cursor:pointer;
+  color:var(--ink-soft);font-family:var(--mono);font-size:12px}
+.pchip-add:hover,.pchip-add:focus-visible{border-color:var(--ink);color:var(--ink)}
 .lgroup{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--ochre);padding:14px 12px 5px;border-bottom:1px solid var(--rule)}
 /* An unlabeled capture. Not a concept row — it has no head, because there is
@@ -318,9 +328,13 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 
    Measured before this rule, in the 460px sheet: passage rows ran 327-618px
    tall and the only thing between one and the next was `.lrow`'s 1px dotted
-   line — while `.quietrow` drew an IDENTICAL 1px dotted line two-thirds of the
-   way down each row. Interior and boundary were the same mark, so a 5344px
-   list read as one undifferentiated column.
+   line — while the `.quietrow` around the row's concept field drew an IDENTICAL
+   1px dotted line two-thirds of the way down each row. Interior and boundary
+   were the same mark, so a 5344px list read as one undifferentiated column.
+   That field is gone as of 2026-08-18 (a + and a card do the same act now), so
+   no `.quietrow` is rendered in here at all and the rules that suppressed it
+   went with it — but the boxes stay, because the row heights that made the
+   list unreadable have not changed.
 
    Its own class, never a redefinition of `.lrow`: that class is shared with 04
    Vocabulary's concept and link rows and two admin pages, and eleven spec files
@@ -342,9 +356,6 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    border is what separates one concept from the next. */
 .ywevidence{margin-top:12px;padding-bottom:8px;border-bottom:1px dotted var(--rule)}
 .ywevidence:last-child{border-bottom:0;padding-bottom:0}
-/* The interior rule that read as a boundary. The block above it is already
-   separated by its own label and spacing. */
-.ywcard .quietrow{border-top:0;padding-top:0}
 /* A collapsed concept card is its head, so the head takes the card's corners
    rather than sitting in a box with a gap around it. */
 .ywcard.ywconcept > .lhead{border-radius:3px}
@@ -353,7 +364,6 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .lrow.loose .passage{font-size:13.5px;margin:0 0 6px}
 .lrow.loose .src{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
 .lrow.loose .pnote{font-size:13px;font-style:italic;color:var(--ink-soft);margin:0 0 6px}
-.lrow.loose .quietrow{margin-top:9px;padding-top:9px}
 /* A Concept with a Description and no Label (TJ, 2026-08-18: "a concept needs
    either or both a description and a label"). Dark grey so it reads as an
    absence rather than as somebody's chosen word. text-transform and

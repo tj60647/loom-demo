@@ -90,9 +90,12 @@ test.describe('Add concept beside the passage', () => {
     // point of the change, and the failure mode is silent — the card would
     // still "work", just somewhere else.
     await stack.locator('.pdf-railcard-add').click();
-    // section, not a bare aria-label match: Your work's per-passage "add"
-    // button carries the SAME aria-label, and its rows stay in the DOM while
-    // the sheet is shut, so an unqualified match is a strict-mode violation.
+    // section, not a bare aria-label match. The reason changed on 2026-08-18
+    // and the qualifier is still needed: Your work's per-passage "add" BUTTON
+    // used to carry this aria-label, and now Your work mounts the very same
+    // <section aria-label="Add concept to passage"> when its own + is pressed.
+    // Its rows stay in the DOM while the sheet is shut either way, so an
+    // unqualified match is a strict-mode violation waiting to happen.
     const editor = page.locator('section[aria-label="Add concept to passage"]');
     await expect(editor).toBeVisible({ timeout: 5000 });
     await expect(page.locator('#yourwork')).toBeHidden();

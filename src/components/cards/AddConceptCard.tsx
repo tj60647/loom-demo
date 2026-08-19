@@ -2,9 +2,23 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react"
 import type { Concept, Passage } from "@/lib/types"
-import styles from "./AddConceptRailCard.module.css"
+import styles from "./AddConceptCard.module.css"
 
-type AddConceptRailCardProps = {
+/**
+ * ONE WAY TO FILE A PASSAGE UNDER ONE MORE CONCEPT, wherever the act is
+ * offered. Opened by the + on a passage card — in the margin beside the page,
+ * and since 2026-08-18 in Your work too, where the same act used to be a
+ * different control (a labelled text input and an `add` button) doing a
+ * slightly different thing.
+ *
+ * It moved out of `pdf/` and lost "Rail" from its name when Your work adopted
+ * it: it is not the rail's, and a name that says otherwise is a name that
+ * misleads the next reader. The prototype doc predicted this step — "Reuse it
+ * from other passage-first cards that offer the same act. Do not add it to
+ * Concept-first evidence lists, where the inverse relationship is the
+ * subject."
+ */
+type AddConceptCardProps = {
   passage: Passage
   concepts: Concept[]
   onCreateConcept: (label: string, def?: string) => Promise<Concept>
@@ -17,16 +31,24 @@ type AddConceptRailCardProps = {
    */
   onEditConcept?: (conceptId: string, data: { def: string }) => Promise<void>
   onClose: () => void
+  /**
+   * Draw it welded to the card above, as the margin rail does: the editor is
+   * the second half of one object there. Your work's list wants it standing
+   * inside the passage card it belongs to, where a joined edge would read as
+   * the next row in a scroll.
+   */
+  joined?: boolean
 }
 
-export default function AddConceptRailCard({
+export default function AddConceptCard({
   passage,
   concepts,
   onCreateConcept,
   onAddConcept,
   onEditConcept,
   onClose,
-}: AddConceptRailCardProps) {
+  joined = false,
+}: AddConceptCardProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const autofilledDescription = useRef("")
   const inputId = useId()
@@ -85,11 +107,21 @@ export default function AddConceptRailCard({
 
   return (
     <section
-      className={styles.card}
+      className={joined ? `${styles.card} ${styles.joined}` : styles.card}
       aria-label="Add concept to passage"
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault()
+          // ONE ESCAPE, ONE THING — PdfViewer states the rule and this card
+          // broke it the moment Your work adopted it. Both of the viewer's
+          // keydown listeners are on `window` in the bubble phase
+          // (PdfViewer.tsx:392, :1421) and the sheet's deliberately lets
+          // Escape through from inside itself ("Escape is the one key that
+          // gets out", :1391), so without this one press dismissed this card
+          // AND the whole panel behind it. React attaches at the root
+          // container, so stopping here stops the native event before window
+          // ever sees it.
+          event.stopPropagation()
           onClose()
         }
       }}

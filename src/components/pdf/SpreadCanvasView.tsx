@@ -33,7 +33,7 @@ import { type PdfDoc } from "./PageRaster";
 import { spreadLayout, pageX } from "@/lib/spreadLayout";
 import { layoutRail, railScale } from "@/lib/railLayout";
 import { RailCardBody } from "./ConceptRail";
-import AddConceptRailCard from "./AddConceptRailCard";
+import AddConceptCard from "@/components/cards/AddConceptCard";
 import type { Concept, Passage } from "@/lib/types";
 
 const CARD_GAP = 12;
@@ -163,7 +163,7 @@ export default function SpreadCanvasView({
   onUnfile?: (passageId: string, conceptId: string) => void;
   onCreateConcept?: (label: string, def?: string) => Promise<Concept>;
   onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
-  /** Fill a reused concept's empty description — see AddConceptRailCard. */
+  /** Fill a reused concept's empty description — see cards/AddConceptCard. */
   onEditConcept?: (conceptId: string, data: { def: string }) => Promise<void>;
   onAspect: (a: number) => void;
   /** The toolbar slider's value: 1 = the whole canvas fits the stage. */
@@ -1260,13 +1260,14 @@ export default function SpreadCanvasView({
                   </div>
                   {activeAddPassageId === id && onCreateConcept && onAddConcept ? (
                     <div id={`canvas-add-concept-${id}`} className="pdf-add-concept-host">
-                      <AddConceptRailCard
+                      <AddConceptCard
                         passage={c.passage}
                         concepts={concepts}
                         onCreateConcept={onCreateConcept}
                         onAddConcept={onAddConcept}
                         onEditConcept={onEditConcept}
                         onClose={() => closeAddConcept(id)}
+                        joined
                       />
                     </div>
                   ) : null}
