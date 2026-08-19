@@ -119,7 +119,11 @@ export default function ConceptCard({
    * THE HEAD'S RIGHT-HAND SLOT, shared by every mode so the cards say the same
    * things in the same order, and there are three things to say, not two:
    *
-   *  - PICK n — which bench slot, the most local fact there is.
+   * The bench slot is NOT one of them any more (TJ, 2026-08-18: "instead of
+   * pick 1 being outside the button and overriding the passage count, let the
+   * button text change to PICKED #"). It sat here and displaced the count, so
+   * picking a concept hid the one fact the row existed to show.
+   *
    *  - no evidence — nothing anywhere backs it. A designation, never a warning:
    *    "a Concept may precede its evidence" (TJ, 2026-08-08; red line 4, "empty
    *    states are visible, not blocked").
@@ -127,8 +131,7 @@ export default function ConceptCard({
    *    render as nothing at all, which read identically to evidence-less.
    */
   const headTag =
-    pick ? <div className="pickedtag">PICK {pick}</div>
-    : loom === 0 ? (
+    loom === 0 ? (
       <div
         className="pickedtag noevidence"
         title="no passage backs this yet — you may have named it ahead of its evidence, which is allowed"
@@ -165,6 +168,12 @@ export default function ConceptCard({
               read-only views use `.clabel` for the same object. */}
           <div className="lconcept clabel"><ConceptName concept={concept} /></div>
           {headTag}
+          {/* THE RIGHT END OF THE ROW, not a control floating in it (TJ,
+              2026-08-18). Full row height and flush to the card's edge, so the
+              row reads as one object with a hinged end rather than as a line
+              with a button dropped on it. The slot number rides the button:
+              `PICKED 1` says both that it is on the bench and which half of
+              the pair it is, and leaves the evidence count where it was. */}
           <button
             type="button"
             className="cselect"
@@ -172,7 +181,16 @@ export default function ConceptCard({
             aria-label={pick ? `Unpick ${conceptNameText(concept)}` : `Select ${conceptNameText(concept)} for the bench`}
             title={pick ? "take it off the bench" : "load it into the bench"}
             onClick={(e) => { e.stopPropagation(); onPick() }}
-          >{pick ? "picked" : "select"} <span aria-hidden="true">→</span></button>
+          >
+            <span>{pick ? `picked ${pick}` : "select"}</span>
+            {/* Chevron, drawn rather than typed: an arrow glyph sits on the
+                text baseline and rides the font, a stroked path does not. */}
+            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"
+                 fill="none" stroke="currentColor" strokeWidth="2.5"
+                 strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
+          </button>
         </div>
         {openHere && (
           /* What the ● used to show, in place: the gloss first, because half

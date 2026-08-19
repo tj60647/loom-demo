@@ -373,11 +373,21 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    two targets — the row used to do both with one tap, which is why a ● had to
    exist to reach the card at all. The arrow points at the bench, which is to
    the right of this column. */
-.cselect{flex:0 0 auto;background:none;border:1px solid var(--rule);border-radius:3px;
-  padding:2px 7px;cursor:pointer;font-family:var(--mono);font-size:9.5px;
+/* THE ROW'S RIGHT END. `align-self:stretch` with the head's padding cancelled
+   on that side is what makes it the full height of the row rather than a pill
+   floating in it; the left border is the only one it keeps, so it reads as the
+   row hinging rather than as a box sitting on top. The card's own radius is
+   4px, so the button's right corners take 3px — the inside of a 1px border. */
+.ywcard.ywpick > .lhead{padding-right:0}
+.cselect{flex:0 0 auto;align-self:stretch;display:flex;align-items:center;gap:5px;
+  background:none;border:0;border-left:1px solid var(--rule);border-radius:0 3px 3px 0;
+  padding:0 10px;margin:-9px 0;cursor:pointer;font-family:var(--mono);font-size:9.5px;
   letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);white-space:nowrap}
-.cselect:hover,.cselect:focus-visible{border-color:var(--ochre);color:var(--ochre)}
-.ywcard.ywpick.picked .cselect{border-color:var(--ochre);background:var(--ochre);color:var(--paper)}
+.cselect:hover,.cselect:focus-visible{background:rgba(168,132,63,.12);color:var(--ochre)}
+.ywcard.ywpick.picked .cselect{background:var(--ochre);color:var(--paper);border-left-color:var(--ochre)}
+/* Open, the head is no longer the card's bottom edge, so the button squares
+   off with it. */
+.ywcard.ywpick.open .cselect{border-radius:0 3px 0 0}
 /* The opened warp card's body: the gloss and this reading's evidence, which is
    what the ● used to show in a popover. */
 .ywcard.ywpick .cbody{border-left:0;margin:0;padding:0 12px 12px}
