@@ -115,7 +115,14 @@ test("a label coined with no thread is a row, and tapping it labels a thread", a
 
   if ((await row.count()) === 0) {
     await page.locator("#coinLabel").fill(COINED)
-    await page.getByRole("button", { name: "Add" }).click()
+    // `exact`, because accessible-name matching is substring by default and
+    // Vocabulary's coin-a-concept + carries aria-label="Add a concept before
+    // you have found evidence in the reading" (cd5ae56, 2026-08-18). Both
+    // match "Add", and Playwright's strict mode fails the click rather than
+    // guessing. It only bites when that + is on screen, which is why it passed
+    // locally and failed on CI's freshly provisioned database — and why nobody
+    // saw it for a day: CI does not run on pushes to dev.
+    await page.getByRole("button", { name: "Add", exact: true }).click()
   }
   await expect(row, "the coined label is a row of its own").toHaveCount(1, { timeout: 15_000 })
   await expect(row.locator(".lsrc")).toHaveText(/0 threads/)
