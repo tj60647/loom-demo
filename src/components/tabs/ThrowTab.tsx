@@ -369,7 +369,13 @@ export default function ThrowTab({ onGotoPassage, pair }: {
 
   const c1 = conceptById(pairA ?? "")
   const c2 = conceptById(pairB ?? "")
-  const both = !!(pairA && pairB && pairA !== pairB)
+  /* BOTH ENDS MUST RESOLVE, not merely be set. `pairA`/`pairB` are ids, and an
+     id whose concept is gone would otherwise wake the bench, light step 3, and
+     enable "Throw it" over an empty From slot — `addEdge` then posts a row
+     whose fromId does not exist and the insert fails with no dialog and no
+     flash. The cloth's pair refuses a deleted concept at the source now, and
+     this is the same refusal stated where the throw actually happens. */
+  const both = !!(pairA && pairB && pairA !== pairB && c1 && c2)
   const sent = sentence.trim()
   const railN = (!pairA && !pairB) ? 0 : (!both ? 1 : (!sent ? 2 : 3))
   const doLine = (!pairA && !pairB)

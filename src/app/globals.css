@@ -679,11 +679,20 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
    names it draws are readable in three other places. */
 #map{display:block;width:100%;height:400px;touch-action:none;user-select:none;-webkit-user-select:none}
 /* The pair's offer. TOP LAYER, via popover="auto" — #mapWrap directly above
-   is overflow-x:auto and would clip an absolutely-positioned card, and its
-   stacking context would let the card's own neighbours paint over it. That is
-   not a prediction: it is what happened to 02's warp popover before it was
-   moved here (the note in ClothReflection's placePop). Positioned from JS, so
-   the UA's centring margin has to go. */
+   is overflow-x:auto, so it would CLIP an absolutely-positioned card at its
+   own edges. That is not a prediction: clipping by an overflow ancestor is
+   half of what happened to 02's warp popover before this approach was taken
+   (the note in ClothReflection's placePop).
+
+   The other half of that story does NOT apply here, and this comment claimed
+   it did until it was checked: #mapWrap establishes no stacking context —
+   measured live at 1536, position:static, z-index:auto, no transform, filter,
+   opacity<1, isolation, contain or will-change, and no ancestor up to <html>
+   establishes one either. `overflow` alone makes a scroll container and a
+   block formatting context, neither of which is a stacking context. The top
+   layer is still the right answer; the clipping alone is reason enough.
+
+   Positioned from JS, so the UA's centring margin has to go. */
 .pairpop{position:fixed;margin:0;inset:auto;width:290px;max-width:calc(100vw - 24px);
   /* The two names wrap and nothing truncates them — this is the one place the
      pair is spelled out in full — so a card is as tall as its concepts are
@@ -694,9 +703,12 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
 .pairpop::backdrop{background:none}
 .pairpop:not(:popover-open){display:none}
 /* `.pairpop .pairpop-x`, not the bare class: `.iconbtn` is defined further
-   down this file (line 815 as this lands), so at equal specificity IT wins and
-   the button goes back to the standing bordered circle. Measured on the
-   running app at 1536: with the bare-class version, 30x30 and a 1px
+   down this file — grep it, do not trust a number here, because the number
+   this comment first carried was wrong the moment it shipped. It said 815; it
+   was 819, because four lines were added ABOVE it after the grep and before
+   the commit. Either way `.iconbtn` comes later at equal specificity, so it
+   wins, and the button goes back to the standing bordered circle. Measured on
+   the running app at 1536: with the bare-class version, 30x30 and a 1px
    var(--rule) ring (rgb(203,199,186)); with this one, 22x22 and no border. */
 .pairpop .pairpop-x{position:absolute;top:6px;right:6px;width:22px;height:22px;
   border:none;font-family:var(--mono);font-size:12px}

@@ -346,9 +346,14 @@ export default function ClothMap({
               />
             )}
             {/* Picked, in the colour the palette reserves for "the one
-                selected thing" (globals.css). The ring rather than a bigger
-                dot: two nodes 18px apart at a full warp cannot both grow, and
-                a hairline circle reads as picked at any spacing. */}
+                selected thing" (globals.css). A RING AND a bigger dot — this
+                comment said "the ring rather than a bigger dot" and the code
+                ten lines below grew the dot in the same commit, so it
+                described a decision that was never taken. Both marks are
+                deliberate: the dot goes 3.4 → 4.6 and red, which is what the
+                trace already did to a selected node, and the ring at r=7.5 is
+                what carries at a full warp where 18px of spacing leaves no
+                room for a dot to grow into. */}
             {picked && (
               <circle
                 cx={x} cy={baseY} r={7.5}

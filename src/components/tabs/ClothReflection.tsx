@@ -110,13 +110,27 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
    * puts it down, which is how the cloth's own selection already behaved.
    */
   const pickConcept = useCallback((id: string, additive: boolean, anchor: SVGCircleElement | null) => {
+    /* THE DRAWING CAN BE OLDER THAN THE LOOM. Scrub the record back and the
+       cloth is `drawn` — a fold of the graph AS IT WAS — which happily draws a
+       concept that has since been deleted. Picking one used to be allowed, and
+       everything downstream then lied in turn: the offer named it "?", the
+       bench woke with an id nothing resolves, and "Throw it" posted an edge
+       whose fromId does not exist. (Reproduced on the seeded Object Worlds
+       record, which carries 100 concepts its replay draws and the loom no
+       longer has.)
+       Refused here rather than patched at each of those, because this is the
+       only place a pick is born. */
+    if (!state.concepts.some((c) => c.id === id)) {
+      flash("that concept has been deleted — the cloth is showing an earlier act")
+      return
+    }
     pairAnchor.current = anchor
     setPair((prev) => {
       if (additive && prev.length === 1 && prev[0] !== id) return [prev[0], id]
       if (!additive && prev.length === 1 && prev[0] === id) return []
       return [id]
     })
-  }, [])
+  }, [state.concepts, flash])
 
   /** Two picked is the whole condition for the offer. */
   const offering = pair.length === 2
@@ -168,9 +182,15 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
       Math.max(window.innerWidth - w - EDGE, EDGE)
     )
     const above = r.top - GAP - h
-    const top = above >= EDGE
-      ? above
-      : Math.min(r.bottom + GAP, Math.max(window.innerHeight - h - EDGE, EDGE))
+    /* CLAMPED AT BOTH ENDS, and the top one was missing. `left` was guarded on
+       both sides and the bottom was guarded, so three window edges were safe
+       and the fourth was not: `placePop` runs on scroll with capture:true
+       precisely so the card follows its node, and when the station scrolled
+       the node above the window top `r.bottom + GAP` went negative and took
+       the card with it — still :popover-open, still holding focus and the
+       pair, and off screen. Measured at 1536x900 and 1280x800 before the fix. */
+    const below = Math.min(r.bottom + GAP, Math.max(window.innerHeight - h - EDGE, EDGE))
+    const top = above >= EDGE ? above : Math.max(below, EDGE)
     pop.style.left = `${Math.round(left)}px`
     pop.style.top = `${Math.round(top)}px`
   }, [])
