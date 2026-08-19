@@ -39,6 +39,7 @@ const READ_ONLY = [
   'matrix-zoom.spec.ts',     // impostor/canvas ladder, no persistence
   'object-download.spec.ts', // downloads what already exists
   'overlay.spec.ts',         // "Read-only throughout: nothing here writes"
+  'pair-and-throw.spec.ts',  // picks, offers, loads the bench — never presses #throwIt
   'pdf-fit.spec.ts',         // fit modes
   'practice-guide.spec.ts',  // "Requires seed:demo. Writes nothing"
   'reading-search.spec.ts',  // "Search is read-only: nothing to clean up"
