@@ -297,6 +297,24 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
       ORDER BY p."createdAt" ASC, p."id" ASC
       LIMIT 1)`
 
+  /**
+   * ORDER: relevance first, then the NAME (TJ, 2026-08-19, asking whether these
+   * lists are alphabetical).
+   *
+   * Everywhere else in the app a list of concepts is alphabetical —
+   * `sortedByLabel` orders the warp, Vocabulary, Your work and the Knowledge
+   * Graph. This panel is the exception on purpose: you typed a word, so the
+   * closest match to it should lead. But the tie-break used to be createdAt,
+   * and ties are the common case here — a query that matches six concepts'
+   * labels equally ranks them all the same and then fell back to the order they
+   * happened to be coined in, which reads as no order at all.
+   *
+   * Name-then-createdAt keeps the best match on top and makes everything level
+   * with it alphabetical. Straight alphabetical was the other option and is
+   * worse: LIMIT is ${MAX_LOOM_HITS}, so the ORDER BY decides WHICH concepts
+   * come back at all, and sorting by name would return an arbitrary alphabetical
+   * dozen with the strongest match possibly not among them.
+   */
   const conceptResult = await db.execute(sql`
     WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
     SELECT "concept"."id", "concept"."label",
@@ -314,7 +332,7 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
       AND (setweight(to_tsvector('english', coalesce("concept"."label", '')), 'A') ||
            setweight(to_tsvector('english', coalesce("concept"."def", '')), 'B') ||
            setweight(to_tsvector('english', coalesce("concept"."note", '')), 'C')) @@ q.query
-    ORDER BY rank DESC, "concept"."createdAt"
+    ORDER BY rank DESC, lower("concept"."label"), "concept"."createdAt"
     LIMIT ${MAX_LOOM_HITS}
   `)
 
@@ -341,7 +359,7 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
       ${conceptsHere ? sql`AND "edge"."fromId" IN ${conceptsHere} AND "edge"."toId" IN ${conceptsHere}` : sql.raw("")}
       AND (setweight(to_tsvector('english', coalesce("edge"."handle", '')), 'A') ||
            setweight(to_tsvector('english', coalesce("edge"."sentence", '')), 'B')) @@ q.query
-    ORDER BY rank DESC, "edge"."createdAt"
+    ORDER BY rank DESC, lower(f."label"), lower(t."label"), "edge"."createdAt"
     LIMIT ${MAX_LOOM_HITS}
   `)
 
@@ -395,7 +413,7 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
       ${linkEdgeScope}
       AND (setweight(to_tsvector('english', coalesce("link"."label", '')), 'A') ||
            setweight(to_tsvector('english', coalesce("link"."description", '')), 'B')) @@ q.query
-    ORDER BY rank DESC, "link"."createdAt"
+    ORDER BY rank DESC, lower("link"."label"), "link"."createdAt"
     LIMIT ${MAX_LOOM_HITS}
   `)
 

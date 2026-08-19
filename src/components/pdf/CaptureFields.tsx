@@ -32,6 +32,7 @@ import { useState, useEffect } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { readingsOf } from "@/lib/scope"
 import ConceptNamingAssist from "@/components/ui/ConceptNamingAssist"
+import { sortedByLabel } from "@/lib/utils"
 import type { CaptureReuse } from "./CaptureModal"
 
 /**
@@ -304,7 +305,7 @@ export default function CaptureFields({
           {/* Blanks filtered, not placeheld: this option's VALUE is typed into
               the field above and then matched to reuse or coin a Concept, so
               "(unlabeled concept)" here would mint one by that name. */}
-          {state.concepts.filter(c => c.label.trim()).map(c => <option key={c.id} value={c.label} />)}
+          {sortedByLabel(state.concepts).filter(c => c.label.trim()).map(c => <option key={c.id} value={c.label} />)}
         </datalist>
 
         {/* Shared with the typed form since 2026-08-13 — this markup was
