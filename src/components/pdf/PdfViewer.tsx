@@ -591,6 +591,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // their <mark> elements, so the passage list for a span is read off the DOM at
   // click time rather than frozen per node at mark time.
   const passagesRef = useRef<Passage[]>([]);
+  /**
+   * gotoOpenPassage, through a ref, because bindHighlightNode must not depend
+   * on it. That callback is a dep of the marking effect, and gotoOpenPassage
+   * changes whenever the search panel opens or closes — depending on it
+   * directly would re-mark every text layer in the reading on a keystroke in
+   * the find field.
+   */
+  const gotoOpenPassageRef = useRef<((passageId: string) => void) | null>(null);
   const conceptsRef = useRef<Concept[]>([]);
   useEffect(() => {
     conceptsRef.current = state.concepts;
@@ -645,8 +653,35 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       setHighlightTooltip({ entries, x, y, sticky });
     };
 
+    /**
+     * A CLICK ON A HIGHLIGHT OPENS THE PASSAGE (TJ, 2026-08-19: "clicking on
+     * highlighted text should open the passage in Your work. now that we have
+     * the rail card that makes sense").
+     *
+     * It used to open a sticky tooltip that named the concept, the source and
+     * the location. That was the only way to learn what a highlight WAS, so it
+     * had to say so in place. The rail card says all of it now, beside the
+     * words, with a leader line drawn to them — so the tooltip was answering a
+     * question the page had already answered, one click before the thing you
+     * actually wanted.
+     *
+     * TWO CAPTURES CAN SHARE A SENTENCE, and then there is no "the" passage to
+     * open. Marks nest, entriesForNode walks the ancestors, and the tooltip
+     * survives for exactly that case — as a chooser rather than as a label. So
+     * the rule is: one capture here, go to it; more than one, ask which.
+     *
+     * Focus still shows the tooltip and never navigates. Tabbing through a page
+     * must not carry you off it, and the tooltip is how a keyboard reader gets
+     * at the same facts.
+     */
     const onClick = (event: MouseEvent) => {
       event.stopPropagation();
+      const entries = entriesForNode((event.target as HTMLElement | null) ?? node);
+      if (entries.length === 1) {
+        hideHighlightTooltip();
+        gotoOpenPassageRef.current?.(entries[0].passageId);
+        return;
+      }
       showFromEvent(event, true);
     };
 
@@ -654,7 +689,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
     node.addEventListener("click", onClick);
     node.addEventListener("focus", onFocus);
-    node.setAttribute("title", "Click highlight for actions");
+    node.setAttribute("title", "Open this passage in your work");
 
     return () => {
       node.removeEventListener("click", onClick);
@@ -1048,6 +1083,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     if (searchOpen) closeSearch();
     onGotoOpenPassage?.(passageId);
   }, [searchOpen, closeSearch, onGotoOpenPassage]);
+  useEffect(() => { gotoOpenPassageRef.current = gotoOpenPassage; }, [gotoOpenPassage]);
 
   /** The badge's destination: Your work, at that concept. Same courtesy. */
   const gotoOpenConcept = useCallback((conceptId: string) => {
