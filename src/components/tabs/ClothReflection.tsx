@@ -13,7 +13,7 @@
 // generic question (red lines #1/#7). "Counted, not judged."
 
 import { useLoom } from "@/components/providers/LoomProvider"
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type { Edge, Tier } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
 import ClothMap from "@/components/svg/ClothMap"
@@ -80,6 +80,42 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
     addMap, setMapTiers, selectMap, scopeMaps,
   } = useLoom()
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
+  /**
+   * THE PAIR (TJ, 2026-08-18: "select 2 nodes and throw them … so i think it
+   * is something like select a node, shift select another node").
+   *
+   * In pick order, so the first is the From and the second the To. The cloth
+   * is where you SEE that two concepts sit near each other and never crossed;
+   * until now the only way to act on that was to remember both names and go
+   * hunt them in 02's warp list.
+   *
+   * This state is what `SHOW_TRACE` freed. The click on a concept used to
+   * light a traced component (commit 75e005c switched that off), so a cloth
+   * with both live would have one gesture meaning two things.
+   */
+  const [pair, setPair] = useState<string[]>([])
+  /**
+   * The second node's own hit circle, kept for whatever has to hang off it.
+   * A ref, not state: it is read at layout time and re-reading its rect is
+   * how the drawing and the thing beside it stay together through a resize.
+   */
+  const pairAnchor = useRef<SVGCircleElement | null>(null)
+
+  /**
+   * A PLAIN CLICK ALWAYS STARTS OVER; SHIFT EXTENDS. The file-manager idiom,
+   * chosen because it is the one rule that makes every click predictable —
+   * there is no state in which you have to remember how many nodes are lit to
+   * know what pressing a third will do. Clicking the single picked node again
+   * puts it down, which is how the cloth's own selection already behaved.
+   */
+  const pickConcept = useCallback((id: string, additive: boolean, anchor: SVGCircleElement | null) => {
+    pairAnchor.current = anchor
+    setPair((prev) => {
+      if (additive && prev.length === 1 && prev[0] !== id) return [prev[0], id]
+      if (!additive && prev.length === 1 && prev[0] === id) return []
+      return [id]
+    })
+  }, [])
   const [drafted, setDrafted] = useState("")
   const [showClothInfo, setShowClothInfo] = useState(false)
   const closeInfoButtonRef = useRef<HTMLButtonElement>(null)
@@ -412,7 +448,10 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
         <span className="hint" style={{ margin: 0 }}>
           Warp in reading order; weft arcs across.{SHOW_PROMPTS
             ? " Click a prompt beside this to trace it here — or click a concept/arc directly to pull it."
-            : " Click a concept or arc to trace it."}
+            /* It said "Click a concept or arc to trace it" until 2026-08-18,
+               which stopped being true the moment SHOW_TRACE went off: the
+               click did nothing at all. Now it picks. */
+            : " Click a concept, then shift-click a second, to pick a pair."}
           {showLog && " Scrub below to see how it grew."}
         </span>
         {showLog && log.ready && (
@@ -452,6 +491,11 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
             readSel={SHOW_TRACE ? readSel : null}
             setReadSel={SHOW_TRACE ? setReadSel : () => {}}
             glow={showLog && log.scrubbed && log.glowId ? { id: log.glowId, seq: log.pulse } : null}
+            /* Only one of the two can own the click. Tracing is off here and
+               pairing takes it; flip SHOW_TRACE back on and this has to be
+               reconsidered rather than merely coexist. */
+            pair={SHOW_TRACE ? [] : pair}
+            onPickConcept={SHOW_TRACE ? undefined : pickConcept}
           />
         )}
       </div>
@@ -462,6 +506,14 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
         <span><span className="sw" style={{borderTop: "2px dashed var(--grey)"}}></span>unlabelled — description only</span>
         {SHOW_TRACE && (
           <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>what you&apos;re tracing</span>
+        )}
+        {/* Only while there IS red on the drawing. A legend line for a
+            transient state would otherwise stand permanently, naming a colour
+            that is not on screen — which is what the tracing line above became
+            the day tracing was switched off. It appends, so nothing else in
+            the row moves when it arrives. */}
+        {pair.length > 0 && (
+          <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>picked</span>
         )}
       </div>
 

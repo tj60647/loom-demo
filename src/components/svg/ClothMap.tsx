@@ -20,14 +20,41 @@ export default function ClothMap({
   readSel,
   setReadSel,
   glow = null,
+  pair = [],
+  onPickConcept,
 }: {
   state: LoomState,
   readSel: ReadSel,
   setReadSel: (s: ReadSel) => void,
   glow?: ClothGlow,
+  /**
+   * The two concepts being gathered for a throw, in pick order — [] , [a] or
+   * [a, b]. Drawn red and ringed; the owner decides what a full pair means.
+   */
+  pair?: readonly string[],
+  /**
+   * A concept was pressed (TJ, 2026-08-18: "select a node, shift select
+   * another node, and then a popup"). `additive` is the shift key. The third
+   * argument is the node's own hit circle — the same element whatever part of
+   * the node was aimed at, so a popover can hang off the drawing rather than
+   * off whichever glyph took the click.
+   *
+   * PASSING THIS TAKES THE CLICK. A node then picks instead of tracing, which
+   * is only safe because the student's cloth has `SHOW_TRACE` off
+   * (ClothReflection) and hands `setReadSel` a no-op. `CohortClothPanel` — the
+   * other call site — passes nothing here and traces as before.
+   */
+  onPickConcept?: (id: string, additive: boolean, anchor: SVGCircleElement | null) => void,
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [width, setWidth] = useState(720)
+  /**
+   * The hit circles, by concept id. The popover anchors to the NODE, not to
+   * the glyph that was clicked: aiming at a concept's name and aiming at its
+   * dot are the same act, and a card that jumps to wherever the rotated label
+   * happens to end reads as two different controls.
+   */
+  const nodeHits = useRef<Map<string, SVGCircleElement>>(new Map())
 
   // ResizeObserver rather than a one-shot measure: it catches window resizes
   // and the moment a hidden panel becomes visible. A zero width means the
@@ -64,6 +91,23 @@ export default function ClothMap({
   
   const idx: Record<string, number> = {}
   cs.forEach((c, i) => idx[c.id] = i)
+
+  /**
+   * A WIDE INVISIBLE TWIN FOR THE NODES, the fix the arcs got in 2026-08-12
+   * and the nodes never did. SVG hit-testing on a circle is exactly the
+   * circle, and the drawn node is r=3.4 — a 6.8px target, which was tolerable
+   * while a miss merely failed to trace and is not while the click is how you
+   * gather a pair.
+   *
+   * Sized off the warp's own spacing so the twins cannot swallow each other:
+   * half the gap between neighbours, capped at 9. Computed from the layout
+   * above at width=1200 — 20 concepts sit 55.7px apart (twin r=9, 37.7px of
+   * clear air between them); 60 concepts sit 17.9px apart (twin r=8.96, edges
+   * touching and not overlapping). The 4 floor is for the pathological case
+   * only, where the warp is already unreadable.
+   */
+  const gap = n > 1 ? (width - mL - mR) / (n - 1) : width
+  const hitR = Math.max(4, Math.min(9, gap / 2))
 
   let selNodes: Set<string> | null = null
   let selEdges: Set<string> | null = null
@@ -233,9 +277,17 @@ export default function ClothMap({
       {cs.map((c, i) => {
         const x = X(i)
         const isSel = readSel?.type === "concept" && readSel.id === c.id
+        const picked = pair.includes(c.id)
         const op = (selNodes && !selNodes.has(c.id)) ? 0.3 : 1
-        
-        const handleSelect = () => {
+        // Deliberately NOT dimmed while a pair is being gathered: the whole
+        // point of the second pick is that you are still reading the warp for
+        // it, and fading the candidates is the opposite of that.
+
+        const handleSelect = (ev: { shiftKey: boolean }) => {
+          if (onPickConcept) {
+            onPickConcept(c.id, ev.shiftKey, nodeHits.current.get(c.id) ?? null)
+            return
+          }
           if (isSel) setReadSel(null)
           else setReadSel({ type: "concept", id: c.id })
         }
@@ -254,19 +306,29 @@ export default function ClothMap({
                 pointerEvents="none"
               />
             )}
+            {/* Picked, in the colour the palette reserves for "the one
+                selected thing" (globals.css). The ring rather than a bigger
+                dot: two nodes 18px apart at a full warp cannot both grow, and
+                a hairline circle reads as picked at any spacing. */}
+            {picked && (
+              <circle
+                cx={x} cy={baseY} r={7.5}
+                fill="none" stroke="var(--red)" strokeWidth={1.4}
+                pointerEvents="none"
+              />
+            )}
             <circle
-              cx={x} cy={baseY} 
-              r={isSel ? 4.6 : 3.4} 
-              fill={isSel ? "var(--red)" : "var(--ochre)"} 
+              cx={x} cy={baseY}
+              r={isSel || picked ? 4.6 : 3.4}
+              fill={isSel || picked ? "var(--red)" : "var(--ochre)"}
               opacity={op}
-              cursor="pointer"
-              onClick={handleSelect}
+              pointerEvents="none"
             />
             <text
               transform={`translate(${x + 4},${baseY + 13}) rotate(30)`}
               fontFamily='"Newsreader",Georgia,serif'
               fontSize={11.5}
-              fill={isSel ? "var(--red)" : "var(--ink)"}
+              fill={isSel || picked ? "var(--red)" : "var(--ink)"}
               opacity={op}
               cursor="pointer"
               onClick={handleSelect}
@@ -275,6 +337,23 @@ export default function ClothMap({
               {/* fill, not a class: `color` is inert on SVG text. */}
               {(() => { const n = conceptNameText(c); return n.length > 34 ? n.slice(0, 33) + '…' : n })()}
             </text>
+            {/* The twin, LAST so it sits over its own node and takes the
+                click — the drawn circle above is the picture and hands its
+                hits here (`pointerEvents:none`), the way the arcs already
+                work. The label keeps its own click: it is the bigger target
+                and people aim at names. */}
+            <circle
+              ref={(el) => {
+                if (el) nodeHits.current.set(c.id, el)
+                else nodeHits.current.delete(c.id)
+              }}
+              cx={x} cy={baseY} r={hitR}
+              fill="rgba(0,0,0,0)"
+              cursor="pointer"
+              onClick={handleSelect}
+            >
+              <title>{conceptNameText(c) + (c.def ? ` — ${c.def}` : '')}</title>
+            </circle>
           </g>
         )
       })}

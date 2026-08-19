@@ -671,7 +671,13 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
    losing the concepts at the right-hand end. */
 #mapWrap{border:1px solid var(--rule);border-radius:4px;overflow-x:auto;
   background:#f4f2ec}
-#map{display:block;width:100%;height:400px;touch-action:none}
+/* user-select:none because SHIFT-CLICK is now a gesture on this drawing
+   (ClothReflection's pair). Shift-clicking a second concept extends the
+   browser's own text selection from the first, and the screenshot at 1536 was
+   two concept labels painted over in selection blue — the drawing looked
+   broken at exactly the moment the pick landed. The cloth is a picture; the
+   names it draws are readable in three other places. */
+#map{display:block;width:100%;height:400px;touch-action:none;user-select:none;-webkit-user-select:none}
 .readitem{padding:10px 0;border-bottom:1px dotted var(--rule)}
 .readitem .trip{font-size:15px;margin-bottom:2px}
 .vpill{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--sage);border:1px solid var(--sage);border-radius:10px;padding:1px 8px}
