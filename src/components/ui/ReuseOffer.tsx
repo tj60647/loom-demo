@@ -70,7 +70,7 @@ export default function ReuseOffer({
   /** The host's own chrome — `.seam` in a form, something quieter in a toast. */
   className?: string
 }) {
-  const { addConcept, refilePassage, unfilePassage, editConcept, flash } = useLoom()
+  const { addConcept, addPassageConcept, unfilePassage, editConcept, flash } = useLoom()
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
 
@@ -84,7 +84,7 @@ export default function ReuseOffer({
       // would flicker the passage out of the concept's list and back, and a
       // failure between the two would strand it as unlabeled.
       const fresh = await addConcept(label, filledDescription || undefined)
-      await refilePassage(passageId, fresh.id)
+      await addPassageConcept(passageId, fresh.id)
       await unfilePassage(passageId, conceptId)
       if (filledDescription) await editConcept(conceptId, { def: "" })
       setDone(true)

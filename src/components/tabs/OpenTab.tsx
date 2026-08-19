@@ -56,7 +56,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
   // naming, dedup and the delete guards must see every concept the student has
   // — otherwise capturing a concept met in an earlier text would mint a
   // duplicate instead of joining its evidence (spec §2 identity).
-  const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, refilePassage, unfilePassage, editPassageNote, flash } = useLoom()
+  const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, addPassageConcept, unfilePassage, editPassageNote, flash } = useLoom()
   const { byId, titleOf } = useReadings()
   // Shared with the margin rail card, so the two dialogs cannot drift apart.
   const removePassageWithConfirm = useRemovePassage()
@@ -208,7 +208,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
      you had pressed. Both are now one AddConceptCard (TJ: "use the add concept
      to passage card when + is pressed"). Two behaviours went with it and are
      not missed here: its own flash ("named — filed under X"), since
-     refilePassage already flashes through LoomProvider; and forcing the new
+     addPassageConcept already flashes through LoomProvider; and forcing the new
      concept's row open in the CONCEPTS view, which is a different view than
      the one the act now happens in. */
 
@@ -772,7 +772,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
                 onToggleAdd: () => setAddConceptFor(cur => cur === b.id ? null : b.id),
                 onCloseAdd: () => setAddConceptFor(null),
                 onCreateConcept: addConcept,
-                onAddConcept: refilePassage,
+                onAddConcept: addPassageConcept,
                 onEditConcept: editConcept,
               }}
             />

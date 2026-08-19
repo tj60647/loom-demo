@@ -99,7 +99,8 @@ scrolling column is a form, not a card.
   which is the rule the other two doors into `addConcept` already keep
   (`CaptureModal`, `OpenTab`: *"the gloss never overwrites what you wrote
   before"*).
-- **File**: `refilePassage(passageId, conceptId)` — additive by ruling 37; the
+- **File**: `addPassageConcept(passageId, conceptId)` — additive by ruling 37 (named
+  `refilePassage` until 2026-08-19; the old name said it moved a filing); the
   passage gains a pointer, no row is copied. The server throws
   *"Already filed under that concept."* if it is reached anyway.
 

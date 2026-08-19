@@ -460,7 +460,20 @@ export async function createPassage(data: { conceptIds?: string[], source: strin
  * gains a pointer — one passage, several concepts, no row copies. The
  * passage's anchor and margin stay singular.
  */
-export async function refilePassage(passageId: string, conceptId: string) {
+/**
+ * ADD one concept to a passage. Renamed from `refilePassage` on 2026-08-19,
+ * on a call recorded in ui-cleanup-pass-1.md: it ADDS a filing and the old
+ * name said it MOVED one. "Refile" is what you do to a folder you are taking
+ * out of one drawer and putting in another, and this has never done that —
+ * ruling 37 is that filing is additive and never copies, so a passage under
+ * two concepts is one passage with two pointers.
+ *
+ * The persisted event kind stays `passage.refile`. Rows already carry that
+ * string, HistoryPanel and logPhrase read it, and renaming a written value is
+ * a migration rather than a rename — a separate decision with a data cost,
+ * which this is not.
+ */
+export async function addPassageConcept(passageId: string, conceptId: string) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
 
@@ -545,7 +558,7 @@ export async function mergeConcepts(sourceId: string, targetId: string, atSource
 }
 
 /**
- * Remove one concept pointer from a passage — refilePassage's inverse; the
+ * Remove one concept pointer from a passage — addPassageConcept's inverse; the
  * pointer model needs both directions. The passage itself is untouched: with no
  * pointers left it is an Unlabeled Passage, not gone.
  */
@@ -613,7 +626,7 @@ export async function attributePassages(passageIds: string[], sourceId: string) 
 /**
  * Revise a passage's note (TJ, 2026-08-17).
  *
- * There was no update path for a passage at all: createPassage, refilePassage,
+ * There was no update path for a passage at all: createPassage, addPassageConcept,
  * unfilePassage, attributePassages, deletePassage. So a note was written once
  * in the capture modal — at the moment you have read the passage least — and
  * could never be changed anywhere in Loom. The model says the passage owns its

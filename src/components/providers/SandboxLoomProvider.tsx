@@ -214,7 +214,7 @@ export default function SandboxLoomProvider({
     return n
   }, [noted])
 
-  const refilePassage = useCallback(async (passageId: string, conceptId: string) => {
+  const addPassageConcept = useCallback(async (passageId: string, conceptId: string) => {
     let out: Passage | null = null
     setState((s) => ({
       ...s,
@@ -422,7 +422,7 @@ export default function SandboxLoomProvider({
     addPassage,
     removePassage,
     attributePassages,
-    refilePassage,
+    addPassageConcept,
     unfilePassage,
     editPassageNote,
     activeCloth,

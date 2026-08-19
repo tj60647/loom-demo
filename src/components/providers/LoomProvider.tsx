@@ -9,7 +9,7 @@ import { emptyViews } from "@/lib/graphExport"
 import { getUserLoomData } from "@/lib/reads"
 import {
   createConcept, updateConcept, deleteConcept, mergeConcepts as mergeConceptsAction,
-  createPassage, deletePassage, refilePassage as refilePassageAction, unfilePassage as unfilePassageAction, attributePassages as attributePassagesAction,
+  createPassage, deletePassage, addPassageConcept as addPassageConceptAction, unfilePassage as unfilePassageAction, attributePassages as attributePassagesAction,
   updatePassageNote as updatePassageNoteAction,
   createEdge, updateEdge, deleteEdge,
   createLink, updateLink, attachLink as attachLinkAction,
@@ -76,7 +76,7 @@ export interface LoomContextType {
   /** Say which reading passages came from — the student's answer, never a guess. */
   attributePassages: (passageIds: string[], sourceId: string) => Promise<number>
   /** File a passage under another concept — adds a pointer, never copies the passage. */
-  refilePassage: (passageId: string, conceptId: string) => Promise<Passage>
+  addPassageConcept: (passageId: string, conceptId: string) => Promise<Passage>
   /** Remove one concept pointer from a passage — the passage itself survives. */
   unfilePassage: (passageId: string, conceptId: string) => Promise<void>
   /** Revise a passage's note. The first way to change one after capture. */
@@ -441,10 +441,10 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const refilePassage = async (passageId: string, conceptId: string) => {
+  const addPassageConcept = async (passageId: string, conceptId: string) => {
     try {
       // The passage gains a pointer (ruling 37) — same row, one more concept.
-      const saved = await refilePassageAction(passageId, conceptId)
+      const saved = await addPassageConceptAction(passageId, conceptId)
       applyLocal(s => ({ ...s, passages: s.passages.map(b => b.id === saved.id ? saved : b) }))
       savedOk()
       return saved
@@ -974,7 +974,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       state, scope, scoped, scopedState, isLoading,
       studentName: session?.user?.name || "",
       addConcept, editConcept, removeConcept, mergeConcepts,
-      addPassage, removePassage, refilePassage, unfilePassage, attributePassages, editPassageNote,
+      addPassage, removePassage, addPassageConcept, unfilePassage, attributePassages, editPassageNote,
       activeCloth, updateCloth, flushCloth,
       addEdge, editEdge, removeEdge,
       links: state.links, addLink, editLink, attachLink,

@@ -138,7 +138,7 @@ type HighlightEntry = {
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
   onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
-  const { state, scoped, addConcept, editConcept, refilePassage, unfilePassage, editPassageNote } = useLoom();
+  const { state, scoped, addConcept, editConcept, addPassageConcept, unfilePassage, editPassageNote } = useLoom();
   // The confirm and its wording live in the hook, so this button and Your
   // work's make the same promise about what a delete takes with it.
   const removePassageWithConfirm = useRemovePassage();
@@ -3104,7 +3104,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 onUnfile={unfilePassage}
                 onRemovePassage={removePassageWithConfirm}
                 onCreateConcept={addConcept}
-                onAddConcept={refilePassage}
+                onAddConcept={addPassageConcept}
                 onEditConcept={editConcept}
                 onEditNote={editPassageNote}
                 draft={railDraft}
@@ -3209,7 +3209,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               onUnfile={unfilePassage}
               onRemovePassage={removePassageWithConfirm}
               onCreateConcept={addConcept}
-              onAddConcept={refilePassage}
+              onAddConcept={addPassageConcept}
               onEditConcept={editConcept}
               onEditNote={editPassageNote}
               draft={railDraft}
