@@ -77,14 +77,22 @@ export async function deleteConceptInVocabulary(page: Page, label: string) {
   // legal (ruling 36) and reuse-seam's whole subject is making a pair of them —
   // so asserting the name is gone fails on the first of two, which is not a
   // failure of the delete. Counting down proves the same thing and survives it.
-  const before = await page.locator('.lconcept', { hasText: label }).count();
+  // Count ROWS, not `.lconcept` elements. A bare `.lconcept` count was global,
+  // and on 2026-08-18 the warp's concept card started carrying that class too
+  // (it is the same shared card) — so with 02 mounted a concept was two
+  // `.lconcept`s, deleting it removed both, and this assertion looked for one
+  // survivor that never existed. `.lrow[data-concept-id]` is a concept row:
+  // Vocabulary's and Your work's, never the warp's, which is `.crow`.
+  const rows = page.locator('.lrow[data-concept-id]', {
+    has: page.locator('.lconcept', { hasText: label }),
+  });
+  const before = await rows.count();
   await row.locator('.lhead').click();
   const deleted = page.waitForResponse((r) => isDeletePost(r.request()));
   await row.getByRole('button', { name: 'remove concept' }).click();
   await page.getByRole('button', { name: 'Delete concept' }).click();
   await deleted;
-  await expect(page.locator('.lconcept', { hasText: label }))
-    .toHaveCount(before - 1, { timeout: 15000 });
+  await expect(rows).toHaveCount(before - 1, { timeout: 15000 });
 }
 
 /**
