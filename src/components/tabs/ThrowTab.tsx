@@ -13,6 +13,7 @@ import { short } from "@/lib/clothMath"
 import ConceptCard from "@/components/cards/ConceptCard"
 import ConceptName from "@/components/ui/ConceptName"
 import { conceptNameText } from "@/lib/conceptName"
+import type { Passage } from "@/lib/types"
 
 const PLAIN_VERBS = ['leads to','depends on','is part of','goes against','is the same as','sets up'];
 
@@ -64,12 +65,12 @@ const STEPS: { label: string; says: string }[] = [
   },
 ]
 
-/* `onGotoPassage` was ThrowTab's prop until 2026-08-18. Its only consumer was
-   the concept popover, which offered a door into 01 · Reading from each
-   evidence passage it listed; with the popover gone nothing here opens a
-   passage, so the prop went too rather than sit wired to nothing. Workbench
-   still holds `handleGotoPassage` for the two tabs that do use it. */
-export default function ThrowTab() {
+/* `onGotoPassage` briefly went with the concept popover on 2026-08-18 and came
+   straight back: the warp card lists a concept's evidence in place now, and a
+   quoted passage you cannot open is a worse version of the popover it
+   replaced (TJ: "clicking on the passage in a concept card should take you to
+   the reading passage"). */
+export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: Passage) => void } = {}) {
   // Scoped for what this reading is about; whole for anything that has to be
   // TRUE. The thread lists are `scoped` — this reading's own work, and since
   // 2026-08-09 only that — while the evidence check, the duplicate-pair guard
@@ -384,6 +385,7 @@ export default function ThrowTab() {
       concepts={state.concepts}
       titleOf={titleOf}
       mode="pick"
+      onGotoPassage={onGotoPassage}
       pick={pairA === c.id ? 1 : pairB === c.id ? 2 : null}
       onPick={() => togglePick(c.id)}
     />

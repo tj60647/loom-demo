@@ -181,7 +181,7 @@ export default function ConceptCard({
           <div className="lbody cbody">
             {concept.def
               ? <p className="oconcept-def">{concept.def}</p>
-              : <p className="oconcept-def empty">no working definition yet</p>}
+              : <p className="oconcept-def empty">no working description yet</p>}
             {passages.length > 0 ? (
               <div className="oconcept-evidence">
                 <div className="lgroup">Evidence in this reading</div>
@@ -191,9 +191,18 @@ export default function ConceptCard({
                     passage={p}
                     concepts={concepts}
                     titleOf={titleOf}
+                    onGoto={onGotoPassage}
                     hideConceptId={concept.id}
                   />
                 ))}
+                {/* Said plainly, because it is true and not obvious: stations
+                    unmount, so leaving 02 drops the picks on the bench. This
+                    was the popover's own warning and it outlived it. */}
+                {onGotoPassage && (
+                  <p className="oconcept-def empty">
+                    Opening a passage goes to 01 · Reading and lets go of your picks here.
+                  </p>
+                )}
               </div>
             ) : (
               <p className="oconcept-def empty">
@@ -305,7 +314,7 @@ export default function ConceptCard({
       {concept.def ? (
         <p className="oconcept-def">{concept.def}</p>
       ) : (
-        <p className="oconcept-def empty">no working definition yet</p>
+        <p className="oconcept-def empty">no working description yet</p>
       )}
 
       {concept.note ? <p className="oconcept-note">{concept.note}</p> : null}

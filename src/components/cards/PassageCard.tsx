@@ -264,25 +264,39 @@ export default function PassageCard({
 
   return (
     <div className="ocard opassage" data-mode={mode}>
-      <blockquote className="opassage-text">{passage.content}</blockquote>
+      {/* THE QUOTATION IS THE DOOR HERE TOO (TJ, 2026-08-18: "clicking on the
+          passage in a concept card should take you to the reading passage") —
+          the rule every other drawing of a Passage already followed, and the
+          reason the separate `goto` button below it is gone: it was the same
+          act twice, offered smaller. */}
+      <blockquote
+        className={`opassage-text${canGoto ? " isdoor" : ""}`}
+        role={canGoto ? "button" : undefined}
+        tabIndex={canGoto ? 0 : undefined}
+        aria-label={canGoto ? "Open this passage in the reading" : undefined}
+        title={canGoto ? "Open this passage in the reading" : undefined}
+        onClick={() => canGoto && onGoto?.(passage)}
+        onKeyDown={(e) => {
+          if (!canGoto) return
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGoto?.(passage) }
+        }}
+      >{passage.content}</blockquote>
 
-      {passage.note ? <p className="opassage-note">{passage.note}</p> : null}
+      {/* NO PASSAGE NOTE HERE (TJ, 2026-08-18: "the concept card does not need
+          to show the passage notes"). Read mode is only ever reached through
+          ConceptCard — the warp card's opened body and the projection popover —
+          where these passages are EVIDENCE for the concept above them. A note
+          is what the words meant to the student on the day they kept them,
+          which is a fact about the passage, not about the concept it is being
+          shown to support; several of them turn a concept's evidence into a
+          column of asides. It is still written and read where the passage is
+          the subject: `mode="edit"` above, in Your work. */}
 
       <div className="ocard-foot">
         <span className="ocard-where">
           {where || "no reading yet"}
           {passage.pageNumber ? ` · p. ${passage.pageNumber}` : ""}
         </span>
-        {canGoto && (
-          <button
-            type="button"
-            className="rm ocard-goto"
-            onClick={() => onGoto?.(passage)}
-            title="Open this passage in the reading"
-          >
-            goto
-          </button>
-        )}
       </div>
 
       {/* The other concepts this passage evidences — what makes a multi-filed

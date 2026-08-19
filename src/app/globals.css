@@ -459,18 +459,33 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    home (and what went wrong in Your work before the scoped step-down). */
 .ocard{font-size:1em}
 .oconcept-def{margin:8px 0 0;font-size:.87em;line-height:1.5;color:var(--ink)}
-.oconcept-def.empty{color:var(--ink-soft);font-style:italic}
+/* An absent description is ONE QUIET LINE, never a panel (TJ, 2026-08-18:
+   "the 'no working description' takes up more space than an actual
+   description, this should not be the case"). It was 71.5px against a real
+   description's 39px, measured in the warp at 1536 — and by accident, not by
+   design: `.empty` on its own is the app's centred empty-STATE panel
+   (padding:26px 14px, line 239), written for a whole region with nothing in
+   it, and this paragraph was collecting all 52px of its vertical padding and
+   its centring through a bare class-name collision. */
+.oconcept-def.empty{color:var(--ink-soft);font-style:italic;padding:0;text-align:left}
 .oconcept-note{margin:6px 0 0;font-size:.82em;line-height:1.45;color:var(--ink-soft)}
 .oconcept-evidence{margin-top:12px}
 .oconcept-evidence .lgroup{margin:0 0 6px;padding:0}
 .opassage{padding:8px 0;border-top:1px dotted var(--rule)}
 .opassage-text{margin:0;padding:0 0 0 9px;border-left:2px solid var(--rule);
   font-size:.85em;line-height:1.5;color:var(--ink)}
-.opassage-note{margin:5px 0 0;font-size:.8em;font-style:italic;color:var(--ink-soft)}
+/* .opassage-note went with the passage note on 2026-08-18 (TJ: "the concept
+   card does not need to show the passage notes"). Nothing renders the class
+   now — kept as this line rather than deleted so the next reader knows the
+   note is deliberately absent from a concept's evidence, not forgotten. */
 .ocard-foot{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:5px}
 .ocard-where{font-family:var(--mono);font-size:.62em;letter-spacing:.05em;color:var(--ink-soft);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ocard-goto{flex:0 0 auto}
+/* .ocard-goto went with the separate "goto" button on 2026-08-18 — the
+   quotation is the door now, as it is everywhere else a Passage is drawn. */
+.opassage-text.isdoor{cursor:pointer;border-radius:3px}
+.opassage-text.isdoor:hover{background:rgba(168,132,63,.08)}
+.opassage-text.isdoor:focus-visible{outline:2px solid var(--ochre);outline-offset:2px}
 .ocard-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .ocard-chip{font-family:var(--mono);font-size:.6em;letter-spacing:.06em;text-transform:uppercase;
   color:var(--ochre);border:1px solid var(--rule);border-radius:999px;padding:2px 7px}
