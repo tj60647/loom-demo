@@ -133,10 +133,64 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
     })
   }, [state.concepts, flash])
 
-  /** Two picked is the whole condition for the offer. */
-  const offering = pair.length === 2
-  // Off `state`, not `drawn`: a concept the scrubber has folded away is not on
-  // the drawing to be picked, and everything that IS drawn is a live object.
+
+  const [drafted, setDrafted] = useState("")
+  const [showClothInfo, setShowClothInfo] = useState(false)
+  const closeInfoButtonRef = useRef<HTMLButtonElement>(null)
+
+  /**
+   * The cloth over time (TJ, 2026-08-13). The hook is called unconditionally —
+   * hooks must be — so `enabled` is what keeps the practice loom from reading
+   * the student's real record. Gating only the render would still fetch it.
+   */
+  const log = useCaptureLog({ sourceId, enabled: showLog })
+  /**
+   * WHICH cloth the one map draws. Live state at the end of the record, the
+   * folded reconstruction anywhere behind it. `log.ready` is false while the
+   * record loads, when it fails, and when nothing is recorded — in every one of
+   * those this stays false and the card draws the student's real work. The log
+   * can hide its own scrubber; it can never blank the cloth.
+   */
+  const inThePast = showLog && log.ready && !log.atMax
+  const drawn = inThePast && log.mapState ? log.mapState : state
+
+  /**
+   * Two views of one thing, in one box (TJ, 2026-08-13: "the previous version
+   * had the diagram and the list in the same space, correct? why not just do
+   * that again?"). It did, and this is that toggle back.
+   *
+   * The difference from then: the box used to hold a SECOND, read-only copy of
+   * the cloth while the live one stayed on the station, so switching to the
+   * list cost you nothing. There is one cloth now, so "record" hides the
+   * drawing — which is what the row badges used to be a door back from. The
+   * scrubber stays under both, because it is the position they share.
+   */
+  const [view, setView] = useState<"cloth" | "record">("cloth")
+
+  /**
+   * THE PAIR, AS IT CAN STILL BE DRAWN AND THROWN — and this is derived rather
+   * than trusted, because `pair` is ids and an id outlives its concept.
+   *
+   * Refusing a pick whose concept is gone (see `pickConcept`) was not enough:
+   * it checks only the id ARRIVING, so a concept picked while alive and deleted
+   * afterwards stayed in the pair. Two routes reached it, both measured on the
+   * running app. Pick a concept on the cloth, delete it on 04 · Vocabulary, and
+   * come back — this station is KEEP_ALIVE, so the pair survives the trip —
+   * then shift-click a live one: the offer opened reading "? → object worlds".
+   * And picking, then scrubbing the record back past that concept's creation,
+   * left the legend advertising PICKED with no red anywhere on the drawing,
+   * which is the exact failure the legend's own guard exists to prevent.
+   *
+   * Filtering here fixes all of it in one place: the rings, the legend and the
+   * offer all read this, so a pair that cannot be drawn is not offered either.
+   * Against `drawn` AND `state` — the first is what is on screen, the second is
+   * what the bench could actually accept.
+   */
+  const livePair = pair.filter(
+    (id) => state.concepts.some((c) => c.id === id) && drawn.concepts.some((c) => c.id === id)
+  )
+  const offering = livePair.length === 2
+  // Off `state`: `livePair` has already established that both resolve there.
   const pairName = (id: string) => {
     const c = state.concepts.find((x) => x.id === id)
     return c ? conceptNameText(c) : "?"
@@ -264,39 +318,6 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
     pop.addEventListener("toggle", onToggle)
     return () => pop.removeEventListener("toggle", onToggle)
   }, [])
-
-  const [drafted, setDrafted] = useState("")
-  const [showClothInfo, setShowClothInfo] = useState(false)
-  const closeInfoButtonRef = useRef<HTMLButtonElement>(null)
-
-  /**
-   * The cloth over time (TJ, 2026-08-13). The hook is called unconditionally —
-   * hooks must be — so `enabled` is what keeps the practice loom from reading
-   * the student's real record. Gating only the render would still fetch it.
-   */
-  const log = useCaptureLog({ sourceId, enabled: showLog })
-  /**
-   * WHICH cloth the one map draws. Live state at the end of the record, the
-   * folded reconstruction anywhere behind it. `log.ready` is false while the
-   * record loads, when it fails, and when nothing is recorded — in every one of
-   * those this stays false and the card draws the student's real work. The log
-   * can hide its own scrubber; it can never blank the cloth.
-   */
-  const inThePast = showLog && log.ready && !log.atMax
-  const drawn = inThePast && log.mapState ? log.mapState : state
-
-  /**
-   * Two views of one thing, in one box (TJ, 2026-08-13: "the previous version
-   * had the diagram and the list in the same space, correct? why not just do
-   * that again?"). It did, and this is that toggle back.
-   *
-   * The difference from then: the box used to hold a SECOND, read-only copy of
-   * the cloth while the live one stayed on the station, so switching to the
-   * list cost you nothing. There is one cloth now, so "record" hides the
-   * drawing — which is what the row badges used to be a door back from. The
-   * scrubber stays under both, because it is the position they share.
-   */
-  const [view, setView] = useState<"cloth" | "record">("cloth")
 
   type ReadPrompt = {
     key: string
@@ -599,16 +620,16 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
                 From. Nothing else on screen says which way the thread runs,
                 and the cloth's two rings are deliberately identical. */}
             <p className="pairpop-pair">
-              <b>{pairName(pair[0])}</b>
+              <b>{pairName(livePair[0])}</b>
               <span className="pairpop-arr">→</span>
-              <b>{pairName(pair[1])}</b>
+              <b>{pairName(livePair[1])}</b>
             </p>
             {onThrowPair && (
               <button
                 type="button"
                 className="btn mini pairpop-go"
                 onClick={() => {
-                  const [a, b] = pair
+                  const [a, b] = livePair
                   setPair([])
                   onThrowPair(a, b)
                 }}
@@ -692,7 +713,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
             /* Only one of the two can own the click. Tracing is off here and
                pairing takes it; flip SHOW_TRACE back on and this has to be
                reconsidered rather than merely coexist. */
-            pair={SHOW_TRACE ? [] : pair}
+            pair={SHOW_TRACE ? [] : livePair}
             onPickConcept={SHOW_TRACE ? undefined : pickConcept}
           />
         )}
@@ -710,7 +731,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
             that is not on screen — which is what the tracing line above became
             the day tracing was switched off. It appends, so nothing else in
             the row moves when it arrives. */}
-        {pair.length > 0 && (
+        {livePair.length > 0 && (
           <span><span className="sw" style={{borderTop: "2px solid var(--red)"}}></span>picked</span>
         )}
       </div>
