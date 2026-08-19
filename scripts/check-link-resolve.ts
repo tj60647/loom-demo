@@ -127,10 +127,24 @@ assert(normLabel("   ") === "", "whitespace alone is no label", `"${normLabel(" 
 
 {
   const throwTab = readFileSync("src/components/tabs/ThrowTab.tsx", "utf8")
+  /* THE CHIPS MOVED INTO THE CARD on 2026-08-19 (ThreadCard.tsx), when the
+     thread's two texts became fields that commit on blur, like a concept's
+     description and a passage's note. This guard read ThrowTab's markup, so it
+     went red on a rendering change while the behaviour it defends was intact —
+     the exact failure mode of the three guards fixed on 2026-08-15.
+     It now reads BOTH ends of the wire it actually cares about: the card's chip
+     calls the callback, and ThrowTab's callback is `attachOwn`. Neither half is
+     the markup. */
+  const threadCard = readFileSync("src/components/cards/ThreadCard.tsx", "utf8")
   assert(
-    /onClick=\{\(\) => attachOwn\(e\.id, link\)\}/.test(throwTab),
-    "ThrowTab's own-label chips ATTACH the Link object",
-    "a chip in the coin-time row no longer calls attachOwn — if it went back to setting the draft text, every reuse would mint a near-duplicate by string copy"
+    /onClick=\{\(\) => edit\.onAttachLink\(link\)\}/.test(threadCard),
+    "the thread card's own-label chips ATTACH, they do not fill the field",
+    "a borrowed chip in ThreadCard no longer calls onAttachLink — if it went back to setting the field's text, every reuse would mint a near-duplicate by string copy"
+  )
+  assert(
+    /onAttachLink:\s*\(link\) => attachOwn\(e\.id, link\)/.test(throwTab),
+    "ThrowTab wires that chip to attachOwn",
+    "the card's onAttachLink is no longer attachOwn, so the tap would not write a reference"
   )
   assert(
     /const attachOwn[\s\S]{0,400}attachLink\(edgeId, link\.id\)/.test(throwTab),

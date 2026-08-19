@@ -1,0 +1,76 @@
+        <div className="aheadofit">
+          <span className="label">Name a concept before its evidence</span>
+          <p className="hint" style={{ marginTop: 2 }}>
+            Expecting an idea before you have found it in the text? Name it, say what you
+            think it is, and go looking. It shows as <b>no evidence</b> until a passage
+            backs it — a state, not a fault — and it stays in view in every reading while
+            you hunt.
+          </p>
+          <div className="form-row">
+            {/* The explanation moves INTO the label and the placeholder becomes
+                an example (TJ, 2026-08-17). It was the other way round: the
+                field said "the concept you are looking for…", which is a
+                sentence about the field rather than a picture of the answer,
+                and the shape of a concept — a short noun phrase — was hidden in
+                a `title` nobody hovers. Every other placeholder in Loom is an
+                example ("ch. 3, p. 49", "your word… e.g. leads to").
+
+                NOT marked "(optional)" yet, though the model allows it —
+                §Concept: "Label [< 8 words, may be null at capture]". The
+                button below is still disabled without one, and it has to be:
+                an unnamed concept renders in 67 places that have no rule for
+                what to show, so shipping the word before the display would
+                make the form promise something the app cannot draw. That work
+                is written up, with the "one or the other or both" constraint
+                TJ added, which the model does not yet state. */}
+            <span className="label">
+              Concept{" "}
+              <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--ochre)" }}>
+                — a short noun phrase naming the idea
+              </span>
+            </span>
+            <input
+              list={listId}
+              placeholder="e.g. boundary objects"
+              value={newConceptOnly}
+              onChange={(e) => setNewConceptOnly(e.target.value)}
+            />
+          </div>
+          <div className="form-row">
+            <span className="label">
+              Description{" "}
+              <span style={{ textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+            </span>
+            <input
+              placeholder="what you take it to mean, in your own words"
+              title="the reason you expect to find this — what you will read the candidate passage against"
+              value={newConceptDef}
+              onChange={(e) => setNewConceptDef(e.target.value)}
+            />
+          </div>
+          {/* "add concept to VOCABULARY", not "to cloth" (TJ proposed the
+              pair; the destination is the correction). A concept coined
+              before its evidence joins nothing here: model §Concept — "A
+              Concept with no Passages therefore belongs to NO Reading, and is
+              in scope EVERYWHERE — it stands in every Reading's warp while the
+              student hunts for what backs it" — and the Concept List "belongs
+              to the User, spans Cloths". It enters THIS cloth the moment a
+              passage here evidences it, which is what the two "add concept to
+              passage" buttons above do.
+
+              The paragraph directly over this input already says as much: "it
+              stays in view in every reading while you hunt". A button reading
+              "to cloth" would have contradicted its own instructions.
+
+              Naming the destination on all three is the point: the same three
+              words, three different objects, was the confusion TJ started
+              from ("i dont know what this means, file this?").
+
+              Disabled until there is a name, like Add passage above: the
+              handler already returned early on an empty one, silently. */}
+          <button
+            className="btn ghost mini"
+            onClick={handleAddConceptOnly}
+            disabled={!newConceptOnly.trim()}
+          >add concept to vocabulary</button>
+        </div>

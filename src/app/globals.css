@@ -669,6 +669,24 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    pill beside it means BEATEN, so an arrow drawn in one would say a loose
    thread had been labelled. */
 .thread .tarrow{font-family:var(--mono);font-size:12px;color:var(--grey)}
+/* The trip and the sentence ARE the card's head — `.sent` has to stay a direct
+   child of the root for three specs, so there is no wrapper to hang the
+   disclosure on and the two lines carry it between them. Hover on both, as
+   `.ywcard.ywpick .lhead` does for a concept. */
+.thread .trip.isopen,.thread .sent.isopen{cursor:pointer;border-radius:3px;
+  margin-inline:-4px;padding-inline:4px}
+.thread .trip.isopen:hover,.thread .sent.isopen:hover{background:rgba(111,125,92,.09)}
+.thread .trip.isopen:focus-visible{outline:2px solid var(--sage);outline-offset:1px}
+/* The opened body. `.defrow` and `.label`/`.labelsay` are the siblings' own —
+   a labelled field that commits on blur, which is how ConceptCard writes a
+   Description and PassageCard a Note. */
+.thread .tbody{margin-top:9px;padding-top:9px;border-top:1px dotted var(--rule)}
+.thread .tbody .defrow{margin:0 0 10px}
+.thread .tbody .defrow:last-child{margin-bottom:2px}
+.thread .tbody .label{display:block;margin-bottom:4px}
+.thread .tbody .chips{margin:2px 0 0}
+.threadlabel{width:100%;font-family:var(--body);font-size:14px;background:#fff;
+  border:1px solid var(--rule);border-radius:3px;padding:6px 8px;color:var(--ink)}
 /* The trip wraps as a row rather than one line: the card no longer truncates
    its ends at 30 characters (the 02 column did), so two long concept names
    have to be able to sit over two lines with the pill between them. */

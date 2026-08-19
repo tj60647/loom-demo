@@ -183,7 +183,14 @@ test("02 · pick two, say the sentence, throw the thread, label the link — the
   await expect(page.locator(".slot.filled")).toHaveCount(2)
 
   await page.getByPlaceholder("…or just start typing. Long and awkward is fine.").fill(SENTENCE)
+  /* Wait for the create to land — see the note in link-object.spec.ts: the row
+     is painted under a temporary id and re-keyed when the server answers, so a
+     card opened inside that window remounts closed. */
+  const thrown = page.waitForResponse(
+    (res) => res.request().method() === "POST" && (res.request().postData() ?? "").includes("one sustains the other")
+  )
   await page.getByRole("button", { name: "Throw it" }).click()
+  await thrown
 
   // Anchor on the sentence, then take the CARD it belongs to by its own id.
   // This walked up with `.locator("..")` until 2026-08-18, which made the row's
@@ -197,11 +204,17 @@ test("02 · pick two, say the sentence, throw the thread, label the link — the
   await expect(thread, "the thread card must carry data-edge-id").toHaveCount(1)
   await expect(thread.locator(".pill", { hasText: "description" })).toBeVisible()
 
-  // Coin a label on the new thread. The control says "edit label" either way
-  // since 2026-08-12; the pill beside it is what says which state this is.
-  await thread.locator(".act", { hasText: "edit label" }).click()
-  await page.getByPlaceholder("your word… e.g. leads to · contradicts · is part of").fill("journey-term")
-  await thread.getByRole("button", { name: "Save label" }).click()
+  // Coin a label on the new thread. THE CARD OPENS AND THE FIELD IS THERE
+  // (TJ, 2026-08-19: "in the others isnt the description and label directly
+  // editable?"). Until then this was two controls and a Save button — an "edit
+  // label" toggle opening a fold — which made the thread the one object in the
+  // set that did not edit the way a concept or a passage does. Clicking the
+  // trip opens it, as clicking a concept's name opens its card, and the label
+  // commits on blur with no button to press.
+  await thread.locator(".trip").click()
+  await thread.getByPlaceholder("your word… e.g. leads to · contradicts · is part of").fill("journey-term")
+  // The blur IS the save. Clicking the column heading is a real click away.
+  await page.locator("#threadList h2").first().click()
   await expect(thread.locator(".pill", { hasText: "label" }).first()).toBeVisible({ timeout: 15_000 })
 
   // Remove the thread; both concepts stay (they are seeded).

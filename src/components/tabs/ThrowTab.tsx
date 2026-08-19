@@ -98,26 +98,21 @@ export default function ThrowTab({ onGotoPassage, pair }: {
   const [pairB, setPairB] = useState<string | null>(null)
   const [drawn, setDrawn] = useState(false)
   const [sentence, setSentence] = useState("")
-  const [namingFor, setNamingFor] = useState<string | null>(null)
-  const [nameDraft, setNameDraft] = useState("")
-  const nameInputRef = useRef<HTMLInputElement>(null)
-  // The SENTENCE, editable where it was written (TJ, 2026-08-12: "threads need
-  // to be editable in Threads in this reading — the description, not the
-  // concepts"). It was editable only on 04 · Vocabulary, filed under whichever
-  // label the thread happens to carry — so a thread with no label had a
-  // sentence that could be read here, quoted in the delete dialog, exported,
-  // and changed nowhere. The ends stay fixed on purpose: re-pointing a thread
-  // is a different claim, and throwing a new one says so honestly.
-  const [editingFor, setEditingFor] = useState<string | null>(null)
-  const [sentDraft, setSentDraft] = useState("")
-  const sentInputRef = useRef<HTMLTextAreaElement>(null)
-
-  // A tapped suggestion is a starting point, not the answer — return focus to
-  // the field (v14 did the same) so the student can edit it into their own word.
-  const pickWord = (word: string) => {
-    setNameDraft(word)
-    nameInputRef.current?.focus()
-  }
+  /**
+   * WHICH THREAD IS OPEN — one card, and one disclosure per card (TJ,
+   * 2026-08-19: "in the others isnt the description and label directly
+   * editable?"). This was four pieces of state: which row's LABEL fold was
+   * open, its draft and its input ref, and the same three again for the
+   * SENTENCE, kept mutually exclusive by hand because two open editors put the
+   * sentence on screen twice. The card opens once and both texts are fields in
+   * it, saved on blur, so the drafts and the exclusion go with them.
+   *
+   * The sentence is still editable where it was written (TJ, 2026-08-12:
+   * "threads need to be editable in Threads in this reading — the description,
+   * not the concepts"). The ends stay fixed on purpose: re-pointing a thread is
+   * a different claim, and throwing a new one says so honestly.
+   */
+  const [openFor, setOpenFor] = useState<string | null>(null)
 
   /**
    * Put a label back on a thread — the one path undo and redo both take.
@@ -292,31 +287,6 @@ export default function ThrowTab({ onGotoPassage, pair }: {
     setSentence(opener + ' ' + newSentence);
   }
 
-  // The two folds are exclusive. A row is narrow and the station's own footer
-  // says "one thread at a time"; two open editors on one thread would also put
-  // the sentence on screen twice, in a textarea and in the row above it.
-  const toggleNamer = (edgeId: string, currentHandle: string | null) => {
-    setEditingFor(null)
-    if (namingFor === edgeId) {
-      setNamingFor(null)
-    } else {
-      setNamingFor(edgeId)
-      setNameDraft(currentHandle ?? "")
-    }
-  }
-
-  const toggleEditor = (edgeId: string, currentSentence: string) => {
-    setNamingFor(null)
-    if (editingFor === edgeId) {
-      setEditingFor(null)
-    } else {
-      setEditingFor(edgeId)
-      setSentDraft(currentSentence)
-      // The fold mounts on the next paint; focus lands after it exists.
-      window.setTimeout(() => sentInputRef.current?.focus(), 0)
-    }
-  }
-
   /**
    * Save the sentence. Empty is allowed and is not a deletion — throwing
    * without one is legal (P0.3, "the description is the thread, and you can
@@ -326,23 +296,29 @@ export default function ThrowTab({ onGotoPassage, pair }: {
    * Not on the undo stack: ⌘Z here is the LABEL history (`restoreLabel`
    * reattaches Link objects), and folding a sentence into it would make one
    * keystroke step back through two different kinds of act. The textarea's own
-   * undo works while the fold is open, which is where a typo gets fixed.
+   * undo works while the card is open, which is where a typo gets fixed.
+   *
+   * The card stays OPEN after a save. It commits on blur now, so closing on
+   * every commit would shut the card the moment you tabbed from the
+   * description to the label.
    */
-  const handleSaveSentence = (edgeId: string, previous: string) => {
-    const s = sentDraft.trim()
+  const handleSaveSentence = (edgeId: string, previous: string, next: string) => {
+    const s = next.trim()
     if (s !== previous.trim()) {
       editEdge(edgeId, { sentence: s })
       flash(s ? "description saved" : "description cleared — the thread stays")
     }
-    setEditingFor(null)
   }
 
   /**
-   * Tap one of your own labels: ATTACH the object, do not copy its word.
-   * Closes the naming fold, because the act is finished — there is nothing
-   * left to type and a Save button that did nothing would invite a second
-   * write. The undo stack still records it as a label change, so ⌘Z behaves
-   * the same whether the word was tapped or typed.
+   * Tap one of your own labels: ATTACH the object, do not copy its word. The
+   * undo stack still records it as a label change, so ⌘Z behaves the same
+   * whether the word was tapped or typed.
+   *
+   * It no longer closes anything. It used to shut the naming fold because the
+   * act was finished and a Save button that did nothing would invite a second
+   * write; there is no Save button now, and shutting the card would hide the
+   * label the tap just put in the field.
    */
   const attachOwn = (edgeId: string, link: { id: string; label: string }) => {
     const edge = state.edges.find((x) => x.id === edgeId)
@@ -352,18 +328,15 @@ export default function ThrowTab({ onGotoPassage, pair }: {
       setRedoStack([])
     }
     attachLink(edgeId, link.id)
-    setNamingFor(null)
     flash("label attached")
   }
 
-  const handleSaveName = (edgeId: string, previousValue: string | null) => {
-    const h = nameDraft.trim()
-    if (h !== (previousValue ?? "")) {
-      setUndoStack(prev => [...prev, { edgeId, from: previousValue, to: h }]);
-      setRedoStack([]);
-      editEdge(edgeId, { handle: h });
-    }
-    setNamingFor(null);
+  const handleSaveName = (edgeId: string, previousValue: string | null, next: string) => {
+    const h = next.trim()
+    if (h === (previousValue ?? "")) return
+    setUndoStack(prev => [...prev, { edgeId, from: previousValue, to: h }]);
+    setRedoStack([]);
+    editEdge(edgeId, { handle: h });
     flash(h ? 'link labelled' : 'left as a description');
   }
 
@@ -471,11 +444,7 @@ export default function ThrowTab({ onGotoPassage, pair }: {
    * labelled.
    */
   const threadRow = (e: typeof state.edges[number]) => {
-    const sel = namingFor === e.id
-    const edt = editingFor === e.id
-    // No far-end pill any more: with the bridges band gone, every row here has
-    // both ends in scope, so there is never a reading to name.
-
+    const current = labelOfEdge(e, state.links)
     return (
       <ThreadCard
         key={e.id}
@@ -486,13 +455,14 @@ export default function ThrowTab({ onGotoPassage, pair }: {
         to={conceptById(e.toId)}
         links={state.links}
         mode="edit"
-        selected={sel || edt}
         edit={{
-          editing: edt,
-          naming: sel,
-          // Description before label, in the row as in the ruled order.
-          onToggleEdit: () => toggleEditor(e.id, e.sentence),
-          onToggleName: () => toggleNamer(e.id, labelOfEdge(e, state.links)),
+          open: openFor === e.id,
+          onToggle: () => setOpenFor((v) => (v === e.id ? null : e.id)),
+          onSaveSentence: (next) => handleSaveSentence(e.id, e.sentence, next),
+          onSaveLabel: (next) => handleSaveName(e.id, current || null, next),
+          onAttachLink: (link) => attachOwn(e.id, link),
+          ownLabels,
+          suggestions: PLAIN_VERBS,
           onRemove: async () => {
             const ok = await confirm({
               title: "Remove this thread?",
@@ -501,87 +471,9 @@ export default function ThrowTab({ onGotoPassage, pair }: {
               danger: true,
             })
             if (!ok) return
-            if (namingFor === e.id) setNamingFor(null)
-            if (editingFor === e.id) setEditingFor(null)
+            if (openFor === e.id) setOpenFor(null)
             removeEdge(e.id)
           },
-          folds: (<>
-        {edt && (
-          <div className="distill">
-            <div className="rnote">
-              <b>The description IS the thread</b> — the claim you would defend out loud.
-              Reword it as your reading of it sharpens; the two concepts stay as they are,
-              because pointing this at a different concept would be a different claim.
-            </div>
-            <div className="form-row" style={{ margin: "6px 0 8px" }}>
-              <textarea
-                ref={sentInputRef}
-                value={sentDraft}
-                onChange={(ev) => setSentDraft(ev.target.value)}
-                placeholder="how these two hang together. Long and awkward is fine."
-                rows={3}
-              />
-            </div>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <button className="btn mini" onClick={() => handleSaveSentence(e.id, e.sentence)}>
-                Save description
-              </button>
-              <span className="act" onClick={() => setEditingFor(null)}>cancel</span>
-            </div>
-          </div>
-        )}
-        {sel && (
-          <div className="distill">
-            <div className="rnote"><b>Label the link</b> (optional) — you&apos;ve already said how they relate; a short word lets this <i>kind</i> of link recur across your weave.</div>
-            <div className="form-row" style={{ margin: "6px 0 8px" }}>
-              <input
-                ref={nameInputRef}
-                className="tinput"
-                value={nameDraft}
-                onChange={(ev) => setNameDraft(ev.target.value)}
-                placeholder="your word… e.g. leads to · contradicts · is part of"
-                autoFocus
-              />
-            </div>
-            {/* Your own labels first, from EVERY reading — TJ, 2026-08-09:
-                "links from other readings may show up as link options". The
-                threads themselves stay this reading's own (the bridges band
-                went in the same ruling), but a label is vocabulary, not
-                evidence: coining "sets the terms for" in one text and reaching
-                for it again in the next is the reuse the course wants, and
-                retyping it by hand is how you end up with two labels that mean
-                one thing. Everyday verbs stay underneath as the fallback for
-                someone who has not coined any yet. */}
-            {ownLabels.shown.length > 0 && (
-              <>
-                <div className="rnote">
-                  Labels you have used before
-                  {ownLabels.rest > 0 && <> — the {ownLabels.shown.length} you reach for most, of {ownLabels.shown.length + ownLabels.rest}</>}:
-                </div>
-                <div className="chips">
-                  {ownLabels.shown.map(link => (
-                    <span
-                      key={link.id}
-                      className="verbchip borrowed"
-                      title={link.description || undefined}
-                      onClick={() => attachOwn(e.id, link)}
-                    >{link.label}</span>
-                  ))}
-                </div>
-              </>
-            )}
-            <div className="rnote">Stuck for a word? Tap an everyday suggestion:</div>
-            <div className="chips">
-              {PLAIN_VERBS.map(v => (
-                <span key={v} className="verbchip" onClick={() => pickWord(v)}>{v}</span>
-              ))}
-            </div>
-            <div style={{ marginTop: "10px" }}>
-              <button className="btn mini" onClick={() => handleSaveName(e.id, labelOfEdge(e, state.links) || null)}>Save label</button>
-            </div>
-          </div>
-        )}
-          </>),
         }}
       />
     )

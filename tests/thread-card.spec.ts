@@ -41,12 +41,18 @@ async function pillsMatchLabels(scope: Page | Locator, where: string) {
   expect(pills, `${where}: a label pill appears if and only if there is a label`).toBe(labelled)
   expect(arrows, `${where}: an unlabelled card shows direction instead of a label`).toBe(loose)
 
-  // The sentence is a DIRECT child of the card root — the contract three other
-  // specs depend on (see `threadOf` in link-object.spec.ts).
+  /* The sentence is a DIRECT child of the card root — the contract three other
+     specs depend on (see `threadOf` in link-object.spec.ts). Counted against
+     every `.sent` there IS rather than against the number of cards: a thread
+     may be thrown and not yet described (P0.3), and since 2026-08-19 a card
+     with nothing to quote draws no `.sent` at all rather than an empty pair of
+     quote marks. What must hold is that none of them is nested. */
+  const sentences = await scope.locator(".thread .sent").count()
   expect(
     await scope.locator(".thread[data-edge-id] > .sent").count(),
-    `${where}: .sent is a direct child of every card`
-  ).toBe(n)
+    `${where}: every .sent is a direct child of its card`
+  ).toBe(sentences)
+  expect(sentences, `${where}: no card carries two sentences`).toBeLessThanOrEqual(n)
 }
 
 test.describe("The thread card", () => {

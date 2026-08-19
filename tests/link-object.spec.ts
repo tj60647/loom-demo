@@ -168,7 +168,19 @@ test("a label coined with no thread is a row, and tapping it labels a thread", a
   await warp.filter({ hasText: "object worlds" }).first().getByRole("button", { name: /select/i }).click()
   await warp.filter({ hasText: "artifact as compromise" }).first().getByRole("button", { name: /select/i }).click()
   await page.getByPlaceholder("…or just start typing. Long and awkward is fine.").fill(SENTENCE)
+  /* WAIT FOR THE THROW TO LAND BEFORE TOUCHING THE ROW. `addEdge` paints the
+     thread optimistically under a temporary `crypto.randomUUID()` and swaps in
+     the server's id when the create returns (LoomProvider.addEdge). The card is
+     keyed by that id, so opening it inside the round-trip means opening a row
+     that is about to be replaced — it remounts closed, and the assertions after
+     it fail on a card that was open a moment ago. Measured: "open-after-click:
+     1" then "open-after-chip: 0", with the label attached correctly either way.
+     Nothing here is testing the optimistic paint, so waiting is honest. */
+  const thrown = page.waitForResponse(
+    (res) => res.request().method() === "POST" && (res.request().postData() ?? "").includes("holds the other open")
+  )
   await page.getByRole("button", { name: "Throw it" }).click()
+  await thrown
 
   const sent = page.locator(".sent", { hasText: "holds the other open" })
   await expect(sent).toHaveCount(1, { timeout: 15_000 })
@@ -176,14 +188,14 @@ test("a label coined with no thread is a row, and tapping it labels a thread", a
   await expect(thread).toHaveCount(1)
   await expect(thread.locator(".pill", { hasText: "description" })).toBeVisible()
 
-  // "edit label" whether the thread carries one or not since 2026-08-12 — the
-  // pill beside it is what says which.
-  await thread.locator(".act", { hasText: "edit label" }).click()
+  // The card opens to its fields — one disclosure, not an "edit label" toggle
+  // (TJ, 2026-08-19). The chips ride the Label field inside it.
+  await thread.locator(".trip").click()
   const chip = page.locator(".verbchip.borrowed", { hasText: COINED })
   await expect(chip, "a label coined ahead of use is offered as a chip").toHaveCount(1)
 
-  // The whole point: tapped, not typed, and no Save. The fold closes because
-  // the act is finished.
+  // The whole point: tapped, not typed, and no Save button anywhere on the
+  // card — the tap attaches the Link OBJECT rather than copying its word.
   // attachLink's payload is the thread, the Link, and the reading the act
   // happened in. Matched on shape rather than on any POST: an any-POST waiter
   // latches onto the throw still in flight, and the test then navigates away
@@ -195,9 +207,20 @@ test("a label coined with no thread is a row, and tapping it labels a thread", a
   )
   await chip.click()
   await attached
-  await expect(thread.locator(".distill")).toHaveCount(0)
+  // The card STAYS OPEN. It used to shut on the tap, because a Save button
+  // that did nothing would have invited a second write; there is no Save
+  // button now, and shutting it would hide the label the tap just put in the
+  // field. So the field holds it, and the head's pill states it.
+  await expect(thread.locator(".threadlabel")).toHaveValue(COINED, { timeout: 15_000 })
   await expect(thread.locator(".pill", { hasText: "label" }).first()).toBeVisible({ timeout: 15_000 })
   await expect(thread.locator(".v")).toHaveText(COINED)
+  // No Save anywhere on the card — it commits on blur (TJ, 2026-08-19). Named
+  // rather than counted: the card DOES hold one button, the trip, which is its
+  // disclosure.
+  await expect(
+    thread.getByRole("button", { name: /save/i }),
+    "the card commits on blur; it has no Save"
+  ).toHaveCount(0)
 
   // --- the count follows the object ---
   await openStation(page, "Vocabulary")
