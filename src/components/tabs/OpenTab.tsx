@@ -10,6 +10,7 @@ import { sortedByLabel } from "@/lib/utils"
 import PassageCard from "@/components/cards/PassageCard"
 import ConceptCard from "@/components/cards/ConceptCard"
 import { useRemovePassage } from "@/components/cards/useRemovePassage"
+import { useRenameConcept } from "@/components/cards/useRenameConcept"
 import { tidy } from "@/lib/clothMath"
 import ClothFold from "@/components/tabs/ClothFold"
 import ReuseOffer from "@/components/ui/ReuseOffer"
@@ -190,37 +191,9 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
   // concept a passage evidences. The difference is only how many it already
   // had — a passage filed nowhere is being named for the first time, so the
   // copy says that rather than "a second concept" (TJ, 2026-08-12).
-  /**
-   * Rename a concept from Your work's row.
-   *
-   * Kept in OpenTab, not in the card, because it can ROLL THE INPUT BACK: the
-   * field is uncontrolled, and a declined homonym confirm has to put the old
-   * label into the DOM node itself. That is why the callback takes the input.
-   */
-  const handleRename = async (concept: Concept, input: HTMLInputElement) => {
-    const v = input.value.trim()
-    if (!v || v === concept.label) return
-    const clash = state.concepts.find(
-      c => c.id !== concept.id && c.label.toLowerCase() === v.toLowerCase()
-    )
-    if (clash) {
-      // Warned, never forbidden (ruling 36): homonyms are legal. What the
-      // second sentence offers is the repair that EXISTS — merge is hidden
-      // while TJ resolves what it means (VocabularyTab's MERGE_VISIBLE), and a
-      // dialog is a bad place to learn that the way out it named is not there.
-      const ok = await confirm({
-        title: `You already have a concept named “${v}”.`,
-        body: "Rename anyway? The two stay distinct concepts sharing a name — if they are one idea, file this one's passages under the other and remove it.",
-        confirmLabel: "Rename anyway",
-      })
-      if (!ok) {
-        input.value = concept.label
-        return
-      }
-    }
-    editConcept(concept.id, { label: v })
-    flash("renamed")
-  }
+  /* handleRename moved into cards/useRenameConcept on 2026-08-18, when 04 ·
+     Vocabulary gained the same field. One homonym dialog, worded once. */
+  const handleRename = useRenameConcept()
 
   /**
    * ONE PIECE OF A CONCEPT'S EVIDENCE, in the concepts view.

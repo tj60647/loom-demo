@@ -482,6 +482,23 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    Emitted only by ui/ConceptName.tsx; SVG sites set fill instead. */
 .unlabeled{color:var(--ink-soft);text-transform:none;letter-spacing:normal}
 
+/* A CONCEPT'S EVIDENCE IN 04, citation first. Each row is a `<details>`: the
+   summary is where the passage was taken from, and opening it shows the words.
+   Quiet rules between them rather than boxes — these are parts of the concept
+   card they sit in, not cards of their own. */
+.citelist{margin-top:10px}
+.citerow{border-top:1px dotted var(--rule);padding:6px 0}
+.citerow:last-child{border-bottom:1px dotted var(--rule)}
+.citerow > summary{cursor:pointer;list-style:none;font-family:var(--mono);font-size:10px;
+  color:var(--ink-soft);padding:2px 0}
+.citerow > summary::-webkit-details-marker{display:none}
+/* The marker is drawn, so it can turn without the row reflowing. */
+.citerow > summary::before{content:"▸";display:inline-block;width:11px;color:var(--dot)}
+.citerow[open] > summary::before{content:"▾";color:var(--ochre)}
+.citerow > summary:hover{color:var(--ochre)}
+.citerow .citewhere{font-style:normal}
+.citerow .passage{font-size:13px;line-height:1.5;margin:4px 0 6px 11px;color:var(--ink)}
+
 /* coding log */
 .lrow{border-bottom:1px dotted var(--rule)}
 .lhead{display:flex;gap:10px;align-items:baseline;padding:9px 12px;cursor:pointer}

@@ -26,6 +26,7 @@ import { sortedByLabel } from "@/lib/utils"
 import { usesOf } from "@/lib/linkResolve"
 import ObjectDownload from "@/components/ui/ObjectDownload"
 import ConceptCard from "@/components/cards/ConceptCard"
+import { useRenameConcept } from "@/components/cards/useRenameConcept"
 import { conceptNameText } from "@/lib/conceptName"
 import { buildVocabularyExport, buildVocabularyMarkdown } from "@/lib/objectExport"
 import VocabularyOverlay from "@/components/tabs/VocabularyOverlay"
@@ -80,6 +81,8 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
   const { titleOf, course } = useReadings()
   const isStaff = !!course?.isStaff
   const { confirm, notify } = useDialog()
+  // Shared with Your work, so one homonym dialog serves both.
+  const renameConcept = useRenameConcept()
 
   /**
    * Pre-filled when a search hit sent you here (TJ, 2026-08-13: "concepts
@@ -364,8 +367,11 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                   edit={{
                     isOpen: !!isOpen,
                     onToggle: () => setOpenConcepts((p) => ({ ...p, [concept.id]: !p[concept.id] })),
-                    /* No onRename: renaming a concept is 03 · Open's act, and
-                       the card draws the field only when a host offers one. */
+                    /* 04 renames too (TJ, 2026-08-18: "the vocabulary concept
+                       card does not show concept as a name i can change"). The
+                       dialog is the shared one, so the homonym warning reads
+                       the same here as it does in Your work. */
+                    onRename: (input: HTMLInputElement) => renameConcept(concept, input),
                     onEditDef: (def: string) => { editConcept(concept.id, { def }); flash("description saved") },
                     body: (
                       <>
@@ -376,26 +382,45 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                             `.conceptDescription` moved onto the card's textarea
                             so journey-learner's assertion still finds it. */}
 
-                    {stats.readings.length > 0 ? (
-                      <p className="ghostnote" style={{ marginTop: "10px" }}>
-                        Evidenced in{" "}
-                        {stats.readings.map((key, i) => (
-                          <span key={key}>
-                            {i > 0 && (i === stats.readings.length - 1 ? " and " : ", ")}
-                            <i>{readingName(key)}</i>
-                          </span>
-                        ))}
-                        {stats.readings.length > 1
-                          ? " — one concept, evidence from several texts."
-                          : "."}
-                      </p>
+                    {/* EVERY CITATION, AND THE PASSAGE UNDER IT (TJ,
+                        2026-08-18: "nor passages, nor all citations. one
+                        approach is to have the citation, and then an expansion
+                        of the citation is the passage").
+
+                        04 is the loom-wide station, so this is every passage in
+                        every reading that backs the concept — the list that was
+                        missing. The citation leads because it is what you scan
+                        for; the words are one disclosure away.
+
+                        `<details>` rather than state: it brings its own
+                        keyboard, its own expanded/collapsed semantics and its
+                        own toggle, so there is no second `openConcepts`-shaped
+                        map to keep. It replaces "Evidenced in X and Y", which
+                        named the readings without ever showing what was in
+                        them — every citation names its own reading now. */}
+                    {stats.passages > 0 ? (
+                      <div className="citelist">
+                        <span className="label">
+                          Evidence <span className="labelsay">— across every reading</span>
+                        </span>
+                        {state.passages
+                          .filter((b) => b.conceptIds.includes(concept.id))
+                          .map((b) => (
+                            <details key={b.id} className="citerow">
+                              <summary>
+                                <span className="citewhere">
+                                  {b.sourceId ? readingName(b.sourceId) : b.source || "no reading yet"}
+                                </span>
+                                {b.location ? <span className="citeloc"> · {b.location}</span> : null}
+                              </summary>
+                              <div className="passage">&quot;{b.content}&quot;</div>
+                            </details>
+                          ))}
+                      </div>
                     ) : (
                       /* A designation, not a warning (TJ, 2026-08-08: "a
                          Concept may precede its evidence"; red line 4:
-                         "empty states are visible, not blocked"). This said
-                         "every concept SHOULD trace to something you
-                         captured", in red — an instruction to fix a state
-                         the model made first-class that same week. */
+                         "empty states are visible, not blocked"). */
                       <p className="ghostnote" style={{ marginTop: "10px" }}>
                         No passage evidences this yet. You may have named it ahead of
                         finding it, or its passages may have moved on.
