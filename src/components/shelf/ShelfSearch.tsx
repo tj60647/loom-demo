@@ -188,41 +188,66 @@ export default function ShelfSearch({
                 {results.length} reading{results.length !== 1 ? "s" : ""} match
                 {results.length === 1 ? "es" : ""}
               </span>
-              {results.map((hit) => (
-                // A hit is a door to the text itself, so it lands on
-                // 00 · Reading with the query riding along — the reading's own
-                // search opens pre-filled, marks and all. Workbench
-                // re-validates the tab, so a card with no PDF simply falls
-                // back to its first station.
-                <Link
-                  key={hit.sourceId}
-                  href={`/reading/${hit.sourceId}?tab=reading&q=${encodeURIComponent(query.trim())}`}
-                  className="searchhit"
-                >
-                  <div className="searchhithead">
-                    <h3>{hit.title}</h3>
-                    {hit.week != null && <span className="cap">week {hit.week}</span>}
-                    {hit.isOwn && <span className="cap">your own</span>}
+              {results.map((hit) => {
+                const q = encodeURIComponent(query.trim())
+                return (
+                  /**
+                   * THE CARD IS NOT ONE DOOR, IT IS SEVERAL (TJ, 2026-08-19:
+                   * "they appear as passages, or at least page numbers, those
+                   * should be clickable").
+                   *
+                   * Every other kind in this panel already lands on the OBJECT —
+                   * a concept on its Vocabulary row, a passage on its row in Your
+                   * work. A reading hit was the exception: the whole card was one
+                   * link to page 1 with the query marked, so a match found on p.
+                   * 10 showed you p. 10 and then took you somewhere else.
+                   *
+                   * So the container is a div and the doors are inside it. It has
+                   * to be that way round: an excerpt cannot be a link while it is
+                   * nested in one — the HTML parser closes the outer anchor at the
+                   * inner one and the result is not the markup anybody wrote.
+                   *
+                   * The head keeps the old destination (the reading, query along,
+                   * no page) because that IS the whole-reading answer: it matched
+                   * on its card, or in sixteen pages, and no single one of them is
+                   * the place to land.
+                   */
+                  <div key={hit.sourceId} className="searchhit searchhit-multi">
+                    <Link href={`/reading/${hit.sourceId}?tab=reading&q=${q}`} className="searchhit-door">
+                      <div className="searchhithead">
+                        <h3>{hit.title}</h3>
+                        {hit.week != null && <span className="cap">week {hit.week}</span>}
+                        {hit.isOwn && <span className="cap">your own</span>}
+                      </div>
+                      {hit.author ? <p className="shelfauthor">{hit.author}</p> : null}
+                      <p className="searchwhere">
+                        {[
+                          hit.matchedCard ? "on its card" : null,
+                          hit.pageHits > 0
+                            ? `in ${hit.pageHits} page${hit.pageHits !== 1 ? "s" : ""}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </Link>
+                    {hit.excerpts.map((excerpt) => (
+                      // `page=` is the last hop, the same shape as `concept=`
+                      // and `passage=`: the query still rides along, so the
+                      // reading opens with its own search marked AND on the page
+                      // whose words you just read here.
+                      <Link
+                        key={excerpt.pageNumber}
+                        href={`/reading/${hit.sourceId}?tab=reading&q=${q}&page=${excerpt.pageNumber}`}
+                        className="searchsnip searchsnip-door"
+                      >
+                        <span className="n">p. {excerpt.pageNumber}</span>
+                        <Snippet text={excerpt.snippet} />
+                      </Link>
+                    ))}
                   </div>
-                  {hit.author ? <p className="shelfauthor">{hit.author}</p> : null}
-                  <p className="searchwhere">
-                    {[
-                      hit.matchedCard ? "on its card" : null,
-                      hit.pageHits > 0
-                        ? `in ${hit.pageHits} page${hit.pageHits !== 1 ? "s" : ""}`
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                  {hit.excerpts.map((excerpt) => (
-                    <p key={excerpt.pageNumber} className="searchsnip">
-                      <span className="n">p. {excerpt.pageNumber}</span>
-                      <Snippet text={excerpt.snippet} />
-                    </p>
-                  ))}
-                </Link>
-              ))}
+                )
+              })}
             </>
           )}
 

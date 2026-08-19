@@ -1226,6 +1226,19 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    Dashed rather than dimmed — the work is real, it just has no door yet. */
 .searchhit.off{border-style:dashed;background:transparent;cursor:default}
 .searchhit.off:hover{border-color:var(--rule);background:transparent}
+/* A reading hit holds SEVERAL doors — the reading itself, and one per page
+   excerpt — so the box is a div and the anchors are inside it. The box keeps
+   its own border and its hover, and each door lights on its own. */
+.searchhit-multi{padding:0}
+.searchhit-multi:hover{border-color:var(--rule);background:rgba(255,255,255,.5)}
+.searchhit-door{display:block;padding:12px 14px 8px;text-decoration:none;color:inherit;border-radius:4px 4px 0 0}
+.searchhit-door:hover{background:rgba(168,132,63,.06)}
+.searchsnip-door{display:block;padding:7px 14px;text-decoration:none;color:inherit;border-top:1px solid var(--rule)}
+.searchsnip-door:hover{background:rgba(168,132,63,.10)}
+.searchsnip-door:last-child{border-radius:0 0 4px 4px}
+/* The page number is the thing you aimed at, so it earns the hover colour
+   rather than staying the quiet caption it is at rest. */
+.searchsnip-door:hover .n{color:var(--ochre)}
 
 /* The practice guide — a coach mark (src/components/practice/PracticeGuide.tsx).
    Standard anatomy: a masked backdrop with a cutout, a popover anchored to the

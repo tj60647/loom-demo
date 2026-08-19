@@ -15,6 +15,7 @@ type ReadingPageSearchParams = {
   passage?: string | string[]
   projection?: string | string[]
   cloth?: string | string[]
+  page?: string | string[]
 }
 
 // Deep links land on a station (`?tab=reading` from a shelf-search hit);
@@ -58,6 +59,15 @@ export default async function ReadingPage({
     passage: firstParam(resolved.passage)?.trim() || undefined,
     projection: firstParam(resolved.projection)?.trim() || undefined,
     cloth: firstParam(resolved.cloth) === "1",
+    // A page number off a URL is a stranger's integer. Anything that is not a
+    // whole number above zero becomes undefined here rather than reaching the
+    // viewer, which would otherwise be asked to render page 0, page -3 or
+    // page NaN on someone else's bookmark.
+    page: (() => {
+      const raw = firstParam(resolved.page)
+      const n = raw ? Number(raw) : NaN
+      return Number.isInteger(n) && n > 0 ? n : undefined
+    })(),
   }
   const sources = await getSources()
   const source = sources.find((s) => s.id === sourceId)

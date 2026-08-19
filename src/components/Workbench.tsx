@@ -82,6 +82,12 @@ export type WorkbenchFocus = {
   projection?: string
   /** Open the cloth's own fold at the head of Your work. */
   cloth?: boolean
+  /**
+   * A PDF page to land on — the last hop for a search hit that matched the
+   * text itself rather than a card. Validated at the route: a positive
+   * integer or nothing, never a number the viewer has to defend against.
+   */
+  page?: number
 }
 
 export default function Workbench({
@@ -136,7 +142,11 @@ export default function Workbench({
   const [activeTab, setActiveTab] = useState<Tab>(firstTab)
 
  const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([firstTab]))
-  const [pdfPage, setPdfPage] = useState(1)
+  // Seeded from the trip in, so a search hit on p. 10 opens ON p. 10 rather
+  // than on p. 1 with the query marked somewhere below the fold. Read once,
+  // like every other focus: it describes the arrival, not a state to keep in
+  // sync — the reader's real position is livePdfPage below.
+  const [pdfPage, setPdfPage] = useState(focus?.page ?? 1)
   const [pdfFocusPassageId, setPdfFocusPassageId] = useState<string | null>(null)
   // Where the reader actually is, which is not the same as `pdfPage` — that
   // one is an instruction TO the viewer ("go here"), this is a report FROM it.
