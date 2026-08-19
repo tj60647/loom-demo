@@ -98,11 +98,49 @@ test("a concept picks, a shift-click pairs it, and the offer takes both to 02", 
   await expect(offer).toBeHidden()
   await expect(picked).toHaveCount(0)
 
-  // --- the throw ----------------------------------------------------------
+  // --- the card is a bench, not a signpost (2026-08-19) --------------------
+  // It offered a trip to 02 and nothing else; it now asks what the bench asks
+  // — direction, and how they hang together — for the student who has done
+  // this a dozen times and does not want a station change to write one
+  // sentence. The door to 02 stays, and this spec still leaves by it.
   await pressNode(page, 0)
   await pressNode(page, 1, { shift: true })
-  const names = await offer.locator("b").allTextContents()
-  await offer.getByRole("button", { name: /Link these two on 02/ }).click()
+  const names = await offer.locator(".pairpop-slot b").allTextContents()
+  expect(names).toHaveLength(2)
+  // From and To are named and the direction is pick order.
+  await expect(offer.locator(".pairpop-slot").first()).toContainText("From")
+  await expect(offer.locator(".pairpop-slot").last()).toContainText("To")
+  // Swap reverses it, in place, without leaving the cloth.
+  await offer.getByRole("button", { name: "swap" }).click()
+  await expect
+    .poll(async () => (await offer.locator(".pairpop-slot b").allTextContents()).join("|"))
+    .toBe([names[1], names[0]].join("|"))
+  await offer.getByRole("button", { name: "swap" }).click()
+  await expect
+    .poll(async () => (await offer.locator(".pairpop-slot b").allTextContents()).join("|"))
+    .toBe(names.join("|"))
+  // The description is editable here — and WITHOUT the bench's opener chips
+  // (2026-08-19). They are the scaffold for a student stuck on how to begin,
+  // and this card is the shortcut for one who is not; seven of them wrapping
+  // over five rows was most of the popup. The bench keeps them, which
+  // throw-tab's own coverage still holds.
+  const say = offer.locator("textarea")
+  await expect(say).toBeVisible()
+  await expect(offer.locator(".openchip"), "the opener chips are the bench's, not the shortcut's").toHaveCount(0)
+  await say.fill("this is a shortcut description")
+  await expect(say).toHaveValue("this is a shortcut description")
+  await say.fill("")
+
+  // The label is offered and optional, and it lists the student's own Links so
+  // a name already owned is REUSED rather than minted a second time — a Link
+  // is an object (5.1), and findLink is the one place that decides two
+  // spellings are the same word.
+  const labelField = offer.locator("input.tinput")
+  await expect(labelField).toBeVisible()
+  await expect(labelField).toHaveValue("")
+  await expect(offer.locator("#pairpop-links")).toHaveCount(1)
+
+  await offer.getByRole("button", { name: /open on 02/ }).click()
 
   // The bench arrives loaded, on the station the offer named. `:visible`
   // matters everywhere here: the workbench keeps all four panels mounted

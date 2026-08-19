@@ -107,7 +107,16 @@ const student: Flow = {
     // read the whole reading's work), so both are named here rather than one
     // replacing the other.
     { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — the card beside the passage, or Your work slid out over the text" },
-    { id: "link", label: "Pick two concepts, say the sentence, label the link", where: "02 · Linking" },
+    // TWO DOORS TO THE SAME ACT, like `file` above (2026-08-19). 02 is still
+    // the main way through and the only place a link is LABELLED — a label is
+    // vocabulary, it recurs across threads, and coining one is not a shortcut's
+    // business. The cloth's own card is the shortcut: pick two concepts on the
+    // drawing, say how they hang together, throw it without a station change.
+    // For the student who has done this a dozen times (TJ, 2026-08-19) — and
+    // the cloth is where you SEE that two concepts sit near each other and
+    // never crossed, so the judgment and the place to record it were one screen
+    // apart until now.
+    { id: "link", label: "Pick two concepts, say the sentence, label the link", where: "02 · Linking — or the cloth's own card, for the throw alone" },
     // 03 before 04, in the array and in the edges below. Stations 03 and 04
     // were swapped on 2026-08-08 (TJ) — "you lay the graph out and read it, and
     // the vocabulary you have collected is what you check afterwards" — and the

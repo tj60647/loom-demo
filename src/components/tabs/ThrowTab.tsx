@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import LinkDescription from "@/components/ui/LinkDescription"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
 import { useReadings } from "@/components/providers/ReadingsProvider"
@@ -23,15 +24,6 @@ const PLAIN_VERBS = ['leads to','depends on','is part of','goes against','is the
 /** How many of the student's own Link Labels the coin-time row offers. */
 const SUGGESTED_LABELS = 12;
 
-const OPENERS = [
-  'this means that',
-  'this explains why',
-  'these are both about',
-  'you can’t have this without that —',
-  'this is an example of',
-  'these pull against each other because',
-  'these don’t obviously touch, except',
-];
 
 function EmptyState({ caption }: { caption: string }) {
   return (
@@ -277,15 +269,6 @@ export default function ThrowTab({ onGotoPassage, pair }: {
     flash('thread thrown — label the link below, when you like')
   }
 
-  const handleOpenerClick = (opener: string) => {
-    let newSentence = sentence;
-    for (const o of OPENERS) {
-      if (newSentence.startsWith(o + ' ')) {
-        newSentence = newSentence.slice((o + ' ').length);
-      }
-    }
-    setSentence(opener + ' ' + newSentence);
-  }
 
   /**
    * Save the sentence. Empty is allowed and is not a deletion — throwing
@@ -610,22 +593,9 @@ export default function ThrowTab({ onGotoPassage, pair }: {
               `.sleeper.asleep` fades it and blocks clicks with its ::after. */}
           <div className={`sleeper ${both ? "" : "asleep"}`}>
             <div className="sleepmsg">pick two concepts on the left — the bench wakes when the pair is loaded</div>
-            <div className="form-row">
-              <span className="label">The link description — how they relate, however awkwardly</span>
-              <div className="chips" style={{ margin: "2px 0 6px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                {OPENERS.map(o => (
-                  <span key={o} className="openchip" onClick={() => handleOpenerClick(o)}>
-                    {o}…
-                  </span>
-                ))}
-              </div>
-              <textarea
-                ref={sentenceRef}
-                placeholder="…or just start typing. Long and awkward is fine."
-                value={sentence}
-                onChange={(e) => setSentence(e.target.value)}
-              />
-            </div>
+            {/* The bench's own field, and the cloth's create-thread card draws
+                the same one — see ui/LinkDescription. */}
+            <LinkDescription value={sentence} onChange={setSentence} textareaRef={sentenceRef} />
             <button id="throwIt" className="btn" onClick={handleThrow} disabled={!both}>Throw it</button>
             {/* The sentence is encouraged, never required (P0.3) — the note
                 coaches toward it instead of the button withholding the throw. */}

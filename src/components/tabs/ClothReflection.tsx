@@ -13,6 +13,8 @@
 // generic question (red lines #1/#7). "Counted, not judged."
 
 import { useLoom } from "@/components/providers/LoomProvider"
+import { findLink } from "@/lib/linkResolve"
+import LinkDescription from "@/components/ui/LinkDescription"
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type { Edge, Tier } from "@/lib/types"
 import { adjacency, componentOf, allComponents, degreeOf, recurringHandles, noEvidenceConcepts, short } from "@/lib/clothMath"
@@ -78,7 +80,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
   // below resolves. Bridges are named but not drawn: they are 02 Linking's
   // material, and drawing half a thread would be a lie.
   const {
-    scopedState: state, flash,
+    scopedState: state, flash, addEdge, links, addLink, attachLink,
     addMap, setMapTiers, selectMap, scopeMaps,
   } = useLoom()
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
@@ -101,7 +103,21 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
    * A ref, not state: it is read at layout time and re-reading its rect is
    * how the drawing and the thing beside it stay together through a resize.
    */
+  /**
+   * The node each picked concept was picked ON, by id.
+   *
+   * One anchor was enough while the offer hung above the second node. The
+   * create-thread card sits at the MIDPOINT of the pair (TJ, 2026-08-19: "a
+   * 'create thread' card open at the arc midpoint"), which needs both — and
+   * "the arc" is the one about to exist, so there is no path to measure and
+   * the midpoint is the two nodes' own.
+   */
+  const pairAnchors = useRef(new Map<string, SVGCircleElement>())
   const pairAnchor = useRef<SVGCircleElement | null>(null)
+  /** The thread being written, while the card is up. */
+  const [threadSentence, setThreadSentence] = useState("")
+  const [threadLabel, setThreadLabel] = useState("")
+  const [throwing, setThrowing] = useState(false)
 
   /**
    * A PLAIN CLICK ALWAYS STARTS OVER; SHIFT EXTENDS. The file-manager idiom,
@@ -126,6 +142,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
       return
     }
     pairAnchor.current = anchor
+    if (anchor) pairAnchors.current.set(id, anchor)
     setPair((prev) => {
       if (additive && prev.length === 1 && prev[0] !== id) return [prev[0], id]
       if (!additive && prev.length === 1 && prev[0] === id) return []
@@ -223,8 +240,29 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
     // record" unmounts the whole SVG, and the anchor would otherwise be a
     // detached node reporting a 0,0 rect.
     if (!pop || !host?.isConnected) return
-    const r = host.getBoundingClientRect()
-    if (!r.width && !r.height) { setPair([]); return }
+    /**
+     * BETWEEN THE TWO, not over one of them.
+     *
+     * The card is about a relationship, so it hangs where the thread will be
+     * drawn rather than on either end of it. Both anchors have to be connected
+     * for that — scrub the record and the SVG is rebuilt, so a remembered node
+     * can be detached — and when only one is, this falls back to the old
+     * behaviour rather than placing the card at a coordinate half of which is
+     * a lie.
+     */
+    const both = shownFor.current ?? []
+    const a = pairAnchors.current.get(both[0] ?? "")
+    const b = pairAnchors.current.get(both[1] ?? "")
+    const mid = a?.isConnected && b?.isConnected
+      ? (() => {
+          const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect()
+          const cx = (ra.left + ra.width / 2 + rb.left + rb.width / 2) / 2
+          const cy = (ra.top + ra.height / 2 + rb.top + rb.height / 2) / 2
+          return { left: cx, top: cy, width: 0, height: 0, right: cx, bottom: cy }
+        })()
+      : null
+    const r = mid ?? host.getBoundingClientRect()
+    if (!mid && !r.width && !r.height) { setPair([]); return }
     const w = pop.offsetWidth
     const h = pop.offsetHeight
     const GAP = 12, EDGE = 12
@@ -616,26 +654,138 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
               title="put this pair down"
               onClick={() => setPair([])}
             >✕</button>
-            {/* The pair, in the order it will arrive in — first picked is the
-                From. Nothing else on screen says which way the thread runs,
-                and the cloth's two rings are deliberately identical. */}
-            <p className="pairpop-pair">
-              <b>{pairName(livePair[0])}</b>
-              <span className="pairpop-arr">→</span>
-              <b>{pairName(livePair[1])}</b>
-            </p>
-            {onThrowPair && (
+            {/* THE BENCH, STREAMLINED, WHERE THE THREAD WILL BE (TJ,
+                2026-08-19: "we are making the cloth a place where threads are
+                created … this is for the student who has done the process 12
+                times and wants a shortcut. the main flow is still through 02.
+                we want a version of the 02 stage but streamlined as a popup
+                with editable fields").
+
+                It offered a trip to 02 and nothing else. For a reader who has
+                done it a dozen times that is a station change to write one
+                sentence — and the cloth is exactly where you SEE that two
+                concepts sit near each other and never crossed, so the judgment
+                and the place to record it were one screen apart.
+
+                It asks what the bench asks and no more: which way the thread
+                runs, and how they hang together. Labels are still 02's — they
+                are vocabulary, they recur across threads, and a shortcut is
+                not the place to coin one. The door to 02 stays below for
+                everything this leaves out. */}
+            <div className="pairpop-slots">
+              <div className="pairpop-slot">
+                <span className="cap">From</span>
+                <b>{pairName(livePair[0])}</b>
+              </div>
+              <div className="pairpop-swap">
+                <span className="pairpop-arr">→</span>
+                {/* The pair is stored in pick order and pick order IS direction,
+                    so swapping is reversing the array — the same act as picking
+                    them the other way round, and it re-places the card too
+                    because nothing about the midpoint depends on order. */}
+                <button
+                  type="button"
+                  onClick={() => setPair((prev) => [...prev].reverse())}
+                  title="reverse the direction of this thread"
+                >swap</button>
+              </div>
+              <div className="pairpop-slot">
+                <span className="cap">To</span>
+                <b>{pairName(livePair[1])}</b>
+              </div>
+            </div>
+
+            {/* No opener chips here (TJ, 2026-08-19). They are the bench's
+                scaffold for a student stuck on how to begin; this card is the
+                shortcut for one who is not, and seven of them wrapping over
+                five rows was most of the popup. */}
+            <LinkDescription
+              value={threadSentence}
+              onChange={setThreadSentence}
+              label="How they hang together"
+              rows={3}
+              openers={false}
+            />
+
+            {/* THE LABEL, OPTIONAL (TJ, 2026-08-19: "add a place for the label
+                as an option").
+
+                A Link is an object the student owns (5.1), not a string on the
+                thread — so typing a name here ATTACHES the Link of that name
+                when one exists and mints one only when it does not. findLink
+                is the one place that decides whether two spellings are the same
+                word ("Leads to" and "leads to" have always been one row), and
+                going through it is what stops this card quietly creating a
+                second Link for a label the student already has.
+
+                Left empty the thread is unlabelled, which is legal and common:
+                a label is for a relationship that RECURS, and the first time
+                you throw one there is nothing to recur yet. */}
+            <div className="form-row">
+              <span className="label">
+                Label <span className="labelsay">(optional — a short word, if this relationship recurs)</span>
+              </span>
+              <input
+                className="tinput"
+                list="pairpop-links"
+                value={threadLabel}
+                onChange={(e) => setThreadLabel(e.target.value)}
+                placeholder="e.g. leads to"
+              />
+              <datalist id="pairpop-links">
+                {links.filter((l) => l.label.trim()).map((l) => (
+                  <option key={l.id} value={l.label} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="pairpop-actions">
               <button
                 type="button"
-                className="btn mini pairpop-go"
-                onClick={() => {
-                  const [a, b] = livePair
-                  setPair([])
-                  onThrowPair(a, b)
+                className="btn mini"
+                disabled={throwing}
+                onClick={async () => {
+                  if (throwing) return
+                  setThrowing(true)
+                  try {
+                    const [a, b] = livePair
+                    // The same call the bench makes, with the same rule: the
+                    // description is encouraged and never required (P0.3), so
+                    // an empty one throws a thread you can describe later.
+                    const edge = await addEdge(a, b, threadSentence.trim())
+                    const name = threadLabel.trim()
+                    if (name && edge?.id) {
+                      // Reuse before mint — see the field's own note.
+                      const existing = findLink(links, name)
+                      const link = existing ?? (await addLink(name))
+                      await attachLink(edge.id, link.id)
+                    }
+                    setThreadSentence("")
+                    setThreadLabel("")
+                    setPair([])
+                    flash(name ? 'thread thrown, and labelled' : 'thread thrown — label the link on 02, when you like')
+                  } catch (e) {
+                    console.error(e)
+                  } finally {
+                    setThrowing(false)
+                  }
                 }}
-              >Link these two on 02 · Linking →</button>
-            )}
-            <p className="pairpop-note">opens with the pair loaded · say how they hang together first</p>
+              >{throwing ? "throwing…" : "Throw it"}</button>
+              {onThrowPair && (
+                <button
+                  type="button"
+                  className="btn mini ghost"
+                  onClick={() => {
+                    const [a, b] = livePair
+                    setThreadSentence("")
+                    setThreadLabel("")
+                    setPair([])
+                    onThrowPair(a, b)
+                  }}
+                >open on 02 →</button>
+              )}
+            </div>
+            <p className="pairpop-note">02 · Linking carries the labels, the openers and the record of every thread</p>
           </>
         )}
       </div>

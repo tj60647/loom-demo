@@ -747,7 +747,7 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
    layer is still the right answer; the clipping alone is reason enough.
 
    Positioned from JS, so the UA's centring margin has to go. */
-.pairpop{position:fixed;margin:0;inset:auto;width:290px;max-width:calc(100vw - 24px);
+.pairpop{position:fixed;margin:0;inset:auto;width:340px;max-width:calc(100vw - 24px);
   /* The two names wrap and nothing truncates them — this is the one place the
      pair is spelled out in full — so a card is as tall as its concepts are
      long. The cap is what keeps a pathological pair inside the window. */
@@ -772,6 +772,22 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
 .pairpop-pair{margin:0 22px 9px 0;font-size:15px;line-height:1.35}
 .pairpop-arr{font-family:var(--mono);color:var(--ochre);margin:0 6px}
 .pairpop-go{width:100%;text-align:center}
+/* The streamlined bench (2026-08-19). Wider than the offer it replaces,
+   because it now holds two named slots and a field rather than one line of
+   prose — and centred on the midpoint of the pair, so the transform that
+   used to hang it above a node is gone. */
+.pairpop-slots{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin:2px 0 10px}
+.pairpop-slot{display:flex;flex-direction:column;gap:2px;min-width:0;padding:6px 8px;
+  border:1px dashed var(--rule);border-radius:4px;background:var(--paper-2)}
+.pairpop-slot b{font-weight:600;overflow-wrap:anywhere}
+.pairpop-swap{display:flex;flex-direction:column;align-items:center;gap:3px}
+.pairpop-swap button{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;
+  background:none;border:1px solid var(--rule);border-radius:3px;padding:1px 6px;cursor:pointer;color:var(--ink-soft)}
+.pairpop-swap button:hover{border-color:var(--sage);color:var(--sage)}
+.pairpop-actions{display:flex;gap:8px;margin-top:8px}
+.pairpop-actions .btn{flex:1 1 0;justify-content:center}
+.pairpop .openchip{font-size:12px;padding:2px 8px}
+.pairpop textarea{width:100%;font-size:13px}
 .pairpop-note{margin:8px 0 0;font-size:.72em;line-height:1.4;color:var(--ink-soft)}
 .readitem{padding:10px 0;border-bottom:1px dotted var(--rule)}
 .readitem .trip{font-size:15px;margin-bottom:2px}
