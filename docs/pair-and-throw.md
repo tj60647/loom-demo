@@ -1,5 +1,33 @@
 # Pair and throw, from the cloth
 
+**Status: BUILT, 2026-08-18 — `1ca3581`, `1e5a77a`, `9e928a9`.** What follows
+is the work order as it was written, kept because a reviewer reads the branch
+against it. Nothing below is authority now; the code is.
+
+Three things went differently, and each says why in its commit:
+
+- **The handoff is lifted state in `Workbench`, not `?pair=`.** The URL option
+  was recommended below as "how every other cross-station hop in the app
+  already works". That is true of cross-READING hops only —
+  `handleGotoPassage` uses a route for another reading and local state for this
+  one, and every in-workbench station hop takes the second road. 03 → 02 is
+  always the same reading. Two facts settle it beyond consistency: `initialTab`
+  seeds `useState` and nothing syncs it while `<Workbench>` is keyed by
+  `source.id`, so a same-route push would not change the station at all; and a
+  page reading `searchParams` renders dynamically, making every such push a
+  server round-trip — against TJ's "immediately".
+- **A plain click on a third node starts the pair over** (the question left
+  open below). File-manager idiom: plain click replaces, shift extends, so no
+  state requires counting the lit nodes to predict the next click.
+- **The nodes got the arcs' wide invisible twin.** r=3.4 was a 6.8px target,
+  survivable while a miss merely failed to trace and not once the click is the
+  gesture.
+
+**The open question below is still open**: faculty and admin cloths still
+trace. They pass no `onPickConcept`, so nothing about them changed.
+
+---
+
 **Status: work order, written 2026-08-18 for a session that has not started.**
 Not authority. `docs/loom-model-build.md` says what things *are*; this says what
 to build and what was already checked. Every fact below was verified in the repo
