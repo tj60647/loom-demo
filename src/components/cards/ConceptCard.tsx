@@ -41,14 +41,22 @@ export type ConceptCardMode =
 export type ConceptCardEdit = {
   isOpen: boolean
   onToggle: () => void
-  /** Takes the input so OpenTab can roll its value back when the clash
-   *  confirm is declined — the reason this is not just (label: string). */
-  onRename: (input: HTMLInputElement) => void
+  /**
+   * Takes the input so the host can roll its value back when a homonym confirm
+   * is declined — the reason this is not just (label: string). OPTIONAL: 04 ·
+   * Vocabulary does not rename, so it passes none and the field is not drawn.
+   * The card matching elsewhere is a matter of shape, not of inventing an act
+   * a station does not have.
+   */
+  onRename?: (input: HTMLInputElement) => void
   onEditDef: (def: string) => void
-  /** The evidence rows. OpenTab still draws these: they carry an unfile and a
-   *  remove whose wording is settled (TJ, 2026-08-17, "BOTH, always") and they
-   *  are the smallest, safest thing to move next. */
-  renderEvidence: (passage: Passage) => React.ReactNode
+  /** The evidence rows, one per passage. Your work draws these: they carry an
+   *  unfile and a remove whose wording is settled (TJ, 2026-08-17, "BOTH,
+   *  always"). Absent in Vocabulary, which speaks in readings, not passages. */
+  renderEvidence?: (passage: Passage) => React.ReactNode
+  /** Anything the host wants under the fields — Vocabulary's "Evidenced in …"
+   *  line, its merge picker and its "remove concept". */
+  body?: React.ReactNode
 }
 
 export default function ConceptCard({
@@ -61,6 +69,7 @@ export default function ConceptCard({
   /** Evidence from OTHER readings, counted rather than listed. */
   elsewhere = 0,
   allPassages,
+  readings = 0,
   edit,
   pick = null,
   onPick,
@@ -91,6 +100,13 @@ export default function ConceptCard({
    * Omitted, the card falls back to `passages` and says only what it can see.
    */
   allPassages?: Passage[]
+  /**
+   * How many READINGS the evidence spans. 04 · Vocabulary is the loom-wide
+   * station — "your vocabulary is across all readings, linking and knowledge
+   * graph and reading are just for this reading" (TJ, 2026-08-18) — so only it
+   * has a second number worth showing, and only when it is more than one.
+   */
+  readings?: number
   /** Required by `mode="edit"`; ignored otherwise. */
   edit?: ConceptCardEdit
   /** Required by `mode="pick"`; which slot this concept is loaded into. */
@@ -146,6 +162,7 @@ export default function ConceptCard({
     : (
       <div className="lsrc">
         {here} passage{here !== 1 ? "s" : ""}
+        {readings > 1 ? ` · ${readings} readings` : ""}
       </div>
     )
 
@@ -252,17 +269,19 @@ export default function ConceptCard({
         </div>
         {edit.isOpen && (
           <div className="lbody">
-            <div className="defrow">
-              <span className="label">Concept</span>
-              {/* Uncontrolled and keyed on the label: the rename can be rolled
-                  back by OpenTab when the homonym confirm is declined. */}
-              <input
-                key={concept.label}
-                placeholder="concept label…"
-                defaultValue={concept.label}
-                onBlur={(e) => edit.onRename(e.target)}
-              />
-            </div>
+            {edit.onRename && (
+              <div className="defrow">
+                <span className="label">Concept</span>
+                {/* Uncontrolled and keyed on the label: the rename can be rolled
+                    back by the host when the homonym confirm is declined. */}
+                <input
+                  key={concept.label}
+                  placeholder="concept label…"
+                  defaultValue={concept.label}
+                  onBlur={(e) => edit.onRename!(e.target)}
+                />
+              </div>
+            )}
             <div className="defrow">
               <span className="label">Description</span>
               {/* A textarea, not an input (TJ, 2026-08-17: "the description
@@ -270,7 +289,7 @@ export default function ConceptCard({
                   words by the model; on one line you could read about eight of
                   them, and the rest scrolled sideways out of view. */}
               <textarea
-                className="conceptdef"
+                className="conceptdef conceptDescription"
                 rows={2}
                 placeholder="in your words; same sense across your sources?"
                 defaultValue={concept.def ?? ""}
@@ -279,7 +298,8 @@ export default function ConceptCard({
                 }}
               />
             </div>
-            {passages.map((b) => edit.renderEvidence(b))}
+            {edit.renderEvidence && passages.map((b) => edit.renderEvidence!(b))}
+            {edit.body}
             {/* "N more passages evidence this concept in your other readings"
                 stood here until 2026-08-13 (TJ: "i think that belongs in
                 vocabulary, not 'in this reading'"). It does, and it is already

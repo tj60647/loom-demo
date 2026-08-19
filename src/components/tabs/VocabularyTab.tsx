@@ -25,7 +25,7 @@ import { soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { usesOf } from "@/lib/linkResolve"
 import ObjectDownload from "@/components/ui/ObjectDownload"
-import ConceptName from "@/components/ui/ConceptName"
+import ConceptCard from "@/components/cards/ConceptCard"
 import { conceptNameText } from "@/lib/conceptName"
 import { buildVocabularyExport, buildVocabularyMarkdown } from "@/lib/objectExport"
 import VocabularyOverlay from "@/components/tabs/VocabularyOverlay"
@@ -346,101 +346,103 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
               const stats = conceptStats.get(concept.id) ?? { passages: 0, readings: [] }
               const isOpen = openConcepts[concept.id]
               return (
-                <div key={concept.id} className={`lrow ${isOpen ? "open" : ""}`} data-concept-id={concept.id}>
-                  <div
-                    className="lhead"
-                    onClick={() => setOpenConcepts((p) => ({ ...p, [concept.id]: !p[concept.id] }))}
-                    style={{ display: "flex", alignItems: "center" }}
-                  >
-                    <div className="lconcept" style={{ flex: 1 }}><ConceptName concept={concept} /></div>
-                    <div className="lsrc">
-                      {stats.passages} passage{stats.passages !== 1 ? "s" : ""}
-                      {stats.readings.length > 1 ? ` · ${stats.readings.length} readings` : ""}
-                    </div>
-                  </div>
-                  {isOpen && (
-                    <div className="lbody">
-                      <div className="defrow">
-                        <span className="label">Description</span>
-                        <input
-                          className="conceptDescription"
-                          placeholder="in your words; same sense across your sources?"
-                          defaultValue={concept.def ?? ""}
-                          onBlur={(e) => {
-                            if (e.target.value !== (concept.def ?? "")) {
-                              editConcept(concept.id, { def: e.target.value })
-                              flash("description saved")
-                            }
-                          }}
-                        />
-                      </div>
+                <ConceptCard
+                  key={concept.id}
+                  concept={concept}
+                  /* 04 is the LOOM-WIDE station (TJ, 2026-08-18: "your
+                     vocabulary is across all readings, linking and knowledge
+                     graph and reading are just for this reading"), so the card
+                     is handed every passage that backs the concept and the
+                     count it prints is the whole loom's. `readings` is the
+                     second number only this station has. */
+                  passages={state.passages.filter((b) => b.conceptIds.includes(concept.id))}
+                  allPassages={state.passages}
+                  readings={stats.readings.length}
+                  concepts={state.concepts}
+                  titleOf={readingName}
+                  mode="edit"
+                  edit={{
+                    isOpen: !!isOpen,
+                    onToggle: () => setOpenConcepts((p) => ({ ...p, [concept.id]: !p[concept.id] })),
+                    /* No onRename: renaming a concept is 03 · Open's act, and
+                       the card draws the field only when a host offers one. */
+                    onEditDef: (def: string) => { editConcept(concept.id, { def }); flash("description saved") },
+                    body: (
+                      <>
+                        {/* The Description field is the CARD's now — one
+                            textarea, drawn by ConceptCard for every station
+                            that edits a concept. Vocabulary's own input stood
+                            here and rendered a second one directly beneath it.
+                            `.conceptDescription` moved onto the card's textarea
+                            so journey-learner's assertion still finds it. */}
 
-                      {stats.readings.length > 0 ? (
-                        <p className="ghostnote" style={{ marginTop: "10px" }}>
-                          Evidenced in{" "}
-                          {stats.readings.map((key, i) => (
-                            <span key={key}>
-                              {i > 0 && (i === stats.readings.length - 1 ? " and " : ", ")}
-                              <i>{readingName(key)}</i>
-                            </span>
-                          ))}
-                          {stats.readings.length > 1
-                            ? " — one concept, evidence from several texts."
-                            : "."}
-                        </p>
-                      ) : (
-                        /* A designation, not a warning (TJ, 2026-08-08: "a
-                           Concept may precede its evidence"; red line 4:
-                           "empty states are visible, not blocked"). This said
-                           "every concept SHOULD trace to something you
-                           captured", in red — an instruction to fix a state
-                           the model made first-class that same week. */
-                        <p className="ghostnote" style={{ marginTop: "10px" }}>
-                          No passage evidences this yet. You may have named it ahead of
-                          finding it, or its passages may have moved on.
-                        </p>
-                      )}
+                    {stats.readings.length > 0 ? (
+                      <p className="ghostnote" style={{ marginTop: "10px" }}>
+                        Evidenced in{" "}
+                        {stats.readings.map((key, i) => (
+                          <span key={key}>
+                            {i > 0 && (i === stats.readings.length - 1 ? " and " : ", ")}
+                            <i>{readingName(key)}</i>
+                          </span>
+                        ))}
+                        {stats.readings.length > 1
+                          ? " — one concept, evidence from several texts."
+                          : "."}
+                      </p>
+                    ) : (
+                      /* A designation, not a warning (TJ, 2026-08-08: "a
+                         Concept may precede its evidence"; red line 4:
+                         "empty states are visible, not blocked"). This said
+                         "every concept SHOULD trace to something you
+                         captured", in red — an instruction to fix a state
+                         the model made first-class that same week. */
+                      <p className="ghostnote" style={{ marginTop: "10px" }}>
+                        No passage evidences this yet. You may have named it ahead of
+                        finding it, or its passages may have moved on.
+                      </p>
+                    )}
 
-                      {MERGE_VISIBLE && <div className="quietrow" style={{ marginTop: "12px" }}>
-                        {/* A picker, not a text field. Typing a NAME to choose
-                            an OBJECT is the bug: two concepts may legally share
-                            one label, and then no amount of typing can say
-                            which. Homonyms carry their passage count so they
-                            can be told apart at the moment it matters. */}
-                        <select
-                          className="tinput inline"
-                          style={{ flex: 1 }}
-                          aria-label={`Merge “${conceptNameText(concept)}” into`}
-                          title="the same idea captured twice? pick the concept to keep — this one's passages and threads move onto it"
-                          value={mergeInputs[concept.id] ?? ""}
-                          onChange={(e) =>
-                            setMergeInputs((p) => ({ ...p, [concept.id]: e.target.value }))
-                          }
-                        >
-                          <option value="">merge into another concept…</option>
-                          {mergeTargets(concept.id).map((t) => (
-                            <option key={t.id} value={t.id}>{t.label}</option>
-                          ))}
-                        </select>
-                        <button
-                          className="btn ghost mini"
-                          onClick={() => handleMerge(concept)}
-                          disabled={!!mergeBusy[concept.id]}
-                        >
-                          Merge
-                        </button>
-                      </div>}
-                      <button
-                        type="button"
-                        className="rm"
-                        style={{ background: "none", border: "none", padding: 0, marginTop: "12px" }}
-                        onClick={() => handleRemoveConcept(concept, stats.passages)}
+                    {MERGE_VISIBLE && <div className="quietrow" style={{ marginTop: "12px" }}>
+                      {/* A picker, not a text field. Typing a NAME to choose
+                          an OBJECT is the bug: two concepts may legally share
+                          one label, and then no amount of typing can say
+                          which. Homonyms carry their passage count so they
+                          can be told apart at the moment it matters. */}
+                      <select
+                        className="tinput inline"
+                        style={{ flex: 1 }}
+                        aria-label={`Merge “${conceptNameText(concept)}” into`}
+                        title="the same idea captured twice? pick the concept to keep — this one's passages and threads move onto it"
+                        value={mergeInputs[concept.id] ?? ""}
+                        onChange={(e) =>
+                          setMergeInputs((p) => ({ ...p, [concept.id]: e.target.value }))
+                        }
                       >
-                        remove concept
+                        <option value="">merge into another concept…</option>
+                        {mergeTargets(concept.id).map((t) => (
+                          <option key={t.id} value={t.id}>{t.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn ghost mini"
+                        onClick={() => handleMerge(concept)}
+                        disabled={!!mergeBusy[concept.id]}
+                      >
+                        Merge
                       </button>
-                    </div>
-                  )}
-                </div>
+                    </div>}
+                    <button
+                      type="button"
+                      className="rm"
+                      style={{ background: "none", border: "none", padding: 0, marginTop: "12px" }}
+                      onClick={() => handleRemoveConcept(concept, stats.passages)}
+                    >
+                      remove concept
+                    </button>
+                      </>
+                    ),
+                  }}
+                />
               )
             })}
           </div>
