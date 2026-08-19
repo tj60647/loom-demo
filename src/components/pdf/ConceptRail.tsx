@@ -254,6 +254,7 @@ export default function ConceptRails({
   onAddConcept,
   onEditConcept,
   onEditNote,
+  draft,
   children,
 }: {
   enabled: boolean;
@@ -276,6 +277,12 @@ export default function ConceptRails({
   /** Write the passage's note from the card. Changes the card's height when it
    *  opens and closes, like the add-concept editor, and not while typing. */
   onEditNote?: (passageId: string, note: string) => void;
+  /**
+   * A capture in progress. Placed like any other card — the viewer has painted
+   * a highlight on the selection under this passage's id, so the anchor sweep
+   * below found it the ordinary way. See PdfViewer's DRAFT_ID.
+   */
+  draft?: { passage: Passage; card: React.ReactNode } | null;
   children: React.ReactNode;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -432,8 +439,14 @@ export default function ConceptRails({
         anchor,
       });
     }
+    // The draft packs into the rail with everything else — it is a card about
+    // a passage, and the rail has no reason to treat it differently until it
+    // is saved and becomes one of them.
+    if (draft && anchors[draft.passage.id]) {
+      out.push({ passage: draft.passage, concepts: [], anchor: anchors[draft.passage.id] });
+    }
     return out.sort((a, b) => a.anchor.midY - b.anchor.midY);
-  }, [enabled, passages, concepts, anchors]);
+  }, [enabled, passages, concepts, anchors, draft]);
 
   const closeAddConcept = useCallback((passageId: string) => {
     restoreAddFocusFor.current = passageId;
@@ -532,6 +545,8 @@ export default function ConceptRails({
               ref={(el) => registerCard(id, el)}
               className="pdf-railcard-stack"
               data-add-open={activeAddPassageId === id ? "true" : undefined}
+              data-draft={draft && id === draft.passage.id ? "true" : undefined}
+              data-side={side}
               style={{
                 top: placement.tops[id] ?? c.anchor.midY,
                 transform: s < 1 ? `scale(${s})` : undefined,
@@ -540,6 +555,7 @@ export default function ConceptRails({
                 transformOrigin: side === "left" ? "top right" : "top left",
               }}
             >
+              {draft && id === draft.passage.id ? draft.card : (<>
               <div className="pdf-railcard">
                 <RailCardBody
                   passage={c.passage}
@@ -567,6 +583,7 @@ export default function ConceptRails({
                   />
                 </div>
               ) : null}
+              </>)}
             </div>
           );
         })}

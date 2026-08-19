@@ -74,21 +74,29 @@ test.describe('PDF Viewer and Highlighting', () => {
       await expect(captureButton).toBeVisible();
       await captureButton.click();
 
-      // Modal appears, save the passage. Exact match: Your work's own concept
-      // input starts with the same words and is mounted behind this at all
-      // times now — the sheet is parked off-screen, not unmounted.
-      const conceptInput = page.locator('.info-scrim').getByPlaceholder('e.g. boundary objects', { exact: true });
-      await conceptInput.fill(conceptName);
+      // The capture form appears — on the rail where there is one, in the
+      // modal where there is not (2026-08-19). Same fields and same ids on
+      // either path, so this reaches for the id rather than scoping to a shell
+      // that is only sometimes there. Your work's own concept input carries
+      // the same placeholder and is mounted behind this at all times (the
+      // sheet is parked off-screen, not unmounted), which is why the old line
+      // needed the scope and this one does not.
+      // The concept block is a disclosure, closed by default (2026-08-19), so it
+      // has to be opened before the field exists to fill.
+      await page.locator('#captureConceptToggle').click();
+      await page.locator('#captureConcept').fill(conceptName);
 
       const saveButton = page.locator('button:has-text("Save Passage")');
       await saveButton.click();
 
-      // Wait for the MODAL to close, not for the button's text: while the
+      // Wait for the capture FORM to go, not for the button's text: while the
       // save is in flight the button reads "Saving..." — which makes a
-      // "Save Passage" locator report hidden while the modal's scrim is still
-      // up, swallowing every click that follows. The heading disappears only
-      // when the capture has really landed and the modal unmounted.
-      await expect(page.getByRole('heading', { name: 'Capture Passage' })).toBeHidden({ timeout: 30_000 });
+      // "Save Passage" locator report hidden while the form is still up,
+      // swallowing every click that follows. And not for the heading either:
+      // that belongs to the modal shell alone, so it reports hidden instantly
+      // on the rail path and proves nothing. #capturePassageSave unmounts only
+      // when the capture has really landed.
+      await expect(page.locator('#capturePassageSave')).toHaveCount(0, { timeout: 30_000 });
 
       // Verify the highlight is applied to the DOM immediately
       const highlight = page.locator('.loom-passage-highlight').first();

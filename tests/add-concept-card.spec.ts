@@ -65,9 +65,24 @@ test.describe('Add concept beside the passage', () => {
     expect(selected.trim().length).toBeGreaterThanOrEqual(80);
 
     await page.locator('button:has-text("Capture as Passage")').click();
-    await page.locator('.info-scrim').getByPlaceholder('e.g. boundary objects', { exact: true }).fill(seedConcept);
+    // The capture form is on the RAIL now, not in a scrim (2026-08-19) — same
+    // fields, same ids, same Save; only the shell around them moved. Reaching
+    // for #captureConcept rather than scoping to .info-scrim is what makes this
+    // line true on either path, which matters because the modal still serves
+    // the strip and narrow widths.
+    // The concept block is a disclosure, closed by default (2026-08-19), so it
+    // has to be opened before the field exists to fill.
+    await page.locator('#captureConceptToggle').click();
+    await page.locator('#captureConcept').fill(seedConcept);
     await page.locator('button:has-text("Save Passage")').click();
-    await expect(page.getByRole('heading', { name: 'Capture Passage' })).toBeHidden({ timeout: 30_000 });
+    // Wait for the capture FORM to go, not for its heading. The heading only
+    // exists in the modal shell, and capture is on the rail here — so a
+    // heading matcher would report hidden instantly and hand the rest of the
+    // spec a capture that has not landed. #capturePassageSave is the one node
+    // both shells mount, and it unmounts only when the passage is really
+    // saved. Waiting on the button's TEXT instead would be worse still: it
+    // reads "Saving..." mid-flight.
+    await expect(page.locator('#capturePassageSave')).toHaveCount(0, { timeout: 30_000 });
     await expect(page.locator('.loom-passage-highlight').first()).toBeVisible({ timeout: 5000 });
 
     // One page, so there is exactly one rail and one card to reason about.

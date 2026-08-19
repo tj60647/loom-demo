@@ -194,6 +194,7 @@ export default function SpreadCanvasView({
   onAddConcept,
   onEditConcept,
   onEditNote,
+  draft,
   onAspect,
   zoomMultiplier,
   onZoomMultiplier,
@@ -232,6 +233,13 @@ export default function SpreadCanvasView({
   /** Write the passage's note from the card. Changes a card's height when it
    *  opens and closes, so the rail re-packs then and not while typing. */
   onEditNote?: (passageId: string, note: string) => void;
+  /**
+   * A capture in progress. The host places it like any other card — the
+   * viewer has already painted a highlight on the selection under this
+   * passage's id, so the anchor sweep found it the ordinary way — and knows
+   * nothing about what the card contains. See PdfViewer's DRAFT_ID.
+   */
+  draft?: { passage: Passage; card: React.ReactNode } | null;
   onAspect: (a: number) => void;
   /** The toolbar slider's value: 1 = the whole canvas fits the stage. */
   zoomMultiplier: number;
@@ -554,6 +562,14 @@ export default function SpreadCanvasView({
     }
     el.style.transform = `translate(${t.x}px, ${t.y}px) scale(${t.k})`;
     el.style.setProperty("--invk", String(Math.max(1, live.current.spreadFitK / t.k)));
+    // The raw scale, for anything that must come out a CONSTANT SIZE ON SCREEN
+    // rather than a constant size on the plane. --invk cannot serve that: it is
+    // clamped at 1, because its job is to stop card TEXT shrinking below
+    // reading size as you zoom out, and it deliberately does nothing as you
+    // zoom in. The draft card is the opposite case — it is a form you type
+    // into, not part of the document, so it should be the same size in the
+    // hand at every zoom. See .pdf-draftcard in PdfViewer.
+    el.style.setProperty("--k", String(t.k));
     // The minimap rides the same write: overview + detail must never drift,
     // so the view-rect is imperative like the canvas — zero React per frame.
     // Visible only when there is somewhere else to be: at fit-all the rect
@@ -870,6 +886,44 @@ export default function SpreadCanvasView({
   // centers that page's spot at the current zoom. Entering the matrix does
   // not jump: the ref starts at whatever page the reading was already on.
   const prevFocus = useRef(focusPage);
+  /**
+   * A DRAFT PULLS THE VIEW IN FAR ENOUGH TO WRITE IN IT (TJ, 2026-08-19).
+   *
+   * Between READ_ONLY_RATIO and the tier where text layers stop mounting you
+   * can still select words, but out there a card is a counter-scaled marker
+   * over a thumbnail — a draft would open at a size nobody can type into. So
+   * capture is allowed to move the view, and only capture: the reader asked
+   * for the move by selecting the words and pressing the button.
+   *
+   * The target is READ_ONLY_RATIO expressed back as a scale, which is why this
+   * lives here rather than in the viewer — `stage.w / (k * basePageWidth)` is
+   * the ratio, so the k that puts it exactly on the reading edge is
+   * `stage.w / (RATIO * basePageWidth)`. A hair tighter than the edge (0.95),
+   * because landing exactly on a threshold is how you get a card that is
+   * read-only on one frame and editable the next.
+   *
+   * It runs ONCE per draft, on the id changing, and never while one is open:
+   * re-centring under someone who has started typing would be its own bug.
+   * A capture begun inside the editable band moves nothing.
+   */
+  const draftId = draft?.passage.id ?? null;
+  const prevDraft = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevDraft.current === draftId) return;
+    prevDraft.current = draftId;
+    if (!draftId || !layout || !initedRef.current) return;
+    const { stage, basePageWidth, fitAllK, maxMultiplier } = live.current;
+    if (stage.w === 0 || basePageWidth === 0 || fitAllK === 0) return;
+    const k = tref.current.k;
+    const needed = stage.w / (READ_ONLY_RATIO * 0.95 * basePageWidth);
+    if (k >= needed) return; // already close enough to write
+    const to = Math.min(needed, fitAllK * maxMultiplier);
+    // Through the multiplier, not writeTransform: the toolbar's − / + / Fit and
+    // the settle sync all speak that unit, and a zoom they cannot see is one
+    // the slider will yank back on its next settle.
+    onZoomMultiplier(Math.min(maxMultiplier, Math.round((to / fitAllK) * 10) / 10));
+  }, [draftId, layout, onZoomMultiplier]);
+
   useEffect(() => {
     if (prevFocus.current === focusPage) return;
     prevFocus.current = focusPage;
@@ -1184,8 +1238,58 @@ export default function SpreadCanvasView({
         anchor,
       });
     }
+    // The draft sits in the same rail, packed and scaled with everything else
+    // — it is a card about a passage, and the rail has no reason to treat it
+    // differently until it is saved and becomes one of the others.
+    if (draft && mergedAnchors[draft.passage.id]) {
+      out.push({ passage: draft.passage, concepts: [], anchor: mergedAnchors[draft.passage.id] });
+    }
     return out.sort((a, b) => a.anchor.midY - b.anchor.midY);
-  }, [cardsOn, layout, passages, concepts, mergedAnchors]);
+  }, [cardsOn, layout, passages, concepts, mergedAnchors, draft]);
+
+  /**
+   * STAGE TWO OF OPENING A DRAFT: put the words and the card you are about to
+   * write in on screen together.
+   *
+   * The zoom effect above is stage one, and on its own it was the whole bug
+   * (TJ, 2026-08-19: "i am in canvas mode, select text, tap capture passage,
+   * and then it goes weird"). applyMultiplier holds the STAGE CENTRE fixed
+   * while it changes k — correct for the toolbar's − / +, where the centre is
+   * what you are looking at — so a capture taken from anything off-centre
+   * zoomed toward a point the reader had not chosen and left the highlight,
+   * and the card anchored to it, outside the view. Measured before this:
+   * capture at ratio 2.18 landed the view at 1.52 with the draft card off
+   * screen entirely.
+   *
+   * It cannot be done in stage one because there is nothing to aim at yet:
+   * the anchor comes from a mark that is painted after the draft is set, and
+   * measured after that. So this waits for the anchor to exist and then
+   * centres once.
+   *
+   * The target is NOT the highlight — it is the midpoint between the highlight
+   * and the outer edge of the rail its card sits in. Centring the highlight
+   * alone puts the card half a rail off the edge on a narrow stage, which is
+   * the same failure in a smaller size.
+   */
+  const centredDraft = useRef<string | null>(null);
+  const draftAnchor = draft ? mergedAnchors[draft.passage.id] : undefined;
+  useEffect(() => {
+    if (!draftId) { centredDraft.current = null; return; }
+    if (!draftAnchor || !layout || centredDraft.current === draftId) return;
+    const el = viewportRef.current;
+    if (!el || !initedRef.current) return;
+    const { stage } = live.current;
+    if (stage.w === 0) return;
+    centredDraft.current = draftId;
+    const s = layout.spreads[draftAnchor.spreadIdx];
+    if (!s) return;
+    const railOuter = draftAnchor.side === "left" ? s.x : s.x + layout.unitW;
+    const cx = (railOuter + draftAnchor.edgeX) / 2;
+    const cy = draftAnchor.midY;
+    const k = tref.current.k;
+    cancelWheel();
+    writeTransform(zoomIdentity.translate(stage.w / 2 - cx * k, stage.h / 2 - cy * k).scale(k));
+  }, [draftId, draftAnchor, layout, cancelWheel, writeTransform]);
 
   const closeAddConcept = useCallback((passageId: string) => {
     restoreAddFocusFor.current = passageId;
@@ -1298,7 +1402,8 @@ export default function SpreadCanvasView({
                  an empty bordered box over a thumbnail, saying only that
                  SOMETHING was captured here — which the highlight says better.
                  Close in it keeps its + and its invitation, so it stays. */
-              if (seesMoreThanAPage && c.concepts.length === 0 && !c.passage.note) return null;
+              if (!(draft && c.passage.id === draft.passage.id)
+                  && seesMoreThanAPage && c.concepts.length === 0 && !c.passage.note) return null;
               const h = (passageCardHeights[id] ?? CARD_FALLBACK_H) * cs;
               const x2 = c.anchor.side === "left" ? s.x + layout.railW : s.x + layout.unitW - layout.railW;
               return <path key={id} d={`M ${c.anchor.edgeX} ${c.anchor.midY} L ${x2} ${top + h / 2}`} />;
@@ -1317,13 +1422,27 @@ export default function SpreadCanvasView({
                  an empty bordered box over a thumbnail, saying only that
                  SOMETHING was captured here — which the highlight says better.
                  Close in it keeps its + and its invitation, so it stays. */
-              if (seesMoreThanAPage && c.concepts.length === 0 && !c.passage.note) return null;
+              const isDraft = !!draft && c.passage.id === draft.passage.id;
+              // The empty-card rule cannot apply to a draft: it has no concept
+              // and no note BY DEFINITION — that is what the reader is about
+              // to supply — so the test that hides an empty card would hide
+              // the one card that must be on screen.
+              if (!isDraft && seesMoreThanAPage && c.concepts.length === 0 && !c.passage.note) return null;
               // No first/chips split: every concept is a badge of equal
               // weight, the same as page mode's rail and the passage view.
               const style: React.CSSProperties = {
                 top: placement.tops[id] ?? s.y,
                 width: `min(calc(${layout.railW}px * var(--invk, 1)), ${layout.railW + layout.gap + basePageWidth}px)`,
-                transform: cs < 1 ? `scale(${cs})` : undefined,
+                // railScale shrinks a crowded side so every card stays visible.
+                // The DRAFT is exempt: it is the thing being written, and
+                // shrinking it because its neighbours are crowded is the one
+                // case where "keep everything visible" costs the reader the
+                // legibility that rule exists to protect. Measured on a rail at
+                // scale 0.718 it took the card to 244px on screen where the
+                // counter-scale had put it at 340. It overlaps its neighbours
+                // instead, which is what its z-index is for, and it is gone as
+                // soon as the capture is taken.
+                transform: cs < 1 && !isDraft ? `scale(${cs})` : undefined,
                 transformOrigin: c.anchor.side === "left" ? "top left" : "top right",
                 ...(c.anchor.side === "left"
                   ? { left: s.x, right: "auto" }
@@ -1343,8 +1462,11 @@ export default function SpreadCanvasView({
                   ref={(el) => registerCard(id, el)}
                   className="pdf-railcard-stack"
                   data-add-open={activeAddPassageId === id ? "true" : undefined}
+                  data-draft={isDraft ? "true" : undefined}
+                  data-side={c.anchor.side}
                   style={style}
                 >
+                  {isDraft ? draft!.card : (
                   <div className="pdf-railcard">
                     <RailCardBody
                       passage={c.passage}
@@ -1360,7 +1482,8 @@ export default function SpreadCanvasView({
                       readOnly={seesMoreThanAPage}
                     />
                   </div>
-                  {activeAddPassageId === id && onCreateConcept && onAddConcept ? (
+                  )}
+                  {!isDraft && activeAddPassageId === id && onCreateConcept && onAddConcept ? (
                     <div id={`canvas-add-concept-${id}`} className="pdf-add-concept-host">
                       <AddConceptCard
                         passage={c.passage}

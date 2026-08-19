@@ -126,8 +126,13 @@ test.describe("The guide", () => {
     // ---- 3. keep it, and name it ------------------------------------------
     // Both halves: the passage's own note, and a concept — which is optional
     // now (TJ, 2026-08-12), so the unlabeled path gets its own test below.
-    await page.locator("#captureConcept").fill("going on anyway")
+    // The note first, because the caret starts there now (2026-08-19) and the
+    // form is written in that order. Naming is behind a disclosure, closed by
+    // default, so the concept costs a press before it can be typed — which is
+    // the point of the beat: keeping the words and naming them are two acts.
     await page.locator("#capturePassageNote").fill("A practice note on why these words.")
+    await page.locator("#captureConceptToggle").click()
+    await page.locator("#captureConcept").fill("going on anyway")
     await page.locator("#capturePassageSave").click()
     await ticked(page, 3)
 
@@ -447,6 +452,9 @@ test.describe("The guide", () => {
     await expect(page.locator("#capturePassageSave")).toBeEnabled()
     await expect(page.locator("#capturePassageSave")).toHaveText("Save unlabeled")
     // The concept's own description is not asked for when there is no concept.
+    // Twice over now: it renders only once a label is typed, AND it sits inside
+    // the closed disclosure. Count, not visibility, so this keeps meaning what
+    // it meant — that the field does not exist, not merely that it is folded.
     await expect(page.locator("#captureConceptDef")).toHaveCount(0)
     await page.locator("#capturePassageNote").fill("Kept before I knew what to call it.")
     await page.locator("#capturePassageSave").click()

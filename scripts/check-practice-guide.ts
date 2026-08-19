@@ -262,11 +262,16 @@ assert(GUIDE_STEPS.length === 8, "eight beats — the moves the work requires, a
 
 // --- the interface raises the two signals the state cannot carry ---
 {
-  const modal = readFileSync("src/components/pdf/CaptureModal.tsx", "utf8")
+  // CaptureFields, not CaptureModal: the form moved out of the modal on
+  // 2026-08-19 so the rail could show the same one, and the signals went with
+  // it. Reading the shell would now pass or fail on the wrong file — and pass
+  // is the dangerous direction, since a shell can keep the events while the
+  // form the reader actually uses has lost them.
+  const modal = readFileSync("src/components/pdf/CaptureFields.tsx", "utf8")
   assert(
     /loom:capture-open/.test(modal),
-    "the capture dialog announces itself",
-    "CaptureModal no longer dispatches loom:capture-open — the highlight beat can never tick"
+    "the capture form announces itself",
+    "CaptureFields no longer dispatches loom:capture-open — the highlight beat can never tick"
   )
   const mapTab = readFileSync("src/components/tabs/MapTab.tsx", "utf8")
   assert(
@@ -441,22 +446,22 @@ assert(GUIDE_STEPS.length === 8, "eight beats — the moves the work requires, a
   )
 }
 
-// --- the dialog beat suppresses the mask ---
+// --- a beat pointing into the capture form suppresses the mask ---
 {
-  const modal = readFileSync("src/components/pdf/CaptureModal.tsx", "utf8")
+  const modal = readFileSync("src/components/pdf/CaptureFields.tsx", "utf8")
   for (const step of GUIDE_STEPS) {
     const inDialog = step.targets.some((t) => t.startsWith("#") && modal.includes(`id="${t.slice(1)}"`))
     if (!inDialog) continue
     assert(
       step.overlay === "none",
-      `${step.key} does not double-dim the capture dialog`,
-      `${step.key} points inside .info-scrim and still asks for a mask`
+      `${step.key} does not double-dim the capture form`,
+      `${step.key} points inside the capture form and still asks for a mask`
     )
   }
   assert(
     /loom:capture-close/.test(modal),
-    "the capture dialog says when it CLOSES",
-    "CaptureModal no longer dispatches loom:capture-close — cancelling would leave the highlight beat ticked"
+    "the capture form says when it CLOSES",
+    "CaptureFields no longer dispatches loom:capture-close — cancelling would leave the highlight beat ticked"
   )
 }
 

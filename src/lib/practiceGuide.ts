@@ -155,12 +155,17 @@ export const GUIDE_STEPS: GuideStep[] = [
     key: "name",
     label: "Keep it, and name it",
     station: "reading",
-    targets: ["#captureConcept", "#capturePassageNote", "#capturePassageSave"],
-    // The dialog brings its own scrim; a second one just darkens it twice.
+    // #captureConceptToggle, not #captureConcept: the concept block is a
+    // disclosure closed by default since 2026-08-19, so the field itself is
+    // not rendered until the reader opens it — a target that is not on screen
+    // is a spotlight on nothing, and it fails silently. The toggle IS the
+    // thing to point at, because opening it is now the first half of the act.
+    targets: ["#capturePassageNote", "#captureConceptToggle", "#capturePassageSave"],
+    // The card brings its own ground; a scrim over it just darkens it twice.
     overlay: "none",
     needsText: true,
     say:
-      "Name the concept those words evidence — or leave it blank and keep the passage unlabeled. Add a note if you want one. Then save.",
+      "Say why you kept these words — the cursor is already there. Then, if you have a name for the idea, open “Add a concept” and give it one; leaving it closed keeps the passage unlabeled. Then save.",
     why: "The passage is the evidence; the concept is what you claim it is evidence OF. Keeping the words and naming them are two acts, and the second can wait.",
   },
   {

@@ -4,6 +4,7 @@ import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import CaptureModal, { type CaptureReuse } from './CaptureModal';
+import DraftCard from './DraftCard';
 import PageSlot from './PageSlot';
 import { type PdfDoc } from './PageRaster';
 import SpreadCanvasView from './SpreadCanvasView';
@@ -75,6 +76,57 @@ interface PdfViewerProps {
 }
 
 /** One passage on the clicked span, as the highlight tooltip presents it. */
+/**
+ * What a capture needs to know about the words, before any of it is saved.
+ * The modal and the rail draft take the same five facts; only where the
+ * reader types them differs.
+ */
+export type CaptureTarget = {
+  text: string;
+  pageNum?: number;
+  startOffset?: number;
+  endOffset?: number;
+  pageContentHash?: string;
+};
+
+/**
+ * The id the in-progress capture wears while it is only a selection.
+ *
+ * A UUID would be wrong twice: it would collide with nothing, but it would
+ * also be indistinguishable from a saved passage to every consumer that keys
+ * off `data-loom-passage-id` — the rails, the tooltip, the mark sweep. A
+ * reserved literal lets each of them ask the one question that matters.
+ */
+export const DRAFT_ID = "draft";
+
+/**
+ * The draft, shaped as the Passage the marking pass already knows how to
+ * paint. Nothing here is written anywhere: it exists for the length of one
+ * mark.js call, so the selection carries a real .loom-passage-highlight and
+ * both rail hosts anchor a card on it with no idea a draft is involved.
+ */
+function draftAsPassage(d: CaptureTarget, sourceName: string): Passage {
+  return {
+    id: DRAFT_ID,
+    courseId: null,
+    userId: "",
+    conceptIds: [],
+    source: sourceName,
+    sourceId: null,
+    location: d.pageNum ? `p. ${d.pageNum}` : null,
+    content: d.text,
+    pageNumber: d.pageNum ?? null,
+    startOffset: d.startOffset ?? null,
+    endOffset: d.endOffset ?? null,
+    pageContentHash: d.pageContentHash ?? null,
+    note: "",
+    question: "",
+    isPullQuote: false,
+    tier: "" as Passage["tier"],
+    createdAt: new Date(0),
+  } as Passage;
+}
+
 type HighlightEntry = {
   passageId: string;
   conceptLabel: string;
@@ -460,7 +512,28 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   
   const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string, pageNum?: number, startOffset?: number, endOffset?: number, pageContentHash?: string} | null>(null);
   const [showCaptureModal, setShowCaptureModal] = useState(false);
-  const [captureData, setCaptureData] = useState<{text: string, pageNum?: number, startOffset?: number, endOffset?: number, pageContentHash?: string} | null>(null);
+  /**
+   * A CAPTURE IN PROGRESS, ON THE RAIL (TJ, 2026-08-19: "the capture passage is
+   * currently a modal, i want it to go on the rail").
+   *
+   * The draft is a passage that does not exist yet, and it is deliberately
+   * shaped like one: DRAFT_ID goes on a real highlight over the selection, so
+   * both rail hosts' anchor sweeps find it the ordinary way and place a card
+   * with a leader line without either of them learning what a draft is. The
+   * card body is the only thing that differs.
+   *
+   * The modal has NOT gone. It still serves every surface with no rail to draw
+   * on — the strip, and page mode below the width where rails are hidden —
+   * because a capture path that disappears with the window is worse than two
+   * that agree. Both end in the same addPassage and report through the same
+   * onCaptured, so the shared ReuseOffer still sees every capture: that is the
+   * 2.1 invariant, and it is what open-work.md 5.7 warned an inline draft
+   * would break.
+   */
+  const [draft, setDraft] = useState<CaptureTarget | null>(null);
+  const draftRef = useRef<CaptureTarget | null>(null);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+  const [captureData, setCaptureData] = useState<CaptureTarget | null>(null);
 
   // Find in this reading. The query runs server-side against the canonical
   // page text (src/actions/search.ts) and comes back as page-ordered snippets;
@@ -1055,7 +1128,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
      * a NEW layer only needs its own marks.
      */
     const applyHighlights = (only?: Iterable<Element>) => {
-      const passages = passagesRef.current;
+      /**
+       * The draft rides in as a passage with a reserved id, so ONE marking
+       * pass paints it: a second pass would race this one's unmark and strip
+       * whichever finished first, which is the same reason search terms ride
+       * here rather than in an effect of their own.
+       */
+      const d = draftRef.current;
+      const passages = d ? [...passagesRef.current, draftAsPassage(d, sourceName)] : passagesRef.current;
       const heatPages = overlayRef.current?.pages ?? [];
       /**
        * Nothing to mark is not nothing to DO: the unmark below lives inside
@@ -1287,21 +1367,82 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     // and having it there made every page turn re-register the observer and
     // re-mark every mounted layer to update marks on the one page that changed
     // — which the observer already catches when that page's layer lands.
-  }, [state.passages, state.concepts, bindHighlightNode, sourceName, searchTerms, overlay, stageEl]); // Re-run when passages, search terms or the overlay change — and if the stage node itself is replaced
+    // `draft` is a dep because the draft IS a mark: opening one has to repaint
+    // the layer that carries the selection, or the rails never see an anchor
+    // for it and no card appears. Closing one has to repaint too, or the
+    // highlight outlives the capture it stood for. Twice per capture, against
+    // an observer re-registration that costs one sweep — the same trade the
+    // passages list already makes.
+  }, [state.passages, state.concepts, bindHighlightNode, sourceName, searchTerms, overlay, stageEl, draft]); // Re-run when passages, search terms, the draft or the overlay change — and if the stage node itself is replaced
+
+  /**
+   * Is there a rail to draw the draft on?
+   *
+   * The strip has none, and page mode hides its rails below the width where
+   * they would eat the page. Where there is nowhere to put a card, the modal
+   * is still the capture — see the draft state's own note on why it stayed.
+   */
+  const railAvailable = railsOn && !isNarrow && (viewMode === "page" || viewMode === "matrix");
 
   const handleCaptureClick = () => {
-    if (highlightRect) {
-      setCaptureData({
-        text: highlightRect.text,
-        pageNum: highlightRect.pageNum,
-        startOffset: highlightRect.startOffset,
-        endOffset: highlightRect.endOffset,
-        pageContentHash: highlightRect.pageContentHash
-      });
+    if (!highlightRect) return;
+    const target: CaptureTarget = {
+      text: highlightRect.text,
+      pageNum: highlightRect.pageNum,
+      startOffset: highlightRect.startOffset,
+      endOffset: highlightRect.endOffset,
+      pageContentHash: highlightRect.pageContentHash,
+    };
+    setHighlightRect(null);
+    if (!railAvailable) {
+      setCaptureData(target);
       setShowCaptureModal(true);
-      setHighlightRect(null);
+      return;
     }
+    /**
+     * The canvas comes in to a zoom the card can be typed into, and it does
+     * that for itself (TJ, 2026-08-19). The multiplier needed is not a
+     * constant this component could hold: READ_ONLY_RATIO is expressed in page
+     * widths, and turning it into a slider multiplier needs fitAllK, which
+     * depends on how many spreads the document lays out. SpreadCanvasView owns
+     * that arithmetic, so it owns the move — see its draft effect, which also
+     * centres the selection while it is in there.
+     */
+    setDraft(target);
   };
+
+  /** The draft is abandoned, and the selection with it. */
+  const cancelDraft = useCallback(() => {
+    setDraft(null);
+    document.getSelection()?.removeAllRanges();
+  }, []);
+
+  /**
+   * The draft as the rails take it: the passage the marking pass painted, and
+   * the card to draw in its place. Built here rather than in either host so
+   * the two cannot drift, and so neither of them has to know a capture path
+   * exists.
+   */
+  const railDraft = useMemo(() => {
+    if (!draft) return null;
+    return {
+      passage: draftAsPassage(draft, sourceName),
+      card: (
+        <DraftCard
+          text={draft.text}
+          source={sourceName}
+          sourceId={sourceId}
+          location={`p. ${draft.pageNum ?? pageNumber}`}
+          pageNumber={draft.pageNum}
+          startOffset={draft.startOffset}
+          endOffset={draft.endOffset}
+          pageContentHash={draft.pageContentHash}
+          onCaptured={handleCaptured}
+          onCancel={cancelDraft}
+        />
+      ),
+    };
+  }, [draft, sourceName, sourceId, pageNumber, handleCaptured, cancelDraft]);
 
   /**
    * Peer passages on what is actually in front of you. Only the paged view has
@@ -1376,6 +1517,18 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       // an info panel, the walkthrough. Escape there is theirs, and `f` must
       // not throw a reader into fullscreen out from under one.
       if (showCaptureModal || document.querySelector(".info-scrim, .scrim.show")) return;
+
+      /**
+       * An OPEN DRAFT owns the keyboard the same way, even though it is not a
+       * dialog and takes no scrim. The card handles Escape itself and stops it
+       * there; this guard is for everything else the viewer binds — `f` for
+       * fullscreen, the arrow keys for page turns — which would otherwise fire
+       * from under someone typing a concept name into the rail. The card's own
+       * fields already suppress most of it through the `typing` test below,
+       * but the draft's Cancel and Save buttons are focusable and are not
+       * inputs.
+       */
+      if (draftRef.current && (containerRef.current?.querySelector(".pdf-draftcard")?.contains(document.activeElement) ?? false)) return;
 
       const active = document.activeElement as HTMLElement | null;
       const typing =
@@ -2213,6 +2366,100 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            cursor. 68px is four lines at this line-height, which is about what
            the resting card shows before short() truncates at 140 chars, so the
            card barely moves when the field opens. */
+        /* THE DRAFT CARD — the capture form, in a rail card's clothes.
+           Wider than a passage card (a rail is 0.33 of a page and the naming
+           assist does not fit in it) and capped in height with its own scroll,
+           because ConceptNamingAssist is 248.5px on its own and 422.8 with the
+           ladder open. It is absolutely placed by the same rail arithmetic as
+           every other card, so the width here is a max, not a layout. */
+        /* THE DRAFT GROWS AWAY FROM THE PAGE. A rail is 0.33 of a page wide
+           and this card is 340px, so it overhangs whatever it is put in — and
+           the direction of that overhang is the whole question, because the
+           one thing it must never cover is the passage it is about. The margin
+           is negative by exactly the overhang (100% is the rail's width), so
+           the edge NEAREST the page stays pinned to the rail and the card
+           spills outward into the margin. In flow, not absolute: the rails
+           measure stack heights to pack and to draw leaders, and an absolute
+           card would measure zero. */
+        .pdf-railcard-stack[data-draft="true"][data-side="left"] .pdf-draftcard {
+          margin-left: calc(100% - 340px);
+        }
+        .pdf-railcard-stack[data-draft="true"][data-side="right"] .pdf-draftcard {
+          margin-right: calc(100% - 340px);
+        }
+        .pdf-draftcard {
+          background: var(--paper);
+          border: 1px solid var(--rule);
+          border-left: 3px solid var(--ochre, rgba(255, 204, 0, 0.9));
+          border-radius: 4px;
+          padding: 10px 12px;
+          width: 340px;
+          max-width: 46vw;
+          max-height: 62vh;
+          overflow-y: auto;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+          font-family: var(--body);
+        }
+        .pdf-draftcard-head {
+          font-family: var(--mono, var(--body));
+          font-size: 10.5px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--ink-soft);
+          margin-bottom: 6px;
+        }
+        /* The quotation keeps a cap of its own: a full-page capture must not
+           push the fields out of a card that is already scrolling. */
+        .pdf-draftcard .passage { max-height: 8.4em; overflow-y: auto; font-size: 12px; }
+        .pdf-draftcard .src { font-size: 10.5px; }
+        .pdf-draftcard .form-row { margin-top: 8px; }
+        .pdf-draftcard textarea, .pdf-draftcard input { width: 100%; font-size: 12px; }
+        /* Sticky for the same reason the modal's footer is: the card scrolls,
+           and the commit must not scroll away with it. */
+        .capturefoot-rail {
+          position: sticky;
+          bottom: -10px;
+          display: flex;
+          /* No justify-content: the halves fill the row (globals: .capturefoot>.btn). */
+          gap: 8px;
+          padding: 8px 0 0;
+          margin-top: 8px;
+          background: linear-gradient(to bottom, transparent, var(--paper) 30%);
+        }
+        /* The draft stack sits above its neighbours: it is taller than a
+           passage card and overlaps them while it is open, and the thing being
+           written must not be the thing underneath. */
+        .pdf-railcard-stack[data-draft="true"] { z-index: 30; }
+        /* ON THE CANVAS THE DRAFT CARD IS COUNTER-SCALED TO SCREEN SIZE.
+
+           Everything in .pdf-spread-canvas is drawn in canvas units and then
+           scaled by the transform, which is right for pages and for the cards
+           that annotate them — a passage card takes its width from the rail
+           (0.33 of a page) so it grows and shrinks WITH the page it belongs to.
+           This card does not belong to the page. It is a form, and a form that
+           doubles in size because you zoomed in is a bug: measured at capture
+           zoom (k = 2.0) the 340px card came out 680px on screen, twice the
+           width of the passage cards beside it, with its footer pushed off the
+           bottom of the viewport.
+
+           Dividing by --k (set in applyTransform) makes it land at 340px in the
+           hand whatever the zoom. --invk is the wrong variable and cannot be
+           made to work here: it is clamped at 1 precisely so that zooming IN
+           does not shrink card text, which is the half of the range this needs.
+
+           The origin is the edge nearest the page, so shrinking pulls the card
+           toward the words its leader points at rather than away from them. */
+        .pdf-spread-canvas .pdf-draftcard {
+          font-size: 12px;
+          transform: scale(calc(1 / var(--k, 1)));
+        }
+        .pdf-spread-canvas .pdf-railcard-stack[data-draft="true"][data-side="left"] .pdf-draftcard {
+          transform-origin: top right;
+        }
+        .pdf-spread-canvas .pdf-railcard-stack[data-draft="true"][data-side="right"] .pdf-draftcard {
+          transform-origin: top left;
+        }
+
         .pdf-railcard-note-edit {
           display: block; width: 100%; margin-top: 6px; padding: 4px 5px;
           height: 68px; resize: none; overflow: auto;
@@ -2748,6 +2995,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 onAddConcept={refilePassage}
                 onEditConcept={editConcept}
                 onEditNote={editPassageNote}
+                draft={railDraft}
               >
                 <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
                   {/* The same slot the matrix reads through, at native tier:
@@ -2852,6 +3100,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               onAddConcept={refilePassage}
               onEditConcept={editConcept}
               onEditNote={editPassageNote}
+              draft={railDraft}
               onAspect={acceptAspect}
               manifest={manifest}
               pageImageBase={pageImageBase}

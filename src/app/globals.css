@@ -906,7 +906,21 @@ body[data-reading-focus] header{display:none}
 .capturecard .passage{font-size:13.5px;line-height:1.5;margin:0 0 6px;
   max-height:150px;overflow-y:auto}
 .capturecard .src{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
+/* The address line: the file position, under the citation it belongs to.
+   Quieter than the title above it, because it is the thing you read only
+   when you are checking where a capture came from. */
+.capturewhere{opacity:.8;letter-spacing:.02em}
 .capturecard .form-row{margin-bottom:0;margin-top:12px}
+/* The concept block is a disclosure, closed until asked for (CaptureFields).
+   The summary carries .label, so it already reads as the section heading it
+   replaced; these rules only make it look pressable and kill the browser's
+   default marker, which sits at a different baseline in every engine. */
+.captureconcept>summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:6px}
+.captureconcept>summary::-webkit-details-marker{display:none}
+.captureconcept>summary::before{content:"+";font-family:var(--mono);color:var(--ochre);font-size:12px;line-height:1}
+.captureconcept[open]>summary::before{content:"–"}
+.captureconcept>summary:hover{color:var(--ink)}
+.captureconcept[open]{display:flex;flex-direction:column;gap:4px}
 .capturecard input,.capturecard textarea{font-size:14px}
 .capturecard textarea{min-height:44px}
 /* The hint's 14px bottom margin was dead space under the citation cells it no
@@ -918,9 +932,20 @@ body[data-reading-focus] header{display:none}
    open, against a comment promising it "must stay reachable". The card's
    bottom padding lives here so the footer's background covers the content
    passing under it. */
-.capturefoot{position:sticky;bottom:0;display:flex;gap:10px;justify-content:flex-end;
+/* HALF AND HALF (TJ, 2026-08-19: "let the cancel and save buttons split the
+   card"). Two equal targets rather than a right-aligned pair, because the two
+   acts are equal here: Cancel discards a capture that does not exist yet, and
+   Save keeps it — neither is the recovery from the other. It also gives the
+   rail card, which is narrow, two targets big enough to hit without aiming.
+   flex-basis:0 with flex:1, not width:50%: the gap is then taken out of the
+   halves rather than added to them, so the pair fills the card exactly.
+   Deliberately NOT the pattern for destructive confirms — those keep their
+   asymmetry, and the passage card's own "remove passage" is set apart on
+   purpose. */
+.capturefoot{position:sticky;bottom:0;display:flex;gap:10px;
   margin-top:14px;padding:10px 0 16px;background:var(--paper);
   border-top:1px solid var(--rule)}
+.capturefoot>.btn{flex:1 1 0;justify-content:center;text-align:center}
 .info-scrim{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:22px}
 .info-dialog{position:relative;max-width:520px;width:100%;background:var(--paper);border:1px solid var(--ink);border-radius:6px;box-shadow:0 18px 50px rgba(0,0,0,.3);padding:24px 26px 20px}
 .info-dialog .info-k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ochre)}

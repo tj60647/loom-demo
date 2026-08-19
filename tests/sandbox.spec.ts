@@ -183,8 +183,12 @@ test.describe('Practice loom', () => {
     expect(selected.trim().length).toBeGreaterThan(0);
 
     await page.locator('button:has-text("Capture as Passage")').click();
-    await page.locator('.info-scrim').getByPlaceholder('e.g. boundary objects', { exact: true }).fill('practice concept');
-    await page.locator('button:has-text("Save Passage")').click();
+    // The capture form is on the rail now (2026-08-19), and its concept block
+    // is a disclosure closed by default — so the field has to be opened before
+    // it can be filled. Same ids on either path; only the shell moved.
+    await page.locator('#captureConceptToggle').click();
+    await page.locator('#captureConcept').fill('practice concept');
+    await page.locator('#capturePassageSave').click();
 
     // It really landed: the mark is drawn on the page and the capture is in
     // Your work, exactly as in the real app.
