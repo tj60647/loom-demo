@@ -129,6 +129,7 @@ export default function SpreadCanvasView({
   onOpenPassage,
   onOpenConcept,
   onUnfile,
+  onRemovePassage,
   onCreateConcept,
   onAddConcept,
   onEditConcept,
@@ -159,8 +160,10 @@ export default function SpreadCanvasView({
   onOpenPassage?: (passageId: string) => void;
   /** A badge's destination: Your work, at that concept. */
   onOpenConcept?: (conceptId: string) => void;
-  /** Take one concept off this passage, in place — the card's only own act. */
+  /** Take one concept off this passage, in place. */
   onUnfile?: (passageId: string, conceptId: string) => void;
+  /** Delete the capture, after the shared confirm — see useRemovePassage. */
+  onRemovePassage?: (passage: Passage) => void;
   onCreateConcept?: (label: string, def?: string) => Promise<Concept>;
   onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
   /** Fill a reused concept's empty description — see cards/AddConceptCard. */
@@ -1255,6 +1258,7 @@ export default function SpreadCanvasView({
                       addConceptExpanded={activeAddPassageId === id}
                       addConceptControls={activeAddPassageId === id ? `canvas-add-concept-${id}` : undefined}
                       onUnfile={onUnfile}
+                      onRemovePassage={onRemovePassage}
                       readOnly={seesMoreThanAPage}
                     />
                   </div>

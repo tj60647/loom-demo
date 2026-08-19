@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { deleteConceptInVocabulary, deletePassageInPassagesView, openReading, openYourWork } from './helpers';
+import { deleteConceptInVocabulary, openReading } from './helpers';
 
 // Runs as Test User A (see playwright/global-setup.ts): the concepts and passages
 // this spec captures belong to the test account, never to a real person's loom.
@@ -14,13 +14,16 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
  * only thing that watches it: `concept-rail.spec.ts` presses the BADGE
  * (`.pdf-chip-open`), which still opens Your work and is a different door.
  *
+ * It also covers the card's "remove passage" and its confirm, by tearing down
+ * through them rather than through the panel.
+ *
  * Names carry a per-run stamp. Test User A's vocabulary is shared with the
  * rest of the suite and accumulates across runs, so a fixed label would match
  * a row a previous run left behind and reuse it instead of coining one — the
  * exact case this spec is trying to tell apart.
  */
 test.describe('Add concept beside the passage', () => {
-  test('the + opens a card in the margin, files a concept, and refuses a duplicate', async ({ page }) => {
+  test('the + opens a card in the margin, files a concept, refuses a duplicate, and the card deletes itself only when asked', async ({ page }) => {
     // One journey: capture → rail → open the card → coin → reuse-refusal →
     // dismissal → cleanup, against a dev server that compiles on demand.
     test.setTimeout(120_000);
@@ -127,14 +130,32 @@ test.describe('Add concept beside the passage', () => {
     await expect(editor).toBeHidden({ timeout: 5000 });
     await expect(stack.locator('.pdf-railcard-chip')).toHaveCount(2);
 
-    // Cleanup through the same UI a student would use, awaiting each delete's
-    // POST — the optimistic UI clears instantly and ending earlier aborts the
-    // queued fetches, leaving residue for the next run.
+    // TEARDOWN THROUGH THE CARD'S OWN "remove passage", which is also the test
+    // of it. The rail card gained that control on 2026-08-18 and it asks first
+    // — deleting a capture is the one act here that destroys something, and
+    // `removePassage` is optimistic in LoomProvider, so before the dialog a
+    // mis-click cleared the card before the server had answered.
     const passageId = await stack.locator('[data-add-concept-for]').getAttribute('data-add-concept-for');
-    // deletePassageInPassagesView needs the sheet: this spec never opened it,
-    // which is the point of the test, so open it now for the teardown only.
-    await openYourWork(page, 'passages');
-    await deletePassageInPassagesView(page, passageId!);
+
+    // Cancel must leave the capture alone.
+    await stack.locator('.pdf-railcard-rm').click();
+    const scrim = page.locator('.info-scrim');
+    await expect(scrim).toBeVisible({ timeout: 5000 });
+    await scrim.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(scrim).toBeHidden({ timeout: 5000 });
+    await expect(stack).toBeVisible();
+
+    // Confirming deletes it. Awaiting the POST matters: the row clears
+    // optimistically and ending at the disappearance strands the delete.
+    const gone = page.waitForResponse((r) =>
+      r.request().method() === 'POST' && (r.request().postData() ?? '').includes(passageId!)
+    );
+    await stack.locator('.pdf-railcard-rm').click();
+    await scrim.getByRole('button', { name: 'Delete passage', exact: true }).click();
+    await gone;
+    await expect(page.locator('.pdf-railcard-stack', { hasText: seedConcept }))
+      .toHaveCount(0, { timeout: 10_000 });
+
     await deleteConceptInVocabulary(page, filedConcept);
     await deleteConceptInVocabulary(page, seedConcept);
   });

@@ -80,6 +80,7 @@ export function RailCardBody({
   addConceptExpanded,
   addConceptControls,
   onUnfile,
+  onRemovePassage,
   readOnly = false,
 }: {
   passage: Passage;
@@ -90,6 +91,8 @@ export function RailCardBody({
   addConceptExpanded?: boolean;
   addConceptControls?: string;
   onUnfile?: (passageId: string, conceptId: string) => void;
+  /** Delete the capture, after the shared confirm — see useRemovePassage. */
+  onRemovePassage?: (passage: Passage) => void;
   /**
    * No × and no + — the card is only a way IN (TJ, 2026-08-17: "i think that
    * zoomed out editing these things is a bad idea").
@@ -154,6 +157,26 @@ export function RailCardBody({
         {passage.note ? short(passage.note, 140) : "add a passage note"}
       </button>
       )}
+      {/* LAST, SMALLEST, AND IT ASKS (TJ, 2026-08-18: "we should add the small
+          remove passage to the passage rail cards with the standard 'are you
+          sure' type flow").
+
+          The only act on this card that destroys anything, so it is set apart
+          from the rest — the badges and the + are things you do to a passage,
+          this ends it. Read-only hides it with the others: at zoom-out the
+          controls are counter-scaled dots over a page thumbnail and a delete is
+          one mis-click from a pan.
+
+          The confirm is not local. useRemovePassage carries it, so this and
+          Your work's button make the same promise about what goes. */}
+      {!readOnly && onRemovePassage && (
+        <button
+          type="button"
+          className="pdf-railcard-rm"
+          onClick={() => onRemovePassage(passage)}
+          title="Delete this capture. Its filings go with it; the concepts stay."
+        >remove passage</button>
+      )}
     </>
   );
 }
@@ -166,6 +189,7 @@ export default function ConceptRails({
   onOpenPassage,
   onOpenConcept,
   onUnfile,
+  onRemovePassage,
   onCreateConcept,
   onAddConcept,
   onEditConcept,
@@ -182,6 +206,8 @@ export default function ConceptRails({
    *  card's own height, so it cannot start a scale reflow — unlike opening the
    *  add-concept card below it, which does. */
   onUnfile?: (passageId: string, conceptId: string) => void;
+  /** Delete the capture, after the shared confirm — see useRemovePassage. */
+  onRemovePassage?: (passage: Passage) => void;
   onCreateConcept?: (label: string, def?: string) => Promise<Concept>;
   onAddConcept?: (passageId: string, conceptId: string) => Promise<Passage>;
   /** Fill a reused concept's empty description — see cards/AddConceptCard. */
@@ -460,6 +486,7 @@ export default function ConceptRails({
                   addConceptExpanded={activeAddPassageId === id}
                   addConceptControls={activeAddPassageId === id ? `add-concept-${id}` : undefined}
                   onUnfile={onUnfile}
+                  onRemovePassage={onRemovePassage}
                 />
               </div>
               {activeAddPassageId === id && onCreateConcept && onAddConcept ? (

@@ -40,6 +40,12 @@ export async function deletePassageInPassagesView(page: Page, passageId: string)
     r.request().method() === 'POST' && (r.request().postData() ?? '').includes(passageId)
   );
   await row.getByRole('button', { name: 'remove passage', exact: true }).click();
+  // It asks now (2026-08-18). Deleting a capture is the one destructive act in
+  // the panel and it used to fire on the press, with `removePassage` optimistic
+  // in LoomProvider — so a mis-click cleared the row before the server had even
+  // answered. The dialog is DialogProvider's standard one, the same shape 04 ·
+  // Vocabulary uses to delete a concept.
+  await page.locator('.info-scrim').getByRole('button', { name: 'Delete passage', exact: true }).click();
   await gone;
 }
 

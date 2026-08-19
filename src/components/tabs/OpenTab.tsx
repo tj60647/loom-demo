@@ -9,6 +9,7 @@ import { readingsOf, soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import PassageCard from "@/components/cards/PassageCard"
 import ConceptCard from "@/components/cards/ConceptCard"
+import { useRemovePassage } from "@/components/cards/useRemovePassage"
 import { tidy } from "@/lib/clothMath"
 import ClothFold from "@/components/tabs/ClothFold"
 import ReuseOffer from "@/components/ui/ReuseOffer"
@@ -53,9 +54,11 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
   // naming, dedup and the delete guards must see every concept the student has
   // — otherwise capturing a concept met in an earlier text would mint a
   // duplicate instead of joining its evidence (spec §2 identity).
-  const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, removePassage, refilePassage, unfilePassage, editPassageNote, flash } = useLoom()
+  const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, refilePassage, unfilePassage, editPassageNote, flash } = useLoom()
   const { byId, titleOf } = useReadings()
   const { confirm } = useDialog()
+  // Shared with the margin rail card, so the two dialogs cannot drift apart.
+  const removePassageWithConfirm = useRemovePassage()
   const activeSourceId = soleSourceId(scope)
   const activeReading = activeSourceId ? byId.get(activeSourceId) : undefined
   // Working inside a reading, the citation is already known — offer it rather
@@ -895,7 +898,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
               edit={{
                 onEditNote: (note) => editPassageNote(b.id, note),
                 onUnfile: (conceptId) => unfilePassage(b.id, conceptId),
-                onRemove: () => removePassage(b.id),
+                onRemove: () => removePassageWithConfirm(b),
                 addOpen: addConceptFor === b.id,
                 onToggleAdd: () => setAddConceptFor(cur => cur === b.id ? null : b.id),
                 onCloseAdd: () => setAddConceptFor(null),

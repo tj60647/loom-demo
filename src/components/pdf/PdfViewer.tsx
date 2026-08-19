@@ -8,6 +8,7 @@ import PageSlot from './PageSlot';
 import { type PdfDoc } from './PageRaster';
 import SpreadCanvasView from './SpreadCanvasView';
 import ConceptRails, { RAIL_W } from './ConceptRail';
+import { useRemovePassage } from '@/components/cards/useRemovePassage';
 import { conceptNameText } from "@/lib/conceptName";
 import ReuseOffer from '@/components/ui/ReuseOffer';
 import FullscreenIcon from '@/components/ui/FullscreenIcon';
@@ -86,6 +87,9 @@ type HighlightEntry = {
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
   onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
   const { state, scoped, addConcept, editConcept, refilePassage, unfilePassage } = useLoom();
+  // The confirm and its wording live in the hook, so this button and Your
+  // work's make the same promise about what a delete takes with it.
+  const removePassageWithConfirm = useRemovePassage();
   // Drawn only for faculty and admins. Not a guard — `overlayViewer()` re-checks
   // on the server, so a student who forces the request gets an empty overlay.
   const readings = useReadings();
@@ -1919,6 +1923,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            Missing one is how a control ends up a two-pixel dot at fit-all.
            (No backticks in this block: styled-jsx template literal.) */
         .pdf-spread-canvas .pdf-railcard-note { font-size: calc(11px * var(--invk, 1)); }
+        .pdf-spread-canvas .pdf-railcard-rm { font-size: calc(9.5px * var(--invk, 1)); }
         .pdf-spread-canvas .pdf-railcard-chip { font-size: calc(10px * var(--invk, 1)); }
         .pdf-spread-canvas .pdf-railcard-add {
           width: calc(18px * var(--invk, 1));
@@ -2197,6 +2202,18 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           line-height: 1.4; color: var(--ink-soft); font-style: italic;
         }
         .pdf-railcard-note:hover { background: var(--paper-2); color: var(--ink); }
+        /* Smaller than the note above it and quieter than the badges: the one
+           act on this card that destroys something should be the last thing
+           the eye reaches, not a target it lands on. The same quiet mono
+           register Your work uses for the identical button.
+           (No backticks in here — this block is a template literal.) */
+        .pdf-railcard-rm {
+          display: block; margin-top: 6px; padding: 2px 5px;
+          background: none; border: none; cursor: pointer;
+          font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em;
+          color: var(--dot); text-align: left;
+        }
+        .pdf-railcard-rm:hover, .pdf-railcard-rm:focus-visible { color: var(--red); }
         .pdf-railcard-note.empty { color: var(--dot); }
         .pdf-railcard-label { font-weight: 600; font-size: 13px; }
         .pdf-railcard-label.unlabeled {
@@ -2703,6 +2720,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 onOpenPassage={gotoOpenPassage}
                 onOpenConcept={gotoOpenConcept}
                 onUnfile={unfilePassage}
+                onRemovePassage={removePassageWithConfirm}
                 onCreateConcept={addConcept}
                 onAddConcept={refilePassage}
                 onEditConcept={editConcept}
@@ -2805,6 +2823,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               onOpenPassage={gotoOpenPassage}
               onOpenConcept={gotoOpenConcept}
               onUnfile={unfilePassage}
+              onRemovePassage={removePassageWithConfirm}
               onCreateConcept={addConcept}
               onAddConcept={refilePassage}
               onEditConcept={editConcept}
