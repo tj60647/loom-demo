@@ -4,3 +4,11 @@
 # of a 1MB minified file on every checkout — a needless diff on an asset that
 # should be byte-identical to what npm installed.
 public/pdf.worker.min.mjs -text -diff
+
+# The WASM codecs beside it, copied by the same script three lines further
+# down, have the same problem: the four LICENSE files and the .js fallback are
+# text, arrive from node_modules with LF, and autocrlf wants CRLF in the
+# worktree — so every `npm run dev` leaves them permanently "modified" with an
+# empty diff. Verified 2026-08-18: index blob, worktree raw and worktree
+# filtered all hash to eec8246 for LICENSE_QCMS, with zero CRs on either side.
+public/pdf-wasm/** -text -diff
