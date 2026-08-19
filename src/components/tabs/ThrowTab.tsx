@@ -577,8 +577,14 @@ export default function ThrowTab({ onGotoPassage }: { onGotoPassage?: (passage: 
               className="pchip-add"
               onClick={() => setCoining((v) => !v)}
               aria-expanded={coining}
-              aria-label="Name a concept before its evidence"
-              title="Name a concept before its evidence"
+              /* A + says nothing on its own, so its label has to carry the
+                 whole act (TJ, 2026-08-18: "in warp we need a less cryptic
+                 tooltip"). "Name a concept before its evidence" is the heading
+                 the FORM already wears, and read cold off a control it names a
+                 condition rather than an offer. This says what pressing does
+                 and when you would want it. */
+              aria-label="Add a concept before you have found evidence in the reading"
+              title="Add a concept before you have found evidence in the reading"
             >+</button>
           </h2>
           {coining && (

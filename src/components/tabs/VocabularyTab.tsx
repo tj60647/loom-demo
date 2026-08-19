@@ -339,8 +339,15 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
               className="pchip-add"
               onClick={() => setCoiningConcept((v) => !v)}
               aria-expanded={coiningConcept}
-              aria-label="Name a concept before its evidence"
-              title="Name a concept before its evidence"
+              /* WORD FOR WORD the warp's (TJ, 2026-08-18: "the same for
+                 vocabulary"). I had trimmed "in the reading" here on the
+                 grounds that 04 is the loom-wide station — but the sentence
+                 holds anyway, and more usefully: a concept coined this way
+                 belongs to no reading and stands in EVERY reading's warp while
+                 you hunt, so "in the reading" is true of whichever one you go
+                 looking in. One control, one sentence, wherever you meet it. */
+              aria-label="Add a concept before you have found evidence in the reading"
+              title="Add a concept before you have found evidence in the reading"
             >+</button>
           </h2>
           {coiningConcept && (
