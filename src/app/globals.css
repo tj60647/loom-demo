@@ -1108,7 +1108,19 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* Inside the station panel now, so no bottom margin of its own to give the
    band air — the panel's padding is the air. */
 .searchwrap{margin:0}
-.searchbar{display:flex;align-items:center;gap:8px}
+/* THE FIELD STAYS PUT WHILE THE RESULTS MOVE (TJ, 2026-08-19: "the search
+   term should remain visible as one scrolls"). The panel is the scroller
+   (.stationsearch-panel, max-height 64vh) and the results run well past it,
+   so the word you searched for scrolled away exactly when a long list made
+   you least sure what you had typed.
+
+   Opaque background, because the covers caption above it and the hits below
+   both pass underneath. The negative top margin eats the panel's own 12px of
+   padding so the bar sits flush against the top edge when stuck rather than
+   leaving a strip of scrolling text above it. */
+.searchbar{display:flex;align-items:center;gap:8px;
+  position:sticky;top:0;z-index:2;background:var(--paper);
+  margin:-12px 0 0;padding:12px 0 9px;border-bottom:1px solid var(--rule)}
 .searchbar .tinput{flex:1;min-width:0}
 /* The practice loom's standing notice. Deliberately not a toast: `flash`
    self-clears after 1500ms, and a student who missed a disappearing notice
