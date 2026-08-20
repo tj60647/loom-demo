@@ -45,7 +45,7 @@ export function buildMapKit(
 
   const tiered = concepts.some((c) => ["p", "s", "t"].includes(tierOf(c)))
   if (tiered) {
-    out += "CONCEPTS (grouped by YOUR tiers, from 04 - Knowledge Graph):" + NL
+    out += "CONCEPTS (grouped by YOUR tiers, from 03 - Knowledge Graph):" + NL
     TIER_GROUPS.forEach(([tier, name]) => {
       const group = concepts.filter((c) => tierOf(c) === tier)
       if (!group.length) return

@@ -39,16 +39,15 @@ export default function StationSearch({ scope, sourceId }: {
   const buttonRef = useRef<HTMLButtonElement>(null)
 
   /**
-   * "Your cloth", not "this reading" (TJ, 2026-08-17) — and the rename fixes a
-   * false claim rather than just a name. This panel calls searchReadings and
-   * searchLoom; searchLoom returns concepts, link labels, links, passages,
-   * cloths and projections, and NO pages. The label and the aria-label both
-   * said "its pages" anyway, and the coverage line added below on the same day
-   * repeated it from them without checking.
-   *
-   * The page text is the reading toolbar's "in the text", which is the one
-   * search that really does read the PDF. So the pair now splits cleanly by
-   * subject: the words on the page there, the work you made from them here.
+   * "Your cloth", not "this reading" (TJ, 2026-08-17). The rename's own
+   * rationale was wrong, though (found 2026-08-19): it reasoned from
+   * searchLoom alone (concepts, link labels, links, passages, cloths,
+   * projections — no pages) and concluded the panel never searches pages. The
+   * panel's OTHER call, searchReadings(query, sourceId), has returned this
+   * reading's page hits since 2026-08-10 (6eafd15), and the 08-19 work made
+   * them doors to the quoted page with per-page match counts. So the panel
+   * does read the page text; the toolbar's "in the text" is the in-document
+   * reader with marks, not the only page search.
    */
   const label = scope === "loom" ? "your loom" : "your cloth"
   /**
@@ -68,7 +67,7 @@ export default function StationSearch({ scope, sourceId }: {
    */
   const covers = scope === "loom"
     ? "readings · cloths · projections · concepts · link labels · links · passages"
-    : "passages · concepts · link labels · links · projections"
+    : "pages · cloth · projections · concepts · link labels · links · passages"
   const what = `Search ${label} — ${covers.replace(/ · /g, ", ")}`
 
   /**

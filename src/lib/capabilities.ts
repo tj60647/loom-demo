@@ -3,7 +3,7 @@
  * matrix of what roles have access to. this can go in the workflows").
  *
  * THIS FILE IS THE MATRIX, on the same contract as `src/lib/workflows.ts`:
- * `/workflows` renders whatever is here, so it moves with the code or it lies.
+ * `/access` renders whatever is here (RoleMatrix), so it moves with the code or it lies.
  * `scripts/check-workflows.ts` asserts that every `gate.file` exists and that
  * every `gate.symbol` still appears in it — so a rename fails the build rather
  * than rotting the matrix quietly.
@@ -74,7 +74,7 @@ export const CAPABILITIES: Capability[] = [
     name: "Browse the course's readings",
     group: "Library",
     student: { verdict: "yes" }, faculty: { verdict: "yes" }, admin: { verdict: "yes" },
-    gate: { file: "src/actions/sources.ts", symbol: "getSources", line: 210 },
+    gate: { file: "src/actions/sources.ts", symbol: "getSources", line: 227 },
     enforcement: "server",
   },
   {
@@ -84,7 +84,7 @@ export const CAPABILITIES: Capability[] = [
     student: { verdict: "no" },
     faculty: { verdict: "no", note: "staging is admin's, even in their own course" },
     admin: { verdict: "qualified", note: "hidden while wearing the student lens" },
-    gate: { file: "src/actions/sources.ts", symbol: "getSources", line: 222 },
+    gate: { file: "src/actions/sources.ts", symbol: "getSources", line: 227 },
     enforcement: "server",
   },
   {
@@ -94,7 +94,7 @@ export const CAPABILITIES: Capability[] = [
     student: { verdict: "qualified", note: "readings of their course, plus their own uploads" },
     faculty: { verdict: "qualified", note: "the same as a student — not widened by the role" },
     admin: { verdict: "yes" },
-    gate: { file: "src/actions/sources.ts", symbol: "authorizeSourceAccess", line: 877 },
+    gate: { file: "src/actions/sources.ts", symbol: "authorizeSourceAccess", line: 1021 },
     enforcement: "server",
   },
   {
@@ -112,7 +112,7 @@ export const CAPABILITIES: Capability[] = [
     name: "Capture a passage",
     group: "Reading and weaving",
     student: { verdict: "yes" }, faculty: { verdict: "yes" }, admin: { verdict: "yes" },
-    gate: { file: "src/actions/loom.ts", symbol: "createPassage", line: 319 },
+    gate: { file: "src/actions/loom.ts", symbol: "createPassage", line: 323 },
     enforcement: "server",
   },
   {
@@ -200,7 +200,7 @@ export const CAPABILITIES: Capability[] = [
     student: { verdict: "yes", note: "learners are the bands; never named, only counted" },
     faculty: { verdict: "no", note: "an exemplar cloth read as 'your cohort' would pre-code the text" },
     admin: { verdict: "no" },
-    gate: { file: "src/actions/overlays.ts", symbol: "peersOf", line: 133 },
+    gate: { file: "src/actions/overlays.ts", symbol: "peersOf", line: 115 },
     enforcement: "server",
   },
 
@@ -220,7 +220,7 @@ export const CAPABILITIES: Capability[] = [
     name: "Invite, place in a section, remove",
     group: "Roster",
     student: { verdict: "no" }, faculty: { verdict: "no" }, admin: { verdict: "yes" },
-    gate: { file: "src/actions/admin.ts", symbol: "checkAdmin", line: 12 },
+    gate: { file: "src/actions/admin.ts", symbol: "checkAdmin", line: 13 },
     enforcement: "server",
   },
   {
@@ -309,6 +309,6 @@ export const CAPABILITIES: Capability[] = [
 export const MATRIX_NOTES: string[] = [
   "There is no stored \"Student\" role. A student is an active course membership that is not FACULTY, held by someone who is not a site admin.",
   "`INSTRUCTOR` is a third membership role, written when an admin enrols by invitation. No gate reads it — it passes every check by being an admin instead. It is why `peersOf` now matches LEARNER positively rather than excluding FACULTY.",
-  "Faculty are not admins for readings: they cannot see or open a staged reading, even in their own course. The model doc's §4 describes Library as one \"Admin/Faculty\" view; the build does not.",
+  "Faculty are not admins for readings: they cannot see or open a staged reading, even in their own course (recorded as a known gap in the model doc's §4).",
   "Removal is thorough — `removedAt` is checked by sign-in, course resolution, the faculty list, the roster gates, file access, and both overlay bands.",
 ]

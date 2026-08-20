@@ -1,7 +1,7 @@
 /**
  * The three workflows, as data — student, faculty, admin.
  *
- * THIS FILE IS THE DIAGRAM. `/admin/workflows` renders whatever is here, so a
+ * THIS FILE IS THE DIAGRAM. `/workflows` renders whatever is here, so a
  * refactor that changes how someone moves through Loom is not finished until
  * the flow below says so. Nothing is hand-drawn: adding a step is adding a
  * node and an edge, and the layout re-flows itself.
@@ -108,15 +108,17 @@ const student: Flow = {
     // replacing the other.
     { id: "file", label: "Name the concept it evidences — or leave it unlabeled", where: "01 · Reading — the card beside the passage, or Your work slid out over the text" },
     // TWO DOORS TO THE SAME ACT, like `file` above (2026-08-19). 02 is still
-    // the main way through and the only place a link is LABELLED — a label is
-    // vocabulary, it recurs across threads, and coining one is not a shortcut's
-    // business. The cloth's own card is the shortcut: pick two concepts on the
+    // the main way through and where the vocabulary is managed — but the
+    // cloth's popover can label too: it grew an optional label field over the
+    // student's own Links in the same commit as this note's first draft
+    // (c214266), which had claimed labelling stayed on 02 alone.
+    // The cloth's own card is the shortcut: pick two concepts on the
     // drawing, say how they hang together, throw it without a station change.
     // For the student who has done this a dozen times (TJ, 2026-08-19) — and
     // the cloth is where you SEE that two concepts sit near each other and
     // never crossed, so the judgment and the place to record it were one screen
     // apart until now.
-    { id: "link", label: "Pick two concepts, say the sentence, label the link", where: "02 · Linking — or the cloth's own card, for the throw alone" },
+    { id: "link", label: "Pick two concepts, say the sentence, label the link", where: "02 · Linking — or the cloth's own card, for the throw with an optional label" },
     // 03 before 04, in the array and in the edges below. Stations 03 and 04
     // were swapped on 2026-08-08 (TJ) — "you lay the graph out and read it, and
     // the vocabulary you have collected is what you check afterwards" — and the

@@ -118,7 +118,7 @@ export type Diagnosis = {
   summary: string
   /**
    * Measurements the diagnosis wanted and did not have. A structural defect
-   * cannot be ruled out without the PDF passages, and saying so is not the same as
+   * cannot be ruled out without the PDF bytes, and saying so is not the same as
    * reporting a clean bill of health.
    */
   notMeasured: string[]
@@ -139,7 +139,7 @@ export function diagnoseExtraction(
   metrics: ExtractionMetrics,
   /**
    * Per-font tallies from probePdfStructure. Optional for the same reason the
-   * structural metrics are, and worth passing whenever the passages are at hand:
+   * structural metrics are, and worth passing whenever the bytes are at hand:
    * the document-wide unmapped share dilutes a single broken font into
    * invisibility, while a repair has to name that font to act.
    */
@@ -151,7 +151,7 @@ export function diagnoseExtraction(
   const hasStructure = metrics.glyphCount != null && metrics.spreadPages != null
   if (!hasStructure) {
     notMeasured.push(
-      "page geometry and glyph mapping — needs the PDF passages, not just the stored page text"
+      "page geometry and glyph mapping — needs the PDF bytes, not just the stored page text"
     )
   }
 
