@@ -4,11 +4,10 @@ import { expect, type Page } from '@playwright/test';
  * Reading-first navigation.
  *
  * The shelf is the home screen, so opening a reading means picking its card,
- * which lands on `/reading/[sourceId]`. The text itself is tab 00 inside that
- * workbench rather than a course-wide Library tab.
+ * which lands on `/studio/reading/[sourceId]` in the Studio workspace.
  */
 export async function openReading(page: Page, title: string) {
-  await page.goto('/');
+  await page.goto('/library');
 
   const card = page.locator('.shelfcard', { hasText: title }).first();
   await expect(card).toBeVisible({ timeout: 15000 });
@@ -21,8 +20,8 @@ export async function openReading(page: Page, title: string) {
   // 15s, not the 5s default: in dev the route compiles on demand and the App
   // Router only commits the URL once the server has rendered, which under
   // parallel workers can outlast the default expect timeout.
-  await expect(page).toHaveURL(/\/reading\//, { timeout: 15000 });
+  await expect(page).toHaveURL(/\/studio\/reading\//, { timeout: 15000 });
 
-  await page.getByRole('button', { name: /Reading/i }).click();
+  await page.getByRole('button', { name: /Source/i }).click();
   await expect(page.locator('text=Loading PDF...')).toBeHidden({ timeout: 15000 });
 }

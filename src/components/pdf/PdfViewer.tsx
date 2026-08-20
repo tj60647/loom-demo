@@ -1052,12 +1052,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           labels shorten rather than the buttons shrinking below thumb size. */}
       <div className="pdf-toolbar">
         <div>
-          {/* This closes the text and lands on 01 Open — where the passage you
+          {/* This closes the source and lands on Capture — where the passage you
               just captured is waiting — not on the readings list. */}
           {/* Labelled only when the label is an arrow on its own; with the
               words visible they are the name. */}
-          <button className="btn ghost mini" onClick={onClose} aria-label={isNarrow ? "Back to 01 · Open" : undefined}>
-            {isNarrow ? "←" : "← Back to 01 · Open"}
+          <button className="btn ghost mini" onClick={onClose} aria-label={isNarrow ? "Back to Capture" : undefined}>
+            {isNarrow ? "←" : "← Back to Capture"}
           </button>
         </div>
 

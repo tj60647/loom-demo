@@ -1,10 +1,7 @@
-// 06 · Keep lives on the shelf, not inside a reading. Maps are the primary
-// keepable artifact (ratified TJ 2026-07-31): each map exports as its own
-// file — from here or from 04 Map — and the whole-cloth export remains the
-// complete backup behind them, so no work is ever locked in (red line #5).
+// Legacy Keep now redirects to Files, where maps and the whole weave export.
 
-import KeepPage from "@/components/shelf/KeepPage"
+import { redirect } from "next/navigation"
 
 export default function Page() {
-  return <KeepPage />
+  redirect("/files")
 }

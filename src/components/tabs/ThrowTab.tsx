@@ -128,7 +128,7 @@ export default function ThrowTab() {
         title: "Not enough warp yet.",
         body: across
           ? "Lay at least two concepts, then the shuttle has something to draw between."
-          : "Lay at least two concepts in this reading on 01 · Open, then the shuttle has something to draw between.",
+          : "Capture at least two concepts in this reading, then the shuttle has something to draw between.",
       })
       return
     }

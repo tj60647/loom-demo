@@ -24,7 +24,7 @@ export interface LoomContextType {
   state: LoomState
   /**
    * The reading the student is working in, read off the route. `WHOLE_WEAVE`
-   * everywhere except `/reading/[sourceId]`.
+   * everywhere except `/studio/reading/[sourceId]`.
    */
   scope: Scope
   /** The graph seen through `scope`, plus its bridges — derived, never stored. */
@@ -104,7 +104,7 @@ export function LoomProvider({ children, frontendOnly = false, initialState }: {
   const [undoStack, setUndoStack] = useState<{edgeId: string, from: string | null, to: string | null}[]>([])
   const [redoStack, setRedoStack] = useState<{edgeId: string, from: string | null, to: string | null}[]>([])
 
-  // Scope comes from the URL, not from state a gesture has to set: `/reading/x`
+  // Scope comes from the URL, not from state a gesture has to set: `/studio/reading/x`
   // IS the act of working in that reading, so there is no window where the app
   // has rendered against the wrong one. Everywhere else is the whole weave.
   const params = useParams<{ sourceId?: string }>()

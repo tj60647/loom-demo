@@ -1,5 +1,5 @@
-import Shelf from "@/components/shelf/Shelf"
+import { redirect } from "next/navigation"
 
 export default function Home() {
-  return <Shelf />
+  redirect("/library")
 }

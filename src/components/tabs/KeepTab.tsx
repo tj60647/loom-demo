@@ -118,7 +118,7 @@ export default function KeepTab() {
   const handleReset = async () => {
     const ok = await confirm({
       title: "Clear this course's cloth?",
-      body: `${state.concepts.length} concept${state.concepts.length !== 1 ? "s" : ""}, ${state.bytes.length} passage${state.bytes.length !== 1 ? "s" : ""}, ${state.edges.length} thread${state.edges.length !== 1 ? "s" : ""} and ${state.maps.length} map${state.maps.length !== 1 ? "s" : ""} — tiers, essences and reads — all go. Export first — a .json makes this reversible. Your weaving history on 03 · Read survives either way.`,
+      body: `${state.concepts.length} concept${state.concepts.length !== 1 ? "s" : ""}, ${state.bytes.length} passage${state.bytes.length !== 1 ? "s" : ""}, ${state.edges.length} thread${state.edges.length !== 1 ? "s" : ""} and ${state.maps.length} map${state.maps.length !== 1 ? "s" : ""} — tiers, essences and reflections — all go. Export first — a .json makes this reversible. Your weaving history in Reflect survives either way.`,
       confirmLabel: "Clear the table",
       danger: true,
     })
@@ -136,7 +136,7 @@ export default function KeepTab() {
         <p className="hint"><b>.json</b> is the map&apos;s complete record and the file to submit — it stands alone, and importing it back later restores the map onto your cards. <b>.md</b> is the same map as a readable outline for notes, Obsidian, or an agent.</p>
         {sortedMaps.length === 0 ? (
           <div className="empty" style={{ padding: "14px 0" }}>
-            <span className="cap">no maps yet — sort your concepts on 04 · Map and your first map appears here</span>
+            <span className="cap">no maps yet — sort your concepts in Map and your first map appears here</span>
           </div>
         ) : (
           <div>
@@ -198,7 +198,7 @@ export default function KeepTab() {
         <h2>Clear the table</h2>
         <p className="do calm">Only if you mean it — reset empties this course&apos;s cloth and starts you blank.</p>
         <p className="hint">Reset removes the concepts, the passages, the threads, and your maps — every tier, essence, read and arrangement — for this course. It cannot be undone from inside Loom. An export taken beforehand is the whole safety net — with a .json in hand, a reset is reversible by importing it back.</p>
-        <p className="hint">What survives on purpose: the development history — &ldquo;the cloth, over time&rdquo; on <b>03 Read</b>. Reset clears the cloth, not the record of weaving it. Your growth stays visible even when the table is empty.</p>
+        <p className="hint">What survives on purpose: the development history — &ldquo;the cloth, over time&rdquo; in <b>Reflect</b>. Reset clears the cloth, not the record of weaving it. Your growth stays visible even when the table is empty.</p>
         <p className="ghostnote">You will be asked to confirm. Export first if there is any doubt.</p>
         <button className="btn ghost" data-tip="clear this course's cloth and start blank — your weaving history is kept" onClick={handleReset} style={{ marginTop: 4 }}>Reset this cloth</button>
       </div>

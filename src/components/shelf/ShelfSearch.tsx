@@ -22,7 +22,7 @@ export default function ShelfSearch({
   /** Fold the search away — wired to Escape, mirroring the reading's panel. */
   onClose: () => void
 }) {
-  const { frontendOnly, readings } = useReadings()
+  const { frontendOnly, readings, selectReading } = useReadings()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<ReadingSearchHit[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -113,15 +113,13 @@ export default function ShelfSearch({
                 {results.length === 1 ? "es" : ""}
               </span>
               {results.map((hit) => (
-                // A hit is a door to the text itself, so it lands on
-                // 00 · Reading with the query riding along — the reading's own
-                // search opens pre-filled, marks and all. Workbench
-                // re-validates the tab, so a card with no PDF simply falls
-                // back to its first station.
+                // A PDF-backed hit is a door to its source text, with the query
+                // riding along; a reference-only hit opens Capture instead.
                 <Link
                   key={hit.sourceId}
-                  href={`/reading/${hit.sourceId}?tab=reading&q=${encodeURIComponent(query.trim())}`}
+                  href={`/studio/reading/${hit.sourceId}?tool=${hit.hasFile ? "source" : "capture"}${hit.hasFile ? `&q=${encodeURIComponent(query.trim())}` : ""}`}
                   className="searchhit"
+                  onClick={() => selectReading(hit.sourceId)}
                 >
                   <div className="searchhithead">
                     <h3>{hit.title}</h3>

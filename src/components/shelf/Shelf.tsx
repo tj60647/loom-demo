@@ -20,14 +20,13 @@ import { tallyByReading } from "@/lib/scope"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 import ShelfSearch from "@/components/shelf/ShelfSearch"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
-import JourneyNav from "@/components/ui/JourneyNav"
 
 export default function Shelf() {
   // See the note in Workbench: `status` is what distinguishes "nobody is
   // signed in" from "we have not asked yet".
   const { data: session, status } = useSession()
   const { state, isLoading, loadExample, flash } = useLoom()
-  const { readings: sources, isLoading: loadingShelf, error, refresh, frontendOnly } = useReadings()
+  const { readings: sources, isLoading: loadingShelf, error, refresh, frontendOnly, selectReading } = useReadings()
   const [exampleBusy, setExampleBusy] = useState(false)
   // The search bar sits behind a toggle, the reading's own ⌕ Search idiom.
   // While a query is live the results own the page; clearing the box — or
@@ -61,14 +60,11 @@ export default function Shelf() {
 
   if (status === "loading") {
     return (
-      <>
-        <JourneyNav active="readings" />
-        <main>
+      <main>
           <div className="empty" style={{ marginTop: "100px" }}>
             <h2>Loading your readings...</h2>
           </div>
-        </main>
-      </>
+      </main>
     )
   }
 
@@ -87,7 +83,7 @@ export default function Shelf() {
   const readingCard = (s: ReadingMeta) => {
     const tally = tallies.get(s.id)
     return (
-      <Link key={s.id} href={`/reading/${s.id}`} className="shelfcard">
+      <Link key={s.id} href={`/studio/reading/${s.id}`} className="shelfcard" onClick={() => selectReading(s.id)}>
         {s.storageKey ? (
           <SourceThumbnail sourceId={s.id} title={s.title} />
         ) : (
@@ -138,7 +134,6 @@ export default function Shelf() {
 
   return (
     <>
-      <JourneyNav active="readings" />
       <main>
         <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", margin: "0 0 3px" }}>
           <p className="tasktitle" style={{ margin: 0 }}>Pick a reading.</p>
@@ -249,10 +244,6 @@ export default function Shelf() {
         <FirstRunWalkthrough />
       </main>
 
-      <footer>
-        <span className="fl">00 — READINGS</span>
-        <span className="fr">PICK A READING</span>
-      </footer>
     </>
   )
 }

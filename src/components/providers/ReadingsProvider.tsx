@@ -7,8 +7,9 @@
 // (2010)". All of them want the same small list, and none of them should
 // re-fetch it.
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useSession } from "next-auth/react"
+import { usePathname } from "next/navigation"
 import { getSources } from "@/actions/sources"
 import { getActiveCourse } from "@/actions/courses"
 import { frontendReadings } from "@/lib/frontendFixture"
@@ -39,6 +40,9 @@ type ReadingsContextValue = {
   error: string | null
   /** StageIt supplies fixture rows and never calls reading actions. */
   frontendOnly: boolean
+  /** The reading the learner most recently opened, retained across routes. */
+  currentReading: ReadingMeta | null
+  selectReading: (sourceId: string) => void
   /** A reading's title, or a plain fallback — never a bare id. */
   titleOf: (sourceId: string | null | undefined) => string
   /** Re-read the shelf, e.g. after the student adds a reading of their own. */
@@ -46,14 +50,34 @@ type ReadingsContextValue = {
 }
 
 const ReadingsContext = createContext<ReadingsContextValue | null>(null)
+const CURRENT_READING_KEY = "loom_current_reading"
 
 export function ReadingsProvider({ children, frontendOnly = false }: { children: ReactNode; frontendOnly?: boolean }) {
   const { data: session } = useSession()
+  const pathname = usePathname() ?? ""
+  const routeReadingId = pathname.match(/^\/studio\/reading\/([^/]+)/)?.[1]
   const [readings, setReadings] = useState<ReadingMeta[]>(() => frontendOnly ? frontendReadings : [])
   const [course, setCourse] = useState<ActiveCourse | null>(() => frontendOnly ? { id: "stageit", name: "Loom interface", term: "frontend-only" } : null)
   const [isLoading, setIsLoading] = useState(!frontendOnly)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
+  const [currentReadingId, setCurrentReadingId] = useState<string | null>(null)
+
+  const selectReading = useCallback((sourceId: string) => {
+    setCurrentReadingId(sourceId)
+    localStorage.setItem(CURRENT_READING_KEY, sourceId)
+  }, [])
+
+  useEffect(() => {
+    const load = window.setTimeout(() => setCurrentReadingId(localStorage.getItem(CURRENT_READING_KEY)), 0)
+    return () => window.clearTimeout(load)
+  }, [])
+
+  useEffect(() => {
+    if (!routeReadingId || routeReadingId === currentReadingId) return
+    const remember = window.setTimeout(() => selectReading(routeReadingId), 0)
+    return () => window.clearTimeout(remember)
+  }, [routeReadingId, currentReadingId, selectReading])
 
   useEffect(() => {
     if (frontendOnly) {
@@ -104,10 +128,12 @@ export function ReadingsProvider({ children, frontendOnly = false }: { children:
       isLoading,
       error,
       frontendOnly,
+      currentReading: (currentReadingId && byId.get(currentReadingId)) || null,
+      selectReading,
       titleOf: (sourceId) => (sourceId && byId.get(sourceId)?.title) || "another reading",
       refresh: () => setNonce((n) => n + 1),
     }
-  }, [readings, course, isLoading, error, frontendOnly])
+  }, [readings, course, isLoading, error, frontendOnly, currentReadingId, selectReading])
 
   return <ReadingsContext.Provider value={value}>{children}</ReadingsContext.Provider>
 }

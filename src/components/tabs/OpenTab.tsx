@@ -137,7 +137,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     if (state.edges.some(e => e.fromId === conceptId || e.toId === conceptId)) {
       await notify({
         title: "This concept is woven into a thread.",
-        body: "Remove the thread on 02 · Throw first — deleting the concept now would take your thread with it.",
+        body: "Remove the thread in Connect first — deleting the concept now would take your thread with it.",
       })
       return
     }
@@ -148,8 +148,8 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
     const ok = await confirm({
       title: `Delete “${label}”?`,
       body: byteCount
-        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s go" : " goes"} with it. Export from 06 · Keep first if you might want this back.`
-        : "Export from 06 · Keep first if you might want this back.",
+        ? `Its ${byteCount} captured passage${byteCount !== 1 ? "s go" : " goes"} with it. Take a backup first if you might want this back.`
+        : "Take a backup first if you might want this back.",
       confirmLabel: "Delete concept",
       danger: true,
     })
@@ -259,7 +259,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
                 <b>Manual capture</b> starts here. Paste or type the passage, add source and location if you have them, then name what the passage is about.
               </p>
               <p>
-                <b>Assisted capture</b> starts in the reading — <b>00 · Reading</b>, the text itself. Select the passage there and capture it. Loom fills in the passage, source, page, and highlight anchor for you.
+                <b>Assisted capture</b> starts in <b>Source</b>, the text itself. Select the passage there and capture it. Loom fills in the passage, source, page, and highlight anchor for you.
               </p>
               <p>
                 In both paths, the thinking stays yours. The word chips are only a scaffold: tap useful words from the passage, reuse an existing concept, or type a new phrase in your own language.
@@ -428,7 +428,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
       <div className="card">
         <h2>Coding log <span className="n">{scoped.bytes.length ? `(${scoped.bytes.length} bytes · ${scoped.concepts.length} concepts)` : ""}</span></h2>
         <p className="do calm">Everything you capture from this reading lands here, A–Z.</p>
-        <p className="hint">Click a row to open it — edit the working definition, or file the same passage under another concept. When you have a handful, go to <b>02 — Throw</b> and start connecting them.</p>
+        <p className="hint">Click a row to open it — edit the working definition, or file the same passage under another concept. When you have a handful, go to <b>Connect</b> and start connecting them.</p>
 
         <div className="scrollbox">
           {scoped.concepts.length === 0 && (

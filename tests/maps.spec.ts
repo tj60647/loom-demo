@@ -33,9 +33,9 @@ async function waitForLoom(page: Page) {
 }
 
 async function openWeaveMap(page: Page) {
-  await page.goto('/weave');
+  await page.goto('/studio/weave');
   await waitForLoom(page);
-  await page.locator('nav button', { hasText: 'Map' }).click();
+  await page.locator('.studio-tools button', { hasText: 'Map' }).click();
   await expect(page.locator('#mapSwitcher')).toBeVisible({ timeout: 15000 });
 }
 
@@ -127,7 +127,7 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
   await expect(async () => {
     await page.reload();
     await waitForLoom(page);
-    await page.locator('nav button', { hasText: 'Map' }).click();
+    await page.locator('.studio-tools button', { hasText: 'Map' }).click();
     const tempChip = page.locator('#mapSwitcher .chip', { hasText: TEMP_NAME });
     await expect(tempChip).toHaveCount(1, { timeout: 5000 });
     await tempChip.click();
@@ -140,7 +140,7 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
 });
 
 test('export carries maps[] with id-valid tiers and the tier mirror', async ({ page }) => {
-  await page.goto('/keep');
+  await page.goto('/files');
   // The export button snapshots current client state, which right after load
   // is still the blank pre-fetch state — retry until the loaded graph (with
   // the map test 1 made) is what lands in the file.
@@ -172,15 +172,15 @@ test('export carries maps[] with id-valid tiers and the tier mirror', async ({ p
 });
 
 test('04 Map lives inside a reading workbench, scoped to it', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/library');
   const card = page.locator('.shelfcard').first();
   await expect(card).toBeVisible({ timeout: 15000 });
   await expect(card.locator('.shelftally')).not.toHaveText('…', { timeout: 15000 });
   await card.click();
-  await expect(page).toHaveURL(/\/reading\//);
+  await expect(page).toHaveURL(/\/studio\/reading\//);
 
   await waitForLoom(page);
-  await page.locator('nav button', { hasText: 'Map' }).click();
+  await page.locator('.studio-tools button', { hasText: 'Map' }).click();
   await expect(page.locator('#mapSwitcher')).toContainText('Your maps of this reading');
   // The whole weave's maps do not leak into a reading's stack.
   await expect(page.locator('#mapSwitcher .chip', { hasText: TEMP_NAME })).toHaveCount(0);

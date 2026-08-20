@@ -53,7 +53,7 @@ export default function CardMenu({
           </button>
         </>
       ) : (
-        <p className="ghostnote">No working definition yet — add one on 01 · Open.</p>
+        <p className="ghostnote">No working definition yet — add one in Capture.</p>
       )}
 
       <span className="cap" style={{ display: "block", marginTop: 12 }}>

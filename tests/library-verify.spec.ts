@@ -46,12 +46,12 @@ test.describe('Library verification', () => {
     await page.screenshot({ path: 'test-results/shelf.png', fullPage: true });
 
     await firstCard.click();
-    await expect(page).toHaveURL(/\/reading\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/studio\/reading\//, { timeout: 15000 });
     // Download moved off the library card onto the reading's scope bar.
     await expect(page.getByRole('link', { name: /Download PDF/i })).toBeVisible();
     // Scoped to the workbench nav: "open" also matches the help button and the
     // Next dev-tools button in a dev build.
-    await expect(page.locator('nav').getByRole('button', { name: /Open/i })).toBeVisible();
+    await expect(page.locator('.studio-tools').getByRole('button', { name: /Capture/i })).toBeVisible();
 
     await page.screenshot({ path: 'test-results/reading-workbench.png', fullPage: true });
   });

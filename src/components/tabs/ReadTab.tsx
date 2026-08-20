@@ -270,7 +270,7 @@ export default function ReadTab() {
           readingPane = (
             <div id="readingPane" style={{ marginTop: "16px" }}>
               <div className="threadhead"><span className="red">{c.label}</span></div>
-              <p className="empty" style={{ marginTop: "8px" }}>This thread crosses nothing yet — warp waiting for weft. Take it to 02 — Throw.</p>
+              <p className="empty" style={{ marginTop: "8px" }}>This thread crosses nothing yet — warp waiting for weft. Take it to Connect.</p>
             </div>
           );
         } else {
@@ -304,7 +304,7 @@ export default function ReadTab() {
       {!wholeWeave && scoped.bridges.length > 0 && (
         <p className="ghostnote" style={{ marginTop: -6, marginBottom: 12 }}>
           {scoped.bridges.length} thread{scoped.bridges.length !== 1 ? "s" : ""} also run{scoped.bridges.length === 1 ? "s" : ""} out of this reading to concepts you met elsewhere.
-          They are not drawn here — half a thread would be a lie — but they are listed on <b>02 · Throw</b>.
+          They are not drawn here — half a thread would be a lie — but they are listed in <b>Connect</b>.
         </p>
       )}
 
@@ -422,7 +422,7 @@ export default function ReadTab() {
         </div>
 
         <div className="card">
-          <h2>Your read {activeMap && <span className="n">of &ldquo;{activeMap.name}&rdquo; — same as 04 · Map</span>}</h2>
+          <h2>Your reflection {activeMap && <span className="n">of &ldquo;{activeMap.name}&rdquo; — same as Map</span>}</h2>
           <p className="hint">One short paragraph, in your own words: what is this {wholeWeave ? "weave" : "reading"} about, and what holds it together? The tool never writes it for you. Essence and paragraph belong to your current map — keep several maps and each keeps its own.</p>
           <p className="readq">In a sentence — what is this {wholeWeave ? "weave" : "reading"} <i>about</i>?</p>
           <input

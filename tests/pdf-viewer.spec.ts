@@ -98,7 +98,7 @@ test.describe('PDF Viewer and Highlighting', () => {
       // The capture WAS the test — the data must not outlive it, or every run
       // stacks another identical concept onto the account. Delete the concept
       // (its byte cascades) through the same UI a student would use.
-      await page.locator('nav button', { hasText: 'Open' }).click();
+      await page.locator('.studio-tools button', { hasText: 'Capture' }).click();
       const row = page
         .locator('.lrow', { has: page.locator('.lconcept', { hasText: conceptName }) })
         .first();

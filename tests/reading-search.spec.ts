@@ -13,7 +13,7 @@ test.use({ storageState: "playwright/.auth/testa.json" })
 test.beforeEach(() => test.setTimeout(120_000))
 
 test("the shelf search finds a reading and stands in for the shelf while live", async ({ page }) => {
-  await page.goto("/")
+  await page.goto("/library")
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
 
   // The search sits behind the same ⌕ toggle the reading uses, up by the
@@ -37,15 +37,15 @@ test("the shelf search finds a reading and stands in for the shelf while live", 
   await expect(page.locator(".searchhit")).toHaveCount(0)
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
 
-  // A hit is a door to the text itself — 00 · Reading, not 01 · Open — and
+  // A hit is a door to the source text, not Capture, and
   // the query rides along: the reading's own search opens pre-filled, so the
   // trail of marks continues into the text.
   await box.fill("object worlds")
   const doorway = page.locator(".searchhit", { hasText: "Object Worlds" }).first()
   await expect(doorway).toBeVisible({ timeout: 15_000 })
   await doorway.click()
-  await expect(page).toHaveURL(/\/reading\/[^?]+\?tab=reading&q=object(%20|\+)worlds/, { timeout: 15_000 })
-  await expect(page.locator("nav button.active", { hasText: "Reading" })).toBeVisible({ timeout: 15_000 })
+  await expect(page).toHaveURL(/\/studio\/reading\/[^?]+\?tool=source&q=object(%20|\+)worlds/, { timeout: 15_000 })
+  await expect(page.locator(".studio-tools button.active", { hasText: "Source" })).toBeVisible({ timeout: 15_000 })
   const inReading = page.getByRole("searchbox", { name: "Search this reading for a word or phrase" })
   await expect(inReading).toBeVisible({ timeout: 15_000 })
   await expect(inReading).toHaveValue("object worlds")
@@ -53,17 +53,17 @@ test("the shelf search finds a reading and stands in for the shelf while live", 
 })
 
 test("search inside a reading lists matching pages and marks the words on the text", async ({ page }) => {
-  await page.goto("/")
+  await page.goto("/library")
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
   await expect(card).toBeVisible({ timeout: 15_000 })
   // Same trap tests/helpers.ts documents: clicking during the tally
   // re-render detaches the card mid-click.
   await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
   await card.click()
-  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
+  await expect(page).toHaveURL(/\/studio\/reading\//, { timeout: 15_000 })
 
-  // Tab 00 — the text itself.
-  await page.locator("nav button", { hasText: "Reading" }).click()
+  // Source — the text itself.
+  await page.locator(".studio-tools button", { hasText: "Source" }).click()
   await expect(page.locator("text=Loading PDF...")).toBeHidden({ timeout: 15_000 })
 
   await page.getByRole("button", { name: "Search this reading" }).click()

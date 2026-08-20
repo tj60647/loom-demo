@@ -7,9 +7,8 @@
  * Every mutation this file makes, it removes again — the seeded data is
  * asserted, never changed.
  *
- * Station coverage this file adds over the older specs: 01 Open's by-hand
- * capture form, 02 Throw (previously untested entirely), 03 Read (same),
- * multi-map assertions on 04, and the whole-cloth export on 06 Keep.
+ * Studio coverage: Capture's by-hand form, Connect, Reflect, Map, and the
+ * whole-workspace export in Files.
  */
 import { test, expect } from "@playwright/test"
 
@@ -28,7 +27,7 @@ async function loomLoaded(page: import("@playwright/test").Page) {
 /** The seeded whole-weave map, made active regardless of what other specs
  *  left most-recently-updated in this scope. */
 async function selectWholeCloth(page: import("@playwright/test").Page) {
-  await page.goto("/weave?tab=map")
+  await page.goto("/studio/weave?tool=map")
   await loomLoaded(page)
   await expect(page.locator("#mapSwitcher")).toBeVisible({ timeout: 15_000 })
   const chip = page.locator("#mapSwitcher .chip", { hasText: "The whole cloth" })
@@ -36,8 +35,8 @@ async function selectWholeCloth(page: import("@playwright/test").Page) {
   await chip.first().click()
 }
 
-test("00 · the shelf shows the readings with the student's own tallies", async ({ page }) => {
-  await page.goto("/")
+test("Library shows the readings with the student's own tallies", async ({ page }) => {
+  await page.goto("/library")
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
   const tally = page.locator(".shelftally").first()
   await expect(tally).not.toHaveText("…", { timeout: 15_000 })
@@ -75,14 +74,13 @@ test("00 · the shelf shows the readings with the student's own tallies", async 
   await expect(page.locator('input[type="file"]')).toHaveCount(0)
 })
 
-test("01 · a byte captured by hand lands in the coding log — and cleans up", async ({ page }) => {
-  await page.goto("/")
+test("Capture: a byte entered by hand lands in the coding log — and cleans up", async ({ page }) => {
+  await page.goto("/library")
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
   await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
   await card.click()
-  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
-  // Station buttons are named "01 —Open" etc. — match by substring, never exact.
-  await page.locator("nav button", { hasText: "Open" }).click()
+  await expect(page).toHaveURL(/\/studio\/reading\//, { timeout: 15_000 })
+  await page.locator(".studio-tools button", { hasText: "Capture" }).click()
   await loomLoaded(page)
 
   await page.locator("#bText").fill("A passage typed by the journey suite, verbatim enough for the log.")
@@ -100,8 +98,8 @@ test("01 · a byte captured by hand lands in the coding log — and cleans up", 
   await expect(page.locator(".lrow", { hasText: "journey test concept" })).toHaveCount(0, { timeout: 15_000 })
 })
 
-test("02 · pick two, say the sentence, throw the thread, coin a term — then unpick it all", async ({ page }) => {
-  await page.goto("/weave?tab=throw")
+test("Connect: pick two, say the sentence, throw the thread, coin a term — then unpick it all", async ({ page }) => {
+  await page.goto("/studio/weave?tool=connect")
   await loomLoaded(page)
 
   const warp = page.locator(".crow")
@@ -148,9 +146,9 @@ test("02 · pick two, say the sentence, throw the thread, coin a term — then u
   await expect(page.locator(".sent", { hasText: "one sustains the other" })).toHaveCount(0, { timeout: 15_000 })
 })
 
-test("03 · the cloth counts what it sees, and the read belongs to the active map", async ({ page }) => {
+test("Reflect: the cloth counts what it sees, and the reflection belongs to the active map", async ({ page }) => {
   await selectWholeCloth(page)
-  await page.locator("nav button", { hasText: "Read" }).click()
+  await page.locator(".studio-tools button", { hasText: "Reflect" }).click()
 
   // Counted prompts render; the two visible failure states are counted, not hidden:
   // the seeded no-evidence concept and the seeded sentence-only thread.
@@ -166,23 +164,23 @@ test("03 · the cloth counts what it sees, and the read belongs to the active ma
   await page.reload()
   await loomLoaded(page)
   await selectWholeCloth(page)
-  await page.locator("nav button", { hasText: "Read" }).click()
+  await page.locator(".studio-tools button", { hasText: "Reflect" }).click()
   await expect(page.locator("#readEssence")).toHaveValue(/Disciplinary worlds hold together/, { timeout: 15_000 })
 })
 
-test("04 · three maps, and each scope keeps its own tiers and essence", async ({ page }) => {
+test("Map: three maps, and each scope keeps its own tiers and essence", async ({ page }) => {
   // Whole weave: the seeded whole-cloth map with its own essence.
   await selectWholeCloth(page)
   await expect(page.locator("#mapEssence")).toHaveValue(/Disciplinary worlds hold together/, { timeout: 15_000 })
 
   // Inside Object Worlds: its own map, its own essence, its own mirror counts —
   // and the whole-weave map does not leak in.
-  await page.goto("/")
+  await page.goto("/library")
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
   await expect(card.locator(".shelftally")).not.toHaveText("…", { timeout: 15_000 })
   await card.click()
-  await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
-  await page.locator("nav button", { hasText: "Map" }).click()
+  await expect(page).toHaveURL(/\/studio\/reading\//, { timeout: 15_000 })
+  await page.locator(".studio-tools button", { hasText: "Map" }).click()
   await expect(page.locator("#mapSwitcher")).toContainText("Your maps of this reading", { timeout: 15_000 })
   await expect(page.locator("#mapSwitcher .chip", { hasText: "The whole cloth" })).toHaveCount(0)
 
@@ -193,8 +191,8 @@ test("04 · three maps, and each scope keeps its own tiers and essence", async (
   await expect(page.locator("#mapMirror")).toContainText("1 primary")
 })
 
-test("06 · keep lists every map, and the whole-cloth export carries them all", async ({ page }) => {
-  await page.goto("/keep")
+test("Files lists every map, and the whole-cloth export carries them all", async ({ page }) => {
+  await page.goto("/files")
   // Wait out the loading window: export is only trustworthy once the tallies are real.
   await expect(page.getByText(/[1-9]\d* concepts/).first()).toBeVisible({ timeout: 20_000 })
   for (const name of ["The whole cloth", "Object worlds, sorted", "A practice lens"]) {
@@ -218,4 +216,13 @@ test("06 · keep lists every map, and the whole-cloth export carries them all", 
   // The mirror holds: concept tiers reflect the oldest whole-weave map.
   const whole = data.graph.maps.find((m: { name: string }) => m.name === "The whole cloth")
   expect(data.graph.read).toBe(whole.read)
+})
+
+test("legacy learner URLs retain their destination and tool", async ({ page }) => {
+  await page.goto("/reading/star?tab=open")
+  await expect(page).toHaveURL(/\/studio\/reading\/star\?tool=capture/, { timeout: 15_000 })
+  await page.goto("/weave?tab=read")
+  await expect(page).toHaveURL(/\/studio\/weave\?tool=reflect/, { timeout: 15_000 })
+  await page.goto("/keep")
+  await expect(page).toHaveURL(/\/files$/, { timeout: 15_000 })
 })

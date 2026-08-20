@@ -11,16 +11,20 @@
   --display:"Fraunces",Georgia,serif;--body:"Newsreader",Georgia,serif;--mono:ui-monospace,Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box} html,body{margin:0}
-/* The chrome is a frame, not part of the page. The wordmark, the reading's own
-   bar and the journey hold still while only the work below them scrolls: the
-   journey is meant to be always in view, and it cannot be that if it scrolls
-   away. tab 00 gets back the steady full-height reading area it had when the
-   viewer was a fixed takeover, without taking the nav away with it. */
+/* The shell holds the wordmark and one learner sidebar still while the active
+   workspace scrolls. Reading and map surfaces can therefore take the full
+   remaining height without rebuilding the navigation around them. */
 html{height:100%}
 body{background:radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/26px 26px,var(--paper);
   color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;
-  height:100dvh;overflow:hidden;display:flex;flex-direction:column}
-header,.scopebar,nav{flex:0 0 auto}
+  height:100dvh;overflow:hidden}
+.app-shell{height:100dvh;display:grid;grid-template-columns:224px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr)}
+header{grid-column:1/-1;grid-row:1;min-width:0}
+.app-shell>.primarynav{grid-column:1;grid-row:2/-1;min-height:0}
+.app-shell>.workspacehead{grid-column:2;grid-row:2}
+.app-shell>main{grid-column:2;grid-row:2/-1}
+.app-shell>.workspacehead~main{grid-row:3}
+.app-shell>.adminshell{grid-column:1/-1;grid-row:2/-1}
 /* min-height:0 or a flex item refuses to shrink below its content and the
    scroll silently moves back to the document. */
 main,.adminshell{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
@@ -49,11 +53,19 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
 .btn.mini{font-size:11px;padding:7px 10px;letter-spacing:.05em;min-height:36px}
 .btn:disabled{opacity:.35;cursor:default} .btn:hover:not(:disabled){opacity:.88}
 #saveDot{font-family:var(--mono);font-size:10px;color:var(--ink-soft);align-self:center}
-nav{display:flex;border-bottom:1px solid var(--rule);padding:0 26px;background:var(--paper-2);flex-wrap:wrap}
-nav button,nav a.station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
-nav button.active,nav a.station.active{color:var(--ink);border-bottom-color:var(--ochre)}
-nav .step{font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-right:7px;color:var(--grey)}
-nav button.active .step,nav a.station.active .step{color:var(--ochre)}
+.primarynav{border-right:1px solid var(--rule);background:var(--paper-2);overflow-y:auto}
+.primarynav .navtoggle{display:none}
+.primarynavbody{display:flex;min-height:100%;flex-direction:column;padding:22px 14px 18px}
+.primarynavbody section{display:flex;flex-direction:column;gap:2px;margin-bottom:23px}
+.primarynavbody .navutility{margin-top:auto;margin-bottom:0}
+.navgroup{display:block;margin:0 10px 7px;font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--grey)}
+.primarynav a,.primarynav button,.navcontext{display:block;width:100%;padding:8px 10px;border:0;border-radius:3px;background:none;text-align:left;text-decoration:none;color:var(--ink-soft);font:15px/1.25 var(--body);cursor:pointer}
+.primarynav a:hover,.primarynav button:hover{background:rgba(168,132,63,.08);color:var(--ink)}
+.primarynav a.active,.primarynav button.active,.navcontext.active{background:rgba(168,132,63,.12);box-shadow:inset 2px 0 var(--ochre);color:var(--ink);font-weight:500}
+.navcontext{padding-top:2px;padding-bottom:9px;color:var(--ink);font-family:var(--display);font-size:16px;cursor:default}
+.navcontext+.primarynav button{margin-top:2px}
+.studio-tools button,.primarynav .navtool{padding-left:22px}
+.textlink{font:inherit;color:var(--ochre);background:none;border:0;border-bottom:1px solid currentColor;padding:0;cursor:pointer}
 /* Full-bleed so the scrollbar rides the window edge rather than the edge of a
    centred column; the 1100px measure is kept by padding instead of max-width. */
 main{padding:24px max(26px,calc((100% - 1100px)/2)) 86px;margin:0}
@@ -180,16 +192,20 @@ footer span{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-tra
 footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 
 @media (max-width: 900px){
+  .app-shell{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto minmax(0,1fr)}
+  .app-shell>.primarynav{grid-column:1;grid-row:2;min-height:auto}
+  .app-shell>.workspacehead{grid-column:1;grid-row:3}
+  .app-shell>main{grid-column:1;grid-row:3/-1}
+  .app-shell>.workspacehead~main{grid-row:4}
+  .app-shell>.adminshell{grid-column:1;grid-row:2/-1}
   header{padding:10px 14px 8px;gap:10px}
   .wordmark{font-size:21px}
-  nav{
-    padding:0 10px;
-    flex-wrap:nowrap;
-    overflow-x:auto;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:thin;
-  }
-  nav button{flex:0 0 auto}
+  .primarynav{border-right:0;border-bottom:1px solid var(--rule);overflow:visible}
+  .primarynav .navtoggle{display:block;width:100%;padding:8px 14px;border:0;background:none;cursor:pointer;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+  .primarynavbody{display:none;min-height:0;padding:8px 14px 14px}
+  .primarynav[data-expanded="true"] .primarynavbody{display:flex}
+  .primarynavbody section{margin-bottom:14px}
+  .primarynavbody .navutility{margin-top:0}
   main{padding:18px 14px 20px}
   /* Static here, in flow under the content — it overlaps nothing, so it can
      take its clicks (and text selection) back. */
@@ -335,9 +351,10 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 
 /* --- reading-first: the shelf, the scope bar, the seam --- */
 
-/* Where you are, above the tabs: which reading, and the way back to the shelf. */
-.scopebar{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+/* One compact line for the open reading or utility; navigation lives at left. */
+.workspacehead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
   padding:9px 26px;border-bottom:1px solid var(--rule);background:var(--paper)}
+@media(max-width:900px){.workspacehead{padding:9px 14px}}
 .scopeback{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
   color:var(--ink-soft);text-decoration:none}
 .scopeback:hover{color:var(--ochre)}
@@ -402,7 +419,7 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .bandtoggle .tw{display:inline-block;transition:transform .15s}
 .bandtoggle.open .tw{transform:rotate(90deg)}
 .bandtoggle .n{color:var(--grey);letter-spacing:.04em}
-.scopebar .scopedl{margin-left:auto}
+.workspacehead .scopedl{margin-left:auto}
 .shelfnofile{display:flex;align-items:center;justify-content:center;flex:0 0 auto;
   width:70px;min-height:92px;border:1px dashed var(--rule);border-radius:3px;background:rgba(0,0,0,.02)}
 .untethered{padding:10px 0;border-bottom:1px dotted var(--rule)}

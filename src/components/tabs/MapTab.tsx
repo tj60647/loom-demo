@@ -816,7 +816,7 @@ export default function MapTab() {
         <p className="hint" style={{ marginTop: 8 }}>Arranging and articulating feed each other: as the map settles, say in one short paragraph what it is about and what holds it together. Essence, paragraph, tiers and arrangement belong to this map — switch maps and each keeps its own.</p>
         <textarea
           id="yourRead2"
-          placeholder="Write your read of this map here — same text as on 03 · Read."
+          placeholder="Write your reflection on this map here — same text as in Reflect."
           value={activeMap?.read ?? ""}
           onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapRead(m.id, v)) }}
           onBlur={flushMapText}
