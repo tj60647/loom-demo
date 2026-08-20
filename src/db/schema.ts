@@ -211,10 +211,13 @@ export const sources = pgTable(
     // to a reading, so a source the library does not hold still needs a row —
     // otherwise its passages have no door and fall out of every lens.
     storageKey: text("storageKey"),
-    // Size of the stored file in bytes, recorded at ingest. NOT refreshed when
-    // a repair rotates storageKey — repairApply.ts never writes this column,
-    // so a repaired reading is served with the pre-repair Content-Length
-    // (checked 2026-08-19; a real mismatch to fix). Serving-time metadata, not identity —
+    // Size of the stored file in bytes, recorded at ingest and refreshed
+    // wherever the file changes: reingestSource on every re-ingest (4363c0e),
+    // repairApply atomically with the storageKey rotation (2026-08-20), and
+    // the seed script when it re-stores a file. (A note here on 08-19 — and
+    // commit 91e69b2 — claimed repaired readings served a pre-repair
+    // Content-Length; that was false since 08-14, reingest rewrote it moments
+    // after each rotation.) Serving-time metadata, not identity —
     // the identity argument above still holds. It exists so the reading route
     // can send Content-Length on a streamed body: without it pdf.js cannot
     // show download progress against a total, and the 4.5MB-cap comment on

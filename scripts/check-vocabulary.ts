@@ -48,6 +48,8 @@ const root = join(__dirname, "..")
  * adding one because a Passage crept back in, that is the bug.
  */
 const FILE_DATA = new Set([
+  // The seed PDFs read off disk — a buffer and the byteLength the row records.
+  "scripts/seed-sources.ts",
   "src/lib/storage.ts",
   "src/lib/textLayerRepair.ts",
   "src/lib/repairPipeline.ts",

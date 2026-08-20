@@ -292,7 +292,18 @@ export async function applyAcceptedRepairs(sourceId: string) {
   // store is shared by every environment.
   const revisedKey = `readings/${sourceId}-repaired-${Date.now()}.pdf`
   await readingStorage.put(revisedKey, repaired.bytes)
-  await db.update(sources).set({ storageKey: revisedKey }).where(eq(sources.id, sourceId))
+  // byteLength rides with the key, in the same statement. Not a steady-state
+  // fix: reingestSource below has refreshed it from these same bytes since
+  // 4363c0e (2026-08-14) — commit 91e69b2's claim that repaired readings
+  // served a stale Content-Length was false, checked against only half the
+  // call path. What this closes is the window between the rotation and
+  // reingest's own write, and the case where reingest throws before reaching
+  // it — the route would then send the old length on the new bytes and
+  // truncate the download.
+  await db
+    .update(sources)
+    .set({ storageKey: revisedKey, byteLength: repaired.bytes.byteLength })
+    .where(eq(sources.id, sourceId))
   // The lineage row, in the same act as the rotation: without it the old key
   // is an orphan the store holds and nothing addresses (see source_revision).
   await db.insert(sourceRevisions).values({

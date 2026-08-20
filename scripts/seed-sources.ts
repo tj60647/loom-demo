@@ -177,19 +177,22 @@ async function readSeedPdf(file: string) {
  *
  * Returns null only for an `optional` reading nothing can supply.
  */
-async function storageKeyFor(reading: (typeof READINGS)[number]): Promise<string | null> {
+async function storageKeyFor(
+  reading: (typeof READINGS)[number]
+): Promise<{ key: string; byteLength: number } | null> {
   if (reading.blobKey) {
     try {
-      await readingStorage.get(reading.blobKey)
-      return reading.blobKey
+      const existing = await readingStorage.get(reading.blobKey)
+      return { key: reading.blobKey, byteLength: existing.byteLength }
     } catch {
       // Not in this store after all — fall through to the file on disk.
     }
   }
   try {
     const key = `${crypto.randomUUID()}.pdf`
-    await readingStorage.put(key, await readSeedPdf(reading.file))
-    return key
+    const bytes = await readSeedPdf(reading.file)
+    await readingStorage.put(key, bytes)
+    return { key, byteLength: bytes.byteLength }
   } catch (err) {
     if (!reading.optional) throw err
     console.log(
@@ -236,8 +239,8 @@ async function run() {
 
 
     if (!source) {
-      const storageKey = await storageKeyFor(reading)
-      if (!storageKey) continue
+      const stored = await storageKeyFor(reading)
+      if (!stored) continue
 
       const [inserted] = await db
         .insert(sources)
@@ -249,7 +252,10 @@ async function run() {
           description: reading.description,
           isDescriptionVisible: reading.isDescriptionVisible,
           metadataProvenance: reading.metadataProvenance,
-          storageKey,
+          storageKey: stored.key,
+          // The reading route serves Content-Length from this; a row whose
+          // length disagrees with its stored file truncates the download.
+          byteLength: stored.byteLength,
         })
         .returning()
       source = inserted
@@ -268,12 +274,16 @@ async function run() {
       }
 
       if (!hasStoredFile) {
-        const storageKey = await storageKeyFor(reading)
-        if (!storageKey) continue
+        const stored = await storageKeyFor(reading)
+        if (!stored) continue
         const [updated] = await db
           .update(sources)
           .set({
-            storageKey,
+            storageKey: stored.key,
+            // byteLength follows the file, as everywhere else a key rotates:
+            // the re-stored seed PDF may differ from what the old length
+            // measured, and a stale Content-Length truncates the download.
+            byteLength: stored.byteLength,
             author: reading.author,
             sourceReference: reading.sourceReference,
             description: reading.description,
