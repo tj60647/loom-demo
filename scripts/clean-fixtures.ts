@@ -49,7 +49,10 @@ const CONCEPT_PATTERNS: { like: string; from: string }[] = [
   { like: "addcard filed ______", from: "add-concept-card.spec.ts" },
   { like: "Rail Test Concept A", from: "concept-rail.spec.ts" },
   { like: "Test Concept for %", from: "pdf-viewer.spec.ts" },
-  { like: "seam concept ______", from: "reuse-seam.spec.ts" },
+  // reuse-seam mints two stems, not the "seam concept" this list once claimed
+  // (that pattern never matched anything the spec coins).
+  { like: "single reading concept ______", from: "reuse-seam.spec.ts" },
+  { like: "crossing concept ______", from: "reuse-seam.spec.ts" },
   { like: "practice concept", from: "sandbox.spec.ts (should never reach the real db)" },
 ]
 

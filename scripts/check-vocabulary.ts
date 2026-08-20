@@ -51,6 +51,14 @@ const FILE_DATA = new Set([
   "src/lib/storage.ts",
   "src/lib/textLayerRepair.ts",
   "src/lib/repairPipeline.ts",
+  // NextAuth's 32-byte email token — crypto octets, minted by the library.
+  "src/lib/auth.ts",
+  // The structural probe's input is the PDF's bytes, and says so.
+  "src/lib/extractionDiagnosis.ts",
+  // Font char codes read as Latin-1 byte values — the mojibake signature.
+  "src/lib/offsetRemap.ts",
+  // The anchoring notes: ligature codes sharing a byte value with ASCII.
+  "src/lib/types.ts",
   // `repaired.bytes` — textLayerRepair's rewritten PDF buffer, applied here.
   "src/lib/repairApply.ts",
   "src/lib/reingest.ts",
@@ -59,8 +67,7 @@ const FILE_DATA = new Set([
   "src/lib/readingUploadClient.ts",
   "src/actions/repairs.ts",
   "src/actions/sources.ts",
-  // The same buffer, round-tripped through a generated fixture.
-  "scripts/check-block-repair.ts",
+  // (check-block-repair.ts sat here until its revert, 0184f3b.)
   // The reading route's Content-Length/ETag prose and the page-image
   // pipeline: "bytes" is always the PDF's octets or an encoded WebP —
   // source.byteLength, buffer.byteLength, "10MB of bytes re-downloaded".
@@ -72,14 +79,11 @@ const FILE_DATA = new Set([
 ])
 
 /**
- * The two places the word survives ON PURPOSE, because a student's already
- * downloaded files say it.
+ * The two places the word survives ON PURPOSE — both must name it to describe
+ * the rule itself. (The importer and its compat guard sat here too, reading
+ * the pre-rename export key, until import went with Keep on 2026-08-11.)
  */
 const DELIBERATE = new Set([
-  // The importer reads the pre-rename export key. Red line 5.
-  "src/lib/graphExport.ts",
-  // Its guard, which has to write a pre-rename file to test one.
-  "scripts/check-import-compat.ts",
   // The note explaining that the table WAS `byte` until 0023.
   "src/db/schema.ts",
   // This file, which cannot describe the rule without naming the word.

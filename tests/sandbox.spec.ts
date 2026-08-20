@@ -95,8 +95,10 @@ test.describe('Practice loom', () => {
     expect(exampleWork, 'the worked example put no passages on the page').toBeGreaterThan(0);
 
     // Search is withheld here: it reads the student's real rows over its own
-    // route, bypassing the provider entirely.
-    await expect(page.getByRole('button', { name: 'Search everything' })).toHaveCount(0);
+    // route, bypassing the provider entirely. (.stationsearch is the docked
+    // control's root — an earlier assertion matched a button name that never
+    // existed and could not fail.)
+    await expect(page.locator('.stationsearch')).toHaveCount(0);
 
     // --- the coach mark constrains without trapping -------------------------
     //
