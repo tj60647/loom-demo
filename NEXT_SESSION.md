@@ -14,7 +14,7 @@ verified, and what is waiting.
 
 ## Where `dev` stands
 
-**295 commits ahead of `master`, 3 behind.** `master` is at `d400378` (the
+**304 commits ahead of `master`, 3 behind.** `master` is at `d400378` (the
 PR #6 merge). Promoting is a release decision nobody has taken; the 3 commits
 `master` has that `dev` does not need looking at first.
 
@@ -25,11 +25,20 @@ PR #6 merge). Promoting is a release decision nobody has taken; the 3 commits
 - `npm run check`: **63 checks**, 0 failing.
 - `tsc --noEmit` and `eslint`: clean (3 pre-existing `<img>` warnings).
 
-**Not verified:** CI has never run any of it. `ci.yml` is `push` on **master
-only**, plus `pull_request` into master or dev — so every push to `dev` bypasses
-the required checks by design. Local green is not CI green: the suite here runs
-against a dev server and the shared dev database, and CI runs a real build
-against the CI database.
+**Verified on CI, 2026-08-19** — the first time this branch had ever been
+through the gate, via a `dev → master` PR opened for that purpose and closed
+without merging (#24). `checks` and `e2e` both green: 44 passed in the read
+pass, 33 passed / 1 skipped in the write pass.
+
+It found a break on the first run that no local run reproduces: an ambiguous
+`getByRole("button", { name: "Add" })` colliding with an aria-label added
+2026-08-18, which bites only when that control is on screen — fixture-dependent,
+so CI's provisioned database saw it and this machine's dev database did not.
+
+`ci.yml` was then split by cost (`eef2c77`): `checks` (~90s, no database) runs
+on every push to `dev`, while `e2e` holds the shared CI database's lock and
+stays on pull requests and master pushes. So a working branch now gets build,
+lint and the 63 check scripts on every push without contending for the database.
 
 > **A trap worth knowing.** `npx playwright test … | tail -n` reports *tail's*
 > exit code, not Playwright's. A run with failures still prints
@@ -61,8 +70,14 @@ deploy lands seven migrations at once, one of them a table rename.
 - **Optional concept name.** The model already allows it. Needs the "one or the
   other or both" constraint TJ added, a validation, and a display decision
   across 67 label sites.
-- **The Weave.** Whether the concept is removed is still open, and
-  `import re-scopes a projection to the whole weave` is blocked behind it.
+- ~~**The Weave.** Whether the concept is removed is still open~~ — **it was
+  ruled on 2026-08-11**: the whole weave is out of the app (open-work.md §Phase
+  1), there is no `/weave` route, and rows already written at `scopeKey ''`
+  render nowhere. This entry was carried forward from the 2026-08-09 handoff
+  without checking whether it had been settled since; it had. What IS still
+  open behind it is narrower: `import re-scopes a projection to the whole
+  weave` when its readings do not resolve, which now sends work somewhere the
+  app cannot show.
 
 ## Decided, not built
 
@@ -78,8 +93,10 @@ deploy lands seven migrations at once, one of them a table rename.
 
 - `@media (max-width: 900px)` in `PdfViewer.tsx` is dead by contracts §2c-iii,
   which puts the floor at 1280.
-- **PR #10** (`reading-canvas-intent`) — every item in its decision table is
-  resolved; item 12 was the last, taken 2026-08-19.
+- ~~**PR #10**~~ — closed 2026-08-19 with the disposition of all 13 items.
+- `docs/loom-model-build.md` may be sitting modified in the working tree. It is
+  the build authority, so an uncommitted edit there is worth resolving rather
+  than leaving to be swept into someone's next `git add`.
 
 ---
 
@@ -117,7 +134,8 @@ Two properties of that script are load-bearing:
 
 1. **Find out where production's schema actually is.** Everything about a
    release depends on it and nobody has looked in ten days.
-2. **Get CI to run the branch** — a `dev → master` PR left unmerged is enough,
-   since `pull_request` into master triggers it. 295 commits have never been
-   through the gate.
+2. ~~Get CI to run the branch~~ — done 2026-08-19, green. `checks` now runs on
+   every dev push; open a `dev → master` PR when the full `e2e` gate is wanted,
+   and close it afterwards so it does not hold the database's turn on every
+   push.
 3. Then the rulings above, model doc first.
