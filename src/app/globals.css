@@ -1223,6 +1223,19 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    `margin-left:auto` puts it right of the journey and left of the staff group,
    which docks after it. */
 .stationsearch{position:relative;margin-left:auto;display:flex;align-items:center}
+/* Home, immediately right of the cloth search. No margin-left:auto of its own
+   — the search already carries it, so the two travel right as a pair and the
+   free space is not re-split three ways (see JourneyNav status/home notes). */
+/* Pulled 6px right so it stacks with the full-screen control on the toolbar
+   directly below. Both sit flush to their own container and the containers do
+   not agree: the journey bar pads 26px on the right, .pdf-toolbar pads 20px,
+   measured at 1536 — right edges 1510 against 1516. Correcting the difference
+   here rather than changing either padding, because both are load-bearing for
+   everything else in their row. */
+.stationhome{display:flex;align-items:center;margin-left:10px;margin-right:-6px;
+  color:var(--ink-soft);text-decoration:none;border-radius:4px;padding:2px 4px}
+.stationhome:hover{color:var(--ochre);background:rgba(168,132,63,.08)}
+.stationhome:focus-visible{outline:2px solid var(--ochre);outline-offset:1px}
 /* Anchored to the button, dropping over the work below. `nav` clips nothing,
    and this is a sibling of <main> — whose station-reading variant is
    overflow:hidden — so it hangs free of the page's own scrolling boxes.

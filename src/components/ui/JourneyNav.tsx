@@ -214,6 +214,7 @@ export default function JourneyNav({
   onStation = {},
   labels = {},
   search,
+  home,
   status,
 }: {
   active: Station | null
@@ -246,6 +247,16 @@ export default function JourneyNav({
    * a third one would have re-split the free space between all three.
    */
   status?: React.ReactNode
+  /**
+   * The way back to 00 Library (TJ, 2026-08-19). A slot for the same reason
+   * `status` is one: this bar also stands on /admin and on the meta pages,
+   * where "home" is not the Library and where nothing should quietly appear.
+   * Only the reading workbench passes it.
+   *
+   * Placed AFTER `search`, which is what carries `margin-left:auto` — so the
+   * pair travels right together and nothing already in this row moves.
+   */
+  home?: React.ReactNode
 }) {
   return (
     <nav aria-label="The journey">
@@ -295,6 +306,8 @@ export default function JourneyNav({
       {status}
 
       {search}
+
+      {home}
 
       {/* fallback={null}: a student never sees this group at all, so the
           honest empty state during hydration is nothing, not a placeholder. */}

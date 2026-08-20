@@ -10,6 +10,8 @@
 // tiers): a reading's map sorts only against that reading's concepts.
 
 import { useCallback, useState, useEffect, useMemo } from "react"
+import Link from "next/link"
+import HomeIcon from "@/components/ui/HomeIcon"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
@@ -432,6 +434,26 @@ export default function Workbench({
             sourceId={activeTab === "read" ? undefined : source.id}
           />
         )}
+/* THE WAY OUT, right of the cloth search (TJ, 2026-08-19).
+           01 Reading stands the header down — the save light moved into this
+           bar on 2026-08-17 so it could — and the header is where Loom's name,
+           the menu, My Loom and About live. So inside a reading there is no
+           visible route to any of them: "someone looking at the journey bar in
+           reading would have no idea how to get to a place where they could see
+           about. thus the home logo".
+
+           `00 Library` is in this bar already, and does not do this job: it
+           reads as a station among stations, one more place in the journey
+           rather than the way back out of it. The house is the only thing here
+           that says "out, to where the app is".
+
+           A Link and not a button: it is a route, so it middle-clicks, opens in
+           a tab, and shows its target on hover like any other address. */
+        home={
+          <Link href="/" className="stationhome" aria-label="Library" data-tip="00 · Library">
+            <HomeIcon />
+          </Link>
+        }
         // The save light rides here now the header can stand down (TJ,
         // 2026-08-17). 01 is where capture happens and the highlight paints
         // optimistically, so "saved" is the only word that says the mark is
