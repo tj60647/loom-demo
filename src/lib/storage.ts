@@ -1,4 +1,5 @@
 import { put, get, del } from "@vercel/blob"
+import { READING_UPLOAD_PREFIX } from "@/lib/readingUpload"
 
 /**
  * Storage backend for shared, immutable reading assets: uploaded PDFs and the
@@ -157,3 +158,23 @@ class VercelBlobStorage implements ReadingStorage {
 }
 
 export const readingStorage: ReadingStorage = new VercelBlobStorage()
+
+/**
+ * Remove a browser upload at its EXACT pathname, prefix-free.
+ *
+ * The client upload path writes the pathname its token named, verbatim — the
+ * browser cannot know this environment's drawer — so its blobs land at the
+ * bare key even where `put` would have prefixed. Registration re-homes the
+ * bytes into the drawer (rehomeClientUpload, src/actions/sources.ts) and then
+ * calls this to clear the quarantine copy: that is deleting our own
+ * seconds-old write, not another environment's object — upload pathnames
+ * carry a random suffix, so nothing else lives there. Guarded to the upload
+ * prefix so no other caller can reach past the namespace with it; everything
+ * else deletes through `delete`, which stays inside the drawer.
+ */
+export async function deleteClientUploadBlob(pathname: string): Promise<void> {
+  if (!pathname.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
+    throw new Error("Refusing to delete outside the upload quarantine.")
+  }
+  await del(pathname)
+}

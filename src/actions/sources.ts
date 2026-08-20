@@ -17,7 +17,7 @@ import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { after } from "next/server"
 import { authOptions, isAdminUser } from "@/lib/auth"
-import { readingStorage } from "@/lib/storage"
+import { deleteClientUploadBlob, readingStorage } from "@/lib/storage"
 import { recordEvent } from "@/lib/graphEvent"
 import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
 import { renderSourcePageImages } from "@/lib/pdfPages"
@@ -416,6 +416,58 @@ export async function archiveOwnReading(sourceId: string) {
  * a curation cost the shared library justifies. An admin can Rescore from
  * the library if a private reading ever needs the reading-order check.
  */
+/**
+ * Move a browser-uploaded blob from its quarantine pathname into this
+ * environment's own drawer, returning the key the row will record.
+ *
+ * The client upload cannot know the drawer — blobNamespace is server-side —
+ * so its bytes land at the bare pathname in EVERY environment: in a preview
+ * that meant writing into the shared root, and a namespaced delete() could
+ * never reach the key the row recorded. Re-homing restores the storage
+ * invariant (an environment writes only into its own space) and makes every
+ * recorded storageKey one this environment may delete. The new key takes
+ * createSource's server-upload shape (a bare UUID), so `readings/` stays
+ * purely transient: no new source row records a quarantine pathname. Rows
+ * written before 2026-08-20 may still carry one — reads fall through to the
+ * bare key, so they keep working; they remain beyond a namespaced delete, as
+ * they always were.
+ *
+ * In production the drawer IS the bare root, so this is a same-store copy —
+ * one extra put per upload, kept for uniformity: one code path everywhere,
+ * and the stored key is server-minted rather than client-named.
+ */
+/**
+ * A quarantine pathname some source row ALREADY records is not a fresh
+ * upload — it is an existing reading's file. Everything downstream of
+ * registration (re-homing, the size-cap rejection, the failure cleanup)
+ * DELETES the pathname it was handed, and rows written before 2026-08-20
+ * record their quarantine pathname as storageKey — so without this check any
+ * signed-in caller could hand registerOwnUploadedReading another reading's
+ * key and destroy the blob every environment reads. Refuse instead; the
+ * legitimate flow never trips this, because a fresh upload's random-suffixed
+ * pathname is claimed by no row until this very call records its re-homed
+ * successor.
+ */
+async function refuseClaimedUploadKey(storageKey: string): Promise<void> {
+  const claimed = await db
+    .select({ id: sources.id })
+    .from(sources)
+    .where(eq(sources.storageKey, storageKey))
+    .limit(1)
+  if (claimed.length > 0) {
+    throw new Error("That pathname already belongs to a registered reading.")
+  }
+}
+
+async function rehomeClientUpload(quarantineKey: string, buffer: Buffer): Promise<string> {
+  const storageKey = `${crypto.randomUUID()}.pdf`
+  await readingStorage.put(storageKey, buffer)
+  // Best-effort: a leftover quarantine blob is the pre-rehome status quo, and
+  // the row about to be written already points at the drawer copy.
+  await deleteClientUploadBlob(quarantineKey).catch(() => {})
+  return storageKey
+}
+
 export async function registerOwnUploadedReading(data: {
   storageKey: string
   filename: string
@@ -430,19 +482,24 @@ export async function registerOwnUploadedReading(data: {
   if (!data.storageKey.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
     throw new Error("That upload is not in the readings area.")
   }
+  await refuseClaimedUploadKey(data.storageKey)
 
   const buffer = await readingStorage.get(data.storageKey)
   if (buffer.byteLength > MAX_READING_BYTES) {
-    await readingStorage.delete(data.storageKey).catch(() => {})
+    // The blob is still at its quarantine pathname — the drawer-scoped
+    // delete() cannot reach a bare key, so the exact-pathname remover must.
+    await deleteClientUploadBlob(data.storageKey).catch(() => {})
     throw new Error(`That file is ${formatBytes(buffer.byteLength)} — the limit is ${MAX_READING_LABEL}.`)
   }
 
+  let storageKey: string | null = null
   try {
+    storageKey = await rehomeClientUpload(data.storageKey, buffer)
     const source = await ingestReading({
       userId,
       isOwn: true,
       buffer,
-      storageKey: data.storageKey,
+      storageKey,
       filename: data.filename,
       title: data.title,
       author: data.author,
@@ -455,8 +512,10 @@ export async function registerOwnUploadedReading(data: {
     return { id: source.id, title: source.title }
   } catch (error) {
     // Nothing references the blob yet; a failed ingest must not leave it
-    // sitting in storage.
-    await readingStorage.delete(data.storageKey).catch(() => {})
+    // sitting in storage. Which copy exists depends on how far we got: after
+    // re-homing it is the drawer key; before, the quarantine pathname.
+    if (storageKey) await readingStorage.delete(storageKey).catch(() => {})
+    else await deleteClientUploadBlob(data.storageKey).catch(() => {})
     throw error
   }
 }
@@ -647,7 +706,11 @@ async function ingestReading(data: {
  * `storageKey` is the pathname the Blob SDK returned to the browser. It is
  * treated as untrusted input — the prefix is checked, the blob is fetched
  * server-side, and its real size and PDF magic bytes are verified here rather
- * than taken on the client's word.
+ * than taken on the client's word. The verified bytes are then RE-HOMED into
+ * this environment's own drawer under a server-minted key and the quarantine
+ * pathname cleared (rehomeClientUpload): the browser wrote at the bare
+ * pathname, which a namespaced environment could read but never delete — and
+ * which, from a preview, was the shared root.
  */
 export async function registerUploadedReading(data: {
   storageKey: string
@@ -660,21 +723,26 @@ export async function registerUploadedReading(data: {
   if (!data.storageKey.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
     throw new Error("That upload is not in the readings area.")
   }
+  await refuseClaimedUploadKey(data.storageKey)
 
   const buffer = await readingStorage.get(data.storageKey)
 
   // The token route caps this too, but a cap enforced only where the token is
   // minted is a cap on the polite path; re-check what actually landed.
   if (buffer.byteLength > MAX_READING_BYTES) {
-    await readingStorage.delete(data.storageKey).catch(() => {})
+    // Still at its quarantine pathname — the drawer-scoped delete() cannot
+    // reach a bare key, so the exact-pathname remover must.
+    await deleteClientUploadBlob(data.storageKey).catch(() => {})
     throw new Error(`That file is ${formatBytes(buffer.byteLength)} — the limit is ${MAX_READING_LABEL}.`)
   }
 
+  let storageKey: string | null = null
   try {
+    storageKey = await rehomeClientUpload(data.storageKey, buffer)
     const source = await ingestReading({
       userId: session.user.id,
       buffer,
-      storageKey: data.storageKey,
+      storageKey,
       filename: data.filename,
       title: data.title,
       courseId: data.courseId,
@@ -691,8 +759,11 @@ export async function registerUploadedReading(data: {
     return { id: source.id, title: source.title }
   } catch (error) {
     // Nothing references the blob yet, so a failed ingest should not leave it
-    // sitting in storage costing money and confusing later audits.
-    await readingStorage.delete(data.storageKey).catch(() => {})
+    // sitting in storage costing money and confusing later audits. Which copy
+    // exists depends on how far we got: after re-homing it is the drawer key;
+    // before, the quarantine pathname.
+    if (storageKey) await readingStorage.delete(storageKey).catch(() => {})
+    else await deleteClientUploadBlob(data.storageKey).catch(() => {})
     throw error
   }
 }
