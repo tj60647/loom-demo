@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 export type AdminNavCourse = {
@@ -31,6 +32,34 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
 
   const activeCourseId = activeCourse?.id ?? null
   const activeSectionId = activeSection?.id ?? null
+
+  // A URL is a claim about what the page shows. When ?course= resolves to
+  // nothing — a course deleted after the link was minted, or a typo — the
+  // fallback above quietly shows the first course while the address keeps the
+  // dead name; this effect corrects the URL to what is actually shown.
+  // Replace, not push, so Back does not walk through the false address. A
+  // param that resolves (the id, or a real course's slug) is a true claim
+  // and is left alone — which is more common than it looks: ids outlive
+  // renames, so ?course=course-foundations-studio names the course now
+  // called Design Frameworks Test 0729, whose row kept its July 6 birth id
+  // through every rename since (the question that prompted this effect —
+  // TJ, 2026-08-20 — turned out to be exactly that, a true URL wearing an
+  // old name; the healing below is for the genuinely dead ones).
+  const courseParamResolves =
+    courseParam === null ||
+    (activeCourse !== null && (activeCourse.id === courseParam || activeCourse.slug === courseParam))
+  const sectionParamResolves = sectionParam === null || activeSection !== null
+  useEffect(() => {
+    if (courseParamResolves && sectionParamResolves) return
+    const next = new URLSearchParams(searchParams.toString())
+    if (!courseParamResolves) {
+      if (activeCourseId) next.set("course", activeCourseId)
+      else next.delete("course")
+    }
+    if (!sectionParamResolves) next.delete("section")
+    const query = next.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname)
+  }, [courseParamResolves, sectionParamResolves, activeCourseId, pathname, router, searchParams])
 
   const navigate = (courseId: string | null, sectionId: string | null) => {
     const next = new URLSearchParams(searchParams.toString())
