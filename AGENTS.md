@@ -12,9 +12,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 **Vocabulary** (full map: refactor spec §F): `maps` = **Projections**,
 `maps.essence` = **Projection One-line**, `maps.read` = **Projection
-Description**, `edges` = **Links**, `edges.handle` = **Link Labels**,
-`edges.sentence` = **Link Description**, `sources` = **Readings**, the shelf =
-**Library**; tongues are deprecated for v1.
+Description**, `edges` = **Threads** (since migration 0024 a `link` row is the
+**Link** — a User-level Label + gloss), `edges.sentence` = **Thread
+Description**, `edges.handle` = a legacy dual-written copy of the **Link
+Label** (`edge.linkId` is the pointer), `sources` = **Readings**, the shelf =
+**Library**; tongues are removed.
 
 **`bytes` are gone.** They are `passages` — in the code, in the UI, and since
 migration 0023 in the database too (table, join, columns, indexes, constraints,
