@@ -609,6 +609,118 @@
 > nothing needs the guard"*. Reset does. Without it the 500ms view timer fires
 > after the delete and writes geometry back under a `map:<id>` key, leaving one
 > orphan row in a loom the student was told is empty.
+>
+> **The rest of 2026-08-13.** The **object cards** arrived — `ConceptCard` and
+> `PassageCard` as standard cards, the concept card drawn on the warp
+> (`ac7cb85`) and on the board (`8e05863`) — the pattern the Thread card
+> joined on 08-19. **The Capture Log moved
+> into the cloth card** with a scrubber over the one drawing (`505020a`,
+> `35b7023`). **One search per station**, scoped and labeled, docked in the
+> journey bar, every hit a door to the object (`1c4bde6`, `1e8d041`; the PDF
+> half of that commit was reverted the same hour, `f9c359f`). **Typing a
+> passage belongs to readings with no PDF, and nowhere else** (`1eef83b`). And
+> the ingest side grew a spine: scanned readings render (wasm codecs beside the
+> worker, `a1fe46f`), the repair pipeline reaches pages with no text at all
+> (`b7e9205`, which also cut migration 0025 — `source_revision`, the table the
+> 08-16 version badge later reads), a split panel goes to a judge that **may
+> only choose, never write** (`b8f6b6f`), a reading is published by its
+> verdict rather than its arrival (`eb67975`), and the **library reprocessor**
+> landed with a tripwire
+> on the two-build text contract (`fd87167`); Node pinned at 22.7 and the
+> text-parity check joined the bar (`3f54f5a`).
+>
+> **2026-08-14 — retranscription, and the matrix learns to climb.**
+> *"This document's OCR is bad"* became a sayable act (`1ddce2a`); a capture of
+> the damage no longer blocks the cure (`c9a827f`); a stranded highlight sets
+> its page aside, not the whole document (`793f28d`). A reading now knows its
+> pages before the viewer opens them — sizes, bytes and images stored at ingest
+> (`4363c0e`, migration 0026) — so the matrix climbs a ladder (impostor ·
+> reading · native) and decodes only what the eye is on (`e281410`), with the
+> whole contact sheet as one tile above the pages (`d2179c8`) and deeper zoom
+> plus an overview inset in one gesture language (`5bd8c45`). CI stopped
+> lying: three guards had stopped watching and were green on a decoy
+> (`ed7a460`), the practice specs could never pass for want of Seuss
+> (`0c4a9de`), a seeded reading nobody filed was a reading nobody could see
+> (`95c6bb3`, `2c02061`), and the twenty-minute gate was split so it is
+> actually read — readers together, writers where the minutes are (`42a3789`,
+> `2177997`).
+>
+> **2026-08-15/16 — a file knows its versions; environments get walls.** The
+> margin-note splice was reverted (`0184f3b`). A reading says which version of
+> its file it is serving, the download names the file it serves, and the badge
+> and history must agree (`970f1ad`, `d64b40e`, `519ee24` — reading the
+> `source_revision` table 08-13's migration 0025 created). An
+> environment writes into its own blob drawer and deletes only from it
+> (`d4cf500`); **branch previews can be entered** — a sign-in door that lands
+> the reviewer as a learner, no key because a preview holds nobody's work, and
+> a database per pull request cut from the preview template (`56fa743`,
+> `40ceac6`, `816e342`, `ef0540d`) — while the tester site is a Preview
+> deployment and is not a preview (`fb7cc97`). The dot grid left every surface
+> (`c27ab04`, `4cba4db`). The written record: data-environments.md and the
+> deployment guides.
+>
+> **2026-08-17 — the cleanup pass** (the record is
+> [ui-cleanup-pass-1.md](ui-cleanup-pass-1.md), caught up in `a75e231`). The
+> toolbar gave its height back and its buttons say what they do (`b42603f`);
+> the reading station is the text — the save light moved into the journey bar
+> and **the header stands down on the reading station**, in the same commit
+> (`860cf80`, via `body[data-reading-focus]`; the house icon that gives the
+> way back out came 08-19). **A menu icon took My Loom and About off the
+> header, and students lost the Workflows link** (`277f7cb`; the page still
+> reads a typed-in student their own flow). A student can take a reading of
+> their own off the shelf (`a75b943`); the shelf counts core, supplemental and
+> your own (`300bf58`). **Your work gained a Passages view and passages lead
+> it** (`539fc0c`); **a passage's note can be revised** — `updatePassageNote`
+> arrived here (`c1567ef`), two days before the rail card drew the field in
+> place. One margin card, its concepts and its note (`8745563`, `91f6d64`);
+> the reading **removes** a concept from a passage while only Vocabulary
+> **deletes** one (`e4fdc2f`); the journey search says "your cloth" and never
+> searched pages (`7bd7359`); a passage is one tab stop (`ec4685a`).
+>
+> **2026-08-18 — the canvas holds, and the Add Concept card ships.** Every
+> canvas move obeys the limit the drag obeys (`bd79f20`), a concept label
+> stays inside its card (`fd7782c`), a mark measured at reading zoom survives
+> the drop to impostors (`d4d3144`), and the Passages/Concepts switch stays on
+> screen while the list scrolls (`d8c232f`). The **Add Concept card** shipped
+> ungated in both of its homes — the `+` beside a passage card in Your work
+> and on the rail — coining or reusing a User-level Concept and filing the
+> pointer without leaving the text (`1a53eb8`;
+> [add-concept-card.md](add-concept-card.md) is the record, rewritten to what
+> shipped).
+>
+> **2026-08-18/19 — a pair on the cloth, and the Thread card.** Two picked
+> concepts (click, shift-click) offer to become a thread at the arc midpoint —
+> thrown in place or opened on 02 with the bench pre-loaded (`1e5a77a`,
+> `c214266`; picks refuse and prune concepts the loom no longer has,
+> `016ce38`, `5481d96`); **tracing is hidden on every cloth from one flag in
+> the renderer** (`SHOW_TRACE`, `0d038e6`), so a cloth click now means "pick a
+> concept". A **Thread is one card** — `ThreadCard.tsx`, relation-first,
+> beside its two siblings — drawn by 02 · Linking in edit mode and by the
+> three read-only lists (`c85be02`, `e4b8aba`), its description and label
+> **fields** committing on blur like a concept's and a passage's (`aa5356b`);
+> a pill means a label on every surface that draws a thread (`3fef47e`).
+> Records: [pair-and-throw.md](pair-and-throw.md),
+> [thread-card.md](thread-card.md).
+>
+> **2026-08-19 — capture moves onto the rail; search says where and how
+> much.** A capture is **written on the rail, beside the words it is about** —
+> the draft card and the modal are one shared `CaptureFields`, so the two
+> paths cannot ask different questions (`3a5f401`); a passage note is written
+> on the rail card, in place (`cd56ce6`); a page can be read while its rail
+> cards are edited (`57536d3`); Save names the one thing the capture is going
+> without — "Save without concept" (`a2fe3be`); clicking a highlight opens
+> that passage in Your work (`6167ab1`); `refilePassage` is
+> `addPassageConcept`, because it adds (`19e15fe`). The canvas reads the
+> trackpad — two fingers pan, a pinch zooms — space pans over the reading, and
+> a canvas card is the card page mode draws at every zoom (`--k`, not
+> `--invk`) (`def8917`, `44b3c6f`, `70a6bbe`). Search: the field stays put
+> while results scroll (`06ee599`), a hit opens the reading **on the page it
+> quoted** (`5a29d49`), marks the words it found at every zoom (`8c671ce`),
+> and a row says how many matches its page really holds (`33f597f`). The app
+> says which build it is (`fad5468`); `checks` runs on every push to dev while
+> e2e stays deliberate (`eef2c77`); the suite sweeps its own debris
+> (`5e3ab6d`); and a reading offers **a way out to where the chrome is** — the
+> house icon in the journey bar (`9e11542`).
 
 The complete inventory of every surface a caller can rely on: database schema, server
 actions, API routes, export/import file formats, and the invariants the code enforces.
@@ -616,9 +728,12 @@ Companion to the *why* — now [loom-model-build.md](loom-model-build.md) (autho
 [loom-refactor-spec.md](loom-refactor-spec.md) (work order); historically
 [archive/loom-spec-v1.md](archive/loom-spec-v1.md). This is the *what, exactly*.
 
-**As of:** `dev`, 2026-08-08 (end of session) — P3.12 auth-side, P3.13, P3.14, the shelf-bounce fix, the faculty browser pass, and a day of TJ's rulings: station 03 → Vocabulary, Reading and Open merged, Weave hidden, Linking scoped to its reading, concepts before evidence, the cloth on the card, Overlays to faculty with a section picker, 03/04 swapped, and `/workflows`. See NEXT_SESSION.md's 08-08 addendum for the ordered list.
-Re-stamp when it reaches master. Line numbers cite that branch and will drift; names
-and shapes are the contract, line numbers are a courtesy.
+**As of:** `dev` @ `9ee4859`, 2026-08-19. The preamble above is the running
+record and now runs through that commit; the numbered sections below were
+written against the 2026-08-08 session and are re-stamped only where later
+work touched them — where a preamble entry and a section disagree, the
+preamble is newer. Line numbers cite the branch of their writing and will
+drift; names and shapes are the contract, line numbers are a courtesy.
 
 Conventions used below:
 
