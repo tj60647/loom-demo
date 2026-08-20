@@ -11,6 +11,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { useSession } from "next-auth/react"
 import { getSources } from "@/actions/sources"
 import { getActiveCourse } from "@/actions/courses"
+import { frontendReadings } from "@/lib/frontendFixture"
 
 export type ReadingMeta = {
   id: string
@@ -36,6 +37,8 @@ type ReadingsContextValue = {
   course: ActiveCourse | null
   isLoading: boolean
   error: string | null
+  /** StageIt supplies fixture rows and never calls reading actions. */
+  frontendOnly: boolean
   /** A reading's title, or a plain fallback — never a bare id. */
   titleOf: (sourceId: string | null | undefined) => string
   /** Re-read the shelf, e.g. after the student adds a reading of their own. */
@@ -44,15 +47,18 @@ type ReadingsContextValue = {
 
 const ReadingsContext = createContext<ReadingsContextValue | null>(null)
 
-export function ReadingsProvider({ children }: { children: ReactNode }) {
+export function ReadingsProvider({ children, frontendOnly = false }: { children: ReactNode; frontendOnly?: boolean }) {
   const { data: session } = useSession()
-  const [readings, setReadings] = useState<ReadingMeta[]>([])
-  const [course, setCourse] = useState<ActiveCourse | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [readings, setReadings] = useState<ReadingMeta[]>(() => frontendOnly ? frontendReadings : [])
+  const [course, setCourse] = useState<ActiveCourse | null>(() => frontendOnly ? { id: "stageit", name: "Loom interface", term: "frontend-only" } : null)
+  const [isLoading, setIsLoading] = useState(!frontendOnly)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
 
   useEffect(() => {
+    if (frontendOnly) {
+      return
+    }
     // Deferred rather than set synchronously, the way LoomProvider does it: a
     // setState in an effect body cascades renders.
     if (!session) {
@@ -87,7 +93,7 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
       live = false
       window.clearTimeout(start)
     }
-  }, [session, nonce])
+  }, [frontendOnly, session, nonce])
 
   const value = useMemo<ReadingsContextValue>(() => {
     const byId = new Map(readings.map((r) => [r.id, r]))
@@ -97,10 +103,11 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
       course,
       isLoading,
       error,
+      frontendOnly,
       titleOf: (sourceId) => (sourceId && byId.get(sourceId)?.title) || "another reading",
       refresh: () => setNonce((n) => n + 1),
     }
-  }, [readings, course, isLoading, error])
+  }, [readings, course, isLoading, error, frontendOnly])
 
   return <ReadingsContext.Provider value={value}>{children}</ReadingsContext.Provider>
 }

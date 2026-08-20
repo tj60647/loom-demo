@@ -27,7 +27,7 @@ export default function Shelf() {
   // signed in" from "we have not asked yet".
   const { data: session, status } = useSession()
   const { state, isLoading, loadExample, flash } = useLoom()
-  const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
+  const { readings: sources, isLoading: loadingShelf, error, refresh, frontendOnly } = useReadings()
   const [exampleBusy, setExampleBusy] = useState(false)
   // The search bar sits behind a toggle, the reading's own ⌕ Search idiom.
   // While a query is live the results own the page; clearing the box — or
@@ -229,7 +229,7 @@ export default function Shelf() {
           {ownReadings.length > 0 && (
             <div className="shelfgrid" style={{ marginBottom: 12 }}>{ownReadings.map(readingCard)}</div>
           )}
-          <AddOwnReading onAdded={refresh} />
+          <AddOwnReading onAdded={refresh} frontendOnly={frontendOnly} />
         </section>
 
         {!isLoading && state.concepts.length === 0 && (
@@ -342,7 +342,7 @@ function Untethered({ readings }: { readings: ReadingMeta[] }) {
  * passages are captured by hand on 01 · Open. Either way it sits on this
  * student's shelf and nobody else's.
  */
-function AddOwnReading({ onAdded }: { onAdded: () => void }) {
+function AddOwnReading({ onAdded, frontendOnly }: { onAdded: () => void; frontendOnly: boolean }) {
   const { flash } = useLoom()
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<File | null>(null)
@@ -460,7 +460,8 @@ function AddOwnReading({ onAdded }: { onAdded: () => void }) {
         <button
           className="btn ghost mini"
           onClick={() => setOpen(true)}
-          data-tip="upload a PDF you're coding, or card a book or lecture"
+          data-tip={frontendOnly ? "reading uploads are outside this local fixture" : "upload a PDF you're coding, or card a book or lecture"}
+          disabled={frontendOnly}
         >
           + a reading of your own
         </button>

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { useLoom } from "@/components/providers/LoomProvider"
 import AuthButton from "./AuthButton"
 
-export default function Header({ deployEnv }: { deployEnv?: string }) {
+export default function Header({ deployEnv, frontendOnly = false }: { deployEnv?: string; frontendOnly?: boolean }) {
   const { data: session } = useSession()
   const { flashMsg } = useLoom()
   const [showAbout, setShowAbout] = useState(false)
@@ -36,7 +36,7 @@ export default function Header({ deployEnv }: { deployEnv?: string }) {
         {session && !inAdmin && (
           <span id="saveDot">{flashMsg ? `· ${flashMsg} ·` : "—"}</span>
         )}
-        <AuthButton />
+        {frontendOnly ? <span className="label">Interface Designer · local fixture</span> : <AuthButton />}
         <button
           className="btn ghost mini"
           onClick={() => setShowAbout(true)}

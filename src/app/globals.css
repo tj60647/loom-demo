@@ -354,6 +354,16 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .shelfcard{display:flex;gap:14px;padding:14px;text-decoration:none;color:inherit;
   border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.5)}
 .shelfcard:hover{border-color:var(--ochre);background:rgba(168,132,63,.06)}
+.prototype-card{font:inherit;text-align:left;cursor:pointer}
+.demo-cover{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:70px;min-height:92px;
+  background:linear-gradient(145deg,#2f382c,#6f7d5c);color:var(--paper);font-family:var(--display);font-size:14px;line-height:1.1;text-align:center}
+.demo-cover small{font-family:var(--mono);font-size:8px;letter-spacing:.13em}
+.sample{font-size:18px;line-height:1.55;margin:14px 0;color:var(--ink-soft)}
+.slot select{width:100%;border:0;background:transparent;font:inherit;color:var(--ink);outline:0}
+.demo-map{position:relative;min-height:286px;padding:18px;background:radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec;border:1px solid var(--rule);border-radius:4px}
+.demo-map-card{position:relative;z-index:1;max-width:170px;margin:12px;padding:8px 10px;background:#fff;border:1px solid var(--ochre);border-radius:3px;font-family:var(--display)}
+.demo-map-card.secondary{margin-left:27%;border-color:var(--sage)} .demo-map-card.tertiary{margin-left:49%;border-color:var(--grey)}
+.demo-thread{display:block;margin:10px 12px;font-family:var(--mono);font-size:10px;color:var(--sage)}
 .shelfbody{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
 .shelfbody h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0 0 3px}
 .shelfauthor{font-size:13px;color:var(--ink-soft);margin:0 0 6px}

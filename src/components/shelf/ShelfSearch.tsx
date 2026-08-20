@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { searchReadings, type ReadingSearchHit } from "@/actions/search"
 import Snippet from "@/components/ui/Snippet"
+import { useReadings } from "@/components/providers/ReadingsProvider"
 
 export default function ShelfSearch({
   onActiveChange,
@@ -21,6 +22,7 @@ export default function ShelfSearch({
   /** Fold the search away — wired to Escape, mirroring the reading's panel. */
   onClose: () => void
 }) {
+  const { frontendOnly, readings } = useReadings()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<ReadingSearchHit[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -51,7 +53,10 @@ export default function ShelfSearch({
     const requestId = ++requestRef.current
     const timer = window.setTimeout(() => {
       setBusy(true)
-      searchReadings(trimmed)
+      const search = frontendOnly
+        ? Promise.resolve(readings.filter((reading) => `${reading.title} ${reading.author ?? ""} ${reading.description ?? ""}`.toLowerCase().includes(trimmed.toLowerCase())).map((reading): ReadingSearchHit => ({ sourceId: reading.id, title: reading.title, author: reading.author, week: reading.week, isOwn: reading.isOwn, hasFile: !!reading.storageKey, matchedCard: true, pageHits: 0, excerpts: [] })))
+        : searchReadings(trimmed)
+      search
         .then((hits) => {
           if (requestRef.current !== requestId) return
           setResults(hits)
@@ -66,7 +71,7 @@ export default function ShelfSearch({
         })
     }, 300)
     return () => window.clearTimeout(timer)
-  }, [query])
+  }, [frontendOnly, query, readings])
 
   const active = query.trim().length >= 2
 

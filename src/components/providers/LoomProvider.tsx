@@ -16,7 +16,7 @@ import {
   importGraph, importMapArrangement, resetGraph, loadWorkedExample,
 } from "@/actions/loom"
 
-interface LoomContextType {
+export interface LoomContextType {
   /**
    * The WHOLE graph, always. Export, import and reset work on this — the
    * artifact is never a slice (red line #5).
@@ -91,14 +91,14 @@ interface LoomContextType {
   setRedoStack: React.Dispatch<React.SetStateAction<{edgeId: string, from: string | null, to: string | null}[]>>
 }
 
-const LoomContext = createContext<LoomContextType | null>(null)
+export const LoomContext = createContext<LoomContextType | null>(null)
 
 const blankState = (): LoomState => ({ concepts: [], bytes: [], edges: [], maps: [], read: "", views: emptyViews() })
 
-export function LoomProvider({ children }: { children: ReactNode }) {
+export function LoomProvider({ children, frontendOnly = false, initialState }: { children: ReactNode; frontendOnly?: boolean; initialState?: LoomState }) {
   const { data: session } = useSession()
-  const [state, setState] = useState<LoomState>(blankState())
-  const [isLoading, setIsLoading] = useState(true)
+  const [state, setState] = useState<LoomState>(() => initialState ?? blankState())
+  const [isLoading, setIsLoading] = useState(!frontendOnly)
   const [flashMsg, setFlashMsg] = useState<string | null>(null)
 
   const [undoStack, setUndoStack] = useState<{edgeId: string, from: string | null, to: string | null}[]>([])
@@ -154,6 +154,9 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   // in-progress tab state every time they tab away and back.
   const userId = session?.user?.id
   useEffect(() => {
+    if (frontendOnly) {
+      return
+    }
     if (userId) {
       const startTimer = window.setTimeout(() => setIsLoading(true), 0)
       getUserLoomData().then(data => {
@@ -171,7 +174,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       }, 0)
       return () => window.clearTimeout(resetTimer)
     }
-  }, [userId])
+  }, [frontendOnly, userId])
 
   // v14 flashed on every save; here the graph mutations were silent on success,
   // so the save dot only ever confirmed the read. Callers that have something
@@ -192,6 +195,10 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }, [flash])
 
   const addConcept = async (label: string, def?: string, note?: string) => {
+    if (frontendOnly) {
+      const concept: Concept = { id: crypto.randomUUID(), courseId: null, userId: session!.user!.id, label, def: def || "", note: note || "", tier: "", createdAt: new Date() }
+      setState(s => ({ ...s, concepts: [...s.concepts, concept] })); flash("saved"); return concept
+    }
     const tempId = crypto.randomUUID()
     const tempConcept: Concept = { id: tempId, courseId: null, userId: session!.user!.id, label, def: def || "", note: note || "", tier: "", createdAt: new Date() }
     setState(s => ({ ...s, concepts: [...s.concepts, tempConcept] }))
@@ -211,6 +218,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       ...s,
       concepts: s.concepts.map(c => c.id === id ? { ...c, ...data } : c)
     }))
+    if (frontendOnly) { savedOk(); return }
     try {
       await updateConcept(id, data)
       savedOk()
@@ -239,6 +247,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
         }])
       ) as LoomViews,
     }))
+    if (frontendOnly) { savedOk(); return }
     try {
       await deleteConcept(id)
       savedOk()
@@ -248,6 +257,10 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }
 
   const addByte = async (conceptId: string, source: string, location: string, content: string, pageNumber?: number, startOffset?: number, endOffset?: number, sourceId?: string, pageContentHash?: string) => {
+    if (frontendOnly) {
+      const byte: Byte = { id: crypto.randomUUID(), courseId: null, userId: session!.user!.id, conceptId, source, sourceId: sourceId ?? soleSourceId(scope), location, content, pageNumber: pageNumber ?? null, startOffset: startOffset ?? null, endOffset: endOffset ?? null, pageContentHash: pageContentHash ?? null, createdAt: new Date() }
+      setState(s => ({ ...s, bytes: [...s.bytes, byte] })); flash("saved"); return byte
+    }
     const tempId = crypto.randomUUID()
     // Capturing inside a reading stamps that reading, so a byte taken by hand
     // has the same provenance as one taken from the PDF and lands in the same
@@ -282,6 +295,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const removeByte = async (id: string) => {
     setState(s => ({ ...s, bytes: s.bytes.filter(b => b.id !== id) }))
+    if (frontendOnly) { savedOk(); return }
     try {
       await deleteByte(id)
       savedOk()
@@ -296,6 +310,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       ...s,
       bytes: s.bytes.map(b => (ids.has(b.id) && !b.sourceId ? { ...b, sourceId } : b)),
     }))
+    if (frontendOnly) { const n = byteIds.length; flash(n === 1 ? "passage placed in its reading" : `${n} passages placed in their reading`); return n }
     try {
       const n = await attributeBytesAction(byteIds, sourceId)
       flash(n === 1 ? "passage placed in its reading" : `${n} passages placed in their reading`)
@@ -307,6 +322,12 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }
 
   const refileByte = async (byteId: string, conceptId: string) => {
+    if (frontendOnly) {
+      const original = state.bytes.find(b => b.id === byteId)
+      if (!original) throw new Error("Passage not found")
+      const byte = { ...original, id: crypto.randomUUID(), conceptId, createdAt: new Date() }
+      setState(s => ({ ...s, bytes: [...s.bytes, byte] })); savedOk(); return byte
+    }
     try {
       const saved = await refileByteAction(byteId, conceptId)
       setState(s => ({ ...s, bytes: [...s.bytes, saved] }))
@@ -337,6 +358,10 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addEdge = async (fromId: string, toId: string, sentence: string) => {
+    if (frontendOnly) {
+      const edge: Edge = { id: crypto.randomUUID(), courseId: null, userId: session!.user!.id, fromId, toId, handle: "", sentence, createdAt: new Date() }
+      setState(s => ({ ...s, edges: [...s.edges, edge] })); flash("saved"); return edge
+    }
     const tempId = crypto.randomUUID()
     const tempEdge: Edge = { id: tempId, courseId: null, userId: session!.user!.id, fromId, toId, handle: "", sentence, createdAt: new Date() }
     setState(s => ({ ...s, edges: [...s.edges, tempEdge] }))
@@ -371,6 +396,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     // The state row may carry either side of the alias by now — match both.
     const knownIds = new Set([id, edgeAlias.current.get(id) ?? id])
     setState(s => ({ ...s, edges: s.edges.map(e => knownIds.has(e.id) ? { ...e, ...data } : e) }))
+    if (frontendOnly) { savedOk(); return }
     try {
       await updateEdge(await resolveEdgeId(id), data)
       savedOk()
@@ -391,6 +417,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
         }])
       ) as LoomViews,
     }))
+    if (frontendOnly) { savedOk(); return }
     try {
       await deleteEdge(await resolveEdgeId(id))
       savedOk()
@@ -432,6 +459,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     }
     setState(s => ({ ...s, maps: [...s.maps, temp] }))
     setSelectedByScope(s => ({ ...s, [scope.key]: tempId }))
+    if (frontendOnly) { flash("saved"); return temp }
     const creating = (async () => {
       try {
         const saved = await createMapAction({ scopeKey: scope.key, name: mapName })
@@ -508,6 +536,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
         ? { concepts: s.concepts.map(c => ({ ...c, tier: stored[c.id] ?? "" })) }
         : {}),
     }))
+    if (frontendOnly) { savedOk(); return }
     try {
       await updateMapAction(await resolveMapId(id), { tiers: stored })
       savedOk()
@@ -525,6 +554,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     if (!pending.size) return
     pendingMapText.current = new Map()
     pending.forEach((data, id) => {
+      if (frontendOnly) { flash("saved"); return }
       resolveMapId(id)
         .then((realId) => updateMapAction(realId, data))
         .then(() => flash("saved"))
@@ -533,7 +563,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
           flash("map not saved — try again")
         })
     })
-  }, [flash, resolveMapId])
+  }, [flash, frontendOnly, resolveMapId])
 
   const queueMapText = (id: string, data: Partial<{ name: string; read: string; essence: string }>) => {
     setState(s => ({
@@ -563,6 +593,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       delete views[`map:${id}`]
       return { ...s, maps: s.maps.filter(m => m.id !== id), views }
     })
+    if (frontendOnly) { flash("map removed"); return }
     try {
       await deleteMapAction(await resolveMapId(id))
       // Deleting the mirror re-points the legacy columns server-side; reload
@@ -597,6 +628,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const pendingViews = useRef<Map<string, CardTableView>>(new Map())
   const setView = (key: string, next: CardTableView) => {
     setState(s => ({ ...s, views: { ...s.views, [key]: next } }))
+    if (frontendOnly) return
     pendingViews.current.set(key, next)
     const existing = viewTimers.current.get(key)
     if (existing !== undefined) window.clearTimeout(existing)
@@ -630,6 +662,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const importFromText = async (raw: string) => {
+    if (frontendOnly) throw new Error("Import is not available in this frontend-only workspace.")
     const parsed = parseImport(raw) // throws with a friendly message on bad input
     cancelPendingSaves()
     setSelectedByScope({})
@@ -646,6 +679,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   }
 
   const importMapFile = async (parsed: ParsedMapImport) => {
+    if (frontendOnly) throw new Error("Import is not available in this frontend-only workspace.")
     const { data, mapId, scopeKey, skipped } = await importMapArrangement(parsed)
     setState(data)
     // Make the arrival visible: the new map is the selected one in its scope.
@@ -657,7 +691,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const resetAll = async () => {
     cancelPendingSaves()
     setSelectedByScope({})
-    await resetGraph()
+    if (!frontendOnly) await resetGraph()
     setState(blankState())
     flash("cleared — the history of your weaving is kept")
   }
@@ -665,6 +699,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const loadExample = async () => {
     cancelPendingSaves()
     setSelectedByScope({})
+    if (frontendOnly) { flash("worked example is already loaded"); return }
     const data = await loadWorkedExample()
     setState(data)
     flash("worked example loaded — explore it, then reset")

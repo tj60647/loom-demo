@@ -4,9 +4,9 @@
 // row written before scoping existed already means.
 
 import Workbench, { type Tab } from "@/components/Workbench"
-import { firstParam } from "@/lib/courses"
 
 type WeavePageSearchParams = { tab?: string | string[] }
+const firstParam = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value
 
 // The journey bar deep-links here (`/weave?tab=map`); anything else lands on
 // the default first tab.

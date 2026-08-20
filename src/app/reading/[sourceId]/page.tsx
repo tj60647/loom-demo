@@ -3,11 +3,11 @@
 // back-buttonable, and linkable by an instructor.
 
 import Link from "next/link"
-import { getSources } from "@/actions/sources"
 import Workbench, { type Tab } from "@/components/Workbench"
-import { firstParam } from "@/lib/courses"
+import { frontendReadings } from "@/lib/frontendFixture"
 
 type ReadingPageSearchParams = { tab?: string | string[]; q?: string | string[] }
+const firstParam = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value
 
 // Deep links land on a station (`?tab=reading` from a shelf-search hit);
 // anything else lands on the default first tab, as /weave does. `q` rides
@@ -28,8 +28,7 @@ export default async function ReadingPage({
   const rawTab = firstParam(resolved.tab)
   const initialTab = rawTab && READING_TABS.has(rawTab as Tab) ? (rawTab as Tab) : undefined
   const initialSearch = firstParam(resolved.q)?.trim() || undefined
-  const sources = await getSources()
-  const source = sources.find((s) => s.id === sourceId)
+  const source = frontendReadings.find((s) => s.id === sourceId)
 
   // Not a 404: the reading may exist but not be published to this student's
   // course, and "go back to the shelf" is more use than a dead end.
