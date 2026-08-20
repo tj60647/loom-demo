@@ -1,4 +1,5 @@
 import { checkAdmin } from "@/actions/admin"
+import { buildStamp } from "@/lib/buildStamp"
 import { getRepairSummary, getRepairsForSource } from "@/actions/repairs"
 import {
   addSourceToCourse,
@@ -77,6 +78,11 @@ export default async function AdminLibraryPage({
   return (
     <main>
       <h1>Readings</h1>
+      {/* The build stamp, where the environment already matters (TJ,
+          2026-08-19). This page is where deployments get checked, so "which
+          copy of the app is this" belongs beside the readings rather than only
+          in the About card a student reads. Same one line, same source. */}
+      <p className="aboutbuild" style={{ marginTop: 0, borderTop: "none", paddingTop: 0 }}>{buildStamp()}</p>
       <p className="tasksub" style={{ marginBottom: "20px" }}>
         One shared library. Every reading is uploaded and OCR&apos;d once, then included in any
         number of courses — each with its own week, visibility, and core/supplemental status.

@@ -964,6 +964,12 @@ body[data-reading-focus] header{display:none}
 .capturefoot>.btn{flex:1 1 0;justify-content:center;text-align:center}
 .info-scrim{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:22px}
 .info-dialog{position:relative;max-width:520px;width:100%;background:var(--paper);border:1px solid var(--ink);border-radius:6px;box-shadow:0 18px 50px rgba(0,0,0,.3);padding:24px 26px 20px}
+/* The build stamp at the foot of the About card. Mono and quiet — it is the
+   one line in there not addressed to a student, so it sits below everything
+   and takes no attention it is not asked for. */
+.aboutbuild{margin:18px 0 0;padding-top:10px;border-top:1px solid var(--rule);
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--grey)}
 .info-dialog .info-k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ochre)}
 .info-dialog h2{font-family:var(--display);font-size:25px;font-weight:600;margin:6px 34px 8px 0}
 .info-dialog p{font-size:15.5px;line-height:1.5;margin:0 0 10px}

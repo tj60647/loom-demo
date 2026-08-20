@@ -1,5 +1,6 @@
 "use client"
 import { useState, useSyncExternalStore } from "react"
+import { buildStamp } from "@/lib/buildStamp"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -192,6 +193,14 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
               <li><b>Concept maps (Novak &amp; Gowin):</b> arranging cards by hand is the thinking. The board digitises the sorting; the map you draw afterwards is where it lands.</li>
             </ul>
 
+            {/* WHICH BUILD THIS IS (TJ, 2026-08-19: "does the about card
+                include a version of what is deployed? this would help me keep
+                track"). Last, quiet, and in mono, because it is the one line
+                here not written for a student: everything above explains what
+                Loom is, and this says which copy of it you have. Small enough
+                to ignore, findable when the question is "am I looking at what I
+                just pushed". See src/lib/buildStamp.ts. */}
+            <p className="aboutbuild">{buildStamp()}</p>
           </div>
         </div>
       )}
