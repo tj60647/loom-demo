@@ -14,8 +14,10 @@ import MetaPage from "@/components/ui/MetaPage"
  * Workflows — how each kind of person moves through Loom.
  *
  * Lives at `/workflows`, NOT under `/admin` (TJ, 2026-08-08): students may read
- * their own flow, and they can never enter the admin shell. Reached from the
- * header, beside About, on every page.
+ * their own flow, and they can never enter the admin shell. Linked from the
+ * journey bar's staff group; the student link left the header menu on
+ * 2026-08-17 (277f7cb), so a student arrives only by typing the URL — which
+ * still works, and still shows their flow alone.
  *
  * Who sees what: a **student** sees the student flow only — the others describe
  * surfaces they cannot reach, and a flow chart of doors that are shut is a

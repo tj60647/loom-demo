@@ -3,10 +3,10 @@
 // The cloth's own card — Cloth Title and Cloth Description.
 //
 // Home moved 2026-08-08 (TJ): it belongs on the work surface for its scope. A
-// cloth starts in READING, so inside a reading this renders in 01 · Reading
-// at the head of Your work; the whole weave has no Reading station, so there it
-// stays on 02 · Linking. Folded either way — the work is the tab's business,
-// the cloth is its name, and an untitled cloth is a fine state.
+// cloth starts in READING, so this renders in 01 · Reading at the head of Your
+// work — the only home left, since the whole weave (whose copy sat on
+// 02 · Linking) went out of the app on 2026-08-11. Folded — the work is the
+// tab's business, the cloth is its name, and an untitled cloth is a fine state.
 //
 // Saving here is what brings a cloth row into existence: the Base Cloth is
 // conceptually always there, and the row is written the first time you title or

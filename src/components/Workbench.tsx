@@ -5,9 +5,10 @@
 //
 // Reading-first (docs/archive/reading-scope-and-map-passes.md §A.1): the shelf is the
 // home screen and this is what opens when you pick a reading off it, so the
-// 01-04 sequence runs INSIDE a text rather than across the course. `04 Map`
-// is honest per reading now that placement is per-map (maps carry their own
-// tiers): a reading's map sorts only against that reading's concepts.
+// 01-04 sequence runs INSIDE a text rather than across the course. The
+// Knowledge Graph (station 03; internal key `map`) is honest per reading now
+// that placement is per-map (maps carry their own tiers): a reading's map
+// sorts only against that reading's concepts.
 
 import { useCallback, useState, useEffect, useMemo } from "react"
 import Link from "next/link"

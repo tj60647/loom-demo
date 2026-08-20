@@ -752,10 +752,11 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
               what it IS. The special case only existed because the other view
               had nowhere to put it.
 
-              The note is shown, not editable, and that is the one thing this
-              view still owes: there is no updatePassage action in the app at
-              all, so a note is written once in the capture modal and cannot be
-              revised anywhere. That is logged as its own piece of work. */}
+              The note edits in place — `updatePassageNote` has existed since
+              2026-08-17 (c1567ef), and `onEditNote` below wires it; the rail
+              card and the capture form write the same field. An earlier
+              version of this comment said the note could not be revised
+              anywhere, and outlived the fix by two days. */}
           {view === "passages" && passagesAZ.map(b => (
             <PassageCard
               key={b.id}

@@ -57,7 +57,7 @@ export const VISIBLE_STATIONS = STATIONS.filter((s) => !s.hidden).map((s, i) => 
   step: `${String(i).padStart(2, "0")} —`,
 }))
 
-/** The number a station displays, e.g. "04" for Knowledge Graph. Exported so
+/** The number a station displays, e.g. "03" for Knowledge Graph. Exported so
  *  the workbench footer cannot drift from the bar above it. */
 export function stationNumber(key: Station): string {
   const found = VISIBLE_STATIONS.findIndex((s) => s.key === key)
@@ -87,8 +87,9 @@ const DEFAULT_HREF: Record<Station, string> = {
  * There is nowhere else for them to be: since the whole weave went
  * (2026-08-11) a reading IS the only scope a student works in. So rather than
  * carrying anyone somewhere unfinished, these render **greyed and inert**
- * wherever they are not a tab you can work at right here — on the Library and
- * on Keep, neither of which has a text to link in.
+ * wherever they are not a tab you can work at right here — the Library, which
+ * has no text to link in. (Keep was the other such surface until it was
+ * deleted, 2026-08-11.)
  *
  * Inside a reading all four are handlers, so this never fires there.
  *
