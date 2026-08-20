@@ -7,11 +7,21 @@
 # it fails loudly, not silently, when they are missing — a suite that
 # quietly skips is not a gate.
 #
-# Why `push` is master-only: the suite holds a global lock (one CI database,
-# one demo account — see the e2e `concurrency` block), so a run is a turn
-# taken from every other open PR, not just runner minutes. A push to `dev` is
-# a tree the PR run already tested; re-running it only lengthens the queue.
-# `master` keeps its push run because that is the tree that ships.
+# THE TWO JOBS ARE TRIGGERED DIFFERENTLY, ON PURPOSE (2026-08-19), because
+# they cost differently. `checks` needs no database and takes about 90
+# seconds, so it runs on every push to `dev` — that is the feedback a working
+# branch actually wants between one change and the next. `e2e` holds a global
+# lock (one CI database, one demo account — see its `concurrency` block), so a
+# run is a turn taken from every other open PR, not just runner minutes; it
+# stays on pull requests and on pushes to `master`, the tree that ships.
+#
+# The rule this replaces was `push` on master only, reasoning that a push to
+# `dev` is "a tree the PR run already tested". That held while `dev` always
+# arrived through a PR. It stopped holding: on 2026-08-19 the branch was 298
+# commits past `master` with none of them ever seen by CI, and the first run
+# found a break that had been sitting there a day — an ambiguous test locator
+# that no local run reproduces, because it depends on fixture state. Cheap
+# feedback on every push is what would have caught it the day it landed.
 #
 # Why the scope step exists rather than `paths-ignore`: e2e is a REQUIRED
 # check. A job filtered away at the `on:` level never reports, so its check
@@ -25,7 +35,9 @@ on:
   pull_request:
     branches: [master, dev]
   push:
-    branches: [master]
+    # dev included since 2026-08-19 — see the note above. `checks` runs on
+    # both; `e2e` decides inside whether a dev push is its business.
+    branches: [master, dev]
 
 jobs:
   checks:
@@ -82,9 +94,29 @@ jobs:
         run: |
           # Pushes to master always run: that is the tree that ships, and a
           # merge can combine two individually-harmless diffs.
+          #
+          # Pushes to dev do NOT. `checks` has already covered that push in
+          # about 90 seconds, and running the suite here would take the shared
+          # database's turn from every open PR on every commit — the cost the
+          # trigger note above weighs. The gate for dev is a pull request, and
+          # a standing draft one is enough to get it whenever it is wanted.
+          #
+          # Decided HERE rather than with an `if:` on the job, for the same
+          # reason this step exists at all: e2e is a required check, and a job
+          # filtered away never reports.
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "push to master — running the full suite" >> "$GITHUB_STEP_SUMMARY"
+            if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+              echo "run=true" >> "$GITHUB_OUTPUT"
+              echo "push to master — running the full suite" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "run=false" >> "$GITHUB_OUTPUT"
+              {
+                echo "### e2e skipped — branch push"
+                echo '`checks` covers a push to a working branch; the suite runs'
+                echo 'on pull requests and on pushes to `master`. See the trigger'
+                echo 'note in ci.yml.'
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
             exit 0
           fi
           BASE="${{ github.event.pull_request.base.sha }}"
