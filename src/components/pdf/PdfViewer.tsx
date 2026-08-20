@@ -2443,8 +2443,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           border-color: var(--ink-soft);
         }
         /* The card is badges and a note now (TJ, 2026-08-17). Its old
-           label/def/chips/go rules below are DEAD — nothing renders those
-           class names any more (checked 2026-08-19); they await deletion.
+           label/def/chips/go rules were dead from that day and were deleted
+           on 2026-08-20.
            (No backticks in this block: styled-jsx template literal.) */
         .pdf-railcard-badges { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
         /* A badge is one line. On the canvas the type is counter-scaled, so a
@@ -2644,32 +2644,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         }
         .pdf-railcard-rm:hover, .pdf-railcard-rm:focus-visible { color: var(--red); }
         .pdf-railcard-note.empty { color: var(--dot); }
-        .pdf-railcard-label { font-weight: 600; font-size: 13px; }
-        .pdf-railcard-label.unlabeled {
-          font-style: italic;
-          font-weight: 400;
-          color: var(--ink-soft);
-        }
-        .pdf-railcard-def { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
         /* .pdf-railcard-note CAME BACK (2026-08-19): the note returned to the
            margin card, editable in place (ConceptRail draws it; cd56ce6). An
            earlier version of this comment said the rule was dead and should go
-           with the markup — it is load-bearing now. */
-        /* The corner mark: this card leads somewhere. Decorative — the card
-           itself is the button — so it is quiet, and it lifts with the card.
-           (No backticks in this block: styled-jsx template literal.) */
-        .pdf-railcard-go {
-          position: absolute;
-          top: 6px;
-          right: 8px;
-          font-family: var(--mono);
-          font-size: 13px;
-          line-height: 1;
-          color: var(--dot);
-          transition: color .12s ease;
-        }
-        .pdf-railcard:hover .pdf-railcard-go { color: var(--ink-soft); }
-        .pdf-railcard-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+           with the markup — it is load-bearing now. The dead siblings that sat
+           here — label, def, go, the chips container — went on 2026-08-20;
+           nothing had rendered them since the card became badges and a note
+           (2026-08-17). The chip rule below stays: ConceptRail draws it, and
+           the canvas counter-scale divides its numbers. */
         .pdf-railcard-chip {
           font-family: var(--mono);
           font-size: 10px;
