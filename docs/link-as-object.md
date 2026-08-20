@@ -1,6 +1,15 @@
 # Should a Link be an object? — a design note
 
-**Status: OPEN. Raised by TJ, 2026-08-09. Not built. TJ's ruling.**
+**Status: BUILT 2026-08-11, as §9 recommends** — migration 0024 (expand-only:
+the `link` table, `edge.linkId`, a backfill from the distinct handles,
+`link_search_idx`), with tap-to-attach in the same phase. `mergeLinks` stays
+deferred until the vocabulary is observed to silt up (open-work.md 5.1e), and
+dropping `edge.handle` is parked (5.1d) — it is dual-written and drifts from
+nothing. The as-built stamp is in contracts.md; the text below is kept as
+written, as the reasoning of record. *(This header said "OPEN … Not built"
+until 2026-08-19 — eight days after the build.)*
+
+Raised by TJ, 2026-08-09.
 
 This began as a vocabulary worry — *"I have concern that we are misusing Link
 object and Link Label, which is a parameter of the object"* — and turned into a
