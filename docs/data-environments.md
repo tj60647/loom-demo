@@ -56,8 +56,12 @@ Two remain open, and one of them cannot be closed the obvious way:
   database holding nothing that matters.
 - **The guest email door is configured nowhere.** `RESEND_API_KEY` and
   `EMAIL_FROM` are unset in every environment, so `emailSignInConfigured()` is
-  false and the form never renders — while the signed-out shelf links to it
-  unconditionally. The link promises a door that is not there.
+  false and the form never renders. The half of this that lied is fixed
+  (2026-08-20, `05c3235`): the signed-out shelf's "no github account?" no
+  longer navigates to the missing door — it opens in place with the way to
+  create a GitHub account using the invited address, and /auth/signin shows
+  the same fold whenever mail is unconfigured. Configuring Resend remains
+  optional, for a true no-GitHub path.
 
 ## The shape, in one paragraph
 
@@ -370,6 +374,7 @@ readings that exist nowhere else.
 | Gap | Fix | Blocking |
 | --- | --- | --- |
 | Previews publicly reachable | Not Vercel Authentication — it would wall the dev alias too and lock alpha testers out. Password Protection is $150/mo. Mitigated instead by the preview database holding nothing real. | nothing today |
-| Guest email door unconfigured | `RESEND_API_KEY` + `EMAIL_FROM`, or make the shelf's "no github account?" link conditional so it stops promising a door that is not there | the advertised no-GitHub path, in production too |
+| Safe Browsing lists the apex `aroughidea.com` (2026-08-20), and browser enforcement covers every subdomain — Chrome/Safari/Firefox draw the red interstitial at production sign-in (Edge, on SmartScreen, is unaffected) | Done 2026-08-20: legacy apex site retired and replaced, Search Console property verified, review requested. Awaiting Google's verdict (~1 day documented). Confirm via the transparency API, then delete this row. Full state: [deployments.md](deployments.md) | production sign-in on Safe Browsing browsers, until the verdict |
+| Guest email door unconfigured | The lying link is fixed (2026-08-20, `05c3235` — "no github account?" now opens guidance to create one with the invited address). What remains, optional: `RESEND_API_KEY` + `EMAIL_FROM` at a Resend-verified domain, for someone who truly will not make a GitHub account | only that last person |
 | Teardown misses abandoned PRs | A scheduled sweep reconciling `preview/pr-*` against closed PRs | orphan databases and stale pinned variables |
 | The pinned `DATABASE_URL` is written non-sensitive | `type: "sensitive"` in the workflow's API call | consistency with every other secret here |
