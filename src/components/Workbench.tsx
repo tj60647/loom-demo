@@ -13,6 +13,7 @@
 import { useCallback, useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import HomeIcon from "@/components/ui/HomeIcon"
+import SignedOutWelcome from "@/components/ui/SignedOutWelcome"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
@@ -99,6 +100,7 @@ export default function Workbench({
   initialSearch,
   focus,
   practice = false,
+  isPreviewDeployment = false,
 }: {
   /**
    * The reading this workbench is for. Not nullable since 2026-08-11: the
@@ -125,6 +127,12 @@ export default function Workbench({
    * server and would show their actual work inside a practice space.
    */
   practice?: boolean
+  /**
+   * Whether this is a branch preview, where GitHub sign-in cannot work — the
+   * signed-out welcome branches on it (SignedOutWelcome). Server-derived
+   * (isBranchPreview) and passed down, like the Shelf's.
+   */
+  isPreviewDeployment?: boolean
 }) {
   // `status`, not just `session`: next-auth reports "loading" on every hard
   // load while it fetches /api/auth/session, and during that window `session`
@@ -213,7 +221,18 @@ export default function Workbench({
    * cleanup removes the attribute, so leaving 01 restores the chrome even if
    * the component never unmounts.
    */
-  const readingFocus = activeTab === "reading" && source.hasFile
+  // The session term is load-bearing: signed out, the workbench renders the
+  // sign-in welcome — and the header, which this attribute hides, carries the
+  // other door. A session that "timed out" mid-reading used to reload into
+  // "Please sign in to continue" with the header stood down: a sentence and
+  // no way back in (TJ, 2026-08-20 — the sign-outs themselves are session
+  // rows dying with a reseeded tester DB branch; the configured lifetime is
+  // next-auth's 30-day rolling default, which an active student never hits).
+  // `status !== "unauthenticated"` rather than `!!session`, so the signed-in
+  // majority's hard load keeps the header down through the session fetch
+  // instead of flashing it; the show lands only on the rare signed-out load,
+  // where a visible header is the destination anyway (review, 2026-08-20).
+  const readingFocus = activeTab === "reading" && source.hasFile && status !== "unauthenticated"
   useEffect(() => {
     if (!readingFocus) return
     document.body.setAttribute("data-reading-focus", "")
@@ -379,12 +398,14 @@ export default function Workbench({
   }
 
   if (!session) {
+    // The same doors the Library offers, because this state is how an
+    // EXPIRED session looks from inside a reading: the reload lands back on
+    // /reading/[id] signed out. It used to render a sentence with no control
+    // — and the header, which holds the other sign-in button, was stood down
+    // by the reading-focus attribute above (now session-gated).
     return (
       <main>
-        <div className="empty" style={{ marginTop: "100px" }}>
-          <h2>Welcome to Loom.</h2>
-          <span className="cap">Please sign in to continue</span>
-        </div>
+        <SignedOutWelcome isPreviewDeployment={isPreviewDeployment} />
       </main>
     )
   }

@@ -6,6 +6,7 @@ import Link from "next/link"
 import { getSources } from "@/actions/sources"
 import Workbench, { type Tab } from "@/components/Workbench"
 import { firstParam } from "@/lib/courses"
+import { isBranchPreview } from "@/lib/previewLogin"
 
 type ReadingPageSearchParams = {
   tab?: string | string[]
@@ -96,6 +97,7 @@ export default async function ReadingPage({
       initialTab={initialTab}
       initialSearch={initialSearch}
       focus={focus}
+      isPreviewDeployment={isBranchPreview()}
       source={{
         id: source.id,
         title: source.title,

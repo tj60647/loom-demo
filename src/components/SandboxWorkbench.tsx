@@ -32,7 +32,10 @@ export default function SandboxWorkbench({
   source,
   cards,
   practiceCloth,
+  isPreviewDeployment = false,
 }: {
+  /** Branch previews offer their own sign-in door; the signed-out welcome branches on this. */
+  isPreviewDeployment?: boolean
   /**
    * The worked cloth the practice loom opens with, read on the server from
    * this reading's own pages. Null when the reading cannot carry it, and the
@@ -144,7 +147,7 @@ export default function SandboxWorkbench({
       </div>
       <PracticeGuide />
       {opened ? (
-        <Workbench source={workbenchSource} practice />
+        <Workbench source={workbenchSource} practice isPreviewDeployment={isPreviewDeployment} />
       ) : (
         <>
           {/* No scope bar: the real Library has none, and the practice loom's

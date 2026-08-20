@@ -19,6 +19,7 @@ import { db } from "@/db"
 import { sourcePages } from "@/db/schema"
 import { getSources } from "@/actions/sources"
 import { buildPracticeCloth } from "@/lib/practiceCloth"
+import { isBranchPreview } from "@/lib/previewLogin"
 import SandboxWorkbench from "@/components/SandboxWorkbench"
 
 /**
@@ -89,6 +90,7 @@ export default async function SandboxPage() {
       sourceId={source.id}
       cards={cards}
       practiceCloth={practiceCloth}
+      isPreviewDeployment={isBranchPreview()}
       source={{
         id: source.id,
         title: source.title,
