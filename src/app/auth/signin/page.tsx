@@ -1,16 +1,19 @@
 import Link from "next/link"
 import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import GuestEmailSignIn from "@/components/ui/GuestEmailSignIn"
+import NoGithubAccountHelp from "@/components/ui/NoGithubAccountHelp"
 import PreviewDoor from "@/components/ui/PreviewDoor"
 import { isBranchPreview, previewLoginNeedsKey } from "@/lib/previewLogin"
 import { emailSignInConfigured } from "@/lib/auth"
 import { ROSTER_CONTACT_EMAIL, signInMessage } from "@/lib/signIn"
 
 /**
- * The sign-in screen. One button, one sentence — and, where mail is
- * configured, a folded-away second door for a guest with no GitHub account.
- * Folded because a visible choice is a choice students would have to make, and
- * for every one of them GitHub is the answer.
+ * The sign-in screen. One button, one sentence — and a folded-away answer to
+ * "no github account?": the guest email door where mail is configured, or the
+ * way to create a GitHub account where it is not (which today is everywhere —
+ * data-environments.md, "Open gaps"). Folded because a visible choice is a
+ * choice students would have to make, and for every one of them GitHub is the
+ * answer.
  *
  * It is also where NextAuth deposits the retryable OAuth failures — it
  * redirects OAuthSignin / OAuthCallback / OAuthAccountNotLinked and friends to
@@ -75,6 +78,11 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
 
         {message.retry && !isPreviewDeployment && emailSignInConfigured() && (
           <GuestEmailSignIn callbackUrl={params?.callbackUrl} />
+        )}
+        {/* No mail configured means no guest door — so the same fold answers
+            the same question with the way to get a GitHub account instead. */}
+        {message.retry && !isPreviewDeployment && !emailSignInConfigured() && (
+          <NoGithubAccountHelp />
         )}
       </div>
     </main>

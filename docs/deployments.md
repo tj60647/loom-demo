@@ -227,6 +227,57 @@ merge time via `npx drizzle-kit migrate` against the production
 `DATABASE_URL`. Check `scripts/check-migrations.ts` before and after —
 `drizzle.__drizzle_migrations` is the record of truth.
 
+### Safe Browsing listed the apex; review requested 2026-08-20, awaiting verdict
+
+On promotion day (PR #25) production sign-in surfaced the browser's red
+"dangerous site" interstitial. The listing was never on Loom: Google Safe
+Browsing lists **`aroughidea.com`** — the apex — under the deceptive-pages
+category, and browser enforcement covers the registrable domain's subdomains,
+`loom.aroughidea.com` included. Checked 2026-08-20 against the
+transparency-report API
+(`transparencyreport.google.com/transparencyreport/api/v3/safebrowsing/status?site=<host>`):
+the apex reported unsafe while every subdomain — all 28 Vercel apps swept
+individually — reported clean. Edge was unaffected throughout (it consults
+Microsoft SmartScreen, not Safe Browsing). Testers never saw it because the
+dev alias lives on vercel.app's own reputation.
+
+What was done, all on 2026-08-20:
+
+- **The flagged site is gone.** The apex content was the pre-2019 Turbify
+  site, frozen since July 2019. It was retired outright: `aroughidea.com` and
+  `www` now serve a minimal page from the Vercel project `aroughidea-home`
+  (Turbify DNS repointed — apex A → `76.76.21.21`, `www` CNAME →
+  `cname.vercel-dns.com`; Turbify registration, DNS and Business Email
+  untouched and deliberately kept).
+- A Search Console **Domain property** for `aroughidea.com` is verified (DNS
+  TXT at Turbify, host `@` — the record must stay). Security Issues showed
+  one issue, "Deceptive pages", **Sample URLs: N/A**.
+- **Review requested 2026-08-20**, explaining the site was retired and
+  replaced. Google's documented time for this category is about a day, and
+  warnings clear within hours–72h of a clean verdict. Confirm with the
+  transparency API above, not by browsing — a bypassed warning leaves a
+  "Dangerous" chip that is local browser state, not the listing.
+- `auth.aroughidea.com` (the operator console, the one credential-form
+  subdomain a deceptive-pages crawler could object to) now answers 401 to
+  every anonymous request — app-level gate plus Standard Protection on its
+  project.
+
+Same day, two changes to the production GitHub OAuth app, both deliberate:
+**"Allow wildcard matching" on the redirect URI is now off** — the app has
+exactly one callback, and GitHub's own caption warns wildcard matching lets
+authorization redirects reach any subdomain and path — and the app now carries
+a user-facing description for the consent screen. Leave wildcard matching off.
+
+Consequence of wildcard-off, seen the same day: a sign-in started from
+**`loom-demo.aroughidea.com`** (the project's second alias) now fails on
+GitHub's "Be careful! The redirect_uri is not associated" screen, because
+NextAuth builds `redirect_uri` from the request host and the app's one
+callback is `loom.aroughidea.com`. The OAuth round trip itself was verified
+end-to-end on production the same evening (real account, 2FA, landed on the
+shelf). Open cleanup: make `loom-demo.aroughidea.com` redirect to
+`loom.aroughidea.com` in the Vercel project's domain settings, so the alias
+stops offering a sign-in that cannot complete.
+
 ## CI (GitHub Actions)
 
 [.github/workflows/ci.yml](../.github/workflows/ci.yml) — two jobs.

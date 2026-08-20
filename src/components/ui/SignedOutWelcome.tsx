@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import GithubSignInButton from "@/components/ui/GithubSignInButton"
+import NoGithubAccountHelp from "@/components/ui/NoGithubAccountHelp"
 import { SIGN_IN_EXPLANATION } from "@/lib/signIn"
 
 /**
@@ -21,8 +22,8 @@ import { SIGN_IN_EXPLANATION } from "@/lib/signIn"
  *
  * Every door returns the reader to the reading they were in; the GitHub
  * button also keeps the exact page and tab (its default callbackUrl is the
- * full URL), while the two /auth/signin links carry the pathname alone —
- * query state (?tab=, ?page=) is dropped there, a known and accepted
+ * full URL), while the preview's /auth/signin link carries the pathname
+ * alone — query state (?tab=, ?page=) is dropped there, a known and accepted
  * narrowing, because carrying it would mean useSearchParams and the Suspense
  * boundary this component deliberately avoids. /auth/signin hands the
  * callbackUrl to all three of its doors.
@@ -79,12 +80,7 @@ export default function SignedOutWelcome({
           <div style={{ marginTop: "20px", display: "flex", justifyContent: "center" }}>
             <GithubSignInButton className="btn" />
           </div>
-          {/* The guest door lives on /auth/signin, folded away, and whether it
-              is open at all is a server question — so from here it is just a
-              quiet way through for the one person who needs it. */}
-          <Link href={signinHref} className="cap" style={{ display: "inline-block", marginTop: "16px", textTransform: "none" }}>
-            no github account?
-          </Link>
+          <NoGithubAccountHelp />
         </>
       )}
     </div>
