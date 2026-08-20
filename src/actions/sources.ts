@@ -1,27 +1,34 @@
 "use server"
 
 import { db } from "@/db"
+import { viewingAsStudent } from "@/lib/viewAsServer"
 import {
+  passages,
   courseMemberships,
   courseSources,
   courses,
   sources,
   sourcePages,
+  sourceRevisions,
   sourceScores,
   users,
 } from "@/db/schema"
-import { and, asc, eq, inArray, isNull } from "drizzle-orm"
+import { and, asc, count, eq, inArray, isNull, or, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { after } from "next/server"
 import { authOptions, isAdminUser } from "@/lib/auth"
-import { readingStorage } from "@/lib/storage"
+import { deleteClientUploadBlob, readingStorage } from "@/lib/storage"
+import { recordEvent } from "@/lib/graphEvent"
 import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
-import { extractPdfPageText } from "@/lib/pdfText"
+import { renderSourcePageImages } from "@/lib/pdfPages"
+import { gatherSourceBlobKeys } from "@/lib/sourceBlobs"
+import { extractPdfPageText, textLayerProjection } from "@/lib/pdfText"
 import { hashText } from "@/lib/hash"
 import { judgeSourceScore, recordHeuristicScore, rescoreSource } from "@/lib/readingScore"
+import { reingestSource } from "@/lib/reingest"
 import { isJudgeConfigured } from "@/lib/openrouter"
 import { draftMetadataFromPages, type MetadataDraft } from "@/lib/metadataDraft"
-import { MAX_READING_BYTES, MAX_READING_LABEL, READING_UPLOAD_PREFIX, formatBytes } from "@/lib/readingUpload"
+import { MAX_READING_BYTES, MAX_READING_LABEL, formatBytes, isClientUploadPathname } from "@/lib/readingUpload"
 import { revalidatePath } from "next/cache"
 import { resolveCourseId, resolveCourseIdForUser } from "@/lib/courses"
 
@@ -53,6 +60,16 @@ function readInt(formData: FormData, key: string) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+/**
+ * Core or supplemental, read the same way wherever it is set — the Courses
+ * tab's Schedule foldout and the library's Add to Course both post the
+ * "true"/"false" radio pair. Core unless told otherwise, matching the column's
+ * own default: a form that forgets the field must not quietly demote a reading.
+ */
+function readIsCore(formData: FormData) {
+  return formData.get("isCore") !== "false"
+}
+
 function revalidateLibrary() {
   revalidatePath("/admin/library")
   // Course reading lists render on the Courses tab, so every membership or
@@ -76,8 +93,8 @@ export async function getLibrarySources({ includeArchived = false } = {}) {
 
 /**
  * The whole library, course-agnostic, with everything the Readings page needs
- * to render a reading on its own terms: its extraction score, and which
- * courses currently include it.
+ * to render a reading on its own terms: its extraction score, which courses
+ * currently include it, and the lineage of the file it is serving.
  *
  * Deliberately one query per table rather than a join — a reading can be in
  * many courses, and a join would fan the library out into duplicate rows that
@@ -86,7 +103,7 @@ export async function getLibrarySources({ includeArchived = false } = {}) {
 export async function getLibraryOverview({ includeArchived = true } = {}) {
   await requireAdmin()
 
-  const [library, scores, memberships, allCourses] = await Promise.all([
+  const [library, scores, memberships, allCourses, revisions] = await Promise.all([
     db.select().from(sources).orderBy(asc(sources.title)),
     db.select().from(sourceScores),
     db
@@ -99,16 +116,30 @@ export async function getLibraryOverview({ includeArchived = true } = {}) {
       })
       .from(courseSources),
     db.select().from(courses).orderBy(asc(courses.createdAt)),
+    db.select().from(sourceRevisions).orderBy(asc(sourceRevisions.createdAt)),
   ])
 
   const scoreBySource = new Map(scores.map((score) => [score.sourceId, score]))
   const courseById = new Map(allCourses.map((course) => [course.id, course]))
+
+  // A revision row exists only for a file that REPLACED another, so the
+  // original upload has none and a reading's version is its revision count + 1.
+  // (The 0025 backfill wrote a single row for readings repaired before the
+  // table existed, so their history may read shorter than it truly was — the
+  // current version is still right, which is what the badge claims.)
+  const revisionsBySource = new Map<string, typeof revisions>()
+  for (const revision of revisions) {
+    const existing = revisionsBySource.get(revision.sourceId)
+    if (existing) existing.push(revision)
+    else revisionsBySource.set(revision.sourceId, [revision])
+  }
 
   const rows = library
     .filter((source) => includeArchived || !source.isArchived)
     .map((source) => ({
       ...source,
       score: scoreBySource.get(source.id) ?? null,
+      revisions: revisionsBySource.get(source.id) ?? [],
       courses: memberships
         .filter((row) => row.sourceId === source.id)
         .flatMap((row) => {
@@ -190,9 +221,9 @@ export async function getCourseSources(courseIdRaw?: string | null) {
  * working in, plus any reference-only readings they added for themselves.
  *
  * Their own readings carry no `course_source` row, so they appear here and on
- * nobody else's shelf. They exist because reading-first needs every byte to
+ * nobody else's shelf. They exist because reading-first needs every passage to
  * belong to a reading — a passage from something the library does not hold
- * still needs a door (docs/reading-scope-and-map-passes.md §A.6).
+ * still needs a door (docs/archive/reading-scope-and-map-passes.md §A.6).
  */
 export async function getSources(courseIdRaw?: string | null) {
   const session = await getServerSession(authOptions)
@@ -201,7 +232,12 @@ export async function getSources(courseIdRaw?: string | null) {
     ? await resolveCourseIdForUser(session.user.id, courseIdRaw)
     : await resolveCourseId(courseIdRaw)
 
-  const admin = isAdminUser(session?.user)
+  // An admin's shelf includes UNPUBLISHED readings; a student's does not. The
+  // student lens has to reach this or "view as student" would show a row no
+  // student can see (TJ, 2026-08-09). It only ever NARROWS — withhold, never
+  // grant. Deliberately not applied to `authorizeSourceAccess` below: that is
+  // an authorization path, and the lens is a display preference.
+  const admin = isAdminUser(session?.user) && !(await viewingAsStudent())
 
   const rows = courseId
     ? await db
@@ -231,12 +267,23 @@ export async function getSources(courseIdRaw?: string | null) {
   const courseIds = new Set(rows.map((row) => row.source.id))
 
   return [
-    ...rows.map((row) => ({ ...row.source, isVisible: row.link.isVisible, week: row.link.week })),
+    ...rows.map((row) => ({
+      ...row.source,
+      isVisible: row.link.isVisible,
+      week: row.link.week,
+      // Core or supplemental is a fact about the reading IN THIS COURSE, so it
+      // lives on the join and has to be carried across with the week. The
+      // shelf groups by week and never showed it; the footer counts it.
+      isCore: row.link.isCore,
+    })),
     // A reading of the student's own that an instructor has since added to the
     // course is the course's copy — don't list it twice.
     ...mine
       .filter((source) => !courseIds.has(source.id))
-      .map((source) => ({ ...source, isVisible: true, week: null as number | null })),
+      // A reading of your own is neither core nor supplemental — those are
+      // the syllabus's words for the course's own list, and this card is on
+      // nobody else's shelf. `isOwn` is what sorts it.
+      .map((source) => ({ ...source, isVisible: true, week: null as number | null, isCore: false })),
   ].sort((a, b) => {
     const aWeek = a.week ?? Number.MAX_SAFE_INTEGER
     const bWeek = b.week ?? Number.MAX_SAFE_INTEGER
@@ -288,6 +335,74 @@ export async function createOwnReading(data: {
 }
 
 /**
+ * Take a reading of your own off your shelf (TJ, 2026-08-17).
+ *
+ * Until now a student could card a reading and never remove it: `deleteSource`
+ * opens with `requireAdmin`, and nothing else touched the row. So the shelf
+ * only ever grew — a mistyped title, or a book carded to try something, stayed
+ * forever. (It also meant the e2e suite could not clean up after itself: 80
+ * own readings had accumulated on the test account by the time this was found,
+ * 23 of them from one spec whose own docstring says it removes everything it
+ * makes. It could not.)
+ *
+ * ARCHIVE, NOT DELETE, and the distinction is load-bearing:
+ *
+ *   - `passages.sourceId` is `onDelete: "set null"`, so really deleting the
+ *     row would untether every passage captured from it — they would survive
+ *     but lose which reading they came from, landing in the same bucket
+ *     `attributePassages` exists to repair. `sourcePages`, `sourceScores` and
+ *     `sourceRepairs` cascade, so the page text and any repair decisions would
+ *     go too.
+ *   - `isArchived` already existed and the learner shelf query already honours
+ *     it, so this is a new act rather than a new state to filter for.
+ *
+ * The student's work is therefore untouched: the passages, their concepts and
+ * the threads between them stay exactly where they were, and Vocabulary is
+ * unscoped so the concepts remain in plain sight. What goes is the card, and
+ * with it the door to that reading's own Capture Log — which is why the shelf
+ * warns before doing it when there is work behind the card, and says how much.
+ *
+ * The file is NOT purged here. That stays an admin act (`deleteSource`
+ * removes the row and the blob together), because a purge is the irreversible
+ * half and an archive is meant to be undoable.
+ *
+ * Owner-gated on exactly the rule `updateOwnReadingMetadata` uses: your own
+ * card, and yours. A course reading is not yours to retire.
+ */
+export async function archiveOwnReading(sourceId: string) {
+  const session = await getServerSession(authOptions)
+  const userId = session?.user?.id
+  if (!userId) throw new Error("Unauthorized")
+
+  const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
+  const source = rows[0]
+  if (!source || !source.isOwn || source.createdByUserId !== userId) {
+    throw new Error("Reading not found")
+  }
+  // Idempotent: a double-submit should not write a second event saying it
+  // happened twice.
+  if (source.isArchived) return { id: source.id, title: source.title }
+
+  await db.update(sources).set({ isArchived: true }).where(eq(sources.id, source.id))
+
+  // Recorded like every other act. The payload carries the title because the
+  // row it names may later be purged by an admin, and a log line reading
+  // "removed a reading" with nothing to point at is not history.
+  const kept = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(passages)
+    .where(and(eq(passages.sourceId, source.id), eq(passages.userId, userId)))
+  await recordEvent(userId, null, "reading.archive", "reading", source.id, {
+    title: source.title,
+    passages: kept[0]?.n ?? 0,
+  })
+
+  revalidatePath("/")
+  revalidateLibrary()
+  return { id: source.id, title: source.title }
+}
+
+/**
  * The learner half of the browser → Blob upload: a reading of the student's
  * own with the PDF behind it, so tab 00 and capture-from-the-text work the
  * same as for course readings. Storage checks match the admin path exactly —
@@ -301,6 +416,75 @@ export async function createOwnReading(data: {
  * a curation cost the shared library justifies. An admin can Rescore from
  * the library if a private reading ever needs the reading-order check.
  */
+/**
+ * Move a browser-uploaded blob from its quarantine pathname into this
+ * environment's own drawer, returning the key the row will record.
+ *
+ * The client upload cannot know the drawer — blobNamespace is server-side —
+ * so its bytes land at the bare pathname in EVERY environment: in a preview
+ * that meant writing into the shared root, and a namespaced delete() could
+ * never reach the key the row recorded. Re-homing restores the storage
+ * invariant (an environment writes only into its own space) and makes every
+ * recorded storageKey one this environment may delete. The new key takes
+ * createSource's server-upload shape (a bare UUID), so the CLIENT-UPLOAD
+ * quarantine is transient: no new registration records its quarantine
+ * pathname. (`readings/` itself is not exclusively transient — repair mints
+ * durable `readings/<id>-repaired-<ms>.pdf` revision keys and the seed
+ * records `readings/…` blobKeys; refuseClaimedUploadKey is what keeps those
+ * out of this flow's reach.) Rows written before 2026-08-20 may still carry
+ * a quarantine pathname — reads fall through to the bare key, so they keep
+ * working; they remain beyond a namespaced delete, as they always were.
+ *
+ * In production the drawer IS the bare root, so this is a same-store copy —
+ * one extra put per upload, kept for uniformity: one code path everywhere,
+ * and the stored key is server-minted rather than client-named.
+ */
+/**
+ * A quarantine-shaped pathname some row ALREADY records is not a fresh
+ * upload — it is an existing reading's file, current or lineage. Everything
+ * downstream of registration (re-homing, the size-cap rejection, the failure
+ * cleanup) DELETES the pathname it was handed; rows written before
+ * 2026-08-20 record their quarantine pathname as storageKey, and every
+ * repair records `readings/<id>-repaired-<ms>.pdf` revision keys whose
+ * timestamps are guessable — so without this check a signed-in caller could
+ * hand registerOwnUploadedReading such a key and destroy a blob a row still
+ * references. Both tables are checked: sources.storageKey (the served file)
+ * and source_revision's storageKey/predecessorKey (the lineage the audit and
+ * deleteSource walk). The legitimate flow never trips this — a fresh
+ * upload's random-suffixed pathname is claimed by no row until this very
+ * call records its re-homed successor.
+ */
+async function refuseClaimedUploadKey(storageKey: string): Promise<void> {
+  const claimed = await db
+    .select({ id: sources.id })
+    .from(sources)
+    .where(eq(sources.storageKey, storageKey))
+    .limit(1)
+  if (claimed.length === 0) {
+    const lineage = await db
+      .select({ id: sourceRevisions.id })
+      .from(sourceRevisions)
+      .where(
+        or(
+          eq(sourceRevisions.storageKey, storageKey),
+          eq(sourceRevisions.predecessorKey, storageKey)
+        )
+      )
+      .limit(1)
+    if (lineage.length === 0) return
+  }
+  throw new Error("That pathname already belongs to a registered reading.")
+}
+
+async function rehomeClientUpload(quarantineKey: string, buffer: Buffer): Promise<string> {
+  const storageKey = `${crypto.randomUUID()}.pdf`
+  await readingStorage.put(storageKey, buffer)
+  // Best-effort: a leftover quarantine blob is the pre-rehome status quo, and
+  // the row about to be written already points at the drawer copy.
+  await deleteClientUploadBlob(quarantineKey).catch(() => {})
+  return storageKey
+}
+
 export async function registerOwnUploadedReading(data: {
   storageKey: string
   filename: string
@@ -312,22 +496,31 @@ export async function registerOwnUploadedReading(data: {
   const userId = session?.user?.id
   if (!userId) throw new Error("Unauthorized")
 
-  if (!data.storageKey.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
+  // Shape, not just prefix: everything downstream deletes the pathname it is
+  // handed, and a dot-segment walks a bare startsWith check out of the
+  // quarantine (isClientUploadPathname; adversarial review, 2026-08-20).
+  if (!isClientUploadPathname(data.storageKey)) {
     throw new Error("That upload is not in the readings area.")
   }
+  await refuseClaimedUploadKey(data.storageKey)
 
   const buffer = await readingStorage.get(data.storageKey)
   if (buffer.byteLength > MAX_READING_BYTES) {
-    await readingStorage.delete(data.storageKey).catch(() => {})
+    // The blob is still at its quarantine pathname — the drawer-scoped
+    // delete() cannot reach a bare key, so the exact-pathname remover must.
+    await deleteClientUploadBlob(data.storageKey).catch(() => {})
     throw new Error(`That file is ${formatBytes(buffer.byteLength)} — the limit is ${MAX_READING_LABEL}.`)
   }
 
+  let storageKey: string | null = null
+  let ingested = false
   try {
+    storageKey = await rehomeClientUpload(data.storageKey, buffer)
     const source = await ingestReading({
       userId,
       isOwn: true,
       buffer,
-      storageKey: data.storageKey,
+      storageKey,
       filename: data.filename,
       title: data.title,
       author: data.author,
@@ -335,13 +528,21 @@ export async function registerOwnUploadedReading(data: {
       isDescriptionVisible: false,
       metadataProvenance: "Student's own upload",
     })
+    ingested = true
     revalidatePath("/")
     revalidateLibrary()
     return { id: source.id, title: source.title }
   } catch (error) {
-    // Nothing references the blob yet; a failed ingest must not leave it
-    // sitting in storage.
-    await readingStorage.delete(data.storageKey).catch(() => {})
+    // Cleanup only while nothing references the blob — a failed ingest must
+    // not leave it in storage. Which copy exists depends on how far we got:
+    // after re-homing it is the drawer key; before, the quarantine pathname.
+    // Once `ingested`, the row exists and the drawer key is the committed
+    // reading's real file: a throw from the revalidates must not take it
+    // (adversarial review, 2026-08-20).
+    if (!ingested) {
+      if (storageKey) await readingStorage.delete(storageKey).catch(() => {})
+      else await deleteClientUploadBlob(data.storageKey).catch(() => {})
+    }
     throw error
   }
 }
@@ -374,7 +575,15 @@ export async function createSource(data: {
   const storageKey = `${crypto.randomUUID()}.pdf`
   await readingStorage.put(storageKey, buffer)
 
-  return ingestReading({ ...data, userId: session.user.id, buffer, storageKey, filename: data.file.name })
+  try {
+    return await ingestReading({ ...data, userId: session.user.id, buffer, storageKey, filename: data.file.name })
+  } catch (error) {
+    // The rollback inside ingestReading takes the row and the cover; the blob
+    // this function put is its own to take, like every other caller's
+    // (review, 2026-08-20 — this was the one caller whose catch was missing).
+    await readingStorage.delete(storageKey).catch(() => {})
+    throw error
+  }
 }
 
 /**
@@ -417,6 +626,13 @@ async function ingestReading(data: {
   const title = data.title?.trim() || fallbackTitle
   const storageKey = data.storageKey
 
+  // Before any row lands. Extraction is the step most likely to fail on a
+  // hostile file, and it used to fail AFTER the source and course rows were
+  // written — the caller's catch deleted the blob but not the rows, leaving a
+  // visible card that 404s on open. Failing here fails clean: no rows, and the
+  // caller still deletes the blob.
+  const pages = await extractPdfPageText(buffer)
+
   const [source] = await db
     .insert(sources)
     .values({
@@ -427,48 +643,92 @@ async function ingestReading(data: {
       isDescriptionVisible: data.isDescriptionVisible ?? true,
       metadataProvenance: data.metadataProvenance || "",
       storageKey,
+      byteLength: buffer.byteLength,
       isOwn: data.isOwn ?? false,
       createdByUserId: userId,
     })
     .returning()
 
-  if (data.courseId) {
-    const courseId = await resolveCourseId(data.courseId)
-    if (courseId) {
-      await db
-        .insert(courseSources)
-        .values({ courseId, sourceId: source.id })
-        .onConflictDoNothing()
+  try {
+    if (pages.length > 0) {
+      await db.insert(sourcePages).values(
+        pages.map((p) => ({
+          sourceId: source.id,
+          pageNumber: p.pageNumber,
+          textContent: p.textContent,
+          contentHash: hashText(textLayerProjection(p.textContent)),
+          width: p.width,
+          height: p.height,
+        }))
+      )
     }
-  }
 
-  const pages = await extractPdfPageText(buffer)
-  if (pages.length > 0) {
-    await db.insert(sourcePages).values(
-      pages.map((p) => ({
-        sourceId: source.id,
-        pageNumber: p.pageNumber,
-        textContent: p.textContent,
-        contentHash: hashText(p.textContent),
-      }))
-    )
-  }
+    let coverRendered = false
+    try {
+      const coverBuffer = await renderPdfCoverImage(buffer)
+      await readingStorage.put(getSourceCoverKey(source.id), coverBuffer)
+      coverRendered = true
+    } catch (error) {
+      console.warn("[Loom] Failed to generate PDF cover image", error)
+    }
 
-  let coverRendered = false
-  try {
-    const coverBuffer = await renderPdfCoverImage(buffer)
-    await readingStorage.put(getSourceCoverKey(source.id), coverBuffer)
-    coverRendered = true
+    // The per-page images the viewer's contact sheet reads. Off the request
+    // path: a long scan takes a minute or two to render at two widths, and
+    // the upload response should not wait on pages nobody has opened yet.
+    // Until they exist the viewer falls back to rendering from the PDF —
+    // slower, never wrong.
+    after(async () => {
+      try {
+        // Scheduled before scoring and the course attach, either of which can
+        // still fail and roll the row back — and this callback fires after
+        // the response regardless. Without the re-check it would render page
+        // images and a sheet for a reading that no longer exists: blobs no
+        // sweep will ever find, because the row that names their id is gone.
+        const still = await db
+          .select({ id: sources.id })
+          .from(sources)
+          .where(eq(sources.id, source.id))
+          .limit(1)
+        if (still.length === 0) return
+        await renderSourcePageImages(source.id, buffer)
+      } catch (error) {
+        console.warn("[Loom] Failed to render page images at ingest", error)
+      }
+    })
+
+    // Deterministic score, computed from the pages already in memory — no extra
+    // queries, no network. The judge pass runs afterwards, off the request path.
+    let pass: boolean | null = null
+    try {
+      pass = (await recordHeuristicScore(source.id, pages, { coverRendered })).pass
+    } catch (error) {
+      console.warn("[Loom] Failed to score extraction quality", error)
+    }
+
+    // The attach comes LAST, so the score exists to gate it: a reading that did
+    // not measure usable arrives in the course hidden, and the card's Reveal
+    // button is the explicit approval the old default-visible skipped. An
+    // unscored reading (score failed, null) is hidden too — "we didn't check"
+    // must not read as "checked and fine".
+    if (data.courseId) {
+      const courseId = await resolveCourseId(data.courseId)
+      if (courseId) {
+        await db
+          .insert(courseSources)
+          .values({ courseId, sourceId: source.id, isVisible: pass === true })
+          .onConflictDoNothing()
+      }
+    }
   } catch (error) {
-    console.warn("[Loom] Failed to generate PDF cover image", error)
-  }
-
-  // Deterministic score, computed from the pages already in memory — no extra
-  // queries, no network. The judge pass runs afterwards, off the request path.
-  try {
-    await recordHeuristicScore(source.id, pages, { coverRendered })
-  } catch (error) {
-    console.warn("[Loom] Failed to score extraction quality", error)
+    // Without this, a failure between the source insert and here leaves the
+    // phantom card the reorder above exists to prevent. Cascades take the
+    // pages and any attach with the row; the caller's catch takes the blob.
+    // The cover is this function's own put and nothing else records its key
+    // once the row is gone, so it goes here too (no-op if the render failed
+    // and it was never written).
+    await db.delete(sources).where(eq(sources.id, source.id)).catch(() => {})
+    await readingStorage.delete(getSourceCoverKey(source.id)).catch(() => {})
+    throw error
   }
 
   return source
@@ -481,7 +741,11 @@ async function ingestReading(data: {
  * `storageKey` is the pathname the Blob SDK returned to the browser. It is
  * treated as untrusted input — the prefix is checked, the blob is fetched
  * server-side, and its real size and PDF magic bytes are verified here rather
- * than taken on the client's word.
+ * than taken on the client's word. The verified bytes are then RE-HOMED into
+ * this environment's own drawer under a server-minted key and the quarantine
+ * pathname cleared (rehomeClientUpload): the browser wrote at the bare
+ * pathname, which a namespaced environment could read but never delete — and
+ * which, from a preview, was the shared root.
  */
 export async function registerUploadedReading(data: {
   storageKey: string
@@ -491,29 +755,39 @@ export async function registerUploadedReading(data: {
 }) {
   const session = await requireAdmin()
 
-  if (!data.storageKey.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
+  // Shape, not just prefix: everything downstream deletes the pathname it is
+  // handed, and a dot-segment walks a bare startsWith check out of the
+  // quarantine (isClientUploadPathname; adversarial review, 2026-08-20).
+  if (!isClientUploadPathname(data.storageKey)) {
     throw new Error("That upload is not in the readings area.")
   }
+  await refuseClaimedUploadKey(data.storageKey)
 
   const buffer = await readingStorage.get(data.storageKey)
 
   // The token route caps this too, but a cap enforced only where the token is
   // minted is a cap on the polite path; re-check what actually landed.
   if (buffer.byteLength > MAX_READING_BYTES) {
-    await readingStorage.delete(data.storageKey).catch(() => {})
+    // Still at its quarantine pathname — the drawer-scoped delete() cannot
+    // reach a bare key, so the exact-pathname remover must.
+    await deleteClientUploadBlob(data.storageKey).catch(() => {})
     throw new Error(`That file is ${formatBytes(buffer.byteLength)} — the limit is ${MAX_READING_LABEL}.`)
   }
 
+  let storageKey: string | null = null
+  let ingested = false
   try {
+    storageKey = await rehomeClientUpload(data.storageKey, buffer)
     const source = await ingestReading({
       userId: session.user.id,
       buffer,
-      storageKey: data.storageKey,
+      storageKey,
       filename: data.filename,
       title: data.title,
       courseId: data.courseId,
       metadataProvenance: "Pending review",
     })
+    ingested = true
 
     revalidateLibrary()
     if (isJudgeConfigured()) {
@@ -524,9 +798,17 @@ export async function registerUploadedReading(data: {
     }
     return { id: source.id, title: source.title }
   } catch (error) {
-    // Nothing references the blob yet, so a failed ingest should not leave it
-    // sitting in storage costing money and confusing later audits.
-    await readingStorage.delete(data.storageKey).catch(() => {})
+    // Cleanup only while nothing references the blob — a failed ingest must
+    // not leave it in storage costing money and confusing later audits.
+    // Which copy exists depends on how far we got: after re-homing it is the
+    // drawer key; before, the quarantine pathname. Once `ingested`, the row
+    // exists and the drawer key is the committed reading's real file: a
+    // throw from the revalidates or the after() scheduling must not take it
+    // (adversarial review, 2026-08-20).
+    if (!ingested) {
+      if (storageKey) await readingStorage.delete(storageKey).catch(() => {})
+      else await deleteClientUploadBlob(data.storageKey).catch(() => {})
+    }
     throw error
   }
 }
@@ -538,27 +820,53 @@ export async function rescoreSourceAction(formData: FormData) {
   const sourceId = readText(formData, "sourceId")
   if (!sourceId) return
 
-  // Rebuild the cover too, not just the scores. Cover rendering used to be
-  // treated as decided once at upload, but the renderer itself changes — it
-  // now targets a fixed width and skips blank opening pages — so readings
-  // uploaded before those changes keep a stale, undersized or empty thumbnail
-  // with no way to refresh it. Re-rendering here gives every existing reading
-  // a route back to a correct cover.
   const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
   const source = rows[0]
-  if (source?.storageKey) {
-    try {
-      const pdf = await readingStorage.get(source.storageKey)
-      const cover = await renderPdfCoverImage(pdf)
-      await readingStorage.put(getSourceCoverKey(sourceId), cover)
-    } catch (error) {
-      // A reading whose opening pages are genuinely blank has no cover to
-      // rebuild; that is recorded by the score, not a reason to fail a rescore.
-      console.warn("[Loom] Cover rebuild failed during rescore", error)
-    }
+
+  // Nothing stored to re-read: a reference-only card has no PDF, so replaying
+  // the rubric over its (absent) pages is all that can be done.
+  if (!source?.storageKey) {
+    await rescoreSource(sourceId)
+    revalidateLibrary()
+    return
   }
 
-  await rescoreSource(sourceId)
+  // Refuse to touch a reading students have worked on. Re-ingesting replaces
+  // the page text every stored offset was measured against; the batch script
+  // carries a --force for the deliberate case, and this button should not be
+  // the way that happens by accident.
+  const [{ value: passageCount }] = await db
+    .select({ value: count() })
+    .from(passages)
+    .where(eq(passages.sourceId, sourceId))
+
+  if (passageCount > 0) {
+    await rescoreSource(sourceId)
+    revalidateLibrary()
+    throw new Error(
+      `Rescored, but the reading was not re-processed: ${passageCount} highlight${passageCount === 1 ? " is" : "s are"} anchored to its current text. ` +
+        `Use "npx tsx scripts/reingest-readings.ts ${sourceId} --force" if you mean to replace it anyway.`
+    )
+  }
+
+  // Full re-processing, not a rubric replay. `rescoreSource` re-reads the
+  // STORED page rows, so on its own it can never show the effect of a repaired
+  // PDF or of a change to extraction itself — and it carried the old
+  // cover-rendered verdict forward, so a rebuilt cover never moved the score.
+  // Re-ingesting settles all three together from the bytes as they stand.
+  try {
+    await reingestSource(sourceId, await readingStorage.get(source.storageKey))
+  } catch (error) {
+    console.warn("[Loom] Re-ingest failed during rescore; falling back to a rubric replay", error)
+    await rescoreSource(sourceId)
+  }
+
+  if (isJudgeConfigured()) {
+    after(async () => {
+      await judgeSourceScore(sourceId)
+      revalidateLibrary()
+    })
+  }
   revalidateLibrary()
 }
 
@@ -703,13 +1011,25 @@ export async function addSourceToCourse(formData: FormData) {
   const sourceId = readText(formData, "sourceId")
   if (!courseId || !sourceId) return
 
+  // Publication is gated on the score: a reading that did not measure usable —
+  // or was never scored — arrives hidden, and the course card's Reveal button
+  // is the admin's explicit approval. The old default-visible published the
+  // moment of attach, before anyone had seen a verdict, which is how a scan
+  // whose pages could not render shipped to students with a passing note.
+  const score = await db
+    .select({ pass: sourceScores.pass })
+    .from(sourceScores)
+    .where(eq(sourceScores.sourceId, sourceId))
+    .limit(1)
+
   await db
     .insert(courseSources)
     .values({
       courseId,
       sourceId,
       week: readInt(formData, "week"),
-      isCore: formData.get("isCore") !== "false",
+      isCore: readIsCore(formData),
+      isVisible: score[0]?.pass === true,
     })
     .onConflictDoNothing()
 
@@ -765,7 +1085,7 @@ export async function updateCourseSourceSchedule(formData: FormData) {
     .set({
       week: readInt(formData, "week"),
       position: readInt(formData, "position") ?? 0,
-      isCore: formData.get("isCore") === "on",
+      isCore: readIsCore(formData),
     })
     .where(and(eq(courseSources.courseId, courseId), eq(courseSources.sourceId, sourceId)))
 
@@ -787,9 +1107,10 @@ export async function setSourceArchived(formData: FormData) {
 }
 
 /**
- * Deletes a reading from the shared library entirely, including its stored PDF
- * and cover. Course inclusions cascade away. Use setSourceArchived to retire a
- * reading without destroying it.
+ * Deletes a reading from the shared library entirely: the current PDF, every
+ * superseded revision blob, the per-page images, the contact sheet, the
+ * repair crops and the cover. Course inclusions cascade away. Use
+ * setSourceArchived to retire a reading without destroying it.
  */
 export async function deleteSource(formData: FormData) {
   await requireAdmin()
@@ -801,12 +1122,42 @@ export async function deleteSource(formData: FormData) {
   const source = rows[0]
   if (!source) return
 
-  await db.delete(sources).where(eq(sources.id, sourceId))
-  // A reference-only reading has no file and no cover to remove.
-  if (source.storageKey) await readingStorage.delete(source.storageKey)
-  await readingStorage.delete(getSourceCoverKey(source.id))
+  // Everything the store holds for this reading, gathered BEFORE the row
+  // delete — the rows that name the revision blobs and the crop keys cascade
+  // away with the source. The full list of key families, and why the two
+  // callers that delete source rows must share it, lives on
+  // gatherSourceBlobKeys (src/lib/sourceBlobs.ts).
+  //
+  // Gather-then-delete is unlocked — neon-http has no transactions — so an
+  // applyAcceptedRepairs in flight when the delete lands can still mint one
+  // revision blob after this sweep. Narrow (admin racing admin), and it fails
+  // loudly on the apply side: its revision insert hits the missing row.
+  const keys = await gatherSourceBlobKeys(sourceId, source.storageKey)
 
+  await db.delete(sources).where(eq(sources.id, sourceId))
+
+  // Best effort, every key attempted: a rejection is transport, not absence
+  // (missing keys no-op), and stopping at the first failure would strand the
+  // rest with the rows that named them already gone. Each failed key is
+  // logged by name — after the cascade the server log is the ONLY remaining
+  // record of what the store still holds — and the throw is for the operator
+  // in dev; a production build redacts a Server Function's error message to a
+  // digest, which is what correlates them to the logged lines.
+  const keyList = [...keys]
+  const results = await Promise.allSettled(keyList.map((key) => readingStorage.delete(key)))
   revalidateLibrary()
+  const failedKeys: string[] = []
+  results.forEach((result, i) => {
+    if (result.status === "rejected") {
+      failedKeys.push(keyList[i])
+      console.error(`[deleteSource] blob not removed: ${keyList[i]}`, result.reason)
+    }
+  })
+  if (failedKeys.length > 0) {
+    throw new Error(
+      `Reading deleted, but ${failedKeys.length} of ${keys.size} stored blobs could not be removed: ${failedKeys.join(", ")}`
+    )
+  }
 }
 
 /**
@@ -815,7 +1166,22 @@ export async function deleteSource(formData: FormData) {
  * lives on the join, so this is a membership question rather than a flag on
  * the source.
  */
-async function authorizeSourceFile(sourceId: string) {
+/**
+ * May the current viewer see this reading at all?
+ *
+ * The rule, in one place because more than one caller needs it: an admin sees
+ * everything; a student sees a reading of their own, or one published visibly
+ * into a course they are currently a member of. Nothing else.
+ *
+ * Deliberately says nothing about FILES — a reference-only reading is a
+ * citation with no PDF, and a student is entitled to name it as the source of a
+ * passage even though there is nothing to serve. `authorizeSourceFile` adds
+ * that requirement on top.
+ *
+ * Throws "Not found" rather than "Forbidden" throughout: whether a particular
+ * reading exists is itself not public.
+ */
+export async function authorizeSourceAccess(sourceId: string) {
   const session = await getServerSession(authOptions)
   const admin = isAdminUser(session?.user)
 
@@ -826,14 +1192,17 @@ async function authorizeSourceFile(sourceId: string) {
   const rows = await db.select().from(sources).where(eq(sources.id, sourceId)).limit(1)
   const source = rows[0]
   if (!source) throw new Error("Not found")
-  // A reference-only reading is a citation, not a file. Nothing to serve.
-  if (!source.storageKey) throw new Error("Not found")
 
-  // A student's own reading is theirs to read; it was never published to a
-  // course, so the membership check below cannot admit it.
+  // A student's own reading is theirs; it was never published to a course, so
+  // the membership check below cannot admit it.
   if (source.isOwn && source.createdByUserId === session?.user?.id) {
-    return { source, storageKey: source.storageKey }
+    return source
   }
+
+  // An own reading belonging to SOMEONE ELSE is never admissible, and would
+  // otherwise fall through the membership check below unexamined — it is in no
+  // course, so `published` would be empty and throw, but only by accident.
+  if (source.isOwn && !admin) throw new Error("Not found")
 
   if (!admin && session?.user?.id) {
     const memberships = await db
@@ -863,6 +1232,13 @@ async function authorizeSourceFile(sourceId: string) {
     if (published.length === 0) throw new Error("Not found")
   }
 
+  return source
+}
+
+async function authorizeSourceFile(sourceId: string) {
+  const source = await authorizeSourceAccess(sourceId)
+  // A reference-only reading is a citation, not a file. Nothing to serve.
+  if (!source.storageKey) throw new Error("Not found")
   return { source, storageKey: source.storageKey }
 }
 
@@ -875,6 +1251,14 @@ async function authorizeSourceFile(sourceId: string) {
  * `source.storageKey`, which authorization has already vouched for.
  */
 export async function getSourceForCover(sourceId: string) {
+  const { source } = await authorizeSourceFile(sourceId)
+  return { source }
+}
+
+/** Same shape, same reason, for the per-page image route and the PDF route's
+ *  conditional-request check: authorization and the row — storageKey included,
+ *  which is what the ETag derives from — without pulling a single byte. */
+export async function getSourceFileMeta(sourceId: string) {
   const { source } = await authorizeSourceFile(sourceId)
   return { source }
 }
@@ -894,4 +1278,48 @@ export async function getSourceFile(sourceId: string) {
 export async function getSourceFileStream(sourceId: string) {
   const { source, storageKey } = await authorizeSourceFile(sourceId)
   return { source, stream: await readingStorage.getStream(storageKey) }
+}
+
+/** One page of the manifest below. */
+export type ReadingPageInfo = {
+  pageNumber: number
+  /** PDF points, rotation applied — null on rows extracted before the
+   *  dimensions column existed and not yet backfilled. */
+  width: number | null
+  height: number | null
+  /** Length of the browser text-layer string (the offset substrate), for
+   *  placing card anchors on pages whose text layer is not mounted. */
+  textLength: number
+}
+
+/**
+ * What the viewer needs to lay a reading out BEFORE any page has rendered:
+ * every page's own size, from the same extraction pass that produced the
+ * canonical text. Without this the viewer guesses one shared aspect ratio and
+ * corrects it page by page as they load — and on a scanned book whose pages
+ * vary a few percent, every correction re-laid the whole matrix grid and
+ * re-rendered every mounted page (the "aspect storm").
+ *
+ * Same gate as the file itself: the manifest describes the file.
+ */
+export async function getReadingPageManifest(sourceId: string) {
+  await authorizeSourceAccess(sourceId)
+  const rows = await db
+    .select({
+      pageNumber: sourcePages.pageNumber,
+      width: sourcePages.width,
+      height: sourcePages.height,
+      textContent: sourcePages.textContent,
+    })
+    .from(sourcePages)
+    .where(eq(sourcePages.sourceId, sourceId))
+    .orderBy(asc(sourcePages.pageNumber))
+
+  const pages: ReadingPageInfo[] = rows.map((row) => ({
+    pageNumber: row.pageNumber,
+    width: row.width,
+    height: row.height,
+    textLength: textLayerProjection(row.textContent).length,
+  }))
+  return { pageCount: pages.length, pages }
 }

@@ -12,6 +12,42 @@ import { defineConfig, devices } from '@playwright/test';
 // reuseExistingServer then picks up. CI leaves PORT unset and keeps 3000.
 const port = Number(process.env.PORT || 3000);
 
+// Two projects, split on ONE question: does this spec write?
+//
+// Every spec shares Test User A, so the suite has always run single-file — 22
+// spec files, 16–22 minutes, because one worker is the only mutex there is.
+// But the race is only ever writer-against-writer or writer-against-reader. A
+// spec that writes NOTHING cannot corrupt another's rows and cannot have its
+// own assertions moved under it — provided nothing is writing alongside it.
+// So: run the readers together, then the writers one at a time. CI does
+// exactly that, in two passes (.github/workflows/ci.yml).
+//
+// THE RULE FOR ADDING A SPEC: it goes in `write` unless you can point at the
+// line that proves it writes nothing. `read` is the claim that needs
+// evidence; `write` is merely slow. Guessing wrong here does not fail
+// loudly — it produces a flake that reappears every few weeks and gets blamed
+// on the app.
+//
+// Everything not listed writes, including two that only MIGHT: repair-panel
+// and library-verify drive admin surfaces whose write controls are on screen.
+// Neither is worth a flake to speed up.
+const READ_ONLY = [
+  'access.spec.ts',          // bounces off /access; asserts absence
+  'audit-seed.spec.ts',      // diagnostic — logs what the highlighter finds
+  'audit-seed2.spec.ts',     // diagnostic — mark.js fuzzy match
+  'faculty.spec.ts',         // the READ half of ruling 18; write surfaces stay shut
+  'matrix-zoom.spec.ts',     // impostor/canvas ladder, no persistence
+  'object-download.spec.ts', // downloads what already exists
+  'overlay.spec.ts',         // "Read-only throughout: nothing here writes"
+  'pair-and-throw.spec.ts',  // picks, offers, loads the bench — never presses #throwIt
+  'thread-card.spec.ts',     // counts classes on rendered lists; opens no editor
+  'pdf-fit.spec.ts',         // fit modes
+  'practice-guide.spec.ts',  // "Requires seed:demo. Writes nothing"
+  'reading-search.spec.ts',  // "Search is read-only: nothing to clean up"
+  'sandbox.spec.ts',         // the practice loom — nothing kept is its premise
+  'workflows.spec.ts',       // renders three diagrams
+];
+
 export default defineConfig({
   testDir: './tests',
   /* Maximum time one test can run for. */
@@ -29,14 +65,21 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
-  // One worker: all specs share the Test User A account, and the capture
-  // specs delete their own data — parallel workers race each other's rows.
+  // One worker BY DEFAULT, and deliberately so: a bare `npx playwright test`
+  // runs both projects below in one pass, where a writer racing a reader is
+  // exactly the corruption this number prevents. The `read` project is the
+  // only thing safe to widen, and CI widens it explicitly on the command line
+  // (.github/workflows/ci.yml) rather than here — so the unsafe default is
+  // never one forgotten flag away.
   workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
   
   /* Global setup to handle authentication bypass */
   globalSetup: require.resolve('./playwright/global-setup'),
+  // Runs whatever happened — the failing run is the one that skipped its own
+  // cleanup, so this is the only place the sweep can be reliable.
+  globalTeardown: require.resolve('./playwright/global-teardown'),
   
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
@@ -53,7 +96,13 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     {
-      name: 'chromium',
+      name: 'read',
+      testMatch: READ_ONLY,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'write',
+      testIgnore: READ_ONLY,
       use: { ...devices['Desktop Chrome'] },
     },
   ],

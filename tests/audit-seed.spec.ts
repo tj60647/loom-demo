@@ -5,13 +5,10 @@ import { openReading } from './helpers';
 // (see playwright/global-setup.ts). No mocked session — the cookie is real.
 test.use({ storageState: 'playwright/.auth/testa.json' });
 
-test.describe('Audit Seed Bytes', () => {
-  test('verify seed bytes are highlighted', async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
+test.describe('Audit Seed Passages', () => {
+  test('verify seed passages are highlighted', async ({ page }) => {
 
-    // Pick the reading off the shelf and open its text (tab 00).
+    // Pick the reading off the shelf and open its text (01 · Reading).
     await openReading(page, 'Object Worlds');
 
     // Go to page 4
@@ -21,7 +18,7 @@ test.describe('Audit Seed Bytes', () => {
     await page.waitForTimeout(1000);
 
     // Check how many highlights exist
-    const highlights = page.locator('.loom-byte-highlight');
+    const highlights = page.locator('.loom-passage-highlight');
     const count = await highlights.count();
     console.log(`Found ${count} highlighted elements on Page 4.`);
 

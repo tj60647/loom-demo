@@ -19,6 +19,13 @@ type ConfirmRequest = {
   cancelLabel?: string
   /** Destructive actions colour the confirm button red and focus Cancel. */
   danger?: boolean
+  /**
+   * The eyebrow above the question. Defaults to "this cannot be undone" when
+   * `danger`, which was true of every caller until 2026-08-17 — archiving a
+   * reading of your own is red-button serious and IS undoable, and a dialog
+   * that overstates once is a dialog nobody reads twice.
+   */
+  eyebrow?: string
 }
 
 type NotifyRequest = { title: string; body?: ReactNode; confirmLabel?: string }
@@ -107,7 +114,10 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             aria-modal="true"
             aria-labelledby="loomDialogTitle"
           >
-            <div className="info-k">{danger ? "this cannot be undone" : isConfirm ? "confirm" : "heads up"}</div>
+            <div className="info-k">
+              {("eyebrow" in pending.req && pending.req.eyebrow) ||
+                (danger ? "this cannot be undone" : isConfirm ? "confirm" : "heads up")}
+            </div>
             <h2 id="loomDialogTitle">{pending.req.title}</h2>
             {pending.req.body && <p>{pending.req.body}</p>}
             <div className="asknav">

@@ -113,6 +113,83 @@
       "when": 1785790823463,
       "tag": "0015_source_category",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1785877223463,
+      "tag": "0016_source_foreign_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785963623463,
+      "tag": "0017_source_repairs",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786050023463,
+      "tag": "0018_repair_costs",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786136423463,
+      "tag": "0019_repair_votes",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786140023463,
+      "tag": "0020_source_seed_key",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786143000000,
+      "tag": "0021_passages_and_cloths",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1786147688831,
+      "tag": "0022_unified_search",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786305972287,
+      "tag": "0023_passages_not_bytes",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786480250015,
+      "tag": "0024_link_as_object",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786685096144,
+      "tag": "0025_source_revision",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786727074731,
+      "tag": "0026_page_dims_and_byte_length",
+      "breakpoints": true
     }
   ]
 }

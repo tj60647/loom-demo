@@ -71,11 +71,25 @@ test("courses: schedule controls render for the course's readings", async ({ pag
   await expect(firstCourse.locator("summary.pillbtn", { hasText: "Delete" })).toBeVisible()
 
   // Each reading row shows its Week/Core/Visible pills; the week+position form
-  // sits behind the "schedule" disclosure.
+  // sits behind the "Schedule" disclosure.
   await expect(page.locator(".pill", { hasText: /Week \d+|Unscheduled/ }).first()).toBeVisible({ timeout: 15_000 })
-  await page.locator("summary", { hasText: "schedule" }).first().click()
-  await expect(page.locator("input[name=week]").first()).toBeVisible()
-  await expect(page.locator("input[name=position]").first()).toBeVisible()
+
+  // The reading's three tools are one uniform set — Schedule and Hide as plain
+  // buttons, Remove as the red pill — not a mix of link-sized words.
+  const readingRow = page
+    .locator(".lrow", { has: page.locator("summary", { hasText: "Schedule" }) })
+    .first()
+  await expect(readingRow.locator("summary.btn.mini", { hasText: "Schedule" })).toBeVisible()
+  await expect(readingRow.locator("button.btn.mini", { hasText: /Hide|Reveal/ })).toBeVisible()
+  await expect(readingRow.locator("button.btn.pillbtn", { hasText: "Remove from Course" })).toBeVisible()
+
+  await readingRow.locator("summary", { hasText: "Schedule" }).click()
+  await expect(readingRow.locator("input[name=week]")).toBeVisible()
+  await expect(readingRow.locator("input[name=position]")).toBeVisible()
+  // Core/supplemental is a radio pair, so the unchosen name is on screen too,
+  // and exactly one of them is always chosen.
+  await expect(readingRow.locator(".radiopick input[name=isCore]")).toHaveCount(2)
+  await expect(readingRow.locator("input[name=isCore]:checked")).toHaveCount(1)
 })
 
 test("the cohort map renders the section's woven concepts", async ({ page }) => {
@@ -90,12 +104,62 @@ test("the cohort map renders the section's woven concepts", async ({ page }) => 
   await expect(page.locator(".crow", { hasText: "object worlds" }).first()).toBeVisible()
   await expect(page.locator(".thread .sent").first()).toBeVisible()
 
-  // A concept opens the bytes behind it — the student's own captures, with
+  // A concept opens the passages behind it — the student's own captures, with
   // attribution — plus the threads that cross it.
   await page.locator(".crow", { hasText: "object worlds" }).first().click()
   await expect(page.locator(".threadhead", { hasText: "object worlds" })).toBeVisible()
-  await expect(page.locator(".bytequote").first()).toBeVisible()
-  await expect(page.locator(".bytequote").first()).toContainText("Test User A")
+  await expect(page.locator(".passagequote").first()).toBeVisible()
+  await expect(page.locator(".passagequote").first()).toContainText("Test User A")
+})
+
+test("readings say which version of their file they serve", async ({ page }) => {
+  await page.goto("/admin/library")
+  // "Readings" exactly — the page also carries an "All Readings" section head.
+  // Generous: this page queries the whole shared shelf before it renders.
+  await expect(page.getByRole("heading", { name: "Readings", exact: true })).toBeVisible({
+    timeout: 60_000,
+  })
+
+  /**
+   * Two invariants, read off every card at once rather than one card at a
+   * time — the library is the whole shared shelf and iterating it in Playwright
+   * costs a round trip per reading.
+   *
+   * A reading's version is its `source_revision` count + 1, so:
+   *   - history is disclosed exactly where the file has been replaced, and
+   *   - the disclosure holds one line per version, v1 (the upload) included.
+   *
+   * Deliberately not asserting that any particular reading is repaired: the CI
+   * database is seeded, not remediated, so the honest assertion is the relation
+   * between badge and disclosure, which holds at v1 as well as at v6.
+   */
+  const readings = await page.evaluate(() =>
+    [...document.querySelectorAll(".card")].flatMap((card) => {
+      const badge = [...card.querySelectorAll(".pill")].find((pill) =>
+        /^v\d+$/.test(pill.textContent?.trim() ?? "")
+      )
+      if (!badge) return []
+      return [
+        {
+          title: card.querySelector("h3")?.textContent?.trim().slice(0, 40) ?? "?",
+          version: Number(badge.textContent!.trim().slice(1)),
+          hasHistory: [...card.querySelectorAll("summary")].some((summary) =>
+            summary.textContent?.includes("File History")
+          ),
+          lines: card.querySelectorAll(".revline").length,
+        },
+      ]
+    })
+  )
+
+  expect(readings.length, "seed missing — run `npm run seed:sources` first").toBeGreaterThan(0)
+  expect(readings.filter((r) => !Number.isFinite(r.version))).toEqual([])
+
+  // History is disclosed when, and only when, the file has been replaced.
+  expect(readings.filter((r) => r.hasHistory !== r.version > 1)).toEqual([])
+
+  // Where it is disclosed, it accounts for every version including the upload.
+  expect(readings.filter((r) => r.hasHistory && r.lines !== r.version)).toEqual([])
 })
 
 test.describe("authorization boundary", () => {

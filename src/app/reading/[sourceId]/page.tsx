@@ -6,14 +6,28 @@ import Link from "next/link"
 import { getSources } from "@/actions/sources"
 import Workbench, { type Tab } from "@/components/Workbench"
 import { firstParam } from "@/lib/courses"
+import { isBranchPreview } from "@/lib/previewLogin"
 
-type ReadingPageSearchParams = { tab?: string | string[]; q?: string | string[] }
+type ReadingPageSearchParams = {
+  tab?: string | string[]
+  q?: string | string[]
+  concept?: string | string[]
+  label?: string | string[]
+  passage?: string | string[]
+  projection?: string | string[]
+  cloth?: string | string[]
+  page?: string | string[]
+}
 
 // Deep links land on a station (`?tab=reading` from a shelf-search hit);
-// anything else lands on the default first tab, as /weave does. `q` rides
+// anything else lands on the default first tab. `q` rides
 // along from a shelf-search hit and opens the reading's own search panel
 // pre-filled, so the trail of marks continues into the text itself.
-const READING_TABS = new Set<Tab>(["reading", "open", "throw", "read", "map"])
+//
+// `open` is kept as an accepted value although the tab is gone: it is in old
+// links and bookmarks, and the Workbench folds it onto `reading` (they merged
+// 2026-08-08). Legacy URL params are deliberate — refactor spec §F.
+const READING_TABS = new Set<string>(["reading", "open", "throw", "read", "map"])
 
 // Next 16: params is a Promise (async request APIs are no longer sync).
 export default async function ReadingPage({
@@ -26,8 +40,36 @@ export default async function ReadingPage({
   const { sourceId } = await params
   const resolved = await searchParams
   const rawTab = firstParam(resolved.tab)
-  const initialTab = rawTab && READING_TABS.has(rawTab as Tab) ? (rawTab as Tab) : undefined
+  const initialTab = rawTab && READING_TABS.has(rawTab) ? (rawTab as Tab) : undefined
   const initialSearch = firstParam(resolved.q)?.trim() || undefined
+  /**
+   * Where inside the station to land (TJ, 2026-08-13: "it seems like the
+   * search results could be more specific and contextual… concepts should have
+   * a link to the vocabulary location. links the same").
+   *
+   * A hit used to open the right ROOM and stop there: a concept landed on
+   * Vocabulary with its row somewhere in a list of every word you own. These
+   * carry the last hop, so the hit is a door to the object rather than to the
+   * surface it lives on. Each is a plain, linkable, bookmarkable param — the
+   * route is the scope here (see the note at the top), and this is the same
+   * idea one level in.
+   */
+  const focus = {
+    concept: firstParam(resolved.concept)?.trim() || undefined,
+    label: firstParam(resolved.label)?.trim() || undefined,
+    passage: firstParam(resolved.passage)?.trim() || undefined,
+    projection: firstParam(resolved.projection)?.trim() || undefined,
+    cloth: firstParam(resolved.cloth) === "1",
+    // A page number off a URL is a stranger's integer. Anything that is not a
+    // whole number above zero becomes undefined here rather than reaching the
+    // viewer, which would otherwise be asked to render page 0, page -3 or
+    // page NaN on someone else's bookmark.
+    page: (() => {
+      const raw = firstParam(resolved.page)
+      const n = raw ? Number(raw) : NaN
+      return Number.isInteger(n) && n > 0 ? n : undefined
+    })(),
+  }
   const sources = await getSources()
   const source = sources.find((s) => s.id === sourceId)
 
@@ -54,6 +96,8 @@ export default async function ReadingPage({
       key={source.id}
       initialTab={initialTab}
       initialSearch={initialSearch}
+      focus={focus}
+      isPreviewDeployment={isBranchPreview()}
       source={{
         id: source.id,
         title: source.title,

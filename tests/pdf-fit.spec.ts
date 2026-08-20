@@ -8,11 +8,9 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 
 test.describe('PDF Viewer Fit Modes', () => {
   test('fit to width should not cause horizontal scroll', async ({ page }) => {
-    // 1. Navigate to the app and bypass walkthrough
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
-    // 2-4. Pick the reading off the shelf and open the text (tab 00).
+    // Pick the reading off the shelf and open the text (01 · Reading).
+    // (An earlier step here "bypassed the walkthrough" — that deck was
+    // retired 2026-08-11.)
     await openReading(page, 'Object Worlds');
 
     // Wait for the text layer to render on the first page
@@ -25,9 +23,20 @@ test.describe('PDF Viewer Fit Modes', () => {
     // Give it a moment to resize
     await page.waitForTimeout(1000);
 
-    // 6. Check if horizontal scrollbar exists
+    // 6. Check if horizontal scrollbar exists.
+    //
+    // Measured on .pdf-stage BY NAME, because the stage is the element that
+    // actually scrolls (.pdf-stage.mode-page is overflow:auto) and therefore
+    // the only one that can put a scrollbar under the reader. This used to
+    // walk two parentElements up from .react-pdf__Document, which landed on
+    // .pdf-shell by accident of depth; since 2026-08-09 that walk reaches
+    // .pdf-body, a wrapper that is overflow:clip and cannot scroll at all.
+    // It still reports a scrollWidth — the scrolling AREA is the union of the
+    // padding box and descendant overflow whether or not the box scrolls, and
+    // Your work is parked a panel-width off the right edge when closed — so
+    // the old walk measured 440px of overflow that no user can ever reach.
     const scrollMetrics = await page.evaluate(() => {
-      const el = document.querySelector('.react-pdf__Document')?.parentElement?.parentElement;
+      const el = document.querySelector('.pdf-stage');
       if (!el) return null;
       return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
     });

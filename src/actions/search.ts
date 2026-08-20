@@ -10,9 +10,11 @@
 // query returns the same pages for every student, and a match is a fact about
 // the text, not a judgment about the student.
 //
-// Both actions scope through getSources(), so search can never surface a
-// reading its caller could not already open — and the shelf-wide search
-// narrows further to published readings: the reading list, not the library.
+// Both READING searches (searchReadings, searchReading) scope through
+// getSources(), so search can never surface a reading its caller could not
+// already open — and the shelf-wide search narrows further to published
+// readings: the reading list, not the library. searchLoom below is gated on
+// the caller's own userId instead: it reads nobody's rows but theirs.
 // The tsvector expressions below repeat src/db/schema.ts's index expressions
 // verbatim — an expression index only serves queries that match it exactly.
 
@@ -21,10 +23,24 @@ import { sql, type SQL } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { getSources } from "@/actions/sources"
+import { resolveCourseIdForUser } from "@/lib/courses"
 import { SNIPPET_OPEN, SNIPPET_CLOSE } from "@/lib/searchText"
 
 /** ts_headline options; markers documented in src/lib/searchText.ts. */
-const HEADLINE_OPTIONS = `StartSel=${SNIPPET_OPEN}, StopSel=${SNIPPET_CLOSE}, MaxWords=16, MinWords=6, ShortWord=2, MaxFragments=2, FragmentDelimiter=" … "`
+const HEADLINE_OPTIONS = `StartSel=${SNIPPET_OPEN}, StopSel=${SNIPPET_CLOSE}, MaxWords=16, MinWords=6, ShortWord=2, MaxFragments=4, FragmentDelimiter=" … "`
+
+/**
+ * The same options, but marking EVERY occurrence and returning the whole page,
+ * so the marker count can be taken off it. Used only to count — the string is
+ * never returned — because the display headline is fragmented and therefore
+ * cannot say how many matches a page really holds.
+ *
+ * Counting this way rather than by scanning the text for the query keeps the
+ * number and the highlighting in agreement: both are Postgres's own idea of a
+ * match, stemming and all, so a page that says "6" has six marked words in it
+ * and not six literal substrings.
+ */
+const COUNT_OPTIONS = `StartSel=${SNIPPET_OPEN}, StopSel=${SNIPPET_CLOSE}, HighlightAll=TRUE`
 
 /** Longest query worth parsing; anything more is pasted prose, truncated. */
 const MAX_QUERY_LENGTH = 200
@@ -54,8 +70,21 @@ export type ReadingSearchHit = {
   excerpts: ReadingSearchExcerpt[]
 }
 
+/**
+ * A page that matched. ONE ROW PER PAGE, not per occurrence (TJ, 2026-08-19:
+ * "search results seem to be by page and not entry, is this correct?").
+ *
+ * It is, and deliberately: a click can only land on a page, so a row per
+ * occurrence would be several rows going to the same place, and the list would
+ * stop being a map of where an idea lives. What was wrong is that the row
+ * under-reported — the headline shows a few windows, so a page with six matches
+ * looked like a page with two. `matches` is the page's real total, counted the
+ * same way the marking counts.
+ */
 export type ReadingPageHit = {
   pageNumber: number
+  /** Every marked word on the page, not just the ones the snippet had room for. */
+  matches: number
   /** Marked like ReadingSearchExcerpt.snippet. */
   snippet: string
 }
@@ -82,7 +111,7 @@ function idList(ids: string[]): SQL {
  * that merely mentions the words, and among texts the best page wins, with a
  * small nudge for matching in many places.
  */
-export async function searchReadings(rawQuery: string): Promise<ReadingSearchHit[]> {
+export async function searchReadings(rawQuery: string, sourceId?: string | null): Promise<ReadingSearchHit[]> {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return []
 
@@ -95,7 +124,12 @@ export async function searchReadings(rawQuery: string): Promise<ReadingSearchHit
   // rows are visible-only already, so this narrows only the admin's view;
   // in-document search (below) keeps the wider gate, since an admin can
   // legitimately open a staged reading and find within it.
-  const shelf = (await getSources()).filter((source) => source.isVisible)
+  // Contextual scope (TJ, 2026-08-10): the Library searches the loom; a
+  // reading searches itself. With a sourceId the shelf narrows to that one
+  // reading — same gates, smaller room.
+  const shelf = (await getSources())
+    .filter((source) => source.isVisible)
+    .filter((source) => !sourceId || source.id === sourceId)
   if (shelf.length === 0) return []
   const shelfOrder = new Map(shelf.map((source, index) => [source.id, index]))
   const ids = shelf.map((source) => source.id)
@@ -203,6 +237,318 @@ export async function searchReadings(rawQuery: string): Promise<ReadingSearchHit
   return scored.slice(0, MAX_READING_HITS).map((entry) => entry.hit)
 }
 
+// --- UNIFIED SEARCH, scopes 3–4 (ruling 34) ---
+// The student's own holdings: concepts (label/gloss/note), links
+// (term/sentence), and passages (text/margin). Same contract as above: plain
+// FTS, no model, the caller sees only their own rows. Grouped by kind — a
+// match in a reading is not the same act as a match in your own vocabulary.
+
+const MAX_LOOM_HITS = 12
+
+/**
+ * A hit's door: the reading to open it in.
+ *
+ * A concept, a Link Label and a thread all belong to the User rather than to
+ * one text, so at the Library there is no reading in the row itself to send
+ * the reader to. The rule is **where its first evidence is** — the earliest
+ * passage of the concept, of either end of the thread, or of either end of
+ * any thread carrying the label. Null when there is none, which is a real
+ * state and not an error: a concept named ahead of its evidence is legal
+ * (red line 4), and its hit is shown without being a door.
+ *
+ * Until 2026-08-11 these three led to `/weave` instead. TJ ruled the whole
+ * weave out of the app — "poorly defined and not supported in the course" —
+ * so a hit now opens the reading where the work was actually done.
+ */
+export type LoomSearchResult = {
+  concepts: { id: string; label: string; sourceId: string | null; snippet: string }[]
+  /**
+   * The Link Labels the student owns (5.1) — objects now, so a word coined
+   * with a gloss and not yet used by any thread is findable. Distinct from
+   * `links` below, which are the threads themselves.
+   */
+  linkLabels: { id: string; label: string; uses: number; sourceId: string | null; snippet: string }[]
+  links: { id: string; handle: string; fromLabel: string; toLabel: string; sourceId: string | null; snippet: string }[]
+  passages: { id: string; sourceId: string | null; source: string; snippet: string }[]
+  /** Single-reading cloths only — scopeKey IS the sourceId for those. */
+  cloths: { sourceId: string; title: string; snippet: string }[]
+  /** Single-reading projections only, for the same reason as cloths. */
+  projections: { id: string; sourceId: string; name: string; snippet: string }[]
+}
+
+/**
+ * Search the student's own holdings. Contextual scope (TJ, 2026-08-10):
+ * without a sourceId this is the whole loom (the Library's search); with one
+ * it is that reading's slice — its passages, its cloth and projections, the
+ * concepts evidenced there and the links between them.
+ */
+export async function searchLoom(rawQuery: string, sourceId?: string | null): Promise<LoomSearchResult> {
+  const empty: LoomSearchResult = { concepts: [], linkLabels: [], links: [], passages: [], cloths: [], projections: [] }
+
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return empty
+  const userId = session.user.id
+
+  const query = normalizeQuery(rawQuery)
+  if (query.length < 2) return empty
+
+  // "This reading's concepts" is the scope the workbench draws: the concepts
+  // a passage of this reading evidences. Links follow ThrowTab's rule —
+  // this reading's threads only, both ends evidenced here.
+  const conceptsHere = sourceId
+    ? sql`(SELECT pc."conceptId" FROM "passage_concept" pc
+           JOIN "passage" p ON p."id" = pc."passageId"
+           WHERE p."userId" = ${userId} AND p."sourceId" = ${sourceId})`
+    : null
+
+  // Same course lens the loom actions resolve — plus the not-yet-adopted
+  // null-course rows, which belong to this student all the same. Read-only:
+  // search never performs the adoption writes.
+  const courseId = await resolveCourseIdForUser(userId, null)
+  const conceptScope = courseId
+    ? sql`("concept"."courseId" = ${courseId} OR "concept"."courseId" IS NULL)`
+    : sql`"concept"."courseId" IS NULL`
+  const edgeScope = courseId
+    ? sql`("edge"."courseId" = ${courseId} OR "edge"."courseId" IS NULL)`
+    : sql`"edge"."courseId" IS NULL`
+  const passageScope = courseId
+    ? sql`("passage"."courseId" = ${courseId} OR "passage"."courseId" IS NULL)`
+    : sql`"passage"."courseId" IS NULL`
+
+  // Each vector repeats its index expression from src/db/schema.ts verbatim.
+  // Where a concept's first evidence is. Repeated in shape by the two below.
+  const firstReadingOfConcept = (conceptRef: SQL) => sql`
+    (SELECT p."sourceId" FROM "passage_concept" pc
+       JOIN "passage" p ON p."id" = pc."passageId"
+      WHERE pc."conceptId" = ${conceptRef}
+        AND p."userId" = ${userId} AND p."sourceId" IS NOT NULL
+      ORDER BY p."createdAt" ASC, p."id" ASC
+      LIMIT 1)`
+
+  /**
+   * ORDER: relevance first, then the NAME (TJ, 2026-08-19, asking whether these
+   * lists are alphabetical).
+   *
+   * Everywhere else in the app a list of concepts is alphabetical —
+   * `sortedByLabel` orders the warp, Vocabulary, Your work and the Knowledge
+   * Graph. This panel is the exception on purpose: you typed a word, so the
+   * closest match to it should lead. But the tie-break used to be createdAt,
+   * and ties are the common case here — a query that matches six concepts'
+   * labels equally ranks them all the same and then fell back to the order they
+   * happened to be coined in, which reads as no order at all.
+   *
+   * Name-then-createdAt keeps the best match on top and makes everything level
+   * with it alphabetical. Straight alphabetical was the other option and is
+   * worse: LIMIT is ${MAX_LOOM_HITS}, so the ORDER BY decides WHICH concepts
+   * come back at all, and sorting by name would return an arbitrary alphabetical
+   * dozen with the strongest match possibly not among them.
+   */
+  const conceptResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "concept"."id", "concept"."label",
+           ${firstReadingOfConcept(sql`"concept"."id"`)} AS "sourceId",
+           ts_headline('english', coalesce(nullif("concept"."def", ''), "concept"."label"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           ts_rank(
+             (setweight(to_tsvector('english', coalesce("concept"."label", '')), 'A') ||
+              setweight(to_tsvector('english', coalesce("concept"."def", '')), 'B') ||
+              setweight(to_tsvector('english', coalesce("concept"."note", '')), 'C')),
+             q.query
+           ) AS rank
+    FROM "concept", q
+    WHERE "concept"."userId" = ${userId} AND ${conceptScope}
+      ${conceptsHere ? sql`AND "concept"."id" IN ${conceptsHere}` : sql.raw("")}
+      AND (setweight(to_tsvector('english', coalesce("concept"."label", '')), 'A') ||
+           setweight(to_tsvector('english', coalesce("concept"."def", '')), 'B') ||
+           setweight(to_tsvector('english', coalesce("concept"."note", '')), 'C')) @@ q.query
+    ORDER BY rank DESC, lower("concept"."label"), "concept"."createdAt"
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
+  const edgeResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "edge"."id", "edge"."handle",
+           f."label" AS "fromLabel", t."label" AS "toLabel",
+           (SELECT p."sourceId" FROM "passage_concept" pc
+              JOIN "passage" p ON p."id" = pc."passageId"
+             WHERE pc."conceptId" IN ("edge"."fromId", "edge"."toId")
+               AND p."userId" = ${userId} AND p."sourceId" IS NOT NULL
+             ORDER BY p."createdAt" ASC, p."id" ASC
+             LIMIT 1) AS "sourceId",
+           ts_headline('english', coalesce(nullif("edge"."sentence", ''), "edge"."handle"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           ts_rank(
+             (setweight(to_tsvector('english', coalesce("edge"."handle", '')), 'A') ||
+              setweight(to_tsvector('english', coalesce("edge"."sentence", '')), 'B')),
+             q.query
+           ) AS rank
+    FROM "edge"
+    JOIN "concept" f ON f."id" = "edge"."fromId"
+    JOIN "concept" t ON t."id" = "edge"."toId", q
+    WHERE "edge"."userId" = ${userId} AND ${edgeScope}
+      ${conceptsHere ? sql`AND "edge"."fromId" IN ${conceptsHere} AND "edge"."toId" IN ${conceptsHere}` : sql.raw("")}
+      AND (setweight(to_tsvector('english', coalesce("edge"."handle", '')), 'A') ||
+           setweight(to_tsvector('english', coalesce("edge"."sentence", '')), 'B')) @@ q.query
+    ORDER BY rank DESC, lower(f."label"), lower(t."label"), "edge"."createdAt"
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
+  // The Link Labels themselves (5.1). A Link is user-level — it spans
+  // readings by design — so the reading scope narrows it the way the threads
+  // are narrowed: to the words this reading's own threads carry. At the
+  // library there is no such filter, which is where a word coined ahead of
+  // its first use is found. `uses` counts threads by the object AND by the
+  // legacy handle, matching usesOf() in src/lib/linkResolve.ts, so rows
+  // written before 0024 are not reported at zero.
+  const linkEdgeScope = conceptsHere
+    ? sql`AND EXISTS (
+            SELECT 1 FROM "edge" e
+            WHERE e."userId" = ${userId}
+              AND (e."linkId" = "link"."id"
+                   OR lower(btrim(coalesce(e."handle", ''))) = lower(btrim("link"."label")))
+              AND e."fromId" IN ${conceptsHere} AND e."toId" IN ${conceptsHere}
+          )`
+    : sql.raw("")
+  const linkScope = courseId
+    ? sql`("link"."courseId" = ${courseId} OR "link"."courseId" IS NULL)`
+    : sql`"link"."courseId" IS NULL`
+
+  const linkResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "link"."id", "link"."label",
+           (SELECT p."sourceId" FROM "edge" e
+              JOIN "passage_concept" pc ON pc."conceptId" IN (e."fromId", e."toId")
+              JOIN "passage" p ON p."id" = pc."passageId"
+             WHERE e."userId" = ${userId}
+               AND (e."linkId" = "link"."id"
+                    OR (e."linkId" IS NULL
+                        AND lower(btrim(coalesce(e."handle", ''))) = lower(btrim("link"."label"))))
+               AND p."sourceId" IS NOT NULL
+             ORDER BY p."createdAt" ASC, p."id" ASC
+             LIMIT 1) AS "sourceId",
+           ts_headline('english', coalesce(nullif("link"."description", ''), "link"."label"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           (SELECT count(*) FROM "edge" e
+             WHERE e."userId" = ${userId}
+               AND (e."linkId" = "link"."id"
+                    OR (e."linkId" IS NULL
+                        AND lower(btrim(coalesce(e."handle", ''))) = lower(btrim("link"."label"))))
+           )::int AS uses,
+           ts_rank(
+             (setweight(to_tsvector('english', coalesce("link"."label", '')), 'A') ||
+              setweight(to_tsvector('english', coalesce("link"."description", '')), 'B')),
+             q.query
+           ) AS rank
+    FROM "link", q
+    WHERE "link"."userId" = ${userId} AND ${linkScope}
+      ${linkEdgeScope}
+      AND (setweight(to_tsvector('english', coalesce("link"."label", '')), 'A') ||
+           setweight(to_tsvector('english', coalesce("link"."description", '')), 'B')) @@ q.query
+    ORDER BY rank DESC, lower("link"."label"), "link"."createdAt"
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
+  const passageResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "passage"."id", "passage"."sourceId", "passage"."source",
+           ts_headline('english', "passage"."content", q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           ts_rank(
+             (setweight(to_tsvector('english', "passage"."content"), 'B') ||
+              setweight(to_tsvector('english', coalesce("passage"."note", '')), 'C') ||
+              setweight(to_tsvector('english', coalesce("passage"."question", '')), 'C')),
+             q.query
+           ) AS rank
+    FROM "passage", q
+    WHERE "passage"."userId" = ${userId} AND ${passageScope}
+      ${sourceId ? sql`AND "passage"."sourceId" = ${sourceId}` : sql.raw("")}
+      AND (setweight(to_tsvector('english', "passage"."content"), 'B') ||
+           setweight(to_tsvector('english', coalesce("passage"."note", '')), 'C') ||
+           setweight(to_tsvector('english', coalesce("passage"."question", '')), 'C')) @@ q.query
+    ORDER BY rank DESC, "passage"."createdAt"
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
+  // The cloth — the reading's own interpretation — searches by title and
+  // description. No GIN index, deliberately: one cloth per reading per user
+  // is tens of rows, the expression scan costs nothing, and an index would
+  // mean a migration production has not got. Single-reading cloths only
+  // (scopeKey = the sourceId, no comma, not ''): the whole-weave cloth has no
+  // reachable surface (the Weave ruling), and a search hit must never be a
+  // door to a room that does not exist.
+  const clothScope = courseId
+    ? sql`("cloth"."courseId" = ${courseId} OR "cloth"."courseId" IS NULL)`
+    : sql`"cloth"."courseId" IS NULL`
+  const clothResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "cloth"."scopeKey" AS "sourceId", "cloth"."title",
+           ts_headline('english', coalesce(nullif("cloth"."description", ''), "cloth"."title"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           ts_rank(
+             (setweight(to_tsvector('english', coalesce("cloth"."title", '')), 'A') ||
+              setweight(to_tsvector('english', coalesce("cloth"."description", '')), 'B')),
+             q.query
+           ) AS rank
+    FROM "cloth", q
+    WHERE "cloth"."userId" = ${userId} AND ${clothScope}
+      ${sourceId
+        ? sql`AND "cloth"."scopeKey" = ${sourceId}`
+        : sql`AND "cloth"."scopeKey" <> '' AND position(',' IN "cloth"."scopeKey") = 0`}
+      AND (setweight(to_tsvector('english', coalesce("cloth"."title", '')), 'A') ||
+           setweight(to_tsvector('english', coalesce("cloth"."description", '')), 'B')) @@ q.query
+    ORDER BY rank DESC, "cloth"."updatedAt" DESC
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
+  // Projections — Title, One-line, Description — under the same rules as
+  // cloths: unindexed on purpose (a handful of rows per user; an index would
+  // be a migration), and single-reading scopeKeys only, because the whole
+  // weave was ruled out of the app (2026-08-11) and a whole-weave projection
+  // has no surface at all — a hit must never be a door to a room that
+  // does not exist.
+  const mapScope = courseId
+    ? sql`("map"."courseId" = ${courseId} OR "map"."courseId" IS NULL)`
+    : sql`"map"."courseId" IS NULL`
+  const mapResult = await db.execute(sql`
+    WITH q AS (SELECT websearch_to_tsquery('english', ${query}) AS query)
+    SELECT "map"."id", "map"."scopeKey" AS "sourceId", "map"."name",
+           ts_headline('english', coalesce(nullif("map"."read", ''), nullif("map"."essence", ''), "map"."name"), q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           ts_rank(
+             (setweight(to_tsvector('english', coalesce("map"."name", '')), 'A') ||
+              setweight(to_tsvector('english', coalesce("map"."essence", '')), 'B') ||
+              setweight(to_tsvector('english', coalesce("map"."read", '')), 'C')),
+             q.query
+           ) AS rank
+    FROM "map", q
+    WHERE "map"."userId" = ${userId} AND ${mapScope}
+      ${sourceId
+        ? sql`AND "map"."scopeKey" = ${sourceId}`
+        : sql`AND "map"."scopeKey" <> '' AND position(',' IN "map"."scopeKey") = 0`}
+      AND (setweight(to_tsvector('english', coalesce("map"."name", '')), 'A') ||
+           setweight(to_tsvector('english', coalesce("map"."essence", '')), 'B') ||
+           setweight(to_tsvector('english', coalesce("map"."read", '')), 'C')) @@ q.query
+    ORDER BY rank DESC, "map"."updatedAt" DESC
+    LIMIT ${MAX_LOOM_HITS}
+  `)
+
+  return {
+    concepts: (conceptResult.rows as { id: string; label: string; sourceId: string | null; snippet: string }[]).map((r) => ({
+      id: r.id, label: r.label, sourceId: r.sourceId ?? null, snippet: r.snippet,
+    })),
+    linkLabels: (linkResult.rows as { id: string; label: string; uses: number | string; sourceId: string | null; snippet: string }[]).map((r) => ({
+      id: r.id, label: r.label, uses: Number(r.uses ?? 0), sourceId: r.sourceId ?? null, snippet: r.snippet,
+    })),
+    links: (edgeResult.rows as { id: string; handle: string | null; fromLabel: string; toLabel: string; sourceId: string | null; snippet: string }[]).map((r) => ({
+      id: r.id, handle: r.handle ?? "", fromLabel: r.fromLabel, toLabel: r.toLabel,
+      sourceId: r.sourceId ?? null, snippet: r.snippet,
+    })),
+    passages: (passageResult.rows as { id: string; sourceId: string | null; source: string | null; snippet: string }[]).map((r) => ({
+      id: r.id, sourceId: r.sourceId, source: r.source ?? "", snippet: r.snippet,
+    })),
+    cloths: (clothResult.rows as { sourceId: string; title: string; snippet: string }[]).map((r) => ({
+      sourceId: r.sourceId, title: r.title, snippet: r.snippet,
+    })),
+    projections: (mapResult.rows as { id: string; sourceId: string; name: string; snippet: string }[]).map((r) => ({
+      id: r.id, sourceId: r.sourceId, name: r.name, snippet: r.snippet,
+    })),
+  }
+}
+
 /**
  * Search one reading's pages, in page order — this is "find in the text",
  * so the results read like the text does, not like a rank.
@@ -230,18 +576,25 @@ export async function searchReading(sourceId: string, rawQuery: string): Promise
       ORDER BY p."pageNumber", p."createdAt" DESC
     )
     SELECT h."pageNumber",
-           ts_headline('english', p."textContent", q.query, ${HEADLINE_OPTIONS}) AS snippet
+           ts_headline('english', p."textContent", q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           -- How many marked words the page really holds. length-of-difference
+           -- over the fully-marked text: one StartSel per match, so the count
+           -- is exact without shipping the marked page back.
+           (length(ts_headline('english', p."textContent", q.query, ${COUNT_OPTIONS}))
+            - length(replace(ts_headline('english', p."textContent", q.query, ${COUNT_OPTIONS}), ${SNIPPET_OPEN}, '')))
+           / ${SNIPPET_OPEN.length} AS matches
     FROM hits h
     JOIN "source_page" p ON p."id" = h."id", q
     ORDER BY h."pageNumber"
     LIMIT ${MAX_PAGE_HITS + 1}
   `)
 
-  const rows = result.rows as { pageNumber: number; snippet: string }[]
+  const rows = result.rows as { pageNumber: number; snippet: string; matches: unknown }[]
   return {
     hits: rows.slice(0, MAX_PAGE_HITS).map((row) => ({
       pageNumber: row.pageNumber,
       snippet: row.snippet,
+      matches: Number(row.matches) || 0,
     })),
     truncated: rows.length > MAX_PAGE_HITS,
   }

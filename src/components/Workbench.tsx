@@ -1,25 +1,32 @@
 "use client"
 
-// The workbench for one scope — a reading, or the whole weave.
+// The workbench for one reading. Since 2026-08-11 that is the only scope
+// there is: the whole weave went out of the app with its route.
 //
-// Reading-first (docs/reading-scope-and-map-passes.md §A.1): the shelf is the
+// Reading-first (docs/archive/reading-scope-and-map-passes.md §A.1): the shelf is the
 // home screen and this is what opens when you pick a reading off it, so the
-// 01-04 sequence runs INSIDE a text rather than across the course. `04 Map`
-// is honest per reading now that placement is per-map (maps carry their own
-// tiers): a reading's map sorts only against that reading's concepts.
+// 01-04 sequence runs INSIDE a text rather than across the course. The
+// Knowledge Graph (station 03; internal key `map`) is honest per reading now
+// that placement is per-map (maps carry their own tiers): a reading's map
+// sorts only against that reading's concepts.
 
-import { useState } from "react"
+import { useCallback, useState, useEffect, useMemo } from "react"
 import Link from "next/link"
+import HomeIcon from "@/components/ui/HomeIcon"
+import SignedOutWelcome from "@/components/ui/SignedOutWelcome"
 import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import OpenTab from "@/components/tabs/OpenTab"
 import ThrowTab from "@/components/tabs/ThrowTab"
-import ReadTab from "@/components/tabs/ReadTab"
+import VocabularyTab from "@/components/tabs/VocabularyTab"
 import MapTab from "@/components/tabs/MapTab"
-import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import JourneyNav, { type Station } from "@/components/ui/JourneyNav"
-import type { Byte } from "@/lib/types"
+import StationSearch from "@/components/ui/StationSearch"
+import SaveLight from "@/components/ui/SaveLight"
+import Identity from "@/components/ui/Identity"
+import type { Passage } from "@/lib/types"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
 
@@ -36,20 +43,20 @@ export type WorkbenchSource = {
   hasFile: boolean
 }
 
-export type Tab = "reading" | "open" | "throw" | "read" | "map"
+// 2026-08-08 (TJ): "reading" IS the merged station — the text and the capture
+// log in one place (model §3 tab 2), where 00 Reading and 01 Open used to be
+// two. `?tab=open` still lands here; the URL params are legacy per §F.
+export type Tab = "reading" | "throw" | "read" | "map"
 
-const FOOT: Record<Tab, [string, string]> = {
-  reading: ["00 — READING", "THE TEXT ITSELF"],
-  open: ["01 — OPEN", "LAY THE WARP"],
-  throw: ["02 — THROW", "ONE THREAD AT A TIME"],
-  read: ["03 — READ", "PULL A THREAD"],
-  map: ["04 — MAP", "THE CARD TABLE"],
-}
+// The footer's two halves used to be this table — the station's name and a
+// gloss on it, e.g. "01 — READING" / "THE TEXT AND YOUR CAPTURES". Both
+// restated the journey bar directly above. Since 2026-08-17 the footer carries
+// identity on the left and the reading on the right, which is what the
+// removed scope bar used to say and what nothing else says now.
 
 /** The journey station each workbench tab sits at. */
 const STATION_OF: Record<Tab, Station> = {
-  reading: "readings",
-  open: "open",
+  reading: "open",
   throw: "throw",
   read: "read",
   map: "map",
@@ -58,22 +65,74 @@ const STATION_OF: Record<Tab, Station> = {
 /**
  * Tabs that stay mounted once visited, hidden by `.panel`'s display rule, the
  * way v14 kept every panel in the DOM. These hold work in progress — a
- * half-typed throw sentence, the traced prompt on Read — which unmounting
- * destroys. The whole workbench is keyed by scope at the route level, so those
- * drafts belong to one reading and cannot follow the student into another.
+ * half-typed throw sentence, a half-typed passage — which unmounting destroys.
+ * The whole workbench is keyed by scope at the route level, so those drafts
+ * belong to one reading and cannot follow the student into another.
+ *
+ * `reading` is in the set for the capture side; the PdfViewer inside it is
+ * still mounted only while the tab is active, because it is heavy and its
+ * position is restored from `pdfPage` anyway.
  */
-const KEEP_ALIVE: ReadonlySet<Tab> = new Set<Tab>(["open", "throw", "read", "map"])
+const KEEP_ALIVE: ReadonlySet<Tab> = new Set<Tab>(["reading", "throw", "read", "map"])
+
+export type WorkbenchFocus = {
+  /** A concept's label — pre-fills Vocabulary's concept filter. */
+  concept?: string
+  /** A Link Label — pre-fills Vocabulary's label filter. */
+  label?: string
+  /** A passage id — slides Your work out on its row. */
+  passage?: string
+  /** A projection id — selects it on the Knowledge Graph. */
+  projection?: string
+  /** Open the cloth's own fold at the head of Your work. */
+  cloth?: boolean
+  /**
+   * A PDF page to land on — the last hop for a search hit that matched the
+   * text itself rather than a card. Validated at the route: a positive
+   * integer or nothing, never a number the viewer has to defend against.
+   */
+  page?: number
+}
 
 export default function Workbench({
   source,
   initialTab,
   initialSearch,
+  focus,
+  practice = false,
+  isPreviewDeployment = false,
 }: {
-  source: WorkbenchSource | null
-  /** Landing tab for journey deep links (`/weave?tab=map`); validated below. */
+  /**
+   * The reading this workbench is for. Not nullable since 2026-08-11: the
+   * whole weave was the only caller that passed null, and TJ retired it —
+   * "poorly defined and not supported in the course". A student works in a
+   * text, and every scope in the app is now one.
+   */
+  source: WorkbenchSource
+  /** Landing tab for a deep link (`?tab=map`); validated below. */
   initialTab?: Tab
   /** A shelf-search hit's query, carried into the reading's own search. */
   initialSearch?: string
+  /**
+   * Where inside the landing station to go — see the route's own note. Read
+   * once, on arrival: it describes the trip in, not a state to keep in sync.
+   */
+  focus?: WorkbenchFocus
+  /**
+   * The practice loom (`/sandbox`): the same workbench, wrapped in
+   * `SandboxLoomProvider` so nothing is written. Two things must change here,
+   * and both are about honesty rather than capability — a standing band that
+   * says nothing is kept, and no search field, because search is the one
+   * control on this page that reads the student's REAL loom straight from the
+   * server and would show their actual work inside a practice space.
+   */
+  practice?: boolean
+  /**
+   * Whether this is a branch preview, where GitHub sign-in cannot work — the
+   * signed-out welcome branches on it (SignedOutWelcome). Server-derived
+   * (isBranchPreview) and passed down, like the Shelf's.
+   */
+  isPreviewDeployment?: boolean
 }) {
   // `status`, not just `session`: next-auth reports "loading" on every hard
   // load while it fetches /api/auth/session, and during that window `session`
@@ -82,41 +141,231 @@ export default function Workbench({
   // milliseconds before the workbench appeared.
   const { data: session, status } = useSession()
   const { isLoading, scoped } = useLoom()
-  const tabs: Tab[] = source
-    ? (source.hasFile ? ["reading", "open", "throw", "read", "map"] : ["open", "throw", "read", "map"])
-    : ["throw", "read", "map"]
-  const firstTab: Tab =
-    initialTab && tabs.includes(initialTab)
-      ? initialTab
-      : tabs.includes("open")
-        ? "open"
-        : "throw"
+  // Tab order follows the journey bar: Knowledge Graph (03) before Vocabulary
+  // (04). The keys are legacy — `map` is the graph, `read` is Vocabulary.
+  // Memoised because the practice guide's station listener depends on it —
+  // a fresh array each render would tear the listener down and rebuild it on
+  // every keystroke anywhere in the workbench.
+  const tabs = useMemo<Tab[]>(() => ["reading", "throw", "map", "read"], [])
+  // `?tab=open` predates the merge and is still in links and bookmarks.
+  const requested = (initialTab as string) === "open" ? "reading" : initialTab
+  const firstTab: Tab = requested && tabs.includes(requested as Tab) ? (requested as Tab) : "reading"
   const [activeTab, setActiveTab] = useState<Tab>(firstTab)
-  const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([firstTab]))
-  const [pdfPage, setPdfPage] = useState(1)
-  const [pdfFocusByteId, setPdfFocusByteId] = useState<string | null>(null)
-  const [openTargetByteId, setOpenTargetByteId] = useState<string | null>(null)
 
-  const goTo = (tab: Tab) => {
+ const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>([firstTab]))
+  // Seeded from the trip in, so a search hit on p. 10 opens ON p. 10 rather
+  // than on p. 1 with the query marked somewhere below the fold. Read once,
+  // like every other focus: it describes the arrival, not a state to keep in
+  // sync — the reader's real position is livePdfPage below.
+  const [pdfPage, setPdfPage] = useState(focus?.page ?? 1)
+  const [pdfFocusPassageId, setPdfFocusPassageId] = useState<string | null>(null)
+  // Where the reader actually is, which is not the same as `pdfPage` — that
+  // one is an instruction TO the viewer ("go here"), this is a report FROM it.
+  // Kept apart on purpose: feeding the report back in as the instruction lets
+  // a stale render drag the reader back a page.
+  const [livePdfPage, setLivePdfPage] = useState(1)
+  const handlePageChange = useCallback((n: number) => setLivePdfPage(n), [])
+  /**
+   * Seeded from the trip in: a search hit naming a passage lands ON its row
+   * (TJ, 2026-08-13). An INITIAL VALUE, not an effect — `focus` describes the
+   * arrival, so there is nothing to synchronise afterwards, and setting it from
+   * an effect is the cascading-render trap this file warns about above.
+   * OpenTab clears it through `onFocusHandled` once it has scrolled there.
+   */
+  const [openTargetPassageId, setOpenTargetPassageId] = useState<string | null>(focus?.passage ?? null)
+  /** The mirror, for a margin badge: open Your work AT a concept. */
+  const [openTargetConceptId, setOpenTargetConceptId] = useState<string | null>(null)
+  // `searchOpen` lived here to drive the standing band and its narrow-screen
+  // toggle. StationSearch owns its own open state now — the panel belongs to
+  // the button, and nothing else on this surface needs to know.
+  // Your work — this reading's Capture Log — as a sheet over the text. Closed
+  // by default: reading is what the station is for, and a student who has not
+  // captured anything does not need a panel over the page. It is handed to the
+  // viewer rather than rendered beside it (see PdfViewer's `workPanel`),
+  // because it has to travel with the reading into fullscreen — which is
+  // position:fixed with its own stacking context, and swallowed the old rail
+  // whole. A reference-only reading has no text to lie over, so its capture
+  // side is the whole panel.
+  // Open on arrival when a hit named something INSIDE it: a passage's row, or
+  // a cloth whose Title and Description sit in a fold at its head. Beside a PDF
+  // this is a sheet that starts closed, so opening the fold alone would open it
+  // inside something nobody can see.
+  const [workOpen, setWorkOpen] = useState(!!(focus?.passage || focus?.cloth))
+  // Stable identity: PdfViewer's window keydown effect takes this as a dep,
+  // and an inline arrow re-bound the reading's whole keyboard every render.
+  const toggleWork = useCallback(() => {
+    setPdfFocusPassageId(null)
+    setWorkOpen((v) => !v)
+  }, [])
+
+  const goTo = useCallback((tab: Tab) => {
     setActiveTab(tab)
     setVisited((seen) => (seen.has(tab) ? seen : new Set(seen).add(tab)))
-  }
+  }, [])
 
-  const shouldRender = (tab: Tab) => (KEEP_ALIVE.has(tab) ? visited.has(tab) : activeTab === tab)
+  /**
+   * Reading focus (TJ, 2026-08-17): with the text open, the station is the
+   * text. The app header and the footer stand down; the journey bar and the
+   * viewer's own toolbar are what remain, because those two still do work
+   * here. The scope bar is not conditional — it is gone from every station.
+   *
+   * Only where there is a PDF to fill the room. A reading with no file is a
+   * card whose station is mostly empty, and stripping the chrome off an empty
+   * room leaves nothing at all.
+   *
+   * The footer is this component's to withhold, just below. The header belongs
+   * to the root layout, so it goes through a body attribute and one rule in
+   * globals.css — the same mechanism, from the far side of the tree.
+   *
+   * It runs on every activeTab change rather than only on entry, and the
+   * cleanup removes the attribute, so leaving 01 restores the chrome even if
+   * the component never unmounts.
+   */
+  // The session term is load-bearing: signed out, the workbench renders the
+  // sign-in welcome — and the header, which this attribute hides, carries the
+  // other door. A session that "timed out" mid-reading used to reload into
+  // "Please sign in to continue" with the header stood down: a sentence and
+  // no way back in (TJ, 2026-08-20 — the sign-outs themselves are session
+  // rows dying with a reseeded tester DB branch; the configured lifetime is
+  // next-auth's 30-day rolling default, which an active student never hits).
+  // `status !== "unauthenticated"` rather than `!!session`, so the signed-in
+  // majority's hard load keeps the header down through the session fetch
+  // instead of flashing it; the show lands only on the rare signed-out load,
+  // where a visible header is the destination anyway (review, 2026-08-20).
+  const readingFocus = activeTab === "reading" && source.hasFile && status !== "unauthenticated"
+  useEffect(() => {
+    if (!readingFocus) return
+    document.body.setAttribute("data-reading-focus", "")
+    return () => document.body.removeAttribute("data-reading-focus")
+  }, [readingFocus])
 
-  // Inside a reading, "goto" is a tab away rather than a page away: the text is
-  // already open in this workbench.
-  const handleGotoByte = (byte: Byte) => {
-    if (!source?.hasFile) return
-    setPdfPage(byte.pageNumber && byte.pageNumber > 0 ? byte.pageNumber : 1)
-    setPdfFocusByteId(byte.id)
+  // The practice guide moves the student between stations as its beats change.
+  // An event rather than a prop: the guide renders below this component's own
+  // chrome, and threading a setter down through it would put the workbench's
+  // tab state in the hands of something that is not a tab.
+  useEffect(() => {
+    if (!practice) return
+    const onStation = (e: Event) => {
+      const wanted = (e as CustomEvent).detail
+      if (typeof wanted === "string" && (tabs as string[]).includes(wanted)) {
+        // Through `goTo`, not `setActiveTab`: a kept-alive tab renders only
+        // once it has been VISITED, so setting the active tab alone switched
+        // the underline and left the station blank.
+        goTo(wanted as Tab)
+      }
+    }
+    // The guide also turns the page. Its "highlight a passage" beat cannot
+    // teach anything on a cover, and `Oh, the Places You'll Go!` opens on two
+    // of them — so the guide asks for one of the example's own passages and
+    // the viewer lands on the page it was taken from, marked.
+    const onFocus = (e: Event) => {
+      const id = (e as CustomEvent).detail
+      if (typeof id === "string") setPdfFocusPassageId(id)
+    }
+    window.addEventListener("loom:practice-station", onStation)
+    window.addEventListener("loom:practice-focus", onFocus)
+    return () => {
+      window.removeEventListener("loom:practice-station", onStation)
+      window.removeEventListener("loom:practice-focus", onFocus)
+    }
+  }, [practice, tabs, goTo])
+   const shouldRender = (tab: Tab) => (KEEP_ALIVE.has(tab) ? visited.has(tab) : activeTab === tab)
+
+  // Since the merge, "goto" is not a tab away at all — the text and your work
+  // are the same station, so this only moves the page under the reader. It
+  // also sends the sheet back: you asked to see the passage in its page, and a
+  // sheet over the right third of that page is not showing it to you.
+  // Go to the passage in the text. Your work STAYS OUT (TJ, 2026-08-12: "why
+  // does the 'my work' panel disappear?" — "no, just dont close it"). It used
+  // to `setWorkOpen(false)` here, on the assumption that the sheet covers the
+  // passage; the sheet is a card inset in the top-right corner, sized to clear
+  // most of a two-page spread, so the panel vanished whether or not it was in
+  // the way. Where it does overlap, the student can close it themselves — the
+  // toggle is right there, and it is their call rather than ours.
+  const router = useRouter()
+  const handleGotoPassage = (passage: Passage) => {
+    /* A CITATION CAN POINT AT ANOTHER READING. 04 · Vocabulary is the
+       loom-wide station — "your vocabulary is across all readings" (TJ,
+       2026-08-18) — so a passage under a concept there may belong to a text
+       that is not open. That is a different ROUTE, not a different page
+       number: `?passage=` is already a first-class deep link on the reading
+       page, read into `focus.passage`, so the hop lands on the passage rather
+       than on the reading's first page. */
+    if (passage.sourceId && passage.sourceId !== source.id) {
+      router.push(`/reading/${passage.sourceId}?passage=${passage.id}`)
+      return
+    }
+    if (!source.hasFile) return
+    setPdfPage(passage.pageNumber && passage.pageNumber > 0 ? passage.pageNumber : 1)
+    setPdfFocusPassageId(passage.id)
     goTo("reading")
   }
 
-  const handleGotoOpenByte = (byteId: string) => {
-    setOpenTargetByteId(byteId)
-    goTo("open")
+  // A capture just landed, or somebody pressed "In your work" on a highlight:
+  // slide the sheet out ON it, rather than leaving them to wonder where it
+  // went. The sheet is already mounted, so the row it scrolls to has a real
+  // layout box the instant this fires.
+  const handleGotoOpenPassage = (passageId: string) => {
+    setOpenTargetConceptId(null)
+    setOpenTargetPassageId(passageId)
+    setWorkOpen(true)
+    goTo("reading")
   }
+
+  // A margin badge names a concept, so it lands on that concept's row. Clearing
+  // the other target matters: both are read by the same panel, and two live
+  // targets would race to decide which view it opens in.
+  const handleGotoOpenConcept = (conceptId: string) => {
+    setOpenTargetPassageId(null)
+    setOpenTargetConceptId(conceptId)
+    setWorkOpen(true)
+    goTo("reading")
+  }
+
+  // Stable identity again: OpenTab's focus effect lists this in its deps and
+  // the sheet is mounted permanently now, so an inline arrow re-ran that
+  // effect on every Workbench render while a target was set.
+  const handleFocusHandled = useCallback(() => {
+    setOpenTargetPassageId(null)
+    setOpenTargetConceptId(null)
+  }, [])
+
+  /**
+   * A PAIR PICKED ON 03's CLOTH, ARRIVING AT 02's BENCH (TJ, 2026-08-18: "a
+   * select 2 nodes and throw them which would put you in linking with the 2
+   * concept nodes populating the 'throw a thread'").
+   *
+   * LIFTED STATE, NOT A URL PARAM, and the split this file already draws is
+   * the reason. `handleGotoPassage` above does both in one function: a passage
+   * in ANOTHER reading is `router.push(?passage=…)`, because that is a
+   * different route; a passage in THIS one is local state plus `goTo`. Every
+   * in-workbench station hop takes the second road — this, the two
+   * `handleGotoOpen*` above, `handleGotoVocabulary` — because the stations are
+   * this component's tabs and moving between them is not a navigation.
+   *
+   * 03 → 02 is always the same reading, so it is the second case. Two facts
+   * settle it beyond consistency. `initialTab` seeds `useState` and nothing
+   * syncs it, and `<Workbench>` is keyed by `source.id`, so a same-route push
+   * would re-render the server component without remounting this one and the
+   * station would not change. And a page reading `searchParams` is rendered
+   * dynamically (Next 16 docs, use-search-params.md; `staleTimes.dynamic`
+   * defaults to 0 and is unset in next.config.ts), so every such push is a
+   * server round-trip — against TJ's "navigate to 02 immediately".
+   *
+   * A FRESH TUPLE EVERY PRESS, and that is load-bearing: ThrowTab consumes the
+   * pair by IDENTITY, so pressing the popup twice on the same two concepts
+   * loads the bench twice, while merely walking back into 02 leaves whatever
+   * the student has picked since alone.
+   */
+  const [benchPair, setBenchPair] = useState<readonly [string, string] | null>(null)
+  const handleThrowPair = useCallback((fromId: string, toId: string) => {
+    setBenchPair([fromId, toId])
+    goTo("throw")
+  }, [goTo])
+
+  // "See them all in Vocabulary", from the capture side. The tab is this
+  // component's state, so it has to be moved from here.
+  const handleGotoVocabulary = useCallback(() => goTo("read"), [goTo])
 
   // Loading comes FIRST. Until next-auth has answered we do not yet know
   // whether anybody is signed in, and guessing "signed out" is the guess that
@@ -125,129 +374,224 @@ export default function Workbench({
     // The journey stays put while the loom loads: it is the one fixed thing
     // under the header, and blinking it out mid-load makes the app look like
     // it is rebuilding itself around you.
+    //
+    // It carries its handlers while loading too, and that matters more since
+    // 2026-08-09: a station with no handler now renders GREYED, so passing
+    // none here made every entry into a reading flash four unavailable
+    // stations before correcting itself — an outright lie, and a worse one
+    // than the plain links it used to draw. The tabs are local state, so the
+    // handlers are valid before any data arrives; only the content below is
+    // not ready.
     return (
       <>
-        <JourneyNav active={source ? STATION_OF[activeTab] : "weave"} />
+        <JourneyNav
+          active={STATION_OF[activeTab]}
+          onStation={Object.fromEntries(tabs.map((tab) => [STATION_OF[tab], () => goTo(tab)]))}
+        />
         <main>
           <div className="empty" style={{ marginTop: "100px" }}>
             <h2>Loading your loom...</h2>
           </div>
-          <FirstRunWalkthrough autoOpen={false} />
         </main>
       </>
     )
   }
 
   if (!session) {
+    // The same doors the Library offers, because this state is how an
+    // EXPIRED session looks from inside a reading: the reload lands back on
+    // /reading/[id] signed out. It used to render a sentence with no control
+    // — and the header, which holds the other sign-in button, was stood down
+    // by the reading-focus attribute above (now session-gated).
     return (
       <main>
-        <div className="empty" style={{ marginTop: "100px" }}>
-          <h2>Welcome to Loom.</h2>
-          <span className="cap">Please sign in to continue</span>
-        </div>
-        <FirstRunWalkthrough autoOpen={false} />
+        <SignedOutWelcome isPreviewDeployment={isPreviewDeployment} />
       </main>
     )
   }
 
   return (
     <>
-      <div className="scopebar">
-        <Link href="/" className="scopeback">‹ readings</Link>
-        {source ? (
-          <>
-            <span className="scopetitle">{source.title}</span>
-            {source.author ? <span className="scopemeta">{source.author}</span> : null}
-            <span className="scopemeta">
-              {scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} evidenced here
-              {scoped.bridges.length
-                ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out`
-                : ""}
-            </span>
-            {/* The library card used to carry this; the reading is the library
-                card now, so the affordance moves here rather than disappearing. */}
-            {source.hasFile ? (
-              <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>
-                Download PDF
-              </a>
-            ) : (
-              <span className="scopemeta scopedl">your own card — no pdf here</span>
-            )}
-          </>
-        ) : (
-          <>
-            <span className="scopetitle">Your whole weave</span>
-            <span className="scopemeta">every reading at once</span>
-          </>
-        )}
-      </div>
+      {/* THE SCOPE BAR IS GONE (TJ, 2026-08-17). It was a 46px band on every
+          station carrying the reading's title, its author, its tallies and
+          Download PDF. All four survive; none of them needed a band:
+
+            title, author, tallies → the footer, which was print restating the
+              journey bar ("01 — READING") and is now the only place either
+              fact is said;
+            Download PDF → the reader's own toolbar, beside the text it
+              downloads.
+
+          That is 46px back on every station, and one fewer horizontal rule
+          between the student and the words. */}
+
+      {/* The standing search band stood here, on every station, and the toolbar
+          above carried a toggle for it under 900px. Both are gone (TJ,
+          2026-08-13): the search is one button in the journey bar below, scoped
+          to the station showing. */}
 
       <JourneyNav
-        // Inside a reading the underline follows the tab; at the whole weave
-        // it stays on 05 — Weave, the journey phase this place IS, while
-        // throw/read/map act as its tools (the footer names the open one).
-        active={source ? STATION_OF[activeTab] : "weave"}
-        // In this workbench, the tabs are stations you can work at right here;
-        // Readings and Keep (and Open, at the whole weave) are elsewhere, so
-        // JourneyNav renders them as links. Inside a text, station 00 IS this
-        // reading, so its label goes singular.
-        labels={source?.hasFile ? { readings: "Reading" } : {}}
+        // The underline follows the open tab: in this workbench the stations
+        // ARE the tabs.
+        active={STATION_OF[activeTab]}
+        // In this workbench the tabs are stations you can work at right here;
+        // Library and Keep are elsewhere, so JourneyNav renders them as links.
+        // Since the merge, station 00 is always the Library — no relabelling.
         onStation={Object.fromEntries(
           tabs.map((tab) => [STATION_OF[tab], () => goTo(tab)])
         )}
+        /* Scope follows the station, never a toggle (TJ, 2026-08-13: "library
+           is your loom, vocabulary is your loom, all else this reading/cloth").
+           Vocabulary is the User's holdings across every reading — JourneyNav
+           calls it "UNSCOPED in the model" — so it searches the loom from
+           inside a text, while its neighbours search the text and the cloth
+           woven from it.
+
+           Not in the practice loom: ShelfSearch reads the student's REAL loom
+           over its own GET route, bypassing the provider, so it would show
+           their actual work inside a space that keeps nothing. */
+        search={practice ? undefined : (
+          <StationSearch
+            scope={activeTab === "read" ? "loom" : "reading"}
+            sourceId={activeTab === "read" ? undefined : source.id}
+          />
+        )}
+/* THE WAY OUT, right of the cloth search (TJ, 2026-08-19).
+           01 Reading stands the header down — the save light moved into this
+           bar on 2026-08-17 so it could — and the header is where Loom's name,
+           the menu, My Loom and About live. So inside a reading there is no
+           visible route to any of them: "someone looking at the journey bar in
+           reading would have no idea how to get to a place where they could see
+           about. thus the home logo".
+
+           `00 Library` is in this bar already, and does not do this job: it
+           reads as a station among stations, one more place in the journey
+           rather than the way back out of it. The house is the only thing here
+           that says "out, to where the app is".
+
+           A Link and not a button: it is a route, so it middle-clicks, opens in
+           a tab, and shows its target on hover like any other address. */
+        home={
+          <Link href="/" className="stationhome" aria-label="Library" data-tip="00 · Library">
+            <HomeIcon />
+          </Link>
+        }
+        // The save light rides here now the header can stand down (TJ,
+        // 2026-08-17). 01 is where capture happens and the highlight paints
+        // optimistically, so "saved" is the only word that says the mark is
+        // real — it cannot live on a band the reading station hides.
+        status={<SaveLight />}
       />
 
       {/* The text gets the room. On 00 the viewer manages its own scrolling
           and wants every pixel under the journey, so main stops padding and
           stops scrolling and simply hands over its height. Every other station
           is an ordinary scrolling page. */}
-      <main className={activeTab === "reading" ? "station-reading" : undefined}>
-        {source?.hasFile && (
+      {/* `station-work` widens the measure to 1680px (contracts.md §2c-iii):
+          these four stations are work surfaces, not prose, and the 1100px
+          reading measure was starving their columns on every screen bigger
+          than a 13" laptop. `station-reading` is the stronger case of the same
+          idea — the PDF takes the whole window and pads nothing. */}
+      <main className={activeTab === "reading" && source.hasFile ? "station-reading" : "station-work"}>
+        {(
           <div className={`panel ${activeTab === "reading" ? "active" : ""}`}>
-            {activeTab === "reading" && (
-              <PdfViewer
-                url={`/api/readings/${source.id}`}
-                sourceName={source.title}
-                sourceId={source.id}
-                initialPageNumber={pdfPage}
-                initialSearch={initialSearch}
-                focusByteId={pdfFocusByteId}
-                onGotoOpenByte={handleGotoOpenByte}
-                onClose={() => {
-                  setPdfFocusByteId(null)
-                  goTo("open")
-                }}
-              />
-            )}
-          </div>
-        )}
-        {source && (
-          <div className={`panel ${activeTab === "open" ? "active" : ""}`}>
-            {shouldRender("open") && (
-              <OpenTab
-                onGotoByte={handleGotoByte}
-                focusByteId={openTargetByteId}
-                onFocusHandled={() => setOpenTargetByteId(null)}
-              />
-            )}
+            {shouldRender("reading") &&
+              (source.hasFile ? (
+                // The merged station. The text holds the whole room; Your work
+                // slides over it. Nothing here reserves space for the sheet —
+                // the page NOT moving is the change (see globals.css).
+                activeTab === "reading" && (
+                  <PdfViewer
+                    url={`/api/readings/${source.id}`}
+                    sourceName={source.title}
+                    sourceId={source.id}
+                    initialPageNumber={pdfPage}
+                    initialSearch={initialSearch}
+                    focusPassageId={pdfFocusPassageId}
+                    onGotoOpenPassage={handleGotoOpenPassage}
+                    onGotoOpenConcept={handleGotoOpenConcept}
+                    onPageChange={handlePageChange}
+                    workOpen={workOpen}
+                    onToggleWork={toggleWork}
+                    workPanel={
+                      <OpenTab
+                        compact
+                        currentPage={livePdfPage}
+                        onGotoPassage={handleGotoPassage}
+                        focusPassageId={openTargetPassageId}
+                        focusConceptId={openTargetConceptId}
+                        onFocusHandled={handleFocusHandled}
+                        onGotoVocabulary={handleGotoVocabulary}
+                        openClothFold={focus?.cloth}
+                      />
+                    }
+                  />
+                )
+              ) : (
+                // A reference-only reading has no text to lie over, so the
+                // capture side is the whole station.
+                <OpenTab
+                  onGotoPassage={handleGotoPassage}
+                  focusPassageId={openTargetPassageId}
+                  focusConceptId={openTargetConceptId}
+                  onFocusHandled={handleFocusHandled}
+                  onGotoVocabulary={handleGotoVocabulary}
+                  openClothFold={focus?.cloth}
+                />
+              ))}
           </div>
         )}
         <div className={`panel ${activeTab === "throw" ? "active" : ""}`}>
-          {shouldRender("throw") && <ThrowTab />}
+          {shouldRender("throw") && (
+            <ThrowTab onGotoPassage={handleGotoPassage} pair={benchPair} />
+          )}
         </div>
         <div className={`panel ${activeTab === "read" ? "active" : ""}`}>
-          {shouldRender("read") && <ReadTab />}
+          {/* The station key stays "read" (and so does ?tab=read) — the URL
+              params are deliberately legacy per refactor spec §F. What it
+              renders is now the model's Vocabulary tab. */}
+          {shouldRender("read") && (
+            <VocabularyTab initialConceptFilter={focus?.concept} initialLabelFilter={focus?.label} onGotoPassage={handleGotoPassage} />
+          )}
         </div>
         <div className={`panel ${activeTab === "map" ? "active" : ""}`}>
-          {shouldRender("map") && <MapTab />}
+          {shouldRender("map") && (
+            <MapTab
+              practice={practice}
+              focusProjectionId={focus?.projection}
+              onThrowPair={handleThrowPair}
+            />
+          )}
         </div>
-        <FirstRunWalkthrough />
       </main>
 
-      <footer>
-        <span className="fl">{FOOT[activeTab][0]}</span>
-        <span className="fr">{FOOT[activeTab][1]}</span>
-      </footer>
+      {/* The footer says who you are and what you are reading (TJ,
+          2026-08-17). It used to say "01 — READING" and "the text and your
+          captures" — the station number the bar above already showed, and a
+          gloss on it. Both halves restated their neighbours.
+
+          Now it carries the two facts that lost their band when the scope bar
+          went: identity on the left, the reading on the right.
+
+          WITHHELD on the reading station, with the header. With the text open
+          the station is the text: the journey bar and the viewer's toolbar are
+          what remain. You do not need to be told which reading you are in
+          while you are looking at it. */}
+      {!readingFocus && (
+        <footer>
+          <Identity />
+          <span className="fr">
+            <span className="foottitle">{source.title}</span>
+            {source.author ? <span className="footmeta">{source.author}</span> : null}
+            <span className="footmeta">
+              {scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} evidenced here
+              {scoped.bridges.length
+                ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out`
+                : ""}
+            </span>
+          </span>
+        </footer>
+      )}
     </>
   )
 }

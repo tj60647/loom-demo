@@ -1,0 +1,133 @@
+/**
+ * The practice loom keeps nothing — asserted, not promised.
+ *
+ * `/sandbox` renders the REAL workbench over `SandboxLoomProvider`, whose one
+ * job is that no student gesture reaches the database. The whole guarantee
+ * rests on a negative: that provider must never gain a server call. A single
+ * `import { createConcept } from "@/actions/loom"` added there in six months —
+ * by someone fixing a bug, reasonably, in a file that looks like the real
+ * provider — turns a practice space into one that silently writes to a real
+ * student's loom. Nothing else in the build would notice: it type-checks, it
+ * renders, and the write succeeds.
+ *
+ * So this checks the negative directly. Cheap, and it fails at the commit
+ * rather than never.
+ *
+ * Run: npx tsx scripts/check-sandbox.ts   (part of `npm run check`)
+ */
+import { readFileSync } from "node:fs"
+
+let failures = 0
+let checks = 0
+
+function ok(label: string) {
+  checks++
+  console.log(`  ok    ${label}`)
+}
+
+function fail(label: string, detail: string) {
+  checks++
+  failures++
+  console.log(`  FAIL  ${label}\n        ${detail}`)
+}
+
+function assert(condition: boolean, label: string, detail: string) {
+  if (condition) ok(label)
+  else fail(label, detail)
+}
+
+console.log("\nsandbox — the practice loom cannot write")
+
+const PROVIDER = "src/components/providers/SandboxLoomProvider.tsx"
+const src = readFileSync(PROVIDER, "utf8")
+
+// 1. No server actions, by any route in. `@/actions/*` is where every write
+//    lives; `"use server"` would make this file one itself.
+const actionImport = /from\s+["']@\/actions\//.test(src)
+assert(!actionImport, "imports no server action", `${PROVIDER} imports from @/actions — a gesture there would write to a real loom`)
+assert(!src.includes('"use server"'), "is not itself a server module", `${PROVIDER} declares "use server"`)
+
+// 2. No client read surface either. src/lib/reads.ts GETs the student's real
+//    rows; showing those inside the practice loom would be the same leak
+//    wearing a different hat.
+assert(
+  !/from\s+["']@\/lib\/reads["']/.test(src),
+  "reads none of the student's real rows",
+  `${PROVIDER} imports @/lib/reads — the practice loom would show real work`
+)
+
+// 3. No raw transport. An action is the ordinary way to write, not the only
+//    conceivable one.
+assert(!/\bfetch\s*\(/.test(src), "makes no fetch call", `${PROVIDER} calls fetch directly`)
+assert(!/navigator\.sendBeacon/.test(src), "sends no beacon", `${PROVIDER} calls sendBeacon`)
+
+// 4. The seam it depends on must stay exported, or the sandbox silently falls
+//    back to the REAL provider's context — every write suddenly real, with no
+//    error anywhere.
+const real = readFileSync("src/components/providers/LoomProvider.tsx", "utf8")
+assert(
+  /export const LoomContext\b/.test(real),
+  "LoomContext is exported for the sandbox to supply",
+  "LoomProvider no longer exports LoomContext — SandboxLoomProvider cannot override it"
+)
+assert(
+  /export interface LoomContextType\b/.test(real),
+  "LoomContextType is exported, so drift breaks the build",
+  "LoomProvider no longer exports LoomContextType — the sandbox would drift silently"
+)
+
+// 5. The notice is the safety argument; it must be standing, not a toast, and
+//    it must cover BOTH stages — the shelf as well as the workbench.
+const workbench = readFileSync("src/components/Workbench.tsx", "utf8")
+const sandboxWorkbench = readFileSync("src/components/SandboxWorkbench.tsx", "utf8")
+assert(
+  sandboxWorkbench.includes("practiceband"),
+  "the practice notice still renders, over both stages",
+  "SandboxWorkbench no longer renders .practiceband — a student cannot tell practice from data loss"
+)
+// The station's search slot must be EMPTY in practice: `StationSearch` reads
+// the student's real loom over its own GET route, bypassing the provider, so
+// it would show their actual work inside a space that keeps nothing.
+//
+// Asserted on the slot rather than on a conditional's shape. This guard read
+// `{!practice && (` until 2026-08-15 and went on passing while that form lived
+// anywhere in the file — then failed the day the slot became a ternary, with
+// the withholding still perfectly in place. What matters is that `search` is
+// handed `undefined` when practising, however that is spelled.
+assert(
+  /search=\{\s*practice\s*\?\s*undefined\s*:/.test(workbench)
+    || /\{!practice && \(\s*<StationSearch/.test(workbench),
+  "search is withheld in practice",
+  "Workbench hands the station a search slot in the practice loom — StationSearch reads the student's real rows"
+)
+
+// 6. The worked cloth arrives as a PROP, built on the server (2026-08-11).
+//    This is the seam most likely to be "simplified" by someone who notices
+//    the provider could just read the pages itself — which would put a
+//    database read inside the one file whose whole guarantee is that it has
+//    none. The build must fail on that, not the code review.
+const practice = readFileSync("src/lib/practiceCloth.ts", "utf8")
+assert(
+  !/from\s+["']@\/db["']/.test(practice) && !/from\s+["']@\/actions\//.test(practice),
+  "the practice cloth is built from pages handed to it, not fetched",
+  "src/lib/practiceCloth.ts reads the database — it is imported across a client boundary and must stay pure"
+)
+assert(
+  /initial\?: LoomState/.test(src) && /useState<LoomState>\(\(\) => initial \?\? blank\(\)\)/.test(src),
+  "the sandbox seeds its state from that prop, once",
+  `${PROVIDER} no longer takes the worked cloth as a prop — either the example is gone, or it is being fetched somewhere it must not be`
+)
+
+// 7. The practice loom must be reachable from anywhere (TJ, 2026-08-11: "the
+//    guide should always be available, like the tutorials in any game").
+//    Without the header link it is reachable only by typing the URL, which is
+//    how it sat unvisited from the day it was built.
+const header = readFileSync("src/components/ui/Header.tsx", "utf8")
+assert(
+  /href="\/sandbox"/.test(header),
+  "the header carries a door to the practice loom, on every page",
+  "src/components/ui/Header.tsx no longer links to /sandbox — the guide would be reachable only by typing the URL"
+)
+
+console.log(`\n${checks} checks, ${failures} failing\n`)
+if (failures > 0) process.exit(1)

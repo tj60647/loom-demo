@@ -32,7 +32,7 @@ type UploadCallbacks = {
     bytes across. What the resulting blob is REGISTERED as differs. */
 async function sendToBlob(file: File, callbacks: UploadCallbacks) {
   // Checked here as well as in the token route and again on the stored blob.
-  // Failing before the bytes move is faster and explains itself; the
+  // Failing before the passages move is faster and explains itself; the
   // server-side checks are what actually enforce it.
   if (file.size > MAX_READING_BYTES) throw new ReadingTooLargeError(file.size)
 

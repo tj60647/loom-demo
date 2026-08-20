@@ -17,14 +17,15 @@
    away. tab 00 gets back the steady full-height reading area it had when the
    viewer was a fixed takeover, without taking the nav away with it. */
 html{height:100%}
-body{background:radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/26px 26px,var(--paper);
+body{background:var(--paper);
   color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;
   height:100dvh;overflow:hidden;display:flex;flex-direction:column}
 header,.scopebar,nav{flex:0 0 auto}
 /* min-height:0 or a flex item refuses to shrink below its content and the
    scroll silently moves back to the document. */
 main,.adminshell{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
-/* Admin pages split the shell: AdminNav (tabs + course picker) is pinned, and
+/* Admin pages split the shell: AdminNav (the course/section picker; the tabs
+   left for the journey bar's staff group on 2026-08-09) is pinned, and
    .adminbody below it owns the scroll, so where you are and which course you
    are in never scroll away. The shell must not scroll itself or the nav would
    ride along with the page. */
@@ -40,30 +41,229 @@ h1,h2,h3{font-family:var(--display);font-weight:500;margin:0}
 .cap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--grey)}
 header{border-bottom:1px solid var(--rule);padding:10px 26px 8px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--paper)}
 .wordmark{font-family:var(--display);font-size:24px;font-weight:600;line-height:1;display:flex;align-items:center;gap:9px}
-.wordmark small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);font-weight:400;margin-top:3px}
+/* The tagline sits BESIDE the name, not under it (TJ, 2026-08-17). Stacked,
+   the mark was 36px — 24px of "Loom" over a 9px line plus its 3px gap — and
+   since the mini buttons came down to 25px the mark was the only thing left
+   setting the header's height. Beside it, the mark is as tall as its own
+   largest type and the header loses 12px on every page.
+   Baseline, not centre: the tagline is a subtitle to the name and reads as
+   one line of type with it, which centring would not give. */
+.wordmark > div{display:flex;align-items:baseline;gap:9px;white-space:nowrap}
+.wordmark small{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);font-weight:400}
 header .spacer{flex:1}
 header .field{display:flex;flex-direction:column;gap:3px}
 header input{font-family:var(--body);font-size:15px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:5px 8px;color:var(--ink)}
-.btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:none;border-radius:3px;padding:7px 11px;cursor:pointer}
-.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
-.btn.mini{font-size:11px;padding:7px 10px;letter-spacing:.05em;min-height:36px}
-.btn:disabled{opacity:.35;cursor:default} .btn:hover:not(:disabled){opacity:.88}
+/* The border is TRANSPARENT, never absent (TJ, 2026-08-13, on the reading's
+   search button: "it does change the layout of the row for some reason"). A
+   button that toggles .ghost — search, Your work, anything with an on state —
+   went from `border:none` to `border:1px`, and box-sizing:border-box does not
+   save an auto-width control: its width is content + padding + border, so the
+   box grew 2px every time it opened and nudged the whole row. Same box in both
+   states; only the colour changes. */
+.btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:1px solid transparent;border-radius:3px;padding:7px 11px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
+/* No min-height (TJ, 2026-08-17). It was 36px, and on an 11px label that is
+   ~7px of empty box above and below the words — which is why every place that
+   cared had already opted out: `.btn.compact` exists only to undo it, the
+   reading toolbar overrode it to get from 63px to 35px, and the workbench
+   footer overrode it again to stop being taller than the band it replaced.
+   Three opt-outs and no opt-ins is a default that is wrong.
+   Released here instead, so the header, the journey bar's search and every
+   mini button elsewhere are sized by their own padding: 25px, not 36. Loom is
+   a desktop tool (AGENTS.md) — there is no touch target to protect. */
+.btn.mini{font-size:11px;padding:5px 10px;letter-spacing:.05em}
+/* A label is one line. Without this a long one wraps inside its own box and
+   the button becomes twice as tall as its neighbours — "download the kit
+   .json" and "download the kit .md" were 38px in a row of 25s, for no reason
+   a reader could see. A control that is wider than its column should overflow
+   its column, not grow downward: the row it sits in is the thing being
+   measured. */
+.btn{white-space:nowrap}
+/* An icon-only button is SQUARE (TJ, 2026-08-17). `.btn.mini` is padded
+   5px 10px, which is right under a word and wrong under a glyph: it drew a
+   lozenge around a square icon. Equal padding and a 1:1 ratio put the four
+   corners of the drawing an equal distance from the four sides of the box. */
+/* An icon-only button is SQUARE and has no box (TJ, 2026-08-17). `.btn.mini`
+   is padded 5px 10px, which is right under a word and wrong under a glyph —
+   it drew a lozenge around a square icon. And the border was drawing a box
+   around a drawing that already has its own edges: two frames, one control.
+   So: equal padding, 1:1, no rule, no fill. The glyph is the button.
+   It runs quieter than the ink around it and comes up to full strength on
+   hover, which is the whole of its answer to the mouse now that there is no
+   border to darken. Placed after the .btn hover rules on purpose — same
+   specificity, so source order is what decides. */
+.btn.iconly{padding:4px;aspect-ratio:1;display:inline-flex;align-items:center;justify-content:center;
+  border-color:transparent;background:transparent;color:var(--ink-soft)}
+.btn.iconly:hover:not(:disabled){background:transparent;border-color:transparent;color:var(--ink)}
+/* The icon buttons are a CLUSTER, not three more items on the header's 16px
+   gap (TJ, 2026-08-17). That gap is sized for bordered buttons with words in
+   them; between three borderless glyphs it read as three unrelated controls
+   that happened to be near each other. Pulled to ~6px they read as one group,
+   which is what they are. The first selector covers the menu, whose button is
+   wrapped in a positioned div for its panel. */
+header .headermenu + .btn.iconly,
+header .btn.iconly + .btn.iconly{margin-left:-10px}
+.btn:disabled{opacity:.35;cursor:default}
+/* HOVER (TJ, 2026-08-17). Every button used to answer the mouse with
+   `opacity:.88` — a 12% fade, identical on a solid button and a ghost one, and
+   on this paper it reads as "slightly further away" rather than "you are on
+   it". A control should say it is a control before you press it.
+   So each kind gets the move that suits its own construction:
+     - a SOLID button lifts off the ink it is made of;
+     - a GHOST button fills, and its rule darkens to ink — the box does not
+       change size, because the border is already there in both states (see
+       the note above .btn);
+     - a PRESSED control (aria-pressed, .active) is already carrying the ink,
+       so it has nothing to fill and only lifts.
+   Colour, not opacity: a faded control on a textured ground reads as
+   disabled, which is the one thing hover must never say. */
+.btn{transition:background-color .12s ease,border-color .12s ease,color .12s ease}
+.btn:hover:not(:disabled){background:#2d2b26}
+.btn.ghost:hover:not(:disabled){background:var(--paper-2);border-color:var(--ink);color:var(--ink)}
+.btn:active:not(:disabled){transform:translateY(.5px)}
+/* The journey's own stations. They are type on paper, not boxes, so the move
+   is the ink coming up to full strength — the same signal the active station
+   already uses, at half its weight. */
+nav .station{transition:color .12s ease,border-color .12s ease}
+nav .station:not(.off):not(.active):hover{color:var(--ink);border-bottom-color:var(--rule)}
+nav .station.staff:not(.active):hover{border-bottom-color:var(--sage)}
+/* `.act` is the same idea outside the journey — a quiet inline verb. */
+.act{transition:color .12s ease}
+.act:hover{color:var(--ink)}
+/* A control's label is not prose. Without this, every button, tab and
+   disclosure in the app drag-selects and double-click-highlights like body
+   text, which reads as "this is content" exactly where it should read as
+   "this is a thing you press" — and a mis-drag on a card leaves half the
+   action row highlighted. Selection stays on for anything a reader might
+   legitimately want to copy: page text, transcriptions, tooltips, hints. */
+.btn,.act,summary,nav .station{-webkit-user-select:none;user-select:none}
 #saveDot{font-family:var(--mono);font-size:10px;color:var(--ink-soft);align-self:center}
 nav{display:flex;border-bottom:1px solid var(--rule);padding:0 26px;background:var(--paper-2);flex-wrap:wrap}
-nav button,nav a.station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:11px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
-nav button.active,nav a.station.active{color:var(--ink);border-bottom-color:var(--ochre)}
+/* `.station`, not `a.station`: a station with nowhere to go is a <span>
+   (JourneyNav's READING_ONLY) and must keep the same padding and rhythm as
+   the links beside it, or the greyed ones run together.
+
+   `.station`, not `nav button` either. This bar carries a button that is NOT a
+   station since 2026-08-13 — the station's search — and the bare element
+   selector was dressing it as an 18px display-font tab. Every station form
+   (button, link, inert span) carries the class, so the class is the rule. */
+/* 7px, not 11px (TJ, 2026-08-17): the station names are 18px display type in
+   a bar whose whole job is to be always in view, and 22px of padding around
+   them was more air than the words. The horizontal 16px stays — that is the
+   gap BETWEEN stations, and closing it would run the journey together. */
+nav .station{font-family:var(--display);font-size:18px;background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:7px 16px;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
+nav .station.active{color:var(--ink);border-bottom-color:var(--ochre)}
+/* A station with nowhere to go (JourneyNav's READING_ONLY, TJ 2026-08-09).
+   Still drawn and still numbered — the arc is meant to be visible whole — but
+   quieter than a link and not interactive. Not `disabled`, because it is not a
+   control that happens to be off; it is a place you are not standing near.
+   cursor:default rather than not-allowed: nothing is forbidden here, there is
+   simply no text open yet. */
+nav .station.off{color:var(--dot);cursor:default;text-decoration:none}
+/* The staff group: the same bar, pushed to the right, in its own colour
+   (TJ, 2026-08-09). Sage rather than the journey's ink/ochre, because these
+   are a different KIND of thing — not steps in the arc a student walks, which
+   is also why they carry no numbers. margin-left:auto does the pushing, so the
+   group falls in under the stations rather than overlapping them when the bar
+   wraps on a narrow screen. */
+nav .staffgroup{margin-left:auto;display:flex;align-items:stretch;flex-wrap:wrap}
+/* Tighter than a journey station: there are six of them, and at 1440px — an
+   ordinary laptop — the bar wrapped to two rows, which costs 47px of height on
+   the reading station, where height is worth the most. Still comfortably above
+   a thumb target because .station keeps its 11px vertical padding. */
+nav .station.staff{color:var(--sage);font-size:14.5px;padding-left:11px;padding-right:11px}
+nav .station.staff:hover{color:var(--ink)}
+nav .station.staff.active{color:var(--sage);border-bottom-color:var(--sage)}
+
+/* A button that reads as prose. Used where the action is a tab change the
+   Workbench owns, so it cannot be an <a> — see OpenTab's "see them all in
+   Vocabulary". */
+.linkish{background:none;border:none;padding:0;font:inherit;color:var(--ochre);
+  text-decoration:underline;cursor:pointer}
+.linkish:hover{opacity:.8}
+nav .station.off .step{color:var(--dot)}
 nav .step{font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-right:7px;color:var(--grey)}
-nav button.active .step,nav a.station.active .step{color:var(--ochre)}
+nav .station.active .step{color:var(--ochre)}
 /* Full-bleed so the scrollbar rides the window edge rather than the edge of a
-   centred column; the 1100px measure is kept by padding instead of max-width. */
-main{padding:24px max(26px,calc((100% - 1100px)/2)) 86px;margin:0}
+   centred column; the measure is kept by padding instead of max-width.
+
+   The measure is a VARIABLE, not a constant (TJ, 2026-08-12 — the standard is
+   contracts.md §2c-iii). 1100px is a reading measure and was applied to every
+   station, which froze 02's three columns at 348px on a 13" laptop and on a
+   27" monitor alike. Prose keeps it; work surfaces raise it. */
+main{padding:24px max(26px,calc((100% - var(--measure,1100px))/2)) 86px;margin:0}
+/* The workbench stations (01–04). Three columns come out at ~530px each here —
+   the width each card had when this station was two columns. */
+main.station-work{--measure:1680px}
 .panel{display:none} .panel.active{display:block}
 /* 00 · Reading hands its whole height to the viewer, which scrolls itself.
    No padding, no page scroll — the text is the thing on this station. */
+/* THE STATION DOES NOT SCROLL; ITS COLUMNS DO (TJ, 2026-08-18: "the main
+   window should not scroll, that the warp, throw a thread, and threads in this
+   reading cards all fit in the window, and they may have panels that scroll",
+   and "same with vocabulary").
+
+   Two things scrolled at once before this. Measured at 1280x800: the station
+   was 707px tall against 845px of content — 138px of it, and 86px of that is
+   `main`'s own bottom padding (line 193) — while each column ALSO scrolled
+   inside a `.scrollbox` whose height is a fixed clamp (238), 52vh here,
+   independent of the room actually available. So the page scrolled to reveal
+   boxes that were themselves scrolling.
+
+   The arrangement is the one 01 · Reading already uses two rules below: the
+   panel takes the station's height, the grid takes what the header leaves, and
+   each scrollbox takes what its own column head leaves.
+
+   `:has()` keeps this off 03 · Knowledge Graph, whose panel is a board and not
+   a column grid — it opts in by containing `.three` or `.two`, so nothing else
+   on the station has to know about it. */
+main.station-work:has(> .panel.active > .three, > .panel.active > .two){
+  overflow:hidden;padding-bottom:24px}
+main.station-work > .panel.active:has(> .three, > .two){
+  display:flex;flex-direction:column;height:100%;min-height:0}
+main.station-work > .panel.active > .three,
+main.station-work > .panel.active > .two{flex:1 1 auto;min-height:0}
+main.station-work > .panel.active > .three > *,
+main.station-work > .panel.active > .two > *{
+  display:flex;flex-direction:column;min-height:0}
+/* The box gives up its clamp and takes the room its column has left. */
+main.station-work > .panel.active > .three .scrollbox,
+main.station-work > .panel.active > .two .scrollbox{
+  flex:1 1 auto;min-height:120px;max-height:none}
+/* The bench is the one column with no scrollbox — its tail is `.sleeper`, the
+   sentence field and the throw controls, 460px of it measured at 1280x800
+   against a column with 588px to give. It takes the remainder and scrolls
+   itself, like the boxes beside it; without this the whole station scrolled by
+   131px at the desktop floor and nowhere above it, which is the worst kind of
+   layout bug to catch by eye. */
+main.station-work > .panel.active > .three > #throwBench > .sleeper{
+  flex:1 1 auto;min-height:0;overflow-y:auto}
 main.station-reading{padding:0;overflow:hidden}
 main.station-reading>.panel.active{height:100%}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:28px}
-@media(max-width:860px){.two{grid-template-columns:1fr}}
+/* Both grids fold on the COLUMN's own minimum, not on a device width
+   (contracts.md §2c-iii). `auto-fit` collapses the empty tracks, so N children
+   make at most N columns — two cards stay two columns however wide the page
+   is, and become one when 360px each stops fitting. The media queries that
+   used to do this by guessing at a viewport are gone: this station's content
+   box is not the window (Your work slides over the text), so a viewport query
+   was asking the wrong element how much room there is. */
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:28px}
+/* 02 · Linking is three moves, so it is three columns (TJ, 2026-08-12): the
+   warp you pick from, the bench you throw at, and what you have thrown. */
+.three{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:28px}
+
+/* 03's projections: 1–2–1, because the board is the surface you work ON and
+   the sort list and the read are texts flanking it (TJ, 2026-08-12). An
+   explicit 1fr/2fr/1fr cannot fold itself the way `auto-fit` does, so the fold
+   is a CONTAINER query — the grid's own width, not the window's, which is the
+   rule in §2c-iii and matters here because the station's content box is not
+   the viewport. The breakpoint is the sum of the three minimums, not a device. */
+.projwrap{container-type:inline-size}
+.projgrid{display:grid;gap:28px;
+  grid-template-columns:minmax(260px,1fr) minmax(420px,2fr) minmax(260px,1fr)}
+@container (max-width:1060px){
+  .projgrid{grid-template-columns:1fr}
+}
 .card{border:1px solid var(--rule);border-radius:4px;padding:18px;background:rgba(255,255,255,.5)}
 .card h2{font-size:21px;margin-bottom:2px} .card h2 .n{font-family:var(--mono);font-size:11px;color:var(--grey);font-weight:400;letter-spacing:.08em}
 .card .hint{color:var(--ink-soft);font-size:14px;margin:2px 0 14px}
@@ -71,7 +271,12 @@ main.station-reading>.panel.active{height:100%}
 textarea,.form-row input,.tinput{width:100%;font-family:var(--body);font-size:15px;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:8px;color:var(--ink)}
 textarea{min-height:62px;resize:vertical;line-height:1.45}
 .mono-in{font-family:var(--mono);font-size:13px}
-.scrollbox{max-height:380px;overflow:auto;border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.55)}
+/* Height tracks the WINDOW, not a constant (contracts.md §2c-iii): vertical is
+   the scarcer axis on a desktop, and a fixed 380px was too tall at the 1280×800
+   floor and far too short on a 1440-tall monitor. Floored so a short window
+   still shows a list, capped so a very tall one does not run a single column
+   the length of the page. */
+.scrollbox{max-height:clamp(320px,52vh,620px);overflow:auto;border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.55)}
 .empty{padding:26px 14px;text-align:center}
 .empty .cap{display:block;margin-top:9px}
 .quietrow{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dotted var(--rule)}
@@ -86,6 +291,226 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .ladder summary{cursor:pointer;color:var(--ochre);font-family:var(--mono);font-size:11px;letter-spacing:.04em}
 .ladder ul{margin:7px 0 0;padding-left:18px} .ladder li{margin-bottom:3px}
 .ladder .eg{font-style:italic}
+/* What Your work is made of (TJ, 2026-08-09, amended 2026-08-12): concepts in
+   this reading · concepts with no evidence · your passages with no label yet.
+   Headings, not steps — the same weight for each, no numbering, no counts of
+   one against another, nothing that would read as an order to work through.
+   (The fourth group, "in your other readings", is gone: a roll-call of every
+   concept from every other text, in the panel that is meant to be this
+   reading's own work. Vocabulary holds that view.) */
+/* Two-state switch, the same shape the reading toolbar uses for its layout
+   (TJ, 2026-08-17: "maybe like this in the panel"). One segmented-control
+   pattern in the app, not two — `.pdf-modes` is scoped inside PdfViewer's
+   styled-jsx, so this is its twin for anything outside the viewer. */
+.segmented{display:inline-flex;background:var(--paper);border-radius:4px;
+  padding:1px;border:1px solid var(--rule);margin:0 0 12px}
+.segmented .btn{border:none;margin:0;padding:4px 10px}
+/* The passage view's own rows: the note you wrote, and the concepts it
+   evidences as removable chips. */
+/* A passage that leads somewhere says so on hover (TJ, 2026-08-17: the first
+   attempt was "to subtle" — and it was white-on-white, since the card under it
+   is already rgba(255,255,255,.5)).
+   Paper-2 is a real step down from the card, and the ochre rule down the left
+   is the highlight's own colour: the same mark the passage wears on the page,
+   and the same edge the margin card carries. It says "this is that passage"
+   rather than merely "you are hovering something". */
+/* The add-a-concept field, wherever it appears: a label saying what a concept
+   is, then the input and its button on one line. */
+.addconcept{margin-top:9px}
+.addconcept .label{display:block;margin-bottom:4px}
+.addconcept .quietrow{margin-top:0}
+.passage.isdoor{cursor:pointer;border-radius:3px;margin:-4px -6px;padding:4px 6px;
+  box-shadow:inset 0 0 0 0 var(--ochre);transition:background-color .12s ease,box-shadow .12s ease}
+.passage.isdoor:hover{background:var(--paper-2);box-shadow:inset 3px 0 0 0 var(--ochre)}
+.passage.isdoor:focus-visible{background:var(--paper-2);box-shadow:inset 3px 0 0 0 var(--ochre);outline:none}
+/* A passage row's blocks: note, concepts, then the one destructive control.
+   Each is labelled, so nothing has to be inferred from position. */
+.pblock{margin-top:10px}
+.pblock .label{display:block;margin-bottom:4px}
+/* The field's own label inside a block that already has one: quieter than the
+   block heading, and clear of the chips above it. */
+.addlabel{display:block;margin:9px 0 4px}
+.labelsay{text-transform:none;letter-spacing:0;color:var(--ochre)}
+/* A concept's gloss is prose up to 100 words (model §Concept), so it wraps.
+   It was a one-line input, which showed about eight of them. */
+.conceptdef{width:100%;font-family:var(--body);font-size:14px;line-height:1.45;
+  background:#fff;border:1px solid var(--rule);border-radius:3px;padding:6px 8px;
+  color:var(--ink);resize:vertical;min-height:40px}
+.passagenote-edit{width:100%;min-height:44px;font-family:var(--body);font-size:13.5px;
+  line-height:1.45;background:#fff;border:1px solid var(--rule);border-radius:3px;
+  padding:6px 8px;color:var(--ink);resize:vertical}
+.passagenote{font-size:13px;font-style:italic;color:var(--ink-soft);margin-top:5px;line-height:1.45}
+.passageconcepts{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.pchip{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.04em;border:1px solid var(--rule);border-radius:999px;padding:2px 5px 2px 8px;
+  background:rgba(255,255,255,.5)}
+.pchip-x{background:none;border:none;padding:0 2px;cursor:pointer;color:var(--grey);
+  font-size:12px;line-height:1;transition:color .12s ease}
+.pchip-x:hover{color:var(--red)}
+/* The + that opens an AddConceptCard, sitting in the chips row as one more
+   badge-sized target. Same shape and same act as the margin card's + — that
+   one is `.pdf-railcard-add`, declared in PdfViewer's own <style> block, which
+   only renders inside the viewer and so cannot reach Your work. Kept in step
+   by hand; the two are 18px dashed circles because a + that looks like one
+   thing beside the page and another in the panel is two controls to learn. */
+.pchip-add{background:none;border:1px dashed var(--rule);border-radius:999px;
+  width:18px;height:18px;line-height:1;padding:0;cursor:pointer;
+  color:var(--ink-soft);font-family:var(--mono);font-size:12px}
+.pchip-add:hover,.pchip-add:focus-visible{border-color:var(--ink);color:var(--ink)}
+.lgroup{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ochre);padding:14px 12px 5px;border-bottom:1px solid var(--rule)}
+/* An unlabeled capture. Not a concept row — it has no head, because there is
+   nothing folded under it — so it carries its own padding, and it borrows the
+   opened row's typography so a quote reads the same wherever your work shows
+   one. */
+/* YOUR WORK'S ROWS ARE CARDS (TJ, 2026-08-18: "the passages in the 'your work'
+   panel need to be clearly differentiated, perhaps a your work passage card is
+   needed, the same for concepts").
+
+   Measured before this rule, in the 460px sheet: passage rows ran 327-618px
+   tall and the only thing between one and the next was `.lrow`'s 1px dotted
+   line — while the `.quietrow` around the row's concept field drew an IDENTICAL
+   1px dotted line two-thirds of the way down each row. Interior and boundary
+   were the same mark, so a 5344px list read as one undifferentiated column.
+   That field is gone as of 2026-08-18 (a + and a card do the same act now), so
+   no `.quietrow` is rendered in here at all and the rules that suppressed it
+   went with it — but the boxes stay, because the row heights that made the
+   list unreadable have not changed.
+
+   Its own class, never a redefinition of `.lrow`: that class is shared with 04
+   Vocabulary's concept and link rows and two admin pages, and eleven spec files
+   bind to it. Applied by cards/PassageCard and cards/ConceptCard in edit mode,
+   so both of the panel's homes get it — the sheet and the full-page variant on
+   a reference-only reading.
+
+   The treatment is the margin rail card's, deliberately: a passage looks the
+   same beside the page as it does in the panel. Left border by object — the
+   highlight's yellow for a passage, ochre (the warp) for a concept. */
+.ywcard{background:var(--paper);border:1px solid var(--rule);
+  border-bottom:1px solid var(--rule);border-radius:4px;
+  box-shadow:0 1px 4px rgba(0,0,0,.06);margin:0 0 10px}
+.ywcard.ywpassage{border-left:3px solid rgba(255,204,0,.8)}
+.ywcard.ywconcept{border-left:3px solid var(--ochre)}
+/* The third object, and the palette had already named its colour: --sage is
+   "weft — beaten (distilled) threads" (line 8), the same green the cloth draws
+   a labelled arc in and the same one the legend teaches under it. Nothing is
+   invented here — ochre is the warp, sage is the weft, and the yellow is the
+   highlighter. */
+.ywcard.ywthread{border-left:3px solid var(--sage)}
+/* Concept cards tile, passage cards do not (TJ, 2026-08-18: "the concept cards
+   in the 'your work' panel can also lose the spacing between cards"). A
+   collapsed concept is one 40px line, so a 10px gap between each was more gap
+   than card and the list read as scattered rather than as a vocabulary. A
+   passage card is 300px+ and needs the air. */
+.ywcard.ywconcept{margin-bottom:0}
+.ywcard.ywconcept + .ywcard.ywconcept{margin-top:-1px}
+/* 02 · Linking's warp: the same card, in the warp's own register (TJ: "they
+   could be the same card with different color and formatting"). Bigger name,
+   because this column is scanned rather than read, and the picked state keeps
+   the inset ochre bar it always had. */
+/* .crow's own layout is neutralised, not deleted: six spec files select the
+   warp by that class, and the admin and faculty read-only views still use the
+   plain row. The card supplies the flex row and the padding through .lhead,
+   exactly as it does in Your work — otherwise .crow's own
+   display:flex;justify-content:space-between wraps the head and the evidence
+   tag sits against the name instead of at the right edge. */
+.crow.ywcard{display:block;padding:0;border-bottom:0}
+.ywcard.ywpick .lhead{cursor:pointer}
+/* SELECT loads the concept into the bench; the head opens the card. Two jobs,
+   two targets — the row used to do both with one tap, which is why a ● had to
+   exist to reach the card at all. The arrow points at the bench, which is to
+   the right of this column. */
+/* THE ROW'S RIGHT END. `align-self:stretch` with the head's padding cancelled
+   on that side is what makes it the full height of the row rather than a pill
+   floating in it; the left border is the only one it keeps, so it reads as the
+   row hinging rather than as a box sitting on top. The card's own radius is
+   4px, so the button's right corners take 3px — the inside of a 1px border. */
+.ywcard.ywpick > .lhead{padding-right:0}
+.cselect{flex:0 0 auto;align-self:stretch;display:flex;align-items:center;
+  justify-content:space-between;gap:5px;
+  /* ONE WIDTH FOR BOTH CAPTIONS (TJ, 2026-08-18: "the button size should not
+     change as text does so select and picked x should have same size button").
+     "SELECT" and "PICKED 1" are 6 and 8 mono characters, so the button grew
+     when you pressed it and the evidence count beside it jumped left. Sized to
+     the longer of the two and left there. */
+  min-width:92px;
+  background:none;border:0;border-left:1px solid var(--rule);border-radius:0 3px 3px 0;
+  padding:0 10px;margin:-9px 0;cursor:pointer;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;
+  /* A HINT OF OCHRE at rest (TJ, 2026-08-18), not only on hover: ochre is the
+     warp's colour and this button is the warp's one act, so the end of the row
+     should read as belonging to it before you touch it. Faint enough that the
+     picked state — a solid ochre fill — is still the loud one. */
+  background:rgba(168,132,63,.07);color:#8a7647}
+/* The ochre it always had (TJ liked it): ochre type on hover, ochre fill when
+   picked. What changed with the full-height button is that the outline became
+   the row's own edge, so the hover reads as a tint behind ochre text rather
+   than as a pill outlining itself. */
+.cselect:hover,.cselect:focus-visible{background:rgba(168,132,63,.18);color:var(--ochre)}
+.ywcard.ywpick.picked .cselect{background:var(--ochre);color:var(--paper);border-left-color:var(--ochre)}
+/* Open, the head is no longer the card's bottom edge, so the button squares
+   off with it. */
+.ywcard.ywpick.open .cselect{border-radius:0 3px 0 0}
+/* The opened warp card's body: the gloss and this reading's evidence, which is
+   what the ● used to show in a popover. */
+.ywcard.ywpick .cbody{border-left:0;margin:0;padding:0 12px 12px}
+.ywcard.ywpick .cbody .oconcept-def{font-size:13px;margin:0 0 8px}
+.ywcard.ywpick .clabel{font-size:16px}
+.ywcard.ywpick:hover{background:rgba(168,132,63,.08)}
+.ywcard.ywpick.picked{box-shadow:inset 3px 0 var(--ochre);background:rgba(168,132,63,.1)}
+/* "no evidence" is a designation, not a warning — so it is the quiet grey of
+   a count, never the red of a problem. It replaced a bare empty slot, which
+   read the same as a concept whose evidence is simply in another reading. */
+.pickedtag.noevidence{color:var(--ink-soft)}
+/* One piece of a concept's evidence, inside an opened concept card. Carried
+   three inline styles and no class until 2026-08-18. Dotted, not boxed: these
+   are parts of the card they sit in, not cards themselves — the card's own
+   border is what separates one concept from the next. */
+.ywevidence{margin-top:12px;padding-bottom:8px;border-bottom:1px dotted var(--rule)}
+/* "remove passage from concept" gets its own line (TJ, 2026-08-18). It sat
+   inline after the citation, so the one act on an evidence row that changes
+   anything read as part of the reference to the text it changes. */
+.ywevidence .src .rm-actions{display:block;margin:5px 0 0}
+.ywevidence:last-child{border-bottom:0;padding-bottom:0}
+/* A collapsed concept card is its head, so the head takes the card's corners
+   rather than sitting in a box with a gap around it. */
+.ywcard.ywconcept > .lhead{border-radius:3px}
+.ywcard.ywconcept.open > .lhead{border-radius:3px 3px 0 0}
+.lrow.loose{padding:10px 12px}
+.lrow.loose .passage{font-size:13.5px;margin:0 0 6px}
+.lrow.loose .src{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
+.lrow.loose .pnote{font-size:13px;font-style:italic;color:var(--ink-soft);margin:0 0 6px}
+/* A Concept with a Description and no Label (TJ, 2026-08-18: "a concept needs
+   either or both a description and a label"). Dark grey so it reads as an
+   absence rather than as somebody's chosen word. text-transform and
+   letter-spacing are reset because this string lands inside mono-uppercase
+   contexts too — .pchip (303), .ocard-chip (363) and .label (39) — where
+   "(UNLABELED CONCEPT)" would read as a heading rather than as a note.
+   Emitted only by ui/ConceptName.tsx; SVG sites set fill instead. */
+.unlabeled{color:var(--ink-soft);text-transform:none;letter-spacing:normal}
+
+/* A CONCEPT'S EVIDENCE IN 04, citation first. Each row is a `<details>`: the
+   summary is where the passage was taken from, and opening it shows the words.
+   Quiet rules between them rather than boxes — these are parts of the concept
+   card they sit in, not cards of their own. */
+.citelist{margin-top:10px}
+.citerow{border-top:1px dotted var(--rule);padding:6px 0}
+.citerow:last-child{border-bottom:1px dotted var(--rule)}
+.citerow > summary{cursor:pointer;list-style:none;font-family:var(--mono);font-size:10px;
+  color:var(--ink-soft);padding:2px 0}
+.citerow > summary::-webkit-details-marker{display:none}
+/* The marker is drawn, so it can turn without the row reflowing. */
+.citerow > summary::before{content:"▸";display:inline-block;width:11px;color:var(--dot)}
+.citerow[open] > summary::before{content:"▾";color:var(--ochre)}
+.citerow > summary:hover{color:var(--ochre)}
+.citerow .citewhere{font-style:normal}
+.citerow .passage{font-size:13px;line-height:1.5;margin:4px 0 6px 11px;color:var(--ink)}
+
+/* A card heading that carries an action at its right end — the + that coins a
+   concept ahead of its evidence, in the two stations where the form is behind
+   one rather than always on screen. */
+.cardhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+
 /* coding log */
 .lrow{border-bottom:1px dotted var(--rule)}
 .lhead{display:flex;gap:10px;align-items:baseline;padding:9px 12px;cursor:pointer}
@@ -94,6 +519,19 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .lhead .lconcept{font-size:15.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lhead .lsrc{font-family:var(--mono);font-size:10px;color:var(--ink-soft);white-space:nowrap}
 .lbody{padding:2px 12px 12px 22px;border-left:2px solid var(--rule);margin:0 12px 10px}
+/* THE OPENED CONCEPT CARD KEEPS ITS FULL WIDTH (TJ, 2026-08-18: "the concept
+   card formatting when open should be more like the warp version, i like that
+   there is little wasted space on either side of text, whereas the your work
+   version has all kinds of indentions").
+
+   `.lbody` was indented three times over — a 12px side margin, 12px of padding
+   and another 10px of left padding past a 2px rule — so an opened concept's
+   description and evidence sat ~36px in from a card edge that is itself inset
+   in a 460px sheet. The rule and the margins go; the padding matches the head
+   above it, which is what the warp card already does. Scoped to the card, so
+   04 · Vocabulary's rows and the two admin pages keep the indented `.lbody`
+   they were drawn for. */
+.ywcard.ywconcept > .lbody{border-left:0;margin:0;padding:0 12px 12px}
 .lbody .passage{font-size:13.5px;margin:4px 0 8px}
 .lbody .src{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
 .lbody .defrow{margin:7px 0 5px}
@@ -103,6 +541,76 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .rm:disabled{opacity:.45;cursor:not-allowed}
 .rm-actions button{font:inherit;color:inherit}
 /* concept palette — clean: just the label, with a picked tag */
+/* THE OBJECT CARDS (src/components/cards/) — one appearance per object,
+   wherever it appears, with editability a mode rather than a second card
+   (TJ, 2026-08-13). Two objects, not one: .oconcept is concept-first (an idea,
+   its evidence under it) and .opassage is passage-first (a quotation, the
+   concepts said about it) — "one is a passage with concept, the other is
+   concept with passages".
+
+   NO FIXED WIDTH AND NO px TYPE except where a step is the point. These sit in
+   a 380px sheet, a margin rail and a popover; sizes in `em` step with whatever
+   container they land in, which is what stops the card needing re-tuning per
+   home (and what went wrong in Your work before the scoped step-down). */
+.ocard{font-size:1em}
+.oconcept-def{margin:8px 0 0;font-size:.87em;line-height:1.5;color:var(--ink)}
+/* An absent description is ONE QUIET LINE, never a panel (TJ, 2026-08-18:
+   "the 'no working description' takes up more space than an actual
+   description, this should not be the case"). It was 71.5px against a real
+   description's 39px, measured in the warp at 1536 — and by accident, not by
+   design: `.empty` on its own is the app's centred empty-STATE panel
+   (padding:26px 14px, line 239), written for a whole region with nothing in
+   it, and this paragraph was collecting all 52px of its vertical padding and
+   its centring through a bare class-name collision. */
+.oconcept-def.empty{color:var(--ink-soft);font-style:italic;padding:0;text-align:left}
+.oconcept-note{margin:6px 0 0;font-size:.82em;line-height:1.45;color:var(--ink-soft)}
+.oconcept-evidence{margin-top:12px}
+.oconcept-evidence .lgroup{margin:0 0 6px;padding:0}
+.opassage{padding:8px 0;border-top:1px dotted var(--rule)}
+.opassage-text{margin:0;padding:0 0 0 9px;border-left:2px solid var(--rule);
+  font-size:.85em;line-height:1.5;color:var(--ink)}
+/* .opassage-note went with the passage note on 2026-08-18 (TJ: "the concept
+   card does not need to show the passage notes"). Nothing renders the class
+   now — kept as this line rather than deleted so the next reader knows the
+   note is deliberately absent from a concept's evidence, not forgotten. */
+.ocard-foot{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:5px}
+.ocard-where{font-family:var(--mono);font-size:.62em;letter-spacing:.05em;color:var(--ink-soft);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* .ocard-goto went with the separate "goto" button on 2026-08-18 — the
+   quotation is the door now, as it is everywhere else a Passage is drawn. */
+.opassage-text.isdoor{cursor:pointer;border-radius:3px}
+.opassage-text.isdoor:hover{background:rgba(168,132,63,.08)}
+.opassage-text.isdoor:focus-visible{outline:2px solid var(--ochre);outline-offset:2px}
+.ocard-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.ocard-chip{font-family:var(--mono);font-size:.6em;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ochre);border:1px solid var(--rule);border-radius:999px;padding:2px 7px}
+
+/* The warp's dot, and the card it opens. */
+.cdot{flex:0 0 auto;background:none;border:none;padding:0 2px;cursor:pointer;line-height:1;
+  font-size:9px;color:var(--dot);transition:color .12s}
+.cdot:hover,.cdot[aria-expanded="true"]{color:var(--ochre)}
+.cdot:focus-visible{outline:none;color:var(--ochre)}
+/* TOP LAYER, via popover="auto" — no z-index and no ancestor can reach it.
+   The first cut was position:absolute inside the warp and was invisible:
+   .scrollbox is overflow:auto and clipped it, while the scrollbox's stacking
+   context let its own scrim paint over it. Positioned from JS (placeCard), so
+   the UA's centring margin has to go. */
+.cpop{position:fixed;margin:0;inset:auto;width:320px;max-width:min(44vw,360px);
+  max-height:76vh;overflow-y:auto;
+  background:var(--paper);color:var(--ink);border:1px solid var(--ink);border-radius:6px;
+  box-shadow:0 12px 34px rgba(0,0,0,.22);padding:14px 16px 13px;font-size:15px}
+.cpop::backdrop{background:none}
+.cpop:not(:popover-open){display:none}
+.cpop .info-close{top:8px;right:8px}
+.cpop .lhead{padding:0 26px 0 0;cursor:default;align-items:baseline}
+.cpop .lhead:hover{background:none}
+/* The label ellipsises in a list row, where one line is the point. In a card
+   there is room, and a truncated concept name is the one thing this card
+   exists to show. */
+.cpop .lconcept{white-space:normal;overflow:visible;text-overflow:clip}
+.cpop-cost{margin:10px 0 0;padding-top:8px;border-top:1px solid var(--rule);
+  font-size:.72em;line-height:1.4;color:var(--ink-soft)}
+
 .crow{padding:10px 12px;border-bottom:1px dotted var(--rule);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;border-radius:4px}
 .crow:hover{background:rgba(168,132,63,.08)}
 .crow .clabel{font-size:16px}
@@ -136,12 +644,64 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 .readsas b{font-style:normal;color:var(--ink);font-weight:500}
 /* thread list */
 .thread{padding:11px 13px;border-bottom:1px dotted var(--rule)}
+/* AS A CARD (ThreadCard.tsx). The dotted separator is what a list of rows
+   wants and a card does not, so the card's own edge replaces it. `.ywcard`
+   supplies paper, the 1px rule, the radius and the shadow; `.ywthread` the
+   sage spine. Threads TILE, as concept cards do and passage cards do not: a
+   collapsed thread is two short lines, so a 10px gap between each was more gap
+   than card. */
+.thread.ywcard{border-bottom:1px solid var(--rule);margin-bottom:0}
+.thread.ywcard + .thread.ywcard{margin-top:-1px}
+/* A selectable card says so under the hand — /admin/aggregate's list, where
+   pressing a thread reads it out above. `.sel` keeps the red inset it has
+   always had: it is "the one selected thing", which is what the palette
+   reserves that colour for. */
+.thread.ispick{cursor:pointer}
+.thread.ispick:hover{background:rgba(111,125,92,.07)}
+.thread.ispick:focus-visible{outline:2px solid var(--sage);outline-offset:-2px}
 .thread.sel{box-shadow:inset 3px 0 var(--red);background:rgba(178,58,43,.05)}
-.thread .trip{font-size:15px}
+/* AS A CARD the spine itself turns, rather than a red bar being laid over the
+   sage one: two colours on one 3px edge read as a smudge, and the object's
+   colour and its state are not both edges. Red because that is what the
+   palette reserves — "the one selected thing" — and an open editor is exactly
+   that. */
+.thread.ywcard.sel{border-left-color:var(--red);box-shadow:0 1px 4px rgba(0,0,0,.06)}
+/* Direction, not a label. Quiet and unbordered on purpose: the bordered sage
+   pill beside it means BEATEN, so an arrow drawn in one would say a loose
+   thread had been labelled. */
+.thread .tarrow{font-family:var(--mono);font-size:12px;color:var(--grey)}
+/* The trip and the sentence ARE the card's head — `.sent` has to stay a direct
+   child of the root for three specs, so there is no wrapper to hang the
+   disclosure on and the two lines carry it between them. Hover on both, as
+   `.ywcard.ywpick .lhead` does for a concept. */
+.thread .trip.isopen,.thread .sent.isopen{cursor:pointer;border-radius:3px;
+  margin-inline:-4px;padding-inline:4px}
+.thread .trip.isopen:hover,.thread .sent.isopen:hover{background:rgba(111,125,92,.09)}
+.thread .trip.isopen:focus-visible{outline:2px solid var(--sage);outline-offset:1px}
+/* The opened body. `.defrow` and `.label`/`.labelsay` are the siblings' own —
+   a labelled field that commits on blur, which is how ConceptCard writes a
+   Description and PassageCard a Note. */
+.thread .tbody{margin-top:9px;padding-top:9px;border-top:1px dotted var(--rule)}
+.thread .tbody .defrow{margin:0 0 10px}
+.thread .tbody .defrow:last-child{margin-bottom:2px}
+.thread .tbody .label{display:block;margin-bottom:4px}
+.thread .tbody .chips{margin:2px 0 0}
+.threadlabel{width:100%;font-family:var(--body);font-size:14px;background:#fff;
+  border:1px solid var(--rule);border-radius:3px;padding:6px 8px;color:var(--ink)}
+/* The trip wraps as a row rather than one line: the card no longer truncates
+   its ends at 30 characters (the 02 column did), so two long concept names
+   have to be able to sit over two lines with the pill between them. */
+.thread .trip{font-size:15px;display:flex;flex-wrap:wrap;gap:4px 7px;align-items:baseline}
 .thread .v{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--sage);border:1px solid var(--sage);border-radius:10px;padding:1px 8px}
 .thread .v.loosev{color:var(--grey);border-color:var(--grey);border-style:dashed;font-style:italic}
 .thread .sent{font-size:13px;font-style:italic;color:var(--ink-soft);margin-top:4px}
-.thread .tmeta{font-family:var(--mono);font-size:10px;margin-top:6px;display:flex;gap:12px;align-items:center}
+/* Quieter still when there is nothing to quote — a state, not a quotation. */
+.thread .sent.empty{color:var(--grey)}
+/* Wraps as a row of whole phrases, never inside one: in a third of the width
+   "edit description" broke across two lines and read as two controls. */
+.thread .tmeta{font-family:var(--mono);font-size:10px;margin-top:6px;display:flex;
+  gap:6px 12px;align-items:center;flex-wrap:wrap}
+.thread .tmeta .act,.thread .tmeta .rm{white-space:nowrap}
 .pill{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:1px 7px;border-radius:9px}
 .pill.loose{color:var(--grey);border:1px dashed var(--grey)}
 .pill.beaten{color:var(--sage);border:1px solid var(--sage)}
@@ -150,11 +710,87 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 /* .act and .rm sit on <a>, <summary> and <button> alike; strip the native
    button chrome so the same word reads the same whatever the element. */
 button.act,button.rm{appearance:none;background:none;border:none;padding:0}
-/* weave */
+/* the cloth drawing and its sections (03 · Knowledge Graph; the "weave" label
+   this section wore named a station deleted 2026-08-11) */
+/* A station's own sections — 03 has two, the cloth you wove and the
+   projections you make of it (TJ, 2026-08-12). Louder than a card's heading,
+   quieter than the page title, and it carries the same `.n` gloss the cards
+   use so a section can say what it is without a paragraph. */
+.sectionhead{font-family:var(--display);font-size:20px;font-weight:600;margin:22px 0 12px;
+  padding-bottom:6px;border-bottom:1px solid var(--rule);
+  display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.sectionhead .n{font-family:var(--body);font-size:13.5px;font-weight:400;color:var(--ink-soft);letter-spacing:0}
 .mapbar{display:flex;gap:16px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
 .loosebanner{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);margin-bottom:10px}
-#mapWrap{border:1px solid var(--rule);border-radius:4px;background:radial-gradient(circle,var(--dot) 1px,transparent 1.4px) 0 0/22px 22px,#f4f2ec}
-#map{display:block;width:100%;height:400px;touch-action:none}
+/* Scrolls rather than clips: the cloth lays itself out to its container down
+   to 480px and stops there, so a narrower column gets a scrollbar instead of
+   losing the concepts at the right-hand end. */
+#mapWrap{border:1px solid var(--rule);border-radius:4px;overflow-x:auto;
+  background:#f4f2ec}
+/* user-select:none because SHIFT-CLICK is now a gesture on this drawing
+   (ClothReflection's pair). Shift-clicking a second concept extends the
+   browser's own text selection from the first, and the screenshot at 1536 was
+   two concept labels painted over in selection blue — the drawing looked
+   broken at exactly the moment the pick landed. The cloth is a picture; the
+   names it draws are readable in three other places. */
+#map{display:block;width:100%;height:400px;touch-action:none;user-select:none;-webkit-user-select:none}
+/* The pair's offer. TOP LAYER, via popover="auto" — #mapWrap directly above
+   is overflow-x:auto, so it would CLIP an absolutely-positioned card at its
+   own edges. That is not a prediction: clipping by an overflow ancestor is
+   half of what happened to 02's warp popover before this approach was taken
+   (the note in ClothReflection's placePop).
+
+   The other half of that story does NOT apply here, and this comment claimed
+   it did until it was checked: #mapWrap establishes no stacking context —
+   measured live at 1536, position:static, z-index:auto, no transform, filter,
+   opacity<1, isolation, contain or will-change, and no ancestor up to <html>
+   establishes one either. `overflow` alone makes a scroll container and a
+   block formatting context, neither of which is a stacking context. The top
+   layer is still the right answer; the clipping alone is reason enough.
+
+   Positioned from JS, so the UA's centring margin has to go. */
+.pairpop{position:fixed;margin:0;inset:auto;width:340px;max-width:calc(100vw - 24px);
+  /* The two names wrap and nothing truncates them — this is the one place the
+     pair is spelled out in full — so a card is as tall as its concepts are
+     long. The cap is what keeps a pathological pair inside the window. */
+  max-height:70vh;overflow-y:auto;
+  background:var(--paper);color:var(--ink);border:1px solid var(--ink);border-radius:6px;
+  box-shadow:0 12px 34px rgba(0,0,0,.22);padding:13px 15px 12px;font-size:15px}
+.pairpop::backdrop{background:none}
+.pairpop:not(:popover-open){display:none}
+/* `.pairpop .pairpop-x`, not the bare class: `.iconbtn` is defined further
+   down this file — grep it, do not trust a number here, because the number
+   this comment first carried was wrong the moment it shipped. It said 815; it
+   was 819, because four lines were added ABOVE it after the grep and before
+   the commit. Either way `.iconbtn` comes later at equal specificity, so it
+   wins, and the button goes back to the standing bordered circle. Measured on
+   the running app at 1536: with the bare-class version, 30x30 and a 1px
+   var(--rule) ring (rgb(203,199,186)); with this one, 22x22 and no border. */
+.pairpop .pairpop-x{position:absolute;top:6px;right:6px;width:22px;height:22px;
+  border:none;font-family:var(--mono);font-size:12px}
+/* Room for the ✕ on the first line, so a long concept name does not run under
+   it. The names wrap — this is the one place the pair is named in full, and a
+   truncated name is the thing the card exists to confirm. */
+.pairpop-pair{margin:0 22px 9px 0;font-size:15px;line-height:1.35}
+.pairpop-arr{font-family:var(--mono);color:var(--ochre);margin:0 6px}
+.pairpop-go{width:100%;text-align:center}
+/* The streamlined bench (2026-08-19). Wider than the offer it replaces,
+   because it now holds two named slots and a field rather than one line of
+   prose — and centred on the midpoint of the pair, so the transform that
+   used to hang it above a node is gone. */
+.pairpop-slots{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin:2px 0 10px}
+.pairpop-slot{display:flex;flex-direction:column;gap:2px;min-width:0;padding:6px 8px;
+  border:1px dashed var(--rule);border-radius:4px;background:var(--paper-2)}
+.pairpop-slot b{font-weight:600;overflow-wrap:anywhere}
+.pairpop-swap{display:flex;flex-direction:column;align-items:center;gap:3px}
+.pairpop-swap button{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;
+  background:none;border:1px solid var(--rule);border-radius:3px;padding:1px 6px;cursor:pointer;color:var(--ink-soft)}
+.pairpop-swap button:hover{border-color:var(--sage);color:var(--sage)}
+.pairpop-actions{display:flex;gap:8px;margin-top:8px}
+.pairpop-actions .btn{flex:1 1 0;justify-content:center}
+.pairpop .openchip{font-size:12px;padding:2px 8px}
+.pairpop textarea{width:100%;font-size:13px}
+.pairpop-note{margin:8px 0 0;font-size:.72em;line-height:1.4;color:var(--ink-soft)}
 .readitem{padding:10px 0;border-bottom:1px dotted var(--rule)}
 .readitem .trip{font-size:15px;margin-bottom:2px}
 .vpill{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--sage);border:1px solid var(--sage);border-radius:10px;padding:1px 8px}
@@ -166,18 +802,37 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
 .report .cap{display:block;margin:13px 0 3px;color:var(--ink-soft)}
 .report .line{font-size:14.5px;padding:1px 0}
 .report .ct{font-family:var(--mono);font-size:11px;color:var(--grey)}
-.bytequote{margin:5px 0 10px;padding-left:9px;border-left:2px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
-.bytequote .src{font-family:var(--mono);font-size:10px}
+.passagequote{margin:5px 0 10px;padding-left:9px;border-left:2px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+.passagequote .src{font-family:var(--mono);font-size:10px}
 .legend{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-top:8px;display:flex;gap:22px;flex-wrap:wrap}
 .legend .sw{display:inline-block;width:22px;height:0;border-top-width:2px;vertical-align:middle;margin-right:5px}
 /* footer rule, poster-style. pointer-events:none because a fixed full-width
    strip is a click shield over whatever scrolls beneath it — the shelf's
    file input sat under this band and "Choose file" silently did nothing.
    The footer is print, not controls, so clicks belong to the page below. */
-footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;gap:12px;
-  padding:9px 26px;border-top:1px solid var(--ink);background:var(--paper);z-index:5;pointer-events:none}
+footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:5px 26px;border-top:1px solid var(--ink);background:var(--paper);z-index:5;pointer-events:none}
 footer span{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
 footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
+/* The footer stopped being print on 2026-08-17: its left half carries the
+   signed-in name, the role badge and Sign out. pointer-events stays OFF on the
+   band — it is still a full-width strip over whatever scrolls beneath it, and
+   that is what silently ate the shelf's "Choose file" — and is handed back to
+   the one part that is now a control. */
+footer .footid{display:flex;align-items:center;gap:9px;pointer-events:auto}
+footer .fr{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end;min-width:0}
+/* The reading's own name reads as a title, not as another mono caption: it is
+   the one proper noun in the row. */
+footer .foottitle{font-family:var(--display);font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46ch}
+footer .footmeta{color:var(--ink-soft);white-space:nowrap}
+footer .footrule{width:1px;height:12px;background:var(--rule);display:inline-block;flex:none}
+footer .footid .label{letter-spacing:.1em}
+/* Reading focus (TJ, 2026-08-17): with the text open, the station is the text.
+   The header belongs to the root layout, so the workbench cannot withhold it
+   the way it withholds its own footer — it sets this attribute on <body>
+   instead and one rule does the work from the far side of the tree. */
+body[data-reading-focus] header{display:none}
 
 @media (max-width: 900px){
   header{padding:10px 14px 8px;gap:10px}
@@ -189,7 +844,7 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
     -webkit-overflow-scrolling:touch;
     scrollbar-width:thin;
   }
-  nav button{flex:0 0 auto}
+  nav .station{flex:0 0 auto}
   main{padding:18px 14px 20px}
   /* Static here, in flow under the content — it overlaps nothing, so it can
      take its clicks (and text selection) back. */
@@ -249,8 +904,74 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .iconbtn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .iconbtn:hover,.iconbtn:focus-visible{border-color:var(--ochre);color:var(--ochre);outline:none}
 .cloth-info-btn{flex:0 0 auto;margin-left:2px}
+/* THE CAPTURE CARD, slimmed 2026-08-18 and put in Your work's order (TJ: "the
+   capture passage card needs to keep its content but be slimmer. maybe the
+   order is as is in the your work passage card, and the same format").
+
+   It takes the sheet's type ladder rather than the reading prose's 17px base,
+   which it had been inheriting: measured, this card's content is 400px wide
+   against Your work's 396px, so the same object is at the same measure and the
+   sizes transplant without re-tuning. Scoped to .capturecard because the
+   `.yourwork` scope that defines that ladder cannot reach inside .info-scrim.
+
+   Before: 871px of content in a 734px box at 1536. The quotation was a
+   labelled, bordered panel (176.5px) and citation/location were two labelled
+   columns (82.5px); both are now the plain `.passage` + `.src` pair Your work
+   uses. Card padding 24 -> 16. ConceptNamingAssist is untouched at 248.5px —
+   TJ is keeping it, so the height came from around it. */
+.capturecard{padding:16px 16px 0}
+.capturecard h2{font-size:16px;margin:0 0 10px}
+.capturecard .passage{font-size:13.5px;line-height:1.5;margin:0 0 6px;
+  max-height:150px;overflow-y:auto}
+.capturecard .src{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
+/* The address line: the file position, under the citation it belongs to.
+   Quieter than the title above it, because it is the thing you read only
+   when you are checking where a capture came from. */
+.capturewhere{opacity:.8;letter-spacing:.02em}
+.capturecard .form-row{margin-bottom:0;margin-top:12px}
+/* The concept block is a disclosure, closed until asked for (CaptureFields).
+   The summary carries .label, so it already reads as the section heading it
+   replaced; these rules only make it look pressable and kill the browser's
+   default marker, which sits at a different baseline in every engine. */
+.captureconcept>summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:6px}
+.captureconcept>summary::-webkit-details-marker{display:none}
+.captureconcept>summary::before{content:"+";font-family:var(--mono);color:var(--ochre);font-size:12px;line-height:1}
+.captureconcept[open]>summary::before{content:"–"}
+.captureconcept>summary:hover{color:var(--ink)}
+.captureconcept[open]{display:flex;flex-direction:column;gap:4px}
+.capturecard input,.capturecard textarea{font-size:14px}
+.capturecard textarea{min-height:44px}
+/* The hint's 14px bottom margin was dead space under the citation cells it no
+   longer has; nothing in this card uses .hint now, but the rule is scoped in
+   case one returns. */
+.capturecard .hint{margin:2px 0 6px}
+/* Sticky so the commit cannot scroll away — measured at 1280x800, Save sat
+   191px below the visible bottom of the card, 388px with the naming ladder
+   open, against a comment promising it "must stay reachable". The card's
+   bottom padding lives here so the footer's background covers the content
+   passing under it. */
+/* HALF AND HALF (TJ, 2026-08-19: "let the cancel and save buttons split the
+   card"). Two equal targets rather than a right-aligned pair, because the two
+   acts are equal here: Cancel discards a capture that does not exist yet, and
+   Save keeps it — neither is the recovery from the other. It also gives the
+   rail card, which is narrow, two targets big enough to hit without aiming.
+   flex-basis:0 with flex:1, not width:50%: the gap is then taken out of the
+   halves rather than added to them, so the pair fills the card exactly.
+   Deliberately NOT the pattern for destructive confirms — those keep their
+   asymmetry, and the passage card's own "remove passage" is set apart on
+   purpose. */
+.capturefoot{position:sticky;bottom:0;display:flex;gap:10px;
+  margin-top:14px;padding:10px 0 16px;background:var(--paper);
+  border-top:1px solid var(--rule)}
+.capturefoot>.btn{flex:1 1 0;justify-content:center;text-align:center}
 .info-scrim{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:22px}
 .info-dialog{position:relative;max-width:520px;width:100%;background:var(--paper);border:1px solid var(--ink);border-radius:6px;box-shadow:0 18px 50px rgba(0,0,0,.3);padding:24px 26px 20px}
+/* The build stamp at the foot of the About card. Mono and quiet — it is the
+   one line in there not addressed to a student, so it sits below everything
+   and takes no attention it is not asked for. */
+.aboutbuild{margin:18px 0 0;padding-top:10px;border-top:1px solid var(--rule);
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--grey)}
 .info-dialog .info-k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ochre)}
 .info-dialog h2{font-family:var(--display);font-size:25px;font-weight:600;margin:6px 34px 8px 0}
 .info-dialog p{font-size:15.5px;line-height:1.5;margin:0 0 10px}
@@ -259,29 +980,60 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
 .info-dialog li b{font-weight:500;color:var(--ink)}
 .info-dialog .info-note{font-size:13.5px;color:var(--ink-soft);border-left:2px solid var(--ochre);padding-left:11px;margin:12px 0 16px}
 .info-close{position:absolute;top:12px;right:12px}
+/* About is the one info dialog with more than a screenful in it, so it scrolls
+   inside itself. Wider than the rest for the same reason. */
+.aboutbox{max-width:620px;max-height:84vh;overflow-y:auto}
+.aboutbox h3{font-family:var(--display);font-size:16px;font-weight:600;margin:20px 0 8px;
+  border-bottom:1px solid var(--rule);padding-bottom:4px}
 @media(max-width:560px){.info-dialog{padding:22px 20px 18px}.info-dialog h2{font-size:23px}}
-/* first-run walkthrough overlay */
-/* v14 used z-index:40, which was top of its stack. This app has overlays v14
-   never had (PDF viewer, capture modal, info dialogs, up to 10000), and the
-   walkthrough must sit above all of them. */
-.scrim{position:fixed;inset:0;background:rgba(26,25,22,.55);z-index:10001;display:none;align-items:center;justify-content:center;padding:22px}
-.scrim.show{display:flex}
-.guide{max-width:540px;width:100%;background:var(--paper);border:1px solid var(--ink);border-radius:6px;
-  box-shadow:0 18px 50px rgba(0,0,0,.3);padding:24px 26px 20px}
-.guide .gk{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ochre)}
-.guide h2{font-family:var(--display);font-size:25px;font-weight:600;margin:6px 0 8px;display:flex;align-items:center;gap:11px}
-.guide p{font-size:15.5px;line-height:1.5;margin:0 0 10px}
-.guide .gloom{font-size:13.5px;color:var(--ink-soft);border-left:2px solid var(--ochre);padding-left:11px;margin:12px 0}
-.guide .gnav{display:flex;justify-content:space-between;align-items:center;margin-top:18px;border-top:1px solid var(--rule);padding-top:14px}
-.guide .dots{display:flex;gap:6px}
-.guide .dot{width:7px;height:7px;border-radius:50%;background:var(--rule)}
-.guide .dot.on{background:var(--ochre)}
-.guide .skip{font-family:var(--mono);font-size:11px;color:var(--ink-soft);cursor:pointer;letter-spacing:.04em}
-/* 36px to match .btn.mini's min-height: the header is one row of equal
-   controls, and a smaller circle beside them read as a different species. */
-.helpbtn{font-family:var(--display);font-size:17px;background:none;border:1px solid var(--rule);border-radius:50%;
-  width:36px;height:36px;cursor:pointer;color:var(--ink-soft);line-height:1;align-self:center}
-.helpbtn:hover{border-color:var(--ochre);color:var(--ochre)}
+
+/* My Loom (Header) — the mirror and the exit. Scrolls inside itself like
+   About: a loom with twenty readings in it is longer than a screen, and the
+   start-over block must stay reachable at the bottom rather than clipped. */
+/* Desktop width, per contracts.md §2c-iii — this opened at 560px, which is
+   About's measure for a column of prose and wrong for what this dialog is.
+   The readings list is a two-column work surface (title, then its tally) and
+   at 560 every real title wrapped to two lines. The prose inside keeps its
+   own 60-75ch measure below rather than stretching with the box: the rule is
+   that prose holds a measure and work surfaces take the room. */
+.myloombox{max-width:820px;max-height:84vh;overflow-y:auto}
+.myloombox p,.myloombox .info-note{max-width:68ch}
+/* The panel takes focus on open (tabIndex -1) so the first Tab reaches Close
+   rather than the destructive button. No ring: the focus is programmatic and
+   the box is already the only lit thing on screen. */
+.myloombox:focus{outline:none}
+.myloombox h3{font-family:var(--display);font-size:16px;font-weight:600;margin:20px 0 8px;
+  border-bottom:1px solid var(--rule);padding-bottom:4px}
+.myloom-totals{list-style:none;padding:0;margin:12px 0 0;display:flex;flex-wrap:wrap;gap:6px 16px}
+.myloom-totals li{margin:0;font-size:14px;color:var(--ink-soft)}
+.myloom-totals b{font-family:var(--mono);font-size:15px;color:var(--ink);margin-right:4px}
+.myloom-readings{list-style:none;padding:0;margin:8px 0 0}
+.myloom-readings li{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+  margin:0;padding:6px 0;border-bottom:1px solid var(--rule)}
+/* The app's own link idiom (.linkish), not the browser's — a default blue
+   anchor was the one bit of this dialog that did not look like Loom. */
+.myloom-readings a{font-size:14.5px;color:var(--ochre);text-decoration:underline}
+.myloom-readings a:hover{opacity:.8}
+.myloom-readings small{font-family:var(--mono);font-size:11px;color:var(--ink-soft);
+  white-space:nowrap;flex:0 0 auto}
+/* The danger zone reads as a different room: ruled off, red-keyed, and last.
+   Nothing above it is a verb, so there is no chance of landing here by drift. */
+.myloom-danger{margin-top:22px;padding-top:4px;border-top:2px solid var(--red)}
+.myloom-danger h3{color:var(--red);border-bottom-color:var(--red)}
+.myloom-type{display:block;font-size:13.5px;color:var(--ink-soft);margin:0 0 12px}
+.myloom-type b{font-family:var(--mono);color:var(--ink)}
+/* Capped rather than full-width: the field takes two words, and a 770px input
+   for "start over" reads as a paragraph box and invites pasting into. */
+.myloom-type input{display:block;width:100%;max-width:320px;margin-top:5px;padding:7px 9px;
+  font-family:var(--mono);font-size:14px;border:1px solid var(--rule);border-radius:3px;
+  background:var(--paper);color:var(--ink)}
+.myloom-type input:focus-visible{outline:none;border-color:var(--red)}
+.myloom-actions{display:flex;gap:8px;justify-content:flex-end}
+.myloom-error{color:var(--red);font-size:13.5px}
+.myloom-hint{display:block;margin-top:6px;font-size:12.5px;color:var(--ink-soft)}
+/* The first-run walkthrough's scrim, panel and round "?" button lived here.
+   Retired 2026-08-11 with the deck itself — the guide walks the same moves in
+   the real interface (.guidepop, below) and About carries the overview. */
 /* One box model for header controls whatever the element (a, button):
    a bare <a class="btn"> otherwise top-aligns its text next to a <button>. */
 header .btn{display:inline-flex;align-items:center;justify-content:center}
@@ -297,11 +1049,12 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .trow.dragging{opacity:.42}
 .trow.dropbefore{box-shadow:inset 0 2px 0 0 var(--ochre)}
 .trow.dropafter{box-shadow:inset 0 -2px 0 0 var(--ochre)}
-/* Hover tips (ported from v14). Decorative by design: a ::after bubble is not
-   announced by screen readers and never appears on touch, so any control whose
-   tip carries information not already in its visible label needs that meaning
-   in the label or an aria-label — never in data-tip alone. Do not add `title`
-   alongside: the browser would draw its own bubble on top of this one. */
+/* Hover tips. Decorative by design: the bubble is aria-hidden and never
+   appears on touch or keyboard focus, so any control whose tip carries
+   information not already in its visible label needs that meaning in the label
+   or an aria-label — never in data-tip alone. Do not add `title` alongside:
+   the browser would draw its own bubble on top of this one. The drawing lives
+   in .tiplayer below, and the why in TipLayer.tsx. */
 /* Loom's confirm/alert (see DialogProvider). Sits on the same .info-scrim and
    .info-dialog as the tab info panels so overlays stay one visual language. */
 .askbox{max-width:440px}
@@ -318,20 +1071,26 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    its neighbours — this opts one back out. */
 .tinput.inline{width:auto;font-size:14px;padding:6px 8px}
 .nowrapbtn{flex:0 0 auto;white-space:nowrap}
-[data-tip]{position:relative}
-[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);
-  background:var(--ink);color:var(--paper);font-family:var(--body);font-size:12.5px;font-style:normal;letter-spacing:0;text-transform:none;
-  padding:6px 10px;border-radius:4px;white-space:normal;width:max-content;max-width:240px;text-align:left;line-height:1.4;z-index:30;pointer-events:none}
-[data-tip]:hover::before{content:"";position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);
-  border:5px solid transparent;border-top-color:var(--ink);z-index:30;pointer-events:none}
-/* Inside a scrollbox the tip flips below the control and left-aligns to it:
-   a centred bubble above a top row is clipped by the box's overflow on two
-   sides. Below, the worst case is the last row of a full box, which scrolls.
-   .tip-below is the same flip for a control that sits at the top of the main
-   scroll area, where an upward bubble slides under the nav. */
-.scrollbox [data-tip]:hover::after{bottom:auto;top:calc(100% + 7px);left:0;transform:none}
-.scrollbox [data-tip]:hover::before,[data-tip].tip-below:hover::before{bottom:auto;top:calc(100% + 2px);border-top-color:transparent;border-bottom-color:var(--ink)}
-[data-tip].tip-below:hover::after{bottom:auto;top:calc(100% + 7px)}
+/* The bubble is ONE element at the document root, in the top layer — see
+   TipLayer.tsx, which also explains why. It carries no z-index on purpose: the
+   top layer is above every stacking context and is clipped by no ancestor's
+   overflow, which is the whole point in an app whose boxes used to eat it.
+   `body` and `main.station-reading` are overflow:hidden, `.adminbody` and
+   `.scrollbox` scroll, and `.pdf-toolbar` is a flex item with z-index:10 —
+   between them they were clipping or burying most of the ~70 tips in the app,
+   the header's on every page (TJ, 2026-08-09). Do not re-add a per-control
+   ::after, and do not add `title` alongside data-tip. */
+.tiplayer{position:fixed;inset:auto;margin:0;border:0;overflow:visible;
+  background:var(--ink);color:var(--paper);
+  font-family:var(--body);font-size:12.5px;font-style:normal;letter-spacing:0;text-transform:none;
+  padding:6px 10px;border-radius:4px;white-space:normal;width:max-content;max-width:240px;
+  text-align:left;line-height:1.4;pointer-events:none}
+/* The arrow follows the control even when the bubble has been clamped to a
+   viewport edge, so --arrow is an offset into the bubble, never a flat 50%. */
+.tiplayer::after{content:"";position:absolute;left:var(--arrow,50%);transform:translateX(-50%);
+  border:5px solid transparent}
+.tiplayer[data-side="above"]::after{top:100%;border-top-color:var(--ink)}
+.tiplayer[data-side="below"]::after{bottom:100%;border-bottom-color:var(--ink)}
 
 /* --- reading-first: the shelf, the scope bar, the seam --- */
 
@@ -344,16 +1103,23 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .scopetitle{font-family:var(--display);font-size:18px}
 .scopemeta{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--grey)}
 
-.shelfbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 20px}
-.shelfbar .shelfcount{margin-left:auto}
+/* `.shelfbar` held the shelf's quick links, then only its tally, and on
+   2026-08-17 the tally moved to the footer — where the same words already
+   were. Nothing renders the class now, so the rules go with it rather than
+   waiting to be found by someone reusing the name for something else. */
 .weekhead{display:flex;align-items:center;gap:12px;margin:0 0 10px}
 .weekrule{flex:1;height:0;border-top:1px solid var(--rule)}
 .shelfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
 
-/* A shelf card is a link, so the whole card is the target. */
-.shelfcard{display:flex;gap:14px;padding:14px;text-decoration:none;color:inherit;
+/* A shelf card: the reading itself is the link (.shelfmain — browsing is not
+   capture); the cloth row beneath carries the work's own doors. */
+.shelfcard{display:flex;flex-direction:column;gap:10px;padding:14px;
   border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.5)}
 .shelfcard:hover{border-color:var(--ochre);background:rgba(168,132,63,.06)}
+.shelfmain{display:flex;gap:14px;flex:1;min-width:0;text-decoration:none;color:inherit}
+.clothrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  border-top:1px solid var(--rule);padding-top:10px}
+.clothbadge{color:var(--grey);cursor:default}
 .shelfbody{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
 .shelfbody h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0 0 3px}
 .shelfauthor{font-size:13px;color:var(--ink-soft);margin:0 0 6px}
@@ -363,14 +1129,258 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 
 /* Shelf search: which reading says this? A hit is a link into the reading,
    shaped like a shelf card; the marked words are Postgres's, not ours. */
-.searchwrap{margin:0 0 18px}
-.searchbar{display:flex;align-items:center;gap:10px}
-.searchinput{max-width:520px}
+/* Inside the station panel now, so no bottom margin of its own to give the
+   band air — the panel's padding is the air. */
+.searchwrap{margin:0}
+/* THE FIELD STAYS PUT WHILE THE RESULTS MOVE (TJ, 2026-08-19: "the search
+   term should remain visible as one scrolls"). The panel is the scroller
+   (.stationsearch-panel, max-height 64vh) and the results run well past it,
+   so the word you searched for scrolled away exactly when a long list made
+   you least sure what you had typed.
+
+   Opaque background, because the covers caption above it and the hits below
+   both pass underneath. The negative top margin eats the panel's own 12px of
+   padding so the bar sits flush against the top edge when stuck rather than
+   leaving a strip of scrolling text above it. */
+/* The per-page match count on a search row: quieter than the page number
+   it qualifies, because it answers a second question and not the first. */
+.pdf-search-n{opacity:.65}
+.searchbar{display:flex;align-items:center;gap:8px;
+  position:sticky;top:0;z-index:2;background:var(--paper);
+  margin:-12px 0 0;padding:12px 0 9px;border-bottom:1px solid var(--rule)}
+.searchbar .tinput{flex:1;min-width:0}
+/* The practice loom's standing notice. Deliberately not a toast: `flash`
+   self-clears after 1500ms, and a student who missed a disappearing notice
+   cannot tell a practice space from data loss. Sage rather than red — this is
+   an invitation, not a warning. */
+/* The practice loom's standing notice — a floater, not a header (TJ,
+   2026-08-11): a full-width band made the practice loom a different-shaped
+   app before the student had done anything, and the point is that it IS the
+   loom. Bottom-left, opposite the guide's usual corner. Takes no pointer
+   events: it is prose, and prose must never eat a control. */
+/* Above the guide's panes (6100–6102). Below them the mask sliced this notice
+   in half wherever a cutout crossed it — the guide dimming its own caption,
+   with a pane edge running through the sentence. It carries no pointer events,
+   so riding that high costs nothing. */
+.practiceband{position:fixed;left:18px;bottom:52px;z-index:6103;
+  width:min(320px,calc(100vw - 32px));pointer-events:none;
+  /* Opaque, not a 13% wash: the notice straddles the mask's edge, and a
+     translucent one let the dim through on one side of the cutout boundary
+     and the lit page through on the other — a seam down the sentence. The
+     gradient is that same wash, composited over paper instead of the page. */
+  background:linear-gradient(rgba(111,125,92,.13),rgba(111,125,92,.13)),var(--paper);
+  border:1px solid var(--sage);border-radius:6px;
+  box-shadow:0 8px 24px rgba(0,0,0,.14);
+  color:var(--ink);font-family:var(--body);font-size:12.5px;line-height:1.45;
+  padding:9px 12px;
+  display:flex;gap:10px;align-items:center;justify-content:space-between}
+/* The band eats nothing; the one control in it must. A button inside
+   pointer-events:none chrome is a picture of a button. */
+.practiceband .bandexit{pointer-events:auto;flex:none}
+/* Out of the way when the guide's cutout reaches it: it rides above the mask,
+   so where it overlapped it covered the control the beat was ringing — the kit
+   button read "OAD THE CONCEPT-MAP KIT".
+   The PROSE is what gets out of the way, not the whole band: the exit is the
+   one way off this page and fading an escape hatch to sixteen per cent is
+   worse than the occlusion this rule exists to prevent. A small button is a
+   fraction of a 320px box, so the ring stays readable either way. */
+.practiceband>*{transition:opacity .18s ease}
+.practiceband.yielded{background:none;border-color:transparent;box-shadow:none}
+.practiceband.yielded .bandsay{opacity:.16}
+@media(max-width:640px){.practiceband{left:12px;right:12px;width:auto;bottom:auto;top:64px}}
+
+/* A shelf card that is not in the practice loom: shown so the Library looks
+   like the Library, and plainly not a door. */
+.shelfcard.off{opacity:.5}
+.shelfcard.off .shelfmain{cursor:default}
+/* The practice shelf's one openable card is a <button>, not a <Link> — it
+   opens a stage rather than a route. Strip the button chrome so it is the
+   same object to look at as every other card. */
+.shelfcard button.shelfmain{background:none;border:none;padding:0;margin:0;
+  font:inherit;color:inherit;text-align:inherit;width:100%;cursor:pointer;
+  /* display:flex, NOT block: .shelfmain is a flex row — thumbnail beside the
+     body — and overriding it stacked the one card the guide points at. */
+  display:flex}
+.practiceband b{font-weight:600}
+
+/* The download that lives at its object (TJ, 2026-08-10) — the same pair of
+   buttons a Projection has always had, so the gesture is learned once. */
+.objdl{display:inline-flex;gap:6px;align-items:center}
+.clothfoot{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+/* Start this reading over — ruled off and below the download, because the
+   order is the advice. Friction proportional to blast radius (My Loom types a
+   phrase for the whole loom; one reading arms and confirms), so the resting
+   state is a quiet ghost button, not a red one: this sits inside a card a
+   student opens to edit a title. */
+.clothdanger{margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)}
+.clothreset{color:var(--red);border-color:transparent}
+.clothreset:hover{border-color:var(--red)}
+
+/* ONE SEARCH PER STATION, docked in the journey bar (TJ, 2026-08-13). The
+   standing band that stood under the bar is gone — `.searchtoggle`, the
+   `.searchhost` show/hide and the <900px media block with it. The band's
+   virtue was that it never moved and its cost was a whole row on every
+   surface; riding the journey keeps the first and pays none of the second.
+
+   `margin-left:auto` puts it right of the journey and left of the staff group,
+   which docks after it. */
+.stationsearch{position:relative;margin-left:auto;display:flex;align-items:center}
+/* Home, immediately right of the cloth search. No margin-left:auto of its own
+   — the search already carries it, so the two travel right as a pair and the
+   free space is not re-split three ways (see JourneyNav status/home notes). */
+/* Pulled 6px right so it stacks with the full-screen control on the toolbar
+   directly below. Both sit flush to their own container and the containers do
+   not agree: the journey bar pads 26px on the right, .pdf-toolbar pads 20px,
+   measured at 1536 — right edges 1510 against 1516. Correcting the difference
+   here rather than changing either padding, because both are load-bearing for
+   everything else in their row. */
+.stationhome{display:flex;align-items:center;margin-left:10px;margin-right:-6px;
+  color:var(--ink-soft);text-decoration:none;border-radius:4px;padding:2px 4px}
+.stationhome:hover{color:var(--ochre);background:rgba(168,132,63,.08)}
+.stationhome:focus-visible{outline:2px solid var(--ochre);outline-offset:1px}
+/* Anchored to the button, dropping over the work below. `nav` clips nothing,
+   and this is a sibling of <main> — whose station-reading variant is
+   overflow:hidden — so it hangs free of the page's own scrolling boxes.
+   z-index 60: above the cards and the card menu (6), above .pdf-search-panel
+   (20) and Your work (25), and far below the fixed furniture at 8000. */
+/* The header's menu. Same panel as the station search's — one dropdown
+   pattern in the app, not two — but narrower, because these are three names
+   rather than a page of results. */
+.headermenu{position:relative;display:flex;align-items:center}
+.headermenu-panel{position:absolute;top:calc(100% + 6px);right:0;z-index:60;
+  width:min(280px,calc(100vw - 32px));padding:6px;background:var(--paper);
+  border:1px solid var(--ink);border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.18);
+  display:flex;flex-direction:column;gap:2px}
+.headermenu-item{display:block;width:100%;text-align:left;background:none;border:none;cursor:pointer;
+  padding:7px 9px;border-radius:3px;color:var(--ink);text-decoration:none;
+  font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+.headermenu-item:hover{background:var(--paper-2)}
+/* What the item is for, under its name — the same sentence its tooltip used
+   to carry, said outright now there is room for it. */
+.headermenu-say{display:block;margin-top:3px;font-family:var(--body);font-size:12px;
+  letter-spacing:0;text-transform:none;color:var(--ink-soft);line-height:1.35}
+.stationsearch-panel{position:absolute;top:calc(100% + 6px);right:0;z-index:60;
+  width:min(420px,calc(100vw - 32px));max-height:min(64vh,560px);overflow:auto;
+  padding:12px 13px;background:var(--paper);border:1px solid var(--ink);
+  border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+/* What the open search covers. Mono caps like every other label in the app,
+   quiet enough to read as a caption rather than as a result, and it stands
+   above the input so it is still there once the placeholder has gone. */
+.stationsearch-covers{margin:0 0 9px;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);line-height:1.5}
+.searchinput{max-width:none}
 .searchresults{margin-top:12px;display:flex;flex-direction:column;gap:10px}
 .searchtally{display:block}
 .searchhit{display:block;padding:12px 14px;text-decoration:none;color:inherit;
   border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.5)}
 .searchhit:hover{border-color:var(--ochre);background:rgba(168,132,63,.06)}
+/* A hit with no reading to open: shown, never clickable, and it says why.
+   Dashed rather than dimmed — the work is real, it just has no door yet. */
+.searchhit.off{border-style:dashed;background:transparent;cursor:default}
+.searchhit.off:hover{border-color:var(--rule);background:transparent}
+/* A reading hit holds SEVERAL doors — the reading itself, and one per page
+   excerpt — so the box is a div and the anchors are inside it. The box keeps
+   its own border and its hover, and each door lights on its own. */
+.searchhit-multi{padding:0}
+.searchhit-multi:hover{border-color:var(--rule);background:rgba(255,255,255,.5)}
+.searchhit-door{display:block;padding:12px 14px 8px;text-decoration:none;color:inherit;border-radius:4px 4px 0 0}
+.searchhit-door:hover{background:rgba(168,132,63,.06)}
+.searchsnip-door{display:block;padding:7px 14px;text-decoration:none;color:inherit;border-top:1px solid var(--rule)}
+.searchsnip-door:hover{background:rgba(168,132,63,.10)}
+.searchsnip-door:last-child{border-radius:0 0 4px 4px}
+/* The page number is the thing you aimed at, so it earns the hover colour
+   rather than staying the quiet caption it is at rest. */
+.searchsnip-door:hover .n{color:var(--ochre)}
+
+/* The practice guide — a coach mark (src/components/practice/PracticeGuide.tsx).
+   Standard anatomy: a masked backdrop with a cutout, a popover anchored to the
+   target with a beak, one primary action.
+
+   RUNGS. 6100–6103, deliberately ABOVE .pdf-shell.fullscreen (6000) — `f`
+   would otherwise delete the whole guide — and BELOW the floating capture
+   button (9000), the highlight tip (9500) and .info-scrim (10000), all three
+   of which are furniture of the gesture being taught and must stay lit and
+   pressable. */
+
+/* The mask. Four inert panes with a genuinely empty hole between them: the
+   geometry IS the hit-test, so anything under the hole is reachable and
+   everything else is not. No handlers, ever — blocking by cancelling events
+   kills the drag-select this guide teaches. */
+.guidemask{position:fixed;inset:0;z-index:6100;pointer-events:none}
+.gpane{position:fixed;background:rgba(26,25,22,.34);pointer-events:auto;user-select:none}
+
+/* The cutout's edge. Never takes a click: a tutorial that swallows the button
+   it just told you to press is worse than no tutorial. No transition — the
+   rAF tracking IS the animation, and a second one on the same rect smears. */
+.guideglow{position:fixed;z-index:6101;pointer-events:none;border-radius:5px;
+  box-shadow:0 0 0 2px var(--ochre),0 0 18px 6px rgba(168,132,63,.30)}
+
+/* The popover, at the target rather than in a corner. */
+.guidepop{position:fixed;z-index:6102;width:min(320px,calc(100vw - 32px));
+  background:var(--paper);border:1px solid var(--ink);border-radius:6px;
+  box-shadow:0 14px 40px rgba(0,0,0,.28);padding:10px 12px 8px}
+/* Adrift: no target on screen. Parked, beakless, and honest about it. */
+.guidepop.adrift{right:18px;bottom:14px;left:auto;top:auto}
+/* Over one of the app's own dialogs. 10001 is the only rung above .info-scrim
+   the guide ever takes, and only while a scrim is actually up: a beat about a
+   field inside that dialog cannot be read from underneath it. */
+.guidepop.overscrim{z-index:10001}
+
+/* The beak. `--beak` is the offset along the card's edge where the target's
+   centre is, so it still points true after the card has been clamped on
+   screen. Two triangles: the border, then the paper over it. */
+.guidepop::before,.guidepop::after{content:"";position:absolute;width:0;height:0;border:8px solid transparent}
+.guidepop.at-bottom::before{bottom:100%;left:var(--beak);margin-left:-8px;border-bottom-color:var(--ink)}
+.guidepop.at-bottom::after{bottom:100%;left:var(--beak);margin-left:-8px;border-bottom-color:var(--paper);margin-bottom:-1px}
+.guidepop.at-top::before{top:100%;left:var(--beak);margin-left:-8px;border-top-color:var(--ink)}
+.guidepop.at-top::after{top:100%;left:var(--beak);margin-left:-8px;border-top-color:var(--paper);margin-top:-1px}
+.guidepop.at-right::before{right:100%;top:var(--beak);margin-top:-8px;border-right-color:var(--ink)}
+.guidepop.at-right::after{right:100%;top:var(--beak);margin-top:-8px;border-right-color:var(--paper);margin-right:-1px}
+.guidepop.at-left::before{left:100%;top:var(--beak);margin-top:-8px;border-left-color:var(--ink)}
+.guidepop.at-left::after{left:100%;top:var(--beak);margin-top:-8px;border-left-color:var(--paper);margin-left:-1px}
+.guidepop.adrift::before,.guidepop.adrift::after{display:none}
+
+.guideopen{position:fixed;right:18px;bottom:14px;z-index:6102;background:var(--paper)}
+
+.guiderail{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:8px}
+.gstep{font-family:var(--mono);font-size:11px;line-height:1;color:var(--ink-soft);
+  background:transparent;border:1px solid var(--rule);border-radius:50%;
+  width:22px;height:22px;padding:0;cursor:pointer;display:inline-flex;
+  align-items:center;justify-content:center}
+.gstep:hover{border-color:var(--ochre)}
+.gstep.now{color:var(--paper);background:var(--ink);border-color:var(--ink)}
+.gstep.done{color:var(--ochre);border-color:var(--ochre)}
+.gstep.done.now{color:var(--paper);background:var(--ochre)}
+.gcount{margin-left:auto}
+.guidepop .gsay{margin:0;font-size:13px;line-height:1.42}
+/* A finished beat says so instead of repeating an instruction the student has
+   already carried out. */
+.guidepop .gdone{color:var(--sage,#5d6b52);font-weight:600}
+/* Said when the beat's control is on the page but off the screen. */
+.guidepop .gaway{color:var(--ochre);font-weight:600}
+.guidepop .gwhy{margin:5px 0 0;font-size:12px;line-height:1.4;color:var(--ink-soft);font-style:italic}
+.guidefoot{display:flex;align-items:center;gap:5px;margin-top:8px;border-top:1px solid var(--rule);padding-top:7px}
+.guidefoot .gwhybtn{margin-left:auto}
+/* The one primary: filled where the others are ghosts. */
+.btn.gnext{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.gnext:hover:not(:disabled){background:var(--ochre);border-color:var(--ochre)}
+/* "Hit this button now": the gesture landed and going on is the move. Slow and
+   small — this app does not flash. */
+/* Light only, never movement. A `transform: scale()` in here made the button
+   a target that never stops moving: Playwright refuses to click an unstable
+   element, and a person chasing a button that breathes is the same problem
+   with better manners. The halo does all the work. */
+@keyframes gpulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(168,132,63,.55),0 0 10px 2px rgba(168,132,63,.35)}
+  50%{box-shadow:0 0 0 8px rgba(168,132,63,.22),0 0 26px 8px rgba(168,132,63,.65)}}
+.btn.gpulse{animation:gpulse 1.25s ease-in-out infinite;background:var(--ochre);
+  border-color:var(--ochre);color:#241f14;font-weight:600}
+@media(prefers-reduced-motion:reduce){
+  .btn.gpulse{animation:none;box-shadow:0 0 0 4px rgba(168,132,63,.45)}}
+@media(max-width:640px){
+  .guidepop{left:12px !important;right:12px;top:auto !important;bottom:14px;width:auto}
+  .guidepop::before,.guidepop::after{display:none}
+}
 .searchhithead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .searchhithead h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0}
 .searchwhere{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:2px 0 0}
@@ -382,6 +1392,94 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .seam{margin-top:12px;padding:11px 13px;border-left:2px solid var(--sage);background:rgba(122,138,110,.09);border-radius:0 4px 4px 0}
 .seam p{font-size:14px;line-height:1.45;margin:4px 0 9px}
 .fromwhere{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--grey);margin-top:2px}
+
+/* The replay slider and its tick strip. `accent-color` because the browser
+   default is a blue nothing else in Loom is, and the bar is ochre like every
+   other mark the student makes. */
+.logslider{accent-color:var(--ochre);display:block}
+/* Inset by the thumb's radius: a range thumb travels between its own
+   half-widths, so a strip drawn edge-to-edge disagrees with it by 8px at each
+   end. `--thumb` is the browser default (16px) — change both together. */
+.logtickbar{--thumb:16px;height:8px;margin:0 calc(var(--thumb) / 2) 5px;
+  border-bottom:1px solid var(--rule)}
+
+/* The log as a LIST (TJ, 2026-08-12) — the record read as a record, one act
+   per row with the time it happened, which the timeline cannot show because it
+   holds a single position. A row is a door back into the replay, so it looks
+   like the other clickable rows in the app rather than like prose. */
+.logrow{display:flex;gap:12px;align-items:baseline;padding:7px 12px;
+  border-bottom:1px dotted var(--rule);cursor:pointer}
+.logrow:last-child{border-bottom:none}
+.logrow:hover{background:rgba(0,0,0,.025)}
+.logrow.on{background:rgba(168,132,63,.10)}
+.logwhen{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--grey);
+  flex:0 0 auto;min-width:52px}
+.logwhat{font-size:14px;flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.logact{color:var(--ink)}
+/* What the act was ABOUT — the student's own words, which is what brings the
+   moment back. Quieter than the act line: you scan the verbs and stop at the
+   quote (TJ, 2026-08-12). */
+.logctx{display:flex;flex-direction:column;gap:2px}
+.logquote{font-size:13.5px;line-height:1.45;color:var(--ink-soft)}
+.lognote{font-size:13px;font-style:italic;color:var(--ink-soft)}
+.logmeta{font-family:var(--mono);font-size:10px;letter-spacing:.05em;color:var(--grey)}
+/* The act that just landed, glowing out (TJ, 2026-08-12). One second, ochre,
+   and gone — long enough to catch the eye at a play beat of 420ms, short
+   enough that a paused replay is not left with a light on. */
+@keyframes clothglow{
+  from{opacity:.55;stroke-width:14}
+  to{opacity:0;stroke-width:2}
+}
+.clothglow{animation:clothglow 1s ease-out forwards}
+@media(prefers-reduced-motion:reduce){.clothglow{animation:none;opacity:.35}}
+
+/* Play · position · the door to the other view.
+
+   NOWRAP and reserved widths (TJ, 2026-08-13: "i really hate it when buttons
+   change size and reformat the card"). This bar relabels as you use it — play
+   becomes pause becomes "replay from the start" — and every relabel was moving
+   its neighbours, and at a narrow width wrapping the row and moving the card.
+   The button reserves its longest label, the counter is tabular and reserves
+   its own, so the bar is the same size at every position in the record. */
+.logbar{display:flex;align-items:center;gap:12px;margin:2px 0 4px;flex-wrap:nowrap}
+.logbar .cap{margin:0}
+/* Reserves are in px and measured, not guessed in em: an em reserve computed
+   against the wrong font-size is a reserve that silently does nothing. The
+   widest counter ("act 112 of 112 · now") is 124px; the widest play label is
+   now "❚❚ pause" at 127px, since "▶ replay from the start" was shortened to
+   "▶ replay" — it was reserving 182px at every position for a sentence shown
+   at one of them (TJ: "the play button might be oversized"). */
+.logbar .logplay{min-width:96px;justify-content:center;white-space:nowrap}
+/* The shape, right-aligned: what changes about it ("now" against a full
+   timestamp) grows leftward into empty space and moves nothing. */
+.logbar .logshape{margin-left:auto;white-space:nowrap;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+.logbar .logcount{min-width:150px;white-space:nowrap;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+/* The act being replayed. Always in the flow, empty at the end of the record,
+   so leaving "now" does not grow the card by a line. */
+.logsaid{min-height:1.5em;line-height:1.5}
+
+/* The record, in the box the cloth was drawn in — same height, so the chips
+   swap the contents and nothing below them moves (TJ, 2026-08-13: "the
+   previous version had the diagram and the list in the same space"). The
+   drawing is 400px tall; so is this. */
+.logrows{height:400px;max-height:400px}
+.yourwork-body .logrows{height:400px;max-height:400px}
+/* The badge that crosses between the views. Quiet until you want it. */
+.logjump{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--sage);
+  background:none;border:none;padding:2px 4px;cursor:pointer;flex:0 0 auto;
+  opacity:0;transition:opacity .12s}
+.logbar .logjump{opacity:1;margin-left:auto}
+.logrow:hover .logjump,.logrow.on .logjump,.logjump:focus-visible{opacity:1}
+.logjump:hover{text-decoration:underline}
+
+/* A day's worth of work, headed where the date turns over. */
+.logday{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ochre);padding:12px 12px 4px;border-bottom:1px solid var(--rule)}
+/* The act's number — the same unit the slider is ticked in, so a row and a
+   notch are legibly the same thing. */
+.logn{font-family:var(--mono);font-size:10px;color:var(--dot);flex:0 0 auto}
 
 /* Concepts from the student's other readings — reachable, out of the way. */
 .outsideband{border-top:1px solid var(--rule);background:rgba(0,0,0,.015)}
@@ -400,17 +1498,26 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .untetheredsrc{font-family:var(--mono);font-size:12px;margin-bottom:6px}
 .untetheredsrc .n{color:var(--grey)}
 
-/* A card's own menu — HTML over the SVG table, because a quote needs real
-   text wrapping and SVG has none. */
+/* A card's own menu — HTML over the SVG table, because a quote needs real text
+   wrapping and SVG has none.
+
+   The SHELL only, since 2026-08-13: position, width, scroll and shadow. What it
+   holds is the standard ConceptCard, so the rules that dressed the old bespoke
+   contents (.cardmenuhead, .cardmenuwhere, and a margin override for
+   .passagequote) went with it. `.cardmenudef` stays — CohortClothPanel still
+   uses it, and it was never only this menu's. */
 .cardmenu{position:absolute;z-index:6;width:260px;max-height:330px;overflow:auto;
   padding:12px 13px;background:var(--paper);border:1px solid var(--ink);border-radius:4px;
   box-shadow:0 6px 22px rgba(0,0,0,.13)}
-.cardmenuhead{font-family:var(--display);font-size:16px;margin-bottom:8px;
-  border-bottom:1px solid var(--rule);padding-bottom:5px}
 .cardmenudef{font-size:13.5px;line-height:1.45;color:var(--ink);margin:3px 0 9px}
-.cardmenuwhere{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin:3px 0 0;line-height:1.5}
-.cardmenu .bytequote{margin:6px 0 8px}
 .cardmenu .ghostnote{margin:3px 0 0}
+/* The concept's name WRAPS here. `.lconcept` ellipsises by default because in
+   Your work it is one row of a scannable list; in a 260px popover opened to
+   read this one concept, cutting its name is the same fault as cutting its
+   description (TJ, 2026-08-13) — and there is nothing to keep it on one line
+   for. */
+.cardmenu .lconcept{white-space:normal;overflow:visible;text-overflow:clip}
+.cardmenu .lhead{align-items:baseline}
 
 /* Roster: one learner per row — a roster is scanned, not read, so each entry
    is a line in a list, not a card. The pills column has a fixed basis so the
@@ -463,3 +1570,483 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    fully rounded so the destructive act is unmistakably not just another
    button. */
 .btn.pillbtn{border-radius:999px;color:var(--red);border-color:var(--red)}
+/* A two-named choice — core or supplemental — wears both names as pills, so
+   the road not taken is legible without ticking anything. The pill shape is
+   borrowed from the row's status pills on purpose: this control sets exactly
+   the pill it looks like. */
+.radiorow{display:flex;flex-wrap:wrap;gap:8px}
+.radiopick{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);background:#fff;
+  border:1px solid var(--rule);border-radius:999px;padding:6px 12px;cursor:pointer}
+.radiopick:hover{border-color:var(--sage)}
+.radiopick input{margin:0;accent-color:var(--sage);cursor:pointer}
+/* :has keeps the checked skin on the label without a client component; the
+   :focus-within ring is the keyboard's only sign the pill is live. */
+.radiopick:has(input:checked){color:var(--sage);border-color:var(--sage);background:rgba(111,125,92,.08)}
+.radiopick:has(input:focus-visible){outline:2px solid var(--sage);outline-offset:2px}
+
+/* --- Repair review (admin) ---------------------------------------------- */
+/* The crop stays beside the text while a reviewer reads: the one question they
+   can answer that no measurement can is whether the transcription matches the
+   page, and that needs both in view at once. */
+.repair-panel { display: grid; gap: 14px; margin-top: 10px; }
+.repair-region { border-top: 1px solid var(--rule, #ddd8cc); padding-top: 12px; }
+.repair-region h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14px; }
+.repair-split { display: grid; grid-template-columns: minmax(200px, 34%) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .repair-split { grid-template-columns: 1fr; } }
+.repair-split figure { margin: 0; position: sticky; top: 12px; }
+.repair-split img { max-width: 100%; border: 1px solid var(--rule, #ccc6b8); background: #fff; }
+.repair-panel pre {
+  white-space: pre-wrap; word-break: break-word; font: 12px/1.5 var(--mono, monospace);
+  background: #fff; border: 1px solid var(--rule, #e3ddd0); padding: 8px; margin: 4px 0;
+  max-height: 240px; overflow: auto;
+}
+.repair-damaged { border-color: #e0c3c3 !important; background: #fdf6f6 !important; }
+.repair-panel textarea { width: 100%; font: 12px/1.5 var(--mono, monospace); }
+.repair-disagreements { margin: 4px 0 10px; padding-left: 16px; font-size: 13px; }
+.repair-disagreements > li { margin-bottom: 8px; }
+.repair-passage { font-weight: 600; }
+.repair-disagreements ul { padding-left: 14px; font: 12px/1.45 var(--mono, monospace); color: #4a4a4a; }
+.repair-error { color: var(--red); font-size: 13px; }
+/* A refusal and a result read the same way — both are the panel telling you
+   what it did — so they sit in the same place and differ only in colour. */
+.repair-notice { color: var(--sage); font-size: 13px; }
+/* The four acts, named in order, with the gear pushed to the far end so it
+   reads as reference rather than as a fifth step. */
+.repair-steps {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; border-bottom: 1px solid var(--rule, #e3ddd0); padding-bottom: 10px;
+}
+.repair-steps ol {
+  display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; padding: 0; list-style: none;
+  font: 12px/1.5 var(--mono, monospace);
+}
+.repair-steps li { display: flex; align-items: baseline; gap: 6px; }
+.repair-steps b { color: var(--ochre); font-weight: 600; }
+.repair-steps .hint { font-size: 11px; }
+.repair-gear { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+
+/* The crop is a whole page. Give it real room — the review is a comparison, and
+   a page rendered at thumbnail size cannot be compared with anything. */
+.repair-split { grid-template-columns: minmax(280px, 44%) 1fr; }
+.repair-split figure a { display: block; cursor: zoom-in; }
+.repair-split figure a:hover img { border-color: var(--ochre); }
+
+.repair-settings {
+  border: 1px solid var(--rule, #ccc6b8); background: var(--paper, #fbf9f4);
+  max-width: 760px; width: calc(100% - 48px); padding: 0; color: var(--ink);
+}
+.repair-settings::backdrop { background: rgba(20, 18, 14, 0.45); }
+.repair-settings-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 16px 20px; border-bottom: 1px solid var(--rule, #e3ddd0); position: sticky; top: 0;
+  background: var(--paper, #fbf9f4);
+}
+.repair-settings-head h3 { margin: 0; font-size: 16px; }
+.repair-settings-body { padding: 4px 20px 20px; max-height: 70vh; overflow: auto; display: grid; gap: 18px; }
+.repair-settings-body section { display: grid; gap: 4px; }
+.repair-settings-body pre {
+  white-space: pre-wrap; word-break: break-word; font: 11.5px/1.5 var(--mono, monospace);
+  background: #fff; border: 1px solid var(--rule, #e3ddd0); padding: 9px; margin: 4px 0; max-height: 220px; overflow: auto;
+}
+.repair-readers { margin: 4px 0; padding-left: 20px; font: 12px/1.7 var(--mono, monospace); }
+.repair-settings-list { margin: 4px 0; padding-left: 17px; font-size: 13px; line-height: 1.5; }
+.repair-settings-list li { margin-bottom: 5px; }
+/* Costs per reader, not just a total: a total hides the reader that spends most
+   of the money for none of the quality. */
+.repair-costs { width: 100%; border-collapse: collapse; font: 11.5px/1.4 var(--mono, monospace); margin: 8px 0; }
+.repair-costs th, .repair-costs td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--rule, #eee7d9); }
+.repair-costs th:first-child, .repair-costs td:first-child { text-align: left; }
+.repair-costs thead th { color: #7a7a7a; font-weight: normal; text-transform: uppercase; letter-spacing: .05em; }
+.repair-costs-total td { font-weight: 600; border-bottom: none; }
+.pill.repair-accepted { color: var(--sage); border-color: var(--sage); }
+.pill.repair-applied { color: var(--sage); border-color: var(--sage); }
+.pill.repair-rejected { color: var(--red); border-color: var(--red); }
+
+/* --- Workflows (/admin/workflows) -------------------------------------- */
+/* The diagram is drawn at its natural width and scrolls inside its own box:
+   a flow squeezed to the viewport stops being readable long before it stops
+   fitting, and the admin shell's own overflow is owned by .adminbody. */
+.flowpicker { display: flex; gap: 8px; flex-wrap: wrap; }
+.flowscroll { overflow-x: auto; overflow-y: hidden; padding: 4px 0 10px; }
+.flowsvg { display: block; max-width: none; }
+.flownodelabel { font-family: var(--body); font-size: 13px; }
+.flownodewhere { font-family: var(--mono); font-size: 10.5px; fill: var(--ink-soft); }
+.flowedgelabel { font-family: var(--body); font-size: 11.5px; fill: var(--ink-soft); font-style: italic; }
+
+.flowlegend {
+  display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px;
+  font-size: 12.5px; color: var(--ink-soft);
+}
+.flowlegend > span { display: inline-flex; align-items: center; gap: 6px; }
+.flowkey { width: 22px; height: 13px; border-radius: 4px; border: 1px solid var(--rule); background: var(--paper); }
+.flowkey-start { border-color: var(--ochre); border-radius: 7px; }
+.flowkey-end { border-color: var(--ochre); border-radius: 7px; background: var(--paper-2); }
+.flowkey-decision { border-color: var(--sage); background: var(--paper-2); }
+.flowkey-denied { border-color: var(--grey); border-style: dashed; background: transparent; }
+.flowkey-back { height: 0; border: 0; border-top: 1px dashed var(--grey); border-radius: 0; }
+
+.flowsources { margin: 6px 0 12px; padding-left: 18px; font-size: 12.5px; color: var(--ink-soft); }
+.flowsources code { font-family: var(--mono); font-size: 11.5px; }
+.flowtext { margin-top: 6px; font-size: 13px; }
+.flowtext summary { cursor: pointer; color: var(--ink-soft); list-style: none; }
+.flowtext summary::-webkit-details-marker { display: none; }
+.flowtext[open] summary .tw { transform: rotate(90deg); }
+.flowtext ol { margin: 10px 0 4px; padding-left: 22px; }
+.flowtext li { margin-bottom: 6px; }
+.flowtext ul { margin: 3px 0 0; padding-left: 18px; color: var(--ink-soft); font-size: 12.5px; }
+.flowwhere { color: var(--ink-soft); font-family: var(--mono); font-size: 11.5px; }
+
+/* --- The Reading station: the text, and Your work over it ---------------- */
+/* One station since 2026-08-08. Until 2026-08-09 the capture side was a RAIL
+   that squeezed the text above 820px and only overlaid it below — so the same
+   button did two different things depending on how wide your window happened
+   to be, which is most of why it read as weird (TJ). Now it is one thing at
+   every width: a sheet that slides over the reading's right edge and hands the
+   pixels straight back.
+
+   Three consequences, so nobody "fixes" them:
+   - The stage's width no longer changes when the sheet opens, so the viewer's
+     ResizeObserver does not fire, the page does not re-fit, react-pdf does not
+     re-rasterise, no text layer is rebuilt and no passage, heat or search mark is
+     re-applied. That is the point of the rebuild, not an oversight.
+   - It fixes a live bug. The floating "Capture as Passage" button is placed in
+     VIEWPORT coordinates taken at selection time and moved only on stage
+     scroll and window resize. The rail slid the pages sideways under it
+     without firing either, leaving the button stranded over the wrong words.
+   - The spread reads a little left of centre while the sheet is out
+     (.pdf-stage.mode-page is `justify-content: safe center`, which centres in
+     the whole stage). LEAVE IT. padding-right shrinks the stage's contentRect
+     and re-fires the observer — the squeeze, back. A translate on the inner
+     run moves the pages, which strands the capture button again. Not moving
+     the page IS the change; you close the sheet to see under it. */
+
+/* Your work — the reading-scoped Capture Log, as a sheet over the text. It is
+   rendered INSIDE .pdf-shell (see PdfViewer's .pdf-body) for two reasons: it
+   must survive fullscreen, which is position:fixed z-index:6000 with its own
+   stacking context and swallowed the old rail whole; and .pdf-body begins
+   below the toolbar, so the frame of the reading stays reachable while the
+   sheet is out. */
+.yourwork {
+  position: absolute;
+  /* A CARD over the reading, not a wall across it (TJ, 2026-08-09: the first
+     cut was "still very disruptive"). Inset on all four sides so the page runs
+     visibly underneath and behind it, and capped in height so the foot of the
+     spread stays in view — a panel that reaches every edge reads as the new
+     state of the screen rather than as something resting on top of it. */
+  /* LEFT, not right (TJ, 2026-08-17). It shared the right edge with
+     .pdf-search-panel, which is why the toggle closes Find on the way in —
+     that courtesy stays, but the collision it was avoiding is gone. */
+  top: 12px; left: 12px;
+  /* 52 = the 12px inset plus the fixed footer's ~40px. The footer is print,
+     not controls (pointer-events:none, z-index 5) — but this card is z-25 and
+     would paint straight over "01 — READING", so the one line telling you
+     where you are would be covered by the panel you opened. */
+  max-height: calc(100% - 52px);
+  /* 460, up from 380 (TJ, 2026-08-17). The old width was set to clear the
+     right-hand page of a spread; from the left edge that constraint is a
+     different one, and the rows inside — a concept, its gloss, its passages —
+     were the thing being squeezed. */
+  width: min(460px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+  background: var(--paper);
+  /* Opaque, and it must stay opaque: the text runs directly underneath, and a
+     half-transparent panel leaves the page's own words reading through your
+     passages — the same reason the capture modal is opaque. */
+  border: 1px solid var(--rule);
+  /* .pdf-search-panel's shadow, opened out to all four sides now that the card
+     floats clear of the edges: the same rung of the ladder — a surface over
+     the reading — casting onto the page it is resting on. */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  /* 25. Above .pdf-toolbar (10) and above .pdf-search-panel (20), which shares
+     this strip of the right edge and which the toggle closes on the way in; a
+     gap of five so a future surface can sit between them without renumbering
+     this. The [data-tip] hover bubbles are not in this comparison at all:
+     since TipLayer they are one element in the top layer, above every number
+     on this list and clipped by nothing. Deliberate — a tip explaining a
+     control has to be readable over whatever the control sits under.
+     Deliberately far BELOW the fixed furniture of the reading, every piece of
+     which must stay usable over the sheet: the phone paging bar (8000, and
+     suppressed while this is open), the floating Capture button (9000) and the
+     highlight tooltip (9500) — you are meant to keep selecting and capturing
+     from the page while your work is out — then the capture modal (10000) and
+     the practice guide's over-scrim popover (10001), which must cover it. Fullscreen (6000) is not in
+     the comparison at all: this is inside that shell and rides with it.
+     Never position:fixed. main.station-reading is overflow:hidden and that
+     clip — not any z-index — is the only thing keeping this off the header and
+     the journey nav; there is no number in this app that sits above the
+     reading and below the chrome, because the chrome is unpositioned. */
+  z-index: 25;
+  /* Closed it is parked off the right edge, not unmounted: the drafts inside
+     survive the toggle, and a just-landed capture has a row with real layout
+     to scroll to at t=40ms (OpenTab's focus effect) rather than none.
+     `visibility` is what takes the sheet out of the tab order and off the
+     screen reader — a panel merely translated away is still focusable and
+     still read aloud — and it is what makes Playwright's toBeVisible() honest.
+     It is delayed by the length of the slide so the sheet does not blink out
+     halfway home; on the way in it flips at once, with no delay. Those two
+     lines are not symmetrical on purpose, and neither is a typo. */
+  /* Parked clear of its own left inset (the 12px), or a sliver of card sits
+     against the edge of the reading when it is meant to be gone. */
+  transform: translateX(calc(-100% - 12px));
+  visibility: hidden;
+  transition: transform .2s, visibility 0s linear .2s;
+}
+.yourwork[data-open="true"] {
+  transform: none;
+  visibility: visible;
+  transition: transform .2s, visibility 0s;
+}
+/* Focused on open to seat the tab order; it is not a control, so no ring. */
+.yourwork:focus { outline: none; }
+/* The head bar is the sheet's name, its tally and its way out. The card below
+   drops its own heading in this mode: two titles a stone's throw apart is how
+   a panel that was bolted on reads. */
+.yourwork-head {
+  flex: 0 0 auto;
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 11px 10px 10px 12px;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 5px 5px 0 0;
+  background: var(--paper-2);
+}
+.yourwork-head h2 { font-family: var(--display); font-size: 17px; font-weight: 600; margin: 0; }
+.yourwork-head .n { font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft); }
+.yourwork-close { margin-left: auto; align-self: center; flex: 0 0 auto; }
+/* The sheet scrolls; the cards inside it do not. One wheel, one scroller — the
+   base .scrollbox max-height nested inside a scrolling panel is the classic
+   two-wheels-fighting bug. overscroll-behavior belongs on whichever element
+   actually scrolls, or the wheel chains through to the page behind. */
+.yourwork-body {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  /* 8px at the sides, down from 16 (TJ, 2026-08-17: "considerably less
+     horizontal padding"). Every row in here is already a bordered card with
+     its own padding, so the sheet's was a second margin around a margin —
+     16px of it, twice, on the axis the rows needed. */
+  /* Top padding 0, and .onecol below carries the 14px instead. A sticky child
+     bottoms out at the SCROLLER'S CONTENT BOX, so while the 14px lived here
+     the view switch parked 14px low and rows slid visibly through the strip
+     above it (measured on the running app at 1536: band stuck at y=158.5 with
+     the body's content starting at y=144.5). Moving the same 14px inside the
+     scrollport costs nothing at rest and gives the switch the real top edge. */
+  padding: 0 8px 40px;
+}
+.yourwork-body .onecol { padding-top: 14px; }
+.yourwork-body .scrollbox { max-height: none; }
+/* The switch stays on screen while the list moves under it (TJ, 2026-08-18).
+   .yourwork-body is the sheet's one scroller and the card inside it is as tall
+   as the list, so PASSAGES/CONCEPTS scrolled off the top with everything else:
+   changing which end of the join you are reading from meant scrolling back up
+   to find the control that does it. Sticky rather than moved into
+   .yourwork-head, because the head bar is the sheet's name and its way out —
+   the switch belongs to the list.
+
+   Full-bleed, because .segmented is an inline-flex pill: stuck at the top it
+   would let rows slide past on either side of it. -9px is .yourwork .card's
+   own horizontal padding, so the band reaches the card's padding edge and
+   stops inside its 1px border.
+
+   The background must be opaque and must match what the card paints, which is
+   rgba(255,255,255,.5) over the panel's --paper. color-mix says exactly that
+   and keeps saying it if --paper moves. */
+.yourwork-body .viewswitch {
+  position: sticky;
+  top: 0;
+  /* Under .cardmenu (6), the concept popover a top row can open upward into. */
+  z-index: 2;
+  margin: 0 -9px 12px;
+  /* 6px above the pill rather than 2: stuck, the band's top IS the top of the
+     panel body, and the switch sat against the head bar's rule with nothing
+     between them. At rest it costs 6px. */
+  padding: 6px 9px 8px;
+  background: color-mix(in srgb, #fff 50%, var(--paper));
+  border-bottom: 1px solid var(--rule);
+}
+.yourwork-body .viewswitch .segmented { margin-bottom: 0; }
+/* TYPE STEP-DOWN (TJ, 2026-08-13: "the font sizes seem overly large to me").
+   They were, and not by taste. The app's base is 17px Newsreader — right for
+   60-75ch of prose on a full-width page, which is what a reading tool should
+   set. This sheet is 380px, about 330px of content, and inherited that scale
+   unchanged: a concept row came out at 15.5px against a 17px panel title, so
+   the step between "the name of this sheet" and "one row in a list" was 1.5px
+   and the hierarchy read flat. The cloth card's own h2 was 21px — LARGER than
+   the panel containing it — because .card h2 is sized for a full-width card
+   at 01 and nothing scoped it down when the card moved in here.
+
+   Scoped to .yourwork on purpose. The reading prose is correctly sized and a
+   global change would shrink it. The ladder: 17 sheet / 15 card / 14 row /
+   13 prose / 11-10 mono, each step big enough to be read as a step. */
+/* The sheet's own padding was only half of it: every block in here is a
+   `.card`, which carries 18px of its own, so the rows sat ~34px in from an
+   edge 12px from the page. Trimmed to 9px, the two insets together are about
+   what one used to be, and the rows get the width back (TJ, 2026-08-17). */
+.yourwork .card { padding: 13px 9px; }
+.yourwork .card h2 { font-size: 15px; }
+.yourwork .lhead .lconcept { font-size: 14px; }
+.yourwork .do { font-size: 13.5px; }
+.yourwork .hint { font-size: 13px; line-height: 1.45; }
+/* The fields keep a touch more than the prose around them — they hold the
+   student's own words, and shrinking those below the labels reads as the
+   input mattering less than its caption. */
+.yourwork input, .yourwork textarea { font-size: 14px; }
+/* One column in the sheet; the two-card row needs a page's width. */
+.onecol { display: flex; flex-direction: column; gap: 16px; }
+
+@media (max-width: 560px) {
+  /* No room to float beside it, so on a phone it takes the reading — the
+     toolbar button is how you get back, and the card never covers it. Still no
+     scrim, here least of all: in Loom a scrim means the work stops, and this
+     is where the work is. 560 is already this app's phone breakpoint. */
+  .yourwork {
+    top: 0; right: 0; bottom: 0;
+    width: 100%; max-height: none;
+    border-radius: 0; border-width: 0 0 0 1px;
+    transform: translateX(100%);
+  }
+  .yourwork-head { border-radius: 0; }
+}
+
+/* --- The capture toast --------------------------------------------------- */
+/* What a capture says for itself, in the corner of the page it came from.
+   Before this a capture from the PDF landed in silence: the modal vanished and
+   the only sign was 1500ms of "· saved ·" in the header, a screen away from
+   where the reader was looking. That silence is most of why the panel had to
+   be opened at all — you opened it to check, not to browse. */
+.captoast {
+  position: absolute;
+  right: 12px; bottom: 40px;        /* clear of the fixed footer, as above */
+  z-index: 26;                      /* just over the card, same rung */
+  width: min(330px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 11px 12px;
+  border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--paper);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  animation: captoast-in .2s ease-out;
+}
+.captoast p { flex: 1 1 150px; margin: 0; font-size: 13px; line-height: 1.35; }
+.captoast .captoast-x { padding-left: 6px; padding-right: 6px; color: var(--ink-soft); }
+
+/* The seam, inside the toast (2026-08-09). The capture form renders the same
+   component as a `.seam` card; here it is a band under the acknowledgement,
+   because TJ ruled the PDF path the quieter of the two — it reports what
+   happened and offers the way out, it does not become a second dialog.
+   `flex-basis: 100%` puts it on its own row rather than competing with the
+   buttons for the toast's 330px. */
+.captoast-seam {
+  flex: 1 1 100%;
+  margin-top: 2px; padding-top: 9px;
+  border-top: 1px solid var(--rule);
+}
+.captoast-seam .cap { display: block; margin-bottom: 3px; color: var(--ink-soft); }
+.captoast-seam p { font-size: 12.5px; margin-bottom: 7px; }
+/* Wraps at this width — a 40-character label on one line would push the
+   toast's own edge out past the viewport on a phone. */
+.captoast-seam .btn { white-space: normal; text-align: left; line-height: 1.3; }
+@keyframes captoast-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 560px) {
+  /* Clear of the phone paging bar, which is fixed to the window at z-8000. */
+  .captoast { right: 8px; left: 8px; bottom: 64px; width: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The first reduced-motion rule in Loom, and the only one it needs: this
+     sheet is also its first animation. The sheet still comes and goes — it
+     just stops travelling, and the visibility delay collapses with the
+     transition, which is right: closed should mean gone. */
+  .yourwork, .yourwork[data-open="true"] { transition: none; }
+  .captoast { animation: none; }
+}
+/* Capture by hand, folded at the foot of Your work (2026-08-08). Quiet
+   on purpose: beside a text you select, this is the exception, not the way in. */
+.handfold > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; }
+.handfold > summary::-webkit-details-marker { display: none; }
+.handfold > summary h2 { display: inline; font-size: 15px; color: var(--ink-soft); }
+.handfold[open] > summary h2 { color: var(--ink); }
+.handfold[open] > summary .tw { transform: rotate(90deg); }
+/* The twisty was the one thing here nobody had styled, so it fell through to
+   the 17px body serif and sat next to .invitefold's 12px mono one — two folds
+   in the same panel with disclosure markers a glyph-size apart. Matched to its
+   neighbour rather than invented: same size, same face, same ochre. */
+.handfold > summary .tw { font-family: var(--mono); font-size: 12px; color: var(--ochre);
+  transition: transform .15s; display: inline-block; }
+/* The Linking step bar: named moves, not four abbreviations (TJ, 2026-08-08). */
+.steprail .rstep { text-transform: none; letter-spacing: .01em; font-family: var(--body); font-size: 12.5px; }
+.steprail .stepn {
+  font-family: var(--mono); font-size: 10px; opacity: .7; margin-right: 3px;
+}
+.steprail .rsep { font-size: 12px; }
+.steprailnote { margin: -8px 0 16px; font-size: 13px; }
+/* Naming a concept before its evidence — a first-class move, so it reads as a
+   block with its own label rather than a stray input (TJ, 2026-08-08). */
+/* A CARD, not a hairline (TJ, 2026-08-18: "the 'name a concept before its
+   evidence card needs a border to distinguish it from its context, not unlike
+   the other borders throughout the my work and other panels").
+
+   It was a dotted top rule — the same mark `.lrow` used as a row separator, so
+   in Your work's concepts view a FORM was divided from the list above it by the
+   line that means "next row". Behind the two new + controls it had no edge at
+   all and simply began.
+
+   The treatment is `.ywcard`'s, deliberately: paper, a 1px rule, 4px radius and
+   the soft shadow every other card in these panels wears. The 3px spine is
+   ochre — the warp's colour, the one the concept cards already use — because
+   what this coins is a Concept. */
+.aheadofit{margin-top:14px;padding:12px;background:var(--paper);
+  border:1px solid var(--rule);border-left:3px solid var(--ochre);
+  border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.aheadofit > .label:first-child{display:block;margin-bottom:2px}
+
+/* The reading card's cloth row, reworked 2026-08-08 (TJ): the cloth's NAME is
+   the affordance, not a count with the name hidden on hover, and "edited …"
+   says the work is alive. The whole row is the door — it opens at 02 · Linking,
+   which is what distinguishes it from the card above (that opens the text). */
+.clothis {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  flex: 1 1 auto; min-width: 0;
+}
+.clothname {
+  font-family: var(--display); font-size: 14px; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.clothmeta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft); white-space: nowrap; }
+/* The cloth row is metadata now, never a control (TJ, 2026-08-08): the reading
+   card itself is the entry point, so nothing in this row is pressable. */
+
+/* --- Who can reach what: the role/capability matrix on /workflows --------- */
+/* Rendered from src/lib/capabilities.ts, which npm run check asserts against.
+   Quiet on purpose: it is a reference table, not a dashboard. */
+/* No top rule and no heading of its own: since it became the Access tab the
+   scopebar carries the title, and the divider it used to need — it sat under
+   the workflow diagrams — was left drawing a stray line under the nav. */
+.matrix{margin-top:2px}
+.matrix .hint{max-width:64ch}
+/* Wide tables scroll in their own box; the page must never scroll sideways. */
+.scrollx{overflow-x:auto;margin-top:14px}
+.mtable{border-collapse:collapse;width:100%;font-size:14px}
+.mtable th,.mtable td{text-align:left;padding:7px 10px;border-bottom:1px dotted var(--rule);vertical-align:top}
+.mtable thead th{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--grey);border-bottom:1px solid var(--rule)}
+.mtable tbody th[scope="row"]{font-weight:400;font-family:var(--body)}
+.mgroup th{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ochre);padding-top:16px;border-bottom:none}
+/* One column each for the three roles: narrow, so the glyphs line up and the
+   eye can run down a role rather than across a row. */
+.mcell{width:132px}
+.mcell span[aria-hidden]{font-size:15px}
+.m-yes span[aria-hidden]{color:var(--sage)}
+.m-qualified span[aria-hidden]{color:var(--ochre)}
+.m-no span[aria-hidden]{color:var(--grey)}
+.mnote{display:block;font-size:12px;line-height:1.35;color:var(--ink-soft);margin-top:2px}
+.mgate{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft)}
+.mfile{display:block;color:var(--grey);font-size:10.5px;margin-top:2px}
+/* A hole is a finding and should read like one. */
+.mhole{background:rgba(178,58,43,.05)}
+.mhole th[scope="row"]{color:var(--red)}
+.mnotes{margin-top:18px;padding-left:18px;max-width:76ch}
+.mnotes li{font-size:13.5px;color:var(--ink-soft);margin-bottom:7px}
+/* For content that must reach a screen reader but not the page. */
+.visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0}

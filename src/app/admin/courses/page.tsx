@@ -248,13 +248,20 @@ export default async function AdminCoursesPage({
                             </span>
                           </div>
 
+                          {/* The same one-row-of-equal-buttons set as a library
+                              card's: whatever a button discloses opens in a
+                              .foldout below the row, so no button ever moves.
+                              Pills above are what the reading *is*; buttons
+                              here are what you can *do* — never the same shape,
+                              except Remove, which wears the red pill every
+                              destructive act in the admin wears. */}
                           <div className="actrow" style={{ marginTop: "8px" }}>
                             <details>
                               <summary
-                                className="act"
+                                className="btn ghost mini"
                                 data-tip="Set the week, order within the week, and core status"
                               >
-                                schedule
+                                Schedule
                               </summary>
                               <form
                                 className="foldout"
@@ -283,10 +290,36 @@ export default async function AdminCoursesPage({
                                     defaultValue={reading.link.position}
                                   />
                                 </div>
-                                <label className="hint" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                  <input type="checkbox" name="isCore" defaultChecked={reading.link.isCore} />
-                                  Core reading (students graph this one)
-                                </label>
+                                {/* Core and supplemental are one choice with two
+                                    names, not a box to tick: a radio pair says
+                                    the unchosen name out loud, so nobody has to
+                                    infer what an empty checkbox made this. */}
+                                <div className="form-row">
+                                  <span className="label">Weight</span>
+                                  <div className="radiorow">
+                                    <label className="radiopick">
+                                      <input
+                                        type="radio"
+                                        name="isCore"
+                                        value="true"
+                                        defaultChecked={reading.link.isCore}
+                                      />
+                                      Core
+                                    </label>
+                                    <label className="radiopick">
+                                      <input
+                                        type="radio"
+                                        name="isCore"
+                                        value="false"
+                                        defaultChecked={!reading.link.isCore}
+                                      />
+                                      Supplemental
+                                    </label>
+                                  </div>
+                                  <p className="hint" style={{ margin: "4px 0 0", fontSize: "13px" }}>
+                                    Students graph the core readings; supplemental ones sit alongside.
+                                  </p>
+                                </div>
                                 <button
                                   className="btn mini"
                                   type="submit"
@@ -307,7 +340,7 @@ export default async function AdminCoursesPage({
                                 value={reading.link.isVisible ? "false" : "true"}
                               />
                               <button
-                                className="act"
+                                className="btn ghost mini"
                                 type="submit"
                                 data-tip={
                                   reading.link.isVisible
@@ -315,7 +348,7 @@ export default async function AdminCoursesPage({
                                     : "Reveal this reading to students in this course"
                                 }
                               >
-                                {reading.link.isVisible ? "hide" : "reveal"}
+                                {reading.link.isVisible ? "Hide" : "Reveal"}
                               </button>
                             </form>
 
@@ -323,11 +356,11 @@ export default async function AdminCoursesPage({
                               <input type="hidden" name="courseId" value={course.id} />
                               <input type="hidden" name="sourceId" value={reading.id} />
                               <button
-                                className="rm"
+                                className="btn ghost mini pillbtn"
                                 type="submit"
                                 data-tip="Remove from this course's list — the reading stays in the library"
                               >
-                                remove from course
+                                Remove from Course
                               </button>
                             </form>
                           </div>

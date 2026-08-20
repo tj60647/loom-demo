@@ -27,6 +27,29 @@ export const MAX_READING_LABEL = "20MB"
 /** Every client-uploaded reading lands under this prefix. */
 export const READING_UPLOAD_PREFIX = "readings"
 
+/**
+ * The shape of a legitimate client-upload pathname: the prefix, one `/`, one
+ * segment. `file.name` may hold spaces, quotes and unicode (browsers strip
+ * directories, so it never holds a `/`) — the segment is therefore not
+ * whitelisted; instead everything a URL parser could bend into an escape is
+ * refused: a second `/`, `..` (WHATWG URLs collapse dot-segments, which walks
+ * a pathname OUT of the prefix), `\`, and `%` (the encoded spelling of both).
+ *
+ * This guards the register actions and deleteClientUploadBlob, which removes
+ * a blob at the EXACT pathname it is handed and must not be steerable past
+ * the quarantine. A bare startsWith check was not enough: adversarial review
+ * (2026-08-20) showed `readings/../covers/<id>.png` passing it, and the Blob
+ * SDK interpolates pathnames into the request URL raw.
+ */
+export function isClientUploadPathname(pathname: string): boolean {
+  const prefix = `${READING_UPLOAD_PREFIX}/`
+  if (!pathname.startsWith(prefix)) return false
+  const rest = pathname.slice(prefix.length)
+  if (rest.length === 0 || rest.includes("/")) return false
+  if (pathname.includes("..") || pathname.includes("\\") || pathname.includes("%")) return false
+  return true
+}
+
 export function formatBytes(bytes: number): string {
   return `${(bytes / 1048576).toFixed(1)}MB`
 }

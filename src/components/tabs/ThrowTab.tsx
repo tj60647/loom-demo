@@ -1,31 +1,29 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import LinkDescription from "@/components/ui/LinkDescription"
 import { useLoom } from "@/components/providers/LoomProvider"
-import { useReadings } from "@/components/providers/ReadingsProvider"
 import { useDialog } from "@/components/providers/DialogProvider"
-import { isWholeWeave, readingsOf } from "@/lib/scope"
+import { useReadings } from "@/components/providers/ReadingsProvider"
+import ObjectDownload from "@/components/ui/ObjectDownload"
+import { buildThreadsExport, buildThreadsMarkdown } from "@/lib/objectExport"
+import { findLink, labelOf as labelOfEdge, usesOf } from "@/lib/linkResolve"
+import { scopeLabelOf } from "@/lib/graphExport"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
+import ConceptCard from "@/components/cards/ConceptCard"
+import ConceptName from "@/components/ui/ConceptName"
+import type { Passage } from "@/lib/types"
+import { useRenameConcept } from "@/components/cards/useRenameConcept"
+import { useCoinConcept } from "@/components/cards/useCoinConcept"
+import NameConceptCard from "@/components/cards/NameConceptCard"
+import ThreadCard from "@/components/cards/ThreadCard"
 
-const REGISTERS = [
-  {id:'plain',   name:'Plain',          tag:'everyday',          verbs:['leads to','depends on','is part of','goes against','is the same as','sets up']},
-  {id:'argue',   name:'Argument',       tag:'logic & claims',    verbs:['presupposes','contradicts','exemplifies','entails','qualifies','generalizes']},
-  {id:'system',  name:'Cause & system', tag:'forces & feedback', verbs:['drives','constrains','bottlenecks','damps','feeds back into','is upstream of']},
-  {id:'design',  name:'Design & making',tag:'craft & use',       verbs:['affords','scaffolds','reframes','trades off against','operationalizes','prototypes']},
-  {id:'practice',name:'Practice & power',tag:'people & norms',   verbs:['legitimizes','governs','mediates','enacts','situates','negotiates']},
-  {id:'stance',  name:'Stance & value', tag:'orientation',       verbs:['honors','resists','mourns','inherits from','answers','betrays']},
-];
+const PLAIN_VERBS = ['leads to','depends on','is part of','goes against','is the same as','sets up'];
 
-const OPENERS = [
-  'this means that',
-  'this explains why',
-  'these are both about',
-  'you can’t have this without that —',
-  'this is an example of',
-  'these pull against each other because',
-  'these don’t obviously touch, except',
-];
+/** How many of the student's own Link Labels the coin-time row offers. */
+const SUGGESTED_LABELS = 12;
+
 
 function EmptyState({ caption }: { caption: string }) {
   return (
@@ -36,30 +34,91 @@ function EmptyState({ caption }: { caption: string }) {
   )
 }
 
-export default function ThrowTab() {
+/**
+ * The four moves of a thread, named rather than abbreviated.
+ *
+ * `railN` indexes this: 0 nothing picked · 1 one picked · 2 both picked, no
+ * sentence · 3 sentence written. `says` is the line under the bar, so the
+ * student reads what to do now rather than inferring it from a lit pill.
+ */
+const STEPS: { label: string; says: string }[] = [
+  {
+    label: "Pick a concept",
+    says: "Press Select on a concept in the warp — one you have evidence for in this reading.",
+  },
+  {
+    label: "Pick a second",
+    says: "Tap the concept you think it hangs together with. Two picked is what wakes the bench.",
+  },
+  {
+    label: "Say how they relate",
+    says: "Write it as a sentence you would defend out loud. Long and awkward is fine — the sentence IS the thread.",
+  },
+  {
+    label: "Throw the thread",
+    says: "Throw it, and the pair is joined. Afterwards you can label the link with a short word, so a word of yours can recur.",
+  },
+]
+
+/* `onGotoPassage` briefly went with the concept popover on 2026-08-18 and came
+   straight back: the warp card lists a concept's evidence in place now, and a
+   quoted passage you cannot open is a worse version of the popover it
+   replaced (TJ: "clicking on the passage in a concept card should take you to
+   the reading passage"). */
+export default function ThrowTab({ onGotoPassage, pair }: {
+  onGotoPassage?: (passage: Passage) => void
+  /**
+   * A pair picked on 03's cloth and sent here (TJ, 2026-08-18: "put you in
+   * linking with the 2 concept nodes populating the 'throw a thread'"). In
+   * pick order — first picked is the From.
+   */
+  pair?: readonly [string, string] | null
+} = {}) {
   // Scoped for what this reading is about; whole for anything that has to be
-  // TRUE. A thread that runs out of this reading has one end outside it, so
-  // label lookups and the evidence check both read the whole graph.
-  const { state, scoped, scope, addEdge, editEdge, removeEdge, flash, setUndoStack, setRedoStack } = useLoom()
-  const { titleOf } = useReadings()
+  // TRUE. The thread lists are `scoped` — this reading's own work, and since
+  // 2026-08-09 only that — while the evidence check, the duplicate-pair guard
+  // and the coined-label vocabulary all read the whole graph, because those
+  // are facts about the student rather than about this bench.
+  const { state, scoped, scope, addEdge, editEdge, removeEdge, attachLink, flash, setUndoStack, setRedoStack , editConcept } = useLoom()
+  const { byId: readingsById } = useReadings()
+  const titleOf = (id: string) => readingsById.get(id)?.title ?? id
+  /* The warp's concept popover lived here — state, a top-layer element and the
+     geometry that kept it beside its row — until 2026-08-18. Removed with the ●
+     that opened it; see the tombstone in the JSX below for what went with it. */
   const { confirm, notify } = useDialog()
   const [pairA, setPairA] = useState<string | null>(null)
   const [pairB, setPairB] = useState<string | null>(null)
   const [drawn, setDrawn] = useState(false)
   const [sentence, setSentence] = useState("")
-  const [namingFor, setNamingFor] = useState<string | null>(null)
-  const [nameDraft, setNameDraft] = useState("")
-  const [moreTongues, setMoreTongues] = useState(false)
-  const [showOutside, setShowOutside] = useState(false)
-  const [outsideFilter, setOutsideFilter] = useState("")
-  const nameInputRef = useRef<HTMLInputElement>(null)
+  /**
+   * WHICH THREAD IS OPEN — one card, and one disclosure per card (TJ,
+   * 2026-08-19: "in the others isnt the description and label directly
+   * editable?"). This was four pieces of state: which row's LABEL fold was
+   * open, its draft and its input ref, and the same three again for the
+   * SENTENCE, kept mutually exclusive by hand because two open editors put the
+   * sentence on screen twice. The card opens once and both texts are fields in
+   * it, saved on blur, so the drafts and the exclusion go with them.
+   *
+   * The sentence is still editable where it was written (TJ, 2026-08-12:
+   * "threads need to be editable in Threads in this reading — the description,
+   * not the concepts"). The ends stay fixed on purpose: re-pointing a thread is
+   * a different claim, and throwing a new one says so honestly.
+   */
+  const [openFor, setOpenFor] = useState<string | null>(null)
 
-  // A tapped suggestion is a starting point, not the answer — return focus to
-  // the field (v14 did the same) so the student can edit it into their own word.
-  const pickWord = (word: string) => {
-    setNameDraft(word)
-    nameInputRef.current?.focus()
-  }
+  /**
+   * Put a label back on a thread — the one path undo and redo both take.
+   *
+   * A word the student already owns is re-ATTACHED, so stepping back over a
+   * tapped chip leaves the thread pointing at the Link object rather than at
+   * a string that merely agrees with it. Anything else goes through
+   * `editEdge`, which coins the object server-side and clears it on "".
+   */
+  const restoreLabel = useCallback((edgeId: string, label: string | null) => {
+    const link = label ? findLink(state.links, label) : undefined
+    if (link) attachLink(edgeId, link.id)
+    else editEdge(edgeId, { handle: label ?? "" })
+  }, [state.links, attachLink, editEdge])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -73,7 +132,7 @@ export default function ThrowTab() {
           setRedoStack(prevRedo => {
             if (prevRedo.length === 0) return prevRedo;
             const action = prevRedo[prevRedo.length - 1];
-            editEdge(action.edgeId, { handle: action.to ?? undefined });
+            restoreLabel(action.edgeId, action.to);
             setUndoStack(prevUndo => [...prevUndo, action]);
             return prevRedo.slice(0, -1);
           });
@@ -82,7 +141,7 @@ export default function ThrowTab() {
           setUndoStack(prevUndo => {
             if (prevUndo.length === 0) return prevUndo;
             const action = prevUndo[prevUndo.length - 1];
-            editEdge(action.edgeId, { handle: action.from ?? undefined });
+            restoreLabel(action.edgeId, action.from);
             setRedoStack(prevRedo => [...prevRedo, action]);
             return prevUndo.slice(0, -1);
           });
@@ -94,7 +153,7 @@ export default function ThrowTab() {
         setRedoStack(prevRedo => {
           if (prevRedo.length === 0) return prevRedo;
           const action = prevRedo[prevRedo.length - 1];
-          editEdge(action.edgeId, { handle: action.to ?? undefined });
+          restoreLabel(action.edgeId, action.to);
           setUndoStack(prevUndo => [...prevUndo, action]);
           return prevRedo.slice(0, -1);
         });
@@ -102,12 +161,47 @@ export default function ThrowTab() {
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editEdge, setRedoStack, setUndoStack]);
+  }, [restoreLabel, setRedoStack, setUndoStack]);
 
   // Whole-graph: a concept evidenced in an earlier reading is not evidence-less
   // just because this reading has not quoted it.
-  const bytesOf = (conceptId: string) => state.bytes.filter(b => b.conceptId === conceptId)
   const conceptById = (id: string) => state.concepts.find(c => c.id === id)
+
+  /**
+   * THE PAIR ARRIVING FROM THE CLOTH. Loaded into the same two slots the warp
+   * list fills, because it is the same act — the cloth is only a second place
+   * to see which two concepts have never crossed.
+   *
+   * DURING RENDER, not in an effect. React's own "adjusting state when a prop
+   * changes" pattern, and here it is also the only one the lint allows:
+   * `react-hooks/set-state-in-effect` rejects the effect version outright, and
+   * an effect would paint an empty bench for a frame before filling it.
+   *
+   * BY IDENTITY, not by contents. The Workbench mints a fresh tuple on every
+   * press, so picking the same two concepts a second time loads them again,
+   * while merely walking back into 02 does not reload the bench over whatever
+   * the student has picked since.
+   *
+   * The sentence in progress is left alone. Replacing the pair by hand does
+   * not clear it either, and a half-written claim is the student's.
+   */
+  const sentenceRef = useRef<HTMLTextAreaElement>(null)
+  const [loadedPair, setLoadedPair] = useState<readonly [string, string] | null>(null)
+  if (pair && pair !== loadedPair) {
+    setLoadedPair(pair)
+    setPairA(pair[0])
+    setPairB(pair[1])
+    setDrawn(false)
+  }
+  // The popup on the cloth promises "say how they hang together first", so
+  // land in the field that asks for it. After the paint that makes this
+  // station's panel visible — `.panel` hides the others with `display`, and
+  // focus on a display:none element is silently dropped. `preventScroll`
+  // because `main` scrolls here and the bench is already in view.
+  useEffect(() => {
+    if (!loadedPair) return
+    window.setTimeout(() => sentenceRef.current?.focus({ preventScroll: true }), 0)
+  }, [loadedPair])
 
   const togglePick = (id: string) => {
     if (pairA === id) setPairA(null)
@@ -118,17 +212,17 @@ export default function ThrowTab() {
     setDrawn(false)
   }
 
-  // The shuttle draws inside this reading by default; `across` opens it to the
-  // whole graph once another reading has concepts. Chance picks the pair —
-  // every judgment about whether they cross is still the student's.
-  const drawPair = async (across = false) => {
-    const cs = across ? state.concepts : scoped.concepts
+  // The shuttle draws from this reading's concepts, and only those. It no
+  // longer takes an `across` flag: linking works on this reading (TJ,
+  // 2026-08-08), and since the whole weave left the app (2026-08-11) a reading
+  // is the only scope there is. Chance picks the pair; every judgment about
+  // whether they cross is still the student's.
+  const drawPair = async () => {
+    const cs = scoped.concepts
     if (cs.length < 2) {
       await notify({
         title: "Not enough warp yet.",
-        body: across
-          ? "Lay at least two concepts, then the shuttle has something to draw between."
-          : "Lay at least two concepts in this reading on 01 · Open, then the shuttle has something to draw between.",
+        body: "Lay at least two concepts in this reading on 01 · Reading, then the shuttle has something to draw between.",
       })
       return
     }
@@ -164,246 +258,293 @@ export default function ThrowTab() {
   }
 
   const handleThrow = async () => {
-    if (!pairA || !pairB || !sentence.trim()) return
+    // The sentence is encouraged, never required (P0.3): connecting first and
+    // describing later is the golden path.
+    if (!pairA || !pairB) return
     await addEdge(pairA, pairB, sentence.trim())
     setPairA(null)
     setPairB(null)
     setDrawn(false)
     setSentence("")
-    flash('thread thrown — coin a term for it below, when you like')
+    flash('thread thrown — label the link below, when you like')
   }
 
-  const handleOpenerClick = (opener: string) => {
-    let newSentence = sentence;
-    for (const o of OPENERS) {
-      if (newSentence.startsWith(o + ' ')) {
-        newSentence = newSentence.slice((o + ' ').length);
-      }
+
+  /**
+   * Save the sentence. Empty is allowed and is not a deletion — throwing
+   * without one is legal (P0.3, "the description is the thread, and you can
+   * throw now and write it later"), so clearing it here returns the thread to
+   * exactly the state a fresh throw can be in.
+   *
+   * Not on the undo stack: ⌘Z here is the LABEL history (`restoreLabel`
+   * reattaches Link objects), and folding a sentence into it would make one
+   * keystroke step back through two different kinds of act. The textarea's own
+   * undo works while the card is open, which is where a typo gets fixed.
+   *
+   * The card stays OPEN after a save. It commits on blur now, so closing on
+   * every commit would shut the card the moment you tabbed from the
+   * description to the label.
+   */
+  const handleSaveSentence = (edgeId: string, previous: string, next: string) => {
+    const s = next.trim()
+    if (s !== previous.trim()) {
+      editEdge(edgeId, { sentence: s })
+      flash(s ? "description saved" : "description cleared — the thread stays")
     }
-    setSentence(opener + ' ' + newSentence);
   }
 
-  const toggleNamer = (edgeId: string, currentHandle: string | null) => {
-    if (namingFor === edgeId) {
-      setNamingFor(null)
-    } else {
-      setNamingFor(edgeId)
-      setNameDraft(currentHandle ?? "")
+  /**
+   * Tap one of your own labels: ATTACH the object, do not copy its word. The
+   * undo stack still records it as a label change, so ⌘Z behaves the same
+   * whether the word was tapped or typed.
+   *
+   * It no longer closes anything. It used to shut the naming fold because the
+   * act was finished and a Save button that did nothing would invite a second
+   * write; there is no Save button now, and shutting the card would hide the
+   * label the tap just put in the field.
+   */
+  const attachOwn = (edgeId: string, link: { id: string; label: string }) => {
+    const edge = state.edges.find((x) => x.id === edgeId)
+    const previous = edge ? labelOfEdge(edge, state.links) : ""
+    if (previous !== link.label) {
+      setUndoStack(prev => [...prev, { edgeId, from: previous || null, to: link.label }])
+      setRedoStack([])
     }
-    setMoreTongues(false)
+    attachLink(edgeId, link.id)
+    flash("label attached")
   }
 
-  const handleSaveName = (edgeId: string, previousValue: string | null) => {
-    const h = nameDraft.trim()
-    if (h !== (previousValue ?? "")) {
-      setUndoStack(prev => [...prev, { edgeId, from: previousValue, to: h }]);
-      setRedoStack([]);
-      editEdge(edgeId, { handle: h });
-    }
-    setNamingFor(null);
-    setMoreTongues(false);
-    flash(h ? 'term coined' : 'left as a sentence');
+  const handleSaveName = (edgeId: string, previousValue: string | null, next: string) => {
+    const h = next.trim()
+    if (h === (previousValue ?? "")) return
+    setUndoStack(prev => [...prev, { edgeId, from: previousValue, to: h }]);
+    setRedoStack([]);
+    editEdge(edgeId, { handle: h });
+    flash(h ? 'link labelled' : 'left as a description');
   }
 
   const c1 = conceptById(pairA ?? "")
   const c2 = conceptById(pairB ?? "")
-  const both = !!(pairA && pairB && pairA !== pairB)
+  /* BOTH ENDS MUST RESOLVE, not merely be set. `pairA`/`pairB` are ids, and an
+     id whose concept is gone would otherwise wake the bench, light step 3, and
+     enable "Throw it" over an empty From slot — `addEdge` then posts a row
+     whose fromId does not exist and the insert fails with no dialog and no
+     flash. The cloth's pair refuses a deleted concept at the source now, and
+     this is the same refusal stated where the throw actually happens. */
+  const both = !!(pairA && pairB && pairA !== pairB && c1 && c2)
   const sent = sentence.trim()
   const railN = (!pairA && !pairB) ? 0 : (!both ? 1 : (!sent ? 2 : 3))
   const doLine = (!pairA && !pairB)
-    ? 'Tap two of your concepts to connect them.'
+    ? 'Select two of your concepts to connect them.'
     : (both ? 'Two picked — now say how they relate, on the right. →' : 'Good — now tap a second.')
 
   const byNamed = (a: { handle: string | null }, b: { handle: string | null }) =>
     (a.handle ? 1 : 0) - (b.handle ? 1 : 0)
   const orderedEdges = [...scoped.edges].sort(byNamed)
-  const orderedBridges = [...scoped.bridges].sort(byNamed)
-  const wholeWeave = isWholeWeave(scope)
+  // The Link List (model §2: "belongs to the User, spans Cloths") — since 5.1 the student's
+  // own Link OBJECTS, not strings scraped off threads. Two things follow. A
+  // label coined and never used is offered here, which is the whole reason
+  // for coining ahead. And tapping one ATTACHES that object rather than
+  // copying its text, so reaching for the same word twice cannot mint a
+  // near-duplicate; the design note's warning is that objects WITHOUT
+  // attachment silt the vocabulary up by string copy.
+  //
+  // Read off `state`, never `scoped` — labels cross readings even though,
+  // since 2026-08-09, the threads themselves do not. Most-used first so the
+  // vocabulary you actually lean on is nearest the hand, then alphabetical so
+  // the order is stable across renders. VocabularyTab is the list's full home.
+  const ownLabels = (() => {
+    const uses = usesOf(state.links, state.edges)
+    const all = state.links
+      .map((link) => ({ link, n: (uses.get(link.id) ?? []).length }))
+      .sort((a, b) => b.n - a.n || a.link.label.localeCompare(b.link.label))
+      .map((x) => x.link)
+    // Twelve chips is what the row holds before it becomes a wall of verbs.
+    // The count says what is not shown rather than quietly ending the list —
+    // this IS the Link List (model §2), and a truncated view of it that
+    // does not admit to being truncated misreports what the student owns.
+    return { shown: all.slice(0, SUGGESTED_LABELS), rest: Math.max(0, all.length - SUGGESTED_LABELS) }
+  })()
 
   // Concepts from the student's other readings, reachable and searchable but
   // out of the way. Never removed: threading this reading to an earlier one is
   // the move weeks 6-13 are built on.
   // Both bands are lists you SEARCH for a concept to pick, so both are A-Z.
   const warp = sortedByLabel(scoped.concepts)
-  const outside = sortedByLabel(
-    outsideFilter.trim()
-      ? scoped.outside.filter(c => c.label.toLowerCase().includes(outsideFilter.trim().toLowerCase()))
-      : scoped.outside
+
+  /**
+   * THE WARP ROW IS THE CONCEPT CARD (TJ, 2026-08-18: "we need to update the
+   * warp list to use the concept cards from the 'your work' concepts panel …
+   * they could be the same card with different color and formatting").
+   *
+   * BOTH LISTS ARE ABOUT THE READING (TJ, 2026-08-18: "your work concepts and
+   * the warp concepts are both about the reading"). The warp already listed
+   * `scoped.concepts`, but counted `state.passages` — the whole loom — so the
+   * list was this reading's and the number beside it was not. `passages` is
+   * now the reading's evidence, as in Your work, and `allPassages` is what
+   * lets the card tell "nothing anywhere" from "not in this one".
+   */
+  const renameConcept = useRenameConcept()
+  const coinConcept = useCoinConcept()
+  const [coining, setCoining] = useState(false)
+  const conceptRow = (c: typeof state.concepts[number]) => (
+    <ConceptCard
+      key={c.id}
+      concept={c}
+      passages={scoped.passages.filter((b) => b.conceptIds.includes(c.id))}
+      allPassages={state.passages}
+      concepts={state.concepts}
+      titleOf={titleOf}
+      mode="pick"
+      onGotoPassage={onGotoPassage}
+      /* 02 opens to the same three sections as 01 and 04 (TJ, 2026-08-18). No
+         unfile: this station links concepts, it does not keep their filings. */
+      edit={{
+        isOpen: false,
+        onToggle: () => {},
+        onRename: (input) => renameConcept(c, input),
+        onEditDef: (def) => editConcept(c.id, { def }),
+      }}
+      pick={pairA === c.id ? 1 : pairB === c.id ? 2 : null}
+      onPick={() => togglePick(c.id)}
+    />
   )
 
-  const conceptRow = (c: typeof state.concepts[number], fromElsewhere: boolean) => {
-    const isPicked = pairA === c.id || pairB === c.id
-    const noev = bytesOf(c.id).length === 0
-    const where = fromElsewhere ? readingsOf(c.id, state.bytes).map(titleOf) : []
-    return (
-      <div
-        key={c.id}
-        className={`crow ${isPicked ? "picked" : ""}`}
-        onClick={() => togglePick(c.id)}
-        title={fromElsewhere ? "evidenced in another reading — tap to thread it to this one" : "tap to load into the bench"}
-      >
-        <div className="clabel">
-          {c.label}
-          {where.length > 0 && <span className="fromwhere">{where.join(" · ")}</span>}
-        </div>
-        {isPicked
-          ? <div className="pickedtag">PICK {pairA === c.id ? 1 : 2}</div>
-          : (noev && <div className="pickedtag" style={{ color: "var(--red)" }} title="no captured passage — every concept should trace to a byte">no evidence</div>)}
-      </div>
-    )
-  }
-
+  /**
+   * THE ROW IS THE THREAD CARD (docs/thread-card.md). It was hand-rolled here,
+   * and six other places hand-rolled their own — three different stand-ins for
+   * an unlabelled thread between them, and two pill vocabularies for one fact.
+   * This station keeps the whole of what it had: the card draws the trip, the
+   * sentence and the meta line, and the two folds stay HERE because their
+   * fields, their chips and their undo stack are 02's and not a card's.
+   *
+   * Two things changed in the drawing, both because the card refuses to keep
+   * them. The ends are no longer cut at 30 characters — the trip wraps
+   * instead. And the label now resolves through `linkId` before the legacy
+   * `handle` (`labelOf`), so a thread carrying a Link object and an empty
+   * handle stops reading as unlabelled here while 04 · Vocabulary calls it
+   * labelled.
+   */
   const threadRow = (e: typeof state.edges[number]) => {
-    const fromC = conceptById(e.fromId)
-    const toC = conceptById(e.toId)
-    // v14 renders a dangling end as "?" rather than dropping the row:
-    // a thread the student threw should stay visible and removable,
-    // not vanish silently because one end went missing.
-    const sel = namingFor === e.id
-    // On a bridge, name the reading the far end came from — otherwise the row
-    // reads as an unexplained stranger among this reading's concepts.
-    const inScope = new Set(scoped.concepts.map(c => c.id))
-    const far = !wholeWeave
-      ? [e.fromId, e.toId].find(id => !inScope.has(id))
-      : undefined
-    const farWhere = far ? readingsOf(far, state.bytes).map(titleOf) : []
-
+    const current = labelOfEdge(e, state.links)
     return (
-      <div key={e.id} className={`thread ${sel ? "sel" : ""}`}>
-        <div className="trip">
-          <b>{fromC ? short(fromC.label, 30) : "?"}</b>{' '}
-          {e.handle
-            ? <span className="v">{e.handle}</span>
-            : <span className="v loosev">{short(e.sentence, 38)}</span>}{' '}
-          <b>{toC ? short(toC.label, 30) : "?"}</b>
-        </div>
-        <div className="sent">“{e.sentence}”</div>
-        <div className="tmeta">
-          {e.handle
-            ? <span className="pill beaten">term</span>
-            : <span className="pill loose">sentence</span>}
-          {farWhere.length > 0 && <span className="pill">from {farWhere.join(" · ")}</span>}
-          <span className="act" onClick={() => toggleNamer(e.id, e.handle)}>
-            {sel ? 'close' : (e.handle ? 'edit term' : 'coin a term')}
-          </span>
-          <span
-            className="rm"
-            onClick={async () => {
-              const ok = await confirm({
-                title: "Remove this thread?",
-                body: <>The sentence goes with it: <i>&ldquo;{short(e.sentence, 120)}&rdquo;</i> Both concepts stay.</>,
-                confirmLabel: "Remove thread",
-                danger: true,
-              })
-              if (!ok) return
-              if (namingFor === e.id) setNamingFor(null)
-              removeEdge(e.id)
-            }}
-          >remove</span>
-        </div>
-        {sel && (
-          <div className="distill">
-            <div className="rnote"><b>Coin a term</b> (optional) — you&apos;ve already said how they relate; a short word lets this <i>kind</i> of link recur across your weave.</div>
-            <div className="form-row" style={{ margin: "6px 0 8px" }}>
-              <input
-                ref={nameInputRef}
-                className="tinput"
-                value={nameDraft}
-                onChange={(ev) => setNameDraft(ev.target.value)}
-                placeholder="your word… e.g. leads to · contradicts · is part of"
-                autoFocus
-              />
-            </div>
-            <div className="rnote">Stuck for a word? Tap an everyday suggestion — or open <b>more tongues</b> for other fields&apos; vocabularies:</div>
-            <div className="chips">
-              {REGISTERS[0].verbs.map(v => (
-                <span key={v} className="verbchip" onClick={() => pickWord(v)}>{v}</span>
-              ))}
-            </div>
-            <span
-              className={`distilltoggle ${moreTongues ? 'open' : ''}`}
-              style={{ marginTop: "8px" }}
-              onClick={() => setMoreTongues(!moreTongues)}
-            >
-              <span className="tw">▸</span> more tongues
-            </span>
-            {moreTongues && REGISTERS.slice(1).map(r => (
-              <div key={r.id} style={{ marginTop: "8px" }}>
-                <span className="cap">{r.name} · {r.tag}</span>
-                <div className="chips" style={{ marginTop: "4px" }}>
-                  {r.verbs.map(v => (
-                    <span key={v} className="verbchip borrowed" onClick={() => pickWord(v)}>{v}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <div style={{ marginTop: "10px" }}>
-              <button className="btn mini" onClick={() => handleSaveName(e.id, e.handle)}>Save term</button>
-            </div>
-          </div>
-        )}
-      </div>
+      <ThreadCard
+        key={e.id}
+        thread={e}
+        // Whole-graph, not scoped: a dangling end is drawn "?" by the card, and
+        // it should only ever be "?" when the concept is genuinely gone.
+        from={conceptById(e.fromId)}
+        to={conceptById(e.toId)}
+        links={state.links}
+        mode="edit"
+        edit={{
+          open: openFor === e.id,
+          onToggle: () => setOpenFor((v) => (v === e.id ? null : e.id)),
+          onSaveSentence: (next) => handleSaveSentence(e.id, e.sentence, next),
+          onSaveLabel: (next) => handleSaveName(e.id, current || null, next),
+          onAttachLink: (link) => attachOwn(e.id, link),
+          ownLabels,
+          suggestions: PLAIN_VERBS,
+          onRemove: async () => {
+            const ok = await confirm({
+              title: "Remove this thread?",
+              body: <>The description goes with it: <i>&ldquo;{short(e.sentence, 120)}&rdquo;</i> Both concepts stay.</>,
+              confirmLabel: "Remove thread",
+              danger: true,
+            })
+            if (!ok) return
+            if (openFor === e.id) setOpenFor(null)
+            removeEdge(e.id)
+          },
+        }}
+      />
     )
   }
 
   return (
     <>
-      <div className="rail">
-        {['pick', 'pick', 'say', 'throw'].map((label, r) => (
+      {/* The warp's concept POPOVER stood here until 2026-08-18, opened by a ●
+          on every row (TJ: "the dot on the existing warp concept card is
+          unnecessary"). The row IS a ConceptCard now, so the dot opened a
+          ConceptCard from inside one.
+
+          DECLARED, because it is more than a dot: the popover carried the
+          concept's Description and its evidence passages, each a door into
+          01 · Reading, and it was the only route to either from 02. The row
+          card shows the name and what backs it, not the gloss. Restoring that
+          reach means a disclosure on the card that does not fight the row's own
+          tap-to-pick — the card is shared with Your work, which expands in
+          place, so the mechanism already exists. */}
+
+      {/* Four pills reading "pick · pick · say · throw" said the shape of the
+          move but not the move. Numbered, named, and with the current step
+          spelled out underneath, so the bar teaches instead of labelling. */}
+      <div className="rail steprail">
+        {STEPS.map((step, r) => (
           <span key={r} style={{ display: 'contents' }}>
-            {r > 0 && <span className="rsep">·</span>}
-            <span className={`rstep ${r === railN ? 'now' : ''} ${r < railN ? 'done' : ''}`}>{label}</span>
+            {r > 0 && <span className="rsep">→</span>}
+            <span className={`rstep ${r === railN ? 'now' : ''} ${r < railN ? 'done' : ''}`}>
+              <span className="stepn">{r + 1}</span> {step.label}
+            </span>
           </span>
         ))}
       </div>
-      <div className="two">
-        <div className="card">
-          <h2>The warp <span className="n">{scoped.concepts.length ? `(${scoped.concepts.length})` : ''}</span></h2>
+      <p className="hint steprailnote">{STEPS[railN]?.says}</p>
+      <div className="three">
+        <div className="card" id="warp">
+          <h2 className="cardhead">
+            <span>The warp <span className="n">{scoped.concepts.length ? `(${scoped.concepts.length})` : ''}</span></span>
+            {/* The same + as the passage card's, for the same kind of act:
+                one more concept, coined where you are looking at concepts (TJ,
+                2026-08-18). It opens the shared NameConceptCard rather than a
+                field of its own, so the three homes cannot drift. */}
+            <button
+              type="button"
+              className="pchip-add"
+              onClick={() => setCoining((v) => !v)}
+              aria-expanded={coining}
+              /* A + says nothing on its own, so its label has to carry the
+                 whole act (TJ, 2026-08-18: "in warp we need a less cryptic
+                 tooltip"). "Name a concept before its evidence" is the heading
+                 the FORM already wears, and read cold off a control it names a
+                 condition rather than an offer. This says what pressing does
+                 and when you would want it. */
+              aria-label="Add a concept before you have found evidence in the reading"
+              title="Add a concept before you have found evidence in the reading"
+            >+</button>
+          </h2>
+          {coining && (
+            <NameConceptCard
+              onAdd={coinConcept}
+              onDone={() => setCoining(false)}
+            />
+          )}
           <p className="do">{doLine}</p>
           <p className="hint">
-            {wholeWeave
-              ? <>Every concept you have made, across all your readings. Tap one, then a second.</>
-              : <>The concepts this reading evidences. Tap one, then a second — or reach into another reading below, which is how a thread comes to run between texts.</>}
+            The concepts <b>this reading</b> evidences — the ones you captured a
+            passage for here. Select one, then a second — or tap a name to open it.
           </p>
+          {/* Ruled 2026-08-08 (TJ): linking works on this reading's concepts.
+              A concept you met elsewhere joins the warp the honest way — you
+              find a passage HERE that embodies it and file it under that same
+              concept, which is offered by name while you capture.
+
+              A ghostnote used to count them here — "17 more concepts from your
+              other readings are not listed here…" with the recipe for bringing
+              one in. Gone (TJ, 2026-08-12: "not necessary and is leading"). The
+              line above already says what this list IS, and a running count of
+              what is absent reads as an instruction to go and fetch it. */}
 
           <div className="scrollbox">
             {warp.length === 0 ? (
               <EmptyState caption="lay some warp on 01 — open first" />
-            ) : warp.map(c => conceptRow(c, false))}
-
-            {scoped.outside.length > 0 && (
-              <div className="outsideband">
-                <button
-                  type="button"
-                  className={`bandtoggle ${showOutside ? "open" : ""}`}
-                  aria-expanded={showOutside}
-                  onClick={() => setShowOutside(v => !v)}
-                >
-                  <span className="tw">▸</span> from your other readings
-                  <span className="n">({scoped.outside.length})</span>
-                </button>
-                {showOutside && (
-                  <>
-                    <div className="quietrow" style={{ padding: "6px 10px" }}>
-                      <input
-                        value={outsideFilter}
-                        onChange={e => setOutsideFilter(e.target.value)}
-                        placeholder="find a concept from another reading…"
-                      />
-                    </div>
-                    {outside.length === 0
-                      ? <p className="ghostnote" style={{ padding: "0 10px 10px" }}>nothing by that name.</p>
-                      : outside.map(c => conceptRow(c, true))}
-                  </>
-                )}
-              </div>
-            )}
+            ) : warp.map(c => conceptRow(c))}
           </div>
         </div>
 
-        <div className="card">
+        <div className="card" id="throwBench">
           <h2>Throw a thread</h2>
-          <p className="hint calm">When two are picked, say how they hang together — long and awkward is fine. The sentence <i>is</i> the thread. A good check: does it read aloud as a claim you&apos;d defend in section?</p>
+          <p className="hint calm">When two are picked, say how they hang together — long and awkward is fine. The description <i>is</i> the thread. A good check: does it read aloud as a claim you&apos;d defend in section?</p>
 
           <div className="benchbar">
             <span className="cap">the pair</span>
@@ -412,15 +553,9 @@ export default function ThrowTab() {
             <button className="btn ghost mini" onClick={() => drawPair()} title="chance picks two threads you'd never elect — you do all the judging">
               ⤳ let the shuttle draw
             </button>
-            {!wholeWeave && scoped.outside.length > 0 && (
-              <button
-                className="btn ghost mini"
-                onClick={() => drawPair(true)}
-                title="chance reaches into your other readings too — you still do all the judging"
-              >
-                ⤳ across readings
-              </button>
-            )}
+            {/* No "across readings" draw here any more (TJ, 2026-08-08): this
+                bench links THIS reading's concepts — and since the whole weave
+                left the app (2026-08-11), a reading is the only scope there is. */}
           </div>
 
           <div className="slots">
@@ -429,7 +564,7 @@ export default function ThrowTab() {
               {c1 ? (
                 <>
                   <span className="clear" onClick={() => handleClearSlot('A')}>✕</span>
-                  {c1.label}
+                  <ConceptName concept={c1} />
                 </>
               ) : <span className="ph">tap a concept on the left</span>}
             </div>
@@ -444,7 +579,7 @@ export default function ThrowTab() {
               {c2 ? (
                 <>
                   <span className="clear" onClick={() => handleClearSlot('B')}>✕</span>
-                  {c2.label}
+                  <ConceptName concept={c2} />
                 </>
               ) : <span className="ph">tap a concept on the left</span>}
             </div>
@@ -457,37 +592,63 @@ export default function ThrowTab() {
               `.sleeper.asleep` fades it and blocks clicks with its ::after. */}
           <div className={`sleeper ${both ? "" : "asleep"}`}>
             <div className="sleepmsg">pick two concepts on the left — the bench wakes when the pair is loaded</div>
-            <div className="form-row">
-              <span className="label">The relationship, however awkwardly — your sentence</span>
-              <div className="chips" style={{ margin: "2px 0 6px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                {OPENERS.map(o => (
-                  <span key={o} className="openchip" onClick={() => handleOpenerClick(o)}>
-                    {o}…
-                  </span>
-                ))}
-              </div>
-              <textarea
-                placeholder="…or just start typing. Long and awkward is fine."
-                value={sentence}
-                onChange={(e) => setSentence(e.target.value)}
-              />
-            </div>
-            <button className="btn" onClick={handleThrow} disabled={!sent}>Throw it</button>
-            {/* v14 alerted the reason on click and showed the standing note
-                always; with a disabled button the reason has to be visible
-                instead — so the two take turns rather than stacking. */}
+            {/* The bench's own field, and the cloth's create-thread card draws
+                the same one — see ui/LinkDescription. */}
+            <LinkDescription value={sentence} onChange={setSentence} textareaRef={sentenceRef} />
+            <button id="throwIt" className="btn" onClick={handleThrow} disabled={!both}>Throw it</button>
+            {/* The sentence is encouraged, never required (P0.3) — the note
+                coaches toward it instead of the button withholding the throw. */}
             <p className="ghostnote" style={{marginTop: "7px"}}>
               {sent
-                ? "Thrown threads land below. When a relationship recurs, coin a short term for it (optional) — that's how your vocabulary grows."
-                : "Say how they hang together — however awkwardly. The sentence is the thread."}
+                ? "Thrown threads land below. When a relationship recurs, label the link with a short word (optional) — that's how your vocabulary grows."
+                : "Say how they hang together — however awkwardly. The description is the thread, and you can throw now and write it later."}
             </p>
           </div>
+        </div>
 
-          <h3 style={{fontFamily: "var(--display)", fontSize: "17px", borderBottom: "1px solid var(--rule)", paddingBottom: "5px", margin: "18px 0 6px"}}>
-            {wholeWeave ? "Threads thrown" : "Threads in this reading"}
+        {/* The threads are their own column, not a strip under the bench (TJ,
+            2026-08-12: "this seems like it is better suited to 3 cols"). The
+            station is three moves — the warp you pick from, the bench you
+            throw at, what you have thrown — and the third used to be the one
+            you had to scroll past the whole bench to reach, which is where
+            "edit description" and "edit label" live. A heading of its own, in
+            the same shape as its two siblings. */}
+        <div className="card" id="threadList">
+          <h2 style={{ display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" }}>
+            Threads in this reading
             {' '}
-            <span className="n" style={{fontFamily: "var(--mono)", fontSize: "11px", color: "var(--grey)"}}>{orderedEdges.length ? `(${orderedEdges.length})` : ''}</span>
-          </h3>
+            <span className="n">{orderedEdges.length ? `(${orderedEdges.length})` : ''}</span>
+            {/* Threads download where they are thrown (TJ, 2026-08-10). Both
+                ends are named in the file: an id says nothing away from Loom. */}
+            {orderedEdges.length > 0 && (
+              <span style={{marginLeft: "auto"}}>
+                <ObjectDownload
+                  kind="threads"
+                  noun="threads"
+                  slug={scopeLabelOf(scope.key, titleOf)}
+                  tip="these threads, each naming both of its concepts"
+                  json={(p) => JSON.stringify(buildThreadsExport(state, scope.key, p, titleOf), null, 2)}
+                  markdown={(p) => buildThreadsMarkdown(state, scope.key, p, titleOf)}
+                />
+              </span>
+            )}
+          </h2>
+
+          {/* What "edit label" is FOR (TJ, 2026-08-12). The control sits on
+              every row with no account of why anyone would press it, and the
+              answer is a movement rather than a field: the sentence comes
+              first and stays the thread, and a label is what you distil out of
+              it once you have written the same relation a few times. Shown
+              only with threads on screen — with none, it explains a control
+              nobody can see. */}
+          {orderedEdges.length > 0 && (
+            <p className="hint">
+              As a thread matures you can promote its description to a <b>label</b> — one
+              short word for the relation, chosen because it captures the essence of what
+              you already said. That is what <i>edit label</i> on a row is for. A thread
+              that stays a description is finished work, not a draft.
+            </p>
+          )}
 
           <div className="scrollbox">
             {orderedEdges.length === 0 ? (
@@ -495,21 +656,17 @@ export default function ThrowTab() {
             ) : orderedEdges.map(threadRow)}
           </div>
 
-          {/* Bridges are the point of the back half of the term, so they get
-              their own band and their own count rather than being filtered out
-              of sight. Counted, never judged. */}
-          {!wholeWeave && orderedBridges.length > 0 && (
-            <>
-              <h3 style={{fontFamily: "var(--display)", fontSize: "17px", borderBottom: "1px solid var(--rule)", paddingBottom: "5px", margin: "18px 0 6px"}}>
-                Threads that run out of this reading{' '}
-                <span className="n" style={{fontFamily: "var(--mono)", fontSize: "11px", color: "var(--grey)"}}>({orderedBridges.length})</span>
-              </h3>
-              <p className="hint">Each of these ties a concept here to one you met in another text. They belong to both readings and show up in either.</p>
-              <div className="scrollbox">
-                {orderedBridges.map(threadRow)}
-              </div>
-            </>
-          )}
+          {/* No band of threads from elsewhere (TJ, 2026-08-09: "threads from
+              other readings should not show up in the linking"). It used to
+              show `scoped.bridges` — threads with one end outside this
+              reading — under "Threads that run out of this reading". Since the
+              ruling of 2026-08-08 removed the outside-concepts band and the
+              across-readings shuttle, a student can no longer MAKE a bridge
+              from inside a reading, so by construction every row in that band
+              had been thrown somewhere else. It had become a list of other
+              readings' work sitting in this reading's Linking. The threads
+              still exist — the workbench footer counts them as "threads out" —
+              they are simply not this bench's business. */}
         </div>
       </div>
     </>

@@ -3,7 +3,7 @@
 // The shelf — the home screen, and the course itself.
 //
 // `course_source` already carries week / core / visibility, so grouping by week
-// IS the syllabus (deployment notes §4: two core readings a week, weeks 2-13).
+// IS the syllabus (deployment notes §3: two core readings a week, weeks 2-13).
 // Each card carries the student's own counts for that reading. Counted, never
 // scored: no completion, no checkmarks, no "not started" — red line #7 holds
 // only if the shelf reports what the student did and never grades it.
@@ -13,29 +13,29 @@ import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
 import { useReadings, type ReadingMeta } from "@/components/providers/ReadingsProvider"
-import { createOwnReading, draftMetadataForOwnSource, updateOwnReadingMetadata } from "@/actions/sources"
+import { archiveOwnReading, createOwnReading, updateOwnReadingMetadata } from "@/actions/sources"
+import { draftMetadataForOwnSource } from "@/lib/reads"
 import { uploadOwnReading } from "@/lib/readingUploadClient"
 import { MAX_READING_BYTES, MAX_READING_LABEL, formatBytes } from "@/lib/readingUpload"
 import { tallyByReading } from "@/lib/scope"
+import { short } from "@/lib/clothMath"
+import { timeAgo } from "@/lib/utils"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
-import ShelfSearch from "@/components/shelf/ShelfSearch"
-import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
+import SignedOutWelcome from "@/components/ui/SignedOutWelcome"
 import JourneyNav from "@/components/ui/JourneyNav"
+import StationSearch from "@/components/ui/StationSearch"
+import Identity from "@/components/ui/Identity"
+import { useDialog } from "@/components/providers/DialogProvider"
 
-export default function Shelf() {
+export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeployment?: boolean }) {
   // See the note in Workbench: `status` is what distinguishes "nobody is
   // signed in" from "we have not asked yet".
   const { data: session, status } = useSession()
-  const { state, isLoading, loadExample, flash } = useLoom()
+  const { state, isLoading } = useLoom()
   const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
-  const [exampleBusy, setExampleBusy] = useState(false)
-  // The search bar sits behind a toggle, the reading's own ⌕ Search idiom.
-  // While a query is live the results own the page; clearing the box — or
-  // closing the panel — puts the week-grouped shelf back exactly as it was.
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [searchActive, setSearchActive] = useState(false)
-
   const tallies = useMemo(() => tallyByReading(state), [state])
+  const { confirm, notify } = useDialog()
+  const [removing, setRemoving] = useState<string | null>(null)
 
   // Syllabus order, with unscheduled readings after the weeks rather than
   // sorted into week 0.
@@ -57,12 +57,66 @@ export default function Shelf() {
     })
   }, [courseReadings])
 
-  const untethered = state.bytes.filter((b) => !b.sourceId).length
+  const untethered = state.passages.filter((b) => !b.sourceId).length
+
+  /**
+   * Take a reading of your own off the shelf.
+   *
+   * Allowed even when there is work behind the card (TJ, 2026-08-17), but
+   * never silently: the warning says exactly what stays and what goes. What
+   * goes is the card and the door to that reading's own Capture Log; what
+   * stays is every passage, concept and thread, which is why this is worth
+   * doing at all rather than refusing.
+   *
+   * `refresh()` rather than optimistic removal: the shelf reads its readings
+   * from the server, and a card that vanished before the write landed would
+   * come back on the next load looking like the removal had failed.
+   */
+  const removeOwn = async (s: ReadingMeta) => {
+    const tally = tallies.get(s.id)
+    const work = tally
+      ? [
+          tally.passages ? `${tally.passages} passage${tally.passages !== 1 ? "s" : ""}` : "",
+          tally.concepts ? `${tally.concepts} concept${tally.concepts !== 1 ? "s" : ""}` : "",
+          tally.threads ? `${tally.threads} thread${tally.threads !== 1 ? "s" : ""}` : "",
+        ].filter(Boolean)
+      : []
+    const ok = await confirm({
+      title: `Take “${short(s.title, 60)}” off your shelf?`,
+      body: work.length ? (
+        <>
+          You have {work.join(" · ")} on this reading. <b>None of it is deleted</b> — your
+          passages keep their concepts and stay in Vocabulary. What goes is the card, and
+          with it the way back to this reading&rsquo;s own Capture Log.
+        </>
+      ) : (
+        <>Nothing has been captured here, so nothing is lost. The card goes off your shelf.</>
+      ),
+      confirmLabel: "Remove from my shelf",
+      danger: true,
+      // NOT "this cannot be undone": the row is archived, not deleted, and the
+      // passages are untouched. The red button is right; that sentence is not.
+      eyebrow: work.length ? "your work is kept" : "the card goes, nothing else",
+    })
+    if (!ok) return
+    setRemoving(s.id)
+    try {
+      await archiveOwnReading(s.id)
+      await refresh()
+    } catch {
+      await notify({
+        title: "That reading is still on your shelf.",
+        body: "The removal did not reach the server. Try again.",
+      })
+    } finally {
+      setRemoving(null)
+    }
+  }
 
   if (status === "loading") {
     return (
       <>
-        <JourneyNav active="readings" />
+        <JourneyNav active="readings" search={<StationSearch scope="loom" />} />
         <main>
           <div className="empty" style={{ marginTop: "100px" }}>
             <h2>Loading your readings...</h2>
@@ -73,92 +127,124 @@ export default function Shelf() {
   }
 
   if (!session) {
+    // The actual front door for most students — the header's button is small
+    // and off to one side. One primary action, and the one sentence that
+    // prevents the commonest failure: signing in with a GitHub account whose
+    // email the roster has never heard of. The block itself is shared with
+    // the workbench (SignedOutWelcome), which used to dead-end here instead.
     return (
       <main>
-        <div className="empty" style={{ marginTop: "100px" }}>
-          <h2>Welcome to Loom.</h2>
-          <span className="cap">Please sign in to continue</span>
-        </div>
-        <FirstRunWalkthrough autoOpen={false} />
+        <SignedOutWelcome isPreviewDeployment={isPreviewDeployment} />
       </main>
     )
   }
 
   const readingCard = (s: ReadingMeta) => {
     const tally = tallies.get(s.id)
-    return (
-      <Link key={s.id} href={`/reading/${s.id}`} className="shelfcard">
-        {s.storageKey ? (
-          <SourceThumbnail sourceId={s.id} title={s.title} />
-        ) : (
-          // No PDF behind this card — say so rather than showing a broken frame.
-          <span className="shelfnofile" aria-hidden="true">
-            <span className="cap">no pdf</span>
-          </span>
-        )}
-        <div className="shelfbody">
-          <div>
-            <h3>{s.title}</h3>
-            {s.author ? <p className="shelfauthor">{s.author}</p> : null}
-            {s.isDescriptionVisible && s.description ? (
-              <p className="shelfdesc">{s.description}</p>
-            ) : null}
+    // 0 or 1 today: the schema's `onePerScope` unique allows exactly one cloth
+    // per (user, course, reading). Several per reading is ratified (TJ,
+    // 2026-08-08 — a Base Cloth plus "Create new cloth") but NOT built, and it
+    // no longer "lands free" here: this card has one door, so several cloths
+    // need a rule for which one it opens, and a cloth needs an identity of its
+    // own — today it is addressed by scope key, not id. See the model doc.
+    const clothsHere = state.cloths.filter((c) => c.scopeKey === s.id)
+    // Exactly ONE door per card (TJ, 2026-08-08). "Just read" is a procedure,
+    // not a path — you browse inside a cloth without capturing anything — so
+    // there is no separate way in that skips the cloth.
+    // The reading card IS the entry point (TJ, 2026-08-08). There is no Create
+    // Cloth button any more and no decision to make: one cloth per reading per
+    // user, and your Base Cloth is simply there — so opening the reading opens
+    // your work on it. The row below is metadata, not a control.
+    const cloth = clothsHere[0] ?? null
+    const body = (
+      <>
+          {s.storageKey ? (
+            <SourceThumbnail sourceId={s.id} title={s.title} />
+          ) : (
+            // No PDF behind this card — say so rather than showing a broken frame.
+            <span className="shelfnofile" aria-hidden="true">
+              <span className="cap">no pdf</span>
+            </span>
+          )}
+          <div className="shelfbody">
+            <div>
+              <h3>{s.title}</h3>
+              {s.author ? <p className="shelfauthor">{s.author}</p> : null}
+              {s.isDescriptionVisible && s.description ? (
+                <p className="shelfdesc">{s.description}</p>
+              ) : null}
+            </div>
+            <p className="shelftally">
+              {/* Say nothing until the loom has actually loaded: "nothing
+                  captured here yet" on a full loom is a lie, and it is the
+                  first thing a student would read on every card. */}
+              {isLoading ? (
+                <span className="shelfquiet">…</span>
+              ) : tally ? (
+                <>
+                  {tally.passages} passage{tally.passages !== 1 ? "s" : ""} ·{" "}
+                  {tally.concepts} concept{tally.concepts !== 1 ? "s" : ""} ·{" "}
+                  {tally.threads} thread{tally.threads !== 1 ? "s" : ""}
+                </>
+              ) : (
+                <span className="shelfquiet">nothing captured here yet</span>
+              )}
+            </p>
           </div>
-          <p className="shelftally">
-            {/* Say nothing until the loom has actually loaded: "nothing
-                captured here yet" on a full loom is a lie, and it is the
-                first thing a student would read on every card. */}
-            {isLoading ? (
-              <span className="shelfquiet">…</span>
-            ) : tally ? (
-              <>
-                {tally.bytes} byte{tally.bytes !== 1 ? "s" : ""} ·{" "}
-                {tally.concepts} concept{tally.concepts !== 1 ? "s" : ""} ·{" "}
-                {tally.threads} thread{tally.threads !== 1 ? "s" : ""}
-              </>
-            ) : (
-              <span className="shelfquiet">nothing captured here yet</span>
-            )}
-          </p>
-        </div>
-      </Link>
+      </>
     )
-  }
+    return (
+      <div key={s.id} className="shelfcard">
+        <Link href={`/reading/${s.id}`} className="shelfmain">{body}</Link>
+        {/* Metadata, not a control: your name for this work and when you last
+            touched it. "Base cloth" until you title it — the cloth is always
+            there, so there is nothing here to press. A row only exists once
+            something has been written to it, which is why the date is
+            conditional. */}
+        {!isLoading && (
+          <div className="clothrow">
+            <span className="clothis">
+              <span className="clothname">
+                {cloth?.title.trim() ? short(cloth.title, 52) : "Base cloth"}
+              </span>
+              {cloth ? (
+                <span className="clothmeta">
+                  {cloth.title.trim() ? "" : "name it · "}edited {timeAgo(cloth.updatedAt)}
+                </span>
+              ) : (
+                <span className="clothmeta">nothing written here yet</span>
+              )}
+            </span>
+            {/* Only on a reading of your OWN, and only yours (TJ, 2026-08-17).
+                Until now nothing could take a carded reading off a shelf — the
+                only delete in the app is admin's — so a mistyped title stayed
+                for good. "Remove", not "delete": the row is archived and every
+                passage captured from it is untouched.
 
-  const handleLoadExample = async () => {
-    setExampleBusy(true)
-    try {
-      await loadExample()
-    } catch (e) {
-      flash(e instanceof Error ? e.message : "could not load the example")
-    } finally {
-      setExampleBusy(false)
-    }
+                In the cloth row rather than on the card face: the card is the
+                door to the reading, and a destructive control inside a door is
+                a mis-click waiting to happen. */}
+            {s.isOwn && (
+              <button
+                className="btn ghost mini compact shelfremove"
+                onClick={() => removeOwn(s)}
+                disabled={removing === s.id}
+                data-tip="take this reading off your shelf — your passages stay"
+              >
+                {removing === s.id ? "removing…" : "remove"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
     <>
-      <JourneyNav active="readings" />
+      <JourneyNav active="readings" search={<StationSearch scope="loom" />} />
       <main>
-        <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", margin: "0 0 3px" }}>
-          <p className="tasktitle" style={{ margin: 0 }}>Pick a reading.</p>
-          <button
-            className={`btn mini tip-below ${searchOpen ? "" : "ghost"}`}
-            onClick={() => {
-              if (searchOpen) {
-                setSearchOpen(false)
-                setSearchActive(false)
-              } else {
-                setSearchOpen(true)
-              }
-            }}
-            data-tip="find a word or phrase across the readings on your list"
-            aria-pressed={searchOpen}
-            aria-label="Search your readings"
-          >
-            ⌕ Search
-          </button>
-        </div>
+        <p className="tasktitle" style={{ margin: "0 0 3px" }}>Pick a reading.</p>
         <p className="tasksub">
           Each reading is its own piece of work: capture its passages, name what they
           evidence, thread those concepts together, and read the whole. Your concepts
@@ -166,35 +252,17 @@ export default function Shelf() {
           the evidence of both.
         </p>
 
-        {/* Which reading says this? Words, or a "quoted phrase" — matched
-            against every card and every page on your reading list, never
-            anyone else's. While a query is live the results stand in for the
-            shelf; unmounting on close is what resets the box. */}
-        {searchOpen && (
-          <ShelfSearch
-            onActiveChange={setSearchActive}
-            onClose={() => {
-              setSearchOpen(false)
-              setSearchActive(false)
-            }}
-          />
-        )}
-
-        {!searchActive && (<>
-        {/* The whole weave and Keep were quick links here; they are journey
-            stations now (05 · 06), so the bar carries them and this row keeps
-            only the tally. */}
-        <div className="shelfbar">
-          <span className="cap shelfcount">
-            {isLoading ? "reading your loom…" : (
-              <>
-                {state.concepts.length} concept{state.concepts.length !== 1 ? "s" : ""} ·{" "}
-                {state.bytes.length} passage{state.bytes.length !== 1 ? "s" : ""} ·{" "}
-                {state.edges.length} thread{state.edges.length !== 1 ? "s" : ""} in all
-              </>
-            )}
-          </span>
-        </div>
+        {/* The search is in the journey bar now (TJ, 2026-08-13) — one per
+            station, scoped and labeled. A standing band stood here, and while a
+            query was live its results REPLACED the shelf; both are gone. The
+            shelf simply stays put behind the panel. */}
+        {(<>
+        {/* The tally stood here in a `.shelfbar` row of its own — the whole
+            weave and Keep were quick links beside it once, and when they became
+            journey stations the row was left carrying only the count. It says
+            the same words the footer now says, so it is the footer's (TJ,
+            2026-08-17: "we dont need stats here, correct? is redundant?"). A
+            row back, above the fold, on the page whose job is to show cards. */}
 
         {untethered > 0 && <Untethered readings={sources} />}
 
@@ -218,7 +286,7 @@ export default function Shelf() {
         ))}
 
         {/* A reading of the student's own: something they are coding that the
-            library does not hold. Reading-first needs every byte to have a
+            library does not hold. Reading-first needs every passage to have a
             door, so a self-found paper gets a card rather than becoming an
             untethered passage. */}
         <section style={{ marginBottom: 26 }}>
@@ -232,26 +300,86 @@ export default function Shelf() {
           <AddOwnReading onAdded={refresh} />
         </section>
 
+        {/* The worked example used to sit here — a finished weave loaded into
+            the student's OWN loom, whose only exit was Keep's reset. Both went
+            on 2026-08-11: a tutorial that writes into your real work is the
+            problem, and the practice loom is the answer to it (TJ, 2026-08-10:
+            "in many games the actual interface is used for the tutorial").
+            This is also the first door to `/sandbox` — the student flow has
+            drawn a `library → practice` edge since it was built, and until now
+            nothing in the app took it. */}
         {!isLoading && state.concepts.length === 0 && (
           <div className="card" style={{ marginTop: 8 }}>
             <h2>New to this?</h2>
             <p className="hint">
-              A finished weave to poke at — Star &amp; Griesemer, already captured, threaded
-              and read. Explore it, then clear it from 06 · Keep to start your own.
+              The guide walks you through it on a real reading: highlight a passage,
+              name what it evidences, thread two concepts together, lay out a board.
+              <b>Nothing there is kept</b>, so nothing you do can go wrong.
             </p>
-            <button className="btn ghost mini" onClick={handleLoadExample} disabled={exampleBusy}>
-              load the worked example
-            </button>
+            <Link className="btn ghost mini" href="/sandbox">open the guide</Link>
           </div>
         )}
         </>)}
-
-        <FirstRunWalkthrough />
       </main>
 
+      {/* Same footer as the workbench's (TJ, 2026-08-17): who you are on the
+          left, what you are looking at on the right. It said "00 — LIBRARY"
+          and "PICK A READING" — the station number the bar above already
+          shows, and an instruction for anyone who could not work out what a
+          shelf of readings is for.
+
+          The subject here is the loom rather than one reading, so the right
+          half counts it. Those numbers are not on this page anywhere else:
+          the cards carry per-reading tallies, and nothing added them up. */}
       <footer>
-        <span className="fl">00 — READINGS</span>
-        <span className="fr">PICK A READING</span>
+        <Identity />
+        <span className="fr">
+          {/* The whole loom, in one line (TJ, 2026-08-17). Deliberately NOT a
+              count of readings: `sources` is every row this student can open —
+              the course's thirty plus every card they have made — and it read
+              "109 readings" on a shelf showing nothing like that many.
+
+              These three counts are not new. They were a `.shelfbar` row under
+              the intro, in these exact words, and this footer duplicated them
+              for half a day before anyone noticed. The row is gone; the words
+              live here.
+
+              "…" while the loom is in flight, exactly as the cards do. A zero
+              is a claim about someone's work, and it would be on screen for
+              the whole first load. */}
+          {/* Three kinds, counted apart (TJ, 2026-08-17). They were one
+              number once — the "109 readings" that gave the problem away —
+              then two, and the syllabus actually has three: `course_source`
+              carries `isCore`, so a course reading is core or supplemental,
+              and a reading of your own is neither. */}
+          <span className="footmeta">
+            {loadingShelf ? (
+              "…"
+            ) : (
+              <>
+                {courseReadings.filter((r) => r.isCore).length} core ·{" "}
+                {courseReadings.filter((r) => !r.isCore).length} supplemental ·{" "}
+                {ownReadings.length} your own
+              </>
+            )}
+          </span>
+          {/* A rule between the shelf's counts and the student's own work
+              (TJ, 2026-08-17). Two different subjects, and mono caps with only
+              a gap between them read as one run of text — the same reason the
+              header already rules the course off from the account. */}
+          <span className="footrule" aria-hidden="true" />
+          <span className="footmeta">
+            {isLoading ? (
+              "…"
+            ) : (
+              <>
+                {state.concepts.length} concept{state.concepts.length !== 1 ? "s" : ""} ·{" "}
+                {state.passages.length} passage{state.passages.length !== 1 ? "s" : ""} ·{" "}
+                {state.edges.length} thread{state.edges.length !== 1 ? "s" : ""} in all
+              </>
+            )}
+          </span>
+        </span>
       </footer>
     </>
   )
@@ -267,19 +395,19 @@ export default function Shelf() {
  * wrong would file someone's evidence under the wrong text (red line #2).
  */
 function Untethered({ readings }: { readings: ReadingMeta[] }) {
-  const { state, attributeBytes } = useLoom()
+  const { state, attributePassages } = useLoom()
   const [picked, setPicked] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
 
   const groups = useMemo(() => {
     const byCitation = new Map<string, string[]>()
-    state.bytes.forEach((b) => {
+    state.passages.forEach((b) => {
       if (b.sourceId) return
-      const key = (b.source ?? "").trim() || " no citation"
+      const key = (b.source ?? "").trim() || "\u0000no citation"
       byCitation.set(key, [...(byCitation.get(key) ?? []), b.id])
     })
     return [...byCitation.entries()].sort((a, b) => b[1].length - a[1].length)
-  }, [state.bytes])
+  }, [state.passages])
 
   if (!groups.length) return null
 
@@ -288,9 +416,9 @@ function Untethered({ readings }: { readings: ReadingMeta[] }) {
     if (!sourceId) return
     setBusy(key)
     try {
-      await attributeBytes(ids, sourceId)
+      await attributePassages(ids, sourceId)
     } catch {
-      // attributeBytes resyncs and flashes; nothing more to say here.
+      // attributePassages resyncs and flashes; nothing more to say here.
     } finally {
       setBusy(null)
     }
@@ -307,7 +435,7 @@ function Untethered({ readings }: { readings: ReadingMeta[] }) {
       {groups.map(([key, ids]) => (
         <div key={key} className="untethered">
           <div className="untetheredsrc">
-            {key === " no citation" ? <i>no citation given</i> : key}
+            {key === "\u0000no citation" ? <i>no citation given</i> : key}
             <span className="n"> · {ids.length} passage{ids.length !== 1 ? "s" : ""}</span>
           </div>
           <div className="quietrow">
@@ -339,7 +467,7 @@ function Untethered({ readings }: { readings: ReadingMeta[] }) {
  * A reading of the student's own, PDF first: uploaded like any course reading
  * (browser → Blob → register), it gets tab 00 and capture from the text
  * itself. Without a PDF — a book, a lecture — the card still stands, and its
- * passages are captured by hand on 01 · Open. Either way it sits on this
+ * passages are captured by hand on 01 · Reading. Either way it sits on this
  * student's shelf and nobody else's.
  */
 function AddOwnReading({ onAdded }: { onAdded: () => void }) {
@@ -541,7 +669,7 @@ function AddOwnReading({ onAdded }: { onAdded: () => void }) {
       <p className="hint">
         With the PDF, the reading opens on 00 and you capture from the text itself.
         Without one — a book, a lecture — the card still stands, and you capture its
-        passages by hand on 01 · Open. It sits on your shelf and nobody else&apos;s.
+        passages by hand on 01 · Reading. It sits on your shelf and nobody else&apos;s.
       </p>
       <div className="form-row">
         <span className="label">PDF File <span style={{ textTransform: "none", letterSpacing: 0 }}>(up to {MAX_READING_LABEL} — optional for a book or lecture)</span></span>

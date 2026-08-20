@@ -5,13 +5,10 @@ import { openReading } from './helpers';
 // real, so no mocked /api/auth/session.
 test.use({ storageState: 'playwright/.auth/testa.json' });
 
-test.describe('Audit Seed Bytes', () => {
+test.describe('Audit Seed Passages', () => {
   test('verify mark.js fuzzy match', async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem("loom_has_seen_walkthrough", "true");
-    });
     
-    // Pick Designing Engineers off the shelf and open its text (tab 00).
+    // Pick Object Worlds off the shelf and open its text (01 · Reading).
     await openReading(page, 'Object Worlds');
     
     // Go to page 4

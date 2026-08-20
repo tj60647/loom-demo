@@ -1,12 +1,12 @@
 "use server"
 
 import { db } from "@/db"
-import { users, concepts, bytes, edges, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
-import { and, eq, inArray, isNull, sql } from "drizzle-orm"
+import { users, concepts, passages, passageConcepts, edges, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, emailHasAppAccess, isAdminUser } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
-import { resolveCourseId, resolveSectionId } from "@/lib/courses"
+import { ensureFacultySection, listFacultyCourseIds, resolveCourseId, resolveSectionId } from "@/lib/courses"
 
 import { redirect } from "next/navigation"
 
@@ -17,6 +17,33 @@ export async function checkAdmin() {
   }
 
   return session
+}
+
+/**
+ * Who is looking at the admin shell, and which course they may look at.
+ *
+ * An ADMIN resolves like before — any course, site-first fallback. A course
+ * FACULTY member resolves only within the courses their membership grants
+ * (their first when the query string names another), so /admin entered bare
+ * lands on THEIR course rather than redirecting home off someone else's.
+ * Everyone else is turned away. Pages use this; the read actions keep their
+ * own checkCourseFaculty gate, so a page bug never widens access.
+ */
+export async function getStaffViewer(
+  courseIdRaw?: string | null
+): Promise<{ courseId: string | null; isAdmin: boolean }> {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) redirect("/")
+  if (isAdminUser(session.user)) {
+    return { courseId: await resolveCourseId(courseIdRaw), isAdmin: true }
+  }
+  const facultyIds = await listFacultyCourseIds(session.user.id)
+  if (facultyIds.length === 0) redirect("/")
+  const requested = await resolveCourseId(courseIdRaw)
+  return {
+    courseId: requested && facultyIds.includes(requested) ? requested : facultyIds[0],
+    isAdmin: false,
+  }
 }
 
 /**
@@ -42,16 +69,64 @@ async function getMemberIds(courseId: string, sectionId?: string | null) {
   return rows.map((row) => row.userId)
 }
 
-export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: string | null) {
+/**
+ * The faculty view's read gate (rulings 17/18): a site ADMIN sees any course;
+ * a member whose membership.role is FACULTY sees THIS course's read-side
+ * (roster, per-student view, cohort aggregate). Capabilities are additive —
+ * faculty keep their own student workspace untouched. Write-side admin
+ * actions stay behind checkAdmin.
+ */
+async function checkCourseFaculty(courseId: string) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) redirect("/")
+  if (isAdminUser(session.user)) return
+  const membership = await db
+    .select({ role: courseMemberships.role })
+    .from(courseMemberships)
+    .where(and(
+      eq(courseMemberships.courseId, courseId),
+      eq(courseMemberships.userId, session.user.id),
+      isNull(courseMemberships.removedAt)
+    ))
+    .limit(1)
+  if (membership[0]?.role !== "FACULTY") redirect("/")
+}
+
+/**
+ * Promote or demote a member's per-course role (ruling 18). Promotion homes
+ * them in the Faculty Section; demotion returns them to unassigned so an
+ * instructor places them deliberately.
+ */
+export async function setMemberRole(formData: FormData) {
   await checkAdmin()
 
+  const courseId = String(formData.get("courseId") ?? "")
+  const userId = String(formData.get("userId") ?? "")
+  const role = String(formData.get("role") ?? "")
+  if (!courseId || !userId || (role !== "LEARNER" && role !== "FACULTY")) return
+
+  const sectionId = role === "FACULTY" ? await ensureFacultySection(courseId) : null
+  await db
+    .update(courseMemberships)
+    .set({ role, sectionId })
+    .where(and(
+      eq(courseMemberships.courseId, courseId),
+      eq(courseMemberships.userId, userId),
+      isNull(courseMemberships.removedAt)
+    ))
+
+  revalidatePath("/admin")
+}
+
+export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: string | null) {
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) return []
+  await checkCourseFaculty(courseId)
 
   const sectionId = await resolveSectionId(courseId, sectionIdRaw)
 
   const memberships = await db
-    .select({ userId: courseMemberships.userId, sectionId: courseMemberships.sectionId })
+    .select({ userId: courseMemberships.userId, sectionId: courseMemberships.sectionId, role: courseMemberships.role })
     .from(courseMemberships)
     .where(
       and(
@@ -83,6 +158,7 @@ export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: s
       sectionName: membership?.sectionId
         ? sectionById.get(membership.sectionId)?.name ?? null
         : null,
+      role: membership?.role ?? "LEARNER",
       conceptsCount: allConcepts.filter((c) => c.userId === u.id).length,
       edgesCount: allEdges.filter((e) => e.userId === u.id).length,
     }
@@ -99,6 +175,8 @@ export type RosterRow = {
   status: "enrolled" | "pending"
   sectionId: string | null
   sectionName: string | null
+  /** The per-course role — "FACULTY" gets this course's read-side (ruling 18); "LEARNER" while pending. */
+  role: string
   conceptsCount: number
   edgesCount: number
   /** False for someone enrolled via the site-wide allowlist rather than this course's. */
@@ -118,10 +196,9 @@ export async function getRoster(
   courseIdRaw?: string | null,
   sectionIdRaw?: string | null
 ): Promise<RosterRow[]> {
-  await checkAdmin()
-
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) return []
+  await checkCourseFaculty(courseId)
   const sectionId = await resolveSectionId(courseId, sectionIdRaw)
 
   const [enrolled, invited, courseSections] = await Promise.all([
@@ -143,6 +220,7 @@ export async function getRoster(
     status: "enrolled",
     sectionId: u.sectionId,
     sectionName: u.sectionName,
+    role: u.role,
     conceptsCount: u.conceptsCount,
     edgesCount: u.edgesCount,
     invited: invitedByEmail.has(u.email.toLowerCase()),
@@ -161,6 +239,7 @@ export async function getRoster(
       status: "pending",
       sectionId: row.sectionId,
       sectionName: row.sectionId ? sectionById.get(row.sectionId) ?? null : null,
+      role: "LEARNER",
       conceptsCount: 0,
       edgesCount: 0,
       invited: true,
@@ -392,34 +471,69 @@ export async function removeFromRoster(formData: FormData) {
 }
 
 export async function getUserLoomDataAsAdmin(targetUserId: string, courseIdRaw?: string | null) {
-  await checkAdmin()
-
   const courseId = await resolveCourseId(courseIdRaw)
-  if (!courseId) return { concepts: [], bytes: [], edges: [] }
+  if (!courseId) return { concepts: [], passages: [], edges: [] }
+  await checkCourseFaculty(courseId)
+
+  // The TARGET must be on this roster, not merely the viewer's course. This
+  // gated the course and then took targetUserId unchecked; what stopped it
+  // being worse was that the queries below are courseId-scoped — a filter, not
+  // a gate. The gap it left was real: removal is soft (`removedAt`), and every
+  // other surface honours it — sign-in, course resolution, the faculty list,
+  // file access and both overlay bands all check `isNull(removedAt)` — so a
+  // removed member's whole loom stayed readable here alone. Nothing links to
+  // it any more either: `getRoster` omits them, so this closes a door that no
+  // longer has a handle on it.
+  const onRoster = await db
+    .select({ userId: courseMemberships.userId })
+    .from(courseMemberships)
+    .where(and(
+      eq(courseMemberships.courseId, courseId),
+      eq(courseMemberships.userId, targetUserId),
+      isNull(courseMemberships.removedAt)
+    ))
+    .limit(1)
+  if (!onRoster.length) return { concepts: [], passages: [], edges: [] }
 
   const userConcepts = await db.select().from(concepts).where(and(eq(concepts.userId, targetUserId), eq(concepts.courseId, courseId)))
-  const userBytes = await db.select().from(bytes).where(and(eq(bytes.userId, targetUserId), eq(bytes.courseId, courseId)))
+  const passageRows = await db.select().from(passages).where(and(eq(passages.userId, targetUserId), eq(passages.courseId, courseId)))
   const userEdges = await db.select().from(edges).where(and(eq(edges.userId, targetUserId), eq(edges.courseId, courseId)))
 
-  return { concepts: userConcepts, bytes: userBytes, edges: userEdges }
+  return { concepts: userConcepts, passages: await foldConceptIds(passageRows), edges: userEdges }
+}
+
+/** Fold passage_concept pointers onto passage rows as `conceptIds` (capture order). */
+async function foldConceptIds<T extends { id: string }>(passageRows: T[]): Promise<(T & { conceptIds: string[] })[]> {
+  if (!passageRows.length) return []
+  const junction = await db
+    .select({ passageId: passageConcepts.passageId, conceptId: passageConcepts.conceptId })
+    .from(passageConcepts)
+    .where(inArray(passageConcepts.passageId, passageRows.map((b) => b.id)))
+    .orderBy(asc(passageConcepts.createdAt), asc(passageConcepts.conceptId))
+  const byPassage = new Map<string, string[]>()
+  junction.forEach((row) => {
+    const list = byPassage.get(row.passageId) ?? []
+    list.push(row.conceptId)
+    byPassage.set(row.passageId, list)
+  })
+  return passageRows.map((b) => ({ ...b, conceptIds: byPassage.get(b.id) ?? [] }))
 }
 
 export async function getAggregateLoomData(
   courseIdRaw?: string | null,
   sectionIdRaw?: string | null
 ) {
-  await checkAdmin()
-
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) {
-    return { concepts: [], bytes: [], edges: [], members: [], bytesUnavailable: false }
+    return { concepts: [], passages: [], edges: [], members: [], passagesUnavailable: false }
   }
+  await checkCourseFaculty(courseId)
 
   const sectionId = await resolveSectionId(courseId, sectionIdRaw)
   const userIds = await getMemberIds(courseId, sectionId)
 
   if (userIds.length === 0) {
-    return { concepts: [], bytes: [], edges: [], members: [], bytesUnavailable: false }
+    return { concepts: [], passages: [], edges: [], members: [], passagesUnavailable: false }
   }
 
   const allConcepts = await db
@@ -440,14 +554,14 @@ export async function getAggregateLoomData(
   const members = memberRows.map((u) => ({ id: u.id, name: u.name || u.email }))
 
   try {
-    const allBytes = await db
+    const allPassages = await db
       .select()
-      .from(bytes)
-      .where(and(eq(bytes.courseId, courseId), inArray(bytes.userId, userIds)))
-    return { concepts: allConcepts, bytes: allBytes, edges: allEdges, members, bytesUnavailable: false }
+      .from(passages)
+      .where(and(eq(passages.courseId, courseId), inArray(passages.userId, userIds)))
+    return { concepts: allConcepts, passages: await foldConceptIds(allPassages), edges: allEdges, members, passagesUnavailable: false }
   } catch (error) {
-    // Fail soft so aggregate map still renders if byte schema/data is temporarily inconsistent.
-    console.error("[getAggregateLoomData] Failed to load bytes for aggregate view", error)
-    return { concepts: allConcepts, bytes: [], edges: allEdges, members, bytesUnavailable: true }
+    // Fail soft so aggregate map still renders if passage schema/data is temporarily inconsistent.
+    console.error("[getAggregateLoomData] Failed to load passages for aggregate view", error)
+    return { concepts: allConcepts, passages: [], edges: allEdges, members, passagesUnavailable: true }
   }
 }

@@ -1,258 +1,141 @@
 # Next Session Prompt
 
-You are continuing work on Loom after the journey build of 2026-08-01 (which
-followed the multiple-maps build of 07-31 and the reading-first pass of 07-30/31).
+**Rewritten 2026-08-19.** The previous contents described 2026-08-09 and had
+stopped being true in most particulars — it claimed a 51-test suite (it is 78)
+and a plan that has since been executed. What is still live from it is carried
+forward below rather than left to be found.
 
-## Addendum, 2026-08-02 (alpha-foundation session — PR #4)
+**Read [docs/open-work.md](docs/open-work.md) for the plan and
+[docs/ui-cleanup-pass-1.md](docs/ui-cleanup-pass-1.md) for the decision
+record.** This file is only the handoff: where the branch stands, what is
+verified, and what is waiting.
 
-Read this first; it supersedes parts of what follows.
+---
 
-- **Open item 3 is closed.** The order-dependent `maps.spec` failure was a
-  test-synchronization bug: `#saveDot` was still showing the *previous* save's
-  1500ms flash on a warm server, so the spec reloaded early and **aborted the
-  essence POST in flight** (the `ECONNRESET` in the server logs). Fixed by
-  waiting on each action POST matched by its body, plus a strand sweep. The
-  suite is now **24 tests in 8 files, all green in ~2.2m** — including new
-  learner (00→06, Throw and Read covered for the first time) and admin journey
-  specs. The underlying *product* bug (navigation aborts debounced saves;
-  rename-during-create invisible in UI) is audit finding U-3.
-- **New authorities:** [docs/audit-2026-08-02.md](docs/audit-2026-08-02.md)
-  (full audit + alpha verdict), [docs/contracts.md](docs/contracts.md) (every
-  contract surface), [docs/deployments.md](docs/deployments.md) (open item 1's
-  plan in durable, checklisted form — the fresh-GitHub-account smoke test
-  still stands and still cannot be automated),
-  [CONTRIBUTING.md](CONTRIBUTING.md) (branch/PR/test rules).
-- **Demo accounts:** `npm run seed:demo` → `test-user-a@loom.local` (3 maps
-  from 2 readings, anchored verbatim passages, mirror-consistent) and
-  `test-user-b` (enrolled, empty). Idempotent; the journey specs assert
-  against it.
-- **The gate exists:** `.github/workflows/ci.yml` (`checks` + `e2e`),
-  CODEOWNERS, PR template; master branch protection requires a PR, the
-  `checks` status and a code-owner review (`e2e` joins once its three CI
-  secrets are configured — deployments.md §CI). A long-lived `dev` branch now
-  exists for the tester deployment.
-- The unpkg/pdf.js item in §5 below is **fixed** (worker vendored, 0f9f01b).
-- Machine note: if the app serves pages but every `/api/*` route 404s, you
-  have a stale `next dev` — kill the PID and `rm -rf .next`. And C: was found
-  at 100% full on 8/2 (npm cache was ~14GB; cleaned to 15GB free) — check
-  `df -h /c` before long runs.
+## Where `dev` stands
 
-## Where things stand
+**304 commits ahead of `master`, 3 behind.** `master` is at `d400378` (the
+PR #6 merge). Promoting is a release decision nobody has taken; the 3 commits
+`master` has that `dev` does not need looking at first.
 
-The app implements the v14 tool in full, on top of the production surfaces v14
-has no equivalent for (auth, courses, the shared reading collection with
-extraction scoring, PDF capture with anchored offsets). It is **reading-first**
-(the reading is the entry point), maps are **per-scope, parallel and plural**,
-and as of 8/1 the whole arc is **one journey bar** visible on every learner
-surface.
+**Verified 2026-08-19, locally:**
 
-- **The journey (ratified TJ 8/1):** `00 Readings · 01 Open · 02 Throw ·
-  03 Read · 04 Map · 05 Weave · 06 Keep`, rendered by
-  [src/components/ui/JourneyNav.tsx](src/components/ui/JourneyNav.tsx) under the
-  header everywhere. A station you can work at *here* is a button (a workbench
-  tab); every other station is a link. Outside a reading, Open routes to
-  Readings — opening IS picking a text. On `/weave` the underline stays on
-  **Weave** while throw/read/map act as its tools, so the bar always answers
-  "where am I on the journey", never "which panel is showing".
-- **Routes:** `/` is Readings (the course's readings by week, with the
-  student's own counts); `/reading/[sourceId]` is one reading's workbench;
-  `/weave` is every reading at once (`?tab=throw|read|map` deep-links);
-  `/keep` is the whole artifact. **05 Weave is a station, not an escape hatch**
-  — weeks 11+ mine and quilt the whole graph (deployment notes §4).
-- **Say "readings", not "library".** The home screen is Readings in all student
-  copy; "shelf" survives only as component and CSS names, which nobody sees.
-  "Library" now means only the *instructor's* collection on `/admin/library`.
-- **Maps (ratified TJ 7/31, spec §3 Map / §6):** tier is per concept PER MAP —
-  `concept.tier` and the `reads` table survive only as expand-phase MIRRORS of
-  the oldest whole-weave map, dual-written by `updateMap`/`saveView`/`deleteMap`
-  in [src/actions/loom.ts](src/actions/loom.ts), so code rollback stays safe.
-  The first sorting gesture in a fresh scope auto-creates "Map 1"
-  (`ensureActiveMap` in LoomProvider). Export adds `graph.maps[]` +
-  `views.maps` additively; import remints tier keys and synthesizes "Map 1"
-  from pre-maps files, and re-scopes a map to the whole weave when its
-  `scopeKey` doesn't resolve.
-- **A map is a keepable artifact (ratified TJ 7/31 — see open item 2).** Each
-  map exports as its own `loom-map` .json from 04 Map or 06 Keep, carrying its
-  tiers, essence, paragraph, in-scope cards with their whole evidence, threads
-  and arrangement — it stands alone — plus a readable .md outline. Importing a
-  map file ADDS a parallel sibling (matched by card id, misses counted and
-  reported); it never re-weaves missing cards and can never reach the replace
-  path. The whole-cloth export remains the complete backup behind every map.
-- **Scope** is read off the route in `LoomProvider`, and membership is derived
-  from `byte.sourceId` in [src/lib/scope.ts](src/lib/scope.ts). **A concept does
-  not belong to a reading — a byte does.** A concept emerges from a reading and
-  may then be evidenced in several; nothing owns or re-homes one. See
-  [docs/reading-scope-and-map-passes.md](docs/reading-scope-and-map-passes.md).
-- **Every byte belongs to a reading.** Capture inside one stamps it; a student
-  can mint a reference-only reading (title/author, no PDF) for anything the
-  collection does not hold; passages with no reading are placed by *asking*,
-  never by matching their citation text against titles.
-- **Invitation, enrolment and access are three things (8/1).** The sign-in gate
-  admits an invite, an active membership, the legacy allowlist, or an admin.
-  Removal ends the *membership* — soft, `removedAt` (`0013`), work survives,
-  re-invitation reinstates — and revokes sessions only when no access remains.
-  Enrolment happens in `events.signIn`, not the `signIn` callback, because a
-  first-time OAuth user's `user.id` is GitHub's, not ours, and the old insert
-  could never survive its FK. Course resolution no longer falls back to "first
-  course on the site" for non-members; admins keep the site-wide view.
-- **One word per move.** A reading is **scheduled** (week, order, on
-  `/admin/courses`); a learner is **placed** (into a section, on `/admin`). The
-  header names the course you are working in, from a learner-safe
-  `getActiveCourse()` resolved through the same enrolment that scopes the work.
-- **Roster** is on `/admin`: invite in bulk (one email per line, optionally
-  `email, Section name`), invited and enrolled shown as one list, pending first.
-- **Graph vs. projections** (spec §6) is enforced in the schema: `concept.tier`
-  is graph; card-table positions, edge bends, sort order and pinned definitions
-  live in `view` rows; `read` has its own table; `graph_event` is the
-  append-only development history, replayed in Read as "the cloth, over time".
-- **Parity is reconciled, the audit docs are not.**
-  [docs/v14-parity-audit.md](docs/v14-parity-audit.md) and
-  [docs/v14-ui-language-diff.md](docs/v14-ui-language-diff.md) (123 items:
-  A closed, B a review list, C production-only) were both last touched 7/31 and
-  predate the whole journey build.
+- Playwright: **78 tests**, all passing. One (`repair-panel` › "a proposed page
+  shows a crop") skips itself when the fixture holds no proposed pages.
+- `npm run check`: **63 checks**, 0 failing.
+- `tsc --noEmit` and `eslint`: clean (3 pre-existing `<img>` warnings).
 
-Verified at hand-off (8/1): `npm run check` (eslint + tsc) clean, `next build`
-clean, migrations applied through `0013` in Neon (14 rows), `master` level with
-`origin/master`. The suite is **12 Playwright tests in 6 files** (one worker,
-signed in as Test User A via `test-login?as=testa`) and it is **not green end to
-end** — see open item 3.
+**Verified on CI, 2026-08-19** — the first time this branch had ever been
+through the gate, via a `dev → master` PR opened for that purpose and closed
+without merging (#24). `checks` and `e2e` both green: 44 passed in the read
+pass, 33 passed / 1 skipped in the write pass.
 
-## Open items, in the order they matter
+It found a break on the first run that no local run reproduces: an ambiguous
+`getByRole("button", { name: "Add" })` colliding with an aria-label added
+2026-08-18, which bites only when that control is on screen — fixture-dependent,
+so CI's provisioned database saw it and this machine's dev database did not.
 
-1. **Monday's dev deployment (8/3).** Testers were warned. The setup, reasoned
-   through in the session log: a **Neon branch** for `DATABASE_URL` (one
-   long-lived branch, not Vercel's auto-branch-per-deployment, which would
-   reset tester data on every push); a **second GitHub OAuth app** whose
-   callback is the stable branch alias, since an OAuth App allows exactly one;
-   `NEXTAUTH_URL` set per-environment **with the protocol**; and the **same**
-   blob store, or every reading 404s against the branched `source` rows.
+`ci.yml` was then split by cost (`eef2c77`): `checks` (~90s, no database) runs
+on every push to `dev`, while `e2e` holds the shared CI database's lock and
+stays on pull requests and master pushes. So a working branch now gets build,
+lint and the 63 check scripts on every push without contending for the database.
 
-   **First smoke test: sign in with a genuinely fresh GitHub account and
-   confirm it enrols and lands on Readings.** 8/1 moved enrolment from the
-   `signIn` callback to `events.signIn` — the bug that locked invited newcomers
-   out at the door. Playwright reaches the app through the `test-login`
-   backdoor and therefore cannot cover this path at all; it has only ever been
-   reasoned about, never run. If it is wrong on Monday, every tester is locked
-   out and nothing else in the deployment matters.
+> **A trap worth knowing.** `npx playwright test … | tail -n` reports *tail's*
+> exit code, not Playwright's. A run with failures still prints
+> `[exited with code 0]`. Read the pass/fail counts, never the exit code, when
+> the command is piped.
 
-   (The old "add a reading of your own is untrodden" note has expired — the
-   database behind this repo's `.env.local` now holds one `isOwn` reading.)
+---
 
-2. **The spec is behind the build — this blocks the freeze.**
-   [docs/loom-spec-v1.md](docs/loom-spec-v1.md) is still rev **30c**, and three
-   things the build now does are recorded only in commit bodies and code
-   comments. Per §7, changes go by PR reviewed against the §4 red lines; these
-   never got that PR, so the wording that is *supposed* to be authoritative now
-   contradicts the shipped app:
-   - §3 says Keep "is always the whole artifact and never a slice of it (red
-     line #5)". The build keeps a single map. The commit (dc6a7f9) says TJ
-     ratified this on 7/31, superseding a code comment that had over-claimed
-     the whole-artifact-only reading — but the supersession never reached the
-     spec, so the file still argues the opposite.
-   - The revision history lists map **passes** as "proposed, not yet ratified".
-     Per-map tiers are built, shipped and load-bearing.
-   - §3 numbers Keep as **05** and has no station 05 Weave.
+## The one operational risk
 
-   Write the spec PR (rev 31) and, for each item, confirm with TJ that the
-   ratification is real rather than inherited from an agent's summary. The spec
-   and TJ are the authority; a commit message is not.
+**Production may be several migrations behind.** The 2026-08-09 note in this
+file said it had applied 20 of the then-23 — never seeing the passages rename
+(0023). There are now **27 migrations** on disk (journal ends `0026`). Nothing
+in the repo records production catching up.
 
-3. **`maps.spec.ts` fails in a full-suite run and passes alone.** Measured 8/1,
-   both ways, against a dev server on 3100:
-   - Whole suite: **8 passed, 1 failed, 3 did not run.** The failure is
-     `maps.spec.ts:42 "a new map holds its own tiers and essence"` — after the
-     reload, `#mapEssence` is still `""` where the spec wrote "One line written
-     by the Playwright suite.", so the `toPass` block times out at 45s.
-   - `maps.spec.ts` on its own: **4/4 in 21.6s.** `pdf-viewer.spec.ts` on its
-     own: **3/3 in 30.6s** (those were the three that "did not run").
+This is a doc's claim ten days stale, not a measurement — nobody has looked at
+production from here. **Look before assuming either way.** If it is true, a
+deploy lands seven migrations at once, one of them a table rename.
 
-   So it is order-dependent, not a broken feature — the essence save is fine
-   when nothing ran before it. f55190a on 8/1 fixed a race in this same spec by
-   waiting on `#saveDot` instead of network-idle; this looks like the same class
-   of problem one layer down, in the map the spec lands on rather than the save
-   it waits for. Worth pinning before Monday, because a suite that only passes
-   file-by-file cannot be the gate on the deployment.
+---
 
-   *Note for whoever runs it:* pipe the suite to a file, not to `tail`. Playwright
-   starts the dev server as a child that inherits stdout, so a pipe never sees
-   EOF and the command appears to hang long after the run is done.
+## Waiting on a ruling (model doc first)
 
-4. **The maps contract migration (the "contract" half of expand/contract).**
-   `concept.tier` and the `reads` table are still dual-written as mirrors of the
-   oldest whole-weave map. Once the build has soaked (post-Monday testers), a
-   follow-up should: stop writing `concept.tier` from `updateMap`/`deleteMap`,
-   stop the `reads` upsert and the `cardTable` geometry echo in `saveView`,
-   retire the deprecated `saveRead` action ([src/actions/loom.ts:517](src/actions/loom.ts#L517)),
-   then drop the columns/table in a migration. Until then two known quirks are
-   accepted: a student who works only in reading-scoped maps leaves the mirror
-   columns reflecting older whole-weave work, and a failed re-mirror after
-   deleting the mirror map leaves them stale until that map is next edited —
-   the `map` table is authoritative either way.
+- **Expected concepts** — a concept in a reading BEFORE evidence. Needs a
+  `cloth_concept` join, a widened `isIn`, and a third grouping. Today "no
+  evidence here" and "no evidence anywhere" are the same set *because* `isIn`
+  guarantees it. `loom-model-build.md` §Concept says a Concept with no Passages
+  "belongs to no Reading" — that sentence changes first.
+- **Optional concept name.** The model already allows it. Needs the "one or the
+  other or both" constraint TJ added, a validation, and a display decision
+  across 67 label sites.
+- ~~**The Weave.** Whether the concept is removed is still open~~ — **it was
+  ruled on 2026-08-11**: the whole weave is out of the app (open-work.md §Phase
+  1), there is no `/weave` route, and rows already written at `scopeKey ''`
+  render nowhere. This entry was carried forward from the 2026-08-09 handoff
+  without checking whether it had been settled since; it had. What IS still
+  open behind it is narrower: `import re-scopes a projection to the whole
+  weave` when its readings do not resolve, which now sends work somewhere the
+  app cannot show.
 
-5. **Auth / ops residue — blocks a freeze.** All pre-existing:
-   - Dev-mode auth fallback impersonates `tjm@tjmcleish.com`
-     ([src/actions/loom.ts:19](src/actions/loom.ts#L19)); `/api/readings` and
-     `getSourceFile` skip auth whenever `NODE_ENV !== 'production'`;
-     [src/lib/auth.ts:9](src/lib/auth.ts#L9) carries hardcoded admin fallback
-     emails.
-   - pdf.js loads its worker from unpkg at runtime
-     ([src/components/pdf/PdfViewer.tsx:12](src/components/pdf/PdfViewer.tsx#L12)).
-   - `scripts/apply-db-compat.ts` is an ad-hoc schema patcher behind the real
-     schema — decide whether it retires.
+## Decided, not built
 
-6. **Section B review, now with a round 2.** The UI/language diff has a fresh
-   **[round 2](docs/v14-ui-language-diff.md#round-2--2026-08-01-the-surfaces-built-since)**
-   (8/1) covering everything the reading-first, maps and journey builds changed:
-   3 small copy regressions to fix, 7 deliberate departures to confirm, 3
-   production-only. Section A's nine priority fixes were re-checked and all
-   survived the rebuild. That sits on top of round 1's untouched 40-item
-   section B. No code needed until you pick.
+- Filter the coin-a-concept list to concepts not already in the reading.
+- Auto-populate the description when an existing concept is picked.
+- `ThrowTab`'s `crossed` check is unscoped — it tests all edges against this
+  reading's concepts, so a pair linked in another reading is withheld here.
+  There is an "every pair crossed — drawing any" fallback, so it is mild.
+- Highlights at full zoom-out still miss any page never promoted; closing it
+  needs the `getTextContent()` route recorded in `ui-cleanup-pass-1.md`.
 
-7. **Deferred by decision, not oversight:** byte→concept is still one-to-many
-   (re-file copies the byte, per spec §2's v1 semantics); markdown export exists
-   but has not been reconciled with Lingxiu's fork; cohort/heat-map views remain
-   admin-only and would need red line #8's "has coded this reading themselves"
-   gate before any student-facing use — that gate does not exist in the data
-   model yet. Multi-reading scopes are keyed for but not exposed.
+## Housekeeping
 
-## Local environment notes
+- `@media (max-width: 900px)` in `PdfViewer.tsx` is dead by contracts §2c-iii,
+  which puts the floor at 1280.
+- ~~**PR #10**~~ — closed 2026-08-19 with the disposition of all 13 items.
+- `docs/loom-model-build.md` may be sitting modified in the working tree. It is
+  the build authority, so an uncommitted edit there is worth resolving rather
+  than leaving to be swept into someone's next `git add`.
 
-Port 3000 is inside a Windows excluded port range on this machine
-(`netsh int ipv4 show excludedportrange protocol=tcp` → 2969-3068 reserved), so
-`npm run dev` on the default port fails with `EACCES`. Reboot, or as admin
-`net stop winnat && net start winnat`.
+---
 
-Meanwhile **run on 3100 and it all works**, including admin pages: cookies are
-not port-scoped, so `NEXTAUTH_URL=http://localhost:3000` still yields the right
-session-cookie name. It was the missing protocol that broke it, never the port.
+## Fixture debris — fixed, and worth understanding
 
-The suite has its own committed config for this — it starts the dev server
-itself, and keeps `globalSetup` + `storageState` (drop them and the
-authenticated specs run signed-out, which reads as a product failure and is
-not one):
+Specs that write tear down at the end, and **a spec that fails never reaches its
+teardown**. The rows accumulated run after run until they changed what the next
+run saw. On 2026-08-19 the sweep found **89 orphaned readings**, and three
+orphaned `addcard seed …` passages had already broken a passing assertion in
+`add-concept-card.spec.ts` — `railScale` shrinks a crowded rail, so opening the
+editor rescaled the card and moved it 56px against a 12px tolerance. The spec
+was right, the code was right, the fixture was wrong, and the failure pointed
+at neither.
 
-```bash
-npx playwright test --config=playwright.3100.config.ts
-```
+`scripts/clean-fixtures.ts` sweeps it, and `playwright/global-teardown.ts` runs
+it after **every** run — the failing run being the one that skipped its own
+cleanup is exactly why per-spec teardown could not be the answer.
 
-Two things that will waste your time if you don't know them:
+Two properties of that script are load-bearing:
 
-- **Next 16 allows one `next dev` per project.** A second one exits with
-  "Another next dev server is already running" and prints the PID to kill.
-- `Get-NetTCPConnection` and `taskkill` have both hung in this shell. Kill the
-  dev server with `Stop-Process -Id <pid> -Force`, taking the PID from the
-  message above.
+- **Both conditions, always.** Only the suite's own account
+  (`test-user-a@loom.local`), and only labels matching the shapes the specs
+  generate. Patterns use `______` rather than `%` for the six-digit stamp so
+  they cannot widen.
+- **It recognises rather than assumes.** A reading being debris does not make a
+  passage on it debris. Unrecognised content on a debris reading **stops the
+  run** instead of guessing. That guard fired on its first outing: 4 passages
+  were riding on the 89 readings, and a naive sweep would have taken them.
 
-## Kickoff commands
+`npm run clean:fixtures` reports without deleting; `--apply` deletes.
 
-```bash
-git status -sb
-npm run check                              # eslint + tsc
-npx tsx scripts/check-migrations.ts        # what Neon actually has
-npm run dev -- -p 3100
-```
+---
 
-## Definition of done for the next session
+## Where I would start
 
-Pick one open item above and close it end to end — with the red lines in
-[docs/loom-spec-v1.md](docs/loom-spec-v1.md) §4 checked before merge, per §7.
+1. **Find out where production's schema actually is.** Everything about a
+   release depends on it and nobody has looked in ten days.
+2. ~~Get CI to run the branch~~ — done 2026-08-19, green. `checks` now runs on
+   every dev push; open a `dev → master` PR when the full `e2e` gate is wanted,
+   and close it afterwards so it does not hold the database's turn on every
+   push.
+3. Then the rulings above, model doc first.

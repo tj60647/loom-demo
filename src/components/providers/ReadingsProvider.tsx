@@ -9,8 +9,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useSession } from "next-auth/react"
-import { getSources } from "@/actions/sources"
-import { getActiveCourse } from "@/actions/courses"
+import { getSources, getActiveCourse } from "@/lib/reads"
 
 export type ReadingMeta = {
   id: string
@@ -22,12 +21,42 @@ export type ReadingMeta = {
   week: number | null
   /** A card the student minted for themselves; on nobody else's shelf. */
   isOwn: boolean
+  /**
+   * Core or supplemental, per the syllabus. A fact about the reading in THIS
+   * course — it lives on `course_source`, not on the reading — so a text can
+   * be core in one course and supplemental in another. Always false for an
+   * own reading, which is neither.
+   */
+  isCore: boolean
   /** Null when the card is reference-only — a citation with no PDF behind it. */
   storageKey: string | null
 }
 
 /** The course these readings belong to — null before it loads, or if none. */
-export type ActiveCourse = { id: string; name: string; term: string }
+export type ActiveCourse = {
+  id: string
+  name: string
+  term: string
+  /** Faculty of this course, or a site admin. Decides whether the Overlay
+   *  controls are drawn at all — students never see them (TJ, 2026-08-08).
+   *  Not an authorization: the overlay actions re-check server-side. */
+  isStaff: boolean
+  /** A SITE admin, who also holds the write surfaces (Readings, Courses).
+   *  Faculty are staff but not admin — the journey bar grades the staff group
+   *  by this (TJ, 2026-08-09). Not an authorization; every page re-gates. */
+  isAdmin: boolean
+  /**
+   * Staff REGARDLESS of the student lens — the one field that must not be
+   * masked, because it is what draws the control for taking the lens off.
+   * Use this for nothing else: every "should this be drawn?" question is
+   * `isStaff` / `isAdmin` above, which the lens does mask.
+   */
+  staffTruly: boolean
+  /** The student lens is on. See src/lib/viewAs.ts. */
+  viewingAsStudent: boolean
+  /** The course's sections, for the Overlay picker. Empty for a student. */
+  sections: { id: string; name: string }[]
+}
 
 type ReadingsContextValue = {
   readings: ReadingMeta[]

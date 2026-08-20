@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
-import { getSourceFileStream } from "@/actions/sources"
+import { getSourceFileMeta, getSourceFileStream } from "@/actions/sources"
+import { hashText } from "@/lib/hash"
 
 /**
  * A Content-Disposition a browser can actually receive. HTTP header values are
- * ByteStrings — anything above U+00FF throws when the Response is constructed,
+ * byte strings (ISO-8859-1) — anything above U+00FF throws when the Response is constructed,
  * so a title with an em dash or a curly quote ("Learning How to Learn — Chapter
  * 1", week 1 of this very course) took the whole route down and, until the
  * catch below learned to tell failures apart, reported itself as a 404 on a
@@ -48,6 +49,22 @@ export async function GET(
   const shouldDownload = new URL(request.url).searchParams.get("download") === "1"
 
   try {
+    // The conditional check first, off the row alone — no byte leaves storage
+    // for a reader who already holds the file. The ETag derives from
+    // storageKey: repairs mint a NEW key rather than overwriting, so the tag
+    // changes exactly when the bytes do. Before this, `max-age=3600` with no
+    // validator meant every session an hour old re-downloaded the whole
+    // reading — 10MB for a scan whose bytes had not moved in weeks.
+    const { source: meta } = await getSourceFileMeta(sourceId)
+    const etag = `W/"${hashText(String(meta.storageKey))}"`
+    const cacheHeaders: Record<string, string> = {
+      "Cache-Control": "private, max-age=3600",
+      ETag: etag,
+    }
+    if (request.headers.get("if-none-match") === etag) {
+      return new NextResponse(null, { status: 304, headers: cacheHeaders })
+    }
+
     // Streamed, not buffered: a Vercel Function may only return ~4.5MB in a
     // buffered body, and three of the course's readings are larger — week 1
     // (4.57MB), week 2's Star & Griesemer (7.29MB) and week 10's Suchman
@@ -61,7 +78,11 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": contentDisposition(shouldDownload ? "attachment" : "inline", source.title),
-        "Cache-Control": "private, max-age=3600",
+        ...cacheHeaders,
+        // The size recorded at ingest, so pdf.js can report progress against
+        // a total. Null on readings ingested before the column existed —
+        // they serve exactly as before until the backfill reaches them.
+        ...(source.byteLength != null ? { "Content-Length": String(source.byteLength) } : {}),
       },
     })
   } catch (error) {

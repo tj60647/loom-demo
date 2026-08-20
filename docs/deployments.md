@@ -4,6 +4,15 @@ Three environments, one Vercel project (`loom-demo`), one blob store, one Neon
 project with three branches. The reasoning for the dev setup was worked through
 in the 8/1 session (NEXT_SESSION item 1); this document is its durable form.
 
+**Precedence, since 2026-08-16.** [data-environments.md](data-environments.md)
+is the authority on what each database and the blob store hold, and on who may
+destroy what; [build-and-test-workflow.md](build-and-test-workflow.md) is the
+authority on how work moves through these environments and where each kind of
+testing belongs. This file remains the authority on standing an environment up
+and on the OAuth smoke test. Both were written against the live Vercel and Neon
+configuration and name several hazards this file predates — read them before
+changing environment variables.
+
 | | local | dev (alpha testers) | production (students) |
 | --- | --- | --- | --- |
 | Git | working tree | `dev` branch | `master` |
@@ -33,16 +42,60 @@ in the 8/1 session (NEXT_SESSION item 1); this document is its durable form.
    reading in one environment that another environment's rows still reference**
    — `deleteSource` removes the blob itself. Archive on dev; delete only in
    production, or only for readings that exist nowhere else.)
+
+   A second consequence, live since re-ingest exists: the blob is shared but the
+   *page text* is per-environment, in three separate Neon databases. Re-ingesting
+   reads production bytes wherever it is run and writes rows only to the database
+   it was pointed at, so the environments can silently disagree about what a
+   reading says. Run it once per environment, and check the `database:` line the
+   script prints before believing its output.
 5. **`NODE_ENV` must be `production` on every deployed build.** Three dev
    conveniences key off it (see [audit](audit-2026-08-02.md) S-1..S-3): the
    loom actions' fallback identity, the reading routes' auth skip, and the
    test-login backdoor. Vercel sets it for production *and* preview builds;
    anything self-hosted must too. Checking this is part of the smoke test.
 
+### Reaching another environment from your machine
+
+Scripts load `.env.local`. `vercel env pull` writes `.env.production.local`, which
+nothing reads by default — so a run intended to inspect production reports on
+development instead, and the output is similar enough to be believed.
+`LOOM_ENV_FILE` redirects them. This repo is developed on Windows, so the
+PowerShell form is the one you will actually type — there is no inline
+`VAR=value cmd` prefix:
+
+```powershell
+$env:LOOM_ENV_FILE = '.env.production.pulled'
+npm run diagnose:readings
+$env:LOOM_ENV_FILE = $null      # it persists for the session otherwise
+```
+
+**Rename the pulled file, don't leave it where Vercel put it.** Next auto-loads
+`.env.production.local` during `next build`, and the `[SENSITIVE]` placeholder it
+carries for `NEXTAUTH_URL` fails the prerender of `/_not-found` with
+`ERR_INVALID_URL` — every local production build breaks until the file is moved
+aside. `LOOM_ENV_FILE` takes any path, so keeping it as `.env.production.pulled`
+costs nothing and ends that (2026-08-08; `.env*` is gitignored either way).
+
+Every script prints the database it reached before it reports anything. Read that
+line; it is the whole point of it existing.
+
+Vercel also refuses to export values for variables marked **sensitive**: it writes
+the literal string `[SENSITIVE]`. In this project that includes `DATABASE_URL`,
+`NEXTAUTH_SECRET`, `GITHUB_ID`, `GITHUB_SECRET`, `NEXTAUTH_URL`,
+`PREVIEW_LOGIN_SECRET` and
+`OPENROUTER_API_KEY` — so a pulled production file is not usable as-is, and the
+connection string has to come from the Neon console. `src/db/index.ts` fails with
+that instruction rather than letting it surface as an opaque driver error.
+
 ## Standing up the dev deployment
 
 1. Neon → create branch `dev` from `main` (schema + data snapshot; migrations
-   already applied through `0013`).
+   applied through `0016` as of 2026-08-03 — check `drizzle/meta/_journal.json`
+   rather than trusting this line, and note that
+   `npx tsx scripts/check-migrations.ts` reports which migrations *ran*, not what
+   the database is shaped like: 0016 exists precisely because a constraint
+   `schema.ts` had declared since 0000 was never in any database).
 2. GitHub → Settings → Developer settings → New OAuth App:
    homepage = dev alias, callback = `https://<dev-alias>/api/auth/callback/github`.
 3. Vercel → project → Settings → Domains: give the `dev` branch a stable domain
@@ -57,7 +110,7 @@ in the 8/1 session (NEXT_SESSION item 1); this document is its durable form.
      on `/admin` — it must enrol and land on Readings. This is the
      `events.signIn` path Playwright can never cover; if it is wrong, every
      tester is locked out and nothing else matters.
-   - Open a reading (blob auth + streaming), capture a byte, sort a tier,
+   - Open a reading (blob auth + streaming), capture a passage, sort a tier,
      export from Keep.
    - Confirm `/api/auth/test-login` returns 403.
 
@@ -71,11 +124,25 @@ a personal long-lived branch drifts for weeks and turns review into "approve
 my month"; a change branch is a ten-minute read.
 
 1. **Cut a branch from `dev`, one per change, days not weeks.** Push it —
-   Vercel builds a throwaway preview. That preview is for *looking at UI*:
-   GitHub sign-in cannot work there (an OAuth app holds exactly one callback
-   URL, and preview URLs are ephemeral), and that is by design, not a bug to
-   fix. Anything needing a session is exercised locally (`next dev` +
-   the test-login backdoor) or on the dev alias after merge.
+   Vercel builds a preview on a **stable branch alias**,
+   `loom-demo-git-<branch>-aroughidea.vercel.app` — only the per-deployment URL
+   is ephemeral. GitHub sign-in still cannot work there: next-auth on Vercel
+   builds `redirect_uri` from the request host, and an OAuth App holds exactly
+   one callback URL, so every branch would need its own app.
+
+   **A reviewer gets in through the preview door instead** —
+   `/api/auth/test-login?key=<PREVIEW_LOGIN_SECRET>`, which mints a session
+   without OAuth. See [previewLogin.ts](../src/lib/previewLogin.ts) for where
+   that door is open and on what terms; the key may also travel as an
+   `x-preview-login` header, to keep it out of the deployment's request logs.
+   The bare URL lands a reviewer as the **learner**; `?as=faculty` and
+   `?as=admin` ask for the other two.
+
+   A preview is no longer read-only, and no longer points at production: each
+   open PR gets its own Neon branch, cut from the `preview` template and
+   dropped when the PR closes (`.github/workflows/preview-db.yml`). What it
+   still shares with production is the **blob store** — invariant 4 — which is
+   why the door's default identity is not the admin.
 2. **PR into `dev`; the other developer reviews.** CI's `checks` job gates
    every PR; `e2e` joins it once its secrets are configured. Keep the PR
    small enough that the review is genuinely a read, and agree on a
@@ -99,6 +166,53 @@ my month"; a change branch is a ten-minute read.
    the production `DATABASE_URL` at merge time (next section).
 
 Rhythm in one line: `branch → PR → review → dev alias → soak → PR to master`.
+
+### When production is broken and `dev` cannot ship
+
+The rhythm above routes every change through the soak, which is right for every
+change except one: a bug students are hitting now, while `dev` is carrying work
+that is not ready to go with it. Waiting for the soak ships the half-finished
+work; shipping `dev` early is the thing the soak exists to prevent.
+
+So a hotfix takes the short way round, and it is **three steps, not two**:
+
+1. Cut from `master`, not `dev` — `git switch -c fix/... origin/master`. A
+   branch cut from `dev` carries `dev`'s unshipped work with it, which is the
+   whole problem.
+2. PR into `master`. Same gate as any promotion: green CI plus review.
+3. **Merge `master` back into `dev` immediately.** This is the step that gets
+   forgotten, and forgetting it is silent: `dev` still holds the old broken
+   code, so the next `dev → master` promotion reverts the hotfix and the bug
+   returns wearing a fix's commit message.
+
+## Onboarding a developer
+
+What a new developer needs, in order:
+
+1. **Repo access: collaborator with write.** Not a fork — fork PRs never
+   receive the CI secrets, so the required `e2e` gate can only pass for
+   branches pushed to this repo.
+2. **Local setup:** clone, `npm ci`, copy `.env.example` → `.env.local` and
+   fill it in (the file says where each value comes from). The non-negotiable
+   line: `DATABASE_URL` points at the Neon **`dev`** branch — `seed:demo`
+   wipes the demo course on whatever database it is aimed at, and aimed at
+   `main` that is production data.
+3. **Local sign-in is the backdoor,** `GET /api/auth/test-login` (admin) or
+   `?as=testa` (learner) — real GitHub OAuth only exists on the deployed
+   environments, whose OAuth apps hold those callbacks. Deployed builds
+   answer 403 there; that is invariant 5 working.
+4. **Read "Working together" above.** Both long-lived branches are protected:
+   `dev` requires green `checks` + `e2e` (so work arrives by PR), `master`
+   additionally requires review and is the production trigger. Neither takes
+   force pushes.
+5. **What they do not need:** Vercel or Neon dashboard access. Previews
+   deploy from git on their own; the environment variables are already
+   scoped. Grant dashboards later if someone ends up debugging deploys.
+
+Two data rules worth saying at hello (both are invariants above): the blob
+store is shared by every environment — never delete a reading locally that
+another environment still references — and the demo accounts (Test User A/B)
+belong to the test suite; human testing happens with real accounts.
 
 ## Production
 
@@ -134,18 +248,111 @@ Repository secrets to configure (Settings → Secrets → Actions):
 | `CI_NEXTAUTH_SECRET` | any fresh random string (optional; has a default) |
 
 Until `CI_DATABASE_URL` is set, the `e2e` job **fails with a pointed message**
-rather than skipping — a gate that silently skips is not a gate. Fork PRs
-don't receive secrets; collaborators should push branches to this repo.
+rather than skipping — a gate that silently skips is not a gate.
 
-Branch protection on `master` initially requires only the `checks` context (so
-an unconfigured e2e gate can't block everything); **once the secrets are in
-and the job is green, add `e2e` to the required status checks** — Settings →
-Branches → master, or:
+**Both jobs run Node 22** (`engines` declares `>= 22.7.0`). This is not
+housekeeping: below 22.7 pdf.js cannot import its no-wasm JPX fallback, every
+server-rendered scan comes back blank behind a *warning*, and four specs fail
+for reasons nothing in their own code explains. Nothing enforces `engines` —
+`npm ci` ignores it — so the runner is the only place this is true.
+
+**Fork PRs cannot run `e2e`, ever.** GitHub does not pass secrets to a
+`pull_request` run from a fork, so the guard fires and the job is red no matter
+what the branch contains. Both jobs are REQUIRED (below), so such a PR cannot
+merge as-is: mirror the branch into this repo and open a same-repo PR —
 
 ```bash
-gh api -X PATCH repos/tj60647/loom-demo/branches/master/protection/required_status_checks \
-  -f "contexts[]=checks" -f "contexts[]=e2e"
+git fetch https://github.com/<owner>/loom-demo.git <branch>
+git push origin FETCH_HEAD:refs/heads/<branch>
 ```
+
+— or add the contributor as a collaborator so they push here directly. Not
+`pull_request_target`: that hands the CI database and blob token to unreviewed
+code. Note the Actions UI shows a fork PR's branch with no owner prefix, so it
+reads as a local branch; `gh api repos/tj60647/loom-demo/pulls/<n> -q
+.head.repo.full_name` is the way to settle it.
+
+**Branch protection requires BOTH `checks` and `e2e`, on `master` AND `dev`**
+(verified 2026-08-15). This paragraph described the bootstrap state — "`master`
+initially requires only `checks`" — for as long as it took someone to run the
+command below, and then went on saying it, which cost a wrong call about
+whether a red `e2e` blocked anything. It does. Read the config, not this line:
+
+```bash
+gh api repos/tj60647/loom-demo/branches/master/protection/required_status_checks
+```
+
+## The one gate CI cannot close: the OAuth round trip
+
+The e2e suite signs in through `/api/auth/test-login`, so it never touches
+GitHub. `npm run check:auth` covers everything on Loom's side of the callback
+— which verified address stands for a student, who the roster admits, what
+each refusal says — but *that GitHub returns the payload we parse* is only
+ever established by a person. Run this after any change to `src/lib/auth.ts`,
+`src/lib/signIn.ts`, the OAuth app's settings, or the callback URLs.
+
+Five minutes, on the deployment you changed:
+
+1. **A real student, first time.** Invite a spare GitHub account's verified
+   address (Admin → Roster), then sign in as it in a private window. Expect:
+   GitHub's consent screen asking for **"Email addresses (read-only)" and
+   nothing else** — if it also asks to read profile data, the scope narrowing
+   has been reverted. You land on the shelf with the course's readings.
+2. **Idempotent second time.** Sign out, sign in again. Same landing, and
+   Admin → Roster still shows exactly one row for them.
+3. **The address that is not primary.** On that account, add the course
+   address as a *secondary* verified address and make something else primary.
+   Sign in: Loom should still find the course. This is the case most students
+   are actually in.
+4. **Not on the roster.** Remove them from the roster, sign in again. Expect
+   "That email is not on a course roster", naming the address GitHub gave —
+   not a NextAuth error page, and not a generic "access denied".
+5. **No confirmed address.** Hard to stage on a real account; if you have a
+   throwaway with an unverified email only, expect "GitHub sent no confirmed
+   email address". Otherwise read `/auth/error?error=NoVerifiedEmail` directly
+   and confirm the copy still makes sense.
+
+If step 1 fails on a fresh deployment, check the OAuth app's callback URL
+against `NEXTAUTH_URL` before anything else — dev and production have separate
+GitHub OAuth apps, and a mismatch surfaces as a generic callback failure.
+
+### The guest door
+
+Some people invited to a course have no GitHub account and will not get one.
+For them the sign-in page carries a folded-away "no GitHub account?" form that
+mails a single-use link, good for 24 hours.
+
+It exists **only where `RESEND_API_KEY` and `EMAIL_FROM` are both set** — leave
+them empty in dev and CI and GitHub is the only provider, which is what those
+environments want. `EMAIL_FROM` must sit at a domain verified in Resend, or
+every send is refused. Neither variable is a secret you can recover from
+Vercel once set: `vercel env pull` writes `[SENSITIVE]` for both.
+
+The roster still decides, and decides first. NextAuth runs the sign-in gate
+*before* it mails anything, so an address no course invited receives no email
+at all — it gets the same "not on a course roster" page the GitHub door gives.
+That is the property to re-check if the gate is ever touched:
+
+```bash
+# uninvited → refused, and nothing sent (no "[auth] Resend refused" in the log)
+curl -s -c /tmp/j http://localhost:3000/api/auth/csrf   # take csrfToken
+curl -s -b /tmp/j -o /dev/null -w '%{redirect_url}\n' -X POST \
+  -d "csrfToken=$CSRF&email=stranger@example.com" \
+  http://localhost:3000/api/auth/signin/email
+# expect: /auth/error?error=NotOnRoster&email=stranger%40example.com
+```
+
+Two smoke steps to add for a guest, after inviting their address:
+
+6. **Guest, first time.** Open the disclosure, enter the invited address,
+   expect "Check your inbox" and a link that lands them on the shelf enrolled.
+7. **Guest, uninvited address.** Enter something not on any roster: expect the
+   roster refusal page and, in the logs, **no send attempt**.
+
+One consequence worth knowing: a person who signs in by link first and later
+tries GitHub with the same address hits `OAuthAccountNotLinked` — NextAuth will
+not join a GitHub account to an existing user row on its own. Keep the door
+guest-only rather than advertised, and it stays a non-issue.
 
 ## Rollback
 

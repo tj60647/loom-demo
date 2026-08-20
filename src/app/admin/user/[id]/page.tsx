@@ -1,7 +1,9 @@
-import { getUserLoomDataAsAdmin } from "@/actions/admin"
+import { getStaffViewer, getUserLoomDataAsAdmin } from "@/actions/admin"
 import ReadOnlyClothMap from "@/components/svg/ReadOnlyClothMap"
-import { firstParam, resolveCourseId } from "@/lib/courses"
+import { firstParam } from "@/lib/courses"
 import type { LoomState } from "@/lib/types"
+import ConceptName from "@/components/ui/ConceptName"
+import ThreadCard from "@/components/cards/ThreadCard"
 
 // Route segment params and searchParams are promises (Next 16 async request APIs).
 type UserLoomSearchParams = {
@@ -17,10 +19,11 @@ export default async function UserLoomPage({
 }) {
   const resolvedParams = await params
   const resolvedSearchParams = await searchParams
-  const courseId = await resolveCourseId(firstParam(resolvedSearchParams.course))
-  const { concepts, bytes, edges } = await getUserLoomDataAsAdmin(resolvedParams.id, courseId)
+  // Viewer-aware: faculty resolve within their own courses (ruling 18).
+  const { courseId } = await getStaffViewer(firstParam(resolvedSearchParams.course))
+  const { concepts, passages, edges } = await getUserLoomDataAsAdmin(resolvedParams.id, courseId)
 
-  const state: LoomState = { concepts, bytes, edges, maps: [], read: "", views: { cardTable: { positions: {}, bends: {} } } }
+  const state: LoomState = { concepts, passages, edges, links: [], maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
   
   // Note: We use a simple read-only wrapper around ClothMap here
   return (
@@ -31,7 +34,7 @@ export default async function UserLoomPage({
           <div className="mapbar">
             <span className="label">The cloth</span>
             <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
-              {concepts.length} concepts, {edges.length} threads, {bytes.length} bytes.
+              {concepts.length} concepts, {edges.length} threads, {passages.length} passages.
             </span>
           </div>
           <div id="mapWrap">
@@ -46,7 +49,7 @@ export default async function UserLoomPage({
           <div className="scrollbox">
             {concepts.map(c => (
               <div key={c.id} className="crow">
-                <div className="clabel">{c.label}</div>
+                <div className="clabel"><ConceptName concept={c} /></div>
               </div>
             ))}
           </div>
@@ -54,18 +57,28 @@ export default async function UserLoomPage({
         <div className="card">
           <h2>Threads</h2>
           <div className="scrollbox">
-            {edges.map(e => {
-              const from = concepts.find(c => c.id === e.fromId)
-              const to = concepts.find(c => c.id === e.toId)
-              return (
-                <div key={e.id} className="thread">
-                  <div className="trip">
-                    {from?.label} <span className="v">{e.handle || "→"}</span> {to?.label}
-                  </div>
-                  <div className="sent">{e.sentence}</div>
-                </div>
-              )
-            })}
+            {/* THE SHARED CARD (docs/thread-card.md). Hand-rolled here until
+                2026-08-18, and wrong in three ways at once: it put `→` inside
+                the SOLID `.v` pill — the cloth's mark for a beaten thread — so
+                every unlabelled thread on this page read as labelled; it left
+                the ends unbolded, which no other drawing did; and it printed
+                the sentence without quotation marks. All three go with the
+                hand-rolling.
+
+                `state.links` is `[]` on this route (built above from what
+                `getUserLoomDataAsAdmin` returns), which is exactly the input
+                that makes `labelOf` fall back to the legacy `handle` — the
+                same label this page was already showing, resolved by the one
+                function that decides what a label is. */}
+            {edges.map((e) => (
+              <ThreadCard
+                key={e.id}
+                thread={e}
+                from={concepts.find((c) => c.id === e.fromId)}
+                to={concepts.find((c) => c.id === e.toId)}
+                links={state.links}
+              />
+            ))}
           </div>
         </div>
       </div>

@@ -1,5 +1,8 @@
-/** Map-tab sort: '' unsorted · p/s/t tiers · x left off the map. */
+/** Per-map concept sort: '' unsorted · p/s/t tiers · x set aside. */
 export type Tier = "" | "p" | "s" | "t" | "x"
+
+/** Passage tier — on the passage itself. '' unranked; no "set aside" for passages. */
+export type PassageTier = "" | "p" | "s" | "t"
 
 export type Concept = {
   id: string
@@ -8,15 +11,18 @@ export type Concept = {
   label: string
   def: string | null
   note: string | null
-  tier: Tier
   createdAt: Date
 }
 
-export type Byte = {
+export type Passage = {
   id: string
   courseId: string | null
   userId: string
-  conceptId: string
+  /**
+   * The concepts this passage evidences (passage_concept join, capture order).
+   * Empty = an Unlabeled Passage — a legal, first-class state.
+   */
+  conceptIds: string[]
   source: string | null
   sourceId: string | null
   location: string | null
@@ -25,6 +31,11 @@ export type Byte = {
   startOffset: number | null
   endOffset: number | null
   pageContentHash: string | null
+  /** The student's own margin, on the passage itself. */
+  note: string
+  question: string
+  isPullQuote: boolean
+  tier: PassageTier
   createdAt: Date
 }
 
@@ -81,6 +92,54 @@ export type ExtractionMetrics = {
    * absent for a largely non-Latin document, where they cannot apply.
    */
   latinShare?: number
+  /**
+   * Occurrences of PDF glyph names left in the text (`/f_i`, `/ffi`,
+   * `/hyphen.cap`). A font whose /ToUnicode map is absent falls back to naming
+   * its glyphs, and the names survive extraction as ordinary ASCII — invisible
+   * to junkCharRatio, which is why this is counted separately.
+   */
+  glyphNameLeaks?: number
+  /**
+   * Punctuation marks sitting between two letters (`INTERAC$IVE`). The
+   * signature of ligature codes resolving to the ASCII punctuation that happens
+   * to share their byte value.
+   */
+  punctuationInWord?: number
+  /**
+   * Share of whitespace-delimited tokens long enough to mean lost word
+   * boundaries. Biased upward — see LONG_TOKEN_CHARS.
+   */
+  longTokenRatio?: number
+  /**
+   * Structural facts read from the file rather than the text, by
+   * src/lib/pdfStructure.ts. Absent on rows scored before the probe existed.
+   *
+   * `spreadPages` is the one no text measure can substitute for: a book opening
+   * scanned as a single landscape sheet extracts as clean prose and passes
+   * every other check while reading across the gutter.
+   */
+  spreadPages?: number
+  pagesWithGlyphs?: number
+  /**
+   * Share of simulated captures that would anchor cleanly, and how many were
+   * tried. This is what `anchorability` is scored from — a direct test of the
+   * mechanism rather than a character count standing in for it.
+   */
+  anchorRate?: number
+  anchorSpansTested?: number
+  /**
+   * Pages that are photographs, plates or diagrams. They have no text because
+   * they are not text, so they are excluded from `coverage` rather than counted
+   * against it.
+   */
+  picturePages?: number
+  /** Pages showing an image with no text over it — the only pages OCR helps. */
+  scannedPages?: number
+  /** Pages with neither text nor image. Blank leaves, not a defect. */
+  blankPages?: number
+  glyphCount?: number
+  /** Share of glyphs that resolved to no usable character at all. */
+  unmappedGlyphRatio?: number
   /** Whether the first page rendered to a cover image. */
   coverRendered: boolean
 }
@@ -117,13 +176,40 @@ export type CourseSourceLink = {
   createdAt: Date
 }
 
+/**
+ * A Link — the reusable relationship the student owns (5.1, migration 0024).
+ * USER-LEVEL, like a Concept (TJ, 2026-08-10: "links are user-level"), so the
+ * student can gloss "leads to" in their own words.
+ *
+ * It exists independently of any Thread that uses it, which is the point:
+ * naming a relationship you expect to need, before you have a pair to hang it
+ * on, is a legal act — the same shape as naming a Concept before its evidence.
+ */
+export type Link = {
+  id: string
+  courseId: string | null
+  userId: string
+  label: string
+  /** The Link's own gloss — one meaning, shared by every Thread using it. */
+  description: string
+  createdAt: Date
+}
+
 export type Edge = {
   id: string
   courseId: string | null
   userId: string
   fromId: string
   toId: string
+  /**
+   * LEGACY string copy of the Link Label, still dual-written through 5.1's
+   * expand phase so nothing breaks mid-changeover. Read `linkId` first and
+   * fall back to this; the column's drop is a later migration.
+   */
   handle: string | null
+  /** The Link this Thread uses. Null = thrown but not yet labelled (P0.3). */
+  linkId: string | null
+  /** The per-pair sentence — the Thread's own description, not the Link's. */
   sentence: string
   createdAt: Date
 }
@@ -182,10 +268,26 @@ export type LoomMap = {
 }
 
 export type LoomViews = {
-  /** Legacy single table — the mirror of the oldest whole-weave map's geometry. */
+  /** Legacy single table — kept for pre-maps geometry; maps carry their own. */
   cardTable: CardTableView
   /** `map:<id>` keys carry each map's own geometry. */
   [key: string]: CardTableView
+}
+
+/**
+ * A cloth — the per-scope workspace identity: the student's own title for
+ * their engagement with a reading (scopeKey as in maps; '' = whole weave)
+ * plus a short interpretation. Absorbed the old `read` mirror in 0021.
+ */
+export type Cloth = {
+  id: string
+  courseId: string | null
+  userId: string
+  scopeKey: string
+  title: string
+  description: string
+  createdAt: Date
+  updatedAt: Date
 }
 
 /** One student act on the graph, as recorded in the append-only history. */
@@ -194,7 +296,7 @@ export type GraphEvent = {
   courseId: string | null
   userId: string
   kind: string
-  entityType: "concept" | "byte" | "edge" | "graph" | "map"
+  entityType: "concept" | "passage" | "edge" | "link" | "graph" | "map" | "cloth" | "reading"
   entityId: string | null
   payload: Record<string, unknown> | null
   at: Date
@@ -202,11 +304,17 @@ export type GraphEvent = {
 
 export type LoomState = {
   concepts: Concept[]
-  bytes: Byte[]
+  passages: Passage[]
   edges: Edge[]
+  /**
+   * The student's Link vocabulary — UNSCOPED, like concepts. Holds labels
+   * that no Thread uses yet, which is why it is a list of its own rather
+   * than something derived from `edges`.
+   */
+  links: Link[]
   maps: LoomMap[]
-  /** Mirror of the oldest whole-weave map's paragraph (expand phase — see maps). */
-  read: string
+  /** One per scope the student has titled or described ('' = whole weave). */
+  cloths: Cloth[]
   views: LoomViews
 }
 
@@ -216,11 +324,11 @@ export type LoomState = {
 // but no consumer of the graph is required to read it.
 
 /**
- * Capture provenance for a byte taken from a library PDF. An extension to the
- * §6 byte shape (recorded in the spec changelog): part of the student's own
+ * Capture provenance for a passage taken from a library PDF. An extension to the
+ * §6 passage shape (recorded in the spec changelog): part of the student's own
  * record, safe for consumers to ignore.
  */
-export type ExportByteAnchor = {
+export type ExportPassageAnchor = {
   sourceId: string
   pageNumber: number | null
   startOffset: number | null
@@ -231,22 +339,33 @@ export type ExportByteAnchor = {
 export type LoomExport = {
   graph: {
     student: string
-    concepts: { id: string; label: string; def: string; note: string; tier: Tier }[]
-    bytes: {
+    concepts: { id: string; label: string; def: string; note: string }[]
+    passages: {
       id: string
-      conceptId: string
+      /** Empty array = an Unlabeled Passage. Legacy files carry `conceptId`. */
+      conceptIds: string[]
       source: string
       location: string
       text: string
-      anchor?: ExportByteAnchor
+      /** The passage's margin — emitted only when set. */
+      note?: string
+      question?: string
+      isPullQuote?: boolean
+      tier?: PassageTier
+      anchor?: ExportPassageAnchor
     }[]
     edges: { id: string; fromId: string; toId: string; sentence: string; handle: string }[]
-    read: string
     /**
-     * The student's maps (additive, like ExportByteAnchor — older consumers
-     * ignore it; older files lack it and import via legacy synthesis).
-     * `concepts[].tier` and `read` above remain the mirror of the oldest
-     * whole-weave map, so pre-maps importers still see a sorted graph.
+     * Cloth titles/descriptions per scope ('' = whole weave). Replaces the
+     * legacy top-level `read` string, which the import that existed until
+     * 2026-08-11 accepted and folded into the whole-weave cloth. Import is
+     * gone; the field stays as the download's record of the cloths.
+     */
+    cloths?: { id: string; scopeKey: string; title: string; description: string }[]
+    /**
+     * The student's maps. Older files lack it (and carry `concepts[].tier` +
+     * `read` instead); the import that existed until 2026-08-11 synthesized a
+     * whole-weave map from those.
      */
     maps?: {
       id: string
@@ -264,7 +383,7 @@ export type LoomExport = {
       order?: string[]
       pins?: string[]
     }
-    /** Per-map geometry, keyed by map id (symbolic on import). */
+    /** Per-map geometry, keyed by map id (was symbolic on import; import is gone). */
     maps?: Record<
       string,
       {

@@ -1,14 +1,16 @@
-// The reading lens (docs/reading-scope-and-map-passes.md §A.3).
+// The reading lens (docs/archive/reading-scope-and-map-passes.md §A.3).
 //
-// A CONCEPT DOES NOT BELONG TO A READING — A BYTE DOES. A concept emerges from
-// a reading and may then be evidenced in several; spec §2 makes one label one
-// concept, reused across readings and weeks. So the only stored relation is the
-// byte's `sourceId`, and everything below derives from it per render and throws
-// the result away. Nothing here owns a concept, re-homes one, or writes.
+// A CONCEPT DOES NOT BELONG TO A READING — A PASSAGE DOES. A concept emerges from
+// a reading and may then be evidenced in several: one User-level object,
+// referenced by passages across readings (identity by object, not label —
+// ruling 36). The stored relations are the passage's `sourceId` and its concept
+// pointers (`passage_concept`), and everything below derives from them per render
+// and throws the result away. Nothing here owns a concept, re-homes one, or
+// writes.
 //
 // A reading is a door into one graph, never one of many graphs.
 
-import type { Byte, Concept, Edge, LoomState } from "@/lib/types"
+import type { Passage, Concept, Edge, LoomState } from "@/lib/types"
 
 /**
  * A selection of readings the student is working in.
@@ -40,14 +42,14 @@ export function soleSourceId(scope: Scope): string | null {
 
 /**
  * The graph as seen through one scope. Shaped so a tab can swap `state` for
- * this and keep reading `.concepts` / `.bytes` / `.edges`, with the
+ * this and keep reading `.concepts` / `.passages` / `.edges`, with the
  * cross-reading facts alongside rather than hidden.
  */
 export type ScopedGraph = {
   /** Concepts evidenced in this scope, in capture order. */
   concepts: Concept[]
-  /** Bytes captured from this scope's readings. */
-  bytes: Byte[]
+  /** Passages captured from this scope's readings. */
+  passages: Passage[]
   /** Threads with both ends in scope — this reading's internal weave. */
   edges: Edge[]
   /**
@@ -61,14 +63,14 @@ export type ScopedGraph = {
 }
 
 /**
- * A concept is *evidenced in* a scope when one of its bytes came from one of
+ * A concept is *evidenced in* a scope when one of its passages came from one of
  * the scope's readings. It is not thereby the reading's — the same concept is
  * evidenced in every reading whose passages support it.
  *
  * Two deliberate exceptions:
  * - the whole weave (`key === ''`) contains everything, with no bridges and
  *   nothing outside;
- * - a concept with NO bytes appears in every scope, flagged "no evidence" by
+ * - a concept with NO passages appears in every scope, flagged "no evidence" by
  *   its tab. Red line #4 already makes that a visible failure state, so it
  *   stays visible rather than being placed by an invented reading link.
  */
@@ -76,7 +78,7 @@ export function scopedGraph(state: LoomState, scope: Scope): ScopedGraph {
   if (isWholeWeave(scope)) {
     return {
       concepts: state.concepts,
-      bytes: state.bytes,
+      passages: state.passages,
       edges: state.edges,
       bridges: [],
       outside: [],
@@ -85,18 +87,18 @@ export function scopedGraph(state: LoomState, scope: Scope): ScopedGraph {
 
   const inScope = new Set(scope.sourceIds)
   const evidenced = new Set<string>()
-  const hasByte = new Set<string>()
-  const bytes: Byte[] = []
+  const hasPassage = new Set<string>()
+  const passages: Passage[] = []
 
-  state.bytes.forEach((b) => {
-    hasByte.add(b.conceptId)
+  state.passages.forEach((b) => {
+    b.conceptIds.forEach((id) => hasPassage.add(id))
     if (b.sourceId && inScope.has(b.sourceId)) {
-      evidenced.add(b.conceptId)
-      bytes.push(b)
+      b.conceptIds.forEach((id) => evidenced.add(id))
+      passages.push(b)
     }
   })
 
-  const isIn = (conceptId: string) => evidenced.has(conceptId) || !hasByte.has(conceptId)
+  const isIn = (conceptId: string) => evidenced.has(conceptId) || !hasPassage.has(conceptId)
 
   const concepts: Concept[] = []
   const outside: Concept[] = []
@@ -111,12 +113,12 @@ export function scopedGraph(state: LoomState, scope: Scope): ScopedGraph {
     else if (from || to) bridges.push(e)
   })
 
-  return { concepts, bytes, edges, bridges, outside }
+  return { concepts, passages, edges, bridges, outside }
 }
 
 /** A scoped graph in the shape the tabs already consume. */
 export function asLoomState(state: LoomState, graph: ScopedGraph): LoomState {
-  return { ...state, concepts: graph.concepts, bytes: graph.bytes, edges: graph.edges }
+  return { ...state, concepts: graph.concepts, passages: graph.passages, edges: graph.edges }
 }
 
 /**
@@ -124,16 +126,16 @@ export function asLoomState(state: LoomState, graph: ScopedGraph): LoomState {
  * together (§A.4): when this returns more than one id, the student has met the
  * same idea in two texts, which is the move the course is trying to teach.
  */
-export function readingsOf(conceptId: string, bytes: Byte[]): string[] {
+export function readingsOf(conceptId: string, passages: Passage[]): string[] {
   const ids = new Set<string>()
-  bytes.forEach((b) => {
-    if (b.conceptId === conceptId && b.sourceId) ids.add(b.sourceId)
+  passages.forEach((b) => {
+    if (b.sourceId && b.conceptIds.includes(conceptId)) ids.add(b.sourceId)
   })
   return [...ids]
 }
 
 /** Per-reading tallies of the student's own acts. Counted, never scored. */
-export type ReadingTally = { bytes: number; concepts: number; threads: number }
+export type ReadingTally = { passages: number; concepts: number; threads: number }
 
 /**
  * What the shelf shows on each card. Pure counting over the student's own
@@ -141,25 +143,28 @@ export type ReadingTally = { bytes: number; concepts: number; threads: number }
  */
 export function tallyByReading(state: LoomState): Map<string, ReadingTally> {
   const conceptsBySource = new Map<string, Set<string>>()
-  const byteCount = new Map<string, number>()
+  const passageCount = new Map<string, number>()
 
-  state.bytes.forEach((b) => {
+  state.passages.forEach((b) => {
     if (!b.sourceId) return
-    byteCount.set(b.sourceId, (byteCount.get(b.sourceId) ?? 0) + 1)
+    passageCount.set(b.sourceId, (passageCount.get(b.sourceId) ?? 0) + 1)
     const set = conceptsBySource.get(b.sourceId) ?? new Set<string>()
-    set.add(b.conceptId)
+    b.conceptIds.forEach((id) => set.add(id))
     conceptsBySource.set(b.sourceId, set)
   })
 
   const tallies = new Map<string, ReadingTally>()
-  conceptsBySource.forEach((conceptIds, sourceId) => {
+  // Keyed by passage count, not by concept map: a reading whose only captures are
+  // unlabeled passages still counts — the passage is the act, not the label.
+  passageCount.forEach((count, sourceId) => {
+    const conceptIds = conceptsBySource.get(sourceId) ?? new Set<string>()
     // A thread counts for a reading when either end is evidenced in it — the
     // same rule the workbench uses, so the card and the tab agree.
     const threads = state.edges.filter(
       (e) => conceptIds.has(e.fromId) || conceptIds.has(e.toId)
     ).length
     tallies.set(sourceId, {
-      bytes: byteCount.get(sourceId) ?? 0,
+      passages: count,
       concepts: conceptIds.size,
       threads,
     })

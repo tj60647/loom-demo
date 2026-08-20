@@ -1,12 +1,13 @@
 "use server"
 
 import { db } from "@/db"
+import { viewingAsStudent } from "@/lib/viewAsServer"
 import { courseMemberships, courses, sections } from "@/db/schema"
-import { and, eq } from "drizzle-orm"
+import { and, asc, eq, isNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth/next"
 import { authOptions, isAdminUser } from "@/lib/auth"
-import { getCourse, resolveCourseIdForUser, slugify } from "@/lib/courses"
+import { ensureFacultySection, getCourse, resolveCourseIdForUser, slugify } from "@/lib/courses"
 
 // Server Functions are reachable by direct POST, not only through the UI, so
 // every mutation here re-checks admin rather than trusting the calling page.
@@ -39,7 +40,53 @@ export async function getActiveCourse() {
   if (!courseId) return null
 
   const course = await getCourse(courseId)
-  return course ? { id: course.id, name: course.name, term: course.term } : null
+  if (!course) return null
+
+  // `isStaff` rides along because every learner surface already reads this, and
+  // the Overlays are a faculty/admin capability (TJ, 2026-08-08) whose CONTROLS
+  // must not render for a student. It decides what is drawn, never what may be
+  // read — `overlayViewer()` re-checks server-side, so a tampered client gets
+  // an empty overlay, not someone else's marks.
+  const membership = await db
+    .select({ role: courseMemberships.role })
+    .from(courseMemberships)
+    .where(and(
+      eq(courseMemberships.courseId, courseId),
+      eq(courseMemberships.userId, session.user.id),
+      isNull(courseMemberships.removedAt)
+    ))
+    .limit(1)
+  // Two grades, not one (TJ, 2026-08-09: "admin role has even more tabs").
+  // Faculty hold the read-side of their own courses; the library and course
+  // managers are write surfaces and stay admin's. Same rule the /admin layout
+  // and AdminNav already enforce — this only carries it to the journey bar.
+  const adminTruly = isAdminUser(session.user)
+  const staffTruly = adminTruly || membership[0]?.role === "FACULTY"
+
+  // The student lens (TJ, 2026-08-09). Masked HERE, once, so that every client
+  // surface gated on isStaff/isAdmin goes quiet together and no consumer has to
+  // know the lens exists. The unmasked truth rides along as `staffTruly`, for
+  // exactly one purpose: drawing the control that takes the lens off again.
+  // Without it a staff member could put the lens on and have no way back.
+  const asStudent = staffTruly && (await viewingAsStudent())
+  const isAdmin = adminTruly && !asStudent
+  const isStaff = staffTruly && !asStudent
+
+  // The sections a staff viewer may overlay. Empty for a student — they see no
+  // Overlay control at all, so the list would only be a leak of names.
+  const courseSections = isStaff
+    ? await db
+        .select({ id: sections.id, name: sections.name })
+        .from(sections)
+        .where(eq(sections.courseId, courseId))
+        .orderBy(asc(sections.name))
+    : []
+
+  return {
+    id: course.id, name: course.name, term: course.term,
+    isStaff, isAdmin, sections: courseSections,
+    staffTruly, viewingAsStudent: asStudent,
+  }
 }
 
 /** Appends -2, -3, … until the slug is free. */
@@ -90,12 +137,14 @@ export async function createCourse(formData: FormData) {
 
   const slug = await uniqueCourseSlug(slugify(readText(formData, "slug") || name))
 
-  await db.insert(courses).values({
+  const [course] = await db.insert(courses).values({
     slug,
     name,
     term: readText(formData, "term"),
     description: readText(formData, "description"),
-  })
+  }).returning({ id: courses.id })
+
+  await ensureFacultySection(course.id)
 
   revalidateAdmin()
 }
@@ -142,7 +191,7 @@ export async function setCourseArchived(formData: FormData) {
 /**
  * Hard-deletes a course. Cascades to sections, memberships, allowlist entries,
  * and course_source rows — but NOT to the readings themselves, which live in
- * the shared library, nor to student concepts/bytes/edges, whose courseId is
+ * the shared library, nor to student concepts/passages/edges, whose courseId is
  * set null so the work survives.
  */
 export async function deleteCourse(formData: FormData) {
@@ -151,7 +200,9 @@ export async function deleteCourse(formData: FormData) {
   const courseId = readText(formData, "courseId")
   if (!courseId) return
 
-  // Guard against deleting a course that still holds student work.
+  // Typed confirmation, nothing more: a hard course delete must not happen on
+  // a mis-click. (Student work survives it regardless — courseId set-null,
+  // per the docstring above; nothing here inspects whether work exists.)
   if (readText(formData, "confirm") !== "delete") return
 
   await db.delete(courses).where(eq(courses.id, courseId))

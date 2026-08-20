@@ -21,3 +21,27 @@ export function byLabel<T extends { label: string }>(a: T, b: T) {
 export function sortedByLabel<T extends { label: string }>(items: T[]): T[] {
   return [...items].sort(byLabel);
 }
+
+/**
+ * "just now" · "3 hours ago" · "2 days ago" · "8 Aug" — how recently a student
+ * touched something, in words rather than a timestamp.
+ *
+ * Only ever rendered client-side (the shelf's cloth row waits for the loom to
+ * load), so a value computed from `Date.now()` cannot desynchronise a server
+ * render. Anything over a week reads as a date, because "43 days ago" is a
+ * number nobody converts back into a week of term.
+ */
+export function timeAgo(when: Date | string, now: Date = new Date()): string {
+  const then = when instanceof Date ? when : new Date(when)
+  const ms = now.getTime() - then.getTime()
+  if (!Number.isFinite(ms)) return ""
+  const mins = Math.floor(ms / 60_000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins} minute${mins !== 1 ? "s" : ""} ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} hour${hours !== 1 ? "s" : ""} ago`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return "yesterday"
+  if (days < 7) return `${days} days ago`
+  return then.toLocaleDateString(undefined, { day: "numeric", month: "short" })
+}

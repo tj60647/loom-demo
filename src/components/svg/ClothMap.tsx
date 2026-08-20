@@ -3,20 +3,82 @@
 import { useEffect, useState, useRef } from "react"
 import type { LoomState } from "@/lib/types"
 import { adjacency, componentOf } from "@/lib/clothMath"
+import { conceptNameText } from "@/lib/conceptName"
 
 type ReadSel = { type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean } | null
 
-export default function ClothMap({ 
-  state, 
-  readSel, 
-  setReadSel 
-}: { 
-  state: LoomState, 
-  readSel: ReadSel, 
-  setReadSel: (s: ReadSel) => void 
+/**
+ * What just happened, if anything (TJ, 2026-08-12: "the latest event needs a
+ * glow that fades out"). The replay hands the id of whatever the current act
+ * touched and a `seq` that changes with every step — the seq is what restarts
+ * the animation, since replaying the same concept twice must glow twice.
+ */
+export type ClothGlow = { id: string; seq: number } | null
+
+/**
+ * TRACING IS HIDDEN ON EVERY CLOTH (TJ, 2026-08-18: "all cloths hide/disable
+ * trace"), and hidden rather than deleted — flip this to true and it returns
+ * whole, everywhere a cloth is drawn (03's reflection, the Cohort Graph, the
+ * read-only student view) at once.
+ *
+ * Clicking a concept lit its full connected component in red and faded
+ * everything else; clicking an arc lit that one thread. It went off on the
+ * student's cloth first (75e005c, a flag in ClothReflection) because it was
+ * unused and it owned the click the pair needed. The other three kept it, and
+ * TJ has now ruled the same for them.
+ *
+ * IT LIVES HERE, in the renderer, and not in the four callers. The trace is
+ * drawn by this file — the component lighting, the dimming, the red arc — so a
+ * per-caller flag would be four chances for one surface to keep tracing after
+ * the others stopped, which is exactly the state this replaces.
+ *
+ * Turning it off does NOT take a selection away from anyone: `CohortClothPanel`
+ * still reads out whichever concept or thread is chosen, from the lists that
+ * sit under the drawing. What goes is the drawing as a way to choose (see the
+ * Removes: line of the commit that did this).
+ */
+export const SHOW_TRACE: boolean = false
+
+export default function ClothMap({
+  state,
+  readSel,
+  setReadSel,
+  glow = null,
+  pair = [],
+  onPickConcept,
+}: {
+  state: LoomState,
+  readSel: ReadSel,
+  setReadSel: (s: ReadSel) => void,
+  glow?: ClothGlow,
+  /**
+   * The two concepts being gathered for a throw, in pick order — [] , [a] or
+   * [a, b]. Drawn red and ringed; the owner decides what a full pair means.
+   */
+  pair?: readonly string[],
+  /**
+   * A concept was pressed (TJ, 2026-08-18: "select a node, shift select
+   * another node, and then a popup"). `additive` is the shift key. The third
+   * argument is the node's own hit circle — the same element whatever part of
+   * the node was aimed at, so a popover can hang off the drawing rather than
+   * off whichever glyph took the click.
+   *
+   * PASSING THIS IS THE ONLY THING A NODE CLICK DOES NOW. With `SHOW_TRACE`
+   * off there is no other candidate for it, on any cloth. The two staff
+   * surfaces — `CohortClothPanel` and `ReadOnlyClothMap` — pass nothing here,
+   * so their nodes are drawing and tooltip and nothing else.
+   */
+  onPickConcept?: (id: string, additive: boolean, anchor: SVGCircleElement | null) => void,
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [width, setWidth] = useState(720)
+  /**
+   * The hit circles, by concept id. The popover anchors to the NODE, not to
+   * the glyph that was clicked: aiming at a concept's name and aiming at its
+   * dot are the same act, and a card that jumps to wherever the rotated label
+   * happens to end reads as two different controls.
+   */
+  const nodeHits = useRef<Map<string, SVGCircleElement>>(new Map())
 
   // ResizeObserver rather than a one-shot measure: it catches window resizes
   // and the moment a hidden panel becomes visible. A zero width means the
@@ -27,7 +89,12 @@ export default function ClothMap({
     if (!svg) return
     const observer = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width ?? 0
-      if (w > 0) setWidth(Math.max(w, 720))
+      // The floor was 720 — from when the cloth was the full width of the
+      // page. In half a column (TJ, 2026-08-12) a 720 layout inside a 562px
+      // box does not shrink, it CLIPS: the last concepts simply leave the
+      // frame. 480 is the narrowest the warp still reads at; below it
+      // `#mapWrap` scrolls rather than hiding anything.
+      if (w > 0) setWidth(Math.max(w, 480))
     })
     observer.observe(svg)
     return () => observer.disconnect()
@@ -36,7 +103,11 @@ export default function ClothMap({
   const H = 400
   const baseY = H - 128
   const mL = 46
-  const mR = 34
+  // Room for the LAST label, which is drawn from the node and rotated 30° into
+  // the right margin — at mR=34 it ran off the frame at any width, and half a
+  // column made that impossible to miss. Not enough for the longest label
+  // there can be (34 chars ≈ 160px projected); enough that a normal one lands.
+  const mR = 96
   
   const cs = state.concepts
   const n = cs.length
@@ -45,16 +116,35 @@ export default function ClothMap({
   const idx: Record<string, number> = {}
   cs.forEach((c, i) => idx[c.id] = i)
 
+  /**
+   * A WIDE INVISIBLE TWIN FOR THE NODES, the fix the arcs got in 2026-08-12
+   * and the nodes never did. SVG hit-testing on a circle is exactly the
+   * circle, and the drawn node is r=3.4 — a 6.8px target, which was tolerable
+   * while a miss merely failed to trace and is not while the click is how you
+   * gather a pair.
+   *
+   * Sized off the warp's own spacing so the twins cannot swallow each other:
+   * half the gap between neighbours, capped at 9. Computed from the layout
+   * above at width=1200 — 20 concepts sit 55.7px apart (twin r=9, 37.7px of
+   * clear air between them); 60 concepts sit 17.9px apart (twin r=8.96, edges
+   * touching and not overlapping). The 4 floor is for the pathological case
+   * only, where the warp is already unreadable.
+   */
+  const gap = n > 1 ? (width - mL - mR) / (n - 1) : width
+  const hitR = Math.max(4, Math.min(9, gap / 2))
+
   let selNodes: Set<string> | null = null
   let selEdges: Set<string> | null = null
   let selEdgeId: string | null = null
 
-  if (readSel?.type === "concept" && readSel.id) {
+  // Everything below is the trace, and with the flag off all three stay null —
+  // no component lit, nothing faded, no red arc.
+  if (SHOW_TRACE && readSel?.type === "concept" && readSel.id) {
     // Pulling a thread lights the FULL connected component, as in v14.
     const comp = componentOf(readSel.id, adjacency(state.edges))
     selNodes = comp.nodes
     selEdges = new Set(comp.edges.map(e => e.id))
-  } else if (readSel?.type === "hub" && readSel.ids) {
+  } else if (SHOW_TRACE && readSel?.type === "hub" && readSel.ids) {
     const ids = readSel.ids
     const nodes = new Set(ids)
     const edgeIds = new Set<string>()
@@ -67,7 +157,7 @@ export default function ClothMap({
     })
     selNodes = nodes
     selEdges = edgeIds
-  } else if (readSel?.type === "edge" && readSel.id) {
+  } else if (SHOW_TRACE && readSel?.type === "edge" && readSel.id) {
     selEdgeId = readSel.id
   }
 
@@ -77,8 +167,11 @@ export default function ClothMap({
   
   eo.sort((a, b) => Math.abs(X(idx[b.e.fromId]) - X(idx[b.e.toId])) - Math.abs(X(idx[a.e.fromId]) - X(idx[a.e.toId])))
 
+  // minWidth pairs with the 480 floor in the observer above: this is drawn in
+  // raw CSS pixels, so a 480-wide warp inside a narrower element is cut off
+  // rather than scaled down. With the minimum real, `#mapWrap` scrolls.
   return (
-    <svg ref={svgRef} id="map" style={{ width: "100%", height: H, touchAction: "none" }}>
+    <svg ref={svgRef} id="map" style={{ width: "100%", minWidth: 480, height: H, touchAction: "none" }}>
       <defs>
         <marker id="arwS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="var(--sage)" />
@@ -106,9 +199,13 @@ export default function ClothMap({
         <line x1={mL - 16} y1={baseY} x2={width - mR + 14} y2={baseY} stroke="var(--rule)" strokeWidth={1.2} />
       )}
 
-      {/* Warp Lines */}
+      {/* Warp Lines. `pointerEvents:none` — they are the paper's grain, not a
+          target, and they run the full height of the cloth: every arc crosses
+          one, and an arc clicked where it crosses used to select nothing at
+          all (the warp line is drawn under, but it wins any pixel the arc's
+          hairline does not exactly cover). */}
       {cs.map((c, i) => (
-        <line key={`warp-${c.id}`} x1={X(i)} y1={28} x2={X(i)} y2={baseY} stroke="rgba(168,132,63,.14)" strokeWidth={1} />
+        <line key={`warp-${c.id}`} x1={X(i)} y1={28} x2={X(i)} y2={baseY} stroke="rgba(168,132,63,.14)" strokeWidth={1} pointerEvents="none" />
       ))}
 
       {/* Edges */}
@@ -127,30 +224,64 @@ export default function ClothMap({
         if (selEdgeId && !isSel) op = 0.18
         else if (selEdges && !selEdges.has(e.id)) op = 0.15
 
-        const handleSelect = () => {
-          if (readSel?.type === "edge" && readSel.id === e.id) {
-            setReadSel(null)
-          } else {
-            setReadSel({ type: "edge", id: e.id })
-          }
-        }
+        // Tracing was the arc's only gesture, so with the flag off it has none.
+        // The twin below stays — it is what carries the sentence as a tooltip,
+        // which is not a trace and is the one thing an arc could always say.
+        const handleSelect = SHOW_TRACE
+          ? () => {
+              if (readSel?.type === "edge" && readSel.id === e.id) {
+                setReadSel(null)
+              } else {
+                setReadSel({ type: "edge", id: e.id })
+              }
+            }
+          : undefined
+
+        const d = `M ${fx} ${baseY - 6} A ${span / 2} ${h} 0 0 ${fx < tx ? 1 : 0} ${tx} ${baseY - 6}`
 
         return (
           <g key={`edge-${e.id}`}>
-            <path 
-              d={`M ${fx} ${baseY - 6} A ${span / 2} ${h} 0 0 ${fx < tx ? 1 : 0} ${tx} ${baseY - 6}`}
-              fill="none" 
-              stroke={col} 
-              opacity={op} 
-              strokeWidth={isSel ? 2 : 1.5}
-              strokeDasharray={beaten ? "none" : "5 4"}
-              markerEnd={`url(#${isSel ? 'arwR' : (beaten ? 'arwS' : 'arwG')})`}
-              cursor="pointer"
+            {/* A WIDE INVISIBLE TWIN, so the arc can actually be hit (TJ,
+                2026-08-12, asking whether the panel's "or a concept/arc on the
+                cloth" was true). It was true of the code and false in the
+                hand: SVG hit-testing on a stroke is exactly the stroke, so the
+                target was a 1.5px hairline crossed by the warp lines — aiming
+                at an arc mostly selected nothing. The board has had this twin
+                for its bend handles all along; the cloth never got one. */}
+            <path
+              d={d}
+              fill="none"
+              stroke="rgba(0,0,0,0)"
+              strokeWidth={14}
+              cursor={handleSelect ? "pointer" : undefined}
               onClick={handleSelect}
             >
               <title>{`"${e.sentence}"`}</title>
             </path>
-            
+            {glow?.id === e.id && (
+              <path
+                key={`glow-${e.id}-${glow.seq}`}
+                className="clothglow"
+                d={d}
+                fill="none"
+                stroke="var(--ochre)"
+                strokeWidth={9}
+                pointerEvents="none"
+              />
+            )}
+            <path
+              d={d}
+              fill="none"
+              stroke={col}
+              opacity={op}
+              strokeWidth={isSel ? 2 : 1.5}
+              strokeDasharray={beaten ? "none" : "5 4"}
+              markerEnd={`url(#${isSel ? 'arwR' : (beaten ? 'arwS' : 'arwG')})`}
+              // The twin above takes the clicks; this one is the drawing, and
+              // must not steal a hit from a neighbour it happens to cross.
+              pointerEvents="none"
+            />
+
             <text
               x={(fx + tx) / 2}
               y={baseY - 6 - h - 5}
@@ -164,7 +295,7 @@ export default function ClothMap({
               paintOrder="stroke"
               letterSpacing=".04em"
               opacity={op}
-              cursor="pointer"
+              cursor={handleSelect ? "pointer" : undefined}
               onClick={handleSelect}
             >
               {e.handle || (e.sentence.length > 34 ? e.sentence.slice(0, 33) + '…' : e.sentence)}
@@ -176,36 +307,98 @@ export default function ClothMap({
       {/* Nodes */}
       {cs.map((c, i) => {
         const x = X(i)
-        const isSel = readSel?.type === "concept" && readSel.id === c.id
+        const isSel = SHOW_TRACE && readSel?.type === "concept" && readSel.id === c.id
+        const picked = pair.includes(c.id)
         const op = (selNodes && !selNodes.has(c.id)) ? 0.3 : 1
-        
-        const handleSelect = () => {
-          if (isSel) setReadSel(null)
-          else setReadSel({ type: "concept", id: c.id })
+        // Deliberately NOT dimmed while a pair is being gathered: the whole
+        // point of the second pick is that you are still reading the warp for
+        // it, and fading the candidates is the opposite of that.
+
+        // Pick if somebody is gathering a pair, trace if tracing is on, and
+        // otherwise nothing at all — in which case the cursor must not promise
+        // a press either, and the handler is not attached below.
+        //
+        // Declared unconditionally rather than as a ternary of two arrows:
+        // `react-hooks/refs` reads a ref access inside a conditionally-created
+        // closure as a render-phase access and fails the build for it, which is
+        // what the first cut of this did.
+        const handleSelect = (ev: { shiftKey: boolean }) => {
+          if (onPickConcept) {
+            onPickConcept(c.id, ev.shiftKey, nodeHits.current.get(c.id) ?? null)
+            return
+          }
+          setReadSel(isSel ? null : { type: "concept", id: c.id })
         }
+        const pressable = !!onPickConcept || SHOW_TRACE
+        const nodeCursor = pressable ? "pointer" : undefined
 
         return (
           <g key={`node-${c.id}`}>
-            <circle 
-              cx={x} cy={baseY} 
-              r={isSel ? 4.6 : 3.4} 
-              fill={isSel ? "var(--red)" : "var(--ochre)"} 
+            {/* The act that just landed, glowing out. Keyed by seq so stepping
+                the replay restarts it — the same concept touched twice in a
+                row must pulse twice, not sit lit. */}
+            {glow?.id === c.id && (
+              <circle
+                key={`glow-${c.id}-${glow.seq}`}
+                className="clothglow"
+                cx={x} cy={baseY} r={9}
+                fill="none" stroke="var(--ochre)" strokeWidth={3}
+                pointerEvents="none"
+              />
+            )}
+            {/* Picked, in the colour the palette reserves for "the one
+                selected thing" (globals.css). A RING AND a bigger dot — this
+                comment said "the ring rather than a bigger dot" and the code
+                ten lines below grew the dot in the same commit, so it
+                described a decision that was never taken. Both marks are
+                deliberate: the dot goes 3.4 → 4.6 and red, which is what the
+                trace already did to a selected node, and the ring at r=7.5 is
+                what carries at a full warp where 18px of spacing leaves no
+                room for a dot to grow into. */}
+            {picked && (
+              <circle
+                cx={x} cy={baseY} r={7.5}
+                fill="none" stroke="var(--red)" strokeWidth={1.4}
+                pointerEvents="none"
+              />
+            )}
+            <circle
+              cx={x} cy={baseY}
+              r={isSel || picked ? 4.6 : 3.4}
+              fill={isSel || picked ? "var(--red)" : "var(--ochre)"}
               opacity={op}
-              cursor="pointer"
-              onClick={handleSelect}
+              pointerEvents="none"
             />
             <text
               transform={`translate(${x + 4},${baseY + 13}) rotate(30)`}
               fontFamily='"Newsreader",Georgia,serif'
               fontSize={11.5}
-              fill={isSel ? "var(--red)" : "var(--ink)"}
+              fill={isSel || picked ? "var(--red)" : "var(--ink)"}
               opacity={op}
-              cursor="pointer"
-              onClick={handleSelect}
+              cursor={nodeCursor}
+              onClick={pressable ? handleSelect : undefined}
             >
-              <title>{c.label + (c.def ? ` — ${c.def}` : '')}</title>
-              {c.label.length > 34 ? c.label.slice(0, 33) + '…' : c.label}
+              <title>{conceptNameText(c) + (c.def ? ` — ${c.def}` : '')}</title>
+              {/* fill, not a class: `color` is inert on SVG text. */}
+              {(() => { const n = conceptNameText(c); return n.length > 34 ? n.slice(0, 33) + '…' : n })()}
             </text>
+            {/* The twin, LAST so it sits over its own node and takes the
+                click — the drawn circle above is the picture and hands its
+                hits here (`pointerEvents:none`), the way the arcs already
+                work. The label keeps its own click: it is the bigger target
+                and people aim at names. */}
+            <circle
+              ref={(el) => {
+                if (el) nodeHits.current.set(c.id, el)
+                else nodeHits.current.delete(c.id)
+              }}
+              cx={x} cy={baseY} r={hitR}
+              fill="rgba(0,0,0,0)"
+              cursor={nodeCursor}
+              onClick={pressable ? handleSelect : undefined}
+            >
+              <title>{conceptNameText(c) + (c.def ? ` — ${c.def}` : '')}</title>
+            </circle>
           </g>
         )
       })}

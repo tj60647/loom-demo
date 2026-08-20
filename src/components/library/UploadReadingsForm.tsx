@@ -14,7 +14,7 @@ type Phase = "waiting" | "sending" | "reading" | "done" | "failed" | "skipped"
 type FileState = {
   file: File
   phase: Phase
-  /** 0–100 while the bytes are in flight. */
+  /** 0–100 while the passages are in flight. */
   percent: number
   message?: string
 }
@@ -57,7 +57,7 @@ export default function UploadReadingsForm({ course }: UploadReadingsFormProps) 
   /**
    * Each reading goes browser → Blob directly, then a short action records it.
    *
-   * The bytes never pass through a Server Action, so the 4.5MB request-body cap
+   * The passages never pass through a Server Action, so the 4.5MB request-body cap
    * that used to reject most course readings does not apply; the ceiling is now
    * our own MAX_READING_BYTES. Files are handled one at a time so each succeeds,
    * fails and can be retried on its own, and so progress is per reading rather
@@ -74,7 +74,7 @@ export default function UploadReadingsForm({ course }: UploadReadingsFormProps) 
     for (let index = 0; index < items.length; index++) {
       const { file } = items[index]
 
-      // Refused here as well as in the token route: failing before the bytes
+      // Refused here as well as in the token route: failing before the passages
       // move is faster and says something useful, rather than surfacing as a
       // rejected upload halfway through.
       if (file.size > MAX_READING_BYTES) {

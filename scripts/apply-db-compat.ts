@@ -20,8 +20,8 @@ async function run() {
       "contentHash" text NOT NULL,
       "createdAt" timestamp DEFAULT now() NOT NULL
     )`,
-    `ALTER TABLE "byte" ADD COLUMN IF NOT EXISTS "sourceId" text`,
-    `ALTER TABLE "byte" ADD COLUMN IF NOT EXISTS "pageContentHash" text`,
+    `ALTER TABLE "passage" ADD COLUMN IF NOT EXISTS "sourceId" text`,
+    `ALTER TABLE "passage" ADD COLUMN IF NOT EXISTS "pageContentHash" text`,
   ]
 
   for (const statement of statements) {

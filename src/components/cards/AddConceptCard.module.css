@@ -1,0 +1,161 @@
+/* STANDALONE BY DEFAULT — a card that stands inside the passage card it
+   belongs to, which is how Your work uses it. The 7px margin and the full 4px
+   radius are that: a list of passages is already a column of boxes, and an
+   editor welded to the row above it reads as the next row rather than as part
+   of this one.
+
+   The RAIL welds it instead, and opts in with `.joined` below. */
+.card {
+  position: relative;
+  margin-top: 7px;
+  padding: 9px 10px 10px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid rgba(255, 204, 0, .8);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
+  color: var(--ink);
+  cursor: default;
+}
+
+/* THE MARGIN RAIL'S WELD (TJ, 2026-08-18: "should not have a gap between
+   itself and the passage card it is associated with ... it is confusing").
+   Beside the page there is one passage card and its editor is the second half
+   of one object, so the two are drawn as one.
+
+   Measured on the running app at 1536 before it was fixed: editor top 326.6
+   against passage-card bottom 319.6 — exactly the 7px this file now keeps as
+   its standalone default. -1px pulls the two 1px borders into ONE shared line
+   rather than stacking them into a 2px seam; the top corners square here and
+   the passage card's bottom corners are squared to match by the
+   [data-add-open] rule in PdfViewer's sheet. The 3px ochre left border is the
+   same colour on both, so it runs unbroken down the pair. */
+.joined {
+  margin-top: -1px;
+  border-radius: 0 0 4px 4px;
+}
+
+.card fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.card legend {
+  display: block;
+  width: 100%;
+  padding: 0 18px 0 0;
+  color: var(--ink-soft);
+  font: 8.5px/1.4 var(--mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.close {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: 14px/1 var(--mono);
+  cursor: pointer;
+}
+
+.close:hover,
+.close:focus-visible {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.card legend span {
+  display: block;
+  color: var(--ochre);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dotted var(--rule);
+}
+
+.inputs {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.row button {
+  justify-self: stretch;
+  align-self: start;
+  width: 100%;
+  min-height: 31px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.row input,
+.row textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 6px 8px;
+  background: #fff;
+  color: var(--ink);
+  font: 12px/1.4 var(--body);
+}
+
+.row input {
+  min-height: 31px;
+}
+
+.row textarea {
+  min-height: 52px;
+  resize: vertical;
+}
+
+.row input:focus,
+.row textarea:focus {
+  border-color: var(--ochre);
+  outline: 2px solid color-mix(in srgb, var(--ochre) 22%, transparent);
+}
+
+.row button {
+  padding: 5px 8px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font: 8.5px/1.2 var(--mono);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.row button:hover:not(:disabled) {
+  border-color: var(--ink-soft);
+  background: var(--paper);
+}
+
+.row button:disabled {
+  color: var(--dot);
+  cursor: default;
+}
+
+.error {
+  display: block;
+  margin-top: 6px;
+  color: var(--red);
+  font-size: 10px;
+}

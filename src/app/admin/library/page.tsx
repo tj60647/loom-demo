@@ -1,3 +1,6 @@
+import { checkAdmin } from "@/actions/admin"
+import { buildStamp } from "@/lib/buildStamp"
+import { getRepairSummary, getRepairsForSource } from "@/actions/repairs"
 import {
   addSourceToCourse,
   deleteSource,
@@ -8,13 +11,28 @@ import {
 } from "@/actions/sources"
 import DraftMetadataButton from "@/components/library/DraftMetadataButton"
 import ExtractionScore from "@/components/library/ExtractionScore"
+import RepairPanel from "@/components/library/RepairPanel"
 import SourceThumbnail from "@/components/library/SourceThumbnail"
 import UploadReadingsForm from "@/components/library/UploadReadingsForm"
 import { firstParam, getCourse, resolveCourseId } from "@/lib/courses"
+import { timeAgo } from "@/lib/utils"
 
 type AdminLibrarySearchParams = {
   course?: string | string[]
 }
+
+/**
+ * Five frontier models read a crop one after another, and the slowest of them
+ * has been measured at 210 seconds on a single region. The platform default
+ * would cut that off mid-panel and leave the region unread with the money
+ * already spent, so this page — and therefore every Server Function reached
+ * from it — is given the room the work actually takes.
+ *
+ * `transcribeAllRepairs` sidesteps this entirely by handing the loop to
+ * `after()`; this ceiling is what makes reading ONE region synchronously, which
+ * is how a reviewer checks a single page, survive the round trip.
+ */
+export const maxDuration = 300
 
 /**
  * The Readings tab: every reading in the library, on its own terms.
@@ -29,19 +47,42 @@ export default async function AdminLibraryPage({
 }: {
   searchParams: Promise<AdminLibrarySearchParams>
 }) {
+  // The shell admits course FACULTY (ruling 18) but this is a write surface and
+  // stays admin's. Gate the page the way the Courses tab does — a redirect —
+  // rather than leaving it to the first action's `Unauthorized` throw, which
+  // faculty who typed the URL met as a 500 error page.
+  await checkAdmin()
+
   const resolved = await searchParams
   const activeCourseId = await resolveCourseId(firstParam(resolved.course))
   const activeCourse = activeCourseId ? await getCourse(activeCourseId) : null
 
   const { readings, courses } = await getLibraryOverview()
+  const repairSummary = await getRepairSummary()
 
   const live = readings.filter((reading) => !reading.isArchived)
   const archived = readings.filter((reading) => reading.isArchived)
   const unscheduled = live.filter((reading) => reading.courses.length === 0).length
 
+  // Full proposal rows only where there are any. A reading nobody has run
+  // detection on renders an empty panel, which is the correct thing to see —
+  // detection is free and the panel says so.
+  const repairsBySource = new Map(
+    await Promise.all(
+      live
+        .filter((reading) => repairSummary.repairs[reading.id])
+        .map(async (reading) => [reading.id, await getRepairsForSource(reading.id)] as const)
+    )
+  )
+
   return (
     <main>
       <h1>Readings</h1>
+      {/* The build stamp, where the environment already matters (TJ,
+          2026-08-19). This page is where deployments get checked, so "which
+          copy of the app is this" belongs beside the readings rather than only
+          in the About card a student reads. Same one line, same source. */}
+      <p className="aboutbuild" style={{ marginTop: 0, borderTop: "none", paddingTop: 0 }}>{buildStamp()}</p>
       <p className="tasksub" style={{ marginBottom: "20px" }}>
         One shared library. Every reading is uploaded and OCR&apos;d once, then included in any
         number of courses — each with its own week, visibility, and core/supplemental status.
@@ -73,6 +114,18 @@ export default async function AdminLibraryPage({
             {live.map((reading) => {
               const memberOf = new Set(reading.courses.map((course) => course.id))
               const addable = courses.filter((course) => !memberOf.has(course.id))
+
+              // The disclosure says where this reading is in the loop, so an
+              // admin does not have to open eleven panels to find the one with
+              // a decision waiting in it.
+              const repairCounts = repairSummary.repairs[reading.id]
+              const repairNote = repairCounts?.accepted
+                ? `${repairCounts.accepted} to write`
+                : repairCounts?.proposed
+                  ? `${repairCounts.proposed} to review`
+                  : repairCounts?.applied
+                    ? `${repairCounts.applied} applied`
+                    : ""
 
               return (
                 <div className="card" key={reading.id} style={{ padding: "20px" }}>
@@ -136,7 +189,36 @@ export default async function AdminLibraryPage({
                           </p>
                         ) : null}
 
-                        <div style={{ marginTop: "10px" }}>
+                        {/* Version sits with the score, not with the course
+                            pills: both are facts about the FILE, and a reading
+                            in four courses would otherwise push it off the end
+                            of the heading row. Two sites showing the same
+                            reading at different versions is the whole point —
+                            it is how you see that a repair has not reached
+                            students yet. */}
+                        <div
+                          style={{
+                            marginTop: "10px",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "10px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span
+                            className={`pill ${reading.revisions.length > 0 ? "beaten" : "loose"}`}
+                            title={
+                              reading.revisions.length === 0
+                                ? "Version 1 — the file as first uploaded"
+                                : `Version ${reading.revisions.length + 1} — this reading's file has been replaced ${
+                                    reading.revisions.length === 1
+                                      ? "once"
+                                      : `${reading.revisions.length} times`
+                                  }`
+                            }
+                          >
+                            v{reading.revisions.length + 1}
+                          </span>
                           <ExtractionScore score={reading.score} />
                         </div>
                       </div>
@@ -180,13 +262,24 @@ export default async function AdminLibraryPage({
                                 <span className="label">Week (Optional)</span>
                                 <input name="week" type="number" min="1" max="20" placeholder="Unscheduled" />
                               </div>
-                              <label
-                                className="hint"
-                                style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                              >
-                                <input type="checkbox" name="isCore" defaultChecked value="on" />
-                                Core reading (students graph this one)
-                              </label>
+                              {/* Same pair, same words, as the Courses tab's
+                                  Schedule foldout — one choice with two names. */}
+                              <div className="form-row">
+                                <span className="label">Weight</span>
+                                <div className="radiorow">
+                                  <label className="radiopick">
+                                    <input type="radio" name="isCore" value="true" defaultChecked />
+                                    Core
+                                  </label>
+                                  <label className="radiopick">
+                                    <input type="radio" name="isCore" value="false" />
+                                    Supplemental
+                                  </label>
+                                </div>
+                                <p className="hint" style={{ margin: "4px 0 0", fontSize: "13px" }}>
+                                  Students graph the core readings; supplemental ones sit alongside.
+                                </p>
+                              </div>
                               <button
                                 className="btn mini"
                                 type="submit"
@@ -273,10 +366,68 @@ export default async function AdminLibraryPage({
                           </form>
                         </details>
 
+                        {/* Only where there is history to read: a reading on
+                            its first file has nothing to disclose that the v1
+                            badge has not already said. `source_revision` has
+                            been written since migration 0025 and read by
+                            nothing — this is the record finally surfacing. */}
+                        {reading.revisions.length > 0 ? (
+                          <details>
+                            <summary
+                              className="btn ghost mini"
+                              data-tip="Every version of this reading's file, and why each replaced the last"
+                            >
+                              File History
+                            </summary>
+                            <div
+                              className="foldout"
+                              style={{ display: "grid", gap: "12px", maxWidth: "560px" }}
+                            >
+                              {reading.revisions
+                                .map((revision, index) => ({ revision, version: index + 2 }))
+                                .reverse()
+                                .map(({ revision, version }) => (
+                                  <div
+                                    key={revision.id}
+                                    className="revline"
+                                    style={{ display: "grid", gap: "2px" }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontFamily: "var(--mono)",
+                                        fontSize: "12px",
+                                        letterSpacing: ".04em",
+                                      }}
+                                    >
+                                      v{version} · {timeAgo(revision.createdAt)}
+                                    </span>
+                                    <span className="hint" style={{ fontSize: "13px" }}>
+                                      {revision.reason || "no reason recorded"}
+                                    </span>
+                                  </div>
+                                ))}
+                              <div className="revline" style={{ display: "grid", gap: "2px" }}>
+                                <span
+                                  style={{
+                                    fontFamily: "var(--mono)",
+                                    fontSize: "12px",
+                                    letterSpacing: ".04em",
+                                  }}
+                                >
+                                  v1 · {timeAgo(reading.createdAt)}
+                                </span>
+                                <span className="hint" style={{ fontSize: "13px" }}>
+                                  added to the library
+                                </span>
+                              </div>
+                            </div>
+                          </details>
+                        ) : null}
+
                         <a
                           className="btn ghost mini"
                           href={`/api/readings/${reading.id}?download=1`}
-                          data-tip="Download the original PDF file"
+                          data-tip="Download the PDF this reading currently serves"
                         >
                           Download PDF
                         </a>
@@ -291,6 +442,25 @@ export default async function AdminLibraryPage({
                             Rescore
                           </button>
                         </form>
+
+                        {/* Repair sits next to Rescore because it is what you
+                            reach for when the score comes back bad: rescore
+                            re-measures, this fixes. */}
+                        <details>
+                          <summary
+                            className="btn ghost mini"
+                            data-tip="Find scan damage no score can see, have five models read it, and decide what the page actually says"
+                          >
+                            Repair Text{repairNote ? ` · ${repairNote}` : ""}
+                          </summary>
+                          <div className="foldout">
+                            <RepairPanel
+                              sourceId={reading.id}
+                              repairs={repairsBySource.get(reading.id) ?? []}
+                              hasHighlights={repairSummary.highlights[reading.id] ?? 0}
+                            />
+                          </div>
+                        </details>
 
                         <form action={setSourceArchived}>
                           <input type="hidden" name="sourceId" value={reading.id} />
@@ -319,7 +489,7 @@ export default async function AdminLibraryPage({
                             <input type="hidden" name="sourceId" value={reading.id} />
                             <p className="hint" style={{ margin: 0, maxWidth: "46ch" }}>
                               Permanently deletes the PDF and removes it from every course. Student
-                              bytes captured from it keep their quoted text but lose the source link.
+                              passages captured from it keep their quoted text but lose the source link.
                             </p>
                             {/* No data-tip here: the bubble would sit exactly
                                 over the warning this button must be read with. */}
@@ -372,7 +542,7 @@ export default async function AdminLibraryPage({
                   <a
                     className="act"
                     href={`/api/readings/${reading.id}?download=1`}
-                    data-tip="Download the original PDF file"
+                    data-tip="Download the PDF this reading currently serves"
                   >
                     download
                   </a>

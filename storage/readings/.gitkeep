@@ -1,1 +1,10 @@
-# Empty file to keep the directory tracked by git
+# Keeps this directory tracked. Its contents are not.
+#
+# scripts/seed-sources.ts reads three PDFs from here to populate a fresh
+# database, then uploads them to Blob storage. The files themselves are
+# gitignored: they are published, copyrighted course readings, and this repo is
+# public. Drop your own copies here before running `npm run seed:sources` — the
+# script names the three it expects and will tell you if one is missing.
+#
+# Nothing at runtime reads this directory. The app's only storage backend is the
+# private Vercel Blob store (src/lib/storage.ts).

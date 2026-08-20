@@ -22,6 +22,9 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   globalSetup: require.resolve('./playwright/global-setup'),
+  // Runs whatever happened — the failing run is the one that skipped its own
+  // cleanup, so this is the only place the sweep can be reliable.
+  globalTeardown: require.resolve('./playwright/global-teardown'),
   use: {
     baseURL: 'http://localhost:3100',
     trace: 'on-first-retry',

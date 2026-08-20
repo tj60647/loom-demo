@@ -1,0 +1,225 @@
+import { test, expect } from '@playwright/test';
+
+// Runs as Test User A (see playwright/global-setup.ts).
+test.use({ storageState: 'playwright/.auth/testa.json' });
+
+/**
+ * The practice loom — the real interface, real gestures, nothing kept.
+ *
+ * The promise this spec exists for is a NEGATIVE, and negatives rot quietly:
+ * `SandboxLoomProvider` supplies the same context the real provider does, so
+ * every tab works without knowing it is in a sandbox — and the day someone
+ * adds a server call there, everything still looks right while a practice
+ * capture lands in a real student's loom. `scripts/check-sandbox.ts` guards
+ * the imports; this guards the behaviour, by watching the wire.
+ */
+/**
+ * Enter the loom from its own Library. Retried because the shelf is
+ * server-rendered: the card is on screen and clickable a beat before React
+ * has hydrated its handler, and a single click lands on markup and does
+ * nothing.
+ */
+async function enterPracticeLoom(page: import('@playwright/test').Page) {
+  await expect(page.locator('#practiceOpen')).toBeVisible({ timeout: 30_000 });
+  await expect(async () => {
+    await page.locator('#practiceOpen').click();
+    // The workbench's own toolbar, not the practice notice: the notice floats
+    // over BOTH stages now, so waiting on it would pass without a click.
+    await expect(page.locator('#yourwork-toggle')).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 40_000, intervals: [500, 1_000, 2_000] });
+}
+
+test.describe('Practice loom', () => {
+  test('the real interface works and nothing is written', async ({ page }) => {
+    test.setTimeout(120_000);
+
+    // Every POST the page makes, minus auth and Next's own traffic. A Server
+    // Function write is a POST to the current route, so this catches them all
+    // without needing to know which action fired.
+    const writes: string[] = [];
+    page.on('request', (r) => {
+      if (r.method() === 'POST' && !/\/api\/auth|_next|test-login/.test(r.url())) writes.push(r.url());
+    });
+
+
+    // What the student's real loom holds before any practice happens.
+    const before = await page.request.get('/api/loom').then((r) => r.json());
+
+    await page.goto('/sandbox');
+
+    // The practice loom opens on the Library now, with one card that opens —
+    // the guide's first beat is a move, not a caption (TJ, 2026-08-12). The
+    // rest of the shelf is drawn and inert.
+    await expect(page.locator('.shelfcard.off').first()).toBeVisible({ timeout: 30_000 });
+    await enterPracticeLoom(page);
+
+    // The band says where you are, and only that — the promise that nothing is
+    // kept came out on 2026-08-12 ("of course everything should work. i dont
+    // expect tutorial to keep my work"). Generous timeout: /sandbox is its own
+    // route and compiles on demand under `next dev`, so a cold first hit
+    // outruns the 5s default.
+    await expect(page.locator('.practiceband')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('.practiceband')).toContainText(/in the guide/i);
+
+    // A REAL reading, with a real text layer to drag-select — not a mock.
+    await expect(page.locator('.react-pdf__Page__textContent').first()).toBeAttached({ timeout: 40_000 });
+
+    // The worked cloth is already here (TJ, 2026-08-11: the sandbox IS the
+    // guide, so it has to SHOW something). Its passages are real substrings of
+    // this PDF found at their true offsets, so the count in Your work is the
+    // proof they resolved — a quotation that stopped matching would silently
+    // drop out and leave a thinner example that still looks deliberate.
+    // Exact counts on purpose: these ARE the example, and a quotation that
+    // stopped matching the page text would thin it silently — the loom would
+    // still open, still look deliberate, and teach less than it claims to.
+    await page.locator('nav button', { hasText: 'Linking' }).click();
+    await expect(page.locator('.crow')).toHaveCount(3);
+    await expect(page.locator('.thread')).toHaveCount(2);
+    // The concept tally, read WHILE the footer is standing. It used to be
+    // `.scopemeta` in a band above the journey; that band went on 2026-08-17
+    // and the tally is in the footer now, which the reading station withholds.
+    // Read here, on a visit the spec was already making, and re-read later on
+    // another station that shows it — the number is the reading's, not the
+    // station's, so the test keeps its exact meaning: nothing was written.
+    const exampleScope = await page.locator('footer .footmeta').last().textContent();
+    await page.locator('nav button.station', { hasText: 'Reading' }).click();
+
+    // What the example puts on the page, so everything below asserts the
+    // CHANGE a student makes rather than a number the example could alter.
+    const workCount = async () => {
+      const label = (await page.locator('#yourwork-toggle').textContent()) ?? '';
+      const found = label.match(/·\s*(\d+)/);
+      return found ? Number(found[1]) : 0;
+    };
+    const exampleWork = await workCount();
+    expect(exampleWork, 'the worked example put no passages on the page').toBeGreaterThan(0);
+
+    // Search is withheld here: it reads the student's real rows over its own
+    // route, bypassing the provider entirely. (.stationsearch is the docked
+    // control's root — an earlier assertion matched a button name that never
+    // existed and could not fail.)
+    await expect(page.locator('.stationsearch')).toHaveCount(0);
+
+    // --- the coach mark constrains without trapping -------------------------
+    //
+    // The mask blocks by geometry: four inert panes with a genuinely empty
+    // hole. Two things must both be true, and the rest of this spec cannot
+    // see either of them because it synthesises its selection with
+    // createRange — which bypasses hit-testing entirely and would pass a mask
+    // that blocks every real drag.
+    await expect(page.locator('.guidepop')).toBeVisible();
+    await page.locator('.gstep').nth(1).click();          // beat 2: the text
+    await expect(page.locator('.guidemask')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.gpane')).toHaveCount(4);
+
+    // 1. The cutout is REACHABLE — the point at its centre hits the page, not
+    //    a pane.
+    const hole = await page.locator('.guideglow').boundingBox();
+    expect(hole, 'the beat has a cutout').toBeTruthy();
+    const inHole = await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y)
+      return el?.closest('.guidemask') ? 'pane' : (el?.tagName ?? 'nothing')
+    }, [hole!.x + hole!.width / 2, hole!.y + hole!.height / 2]);
+    expect(inHole, 'the cutout is empty DOM, not a pane').not.toBe('pane');
+
+    // 2. Outside it is BLOCKED — a pane is what the pointer finds.
+    const outside = await page.evaluate(() => {
+      const el = document.elementFromPoint(window.innerWidth - 6, 6)
+      return el?.classList.contains('gpane') ? 'pane' : (el?.className ?? 'nothing')
+    });
+    expect(outside, 'the dim area is behind a pane').toBe('pane');
+
+    // 3. And a REAL drag inside the cutout still selects — with the mouse, not
+    //    a synthesised Range, and overshooting the hole on the way out, which
+    //    is exactly the gesture this beat teaches.
+    // The beat turns to a page that HAS text, and the layer renders after the
+    // page does — wait for the words before trying to drag across them.
+    await expect(page.locator('.react-pdf__Page__textContent span').first())
+      .toBeAttached({ timeout: 30_000 });
+    const line = await page.evaluate(() => {
+      const spans = Array.from(document.querySelectorAll('.react-pdf__Page__textContent span'))
+        .filter((s) => (s.textContent ?? '').trim().length > 8)
+      if (!spans.length) return null
+      const a = spans[0].getBoundingClientRect()
+      const b = spans[Math.min(2, spans.length - 1)].getBoundingClientRect()
+      return { x1: a.left + 2, y1: a.top + a.height / 2, x2: b.right - 2, y2: b.top + b.height / 2 }
+    });
+    expect(line, 'the page the guide turned to has text on it').toBeTruthy();
+    await page.mouse.move(line!.x1, line!.y1);
+    await page.mouse.down();
+    await page.mouse.move(line!.x2, line!.y2, { steps: 14 });
+    // …and out past the cutout's edge before letting go.
+    await page.mouse.move(hole!.x + hole!.width + 60, line!.y2 + 30, { steps: 8 });
+    await page.mouse.up();
+    const dragged = await page.evaluate(() => (window.getSelection()?.toString() ?? '').trim().length);
+    expect(dragged, 'a drag across the cutout still selects text under the mask').toBeGreaterThan(0);
+
+    // The rail navigates and the card still renders. Pip 2, not pip 1: since
+    // 2026-08-12 pip 1 returns to the Library — every other pip goes to where
+    // its beat happens and that one used to go nowhere — which would take the
+    // reading, and the text layer, out from under the capture below.
+    await page.locator('.gstep').nth(1).click();
+    await expect(page.locator('.guidepop .gsay')).toBeVisible();
+
+    // Really select, really capture — the same path a student takes.
+    const selected = await page.locator('.react-pdf__Page__textContent').first().evaluate((layer) => {
+      const spans = Array.from(layer.querySelectorAll('span')).filter((s) => (s.textContent ?? '').trim().length > 0);
+      if (!spans.length) return '';
+      let start = spans.findIndex((s) => (s.textContent ?? '').trim().length >= 40);
+      if (start === -1) start = 0;
+      let end = start;
+      let length = (spans[start].textContent ?? '').length;
+      while (end + 1 < spans.length && length < 200) {
+        end++;
+        length += (spans[end].textContent ?? '').length;
+      }
+      const range = document.createRange();
+      range.setStartBefore(spans[start].firstChild ?? spans[start]);
+      range.setEndAfter(spans[end].firstChild ?? spans[end]);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+      return selection?.toString() ?? '';
+    });
+    expect(selected.trim().length).toBeGreaterThan(0);
+
+    await page.locator('button:has-text("Capture as Passage")').click();
+    // The capture form is on the rail now (2026-08-19), and its concept block
+    // is a disclosure closed by default — so the field has to be opened before
+    // it can be filled. Same ids on either path; only the shell moved.
+    await page.locator('#captureConceptToggle').click();
+    await page.locator('#captureConcept').fill('practice concept');
+    await page.locator('#capturePassageSave').click();
+
+    // It really landed: the mark is drawn on the page and the capture is in
+    // Your work, exactly as in the real app.
+    await expect(page.locator('.loom-passage-highlight').first()).toBeVisible({ timeout: 10_000 });
+    await expect.poll(workCount, { timeout: 10_000 }).toBe(exampleWork + 1);
+
+    // The whole point.
+    expect(writes, `the practice loom wrote to the server: ${writes.join(', ')}`).toHaveLength(0);
+
+    // And the student's own loom is untouched — the assertion that would
+    // catch a write escaping by a route this spec never thought of.
+    const after = await page.request.get('/api/loom').then((r) => r.json());
+    expect(after.concepts.length).toBe(before.concepts.length);
+    expect(after.passages.length).toBe(before.passages.length);
+
+    // Nothing survives the reload, by design. Asserted on the counts the
+    // provider drives rather than on the highlights: a mark is absent while
+    // the PDF is still rendering too, which would pass for the wrong reason.
+    // Nothing the student did survives, and the example comes back exactly as
+    // it was — which is also the "start over" this place would otherwise need
+    // a button for.
+    // A reload puts the whole place back, the Library included — so starting
+    // over starts where a student starts, at the guide's first beat.
+    await page.reload();
+    await enterPracticeLoom(page);
+    await expect.poll(workCount, { timeout: 20_000 }).toBe(exampleWork);
+    await page.locator('nav button', { hasText: 'Vocabulary' }).click();
+    // Same tally, same number, on a station whose footer stands.
+    await expect(page.locator('footer .footmeta').last()).toHaveText(exampleScope ?? '');
+    await expect(page.locator('.lrow', { hasText: 'practice concept' })).toHaveCount(0);
+  });
+});

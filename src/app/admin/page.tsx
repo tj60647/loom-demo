@@ -1,6 +1,6 @@
-import { addAllowedEmail, getRoster, removeAllowedEmail, removeFromRoster } from "@/actions/admin"
+import { addAllowedEmail, getRoster, getStaffViewer, removeAllowedEmail, removeFromRoster, setMemberRole } from "@/actions/admin"
 import { assignMemberSection } from "@/actions/courses"
-import { firstParam, getCourse, listSections, resolveCourseId, resolveSectionId } from "@/lib/courses"
+import { firstParam, getCourse, listSections, resolveSectionId } from "@/lib/courses"
 import InviteLearners from "@/components/admin/InviteLearners"
 
 type AdminPageSearchParams = {
@@ -10,7 +10,10 @@ type AdminPageSearchParams = {
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<AdminPageSearchParams> }) {
   const resolved = await searchParams
-  const courseId = await resolveCourseId(firstParam(resolved.course))
+  // Faculty read the roster; only an admin holds its write controls, so the
+  // page renders those conditionally rather than letting a form submit into a
+  // redirect.
+  const { courseId, isAdmin } = await getStaffViewer(firstParam(resolved.course))
 
   if (!courseId) {
     return (
@@ -46,18 +49,22 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         {pendingCount > 0 ? <> · <b>{pendingCount}</b> invited, not signed in yet</> : null}.
       </p>
 
-      <details className="card invitefold" style={{ marginBottom: "24px" }}>
-        <summary>
-          <span className="tw">▸</span>
-          <h2>Invite learners</h2>
-        </summary>
-        <p className="hint" style={{ marginTop: "10px" }}>
-          Sign-in succeeds for anyone invited to or enrolled in a course. A learner joins this
-          course the first time they sign in with the GitHub email you invite here, landing in
-          whichever section you gave them — you can move them afterwards.
-        </p>
-        <InviteLearners courseId={courseId} sections={courseSections} />
-      </details>
+      {isAdmin && (
+        <details className="card invitefold" style={{ marginBottom: "24px" }}>
+          <summary>
+            <span className="tw">▸</span>
+            <h2>Invite learners</h2>
+          </summary>
+          <p className="hint" style={{ marginTop: "10px" }}>
+            Sign-in succeeds for anyone invited to or enrolled in a course. A learner joins this
+            course the first time they sign in with the GitHub email you invite here, landing in
+            whichever section you gave them — you can move them afterwards. An invitation
+            addressed to the Faculty Section enrols as faculty: they get this course&apos;s
+            read-side admin view alongside their own workspace.
+          </p>
+          <InviteLearners courseId={courseId} sections={courseSections} />
+        </details>
+      )}
 
       {roster.length === 0 ? (
         <div className="card empty">
@@ -82,6 +89,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     </span>
                   ) : (
                     <>
+                      {person.role === "FACULTY" && (
+                        <span className="pill" title="holds this course's read-side admin view (ruling 18)">
+                          faculty
+                        </span>
+                      )}
                       <span className="pill beaten">{person.conceptsCount} concepts</span>
                       <span className="pill loose">{person.edgesCount} edges</span>
                     </>
@@ -92,7 +104,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     their section lives on the membership; before that it lives on
                     the invitation, so placing a pending learner is an upsert of
                     the invitation and they land there on first sign-in. */}
-                {courseSections.length > 0 ? (
+                {isAdmin && courseSections.length > 0 ? (
                   <form action={person.userId ? assignMemberSection : addAllowedEmail}>
                     <input type="hidden" name="courseId" value={courseId} />
                     {person.userId ? (
@@ -121,19 +133,40 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                       >
                         Open Loom
                       </a>
-                      <form action={removeFromRoster}>
-                        <input type="hidden" name="courseId" value={courseId} />
-                        <input type="hidden" name="userId" value={person.userId} />
-                        <button
-                          className="btn ghost mini compact"
-                          type="submit"
-                          aria-label={`Remove ${person.name ?? person.email} from course`}
-                        >
-                          Remove
-                        </button>
-                      </form>
+                      {isAdmin && (
+                        <>
+                          {/* One reversible toggle (ruling 18): promotion homes
+                              them in the Faculty Section; demotion returns them
+                              to unassigned for deliberate re-placement. */}
+                          <form action={setMemberRole}>
+                            <input type="hidden" name="courseId" value={courseId} />
+                            <input type="hidden" name="userId" value={person.userId} />
+                            <input type="hidden" name="role" value={person.role === "FACULTY" ? "LEARNER" : "FACULTY"} />
+                            <button
+                              className="btn ghost mini compact"
+                              type="submit"
+                              data-tip={person.role === "FACULTY"
+                                ? "back to a learner's view — their section resets to unassigned"
+                                : "grants this course's read-side admin view; their own workspace is untouched"}
+                            >
+                              {person.role === "FACULTY" ? "Return to learner" : "Make faculty"}
+                            </button>
+                          </form>
+                          <form action={removeFromRoster}>
+                            <input type="hidden" name="courseId" value={courseId} />
+                            <input type="hidden" name="userId" value={person.userId} />
+                            <button
+                              className="btn ghost mini compact"
+                              type="submit"
+                              aria-label={`Remove ${person.name ?? person.email} from course`}
+                            >
+                              Remove
+                            </button>
+                          </form>
+                        </>
+                      )}
                     </>
-                  ) : (
+                  ) : isAdmin ? (
                     <form action={removeAllowedEmail}>
                       <input type="hidden" name="courseId" value={courseId} />
                       <input type="hidden" name="email" value={person.email} />
@@ -145,15 +178,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         Withdraw
                       </button>
                     </form>
-                  )}
+                  ) : null}
                 </div>
               </div>
             ))}
           </div>
-          <p className="hint" style={{ fontSize: "12.5px", marginTop: "10px" }}>
-            Removing an enrolled learner ends their access to this course only — other courses are
-            untouched, and their work is kept. Re-inviting them brings it all back.
-          </p>
+          {isAdmin && (
+            <p className="hint" style={{ fontSize: "12.5px", marginTop: "10px" }}>
+              Removing an enrolled learner ends their access to this course only — other courses are
+              untouched, and their work is kept. Re-inviting them brings it all back.
+            </p>
+          )}
         </>
       )}
     </main>

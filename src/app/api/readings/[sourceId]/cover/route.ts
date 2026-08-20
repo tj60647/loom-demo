@@ -42,7 +42,7 @@ export async function GET(
   try {
     // Authorization only — the cached cover is a few tens of KB, and fetching
     // the whole PDF up front made every cover request download the reading
-    // (the library page fires one of these per card). The bytes are fetched
+    // (the library page fires one of these per card). The passages are fetched
     // below, only when a re-render is actually needed.
     const { source } = await getSourceForCover(sourceId)
     const coverKey = getSourceCoverKey(source.id)

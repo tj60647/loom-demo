@@ -11,7 +11,7 @@
  *
  * What keeps it inside the line:
  *   - It reads the instructor's uploaded PDF, never a student's work. It must
- *     not read or write a concept, byte, edge, or read.
+ *     not read or write a concept, passage, edge, or read.
  *   - It only ever returns a DRAFT. Nothing here writes to the database. The
  *     instructor sees every field, edits what they like, and saves — so no
  *     model-written sentence reaches a student that an instructor has not read

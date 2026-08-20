@@ -1,0 +1,3 @@
+CREATE INDEX "byte_search_idx" ON "byte" USING gin ((setweight(to_tsvector('english', "content"), 'B') || setweight(to_tsvector('english', coalesce("note", '')), 'C') || setweight(to_tsvector('english', coalesce("question", '')), 'C')));--> statement-breakpoint
+CREATE INDEX "concept_search_idx" ON "concept" USING gin ((setweight(to_tsvector('english', coalesce("label", '')), 'A') || setweight(to_tsvector('english', coalesce("def", '')), 'B') || setweight(to_tsvector('english', coalesce("note", '')), 'C')));--> statement-breakpoint
+CREATE INDEX "edge_search_idx" ON "edge" USING gin ((setweight(to_tsvector('english', coalesce("handle", '')), 'A') || setweight(to_tsvector('english', coalesce("sentence", '')), 'B')));

@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { draftMetadataForSource } from "@/actions/sources"
+import { draftMetadataForSource } from "@/lib/reads"
 
 /**
  * Fills the edit form with a draft read off the PDF, for the instructor to
