@@ -1140,6 +1140,9 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    both pass underneath. The negative top margin eats the panel's own 12px of
    padding so the bar sits flush against the top edge when stuck rather than
    leaving a strip of scrolling text above it. */
+/* The per-page match count on a search row: quieter than the page number
+   it qualifies, because it answers a second question and not the first. */
+.pdf-search-n{opacity:.65}
 .searchbar{display:flex;align-items:center;gap:8px;
   position:sticky;top:0;z-index:2;background:var(--paper);
   margin:-12px 0 0;padding:12px 0 9px;border-bottom:1px solid var(--rule)}

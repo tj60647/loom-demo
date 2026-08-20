@@ -25,7 +25,20 @@ import { resolveCourseIdForUser } from "@/lib/courses"
 import { SNIPPET_OPEN, SNIPPET_CLOSE } from "@/lib/searchText"
 
 /** ts_headline options; markers documented in src/lib/searchText.ts. */
-const HEADLINE_OPTIONS = `StartSel=${SNIPPET_OPEN}, StopSel=${SNIPPET_CLOSE}, MaxWords=16, MinWords=6, ShortWord=2, MaxFragments=2, FragmentDelimiter=" … "`
+const HEADLINE_OPTIONS = `StartSel=${SNIPPET_OPEN}, StopSel=${SNIPPET_CLOSE}, MaxWords=16, MinWords=6, ShortWord=2, MaxFragments=4, FragmentDelimiter=" … "`
+
+/**
+ * The same options, but marking EVERY occurrence and returning the whole page,
+ * so the marker count can be taken off it. Used only to count — the string is
+ * never returned — because the display headline is fragmented and therefore
+ * cannot say how many matches a page really holds.
+ *
+ * Counting this way rather than by scanning the text for the query keeps the
+ * number and the highlighting in agreement: both are Postgres's own idea of a
+ * match, stemming and all, so a page that says "6" has six marked words in it
+ * and not six literal substrings.
+ */
+const COUNT_OPTIONS = `StartSel=${SNIPPET_OPEN}, StopSel=${SNIPPET_CLOSE}, HighlightAll=TRUE`
 
 /** Longest query worth parsing; anything more is pasted prose, truncated. */
 const MAX_QUERY_LENGTH = 200
@@ -55,8 +68,21 @@ export type ReadingSearchHit = {
   excerpts: ReadingSearchExcerpt[]
 }
 
+/**
+ * A page that matched. ONE ROW PER PAGE, not per occurrence (TJ, 2026-08-19:
+ * "search results seem to be by page and not entry, is this correct?").
+ *
+ * It is, and deliberately: a click can only land on a page, so a row per
+ * occurrence would be several rows going to the same place, and the list would
+ * stop being a map of where an idea lives. What was wrong is that the row
+ * under-reported — the headline shows a few windows, so a page with six matches
+ * looked like a page with two. `matches` is the page's real total, counted the
+ * same way the marking counts.
+ */
 export type ReadingPageHit = {
   pageNumber: number
+  /** Every marked word on the page, not just the ones the snippet had room for. */
+  matches: number
   /** Marked like ReadingSearchExcerpt.snippet. */
   snippet: string
 }
@@ -546,18 +572,25 @@ export async function searchReading(sourceId: string, rawQuery: string): Promise
       ORDER BY p."pageNumber", p."createdAt" DESC
     )
     SELECT h."pageNumber",
-           ts_headline('english', p."textContent", q.query, ${HEADLINE_OPTIONS}) AS snippet
+           ts_headline('english', p."textContent", q.query, ${HEADLINE_OPTIONS}) AS snippet,
+           -- How many marked words the page really holds. length-of-difference
+           -- over the fully-marked text: one StartSel per match, so the count
+           -- is exact without shipping the marked page back.
+           (length(ts_headline('english', p."textContent", q.query, ${COUNT_OPTIONS}))
+            - length(replace(ts_headline('english', p."textContent", q.query, ${COUNT_OPTIONS}), ${SNIPPET_OPEN}, '')))
+           / ${SNIPPET_OPEN.length} AS matches
     FROM hits h
     JOIN "source_page" p ON p."id" = h."id", q
     ORDER BY h."pageNumber"
     LIMIT ${MAX_PAGE_HITS + 1}
   `)
 
-  const rows = result.rows as { pageNumber: number; snippet: string }[]
+  const rows = result.rows as { pageNumber: number; snippet: string; matches: unknown }[]
   return {
     hits: rows.slice(0, MAX_PAGE_HITS).map((row) => ({
       pageNumber: row.pageNumber,
       snippet: row.snippet,
+      matches: Number(row.matches) || 0,
     })),
     truncated: rows.length > MAX_PAGE_HITS,
   }

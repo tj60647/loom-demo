@@ -3097,7 +3097,15 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                       onClick={() => setPageNumber(hit.pageNumber)}
                       aria-label={`Go to page ${hit.pageNumber}`}
                     >
-                      <span className="n">p. {hit.pageNumber}</span>
+                      {/* The page's REAL total, not the snippet's (TJ,
+                          2026-08-19). The headline carries four windows at
+                          most, so a page with six matches read as a page with
+                          two — the list said less than the page showed. Silent
+                          at 1, where a count is noise. */}
+                      <span className="n">
+                        p. {hit.pageNumber}
+                        {hit.matches > 1 && <span className="pdf-search-n"> · {hit.matches}</span>}
+                      </span>
                       <span className="pdf-search-snip"><Snippet text={hit.snippet} /></span>
                     </button>
                   </li>
