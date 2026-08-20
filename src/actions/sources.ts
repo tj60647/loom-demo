@@ -9,7 +9,6 @@ import {
   courses,
   sources,
   sourcePages,
-  sourceRepairs,
   sourceRevisions,
   sourceScores,
   users,
@@ -21,7 +20,8 @@ import { authOptions, isAdminUser } from "@/lib/auth"
 import { readingStorage } from "@/lib/storage"
 import { recordEvent } from "@/lib/graphEvent"
 import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
-import { PAGE_IMAGE_WIDTHS, getSourcePageImageKey, getSourceSheetKey, renderSourcePageImages } from "@/lib/pdfPages"
+import { renderSourcePageImages } from "@/lib/pdfPages"
+import { gatherSourceBlobKeys } from "@/lib/sourceBlobs"
 import { extractPdfPageText, textLayerProjection } from "@/lib/pdfText"
 import { hashText } from "@/lib/hash"
 import { judgeSourceScore, recordHeuristicScore, rescoreSource } from "@/lib/readingScore"
@@ -1006,49 +1006,17 @@ export async function deleteSource(formData: FormData) {
   const source = rows[0]
   if (!source) return
 
-  // Everything the store holds for this reading — the current file, the
-  // cover, every superseded revision, the page images and the contact sheet,
-  // and the repair-panel crops — gathered BEFORE the row delete:
-  // source_revision, source_page and source_repair all cascade away with the
-  // source, and their rows are the only record of the revision blobs and the
-  // crop keys (crops carry a UUID suffix, so a key lost is a blob lost).
-  // Until 2026-08-20 only the current file and the cover were removed, so a
-  // repaired reading stranded its whole chain (the gap the source_revision
-  // header records).
+  // Everything the store holds for this reading, gathered BEFORE the row
+  // delete — the rows that name the revision blobs and the crop keys cascade
+  // away with the source. The full list of key families, and why the two
+  // callers that delete source rows must share it, lives on
+  // gatherSourceBlobKeys (src/lib/sourceBlobs.ts).
   //
   // Gather-then-delete is unlocked — neon-http has no transactions — so an
   // applyAcceptedRepairs in flight when the delete lands can still mint one
   // revision blob after this sweep. Narrow (admin racing admin), and it fails
   // loudly on the apply side: its revision insert hits the missing row.
-  const revisionRows = await db
-    .select({ storageKey: sourceRevisions.storageKey, predecessorKey: sourceRevisions.predecessorKey })
-    .from(sourceRevisions)
-    .where(eq(sourceRevisions.sourceId, sourceId))
-  const pageRows = await db
-    .select({ pageNumber: sourcePages.pageNumber })
-    .from(sourcePages)
-    .where(eq(sourcePages.sourceId, sourceId))
-  const cropRows = await db
-    .select({ cropKey: sourceRepairs.cropKey })
-    .from(sourceRepairs)
-    .where(eq(sourceRepairs.sourceId, sourceId))
-
-  const keys = new Set<string>()
-  // A reference-only reading has no file, but may still have a cover key to
-  // try — `delete` no-ops on a missing key, so over-asking costs nothing.
-  if (source.storageKey) keys.add(source.storageKey)
-  keys.add(getSourceCoverKey(source.id))
-  keys.add(getSourceSheetKey(sourceId))
-  for (const revision of revisionRows) {
-    keys.add(revision.storageKey)
-    if (revision.predecessorKey) keys.add(revision.predecessorKey)
-  }
-  for (const { pageNumber } of pageRows) {
-    for (const width of PAGE_IMAGE_WIDTHS) keys.add(getSourcePageImageKey(sourceId, pageNumber, width))
-  }
-  for (const { cropKey } of cropRows) {
-    if (cropKey) keys.add(cropKey)
-  }
+  const keys = await gatherSourceBlobKeys(sourceId, source.storageKey)
 
   await db.delete(sources).where(eq(sources.id, sourceId))
 

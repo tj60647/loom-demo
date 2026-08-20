@@ -34,6 +34,8 @@
 import { db } from "../src/db"
 import { concepts, passages, passageConcepts, sources, edges } from "../src/db/schema"
 import { and, eq, inArray, or, like, sql } from "drizzle-orm"
+import { gatherSourceBlobKeys } from "../src/lib/sourceBlobs"
+import { readingStorage } from "../src/lib/storage"
 
 const APPLY = process.argv.includes("--apply")
 const TEST_EMAIL = "test-user-a@loom.local"
@@ -91,7 +93,7 @@ async function main() {
     .where(and(eq(concepts.userId, userId), or(...CONCEPT_PATTERNS.map((p) => like(concepts.label, p.like)))))
 
   const sourceRows = await db
-    .select({ id: sources.id, title: sources.title })
+    .select({ id: sources.id, title: sources.title, storageKey: sources.storageKey })
     .from(sources)
     .where(and(eq(sources.createdByUserId, userId), or(...SOURCE_PATTERNS.map((p) => like(sources.title, p.like)))))
 
@@ -207,7 +209,23 @@ async function main() {
     await db.delete(passages).where(inArray(passages.id, ridersToDrop))
   }
   if (sourceRows.length) {
+    // The store's side of the teardown, gathered BEFORE the rows go — the
+    // same sweep deleteSource runs, from the same module, because a second
+    // copy of the key-family list is how one caller falls behind the next
+    // blob family (src/lib/sourceBlobs.ts). Until 2026-08-20 this deleted
+    // the rows and left every blob a fixture upload had minted.
+    const keySets = await Promise.all(
+      sourceRows.map((s) => gatherSourceBlobKeys(s.id, s.storageKey))
+    )
     await db.delete(sources).where(inArray(sources.id, sourceRows.map((s) => s.id)))
+    const keys = [...new Set(keySets.flatMap((set) => [...set]))]
+    const results = await Promise.allSettled(keys.map((key) => readingStorage.delete(key)))
+    const failedKeys = keys.filter((_, i) => results[i].status === "rejected")
+    for (const key of failedKeys) console.error(`[clean-fixtures] blob not removed: ${key}`)
+    console.log(
+      `[clean-fixtures] blobs     ${keys.length - failedKeys.length} of ${keys.length} removed` +
+        (failedKeys.length ? ` — ${failedKeys.length} FAILED, keys logged above` : "")
+    )
   }
   console.log("[clean-fixtures] removed")
 }
