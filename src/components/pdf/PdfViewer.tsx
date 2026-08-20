@@ -1350,19 +1350,48 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             });
             if (matches > 0) console.log(`[Loom PDF] Applied ${matches} highlights on Page ${parsedPage}.`);
 
-            // Search hits, marked after the passages so a passage that is both
-            // captured and searched shows the search mark on top. The terms
-            // are whole word forms from the document, so "exactly" marks the
-            // word and not every substring echo of it.
+            /**
+             * SEARCH HITS, MARKED SPAN BY SPAN — and the "span by span" is the
+             * whole fix (TJ, 2026-08-19, from a screenshot: "here the first
+             * result is not identified on the left page").
+             *
+             * A pdf.js text layer concatenates its spans with NO separator, so
+             * the layer's textContent runs words together across every span
+             * boundary. Measured on Communities of Practice p.1: a heading
+             * ending "…social structure" is immediately followed by a paragraph
+             * beginning "Engagement", and the combined text reads
+             * "structureEngagement". `accuracy: "exactly"` asks for a non-word
+             * character before the term, finds a letter, and refuses — so the
+             * word was in the text, in the term list, on a mounted layer, and
+             * still unmarked. mark.js reported noMatch for every term while the
+             * page plainly contained two of them.
+             *
+             * Marking each span as its own context makes the seam a boundary,
+             * which is what it is: those are two different runs of text in the
+             * document, and only the rendering ran them together. Measured after:
+             * p.1 went 0 → 2 matches, and p.2 — which looked fine — went 4 → 6,
+             * because it was losing two at seams as well.
+             *
+             * The cost is a word SPLIT across two spans, which acrossElements
+             * used to catch and this cannot. That trade is the right way round:
+             * pdf.js splits by style and position run, so a split mid-word is
+             * rare, while a paragraph starting flush against the previous run is
+             * every heading on every page. Passages do not have this problem at
+             * all — they mark by offset through markRanges, against the same
+             * projection check-text-parity asserts.
+             *
+             * "exactly" stays. It is what keeps a search for "engage" off every
+             * "disengagement" on the page.
+             */
             const searchWords = searchTermsRef.current;
             if (searchWords.length > 0) {
-              instance.mark(searchWords, {
+              new Mark(Array.from(layer.children) as HTMLElement[]).mark(searchWords, {
                 className: "loom-search-hit",
                 separateWordSearch: false,
                 accuracy: "exactly",
                 caseSensitive: false,
                 diacritics: true,
-                acrossElements: true,
+                acrossElements: false,
               });
             }
           }
@@ -2353,6 +2382,22 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         .pdf-kept-marks rect {
           fill: rgba(255, 204, 0, 0.4);
           stroke: rgba(255, 204, 0, 0.8);
+          stroke-width: 1;
+          vector-effect: non-scaling-stroke;
+        }
+        /* The redrawn search hits, in the SAME sage the live mark uses
+           (.loom-search-hit) rather than the passage ochre — at fit-all the two
+           kinds sit side by side on the plane, and a search hit wearing a
+           capture's colour would be a lie about what it is. */
+        .pdf-kept-search {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          overflow: visible;
+        }
+        .pdf-kept-search rect {
+          fill: rgba(122, 138, 110, 0.4);
+          stroke: rgba(122, 138, 110, 0.75);
           stroke-width: 1;
           vector-effect: non-scaling-stroke;
         }

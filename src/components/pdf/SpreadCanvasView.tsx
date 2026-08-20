@@ -277,6 +277,16 @@ export default function SpreadCanvasView({
   /** The rectangles mark.js painted, kept after the text layer that carried
    *  them is gone. See the merge in `measure`. */
   const [markRects, setMarkRects] = useState<Record<string, MarkRect[]>>({});
+  /**
+   * The same trick for SEARCH hits, keyed by page rather than by passage id
+   * because a search mark has no identity — it is a word, not an object.
+   *
+   * Without this the canvas told two different stories at once (TJ,
+   * 2026-08-19): zoom out to fit-all and every passage highlight survives, redrawn
+   * from remembered geometry, while every search mark vanishes — and the panel
+   * goes on listing the hits. Seven pages match, the drawing shows none.
+   */
+  const [searchRects, setSearchRects] = useState<Record<number, MarkRect[]>>({});
   const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
   const [passageCardHeights, setPassageCardHeights] = useState<Record<string, number>>({});
   const [activeAddPassageId, setActiveAddPassageId] = useState<string | null>(null);
@@ -1106,6 +1116,43 @@ export default function SpreadCanvasView({
      * "the passages went away".
      */
     setMarkRects((prev) => (Object.keys(nextRects).length === 0 ? prev : { ...prev, ...nextRects }));
+    /**
+     * Search hits, measured in the same pass and REPLACED per page rather than
+     * merged. A page whose layer is up is the authority on its own hits: if the
+     * reader has changed the query, yesterday's rects for that page are wrong,
+     * and merging would leave them on screen for ever. A page whose layer is
+     * gone is not in `seen` at all, so its remembered rects survive untouched —
+     * which is the whole point.
+     */
+    const nextSearch: Record<number, MarkRect[]> = {};
+    const seen = new Set<number>();
+    for (const layerEl of canvas.querySelectorAll<HTMLElement>(".react-pdf__Page__textContent")) {
+      const n = Number(layerEl.closest<HTMLElement>(".react-pdf__Page")?.getAttribute("data-page-number"));
+      if (n) seen.add(n);
+    }
+    for (const mark of canvas.querySelectorAll<HTMLElement>(".loom-search-hit")) {
+      const pageEl = mark.closest<HTMLElement>(".react-pdf__Page");
+      const pageNum = Number(pageEl?.getAttribute("data-page-number"));
+      if (!pageEl || !pageNum) continue;
+      const s2 = layout.spreads[Math.floor((pageNum - 1) / 2)];
+      if (!s2) continue;
+      const pr = pageEl.getBoundingClientRect();
+      const px = pageX(layout, s2, pageNum, basePageWidth);
+      for (const r of mark.getClientRects()) {
+        if (r.width === 0 && r.height === 0) continue;
+        (nextSearch[pageNum] ??= []).push({
+          x: px + (r.left - pr.left) / k,
+          y: s2.y + (r.top - pr.top) / k,
+          w: r.width / k,
+          h: r.height / k,
+        });
+      }
+    }
+    setSearchRects((prev) => {
+      const merged = { ...prev };
+      for (const n of seen) delete merged[n];
+      return { ...merged, ...nextSearch };
+    });
     setAnchors((prev) => {
       if (Object.keys(next).length === 0) return prev;
       const merged = { ...prev, ...next };
@@ -1159,6 +1206,7 @@ export default function SpreadCanvasView({
     if (prevMeasureGeom.current === geomKey) return;
     prevMeasureGeom.current = geomKey;
     setMarkRects({});
+    setSearchRects({});
     setAnchors({});
   }, [geomKey]);
 
@@ -1269,6 +1317,17 @@ export default function SpreadCanvasView({
     }
     return out;
   }, [passages, pageView, markRects]);
+
+  /** Search hits for pages whose text layer is gone — the same rule keptMarks
+   *  uses, and the same reason: at fit-all nothing is mounted to carry them. */
+  const keptSearchMarks = useMemo(() => {
+    const out: MarkRect[] = [];
+    for (const [page, rects] of Object.entries(searchRects)) {
+      if (pageView[Number(page)]) continue;
+      out.push(...rects);
+    }
+    return out;
+  }, [searchRects, pageView]);
 
   const cards = useMemo(() => {
     if (!cardsOn || !layout) return [];
@@ -1430,6 +1489,18 @@ export default function SpreadCanvasView({
         {keptMarks.length > 0 && (
           <svg className="pdf-kept-marks" width={layout.canvasW} height={layout.canvasH} aria-hidden="true">
             {keptMarks.map((m, i) => (
+              <rect key={i} x={m.x} y={m.y} width={m.w} height={m.h} />
+            ))}
+          </svg>
+        )}
+
+        {/* Redrawn search hits. Separate from the passage marks above because
+            they are a different claim — that is a capture, this is a word you
+            asked for — and because they come and go with the search while a
+            passage stays. */}
+        {keptSearchMarks.length > 0 && (
+          <svg className="pdf-kept-search" width={layout.canvasW} height={layout.canvasH} aria-hidden="true">
+            {keptSearchMarks.map((m, i) => (
               <rect key={i} x={m.x} y={m.y} width={m.w} height={m.h} />
             ))}
           </svg>
