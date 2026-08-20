@@ -3,8 +3,8 @@ import { enterReadingFromCard } from './helpers';
 
 /**
  * Visual + structural verification of the student Library tab and the
- * admin Library manager. Uses the same client-side session mock pattern as
- * the existing PDF viewer specs so the UI renders in an authenticated state.
+ * admin Library manager. Mocks the session client-side — the LAST spec that
+ * does; every other spec signs in through `test-login` and storageState.
  */
 
 const ADMIN_SESSION = {
@@ -52,7 +52,8 @@ test.describe('Library verification', () => {
     await expect(page.getByRole('link', { name: /Download PDF/i })).toBeVisible();
     // Scoped to the workbench nav: the station is "01 — Reading" since the
     // text and capture merged (2026-08-08), and an unscoped match would also
-    // hit the help button and the Next dev-tools button in a dev build.
+    // hit the station search button and the header's guide link, whose names
+    // both carry "reading" (the old "?" help button is deleted).
     // `.station`: the bar also carries this station's search since 2026-08-13,
     // and its button is named for the reading too.
     await expect(page.locator('nav button.station', { hasText: 'Reading' })).toBeVisible();

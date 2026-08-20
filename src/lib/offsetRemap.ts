@@ -60,13 +60,13 @@ export function isCategorySpecial(expansion: string) {
  *
  * pdf.js reads `toUnicode.get(charcode) || charcode`, and an empty string is
  * falsy — so a /ToUnicode entry that is present but blank does NOT yield an
- * empty expansion. It falls through to the code point itself, rendering passage
+ * empty expansion. It falls through to the code point itself, rendering byte
  * 0x50 as "P". Modelling a blank entry as "" instead was measured predicting a
  * page 222 characters shorter than it really was, diverging from the true text
  * at the first blank code.
  *
  * That fallback is also a diagnosis in its own right: a font whose map is
- * present but empty extracts as its own passage values read as Latin-1, which is
+ * present but empty extracts as its own byte values read as Latin-1, which is
  * the distinctive mojibake signature of a stripped CMap.
  */
 export function expandCharCode(map: Map<number, string>, charCode: number) {

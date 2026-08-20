@@ -24,7 +24,8 @@ header,.scopebar,nav{flex:0 0 auto}
 /* min-height:0 or a flex item refuses to shrink below its content and the
    scroll silently moves back to the document. */
 main,.adminshell{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
-/* Admin pages split the shell: AdminNav (tabs + course picker) is pinned, and
+/* Admin pages split the shell: AdminNav (the course/section picker; the tabs
+   left for the journey bar's staff group on 2026-08-09) is pinned, and
    .adminbody below it owns the scroll, so where you are and which course you
    are in never scroll away. The shell must not scroll itself or the nav would
    ride along with the page. */
@@ -709,7 +710,8 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
 /* .act and .rm sit on <a>, <summary> and <button> alike; strip the native
    button chrome so the same word reads the same whatever the element. */
 button.act,button.rm{appearance:none;background:none;border:none;padding:0}
-/* weave */
+/* the cloth drawing and its sections (03 · Knowledge Graph; the "weave" label
+   this section wore named a station deleted 2026-08-11) */
 /* A station's own sections — 03 has two, the cloth you wove and the
    projections you make of it (TJ, 2026-08-12). Louder than a card's heading,
    quieter than the page title, and it carries the same `.n` gloss the cards
@@ -1770,7 +1772,7 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
      suppressed while this is open), the floating Capture button (9000) and the
      highlight tooltip (9500) — you are meant to keep selecting and capturing
      from the page while your work is out — then the capture modal (10000) and
-     the walkthrough (10001), which must cover it. Fullscreen (6000) is not in
+     the practice guide's over-scrim popover (10001), which must cover it. Fullscreen (6000) is not in
      the comparison at all: this is inside that shell and rides with it.
      Never position:fixed. main.station-reading is overflow:hidden and that
      clip — not any z-index — is the only thing keeping this off the header and

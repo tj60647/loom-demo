@@ -20,7 +20,7 @@ test.describe('PDF Viewer and Highlighting', () => {
       const conceptName = `Test Concept for ${pdf.cardTitle}`;
 
       // The shelf is the home screen: pick the reading off it, which opens
-      // that reading's workbench, and read the text from tab 00 inside it.
+      // that reading's workbench, and read the text at 01 · Reading inside it.
       await openReading(page, pdf.cardTitle);
 
       // Wait for the text layer to render on the first page

@@ -447,7 +447,7 @@ function threadLine(from = "?", to = "?", handle = "", sentence = ""): string {
   return `**${from || "?"}** —[${handle || "…"}]→ **${to || "?"}**${sentence ? `: ${sentence}` : ""}`
 }
 
-/** `<student>-<slug>.<kind>.<ext>`, the shape mapExportFilename already uses. */
+/** `<student>-<slug>.<kind>.<yymmddhhmm>.<ext>`, the shape mapExportFilename already uses — the stamp sits last, before the extension (see fileStamp below). */
 /**
  * When the file was taken, as `yymmddhhmm` in the student's own clock (TJ,
  * 2026-08-12: "file downloads should include the yymmddhhmm in the filename,

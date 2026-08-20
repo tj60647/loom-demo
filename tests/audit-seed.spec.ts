@@ -8,7 +8,7 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 test.describe('Audit Seed Passages', () => {
   test('verify seed passages are highlighted', async ({ page }) => {
 
-    // Pick the reading off the shelf and open its text (tab 00).
+    // Pick the reading off the shelf and open its text (01 · Reading).
     await openReading(page, 'Object Worlds');
 
     // Go to page 4

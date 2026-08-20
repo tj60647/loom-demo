@@ -13,11 +13,11 @@
  * cover and the score together, from the bytes as they stand.
  *
  * WHAT THIS DESTROYS. Page text is the substrate every stored highlight offset
- * is measured against, and this replaces it wholesale. A byte captured before
+ * is measured against, and this replaces it wholesale. A passage captured before
  * the change keeps its old offsets and its old `pageContentHash`, which will no
  * longer match — the viewer falls back to fuzzy matching, and for the very
  * readings most worth repairing (the ones whose text was mojibake) the fuzzy
- * match has nothing to match against, because the byte's own stored text is the
+ * match has nothing to match against, because the passage's own stored text is the
  * mojibake. Carrying highlights across a repair is a separate problem with a
  * separate answer (src/lib/offsetRemap.ts). This function does not attempt it,
  * and callers should be reaching for it while a reading has no highlights on it

@@ -102,7 +102,7 @@ export type ExtractionMetrics = {
   /**
    * Punctuation marks sitting between two letters (`INTERAC$IVE`). The
    * signature of ligature codes resolving to the ASCII punctuation that happens
-   * to share their passage value.
+   * to share their byte value.
    */
   punctuationInWord?: number
   /**
@@ -357,13 +357,15 @@ export type LoomExport = {
     edges: { id: string; fromId: string; toId: string; sentence: string; handle: string }[]
     /**
      * Cloth titles/descriptions per scope ('' = whole weave). Replaces the
-     * legacy top-level `read` string, which import still accepts and folds
-     * into the whole-weave cloth.
+     * legacy top-level `read` string, which the import that existed until
+     * 2026-08-11 accepted and folded into the whole-weave cloth. Import is
+     * gone; the field stays as the download's record of the cloths.
      */
     cloths?: { id: string; scopeKey: string; title: string; description: string }[]
     /**
      * The student's maps. Older files lack it (and carry `concepts[].tier` +
-     * `read` instead); import synthesizes a whole-weave map from those.
+     * `read` instead); the import that existed until 2026-08-11 synthesized a
+     * whole-weave map from those.
      */
     maps?: {
       id: string
@@ -381,7 +383,7 @@ export type LoomExport = {
       order?: string[]
       pins?: string[]
     }
-    /** Per-map geometry, keyed by map id (symbolic on import). */
+    /** Per-map geometry, keyed by map id (was symbolic on import; import is gone). */
     maps?: Record<
       string,
       {

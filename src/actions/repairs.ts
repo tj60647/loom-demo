@@ -141,7 +141,8 @@ export async function getRepairSummary() {
       .groupBy(sourceRepairs.sourceId, sourceRepairs.status),
     // Only highlights with offsets. A passage typed or pasted rather than selected
     // was never measured against a text layer, so replacing one cannot disturb
-    // it — 20 of this library's 43 passages are that kind, carrying a written
+    // it — 20 of this library's 43 passages were that kind when this was
+    // written (2026-08; the counts drift with every capture), carrying a written
     // location like "p. 387 (abstract)" and nothing to move. Counting them made
     // the panel say "7 highlights anchored to this reading" about a reading with
     // none, and refused a repair that would have broken nothing.

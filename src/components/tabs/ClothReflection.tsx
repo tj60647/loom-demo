@@ -2,10 +2,11 @@
 
 // The cloth, its prompts, and the threads a prompt lays out to work from.
 //
-// This was station 03's whole content until 2026-08-08, when 03 became
-// Vocabulary (the model's tab 4 — the User's holdings). It moved here to 04 ·
-// Knowledge Graph on TJ's call: the panel reads the *structure of the graph*,
-// and 04 already owns the projection whose one-line and paragraph it feeds.
+// This was the holdings station's whole content until 2026-08-08, when that
+// station became Vocabulary pure (the model's User's holdings, now 04). It
+// moved here to the Knowledge Graph — 03, after the same day's 03/04 swap —
+// on TJ's call: the panel reads the *structure of the graph*, and this
+// station already owns the projection whose one-line and paragraph it feeds.
 // The read editor came with it only in the sense that it was already here —
 // 03's copy was a duplicate of `#yourRead2` and is gone.
 //
@@ -796,8 +797,9 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
           drawing does not show something you were not looking for. The rule it
           defended is unchanged and still true — the cloth draws only threads
           with both ends in this reading, because half a thread would be a lie —
-          and the bridges themselves are still counted and listed where they can
-          be acted on, on 02 · Linking. */}
+          and the bridges themselves are still counted, in the workbench
+          footer's "N threads out" — nothing lists them since 02's band was
+          removed on 2026-08-09. */}
 
       {/* The cloth and its reading were side by side (TJ, 2026-08-12) — one
           gesture, a prompt on the right lighting the cloth on the left. The

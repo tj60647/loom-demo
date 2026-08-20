@@ -1,13 +1,14 @@
 "use client"
 
-// 04 · Map — the card table, ported from v14 (loom-v14-example.html).
+// 03 · Knowledge Graph — the card table (the board), ported from v14 (loom-v14-example.html).
 // Red line #7: render and count, never decide. Cards without a stored position
 // get a DEFAULT position computed fresh each render (v14's drift grid) that is
 // NEVER persisted — only a student drag (card drop, line bend) or a de-tier
 // cleanup writes geometry, into the ACTIVE MAP's own view row (`map:<id>`).
 //
-// A map is one named sorting of this scope's concepts with its own essence
-// sentence and paragraph — parallel siblings, switched in the mapbar. Tiers
+// A map row is one Projection: a named sorting of this scope's concepts with
+// its own one-line (`essence` in the schema) and paragraph — parallel
+// siblings, switched in the mapbar. Tiers
 // live on the map (a tier is a rank relative to the concepts it sits among),
 // so the same concept may be primary here and tertiary on another map.
 
@@ -202,7 +203,8 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
     return () => observer.disconnect()
   }, [])
   const W = width
-  // Usable width — the denominator for proportional x (spec §5): stored x is a
+  // Usable width — the denominator for proportional x ("positions stored
+  // proportionally", archive/loom-spec-v1.md §5): stored x is a
   // 0..1 fraction of this; y stays absolute px.
   const usableW = Math.max(1, W - 20)
 
@@ -518,7 +520,7 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
           flash("re-tiered to " + TIERS[idx][1].toLowerCase() + " — placement is the decision")
         }
         // The drag is the student gesture — persist this card's spot, once.
-        // x is stored as a fraction of the usable width (spec §5), y in px.
+        // x is stored as a fraction of the usable width (archive/loom-spec-v1.md §5), y in px.
         setView(`map:${activeMap.id}`, { ...view, positions: { ...stored, [id]: { x: pos.x / usableW, y: pos.y } } })
       }
       setLive(null)
@@ -549,8 +551,9 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
 
   // "Copy your read" stood here until 2026-08-12 (TJ). It copied the one-line
   // and the paragraph to the clipboard — two fields the student is looking at
-  // and can select — while the projection's own `keep .json` / `keep .md` at
-  // the head of the section already hand the whole thing over as a file.
+  // and can select — while the projection's own download buttons at the head
+  // of the section ("download projection .json/.md" since 2026-08-12) already
+  // hand the whole thing over as a file.
 
   /**
    * The concept-map kit — a FILE, not a clipboard (TJ, 2026-08-11: "the map
@@ -936,8 +939,8 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
             "your description" over the gloss, hand-rolled passage quotes capped
             at four, a "where else you met it" list. `ConceptCard` says all of
             it in the shape every other surface uses, and its own header asks
-            for exactly this: "no fixed width: this is meant to sit in a 380px
-            sheet, a margin rail and a popover".
+            for exactly this: no fixed width — meant to sit in the sheet
+            (460px since 2026-08-17), a margin rail and a popover.
 
             `.cardmenu` stays as the SHELL — it is the positioning, the 260px,
             the scroll and the shadow, and it carries no opinion about contents.

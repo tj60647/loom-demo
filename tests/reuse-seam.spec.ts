@@ -33,8 +33,9 @@ const unique = (stem: string) => `${stem} ${Date.now().toString().slice(-6)}`
 async function captureByHand(page: import("@playwright/test").Page, label: string, gloss = "") {
   await page.locator("#bText").fill(`A passage supporting ${label}.`)
   // By placeholder, not nth(): more than one input on this station shares the
-  // concept datalist — the capture form's and "the concept you are looking
-  // for". (The refile row inside an opened log row was a third until
+  // concept datalist — the capture form's and the name-ahead card's, whose
+  // placeholder is the shorter "e.g. boundary objects". (The refile row inside
+  // an opened log row was a third until
   // 2026-08-18, when a + and an AddConceptCard replaced it.) Only this one has
   // this placeholder.
   await page.getByPlaceholder("e.g. boundary objects · satisficing · valence").fill(label)

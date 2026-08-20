@@ -10,9 +10,11 @@
 // query returns the same pages for every student, and a match is a fact about
 // the text, not a judgment about the student.
 //
-// Both actions scope through getSources(), so search can never surface a
-// reading its caller could not already open — and the shelf-wide search
-// narrows further to published readings: the reading list, not the library.
+// Both READING searches (searchReadings, searchReading) scope through
+// getSources(), so search can never surface a reading its caller could not
+// already open — and the shelf-wide search narrows further to published
+// readings: the reading list, not the library. searchLoom below is gated on
+// the caller's own userId instead: it reads nobody's rows but theirs.
 // The tsvector expressions below repeat src/db/schema.ts's index expressions
 // verbatim — an expression index only serves queries that match it exactly.
 
@@ -495,8 +497,10 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
 
   // Projections — Title, One-line, Description — under the same rules as
   // cloths: unindexed on purpose (a handful of rows per user; an index would
-  // be a migration), and single-reading scopeKeys only, because a whole-weave
-  // projection has no reachable surface until the weave is ruled.
+  // be a migration), and single-reading scopeKeys only, because the whole
+  // weave was ruled out of the app (2026-08-11) and a whole-weave projection
+  // has no surface at all — a hit must never be a door to a room that
+  // does not exist.
   const mapScope = courseId
     ? sql`("map"."courseId" = ${courseId} OR "map"."courseId" IS NULL)`
     : sql`"map"."courseId" IS NULL`

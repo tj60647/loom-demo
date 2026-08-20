@@ -12,7 +12,8 @@
  * `edit` is Your work's row, moved here on 2026-08-18 — the commit this file
  * predicted. It keeps every block that row carried (TJ asked for the panel's
  * "more verbose form" expressly) and it keeps `.lrow`, `.lhead`, `.lconcept`
- * and `data-concept-id` on the same elements, because eleven spec files and
+ * and `data-concept-id` on the same elements, because several spec files
+ * (seven at the 2026-08-19 count) and
  * OpenTab's own focus effects reach in by those.
  *
  * The state it edits is NOT held here. The rename runs a whole-graph homonym
@@ -20,8 +21,8 @@
  * toggle is forced open by OpenTab's own handlers after a refile. Both stay in
  * OpenTab and arrive as callbacks.
  *
- * No fixed type sizes, and no fixed width: this is meant to sit in a 380px
- * sheet, a margin rail and a popover without being re-tuned for each.
+ * No fixed type sizes, and no fixed width: this is meant to sit in the sheet
+ * (460px since 2026-08-17), a margin rail and a popover without being re-tuned for each.
  */
 
 import { useState } from "react"
@@ -31,7 +32,7 @@ import ConceptName from "@/components/ui/ConceptName"
 import { conceptNameText } from "@/lib/conceptName"
 
 export type ConceptCardMode =
-  /** Shown, never changed — the warp popover at 02. */
+  /** Shown, never changed — the board's card popover at 03. */
   | "read"
   /** Your work's row: rename, describe, and the evidence under it. */
   | "edit"
@@ -43,10 +44,10 @@ export type ConceptCardEdit = {
   onToggle: () => void
   /**
    * Takes the input so the host can roll its value back when a homonym confirm
-   * is declined — the reason this is not just (label: string). OPTIONAL: 04 ·
-   * Vocabulary does not rename, so it passes none and the field is not drawn.
-   * The card matching elsewhere is a matter of shape, not of inventing an act
-   * a station does not have.
+   * is declined — the reason this is not just (label: string). OPTIONAL by
+   * type, though every host passes it today — 01, 02's warp and 04 all rename
+   * (04 since 2026-08-18); a host that cannot rename simply passes none and
+   * the field is not drawn.
    */
   onRename?: (input: HTMLInputElement) => void
   onEditDef: (def: string) => void

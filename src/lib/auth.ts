@@ -87,7 +87,7 @@ export function emailSignInConfigured() {
  * `next-auth/providers/email` requires nodemailer at module load — an optional
  * peer dependency this project does not install — and we would only be
  * replacing the one function that uses it. Everything security-bearing still
- * belongs to the library: it mints the 32-passage token, hashes it into
+ * belongs to the library: it mints the 32-byte token, hashes it into
  * `verificationToken`, and expires it. This supplies the delivery and the
  * copy, and nothing else.
  */
@@ -135,8 +135,9 @@ function guestEmailProvider(): Provider {
 export const authOptions: NextAuthOptions = {
   adapter: DrizzleAdapter(db) as Adapter,
   pages: {
-    // GitHub is the only provider, so there is nothing to choose: our own page
-    // is one button and one sentence, where NextAuth's built-in is a provider
+    // GitHub is the door for everyone the roster knows, and the guest email
+    // link (built above, when mail is configured) is folded away — so our own
+    // page is one button and a fold, where NextAuth's built-in is a provider
     // list. It also catches the retryable OAuth codes, which NextAuth bounces
     // to the sign-in route rather than to pages.error.
     signIn: "/auth/signin",

@@ -41,7 +41,8 @@ for (let run = 1; run <= RUNS; run += 1) {
     storageState: "playwright/.auth/testa.json",
     viewport: { width: 1280, height: 720 },
   })
-  // The first-run walkthrough's scrim eats every click on a fresh origin.
+  // Vestigial: the first-run walkthrough (whose scrim ate every click on a
+  // fresh origin) was retired 2026-08-11; nothing reads this key any more.
   await ctx.addInitScript(() => localStorage.setItem("loom_has_seen_walkthrough", "true"))
   const page = await ctx.newPage()
   const posts = []

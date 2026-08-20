@@ -78,14 +78,14 @@ const near = (a: Rect | null, b: Rect | null) =>
  * the sentence box the same beat tells you to type in, so the mask would have
  * made its own instruction impossible to follow.
  *
- * The union also walks the move by itself: the cloth beat's chain is the Your
- * work button, the fold, the title and Save, and the last three do not exist
- * until the ones before them are pressed — so the hole grows as the student
- * goes.
+ * The union also walks the move by itself: the `name` beat's chain is the
+ * note field, the concept toggle and Save, and the later targets appear only
+ * as the student goes — so the hole grows with the work.
  *
  * A target counts only if it is IN the viewport. Size alone is not enough:
- * the Your-work sheet is always mounted, parked at `translateX(100% + 12px)`,
- * so a closed sheet has a perfectly real rect off the right edge — and a
+ * the Your-work sheet is always mounted, parked at
+ * `translateX(calc(-100% - 12px))` off the LEFT edge (TJ, 2026-08-17),
+ * so a closed sheet has a perfectly real rect off-screen — and a
  * cutout there is a dark screen with no hole in it.
  */
 function resolveTarget(selectors: string[]): { rect: Rect | null; away: boolean } {

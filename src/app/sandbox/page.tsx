@@ -7,10 +7,11 @@
 // names the concept, really throws a thread, really drags a card on the
 // board — and closing the page loses all of it, by design.
 //
-// It runs on a REAL reading (TJ: "use the learning to learn pdf") rather than
-// a bundled sample, so the PDF, its text layer and the whole capture path are
-// the genuine ones. Novak & Gowin is also the book the board's method comes
-// from, which makes it the right text to practise the method on.
+// It runs on a REAL reading rather than a bundled sample, so the PDF, its
+// text layer and the whole capture path are the genuine ones. The text is
+// chosen at PREFERRED below — Oh, the Places You'll Go! (TJ, 2026-08-11: "lets
+// use Oh, the Places You'll Go! it is in the database"), superseding his
+// earlier pick of Learning How to Learn.
 
 import Link from "next/link"
 import { asc, eq } from "drizzle-orm"

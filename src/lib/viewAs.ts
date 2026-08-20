@@ -11,8 +11,8 @@
  *     (`courseSources.isVisible` is only applied to non-admins);
  *   - `getActiveCourse` is what tells every client surface it is staff at all.
  *
- * A URL param was the alternative and is worse: `/keep` is statically
- * prerendered and `useSearchParams` already forced a Suspense boundary once,
+ * A URL param was the alternative and is worse: `/keep`, while it existed, was
+ * statically prerendered and `useSearchParams` forced a Suspense boundary there once,
  * every `<Link>` would have to propagate it, and the plain `<a href>`
  * navigations in the header would drop it silently — a lens that falls off
  * halfway through a session is worse than no lens.

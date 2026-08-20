@@ -1,7 +1,7 @@
 // Pure graph arithmetic over the student's concepts and edges — the counting
-// half of "render and count, never decide" (red line #7). Shared by the Read
-// tab, the Map tab, the history view, and the cloth SVGs so their numbers can
-// never disagree.
+// half of "render and count, never decide" (red line #7). Shared across the
+// stations, the rails, the shelf and the cloth SVGs (eleven importers at last
+// count) so their numbers can never disagree.
 
 import type { Concept, Edge } from "./types"
 
@@ -86,7 +86,9 @@ export function noEvidenceConcepts(concepts: Concept[], passages: { conceptIds: 
 
 /**
  * Paste tidy (v14): re-join hyphenated line breaks, collapse newlines and runs
- * of whitespace. Capture automation, permitted by red line #2.
+ * of whitespace. Mechanical cleanup, not interpretation — the "red line #2"
+ * this used to cite is the archived spec's numbering; no current red line
+ * touches whitespace repair.
  */
 export function tidy(text: string): string {
   return text

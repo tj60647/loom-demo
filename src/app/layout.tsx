@@ -47,8 +47,8 @@ export default function RootLayout({
                     what Loom is, so the deck was the middle of three overlapping surfaces
                     and the only one that merely described. */}
                 {/* The hover tips, in the top layer. Mounted once, here, for
-                    the same reason the walkthrough is: [data-tip] is on
-                    controls in the header, the admin nav and every page. */}
+                    the same reason the walkthrough was: [data-tip] is on
+                    controls in the header and across the pages. */}
                 <TipLayer />
                 {children}
               </DialogProvider>

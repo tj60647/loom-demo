@@ -19,7 +19,7 @@ type ReadingPageSearchParams = {
 }
 
 // Deep links land on a station (`?tab=reading` from a shelf-search hit);
-// anything else lands on the default first tab, as /weave does. `q` rides
+// anything else lands on the default first tab. `q` rides
 // along from a shelf-search hit and opens the reading's own search panel
 // pre-filled, so the trail of marks continues into the text itself.
 //

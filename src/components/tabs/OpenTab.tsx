@@ -55,7 +55,8 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
   // split is load-bearing: the log renders what this reading evidences, but
   // naming, dedup and the delete guards must see every concept the student has
   // — otherwise capturing a concept met in an earlier text would mint a
-  // duplicate instead of joining its evidence (spec §2 identity).
+  // duplicate instead of joining its evidence (loom-model-build.md §2:
+  // identity is by object, not label string).
   const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, addPassageConcept, unfilePassage, editPassageNote, flash } = useLoom()
   const { byId, titleOf } = useReadings()
   // Shared with the margin rail card, so the two dialogs cannot drift apart.
@@ -100,10 +101,11 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
 
   const [openLogRows, setOpenLogRows] = useState<Record<string, boolean>>({})
 
-  // Unique per surface: VocabularyTab declares a <datalist id="conceptOptions">
-  // too, and both tabs are kept alive. Whichever mounted first wins the id, so
-  // the other's autocomplete quietly offered the wrong list. The sheet is
-  // mounted permanently now, which would have made that permanent.
+  // Unique per surface: VocabularyTab's coin form points at "conceptOptions"
+  // and declares no datalist of its own (its declaration was deleted 2026-08-09,
+  // ac4d6cc), so this file is the sole declaration — and the compact copy takes
+  // its own id so the two mounted-alive instances of THIS component cannot
+  // collide with each other.
   const listId = compact ? "conceptOptions-reading" : "conceptOptions"
   /**
    * Every concept, alphabetically — how you find one you already made,
@@ -141,7 +143,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
     const wdef = workingDef.trim()
     // Find concept or create it. `findConcept` searches the WHOLE graph, so
     // naming an idea met in an earlier text reuses that concept rather than
-    // minting a second one under the same label (spec §2 identity).
+    // minting a second one under the same label (loom-model-build.md §2 identity).
     let concept = findConcept(cname)
     // Captured before the passage lands, so it says where the concept had ALREADY
     // been met rather than counting the capture about to happen.

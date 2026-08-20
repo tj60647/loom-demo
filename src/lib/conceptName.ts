@@ -5,8 +5,8 @@ import type { Concept } from "@/lib/types"
  *
  * A Concept may carry a Description and no Label (TJ, 2026-08-18: "a concept
  * needs either or both a description and a label"), and the model has allowed
- * it for longer — docs/loom-model-build.md:95 defines the Label as
- * "[< 8 words, may be null at capture]" and :106 adds that "A Label need not
+ * it for longer — docs/loom-model-build.md §2 Concept defines the Label as
+ * "[< 8 words, may be null at capture]" and adds that "A Label need not
  * exist before linking; naming can follow."
  *
  * Until this module every surface but the margin rail interpolated `label`

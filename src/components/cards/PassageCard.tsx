@@ -22,8 +22,8 @@
  * descendant selectors `.lrow.loose .passage` and `.lrow.loose .src`, so
  * dropping that class would strip the type silently. (Grep the selectors, not
  * a line number — the numbers here were already 37 off before this file was
- * touched again.) Eleven spec files also bind to `.lrow`, `.passage.isdoor`
- * and `data-passage-id`.
+ * touched again.) Several spec files (eight at the 2026-08-19 count) also bind
+ * to `.lrow`, `.passage.isdoor` and `data-passage-id`.
  *
  * State stays in OpenTab. This card takes callbacks, because the row's state
  * is not the row's: the note is written optimistically by LoomProvider while
@@ -43,7 +43,7 @@ import AddConceptCard from "./AddConceptCard"
 import { conceptNameText } from "@/lib/conceptName"
 
 export type PassageCardMode =
-  /** Shown, never changed — the warp popover, and anywhere quoting evidence. */
+  /** Shown, never changed — the board's card popover, and anywhere quoting evidence. */
   | "read"
   /** Your work's row: the note, the filings, and the one destructive act. */
   | "edit"
@@ -284,7 +284,7 @@ export default function PassageCard({
 
       {/* NO PASSAGE NOTE HERE (TJ, 2026-08-18: "the concept card does not need
           to show the passage notes"). Read mode is only ever reached through
-          ConceptCard — the warp card's opened body and the projection popover —
+          ConceptCard's read branch — the board's card popover at 03 —
           where these passages are EVIDENCE for the concept above them. A note
           is what the words meant to the student on the day they kept them,
           which is a fact about the passage, not about the concept it is being

@@ -11,7 +11,7 @@
  * thread, really drags a card. None of it is written anywhere.
  *
  * WHY A SECOND PROVIDER RATHER THAN A FLAG IN THE REAL ONE. `LoomProvider`
- * calls the server from 22 separate places, one per mutation; a flag would
+ * calls the server from two dozen separate places, one per mutation; a flag would
  * have to be honoured at every one of them, and the failure mode of
  * forgetting is a silent write into a real student's loom. This file
  * **never imports `@/actions/loom`**, so that write cannot happen — there is
@@ -26,20 +26,15 @@
  * difference, and keeping it that narrow is what stops this file rotting
  * into a second, subtly different Loom.
  *
- * WHAT IS DELIBERATELY MISSING. It starts EMPTY. There was no import and no
- * worked example here even while those existed, because both bring in content
- * a student might want to keep and nothing here can be kept (see the band in
- * `SandboxWorkbench`); they were deleted outright on 2026-08-11, along with
- * the local "clear my practice" that only Keep ever rendered.
- *
- * Starting empty is a choice, not a conclusion. TJ, 2026-08-11: "i have yet to
- * see the practice loom, but i imagine we can use the worked example content
- * in it?" A practice loom that also SHOWS a worked cloth is a different and
- * probably better thing than one that only offers the gestures — see
- * docs/open-work.md. It would have to be built from the practice reading's own
- * pages, though: the deleted example was Star & Griesemer, and salting Novak &
- * Gowin's text with another book's passages would teach the wrong thing about
- * what a passage is.
+ * WHAT IT OPENS WITH. The worked cloth, seeded once into initial state (see
+ * `initial` below): built on the SERVER from the practice reading's own pages
+ * (src/lib/practiceCloth.ts — real substrings at their true offsets, which is
+ * exactly the constraint an earlier version of this header raised against
+ * salting the text with another book's passages). It starts empty only when
+ * that build returns null. The old import and worked-example ACTIONS stayed
+ * out and were deleted app-wide on 2026-08-11; TJ then asked for the worked
+ * content here ("i imagine we can use the worked example content in it?") and
+ * it landed the same day.
  */
 
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react"

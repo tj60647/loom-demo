@@ -34,8 +34,9 @@ export type EventEntity =
  * the browser may call, and a free-form event writer is not something to hand
  * out. This module is plain server code and is importable by both.
  *
- * Any new `kind` needs a sentence in `logPhrase.ts`; `check-vocabulary` fails
- * the build on a kind the history cannot read.
+ * Any new `kind` needs a `case` in HistoryPanel's foldEvents — that is what
+ * `check-vocabulary` fails the build on. A sentence in `logPhrase.ts` is
+ * wanted too, but unguarded: a kind without one falls back to the default line.
  */
 export async function recordEvent(
   userId: string,

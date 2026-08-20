@@ -120,7 +120,7 @@ export interface LoomContextType {
    */
   activeMap: LoomMap | null
   selectMap: (id: string) => void
-  /** Create a map in the current scope (default name "Map N") and select it. */
+  /** Create a map in the current scope (default name "Projection N") and select it. */
   addMap: (name?: string) => Promise<LoomMap>
   renameMap: (id: string, name: string) => void
   removeMap: (id: string) => Promise<void>
@@ -133,7 +133,7 @@ export interface LoomContextType {
   /** Persist a student gesture on a view's geometry, keyed 'cardTable' | 'map:<id>'. */
   setView: (key: string, next: CardTableView) => void
   /**
-   * The active map, creating "Map N" first when the scope has none — so the
+   * The active map, creating "Projection N" first when the scope has none — so the
    * first tier chip / drag / keystroke in a fresh scope just works. The create
    * is itself a student gesture's consequence, and it is flashed.
    */
@@ -220,7 +220,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
    * concept vanishes until the next reload. Every local write bumps the epoch;
    * a whole-truth read applies only if the epoch it set out under still holds.
    *
-   * A write's OWN response (mergeConcepts, the imports, the worked example)
+   * A write's OWN response (mergeConcepts, the resets)
    * still applies unconditionally: it is the truth including that write.
    */
   const writeEpoch = useRef(0)

@@ -1,19 +1,20 @@
 "use server"
 
 /**
- * Overlays — the read-only comparison of your marks with your section's and
- * your cohort's (docs/loom-model-build.md §2 "Overlays"; refactor spec P3.14,
- * ruling 28). The faculty side already exists at `/admin/aggregate`; this is
- * the student side, and it is deliberately narrower.
+ * Overlays — the read-only comparison of a section's marks with the cohort's
+ * (docs/loom-model-build.md §2 "Overlays"; refactor spec P3.14, ruling 28).
+ * The aggregate side lives at `/admin/aggregate`; this is the in-reading side,
+ * deliberately narrower — and it is staff-only too (decision 0 below): the
+ * viewer's own marks are never a band, and students never meet these at all.
  *
- * Four decisions (TJ, 2026-08-07) are wired here and nowhere else:
+ * The decisions wired here and nowhere else:
  *
- * 1. THE GATE, PER READING. The archived spec's red line #8 — "the crowd must
- *    not pre-code the text" — carries into v1: an overlay opens on a reading
- *    only once the viewer has captured a passage in that reading themselves.
- *    At the whole weave the same rule runs reading by reading: the comparison
- *    covers the readings you have coded and no others, so the cohort's
- *    vocabulary for a text you have not opened is not on the screen.
+ * 1. THE GATE, PER READING — RETIRED 2026-08-08 with the student overlays.
+ *    The archived spec's red line #8 ("the crowd must not pre-code the text")
+ *    gated an overlay on the viewer having captured in that reading first; it
+ *    protected a *student's* first read, and there is no student viewer left.
+ *    Scope is now the peers' coded readings (see below), and no capture check
+ *    remains in this file.
  * 2. SECTION AND COHORT ONLY. No per-person band ships in v1, so nothing here
  *    returns a name, an id, or anything that resolves to one. Counts are of
  *    PEOPLE, never of rows that carry an author.

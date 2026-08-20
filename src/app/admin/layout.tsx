@@ -47,8 +47,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     // The shell itself no longer scrolls: AdminNav is the pinned header panel
-    // and `adminbody` below it owns the overflow, so the tabs and the course
-    // picker stay put while the page scrolls under them (see globals.css).
+    // and `adminbody` below it owns the overflow, so the course and section
+    // picker stay put while the page scrolls under them (see globals.css; the
+    // tabs left AdminNav for the journey bar's staff group on 2026-08-09).
     // Bottom padding lives on the pages' <main>, not the shell — padding here
     // would put a dead strip under the scroll area.
     <>

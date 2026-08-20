@@ -200,7 +200,9 @@ export async function deleteCourse(formData: FormData) {
   const courseId = readText(formData, "courseId")
   if (!courseId) return
 
-  // Guard against deleting a course that still holds student work.
+  // Typed confirmation, nothing more: a hard course delete must not happen on
+  // a mis-click. (Student work survives it regardless — courseId set-null,
+  // per the docstring above; nothing here inspects whether work exists.)
   if (readText(formData, "confirm") !== "delete") return
 
   await db.delete(courses).where(eq(courses.id, courseId))

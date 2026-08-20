@@ -4,16 +4,20 @@
  * panel unanimously agrees on, write repaired revisions, and rescore.
  *
  * The acts are the pipeline's own — detectRepairsForSource, transcribe,
- * acceptRepairDecision, applyAcceptedRepairs, rescoreSource — so every guard
+ * arbitrateRepair, acceptRepairDecision, applyAcceptedRepairs, rescoreSource
+ * — so every guard
  * that protects the admin panel protects this run: overlap on accept,
  * staleness, kept-text, measured improvement and highlight re-anchoring on
  * apply. Nothing here has its own copy of a rule.
  *
- * ACCEPTANCE POLICY, deliberately conservative (TJ's own plan, §6): a repair
- * is accepted automatically only when the panel had at least three complete
- * readers and NOT ONE disagreement — the agreed text is then every reader's
- * text. Anything less stays `proposed` for a person in the repair panel, and
- * this script's report names each one and why it was held.
+ * ACCEPTANCE POLICY (TJ's plan §6, amended by b8f6b6f): a repair is accepted
+ * automatically when the panel had at least three complete readers and NOT
+ * ONE disagreement — the agreed text is then every reader's text. A split
+ * panel goes to the judge (arbitrateRepair), which may only CHOOSE among the
+ * readers' candidates, never write; what it accepts is applied like a
+ * unanimous one. Only what the judge calls ambiguous stays `proposed` for a
+ * person in the repair panel, and this script's report names each one and why
+ * it was held.
  *
  * Detection proposes at most 12 pages per source per run, so the script
  * cycles detect → transcribe → accept → apply until a pass proposes nothing

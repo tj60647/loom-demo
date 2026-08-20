@@ -211,8 +211,10 @@ export const sources = pgTable(
     // to a reading, so a source the library does not hold still needs a row —
     // otherwise its passages have no door and fall out of every lens.
     storageKey: text("storageKey"),
-    // Size of the stored file in bytes, recorded at ingest (and refreshed when
-    // a repair mints a new revision). Serving-time metadata, not identity —
+    // Size of the stored file in bytes, recorded at ingest. NOT refreshed when
+    // a repair rotates storageKey — repairApply.ts never writes this column,
+    // so a repaired reading is served with the pre-repair Content-Length
+    // (checked 2026-08-19; a real mismatch to fix). Serving-time metadata, not identity —
     // the identity argument above still holds. It exists so the reading route
     // can send Content-Length on a streamed body: without it pdf.js cannot
     // show download progress against a total, and the 4.5MB-cap comment on
@@ -268,7 +270,7 @@ export const courseSources = pgTable(
 
 // Canonical, server-extracted plain text for each page of a source. This is
 // the stable anchor used to compute and validate highlight offsets, since the
-// client-side pdf.js text layer is not guaranteed to be passage-stable across
+// client-side pdf.js text layer is not guaranteed to be byte-stable across
 // renders/versions.
 export const sourcePages = pgTable(
   "source_page",
@@ -281,8 +283,10 @@ export const sourcePages = pgTable(
       .references(() => sources.id, { onDelete: "cascade" }),
     pageNumber: integer("pageNumber").notNull(),
     textContent: text("textContent").notNull(),
-    // Hash of textContent, duplicated onto passages.pageContentHash at capture
-    // time so we can cheaply detect drift without re-fetching this row.
+    // Hash of textLayerProjection(textContent) — the browser's offset substrate,
+    // not the stored string (see sources.ts / reingest.ts, the two writers) —
+    // duplicated onto passages.pageContentHash at capture time so we can
+    // cheaply detect drift without re-fetching this row.
     contentHash: text("contentHash").notNull(),
     // The page's own size in PDF points, from the same extraction pass that
     // produced textContent. A document fact, like the text — NOT display
@@ -452,8 +456,9 @@ export const sourceRepairReadings = pgTable("source_repair_reading", {
  * the store with nothing addressing it": `measuredAgainstKey` on pending
  * proposals was the only record of a prior key, deleteSource stranded every
  * superseded blob forever, and "which file did students read in week 3?" had
- * no answer. A row here per rotation makes the chain walkable: audit, cleanup
- * on delete, and one day a rollback all read this table instead of guessing.
+ * no answer. A row here per rotation makes the chain walkable: the library
+ * audit reads it today; cleanup on delete and rollback are still to come —
+ * deleteSource does not walk it yet, so superseded blobs still strand.
  *
  * Append-only by convention: rows record what happened and are never edited.
  */
@@ -509,7 +514,7 @@ export const concepts = pgTable(
   })
 )
 
-// A passage — one captured passage. Concepts attach via `byte_concept` (0..n):
+// A passage — one captured passage. Concepts attach via `passage_concept` (0..n):
 // a passage with zero rows there is an Unlabeled Passage, a legal first-class
 // state (docs/loom-model-build.md §2 Passage). Deleting a concept never
 // deletes a passage — the passage survives its labels.
@@ -691,12 +696,14 @@ export const views = pgTable(
   })
 )
 
-// Append-only record of the student's own graph acts (create / rename / re-tier
-// / throw / coin / delete / import / reset). This is the development history of
+// Append-only record of the student's own graph acts (create / rename / throw
+// / coin / delete / reset). This is the development history of
 // the knowledge graph — provenance the student can explore ("the cloth, over
 // time"), never a surface that grades or advises (red line #7: counted, not
-// judged). Deliberately survives reset and import: reset clears the cloth, not
-// the loom's memory of weaving. Best-effort writes (neon-http has no
+// judged). Deliberately survives reset: reset clears the cloth, not
+// the loom's memory of weaving. Import was deleted 2026-08-11; its kinds
+// (graph.import, map.import, graph.example) live on only as historical rows.
+// Best-effort writes (neon-http has no
 // transactions): the graph tables stay the source of truth.
 export const graphEvents = pgTable("graph_event", {
   id: text("id")

@@ -1,13 +1,14 @@
 /**
- * The cloth loop, shelf → Reading → shelf (the model's reading-card ruling:
- * explicit Create Cloth, the cloth opened by name — rulings 20–22, 33 — plus
- * the Cloth Title/Description, which since 2026-08-08 are edited on 01 ·
- * Reading, the work surface a cloth starts on).
+ * The cloth loop, shelf → Reading → shelf (the model's reading-card ruling as
+ * it stands since 2026-08-08: the card is the ONE door, no Create Cloth
+ * button, the cloth row beneath is metadata — plus the Cloth
+ * Title/Description, edited on 01 · Reading, the work surface a cloth starts
+ * on).
  *
  * Unlike the journey file this spec cannot remove what it makes — the UI has
  * no single-cloth delete (reset was far too blunt, and went with Keep) — so
  * it is written to pass against both a virgin and an already-clothed seed:
- * whichever of Create/Open the card offers is the door it takes, and the
+ * entering the card opens the cloth either way, and the
  * title is only saved when it differs.
  */
 import { test, expect } from "@playwright/test"

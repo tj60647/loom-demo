@@ -111,7 +111,7 @@ test.describe('Concept rail', () => {
     // door closes Find on the way — the sheet and the search panel share the
     // right edge, and a panel left open underneath eats the first Escape.
     // The toolbar's search is "in the text" since 2026-08-17; the journey
-    // bar's is "this reading". They no longer share a name, but the scope
+    // bar's is "your cloth" (renamed the same day). They no longer share a name, but the scope
     // stays because a bare /search/i would still find both.
     await page.locator('.pdf-toolbar').getByRole('button', { name: 'Search the text of this reading' }).click();
     await expect(page.locator('.pdf-search-panel')).toBeVisible();

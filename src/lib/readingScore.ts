@@ -120,7 +120,7 @@ const GLYPH_NAME_LEAK =
 /**
  * A punctuation mark between two letters — `INTERAC$IVE`. This is what a
  * ligature code looks like once it has resolved to the ASCII punctuation that
- * shares its passage value, which is the most common way a broken font map stays
+ * shares its byte value, which is the most common way a broken font map stays
  * invisible to every other check.
  *
  * Two exclusions, both learned from false positives on this library's own

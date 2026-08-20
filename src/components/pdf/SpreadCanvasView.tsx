@@ -15,10 +15,11 @@
  *
  * What deliberately does NOT carry over: the single/spread reading modes,
  * masks and snap-to-page (01 · Reading's page mode already IS the focused
- * spread — one answer per question), and the branch's own capture path (the
- * text layers here are ordinary react-pdf layers inside `.pdf-stage`, so the
- * viewer's one selection handler, one CaptureModal and one ReuseOffer serve
- * this view like every other — the 2.1 invariant).
+ * spread — one answer per question). The branch's inline draft capture DID
+ * land here (2026-08-19): the text layers are ordinary react-pdf layers inside
+ * `.pdf-stage`, and what serves this view is the viewer's one selection
+ * handler, one shared CaptureFields (drawn as the rail's draft card) and one
+ * ReuseOffer — the 2.1 invariant is one shared reuse seam, not one modal.
  *
  * All geometry is derived for display and discarded (red line #7). The card
  * body is shared with page mode; this host owns its Canvas threshold,
@@ -54,7 +55,9 @@ const CARD_FALLBACK_H = 88;
  *
  * So the test is now against `spreadFitK` — the scale at which one spread
  * fills the stage — and that is a better rule than either number, for a reason
- * neither of them had: it is the SAME line `--invk` already turns on at.
+ * neither of them had: it is the same line counter-scaling begins at
+ * (formerly `--invk`'s switch-on point; that variable was deleted 2026-08-19
+ * and everything divides by `--k` now).
  * Counter-scaling begins the moment you zoom out past spread-fit, so the
  * invariant is now legible in one sentence — a card is editable exactly while
  * it is not being shrunk to stay readable. A counter-scaled card is a marker
@@ -242,7 +245,7 @@ export default function SpreadCanvasView({
    */
   draft?: { passage: Passage; card: React.ReactNode } | null;
   onAspect: (a: number) => void;
-  /** The toolbar slider's value: 1 = the whole canvas fits the stage. */
+  /** The toolbar's zoom multiplier (− / + / Fit drive it): 1 = the whole canvas fits the stage. */
   zoomMultiplier: number;
   onZoomMultiplier: (m: number) => void;
   /** Reports this document's zoom ceiling (a multiplier), so the toolbar's
@@ -331,7 +334,7 @@ export default function SpreadCanvasView({
     [numPages, basePageWidth, basePageHeight]
   );
 
-  // 1 on the slider = the whole canvas in view; the counter-scale reference is
+  // Multiplier 1 = the whole canvas in view; the counter-scale reference is
   // the two-page fit, so "reading size" means the same thing as page mode.
   const fitAllK = useMemo(
     () => (layout && stage.w > 0 ? Math.min(stage.w / (layout.canvasW + 24), stage.h / (layout.canvasH + 24)) : 1),
@@ -560,7 +563,7 @@ export default function SpreadCanvasView({
   // Whether more than one page is in view — see applyTransform.
   const wideRef = useRef(true);
   const [seesMoreThanASpread, setSeesMoreThanAPage] = useState(true);
-  /** Tracks EDITOR_CLOSE_RATIO independently of the read-only flip above. */
+  /** Tracks EDITOR_CLOSE_AT independently of the read-only flip above. */
   const farOutRef = useRef(true);
 
   const applyTransform = useCallback((t: ZoomTransform) => {
@@ -577,8 +580,8 @@ export default function SpreadCanvasView({
      * are in view you are reading a map, the cards are counter-scaled markers
      * over thumbnails, and a × is one mis-click from a pan.
      *
-     * `stage.w / t.k` is the viewport measured in canvas units, so comparing
-     * it to one page's width asks exactly that question. Set through state
+     * Comparing `t.k` against `spreadFitK` asks exactly that question — is
+     * more than one spread in view. Set through state
      * only when it flips, because this runs on every pan frame.
      */
     const { spreadFitK: sfk } = live.current;
@@ -642,7 +645,7 @@ export default function SpreadCanvasView({
     window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
       retargetView();
-      // Keep the toolbar slider honest about where a gesture left the zoom.
+      // Keep the toolbar's multiplier honest about where a gesture left the zoom.
       const { fitAllK, maxMultiplier, zoomMultiplier, onZoomMultiplier } = live.current;
       const m = Math.min(maxMultiplier, Math.max(0.5, Math.round((tref.current.k / fitAllK) * 10) / 10));
       if (Math.abs(m - zoomMultiplier) > 0.05) onZoomMultiplier(m);
@@ -732,7 +735,7 @@ export default function SpreadCanvasView({
     const pad = layout.spreadGap * 4;
     // The gesture range IS the slider range — [0.5, maxMultiplier] × fit-all,
     // exactly. A gesture ceiling wider than the settle sync's clamp would let
-    // a pinch rest where the slider clamps lower, and the slider effect would
+    // a pinch rest where the multiplier clamps lower, and its effect would
     // then yank the view back out on its own — the extent and the clamp must
     // never disagree, which is why both read maxMultiplier.
     zb.scaleExtent([fitAllK * 0.5, fitAllK * maxMultiplier])
@@ -941,18 +944,16 @@ export default function SpreadCanvasView({
   /**
    * A DRAFT PULLS THE VIEW IN FAR ENOUGH TO WRITE IN IT (TJ, 2026-08-19).
    *
-   * Between READ_ONLY_RATIO and the tier where text layers stop mounting you
+   * Zoomed out past the editable line (EDIT_FROM_SPREAD × spreadFitK) you
    * can still select words, but out there a card is a counter-scaled marker
    * over a thumbnail — a draft would open at a size nobody can type into. So
    * capture is allowed to move the view, and only capture: the reader asked
    * for the move by selecting the words and pressing the button.
    *
-   * The target is READ_ONLY_RATIO expressed back as a scale, which is why this
-   * lives here rather than in the viewer — `stage.w / (k * basePageWidth)` is
-   * the ratio, so the k that puts it exactly on the reading edge is
-   * `stage.w / (RATIO * basePageWidth)`. A hair tighter than the edge (0.95),
-   * because landing exactly on a threshold is how you get a card that is
-   * read-only on one frame and editable the next.
+   * The target is spread-fit, which is why this lives here rather than in the
+   * viewer — only this component knows `spreadFitK`. It sits a hair above
+   * EDIT_FROM_SPREAD, because landing exactly on a threshold is how you get a
+   * card that is read-only on one frame and editable the next.
    *
    * It runs ONCE per draft, on the id changing, and never while one is open:
    * re-centring under someone who has started typing would be its own bug.
@@ -976,7 +977,7 @@ export default function SpreadCanvasView({
     const to = Math.min(needed, fitAllK * maxMultiplier);
     // Through the multiplier, not writeTransform: the toolbar's − / + / Fit and
     // the settle sync all speak that unit, and a zoom they cannot see is one
-    // the slider will yank back on its next settle.
+    // the settle sync will yank back on its next pass.
     onZoomMultiplier(Math.min(maxMultiplier, Math.round((to / fitAllK) * 10) / 10));
   }, [draftId, layout, onZoomMultiplier]);
 
@@ -1258,8 +1259,8 @@ export default function SpreadCanvasView({
    * as a fraction of the page's text, placed down the page's height. Wrong by
    * a line or two, invisible at the zooms where impostors exist — and the
    * cards this feeds are exactly the concept-map reading of the far zoom
-   * (cards counter-scale; a fit-all matrix with Cards on reads as concepts
-   * over pages). Before this, cards existed only because every page carried
+   * (cards counter-scale; a fit-all canvas reads as concepts
+   * over pages — the rails are always on). Before this, cards existed only because every page carried
    * a text layer; the LOD ladder removes those, so the cards needed their own
    * geometry. DOM-measured anchors win wherever both exist.
    */

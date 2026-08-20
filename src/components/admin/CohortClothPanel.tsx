@@ -1,7 +1,8 @@
 "use client"
 
-// The cohort map with its material laid out. Mirrors the student's 03 · Read
-// pane — the cloth on top, what is selected read out beneath it — but where
+// The cohort map with its material laid out. Mirrors the student's 03 ·
+// Knowledge Graph cloth pane — the cloth on top, what is selected read out
+// beneath it — but where
 // the student weaves a read, the instructor inspects the weaving: a concept
 // opens the passages behind it, an arc opens its thread, and the full concept
 // and thread lists sit below the map. Every quote and sentence is shown as

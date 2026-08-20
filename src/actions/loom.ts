@@ -443,8 +443,9 @@ export async function createPassage(data: { conceptIds?: string[], source: strin
   // carry it: the row it points at can be deleted, and an append-only log
   // outliving its rows is the whole point. Null is meaningful — an untethered
   // passage belongs to no reading. Costs no migration; the payload is jsonb.
-  // Concept and thread events carry none: by the model a concept does not
-  // belong to a reading, and nothing server-side knows which one was open.
+  // Concept and thread events carry it too, via the client's atSourceId (see
+  // the docstring above createConcept): a concept does not belong to a reading,
+  // but the ACT happened in one, and only the caller knows which was open.
   await recordEvent(userId, courseId, "passage.capture", "passage", passageId, {
     conceptIds,
     sourceId: data.sourceId ?? null,
@@ -1162,7 +1163,7 @@ export async function getGraphEvents(): Promise<GraphEvent[]> {
  * tab, never the exit; a tool you cannot start over in is a tool you are
  * afraid to work in. It is not the old function restored: it lives in the
  * header's My Loom modal rather than a station, it clears Links too (they did
- * not exist in August), and its event carries the whole loom rather than
+ * not exist when the old resetGraph was written), and its event carries the whole loom rather than
  * counts, which is what makes it undoable.
  *
  * The other three kinds — graph.import, map.import, graph.example — are STILL

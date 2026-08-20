@@ -11,7 +11,8 @@
  * would pass against an empty comparison, which is the failure this spec
  * exists to catch. Note the COHORT band is the one under test: a faculty
  * viewer sits in the Faculty Section, and `peersOf` excludes faculty, so their
- * "section" is structurally empty — see the note in NEXT_SESSION.md.
+ * "section" is structurally empty (`peersOf` counts LEARNER rows only, and a
+ * faculty viewer sits in the Faculty Section — src/actions/overlays.ts).
  *
  * Read-only throughout: nothing here writes, so it needs no cleanup.
  */
@@ -28,24 +29,19 @@ async function loomLoaded(page: Page) {
 }
 
 /**
- * Open a reading's workbench, found by title on the shelf but entered by URL.
- *
- * Deliberately NOT a click on the card. This entry was chosen while the shelf
- * bounce was live (client-side entry left the router's canonical URL on `/`
- * about half the time, and the next server function POST bounced the student
- * to the library). That fault is fixed — client reads now go through
- * src/lib/reads.ts, off the action queue, and tests/reading-search.spec.ts
- * guards the click-entry path — but href entry stays here: this spec is about
- * overlays, and the end-of-test still-on-the-reading assertions below keep
- * their meaning either way.
+ * Open a reading's workbench by clicking its shelf card (via
+ * enterReadingFromCard, like every other spec). The NAME is historical: this
+ * used to enter by composed href, chosen while the shelf bounce was live
+ * (client-side entry left the router's canonical URL on `/` about half the
+ * time). That fault is fixed — client reads go through src/lib/reads.ts, off
+ * the action queue — and the body now clicks the card like a student does.
  */
 async function openReadingByHref(page: Page, title: string) {
   await page.goto("/")
   const card = page.locator(".shelfcard", { hasText: title }).first()
   await expect(card, "seed missing — run `npm run seed:demo` first").toBeVisible({ timeout: 15_000 })
-  // Whichever door the card offers: since 2026-08-08 an unclothed reading has
-  // no link at all, only Create Cloth. (The name is historical — entering by
-  // href was how this spec dodged the navigation bounce, which is now fixed.)
+  // The card is the one door (TJ, 2026-08-08) — no Create Cloth button
+  // exists; entering opens the cloth, minting it on first entry.
   await enterReadingFromCard(page, card)
   await loomLoaded(page)
 }

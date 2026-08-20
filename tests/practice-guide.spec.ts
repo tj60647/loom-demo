@@ -257,7 +257,7 @@ test.describe("The guide", () => {
 
     // TJ, 2026-08-12: *"in many pages it is possible to scroll away from the
     // 'glowing button/card'. how do we indicate where the 'glow' is?"* — on
-    // the Library that is 24 cards deep, and the beat goes on saying "press
+    // a Library many cards deep, and the beat goes on saying "press
     // the glowing card" with nothing glowing anywhere on screen.
     await page.goto("/sandbox")
     await expect(page.locator(".guidepop")).toBeVisible({ timeout: 30_000 })
@@ -265,8 +265,8 @@ test.describe("The guide", () => {
     await expect(page.locator(".gfind")).toHaveCount(0)
 
     // Scroll the one openable card clean out of the viewport — UPWARD, which
-    // is the direction that does it: the practice reading is the last card of
-    // twenty-four, so the guide arrives with the Library scrolled to its foot
+    // is the direction that does it: the practice reading sorts last on the
+    // shelf, so the guide arrives with the Library scrolled to its foot
     // and scrolling back to the top is what loses the glow. This is also the
     // wheel going through a mask pane, which used to swallow it entirely: a
     // fixed pane is not in `main`'s scroll chain, so the page moved or did not

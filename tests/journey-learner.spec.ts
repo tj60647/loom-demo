@@ -7,17 +7,18 @@
  * Every mutation this file makes, it removes again — the seeded data is
  * asserted, never changed.
  *
- * Station coverage this file adds over the older specs: 01 Open's by-hand
- * capture form, 02 Linking (previously untested entirely), 03 Vocabulary
- * (same), and per-reading projection assertions on 04.
+ * Station coverage this file adds over the older specs: 01 Reading's by-hand
+ * capture form, 02 Linking (previously untested entirely), 04 Vocabulary
+ * (same), and per-reading projection assertions on 03 · Knowledge Graph.
  *
  * Everything here happens inside a reading. It used to reach several stations
  * through `/weave`, which was the whole-weave workbench; TJ retired that on
  * 2026-08-11 and a reading is now the only scope a student works in.
  *
- * Since 2026-08-08, 03 is the holdings tab and the cloth reflection it used to
- * hold lives on 04 — the 03 test asserts the words, the 04 test asserts the
- * prompts and the read.
+ * Since 2026-08-08 (the 03/04 swap), 04 · Vocabulary is the holdings tab and
+ * the cloth reflection lives on 03 · Knowledge Graph with the projection it
+ * feeds — the Vocabulary test asserts the words and that the prompts are NOT
+ * there; the Knowledge Graph test asserts the projections.
  */
 import { test, expect } from "@playwright/test"
 import { cardOwnReading, deleteConceptInVocabulary, deletePassageInPassagesView, enterReadingFromCard, isDeletePost, removeOwnReading } from "./helpers"
@@ -295,7 +296,7 @@ test("03 · vocabulary is every word you own, across all your readings", async (
   await expect(page.locator(".conceptDescription").first()).toBeVisible()
   await expect(page.getByRole("button", { name: "Merge" })).toHaveCount(0)
 
-  // The read editor and the cloth prompts moved to 04 — they must not be here.
+  // The read editor and the cloth prompts live on 03 · Knowledge Graph — they must not be here on 04.
   await expect(page.locator("#yourRead, #readEssence")).toHaveCount(0)
   await expect(page.locator("#clothPrompts")).toHaveCount(0)
 })

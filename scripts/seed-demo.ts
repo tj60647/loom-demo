@@ -18,10 +18,11 @@
  *
  * Passages are pulled verbatim from the `source_page` rows with their canonical
  * offsets and content hashes, so they highlight precisely in the PDF viewer.
- * Concepts attach through `byte_concept` (P0.1); tiers live per map only; the
- * whole-weave cloth carries the student's read paragraph — matching what the
- * actions would have produced, so the seeded account is indistinguishable
- * from a worked one.
+ * Concepts attach through `passage_concept` (P0.1, renamed by 0023); tiers
+ * live per map only; a cloth per reading carries the student's read paragraph
+ * — matching what the actions would have produced, so the seeded account is
+ * indistinguishable from a worked one. (The whole-weave cloth this used to
+ * seed went with the whole weave, 2026-08-11.)
  *
  * Sign-in: these accounts have no GitHub identity. Locally and in CI they are
  * reached through /api/auth/test-login (?as=testa); on any production build
@@ -226,7 +227,7 @@ async function main() {
   // purpose — the visible no-evidence state — so it is never referenced again.
   const [oworlds, social, compromise, cop, lpp, reif, negmean] = conceptRows
 
-  // Concepts attach through byte_concept rows (P0.1): the passage row carries the
+  // Concepts attach through passage_concept rows (P0.1): the passage row carries the
   // passage, the join row carries the filing.
   const B = (c: { id: string }, src: typeof srcA, srcLabel: string, p: ReturnType<typeof pickPassage>) => ({
     id: crypto.randomUUID(), conceptId: c.id,

@@ -137,9 +137,9 @@ const STAFF_ITEMS: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/admin/library", label: "Readings", adminOnly: true },
   { href: "/admin", label: "Roster" },
   { href: "/admin/aggregate", label: "Cohort Graph" },
-  // Not an admin surface — a student reads their own flow there, and the
-  // header keeps the link for them (see Header.tsx). It sits here for staff
-  // because they read all three flows, and the header should not carry it twice.
+  // Not an admin surface — a student who types /workflows still reads their
+  // own flow, but the header stopped offering it on 2026-08-17 (277f7cb; see
+  // HeaderMenu.tsx), so for staff this is the only link to it.
   { href: "/workflows", label: "Workflows" },
   // Its own tab, not a section under the diagrams: the flows are a picture of
   // movement and this is a table of permission, and a reader looking for one
@@ -166,9 +166,11 @@ const OFF_TIP_DEFAULT = "open a reading first — this works inside a text"
 /**
  * The staff group, split out for one mechanical reason: it is the only part of
  * this bar that reads search params, and `useSearchParams` forces the whole
- * route to be client-rendered unless it sits under a Suspense boundary. `/keep`
- * is statically prerendered, and putting this inline took the build down with
- * "useSearchParams() should be wrapped in a suspense boundary at page /keep".
+ * route to be client-rendered unless it sits under a Suspense boundary. It
+ * took the build down once on the statically prerendered `/keep` ("should be
+ * wrapped in a suspense boundary at page /keep") — that station is deleted
+ * (2026-08-11), but any prerendered surface carrying this bar would fail the
+ * same way, so the boundary stays.
  */
 function StaffGroup() {
   const { course } = useReadings()

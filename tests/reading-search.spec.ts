@@ -43,7 +43,7 @@ test("the loom search finds a reading, from a panel that leaves the shelf alone"
   await expect(page.locator(".searchhit")).toHaveCount(0)
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 15_000 })
 
-  // A hit is a door to the text itself — 00 · Reading, not 01 · Open — and
+  // A hit is a door to the text itself — 01 · Reading, not the Library — and
   // the query rides along: the reading's own search opens pre-filled, so the
   // trail of marks continues into the text.
   await box.fill("object worlds")
@@ -74,7 +74,7 @@ test("search inside a reading lists matching pages and marks the words on the te
   await enterReadingFromCard(page, card)
   await expect(page).toHaveURL(/\/reading\//, { timeout: 15_000 })
 
-  // Tab 00 — the text itself.
+  // 01 · Reading — the text itself.
   await page.locator("nav button.station", { hasText: "Reading" }).click()
   await expect(page.locator("text=Loading PDF...")).toBeHidden({ timeout: 15_000 })
 

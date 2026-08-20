@@ -18,7 +18,8 @@ export const isDeletePost = (request: Request) =>
   /^\["[0-9a-f-]{36}"(,(null|"[0-9a-f-]{36}"))?\]$/.test(request.postData() ?? '');
 
 /**
- * Delete a passage — from the PASSAGES view, the only place that does it.
+ * Delete a passage — from the PASSAGES view, one of the two places that does
+ * it (the margin rail card's "remove passage" is the other, since 2026-08-18).
  *
  * The concept view lost "remove passage" on 2026-08-17 (TJ): that list is a
  * concept and its evidence, so the act belonging there is taking one passage
@@ -144,8 +145,8 @@ export async function expectReadingTitle(page: Page, title: RegExp) {
  * Reading-first navigation.
  *
  * The shelf is the home screen, so opening a reading means picking its card,
- * which lands on `/reading/[sourceId]`. The text itself is tab 00 inside that
- * workbench rather than a course-wide Library tab.
+ * which lands on `/reading/[sourceId]`. The text itself is station 01 ·
+ * Reading inside that workbench; 00 · Library is the shelf.
  */
 /**
  * Enter a reading through its shelf card, the way a student does.

@@ -10,7 +10,7 @@ import { MAX_READING_BYTES, MAX_READING_LABEL, READING_UPLOAD_PREFIX, formatByte
  * so they cannot drift apart on limits or error wording — the previous split
  * meant fixing the size ceiling in one place left the other still broken.
  *
- * The passages never travel through a Server Action, which is the point: a
+ * The bytes never travel through a Server Action, which is the point: a
  * serverless request body is capped at 4.5MB on Vercel and most course
  * readings are larger.
  */

@@ -7,7 +7,7 @@
  *
  *     a pill appears if and only if the thread has a label.
  *
- * That is exactly what /admin/user/[id] got wrong for as long as it existed. It
+ * That is exactly what /admin/user/[id] got wrong until it adopted this card (2026-08-18). It
  * put `→` inside the SOLID `.v` — the cloth's mark for a beaten thread — so its
  * six threads drew six pills over one real label, and every loose thread on the
  * page read as labelled. Nothing failed; the page simply said something untrue.

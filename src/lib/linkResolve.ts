@@ -3,10 +3,11 @@
 // 5.1 made a Link an object the student owns, but `edge.handle` still carries
 // a copy of the label through the expand phase. So two questions recur all
 // over the app: "what is this thread's label?" and "does the student already
-// own a Link for this word?". Both are answered here, once, because the
-// server (src/actions/loom.ts) and BOTH providers must agree — the real one
-// and the practice loom's, which cannot call the server at all. A second
-// implementation is how they would drift.
+// own a Link for this word?". Both are answered here, once, because BOTH
+// providers must agree — the real one and the practice loom's, which cannot
+// call the server at all — and the server repeats the same normalization in
+// SQL (loom.ts's lower(btrim(…)) label matches). A second implementation is
+// how they would drift.
 //
 // Case-insensitive throughout, because that is how the derived Link List
 // always grouped handles: "Leads to" and "leads to" were one row on screen,
@@ -83,8 +84,9 @@ export function usesOf(links: Link[], edges: Edge[]): Map<string, Edge[]> {
 }
 
 /** A thread carrying a label that matches no Link the student owns. Only
- *  possible while `handle` survives; the count belongs in no UI, but the
- *  guard script asserts it stays zero for freshly written work. */
+ *  possible while `handle` survives; the count belongs in no UI.
+ *  scripts/check-link-resolve.ts pins this function's behaviour on fixtures
+ *  and the attachLink/updateEdge wiring that keeps fresh work resolvable. */
 export function unresolvedLabelled(links: Link[], edges: Edge[]): Edge[] {
   const known = new Set(links.map((l) => normLabel(l.label)))
   return edges.filter((e) => {

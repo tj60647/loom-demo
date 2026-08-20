@@ -89,8 +89,8 @@ export default function AddConceptCard({
          and under "either or both" (TJ, 2026-08-18) describing a Concept that
          has no Description yet is the ordinary act, not an edge case.
          Fill-if-empty, never overwrite, is the rule the other two doors into
-         `addConcept` already keep: CaptureModal.tsx ("the gloss never
-         overwrites what you wrote before") and OpenTab.tsx both do
+         `addConcept` already keep: CaptureFields.tsx (the capture form) and
+         OpenTab.tsx both do
          `else if (wdef && !concept.def) editConcept(...)`. An autofilled
          Description equals the stored one, so that case writes nothing. */
       if (exactConcept && definition && !exactConcept.def?.trim()) {
@@ -114,10 +114,10 @@ export default function AddConceptCard({
           event.preventDefault()
           // ONE ESCAPE, ONE THING — PdfViewer states the rule and this card
           // broke it the moment Your work adopted it. Both of the viewer's
-          // keydown listeners are on `window` in the bubble phase
-          // (PdfViewer.tsx:392, :1421) and the sheet's deliberately lets
-          // Escape through from inside itself ("Escape is the one key that
-          // gets out", :1391), so without this one press dismissed this card
+          // keydown listeners sit on `window` in the bubble phase (the `f`
+          // shortcut handler and the Your-work hotkeys — line numbers drift),
+          // and the sheet deliberately lets Escape through from inside itself,
+          // so without this one press dismissed this card
           // AND the whole panel behind it. React attaches at the root
           // container, so stopping here stops the native event before window
           // ever sees it.
@@ -169,7 +169,8 @@ export default function AddConceptCard({
                   /* Read and written OUT HERE, never inside the setState
                      updater below. React invokes updaters twice under
                      StrictMode — which Next's App Router turns on in
-                     development, the only mode this card runs in — so a ref
+                     development (production is single-invoke, so the bug hid
+                     there) — so a ref
                      written inside one is clobbered by the first pass and read
                      stale by the second. The clear branch then never fired:
                      measured on the running app, typing "confusion", deleting

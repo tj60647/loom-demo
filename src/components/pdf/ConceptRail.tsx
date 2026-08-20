@@ -65,10 +65,12 @@ type CardModel = {
 };
 
 
-/**
- * Wraps the page-mode spread. Always renders the same wrapper element so the
- * pages inside keep their identity when the rails toggle; the rails, cards
- * and leader lines appear as siblings around the children.
+/*
+ * (ConceptRails, below: wraps the page-mode spread. Always renders the same
+ * wrapper element so the pages inside keep their identity as rails come and
+ * go — the on/off toggle is gone since 2026-08-17, rails are always reserved;
+ * only the <900px breakpoint disables them. The rails, cards and leader lines
+ * appear as siblings around the children.)
  */
 
 /**

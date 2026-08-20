@@ -22,9 +22,10 @@ import { scopeLabelOf } from "@/lib/graphExport"
 
 /**
  * The cloth's own card — Cloth Title and Cloth Description, edited where the
- * model homes them (Linking). Folded: the bench is this tab's work; the cloth
- * is its name. Saving here is also how a cloth begun from the shelf's Create
- * Cloth button gets its title — the shelf card shows both.
+ * model homes them (01 · Reading, at the head of Your work). Folded: the work
+ * is the tab's business; the cloth is its name. Saving here is how a cloth
+ * opened from its Library card (the card is the only door) gets its title —
+ * the shelf card shows it, or "Base cloth" until then.
  */
 export default function ClothFold({ openOnArrival = false }: {
   /** A search hit named this cloth — see below. */

@@ -12,9 +12,9 @@
 // It holds what the model gives Vocabulary and nothing else: browse/filter
 // Concepts as full objects and Link Labels, recurrence, edit Descriptions,
 // merge Concepts (HIDDEN — see MERGE_VISIBLE), and the Concepts/Links
-// Overlays. The cloth-reflection prompts and "Your read" that used to live on
-// 03 moved to 04 · Knowledge Graph, where the projection they describe already
-// lives (TJ, 2026-08-08).
+// Overlays. The cloth-reflection prompts and "Your read" that used to live
+// here moved to 03 · Knowledge Graph, where the projection they describe
+// already lives (TJ, 2026-08-08; this station is 04).
 
 import { useMemo, useState } from "react"
 import { useLoom } from "@/components/providers/LoomProvider"
@@ -182,7 +182,7 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
    *  · The old grouping keyed on a TRIMMED but case-SENSITIVE handle, so
    *    "Leads to" and "leads to" were two rows. Links fold case, so such a
    *    loom now shows one. That is a correction, not a loss — the two were
-   *    always one word — and the merge of true duplicates lands in 5.1c.
+   *    always one word — and the merge of true duplicates is open-work 5.1e, held on purpose.
    */
   const linkRows = useMemo(() => {
     const uses = usesOf(state.links, state.edges)
@@ -285,7 +285,7 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
     // With merge hidden, deleting the row you are not keeping IS the duplicate
     // repair — so this says where the passages go (01 · Reading, Your work,
     // under Unlabeled) rather than leaving "unfiled" as a word with no place
-    // attached. It said "Export from Keep first" until 2026-08-12, four days
+    // attached. It said "Export from Keep first" until 2026-08-12, the day
     // after Keep was deleted; the vocabulary downloads at the head of this tab.
     const ok = await confirm({
       title: `Delete “${conceptNameText(concept)}”?`,

@@ -11,7 +11,7 @@
  *
  * Uploads go browser → Blob, so this is not bounded by the 4.5MB request-body
  * cap that applies to Server Actions. It is a deliberate policy limit: the
- * passages still have to be pulled back into a function to extract text and render
+ * bytes still have to be pulled back into a function to extract text and render
  * a cover, and a scanned chapter far past this is usually a whole book that
  * wants splitting rather than a reading.
  *

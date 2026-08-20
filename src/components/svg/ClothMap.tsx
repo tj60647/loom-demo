@@ -18,7 +18,8 @@ export type ClothGlow = { id: string; seq: number } | null
 /**
  * TRACING IS HIDDEN ON EVERY CLOTH (TJ, 2026-08-18: "all cloths hide/disable
  * trace"), and hidden rather than deleted — flip this to true and it returns
- * whole, on all four surfaces at once.
+ * whole, everywhere a cloth is drawn (03's reflection, the Cohort Graph, the
+ * read-only student view) at once.
  *
  * Clicking a concept lit its full connected component in red and faded
  * everything else; clicking an arc lit that one thread. It went off on the

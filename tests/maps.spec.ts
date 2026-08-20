@@ -14,7 +14,8 @@ import { enterReadingFromCard } from './helpers';
  * 2026-08-11, so a reading is the only scope a projection can belong to.
  *
  * Local runs on this machine need the 3100-port scratch config (port 3000 sits
- * in a Windows excluded range — see NEXT_SESSION.md): keep globalSetup and
+ * in a Windows excluded range — see CONTRIBUTING.md and
+ * docs/build-and-test-workflow.md): keep globalSetup and
  * storageState or everything runs unauthenticated.
  */
 test.describe.configure({ mode: 'serial' });
@@ -151,7 +152,7 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
 // export is being replaced by a download at each object, and the same
 // contract is asserted per projection in tests/object-download.spec.ts.
 
-test('04 Map lives inside a reading workbench, scoped to it', async ({ page }) => {
+test('03 Knowledge Graph lives inside a reading workbench, scoped to it', async ({ page }) => {
   // The OTHER reading: a projection belongs to the text it was made in, and
   // one reading's stack must not show another's.
   await openReadingMap(page, 'Communities of practice');

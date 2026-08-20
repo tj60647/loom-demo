@@ -3,8 +3,8 @@
  *
  * It used to come from unpkg at runtime, which made every reading in the course
  * depend on a third party being reachable: block unpkg (an extension, a campus
- * proxy, an offline room, a CDN outage) and tab 00 shows "Failed to load PDF"
- * for every text, blaming the file.
+ * proxy, an offline room, a CDN outage) and 01 · Reading shows "Failed to load
+ * PDF" for every text, blaming the file.
  *
  * The copy MUST come from react-pdf's own nested pdfjs-dist, not the top-level
  * one. This repo has two: react-pdf pins 5.4.296 for the browser, while the

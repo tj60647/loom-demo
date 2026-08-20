@@ -6,7 +6,7 @@ import { hashText } from "@/lib/hash"
 
 /**
  * A Content-Disposition a browser can actually receive. HTTP header values are
- * PassageStrings — anything above U+00FF throws when the Response is constructed,
+ * byte strings (ISO-8859-1) — anything above U+00FF throws when the Response is constructed,
  * so a title with an em dash or a curly quote ("Learning How to Learn — Chapter
  * 1", week 1 of this very course) took the whole route down and, until the
  * catch below learned to tell failures apart, reported itself as a 404 on a

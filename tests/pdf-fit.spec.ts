@@ -8,8 +8,9 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 
 test.describe('PDF Viewer Fit Modes', () => {
   test('fit to width should not cause horizontal scroll', async ({ page }) => {
-    // 1. Navigate to the app and bypass walkthrough
-    // 2-4. Pick the reading off the shelf and open the text (tab 00).
+    // Pick the reading off the shelf and open the text (01 · Reading).
+    // (An earlier step here "bypassed the walkthrough" — that deck was
+    // retired 2026-08-11.)
     await openReading(page, 'Object Worlds');
 
     // Wait for the text layer to render on the first page

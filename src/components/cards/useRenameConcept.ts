@@ -8,7 +8,8 @@ import type { Concept } from "@/lib/types"
 /**
  * RENAMING A CONCEPT, ASKED ONCE AND WORDED ONCE.
  *
- * Two surfaces offer it — Your work's concept card and, since 2026-08-18,
+ * Three surfaces offer it — Your work's concept card, the warp at 02, and,
+ * since 2026-08-18,
  * 04 · Vocabulary's — and a homonym warning phrased two ways would become two
  * different accounts of what sharing a name costs. The same argument as
  * `useRemovePassage`, and the same remedy.

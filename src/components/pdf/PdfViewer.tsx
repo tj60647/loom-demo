@@ -548,8 +548,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * because a capture path that disappears with the window is worse than two
    * that agree. Both end in the same addPassage and report through the same
    * onCaptured, so the shared ReuseOffer still sees every capture: that is the
-   * 2.1 invariant, and it is what open-work.md 5.7 warned an inline draft
-   * would break.
+   * 2.1 invariant. open-work.md 5.5's gated list once warned an inline draft
+   * would break it — and now records (2026-08-19) that the conflict was not real.
    */
   const [draft, setDraft] = useState<CaptureTarget | null>(null);
   const draftRef = useRef<CaptureTarget | null>(null);
@@ -1488,8 +1488,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     /**
      * The canvas comes in to a zoom the card can be typed into, and it does
      * that for itself (TJ, 2026-08-19). The multiplier needed is not a
-     * constant this component could hold: READ_ONLY_RATIO is expressed in page
-     * widths, and turning it into a slider multiplier needs fitAllK, which
+     * constant this component could hold: the editable line is
+     * EDIT_FROM_SPREAD × spreadFitK, and turning that into a zoom multiplier
+     * needs fitAllK, which
      * depends on how many spreads the document lays out. SpreadCanvasView owns
      * that arithmetic, so it owns the move — see its draft effect, which also
      * centres the selection while it is in there.
@@ -1600,7 +1601,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     const handleKeyDown = (e: KeyboardEvent) => {
       // A dialog owns the keyboard while it is up — the capture modal, Loom's
       // confirm (which you can raise from inside the sheet: "remove concept"),
-      // an info panel, the walkthrough. Escape there is theirs, and `f` must
+      // an info panel. Escape there is theirs, and `f` must
       // not throw a reader into fullscreen out from under one.
       if (showCaptureModal || document.querySelector(".info-scrim, .scrim.show")) return;
 
@@ -2167,10 +2168,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            came out 275px tall against 87. One step further in it was worse
            still: 325px wide, 30px type, 386px tall.
 
-           --invk could not fix it and was never meant to. It is
-           max(1, spreadFitK / k) — clamped at 1 — so it holds type at reading
-           size as you zoom OUT and does nothing at all as you zoom IN. This is
-           the zoom-in half, which nothing governed.
+           --invk could not fix it and was never meant to. It was
+           max(1, spreadFitK / k) — clamped at 1 — so it held type at reading
+           size as you zoom OUT and did nothing at all as you zoom IN. This is
+           the zoom-in half, which nothing governed (--invk itself is deleted;
+           everything divides by --k now).
 
            Dividing by --k instead governs both halves with one rule: every
            length here is screen px, so a card is the size page mode draws it,
@@ -2440,8 +2442,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         .pdf-railcard:hover, .pdf-railcard:focus-visible {
           border-color: var(--ink-soft);
         }
-        /* The card is badges and a note now (TJ, 2026-08-17), so its old
-           label/def rules are gone with the markup that used them.
+        /* The card is badges and a note now (TJ, 2026-08-17). Its old
+           label/def/chips/go rules below are DEAD — nothing renders those
+           class names any more (checked 2026-08-19); they await deletion.
            (No backticks in this block: styled-jsx template literal.) */
         .pdf-railcard-badges { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
         /* A badge is one line. On the canvas the type is counter-scaled, so a
@@ -2648,11 +2651,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           color: var(--ink-soft);
         }
         .pdf-railcard-def { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
-        /* .pdf-railcard-note is gone from the margin (TJ, 2026-08-17): the
-           note is the student's writing about the PASSAGE and this card is
-           about the CONCEPT. It is getting a card of its own here later.
-           The rule stays until then only if something still draws it — it does
-           not, so it goes with the markup. */
+        /* .pdf-railcard-note CAME BACK (2026-08-19): the note returned to the
+           margin card, editable in place (ConceptRail draws it; cd56ce6). An
+           earlier version of this comment said the rule was dead and should go
+           with the markup — it is load-bearing now. */
         /* The corner mark: this card leads somewhere. Decorative — the card
            itself is the button — so it is quiet, and it lifts with the card.
            (No backticks in this block: styled-jsx template literal.) */
@@ -3241,11 +3243,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
           {/* Matrix: the whole document as 2-page spreads on one zoomable
               canvas. At the low end it is a contact sheet for finding your
-              way — and, with Cards on, a concept map, because the cards
-              counter-scale while the pages shrink; wind the zoom in and the
+              way — and a concept map, because the cards (the rails are always
+              on) counter-scale while the pages shrink; wind the zoom in and the
               same canvas becomes readable, and a passage can be taken from
               it. Pan by dragging or two-finger scroll; pinch or ctrl+wheel
-              zooms; the toolbar slider drives the same transform. */}
+              zooms; the toolbar's − / + / Fit drive the same transform. */}
           {viewMode === "matrix" && (
             <SpreadCanvasView
               pdf={pdfProxy}

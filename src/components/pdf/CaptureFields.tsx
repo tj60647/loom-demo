@@ -17,13 +17,15 @@
  *   DraftCard    — the rail card, anchored on the selection by its leader.
  *
  * WHAT MUST NOT MOVE, because things outside this file point at it by name:
- *   - `#captureConcept`, `#capturePassageNote`, `#capturePassageSave` are the
- *     practice guide's spotlight targets (src/lib/practiceGuide.ts, beat 3).
+ *   - `#capturePassageNote`, `#captureConceptToggle`, `#capturePassageSave`
+ *     are the practice guide's spotlight targets (src/lib/practiceGuide.ts,
+ *     the `name` beat — the toggle, NOT `#captureConcept`).
  *     Rename one and the guide highlights nothing, silently.
  *   - `#captureConceptDef` is asserted ABSENT on the unlabeled path
  *     (practice-guide.spec.ts).
- *   - "Save passage" / "Save without concept" are matched as button text by
- *     specs (practice-guide asserts the second one exactly).
+ *   - "Save without concept" is matched as button text by
+ *     practice-guide.spec.ts; every other spec reaches the button by
+ *     `#capturePassageSave`, so "Save passage" itself is unasserted.
  *   - `loom:capture-open` / `loom:capture-close` are how PracticeGuide knows a
  *     capture is being written. They fire from HERE now, not from the modal,
  *     so the guide keeps working on whichever path the reader is on.

@@ -8,7 +8,7 @@ test.use({ storageState: 'playwright/.auth/testa.json' });
 test.describe('Audit Seed Passages', () => {
   test('verify mark.js fuzzy match', async ({ page }) => {
     
-    // Pick Designing Engineers off the shelf and open its text (tab 00).
+    // Pick Object Worlds off the shelf and open its text (01 · Reading).
     await openReading(page, 'Object Worlds');
     
     // Go to page 4

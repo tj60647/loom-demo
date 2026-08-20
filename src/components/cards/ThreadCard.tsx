@@ -11,8 +11,8 @@
  * concepts said about it (TJ, 2026-08-13: "one is a passage with concept, the
  * other is concept with passages"). A Thread is neither: it is the claim that
  * two of them hang together, and "the description IS the thread" — which this
- * repository says on 02's bench, in its editor fold, in its export and in the
- * model.
+ * repository says on 02's bench, in its editor fold, in the practice guide and
+ * in the header's About.
  *
  * Written for the reason PassageCard was: the same object was drawn SIX
  * different ways in six places (docs/thread-card.md has the inventory), each
@@ -138,9 +138,10 @@ export default function ThreadCard({
 
   return (
     /* `.thread` and `.sent` are load-bearing for the suite, and `.sent` must
-       stay a DIRECT CHILD of the root: three specs take `.sent`'s parent as
-       their handle on a row. `data-edge-id` is the stable hook that replaces
-       that hop, named for its siblings `data-concept-id` and
+       stay a DIRECT CHILD of the root: thread-card.spec.ts asserts exactly
+       that (`.thread[data-edge-id] > .sent`). The parent hops the specs used
+       to take were rewritten to `data-edge-id` on 2026-08-18 — the stable hook
+       named for its siblings `data-concept-id` and
        `data-passage-id`. Both are kept — the classes so nothing goes vacuously
        green, the attribute so the next change need not. */
     <div
@@ -159,7 +160,7 @@ export default function ThreadCard({
       {/* THE TRIP OPENS THE CARD, the way a concept's name opens its own (TJ,
           2026-08-18: "if we are using the same card as in your work, clicking
           on the concept opens it"). It is the head in all but name — `.sent`
-          has to stay a DIRECT CHILD of the root for three specs, so there is no
+          has to stay a DIRECT CHILD of the root (thread-card.spec.ts), so there is no
           `.lhead` wrapper to hang the disclosure on, and the two lines that
           would be inside one carry it instead. */}
       <div
@@ -181,8 +182,9 @@ export default function ThreadCard({
             An arrow rather than a stand-in word, and BARE rather than in the
             pill: the pill is bordered and sage because that is what the cloth
             draws a beaten thread in, so a glyph inside one says "labelled".
-            That is the exact mistake /admin/user/[id] has been making — a `→`
-            in the solid pill, on every loose thread it lists. */}
+            That is the exact mistake /admin/user/[id] made until it adopted
+            this card (2026-08-18) — a `→`
+            in the solid pill, on every loose thread it listed. */}
         {label
           ? <span className="v">{label}</span>
           : <span className="tarrow" aria-hidden="true">→</span>}

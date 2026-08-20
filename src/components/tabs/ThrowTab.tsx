@@ -212,10 +212,10 @@ export default function ThrowTab({ onGotoPassage, pair }: {
     setDrawn(false)
   }
 
-  // The shuttle draws from whatever is in scope — this reading's concepts here,
-  // every concept at the whole weave. It no longer takes an `across` flag:
-  // linking works on this reading (TJ, 2026-08-08), and at the whole weave the
-  // scope already IS everything. Chance picks the pair; every judgment about
+  // The shuttle draws from this reading's concepts, and only those. It no
+  // longer takes an `across` flag: linking works on this reading (TJ,
+  // 2026-08-08), and since the whole weave left the app (2026-08-11) a reading
+  // is the only scope there is. Chance picks the pair; every judgment about
   // whether they cross is still the student's.
   const drawPair = async () => {
     const cs = scoped.concepts
@@ -341,8 +341,7 @@ export default function ThrowTab({ onGotoPassage, pair }: {
   const byNamed = (a: { handle: string | null }, b: { handle: string | null }) =>
     (a.handle ? 1 : 0) - (b.handle ? 1 : 0)
   const orderedEdges = [...scoped.edges].sort(byNamed)
-  // The Link List (model §Student: "belongs to the User, spans Cloths: the
-  // reusable Link Labels, tappable at coin-time") — since 5.1 the student's
+  // The Link List (model §2: "belongs to the User, spans Cloths") — since 5.1 the student's
   // own Link OBJECTS, not strings scraped off threads. Two things follow. A
   // label coined and never used is offered here, which is the whole reason
   // for coining ahead. And tapping one ATTACHES that object rather than
@@ -362,7 +361,7 @@ export default function ThrowTab({ onGotoPassage, pair }: {
       .map((x) => x.link)
     // Twelve chips is what the row holds before it becomes a wall of verbs.
     // The count says what is not shown rather than quietly ending the list —
-    // this IS the Link List (model §Student), and a truncated view of it that
+    // this IS the Link List (model §2), and a truncated view of it that
     // does not admit to being truncated misreports what the student owns.
     return { shown: all.slice(0, SUGGESTED_LABELS), rest: Math.max(0, all.length - SUGGESTED_LABELS) }
   })()
@@ -555,8 +554,8 @@ export default function ThrowTab({ onGotoPassage, pair }: {
               ⤳ let the shuttle draw
             </button>
             {/* No "across readings" draw here any more (TJ, 2026-08-08): this
-                bench links THIS reading's concepts. The shuttle can still reach
-                across at the whole weave, where every concept is in scope. */}
+                bench links THIS reading's concepts — and since the whole weave
+                left the app (2026-08-11), a reading is the only scope there is. */}
           </div>
 
           <div className="slots">
@@ -666,8 +665,8 @@ export default function ThrowTab({ onGotoPassage, pair }: {
               from inside a reading, so by construction every row in that band
               had been thrown somewhere else. It had become a list of other
               readings' work sitting in this reading's Linking. The threads
-              still exist and still show at the whole weave; they are simply
-              not this bench's business. */}
+              still exist — the workbench footer counts them as "threads out" —
+              they are simply not this bench's business. */}
         </div>
       </div>
     </>

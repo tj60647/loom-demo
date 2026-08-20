@@ -1,7 +1,7 @@
 /**
  * The workflow diagrams, asserted without a browser.
  *
- * These exist so the diagrams on /admin/workflows cannot rot quietly. The
+ * These exist so the diagrams on /workflows cannot rot quietly. The
  * failure they guard against is specific: someone refactors a workflow, edits
  * `src/lib/workflows.ts` half-way, and the picture keeps rendering — just
  * wrong. A dangling edge id silently drops a connector; an orphan node draws a

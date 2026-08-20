@@ -3,7 +3,7 @@
 // The shelf — the home screen, and the course itself.
 //
 // `course_source` already carries week / core / visibility, so grouping by week
-// IS the syllabus (deployment notes §4: two core readings a week, weeks 2-13).
+// IS the syllabus (deployment notes §3: two core readings a week, weeks 2-13).
 // Each card carries the student's own counts for that reading. Counted, never
 // scored: no completion, no checkmarks, no "not started" — red line #7 holds
 // only if the shelf reports what the student did and never grades it.
@@ -198,10 +198,7 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
     const clothsHere = state.cloths.filter((c) => c.scopeKey === s.id)
     // Exactly ONE door per card (TJ, 2026-08-08). "Just read" is a procedure,
     // not a path — you browse inside a cloth without capturing anything — so
-    // there is no separate way in that skips the cloth. With a cloth, the card
-    // body opens it; without one, the card is inert and Create Cloth is the
-    // only act. That also keeps creation explicit: a card click never mints a
-    // cloth, it simply does nothing until you have asked for one.
+    // there is no separate way in that skips the cloth.
     // The reading card IS the entry point (TJ, 2026-08-08). There is no Create
     // Cloth button any more and no decision to make: one cloth per reading per
     // user, and your Base Cloth is simply there — so opening the reading opens
