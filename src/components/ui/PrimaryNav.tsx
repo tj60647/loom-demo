@@ -1,15 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useState } from "react"
-import { useReadings } from "@/components/providers/ReadingsProvider"
+import { OPEN_READING_LIMIT, useReadings } from "@/components/providers/ReadingsProvider"
 
 type Tool = "source" | "capture" | "connect" | "reflect" | "map"
 
 const TOOL_LABEL: Record<Tool, string> = {
-  source: "Source", capture: "Capture", connect: "Connect", reflect: "Reflect", map: "Map",
+  source: "Read", capture: "Capture", connect: "Connections", reflect: "Reflection", map: "Map",
 }
+const KNOWLEDGE_TOOLS: Tool[] = ["connect", "reflect", "map"]
 export default function PrimaryNav({ studio }: {
   studio?: {
     source: { id: string; title: string; hasFile: boolean } | null
@@ -19,43 +20,53 @@ export default function PrimaryNav({ studio }: {
   }
 }) {
   const pathname = usePathname() ?? ""
-  const { currentReading } = useReadings()
+  const router = useRouter()
+  const { openReadings, closeReading } = useReadings()
   const [expanded, setExpanded] = useState(false)
   const inLibrary = pathname.startsWith("/library") || pathname === "/"
-  const inWeave = pathname.startsWith("/studio/weave")
   const inFiles = pathname.startsWith("/files")
-  const remembered = studio?.source ?? currentReading
-  const rememberedHasFile = remembered && ("hasFile" in remembered ? remembered.hasFile : !!remembered.storageKey)
+  const deskReadings = openReadings
 
   return (
-    <aside className={`primarynav${studio ? " studio-tools" : ""}`} data-expanded={expanded}>
-      <button className="navtoggle" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>Navigation</button>
+    <aside className={`primarynav${studio ? " studio-tools" : ""}`} data-expanded={expanded} data-open-count={openReadings.length}>
+      <button className="navtoggle" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>Menu</button>
       <nav className="primarynavbody" aria-label="Main navigation">
-        <section>
-          <span className="navgroup">Read</span>
-          <Link className={inLibrary ? "active" : ""} href="/library">Library</Link>
+        <section className="navsection">
+          <span className="navgroup">Readings</span>
+          <Link className={`navitem ${inLibrary ? "active" : ""}`} aria-current={inLibrary ? "page" : undefined} href="/library">Browse all</Link>
+
+          <div className="navsubgroup">
+            <span className="navgroup">Open readings <span>{deskReadings.length}/{OPEN_READING_LIMIT}</span></span>
+            {deskReadings.length > 0
+              ? <div className="navreadings">{deskReadings.map((reading) => <div className="navreading" key={reading.id}>
+              <div className="navreadinghead">
+                <Link className={`navitem ${studio?.source?.id === reading.id ? "current" : ""}`} aria-current={studio?.source?.id === reading.id ? "page" : undefined} href={`/studio/reading/${reading.id}`}>{reading.title}</Link>
+                <button
+                  className="navclose"
+                  aria-label={`Close ${reading.title}`}
+                  title="Remove from open readings"
+                  onClick={() => {
+                    closeReading(reading.id)
+                    if (studio?.source?.id === reading.id) router.push("/library")
+                  }}
+                >×</button>
+              </div>
+              {studio?.source?.id === reading.id && <div className="navtools">
+                {studio.tools.map((tool) => <button key={tool} className={studio.activeTool === tool ? "active" : ""} onClick={() => studio.onTool(tool)}>{TOOL_LABEL[tool]}</button>)}
+              </div>}
+            </div>)}</div>
+              : <span className="navempty">No readings open</span>}
+          </div>
         </section>
 
-        {remembered && <section>
-          <span className="navgroup">Current reading</span>
-          <span className="navcontext">{remembered.title}</span>
-          {studio?.source
+        <section className="navsection">
+          <span className="navgroup">Knowledge</span>
+          {studio && !studio.source
             ? studio.tools.map((tool) => <button key={tool} className={studio.activeTool === tool ? "active" : ""} onClick={() => studio.onTool(tool)}>{TOOL_LABEL[tool]}</button>)
-            : ([...(rememberedHasFile ? ["source" as const] : []), "capture" as const, "connect" as const, "reflect" as const, "map" as const]).map((tool) => <Link key={tool} className="navtool" href={`/studio/reading/${remembered.id}?tool=${tool}`}>{TOOL_LABEL[tool]}</Link>)}
-        </section>}
-
-        <section>
-          <span className="navgroup">Synthesize</span>
-          {studio && !studio.source ? <>
-            <span className="navcontext">Whole weave</span>
-            {studio.tools.map((tool) => <button key={tool} className={studio.activeTool === tool ? "active" : ""} onClick={() => studio.onTool(tool)}>{TOOL_LABEL[tool]}</button>)}
-          </> : <Link className={inWeave ? "active" : ""} href="/studio/weave">Whole weave</Link>}
+            : KNOWLEDGE_TOOLS.map((tool) => <Link key={tool} href={`/studio/weave?tool=${tool}`}>{TOOL_LABEL[tool]}</Link>)}
         </section>
 
-        <section className="navutility">
-          <span className="navgroup">Utility</span>
-          <Link className={inFiles ? "active" : ""} href="/files">Export &amp; backup</Link>
-        </section>
+        <Link className={`navdestination navutility ${inFiles ? "active" : ""}`} href="/files">Export &amp; backup</Link>
       </nav>
     </aside>
   )

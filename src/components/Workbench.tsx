@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import dynamic from "next/dynamic"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
@@ -42,6 +41,9 @@ export default function Workbench({
   const goTo = (tool: StudioTool) => {
     setActiveTool(tool)
     setVisited((seen) => seen.has(tool) ? seen : new Set(seen).add(tool))
+    const url = new URL(window.location.href)
+    url.searchParams.set("tool", tool)
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`)
   }
   const shouldRender = (tool: StudioTool) => !KEEP_ALIVE.has(tool) || visited.has(tool)
   const handleGotoByte = (byte: Byte) => {
@@ -65,17 +67,16 @@ export default function Workbench({
   return <>
     <PrimaryNav studio={{ source, tools, activeTool, onTool: goTo }} />
     <div className="workspacehead">
-      <Link href="/library" className="scopeback">‹ library</Link>
       {source ? <>
         <span className="scopetitle">{source.title}</span>
         {source.author && <span className="scopemeta">{source.author}</span>}
         <span className="scopemeta">{scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} evidenced here{scoped.bridges.length ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out` : ""}</span>
         {source.hasFile ? <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>Download PDF</a> : <span className="scopemeta scopedl">no source file attached</span>}
-      </> : <><span className="scopetitle">Whole weave</span><span className="scopemeta">every reading at once</span></>}
+      </> : <><span className="scopetitle">Knowledge</span><span className="scopemeta">connections across every reading</span></>}
     </div>
 
     <main className={activeTool === "source" ? "station-reading" : undefined}>
-      {source && !source.hasFile && <p className="hint">This reference has no source file attached; capture passages by hand.</p>}
+      {source && !source.hasFile && activeTool === "capture" && <p className="hint">This reference has no source file attached; capture passages by hand.</p>}
       {source?.hasFile && <div className={`panel ${activeTool === "source" ? "active" : ""}`}>
         {activeTool === "source" && <PdfViewer url={`/api/readings/${source.id}`} sourceName={source.title} sourceId={source.id} initialPageNumber={pdfPage} initialSearch={initialSearch} focusByteId={pdfFocusByteId} onGotoOpenByte={handleGotoOpenByte} onClose={() => { setPdfFocusByteId(null); goTo("capture") }} />}
       </div>}

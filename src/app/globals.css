@@ -55,16 +55,25 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
 #saveDot{font-family:var(--mono);font-size:10px;color:var(--ink-soft);align-self:center}
 .primarynav{border-right:1px solid var(--rule);background:var(--paper-2);overflow-y:auto}
 .primarynav .navtoggle{display:none}
-.primarynavbody{display:flex;min-height:100%;flex-direction:column;padding:22px 14px 18px}
-.primarynavbody section{display:flex;flex-direction:column;gap:2px;margin-bottom:23px}
-.primarynavbody .navutility{margin-top:auto;margin-bottom:0}
-.navgroup{display:block;margin:0 10px 7px;font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--grey)}
-.primarynav a,.primarynav button,.navcontext{display:block;width:100%;padding:8px 10px;border:0;border-radius:3px;background:none;text-align:left;text-decoration:none;color:var(--ink-soft);font:15px/1.25 var(--body);cursor:pointer}
+.primarynavbody{display:flex;min-height:100%;flex-direction:column;padding:18px 14px}
+.primarynav a,.primarynav button{display:block;width:100%;padding:8px 10px;border:0;border-radius:3px;background:none;text-align:left;text-decoration:none;color:var(--ink-soft);font:15px/1.25 var(--body);cursor:pointer}
 .primarynav a:hover,.primarynav button:hover{background:rgba(168,132,63,.08);color:var(--ink)}
-.primarynav a.active,.primarynav button.active,.navcontext.active{background:rgba(168,132,63,.12);box-shadow:inset 2px 0 var(--ochre);color:var(--ink);font-weight:500}
-.navcontext{padding-top:2px;padding-bottom:9px;color:var(--ink);font-family:var(--display);font-size:16px;cursor:default}
-.navcontext+.primarynav button{margin-top:2px}
-.studio-tools button,.primarynav .navtool{padding-left:22px}
+.primarynav a.active,.primarynav button.active{background:rgba(168,132,63,.12);box-shadow:inset 2px 0 var(--ochre);color:var(--ink);font-weight:500}
+.primarynav a.current{box-shadow:inset 2px 0 var(--ochre);color:var(--ink);font-weight:500}
+.navsection{padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid var(--rule)}
+.navsection:last-of-type{border-bottom:0}
+.navsubgroup{margin-top:14px}
+.navreadings{margin:0;padding:0}
+.navgroup{display:flex;justify-content:space-between;margin:0 10px 6px;font-family:var(--mono);font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--grey)}
+.navgroup span{letter-spacing:.05em}
+.navreadinghead{display:flex;align-items:flex-start;gap:2px}
+.navreadinghead>a{min-width:0;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.primarynav .navreadinghead .navclose{flex:0 0 28px;width:28px;margin-top:3px;padding:6px 0;text-align:center;font:17px/1 var(--body);color:var(--grey)}
+.primarynav .navreadinghead .navclose:hover{color:var(--red);background:rgba(178,58,43,.07)}
+.navtools{margin:2px 0 6px 10px;padding-left:8px;border-left:1px solid var(--rule)}
+.primarynav .navtools button,.primarynav .navtools a{padding:6px 10px;font-size:13px}
+.navempty{display:block;padding:5px 10px;color:var(--grey);font-size:13px;font-style:italic}
+.primarynavbody>.navutility{margin-top:auto}
 .textlink{font:inherit;color:var(--ochre);background:none;border:0;border-bottom:1px solid currentColor;padding:0;cursor:pointer}
 /* Full-bleed so the scrollbar rides the window edge rather than the edge of a
    centred column; the 1100px measure is kept by padding instead of max-width. */
@@ -204,8 +213,7 @@ footer .fl{color:var(--ink)} footer .fr{color:var(--ink-soft)}
   .primarynav .navtoggle{display:block;width:100%;padding:8px 14px;border:0;background:none;cursor:pointer;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
   .primarynavbody{display:none;min-height:0;padding:8px 14px 14px}
   .primarynav[data-expanded="true"] .primarynavbody{display:flex}
-  .primarynavbody section{margin-bottom:14px}
-  .primarynavbody .navutility{margin-top:0}
+  .primarynavbody>.navutility{margin-top:8px}
   main{padding:18px 14px 20px}
   /* Static here, in flow under the content — it overlaps nothing, so it can
      take its clicks (and text selection) back. */
@@ -367,10 +375,15 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .weekrule{flex:1;height:0;border-top:1px solid var(--rule)}
 .shelfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
 
-/* A shelf card is a link, so the whole card is the target. */
+/* The card opens the reading; the small overlaid control only adds it to the desk. */
+.shelfcardwrap{position:relative;min-width:0}
 .shelfcard{display:flex;gap:14px;padding:14px;text-decoration:none;color:inherit;
-  border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.5)}
+  height:100%;border:1px solid var(--rule);border-radius:4px;background:rgba(255,255,255,.5)}
 .shelfcard:hover{border-color:var(--ochre);background:rgba(168,132,63,.06)}
+.deskadd{position:absolute;right:11px;bottom:10px;padding:4px 7px;border:1px solid var(--rule);border-radius:3px;
+  background:var(--paper);color:var(--ink-soft);font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.deskadd:hover:not(:disabled){border-color:var(--ochre);color:var(--ink)}
+.deskadd:disabled{border-color:transparent;background:transparent;color:var(--sage);cursor:default}
 .prototype-card{font:inherit;text-align:left;cursor:pointer}
 .demo-cover{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:70px;min-height:92px;
   background:linear-gradient(145deg,#2f382c,#6f7d5c);color:var(--paper);font-family:var(--display);font-size:14px;line-height:1.1;text-align:center}
@@ -385,7 +398,7 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .shelfbody h3{font-family:var(--display);font-size:16px;font-weight:500;margin:0 0 3px}
 .shelfauthor{font-size:13px;color:var(--ink-soft);margin:0 0 6px}
 .shelfdesc{font-size:13.5px;line-height:1.4;color:var(--ink-soft);margin:0}
-.shelftally{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:0}
+.shelftally{padding-right:95px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ochre);margin:0}
 .shelfquiet{color:var(--grey)}
 
 /* Shelf search: which reading says this? A hit is a link into the reading,

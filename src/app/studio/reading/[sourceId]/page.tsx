@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import Workbench, { type StudioTool } from "@/components/Workbench"
 import { frontendReadings } from "@/lib/frontendFixture"
@@ -5,6 +6,11 @@ import { frontendReadings } from "@/lib/frontendFixture"
 type SearchParams = { tool?: string | string[]; q?: string | string[] }
 const first = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value
 const TOOLS = new Set<StudioTool>(["source", "capture", "connect", "reflect", "map"])
+
+export async function generateMetadata({ params }: { params: Promise<{ sourceId: string }> }): Promise<Metadata> {
+  const { sourceId } = await params
+  return { title: frontendReadings.find((reading) => reading.id === sourceId)?.title ?? "Reading" }
+}
 
 export default async function ReadingStudioPage({ params, searchParams }: { params: Promise<{ sourceId: string }>; searchParams: Promise<SearchParams> }) {
   const { sourceId } = await params

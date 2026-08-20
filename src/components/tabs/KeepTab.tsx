@@ -168,12 +168,12 @@ export default function KeepTab() {
 
       <div className="card" style={{ marginBottom: 14 }}>
         <h2>Take it all out <span className="n">{`${state.concepts.length} concepts · ${state.bytes.length} passages · ${state.edges.length} threads`}</span></h2>
-        <p className="do">The whole cloth in one file — every concept, passage, thread and every map at once. Download one now and again whenever you&apos;ve done real work.</p>
+        <p className="do">Everything in one file — every concept, passage, connection, reflection, and map. Download one whenever you&apos;ve done work you want to keep.</p>
         <p className="hint"><b>.json</b> is the complete, exact record and the only file that restores everything — import it back here later and your cloth returns exactly as you left it, maps and all. It is the backup behind every map you keep; if you keep one file, keep this one.</p>
-        <p className="hint"><b>.md</b> is a readable outline of the whole weave — plain Markdown for reading, quoting, and pasting. It is <b>not</b> re-importable.</p>
+        <p className="hint"><b>.md</b> is a readable outline of your knowledge — plain Markdown for reading, quoting, and pasting. It is <b>not</b> re-importable.</p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="btn" data-tip="download your whole weave as a .json file — the complete backup" onClick={handleExportJson}>Export .json</button>
-          <button className="btn ghost" data-tip="download a readable outline of the whole weave — not re-importable" onClick={handleExportMd}>Export .md</button>
+          <button className="btn" data-tip="download all your knowledge as a .json file — the complete backup" onClick={handleExportJson}>Export .json</button>
+          <button className="btn ghost" data-tip="download a readable outline of your knowledge — not re-importable" onClick={handleExportMd}>Export .md</button>
         </div>
         <p className="ghostnote" style={{ marginTop: 9 }}>Submitting one map? Keep it above. Archiving or moving machines? This is the file.</p>
       </div>

@@ -122,7 +122,7 @@ export function buildMarkdown(
     lines.push("## Maps", "")
     const scopeLabel = (scopeKey: string) =>
       scopeKey === ""
-        ? "your whole weave"
+        ? "all readings"
         : scopeKey.split(",").map((id) => (titleOfSource ? titleOfSource(id) : id)).join(" + ")
     const tierGroups: [Tier, string][] = [
       ["p", "Primary"],
@@ -464,10 +464,10 @@ export type LoomMapExport = {
   view?: CardTableView
 }
 
-/** Readable scope label: the whole weave, or the readings' titles. */
+/** Readable scope label: all readings, or the readings' titles. */
 export function scopeLabelOf(scopeKey: string, titleOfSource?: (id: string) => string): string {
   return scopeKey === ""
-    ? "the whole weave"
+    ? "all readings"
     : scopeKey.split(",").map((id) => (titleOfSource ? titleOfSource(id) : id)).join(" + ")
 }
 

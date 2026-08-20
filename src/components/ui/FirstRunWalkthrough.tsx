@@ -7,7 +7,7 @@ const LEGACY_SEEN_KEY = "loom_has_seen_walkthrough"
 
 const GUIDE = [
  {k:'how loom works', h:'Loom turns reading into weaving',
-  p:'You read anywhere — paper, PDF, screen — marking what strikes you. Then you bring the best passages here. Over three moves, the pieces become a graph of your own understanding. The tool holds the structure; you do all the thinking.',
+  p:'You read anywhere — paper, PDF, screen — marking what strikes you. Then you bring the best passages here. Over four moves, the pieces become a graph of your own understanding. The tool holds the structure; you do all the thinking.',
   loom:'Library is where you start. Inside a reading, Capture · Connect · Reflect · Map turn it into a weave. Export & backup is where your work comes out.'},
  {k:'capture', h:'① Capture and name',
   p:'Paste a passage worth keeping (a "byte"), with its citation. Name the concept it evidences — a short noun phrase, often the author\'s own term ("boundary objects"). Then gloss it in your own words in the working definition; crude is welcome there.',

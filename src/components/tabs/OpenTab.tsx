@@ -556,7 +556,7 @@ export default function OpenTab({ onGotoByte, focusByteId, onFocusHandled }: Ope
           <p className="ghostnote" style={{ marginTop: "10px" }}>
             {scoped.outside.length} concept{scoped.outside.length !== 1 ? "s" : ""} from your other readings —
             not hidden, just not evidenced here. Type one&apos;s name above to file a passage from this
-            reading under it, or see them all in <Link href="/weave">your whole weave</Link>.
+            reading under it, or see them all in <Link href="/studio/weave">Knowledge</Link>.
           </p>
         )}
 

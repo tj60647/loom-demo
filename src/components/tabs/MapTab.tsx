@@ -602,7 +602,7 @@ export default function MapTab() {
       </div>
 
       <div className="mapbar" id="mapSwitcher">
-        <span className="label">{wholeWeave ? "Your maps of the whole weave" : "Your maps of this reading"}</span>
+        <span className="label">{wholeWeave ? "Maps across all readings" : "Maps of this reading"}</span>
         <span className="chips" style={{ margin: 0, alignItems: "center" }}>
           {scopeMaps.map(m => (
             <span

@@ -3,7 +3,10 @@ import "./globals.css";
 import FrontendShell from "@/components/FrontendShell";
 
 export const metadata: Metadata = {
-  title: "Loom — Interface prototype",
+  title: {
+    default: "Loom — Interface prototype",
+    template: "%s · Loom",
+  },
   description: "The Loom UI, running on local fixture data",
 };
 

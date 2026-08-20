@@ -26,7 +26,7 @@ export default function Shelf() {
   // signed in" from "we have not asked yet".
   const { data: session, status } = useSession()
   const { state, isLoading, loadExample, flash } = useLoom()
-  const { readings: sources, isLoading: loadingShelf, error, refresh, frontendOnly, selectReading } = useReadings()
+  const { readings: sources, isLoading: loadingShelf, error, refresh, frontendOnly, openReadings, selectReading } = useReadings()
   const [exampleBusy, setExampleBusy] = useState(false)
   // The search bar sits behind a toggle, the reading's own ⌕ Search idiom.
   // While a query is live the results own the page; clearing the box — or
@@ -82,8 +82,10 @@ export default function Shelf() {
 
   const readingCard = (s: ReadingMeta) => {
     const tally = tallies.get(s.id)
+    const onDesk = openReadings.some((reading) => reading.id === s.id)
     return (
-      <Link key={s.id} href={`/studio/reading/${s.id}`} className="shelfcard" onClick={() => selectReading(s.id)}>
+      <div className="shelfcardwrap" key={s.id}>
+      <Link href={`/studio/reading/${s.id}`} className="shelfcard" onClick={() => selectReading(s.id)}>
         {s.storageKey ? (
           <SourceThumbnail sourceId={s.id} title={s.title} />
         ) : (
@@ -118,6 +120,14 @@ export default function Shelf() {
           </p>
         </div>
       </Link>
+      <button
+        className="deskadd"
+        disabled={onDesk}
+        aria-label={onDesk ? `${s.title} is open` : `Add ${s.title} to open readings`}
+        data-tip={onDesk ? "already open" : "keep this reading on your desk without leaving the library"}
+        onClick={() => selectReading(s.id)}
+      >{onDesk ? "On desk" : "+ Add to desk"}</button>
+      </div>
     )
   }
 

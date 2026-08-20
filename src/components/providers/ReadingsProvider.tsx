@@ -7,7 +7,7 @@
 // (2010)". All of them want the same small list, and none of them should
 // re-fetch it.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { usePathname } from "next/navigation"
 import { getSources } from "@/actions/sources"
@@ -26,6 +26,8 @@ export type ReadingMeta = {
   isOwn: boolean
   /** Null when the card is reference-only — a citation with no PDF behind it. */
   storageKey: string | null
+  /** A front-end-only stand-in for the source text, used while designing the reading workspace. */
+  isPreview?: boolean
 }
 
 /** The course these readings belong to — null before it loads, or if none. */
@@ -40,9 +42,10 @@ type ReadingsContextValue = {
   error: string | null
   /** StageIt supplies fixture rows and never calls reading actions. */
   frontendOnly: boolean
-  /** The reading the learner most recently opened, retained across routes. */
-  currentReading: ReadingMeta | null
+  /** The four most recently added readings, retained across routes. */
+  openReadings: ReadingMeta[]
   selectReading: (sourceId: string) => void
+  closeReading: (sourceId: string) => void
   /** A reading's title, or a plain fallback — never a bare id. */
   titleOf: (sourceId: string | null | undefined) => string
   /** Re-read the shelf, e.g. after the student adds a reading of their own. */
@@ -50,7 +53,9 @@ type ReadingsContextValue = {
 }
 
 const ReadingsContext = createContext<ReadingsContextValue | null>(null)
-const CURRENT_READING_KEY = "loom_current_reading"
+const OPEN_READINGS_KEY = "loom_open_readings"
+const LEGACY_CURRENT_READING_KEY = "loom_current_reading"
+export const OPEN_READING_LIMIT = 4
 
 export function ReadingsProvider({ children, frontendOnly = false }: { children: ReactNode; frontendOnly?: boolean }) {
   const { data: session } = useSession()
@@ -61,23 +66,58 @@ export function ReadingsProvider({ children, frontendOnly = false }: { children:
   const [isLoading, setIsLoading] = useState(!frontendOnly)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
-  const [currentReadingId, setCurrentReadingId] = useState<string | null>(null)
+  const [openReadingIds, setOpenReadingIds] = useState<string[]>([])
+  const openReadingIdsRef = useRef<string[]>([])
+  const closedRouteIdRef = useRef<string | null>(null)
 
   const selectReading = useCallback((sourceId: string) => {
-    setCurrentReadingId(sourceId)
-    localStorage.setItem(CURRENT_READING_KEY, sourceId)
+    if (openReadingIdsRef.current.includes(sourceId)) return
+    const next = [sourceId, ...openReadingIdsRef.current].slice(0, OPEN_READING_LIMIT)
+    openReadingIdsRef.current = next
+    localStorage.setItem(OPEN_READINGS_KEY, JSON.stringify(next))
+    setOpenReadingIds(next)
+  }, [])
+
+  const closeReading = useCallback((sourceId: string) => {
+    const next = openReadingIdsRef.current.filter((id) => id !== sourceId)
+    closedRouteIdRef.current = sourceId
+    openReadingIdsRef.current = next
+    localStorage.setItem(OPEN_READINGS_KEY, JSON.stringify(next))
+    setOpenReadingIds(next)
   }, [])
 
   useEffect(() => {
-    const load = window.setTimeout(() => setCurrentReadingId(localStorage.getItem(CURRENT_READING_KEY)), 0)
+    const load = window.setTimeout(() => {
+      let restored: string[] = []
+      try {
+        const saved = localStorage.getItem(OPEN_READINGS_KEY)
+        const stored = saved ? JSON.parse(saved) : null
+        if (Array.isArray(stored)) {
+          restored = stored.filter((id): id is string => typeof id === "string").slice(0, OPEN_READING_LIMIT)
+        } else {
+          const legacy = localStorage.getItem(LEGACY_CURRENT_READING_KEY)
+          if (legacy) restored = [legacy]
+        }
+      } catch {
+        const legacy = localStorage.getItem(LEGACY_CURRENT_READING_KEY)
+        if (legacy) restored = [legacy]
+      }
+      openReadingIdsRef.current = restored
+      setOpenReadingIds(restored)
+    }, 0)
     return () => window.clearTimeout(load)
   }, [])
 
   useEffect(() => {
-    if (!routeReadingId || routeReadingId === currentReadingId) return
+    if (!routeReadingId) {
+      closedRouteIdRef.current = null
+      return
+    }
+    if (routeReadingId === closedRouteIdRef.current || openReadingIds.includes(routeReadingId)) return
+    closedRouteIdRef.current = null
     const remember = window.setTimeout(() => selectReading(routeReadingId), 0)
     return () => window.clearTimeout(remember)
-  }, [routeReadingId, currentReadingId, selectReading])
+  }, [routeReadingId, openReadingIds, selectReading])
 
   useEffect(() => {
     if (frontendOnly) {
@@ -128,12 +168,13 @@ export function ReadingsProvider({ children, frontendOnly = false }: { children:
       isLoading,
       error,
       frontendOnly,
-      currentReading: (currentReadingId && byId.get(currentReadingId)) || null,
+      openReadings: openReadingIds.flatMap((id) => byId.get(id) ?? []),
       selectReading,
+      closeReading,
       titleOf: (sourceId) => (sourceId && byId.get(sourceId)?.title) || "another reading",
       refresh: () => setNonce((n) => n + 1),
     }
-  }, [readings, course, isLoading, error, frontendOnly, currentReadingId, selectReading])
+  }, [readings, course, isLoading, error, frontendOnly, openReadingIds, selectReading, closeReading])
 
   return <ReadingsContext.Provider value={value}>{children}</ReadingsContext.Provider>
 }
