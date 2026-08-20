@@ -460,8 +460,8 @@ export const sourceRepairReadings = pgTable("source_repair_reading", {
  * proposals was the only record of a prior key, deleteSource stranded every
  * superseded blob forever, and "which file did students read in week 3?" had
  * no answer. A row here per rotation makes the chain walkable: the library
- * audit reads it today; cleanup on delete and rollback are still to come —
- * deleteSource does not walk it yet, so superseded blobs still strand.
+ * audit reads it, and deleteSource walks it on the way out (since 2026-08-20;
+ * before that superseded blobs stranded). Rollback is still to come.
  *
  * Append-only by convention: rows record what happened and are never edited.
  */

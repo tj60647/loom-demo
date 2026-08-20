@@ -23,8 +23,9 @@
  *
  * Keys are per-source, overwritten in place on re-ingest (the covers model):
  * a repair that changes the bytes re-renders the images in the same pass
- * that replaces the canonical text. Deleting a source orphans its images in
- * blob — same standing as superseded PDF revisions, which are also kept.
+ * that replaces the canonical text. deleteSource sweeps the images, the
+ * sheet and the revision blobs on the way out (since 2026-08-20; before
+ * that, deleting a source orphaned all of them).
  */
 import { createCanvas, loadImage } from "@napi-rs/canvas"
 import { asc, eq } from "drizzle-orm"
