@@ -585,6 +585,17 @@ async function ingestReading(data: {
     // slower, never wrong.
     after(async () => {
       try {
+        // Scheduled before scoring and the course attach, either of which can
+        // still fail and roll the row back — and this callback fires after
+        // the response regardless. Without the re-check it would render page
+        // images and a sheet for a reading that no longer exists: blobs no
+        // sweep will ever find, because the row that names their id is gone.
+        const still = await db
+          .select({ id: sources.id })
+          .from(sources)
+          .where(eq(sources.id, source.id))
+          .limit(1)
+        if (still.length === 0) return
         await renderSourcePageImages(source.id, buffer)
       } catch (error) {
         console.warn("[Loom] Failed to render page images at ingest", error)
@@ -618,7 +629,11 @@ async function ingestReading(data: {
     // Without this, a failure between the source insert and here leaves the
     // phantom card the reorder above exists to prevent. Cascades take the
     // pages and any attach with the row; the caller's catch takes the blob.
+    // The cover is this function's own put and nothing else records its key
+    // once the row is gone, so it goes here too (no-op if the render failed
+    // and it was never written).
     await db.delete(sources).where(eq(sources.id, source.id)).catch(() => {})
+    await readingStorage.delete(getSourceCoverKey(source.id)).catch(() => {})
     throw error
   }
 
