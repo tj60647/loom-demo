@@ -1,5 +1,5 @@
 import { put, get, del } from "@vercel/blob"
-import { READING_UPLOAD_PREFIX } from "@/lib/readingUpload"
+import { isClientUploadPathname } from "@/lib/readingUpload"
 
 /**
  * Storage backend for shared, immutable reading assets: uploaded PDFs and the
@@ -169,11 +169,14 @@ export const readingStorage: ReadingStorage = new VercelBlobStorage()
  * calls this to clear the quarantine copy: that is deleting our own
  * seconds-old write, not another environment's object — upload pathnames
  * carry a random suffix, so nothing else lives there. Guarded to the upload
- * prefix so no other caller can reach past the namespace with it; everything
- * else deletes through `delete`, which stays inside the drawer.
+ * SHAPE, not just the prefix (isClientUploadPathname): a startsWith check
+ * alone let `readings/../covers/<id>.png` through, and the Blob SDK
+ * interpolates pathnames into URLs raw, so a dot-segment walks out of the
+ * quarantine (adversarial review, 2026-08-20). Everything else deletes
+ * through `delete`, which stays inside the drawer.
  */
 export async function deleteClientUploadBlob(pathname: string): Promise<void> {
-  if (!pathname.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
+  if (!isClientUploadPathname(pathname)) {
     throw new Error("Refusing to delete outside the upload quarantine.")
   }
   await del(pathname)

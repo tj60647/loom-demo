@@ -212,8 +212,12 @@ async function main() {
     // The store's side of the teardown, gathered BEFORE the rows go — the
     // same sweep deleteSource runs, from the same module, because a second
     // copy of the key-family list is how one caller falls behind the next
-    // blob family (src/lib/sourceBlobs.ts). Until 2026-08-20 this deleted
-    // the rows and left every blob a fixture upload had minted.
+    // blob family (src/lib/sourceBlobs.ts). PROSPECTIVE today, not a leak
+    // being drained: no current spec stores a file (the journey's carded
+    // reading is reference-only, tests/helpers.ts), so these keys are
+    // derived cover/sheet names that no-op. It exists so the first spec that
+    // DOES upload cannot strand its blobs — and "swept", not "removed",
+    // because del() no-ops on keys this drawer never held.
     const keySets = await Promise.all(
       sourceRows.map((s) => gatherSourceBlobKeys(s.id, s.storageKey))
     )
@@ -223,7 +227,7 @@ async function main() {
     const failedKeys = keys.filter((_, i) => results[i].status === "rejected")
     for (const key of failedKeys) console.error(`[clean-fixtures] blob not removed: ${key}`)
     console.log(
-      `[clean-fixtures] blobs     ${keys.length - failedKeys.length} of ${keys.length} removed` +
+      `[clean-fixtures] blobs     swept ${keys.length} key${keys.length === 1 ? "" : "s"}` +
         (failedKeys.length ? ` — ${failedKeys.length} FAILED, keys logged above` : "")
     )
   }

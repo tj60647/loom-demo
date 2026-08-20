@@ -13,7 +13,7 @@ import {
   sourceScores,
   users,
 } from "@/db/schema"
-import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm"
+import { and, asc, count, eq, inArray, isNull, or, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { after } from "next/server"
 import { authOptions, isAdminUser } from "@/lib/auth"
@@ -28,7 +28,7 @@ import { judgeSourceScore, recordHeuristicScore, rescoreSource } from "@/lib/rea
 import { reingestSource } from "@/lib/reingest"
 import { isJudgeConfigured } from "@/lib/openrouter"
 import { draftMetadataFromPages, type MetadataDraft } from "@/lib/metadataDraft"
-import { MAX_READING_BYTES, MAX_READING_LABEL, READING_UPLOAD_PREFIX, formatBytes } from "@/lib/readingUpload"
+import { MAX_READING_BYTES, MAX_READING_LABEL, formatBytes, isClientUploadPathname } from "@/lib/readingUpload"
 import { revalidatePath } from "next/cache"
 import { resolveCourseId, resolveCourseIdForUser } from "@/lib/courses"
 
@@ -426,27 +426,33 @@ export async function archiveOwnReading(sourceId: string) {
  * never reach the key the row recorded. Re-homing restores the storage
  * invariant (an environment writes only into its own space) and makes every
  * recorded storageKey one this environment may delete. The new key takes
- * createSource's server-upload shape (a bare UUID), so `readings/` stays
- * purely transient: no new source row records a quarantine pathname. Rows
- * written before 2026-08-20 may still carry one — reads fall through to the
- * bare key, so they keep working; they remain beyond a namespaced delete, as
- * they always were.
+ * createSource's server-upload shape (a bare UUID), so the CLIENT-UPLOAD
+ * quarantine is transient: no new registration records its quarantine
+ * pathname. (`readings/` itself is not exclusively transient — repair mints
+ * durable `readings/<id>-repaired-<ms>.pdf` revision keys and the seed
+ * records `readings/…` blobKeys; refuseClaimedUploadKey is what keeps those
+ * out of this flow's reach.) Rows written before 2026-08-20 may still carry
+ * a quarantine pathname — reads fall through to the bare key, so they keep
+ * working; they remain beyond a namespaced delete, as they always were.
  *
  * In production the drawer IS the bare root, so this is a same-store copy —
  * one extra put per upload, kept for uniformity: one code path everywhere,
  * and the stored key is server-minted rather than client-named.
  */
 /**
- * A quarantine pathname some source row ALREADY records is not a fresh
- * upload — it is an existing reading's file. Everything downstream of
- * registration (re-homing, the size-cap rejection, the failure cleanup)
- * DELETES the pathname it was handed, and rows written before 2026-08-20
- * record their quarantine pathname as storageKey — so without this check any
- * signed-in caller could hand registerOwnUploadedReading another reading's
- * key and destroy the blob every environment reads. Refuse instead; the
- * legitimate flow never trips this, because a fresh upload's random-suffixed
- * pathname is claimed by no row until this very call records its re-homed
- * successor.
+ * A quarantine-shaped pathname some row ALREADY records is not a fresh
+ * upload — it is an existing reading's file, current or lineage. Everything
+ * downstream of registration (re-homing, the size-cap rejection, the failure
+ * cleanup) DELETES the pathname it was handed; rows written before
+ * 2026-08-20 record their quarantine pathname as storageKey, and every
+ * repair records `readings/<id>-repaired-<ms>.pdf` revision keys whose
+ * timestamps are guessable — so without this check a signed-in caller could
+ * hand registerOwnUploadedReading such a key and destroy a blob a row still
+ * references. Both tables are checked: sources.storageKey (the served file)
+ * and source_revision's storageKey/predecessorKey (the lineage the audit and
+ * deleteSource walk). The legitimate flow never trips this — a fresh
+ * upload's random-suffixed pathname is claimed by no row until this very
+ * call records its re-homed successor.
  */
 async function refuseClaimedUploadKey(storageKey: string): Promise<void> {
   const claimed = await db
@@ -454,9 +460,20 @@ async function refuseClaimedUploadKey(storageKey: string): Promise<void> {
     .from(sources)
     .where(eq(sources.storageKey, storageKey))
     .limit(1)
-  if (claimed.length > 0) {
-    throw new Error("That pathname already belongs to a registered reading.")
+  if (claimed.length === 0) {
+    const lineage = await db
+      .select({ id: sourceRevisions.id })
+      .from(sourceRevisions)
+      .where(
+        or(
+          eq(sourceRevisions.storageKey, storageKey),
+          eq(sourceRevisions.predecessorKey, storageKey)
+        )
+      )
+      .limit(1)
+    if (lineage.length === 0) return
   }
+  throw new Error("That pathname already belongs to a registered reading.")
 }
 
 async function rehomeClientUpload(quarantineKey: string, buffer: Buffer): Promise<string> {
@@ -479,7 +496,10 @@ export async function registerOwnUploadedReading(data: {
   const userId = session?.user?.id
   if (!userId) throw new Error("Unauthorized")
 
-  if (!data.storageKey.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
+  // Shape, not just prefix: everything downstream deletes the pathname it is
+  // handed, and a dot-segment walks a bare startsWith check out of the
+  // quarantine (isClientUploadPathname; adversarial review, 2026-08-20).
+  if (!isClientUploadPathname(data.storageKey)) {
     throw new Error("That upload is not in the readings area.")
   }
   await refuseClaimedUploadKey(data.storageKey)
@@ -493,6 +513,7 @@ export async function registerOwnUploadedReading(data: {
   }
 
   let storageKey: string | null = null
+  let ingested = false
   try {
     storageKey = await rehomeClientUpload(data.storageKey, buffer)
     const source = await ingestReading({
@@ -507,15 +528,21 @@ export async function registerOwnUploadedReading(data: {
       isDescriptionVisible: false,
       metadataProvenance: "Student's own upload",
     })
+    ingested = true
     revalidatePath("/")
     revalidateLibrary()
     return { id: source.id, title: source.title }
   } catch (error) {
-    // Nothing references the blob yet; a failed ingest must not leave it
-    // sitting in storage. Which copy exists depends on how far we got: after
-    // re-homing it is the drawer key; before, the quarantine pathname.
-    if (storageKey) await readingStorage.delete(storageKey).catch(() => {})
-    else await deleteClientUploadBlob(data.storageKey).catch(() => {})
+    // Cleanup only while nothing references the blob — a failed ingest must
+    // not leave it in storage. Which copy exists depends on how far we got:
+    // after re-homing it is the drawer key; before, the quarantine pathname.
+    // Once `ingested`, the row exists and the drawer key is the committed
+    // reading's real file: a throw from the revalidates must not take it
+    // (adversarial review, 2026-08-20).
+    if (!ingested) {
+      if (storageKey) await readingStorage.delete(storageKey).catch(() => {})
+      else await deleteClientUploadBlob(data.storageKey).catch(() => {})
+    }
     throw error
   }
 }
@@ -548,7 +575,15 @@ export async function createSource(data: {
   const storageKey = `${crypto.randomUUID()}.pdf`
   await readingStorage.put(storageKey, buffer)
 
-  return ingestReading({ ...data, userId: session.user.id, buffer, storageKey, filename: data.file.name })
+  try {
+    return await ingestReading({ ...data, userId: session.user.id, buffer, storageKey, filename: data.file.name })
+  } catch (error) {
+    // The rollback inside ingestReading takes the row and the cover; the blob
+    // this function put is its own to take, like every other caller's
+    // (review, 2026-08-20 — this was the one caller whose catch was missing).
+    await readingStorage.delete(storageKey).catch(() => {})
+    throw error
+  }
 }
 
 /**
@@ -720,7 +755,10 @@ export async function registerUploadedReading(data: {
 }) {
   const session = await requireAdmin()
 
-  if (!data.storageKey.startsWith(`${READING_UPLOAD_PREFIX}/`)) {
+  // Shape, not just prefix: everything downstream deletes the pathname it is
+  // handed, and a dot-segment walks a bare startsWith check out of the
+  // quarantine (isClientUploadPathname; adversarial review, 2026-08-20).
+  if (!isClientUploadPathname(data.storageKey)) {
     throw new Error("That upload is not in the readings area.")
   }
   await refuseClaimedUploadKey(data.storageKey)
@@ -737,6 +775,7 @@ export async function registerUploadedReading(data: {
   }
 
   let storageKey: string | null = null
+  let ingested = false
   try {
     storageKey = await rehomeClientUpload(data.storageKey, buffer)
     const source = await ingestReading({
@@ -748,6 +787,7 @@ export async function registerUploadedReading(data: {
       courseId: data.courseId,
       metadataProvenance: "Pending review",
     })
+    ingested = true
 
     revalidateLibrary()
     if (isJudgeConfigured()) {
@@ -758,12 +798,17 @@ export async function registerUploadedReading(data: {
     }
     return { id: source.id, title: source.title }
   } catch (error) {
-    // Nothing references the blob yet, so a failed ingest should not leave it
-    // sitting in storage costing money and confusing later audits. Which copy
-    // exists depends on how far we got: after re-homing it is the drawer key;
-    // before, the quarantine pathname.
-    if (storageKey) await readingStorage.delete(storageKey).catch(() => {})
-    else await deleteClientUploadBlob(data.storageKey).catch(() => {})
+    // Cleanup only while nothing references the blob — a failed ingest must
+    // not leave it in storage costing money and confusing later audits.
+    // Which copy exists depends on how far we got: after re-homing it is the
+    // drawer key; before, the quarantine pathname. Once `ingested`, the row
+    // exists and the drawer key is the committed reading's real file: a
+    // throw from the revalidates or the after() scheduling must not take it
+    // (adversarial review, 2026-08-20).
+    if (!ingested) {
+      if (storageKey) await readingStorage.delete(storageKey).catch(() => {})
+      else await deleteClientUploadBlob(data.storageKey).catch(() => {})
+    }
     throw error
   }
 }
