@@ -5,8 +5,8 @@ const now = new Date("2026-08-20T12:00:00Z")
 const userId = "stageit-designer"
 
 export const frontendReadings: ReadingMeta[] = [
-  { id: "star", title: "This Is Not a Boundary Object", author: "Susan Leigh Star", sourceReference: "Star (2010)", description: "A short intervention on how shared things coordinate different social worlds.", isDescriptionVisible: true, week: 2, isOwn: false, storageKey: null },
-  { id: "wenger", title: "Communities of Practice", author: "Etienne Wenger", sourceReference: "Wenger (1998)", description: "How learning lives in participation, practice, and a shared repertoire.", isDescriptionVisible: true, week: 3, isOwn: false, storageKey: null },
+  { id: "star", title: "This Is Not a Boundary Object", author: "Susan Leigh Star", sourceReference: "Star (2010)", description: "A short intervention on how shared things coordinate different social worlds.", isDescriptionVisible: true, week: 2, isOwn: false, storageKey: null, isPreview: true },
+  { id: "wenger", title: "Communities of Practice", author: "Etienne Wenger", sourceReference: "Wenger (1998)", description: "How learning lives in participation, practice, and a shared repertoire.", isDescriptionVisible: true, week: 3, isOwn: false, storageKey: null, isPreview: true },
 ]
 
 export const frontendState = (): LoomState => ({

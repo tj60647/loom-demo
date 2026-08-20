@@ -54,7 +54,7 @@ export default function ShelfSearch({
     const timer = window.setTimeout(() => {
       setBusy(true)
       const search = frontendOnly
-        ? Promise.resolve(readings.filter((reading) => `${reading.title} ${reading.author ?? ""} ${reading.description ?? ""}`.toLowerCase().includes(trimmed.toLowerCase())).map((reading): ReadingSearchHit => ({ sourceId: reading.id, title: reading.title, author: reading.author, week: reading.week, isOwn: reading.isOwn, hasFile: !!reading.storageKey, matchedCard: true, pageHits: 0, excerpts: [] })))
+        ? Promise.resolve(readings.filter((reading) => `${reading.title} ${reading.author ?? ""} ${reading.description ?? ""}`.toLowerCase().includes(trimmed.toLowerCase())).map((reading): ReadingSearchHit => ({ sourceId: reading.id, title: reading.title, author: reading.author, week: reading.week, isOwn: reading.isOwn, hasFile: !!reading.storageKey || !!reading.isPreview, matchedCard: true, pageHits: 0, excerpts: [] })))
         : searchReadings(trimmed)
       search
         .then((hits) => {

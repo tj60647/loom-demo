@@ -88,6 +88,10 @@ export default function Shelf() {
       <Link href={`/studio/reading/${s.id}`} className="shelfcard" onClick={() => selectReading(s.id)}>
         {s.storageKey ? (
           <SourceThumbnail sourceId={s.id} title={s.title} />
+        ) : s.isPreview ? (
+          <span className="shelfnofile" aria-hidden="true">
+            <span className="cap">reading preview</span>
+          </span>
         ) : (
           // No PDF behind this card — say so rather than showing a broken frame.
           <span className="shelfnofile" aria-hidden="true">

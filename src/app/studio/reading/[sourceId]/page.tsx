@@ -18,5 +18,5 @@ export default async function ReadingStudioPage({ params, searchParams }: { para
   const source = frontendReadings.find((reading) => reading.id === sourceId)
   if (!source) return <main><div className="empty" style={{ marginTop: "100px" }}><h2>That reading isn&apos;t in your library.</h2><p style={{ marginTop: 18 }}><Link className="btn ghost mini" href="/library">‹ back to library</Link></p></div></main>
   const rawTool = first(query.tool)
-  return <Workbench key={source.id} initialTool={rawTool && TOOLS.has(rawTool as StudioTool) ? rawTool as StudioTool : undefined} initialSearch={first(query.q)?.trim() || undefined} source={{ id: source.id, title: source.title, author: source.author ?? "", week: source.week, hasFile: !!source.storageKey }} />
+  return <Workbench key={source.id} initialTool={rawTool && TOOLS.has(rawTool as StudioTool) ? rawTool as StudioTool : undefined} initialSearch={first(query.q)?.trim() || undefined} source={{ id: source.id, title: source.title, author: source.author ?? "", week: source.week, hasFile: !!source.storageKey, isPreview: source.isPreview }} />
 }

@@ -8,13 +8,14 @@ import OpenTab from "@/components/tabs/OpenTab"
 import ThrowTab from "@/components/tabs/ThrowTab"
 import ReadTab from "@/components/tabs/ReadTab"
 import MapTab from "@/components/tabs/MapTab"
+import ReadingPreview from "@/components/pdf/ReadingPreview"
 import FirstRunWalkthrough from "@/components/ui/FirstRunWalkthrough"
 import PrimaryNav from "@/components/ui/PrimaryNav"
 import type { Byte } from "@/lib/types"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
 
-export type WorkbenchSource = { id: string; title: string; author: string; week: number | null; hasFile: boolean }
+export type WorkbenchSource = { id: string; title: string; author: string; week: number | null; hasFile: boolean; isPreview?: boolean }
 export type StudioTool = "source" | "capture" | "connect" | "reflect" | "map"
 
 const KEEP_ALIVE = new Set<StudioTool>(["capture", "connect", "reflect", "map"])
@@ -28,10 +29,11 @@ export default function Workbench({
 }) {
   const { data: session, status } = useSession()
   const { isLoading, scoped } = useLoom()
+  const hasReadingSurface = !!source && (source.hasFile || source.isPreview)
   const tools: StudioTool[] = source
-    ? source.hasFile ? ["source", "capture", "connect", "reflect", "map"] : ["capture", "connect", "reflect", "map"]
+    ? hasReadingSurface ? ["source", "capture", "connect", "reflect", "map"] : ["capture", "connect", "reflect", "map"]
     : ["connect", "reflect", "map"]
-  const firstTool = initialTool && tools.includes(initialTool) ? initialTool : source?.hasFile ? "source" : tools[0]
+  const firstTool = initialTool && tools.includes(initialTool) ? initialTool : hasReadingSurface ? "source" : tools[0]
   const [activeTool, setActiveTool] = useState<StudioTool>(firstTool)
   const [visited, setVisited] = useState<ReadonlySet<StudioTool>>(() => new Set([firstTool]))
   const [pdfPage, setPdfPage] = useState(1)
@@ -47,7 +49,7 @@ export default function Workbench({
   }
   const shouldRender = (tool: StudioTool) => !KEEP_ALIVE.has(tool) || visited.has(tool)
   const handleGotoByte = (byte: Byte) => {
-    if (!source?.hasFile) return
+    if (!hasReadingSurface) return
     setPdfPage(byte.pageNumber && byte.pageNumber > 0 ? byte.pageNumber : 1)
     setPdfFocusByteId(byte.id)
     goTo("source")
@@ -71,14 +73,16 @@ export default function Workbench({
         <span className="scopetitle">{source.title}</span>
         {source.author && <span className="scopemeta">{source.author}</span>}
         <span className="scopemeta">{scoped.concepts.length} concept{scoped.concepts.length !== 1 ? "s" : ""} evidenced here{scoped.bridges.length ? ` · ${scoped.bridges.length} thread${scoped.bridges.length !== 1 ? "s" : ""} out` : ""}</span>
-        {source.hasFile ? <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>Download PDF</a> : <span className="scopemeta scopedl">no source file attached</span>}
+        {source.hasFile ? <a className="scopeback scopedl" href={`/api/readings/${source.id}?download=1`}>Download PDF</a> : source.isPreview ? <span className="scopemeta scopedl">front-end reading preview</span> : <span className="scopemeta scopedl">no source file attached</span>}
       </> : <><span className="scopetitle">Knowledge</span><span className="scopemeta">connections across every reading</span></>}
     </div>
 
     <main className={activeTool === "source" ? "station-reading" : undefined}>
-      {source && !source.hasFile && activeTool === "capture" && <p className="hint">This reference has no source file attached; capture passages by hand.</p>}
-      {source?.hasFile && <div className={`panel ${activeTool === "source" ? "active" : ""}`}>
-        {activeTool === "source" && <PdfViewer url={`/api/readings/${source.id}`} sourceName={source.title} sourceId={source.id} initialPageNumber={pdfPage} initialSearch={initialSearch} focusByteId={pdfFocusByteId} onGotoOpenByte={handleGotoOpenByte} onClose={() => { setPdfFocusByteId(null); goTo("capture") }} />}
+      {source && !hasReadingSurface && activeTool === "capture" && <p className="hint">This reference has no source file attached; capture passages by hand.</p>}
+      {hasReadingSurface && source && <div className={`panel ${activeTool === "source" ? "active" : ""}`}>
+        {activeTool === "source" && (source.hasFile
+          ? <PdfViewer url={`/api/readings/${source.id}`} sourceName={source.title} sourceId={source.id} initialPageNumber={pdfPage} initialSearch={initialSearch} focusByteId={pdfFocusByteId} onGotoOpenByte={handleGotoOpenByte} onClose={() => { setPdfFocusByteId(null); goTo("capture") }} />
+          : <ReadingPreview sourceId={source.id} sourceName={source.title} author={source.author} onClose={() => goTo("capture")} />)}
       </div>}
       {source && <div className={`panel ${activeTool === "capture" ? "active" : ""}`}>
         {shouldRender("capture") && <OpenTab onGotoByte={handleGotoByte} focusByteId={openTargetByteId} onFocusHandled={() => setOpenTargetByteId(null)} />}
