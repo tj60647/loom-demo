@@ -8,7 +8,7 @@ import { and, asc, eq, isNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth/next"
 import { authOptions, isAdminUser } from "@/lib/auth"
-import { ensureFacultySection, getCourse, resolveCourseIdForUser, slugify } from "@/lib/courses"
+import { ensureFacultySection, getCourse, listEnrolledCourses, resolveCourseIdForUser, slugify } from "@/lib/courses"
 
 // Server Functions are reachable by direct POST, not only through the UI, so
 // every mutation here re-checks admin rather than trusting the calling page.
@@ -92,12 +92,75 @@ export async function getActiveCourse() {
         .orderBy(asc(sections.name))
     : []
 
+  // Every enrolment this person could make the working course — their own
+  // active memberships in unarchived courses. Empty while Open Loom viewing
+  // is on (the course above is the STUDENT's, and setActiveCourse refuses
+  // then too); empty-by-construction for an admin with no membership
+  // (listEnrolledCourses returns only real enrolments — AdminNav's ?course=
+  // picker is their switcher). Display order is stable (createdAt, then id)
+  // so the menu's rows do not jump after a switch: the resolver's selectedAt
+  // ordering decides WHICH course wins, never where it sits in this list.
+  // Deliberately NOT masked by the student lens — these are the wearer's own
+  // enrolments, which is exactly what a real two-course student sees.
+  const enrolments = viewing ? [] : await listEnrolledCourses(session.user.id)
+  const switchable = [...enrolments]
+    .sort(
+      (a, b) =>
+        a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)
+    )
+    .map(({ id, name, term }) => ({ id, name, term }))
+
   return {
     id: course.id, name: course.name, term: course.term,
     isStaff, isAdmin, sections: courseSections,
     staffTruly, viewingAsStudent: asStudent,
     viewingUser: viewing ? { id: viewing.userId, name: viewing.name ?? viewing.email } : null,
+    courses: switchable,
   }
+}
+
+/**
+ * Stamps the chosen membership as the working course — the only writer of
+ * course_membership.selectedAt. The resolver (resolveCourseIdForUser) then
+ * prefers it everywhere, so this is the whole server side of the header's
+ * course switch. Validates an ACTIVE membership in an UNARCHIVED course —
+ * the same filters listEnrolledCourses applies — so the stamp can never
+ * point the resolver at a course it would refuse to resolve. Refused while
+ * Open Loom viewing is on: every read is scoped to the student then, and a
+ * stamp mid-view would silently re-aim the viewer's own surfaces for later.
+ */
+export async function setActiveCourse(courseId: string) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) throw new Error("Unauthorized")
+
+  if (await resolveViewTarget(session.user.id)) {
+    throw new Error("Leave the student's loom before switching your own course")
+  }
+
+  const membership = await db
+    .select({ courseId: courseMemberships.courseId })
+    .from(courseMemberships)
+    .innerJoin(courses, eq(courses.id, courseMemberships.courseId))
+    .where(
+      and(
+        eq(courseMemberships.userId, session.user.id),
+        eq(courseMemberships.courseId, courseId),
+        isNull(courseMemberships.removedAt),
+        eq(courses.isArchived, false)
+      )
+    )
+    .limit(1)
+  if (membership.length === 0) throw new Error("Not one of your courses")
+
+  await db
+    .update(courseMemberships)
+    .set({ selectedAt: new Date() })
+    .where(
+      and(
+        eq(courseMemberships.courseId, courseId),
+        eq(courseMemberships.userId, session.user.id)
+      )
+    )
 }
 
 /** Appends -2, -3, … until the slug is free. */

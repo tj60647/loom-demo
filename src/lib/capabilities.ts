@@ -299,6 +299,16 @@ export const CAPABILITIES: Capability[] = [
 
   // --- Courses -------------------------------------------------------------
   {
+    id: "course-switch",
+    name: "Switch your working course",
+    group: "Courses",
+    student: { verdict: "qualified", note: "their own active enrolments — the header label becomes the switch only when they hold more than one" },
+    faculty: { verdict: "qualified", note: "same as a student: the learner side switches; the staff side stays AdminNav's ?course=" },
+    admin: { verdict: "qualified", note: "via their own memberships; with none there is nothing to stamp and AdminNav is their picker" },
+    gate: { file: "src/actions/courses.ts", symbol: "setActiveCourse" },
+    enforcement: "server",
+  },
+  {
     id: "courses-manage",
     name: "Create courses, sections and the Faculty Section",
     group: "Courses",
