@@ -18,14 +18,20 @@ import { VIEW_USER_COOKIE } from "@/lib/viewUser"
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const targetId = req.nextUrl.searchParams.get("user")
-  const target = await authorizeViewTarget(session?.user?.id, targetId)
+  // The roster names which course's roster was clicked; the gate honors it
+  // when this viewer may see this target through it, else falls back. The
+  // authorized course rides in the cookie ("userId:courseId") so every later
+  // read re-authorizes the SAME pin — without it, the mode would re-derive a
+  // course per read and could drift with the student's own switching.
+  const requestedCourseId = req.nextUrl.searchParams.get("course")
+  const target = await authorizeViewTarget(session?.user?.id, targetId, requestedCourseId)
 
   if (!target) {
     return NextResponse.redirect(new URL("/admin", req.url), 303)
   }
 
   const res = NextResponse.redirect(new URL("/", req.url), 303)
-  res.cookies.set(VIEW_USER_COOKIE, target.userId, {
+  res.cookies.set(VIEW_USER_COOKIE, `${target.userId}:${target.courseId}`, {
     path: "/",
     sameSite: "lax",
     httpOnly: true,

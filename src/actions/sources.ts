@@ -243,14 +243,18 @@ export async function getSources(courseIdRaw?: string | null) {
   const session = await getServerSession(authOptions)
 
   // Open Loom (src/lib/viewUser.ts): the shelf becomes the STUDENT's shelf —
-  // their course resolution, their own readings, and never the admin lens,
-  // because the student it belongs to could not see an unpublished row.
+  // their own readings, never the admin lens (the student it belongs to could
+  // not see an unpublished row) — pinned to the course that authorized the
+  // view, so the shelf cannot flip when the student switches their own
+  // working course (selectedAt).
   const viewing = await resolveViewTarget(session?.user?.id)
   const shelfOwnerId = viewing?.userId ?? session?.user?.id
 
-  const courseId = shelfOwnerId
-    ? await resolveCourseIdForUser(shelfOwnerId, courseIdRaw)
-    : await resolveCourseId(courseIdRaw)
+  const courseId = viewing
+    ? await resolveCourseIdForUser(viewing.userId, viewing.courseId)
+    : shelfOwnerId
+      ? await resolveCourseIdForUser(shelfOwnerId, courseIdRaw)
+      : await resolveCourseId(courseIdRaw)
 
   // An admin's shelf includes UNPUBLISHED readings; a student's does not. The
   // student lens has to reach this or "view as student" would show a row no

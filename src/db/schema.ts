@@ -86,6 +86,14 @@ export const courseMemberships = pgTable(
     // authorization stays users.role.
     role: text("role").default("LEARNER").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
+    // The moment this membership was last chosen as the working course —
+    // written only by setActiveCourse (src/actions/courses.ts), read only by
+    // listEnrolledCourses' ordering (src/lib/courses.ts). Null for anyone who
+    // never switched, so the oldest-course fallback is unchanged for them.
+    // Survives soft-remove on purpose: reinstatement (enrolInvitedCourses'
+    // conflict branch clears removedAt only) returns the person to the course
+    // they were working in.
+    selectedAt: timestamp("selectedAt"),
     // Soft-remove: set when an instructor removes the person from the course.
     // The row (and all their work) survives so re-inviting reinstates them;
     // rosters, aggregates and the sign-in gate treat the membership as ended.

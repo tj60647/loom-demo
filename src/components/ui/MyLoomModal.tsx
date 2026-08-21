@@ -57,7 +57,7 @@ export default function MyLoomModal({
   // are the STUDENT's and stay — the mirror is the mode's whole point — but
   // the one verb in the dialog is not offered over somebody else's work.
   const { state, resetLoom, flash, readOnly } = useLoom()
-  const { titleOf } = useReadings()
+  const { titleOf, course } = useReadings()
   const [arming, setArming] = useState(false)
   const [typed, setTyped] = useState("")
   const [busy, setBusy] = useState(false)
@@ -245,9 +245,12 @@ export default function MyLoomModal({
             {!arming ? (
               <>
                 <p>
+                  {/* The course is NAMED when it can be: one account can carry
+                      several, and the moment before a destructive clear is
+                      exactly when "this course" must not be ambiguous. */}
                   Clears everything above — every passage, concept, link, thread,
-                  projection and cloth in this course. Your readings stay, and so does
-                  your place on the course.
+                  projection and cloth in {course ? <strong>{course.name}</strong> : "this course"}.
+                  Your readings stay, and so does your place on the course.
                 </p>
                 <p className="info-note">
                   Your Capture Log keeps the record of the weaving, and your instructor

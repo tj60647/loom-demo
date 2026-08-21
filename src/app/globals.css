@@ -1271,6 +1271,19 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    to carry, said outright now there is room for it. */
 .headermenu-say{display:block;margin-top:3px;font-family:var(--body);font-size:12px;
   letter-spacing:0;text-transform:none;color:var(--ink-soft);line-height:1.35}
+/* The course label, and the switch it becomes when one person carries more
+   than one course (CourseSwitch.tsx). At rest it is EXACTLY the ochre label
+   it has always been — context, not identity — a second enrolment adds only
+   an 8px caret (12px with the 4px gap, measured 12.0px on the running app at
+   1280: trigger 299.4px vs plain span 287.4px for the same text). For scale,
+   the label Header.tsx rejected overflowed by 4 characters ≈ 32px of width,
+   and the wrap it caused costs 52px of the scarce vertical axis (Header.tsx's
+   own note). The open panel is .headermenu-panel: one dropdown pattern in
+   the app, not three. */
+.courseswitch{position:relative;display:flex;align-items:center}
+.courseswitch-btn{background:none;border:none;padding:0;margin:0;cursor:pointer;
+  display:inline-flex;align-items:center;gap:4px}
+.courseswitch-btn:hover,.courseswitch-btn:focus-visible{text-decoration:underline;text-underline-offset:3px}
 .stationsearch-panel{position:absolute;top:calc(100% + 6px);right:0;z-index:60;
   width:min(420px,calc(100vw - 32px));max-height:min(64vh,560px);overflow:auto;
   padding:12px 13px;background:var(--paper);border:1px solid var(--ink);

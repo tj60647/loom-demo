@@ -56,6 +56,15 @@ export type ActiveCourse = {
   viewingAsStudent: boolean
   /** The course's sections, for the Overlay picker. Empty for a student. */
   sections: { id: string; name: string }[]
+  /** Every enrolment this person could make the working course — their own
+   *  active memberships in unarchived courses, stable order (createdAt then
+   *  id, so rows do not jump after a switch; the current one is marked by
+   *  id, never by position). Empty while Open Loom viewing is on (the course
+   *  above is the STUDENT's) and for an admin with no membership (AdminNav's
+   *  ?course= picker is theirs). NOT masked by the student lens — these are
+   *  the wearer's own enrolments. The header label is a control only when
+   *  this holds more than one. */
+  courses: { id: string; name: string; term: string }[]
 }
 
 type ReadingsContextValue = {

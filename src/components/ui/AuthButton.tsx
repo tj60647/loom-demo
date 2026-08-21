@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react"
 import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useReadings } from "@/components/providers/ReadingsProvider"
+import CourseSwitch from "@/components/ui/CourseSwitch"
 import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import { VIEW_AS_STUDENT_COOKIE } from "@/lib/viewAs"
 
@@ -48,15 +49,14 @@ export default function AuthButton({ isBranchPreview = false }: { isBranchPrevie
 
     return (
       <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-        {/* Whose syllabus this is, before whose account it is: one person can
-            carry several courses, and every count on screen belongs to one of
-            them. Quieter than the name so it reads as context, not identity. */}
+        {/* Whose syllabus this is, before whose account it is — and, when one
+            person carries several courses, the place they pick which one
+            (CourseSwitch keeps the single-course case as the exact quiet
+            span this comment used to sit over). The divider stays here: it
+            is row composition, not label behavior. */}
         {course && (
           <>
-            <span className="label" style={{ color: "var(--ochre)" }}>
-              {course.name}
-              {course.term ? ` · ${course.term}` : ""}
-            </span>
+            <CourseSwitch course={course} />
             {/* Both are small mono caps, so without a rule they read as one
                 run of text — "…FALL 2026 TEST USER A". */}
             <span

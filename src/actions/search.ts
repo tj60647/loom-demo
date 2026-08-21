@@ -309,8 +309,11 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
 
   // Same course lens the loom actions resolve — plus the not-yet-adopted
   // null-course rows, which belong to this student all the same. Read-only:
-  // search never performs the adoption writes.
-  const courseId = await resolveCourseIdForUser(userId, null)
+  // search never performs the adoption writes. Under Open Loom the search is
+  // pinned to the course that authorized the view (viewing.courseId), the
+  // same pin getUserLoomData keeps — so search results and the loom on
+  // screen come from one course.
+  const courseId = await resolveCourseIdForUser(userId, viewing?.courseId ?? null)
   const conceptScope = courseId
     ? sql`("concept"."courseId" = ${courseId} OR "concept"."courseId" IS NULL)`
     : sql`"concept"."courseId" IS NULL`

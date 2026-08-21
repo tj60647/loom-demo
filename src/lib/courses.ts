@@ -1,6 +1,6 @@
 import { db } from "@/db"
 import { courseMemberships, courses, sections, users } from "@/db/schema"
-import { and, asc, eq, isNull } from "drizzle-orm"
+import { and, asc, eq, isNull, sql } from "drizzle-orm"
 import { isAdminUser } from "@/lib/auth"
 
 export type CourseRecord = typeof courses.$inferSelect
@@ -50,21 +50,32 @@ export async function resolveCourseId(raw?: string | null): Promise<string | nul
   return available[0].id
 }
 
+export type EnrolledCourse = {
+  id: string
+  name: string
+  term: string
+  createdAt: Date
+}
+
 /**
- * The course a learner is looking at: the requested one when they actively
- * belong to it, otherwise their first active enrolment, otherwise nothing —
- * membership is the authorization boundary, so a learner is never dropped
- * into a course that has not enrolled them (their work stays unscoped
- * instead). Admins keep the site-wide fallback: they are global staff here
- * (every /admin page already works that way), and it lets them walk the
- * learner surfaces of any course without being on its roster.
+ * The user's active enrolments in unarchived courses, in working-course
+ * order: most recently selected first (selectedAt — stamped only by
+ * setActiveCourse), then oldest course, then id. The FIRST row is the course
+ * resolveCourseIdForUser falls back to; the header's switch list is built
+ * from these same rows, so the two cannot disagree on filters. The raw
+ * fragment because drizzle-orm 0.45.2 ships no nulls-ordering helper
+ * (sql/expressions/select.d.ts exports only asc/desc) and Postgres puts
+ * NULLs first under DESC — `nulls last` is what keeps never-switched users
+ * on the oldest-course ordering.
  */
-export async function resolveCourseIdForUser(
-  userId: string,
-  raw?: string | null
-): Promise<string | null> {
-  const memberships = await db
-    .select({ courseId: courseMemberships.courseId })
+export async function listEnrolledCourses(userId: string): Promise<EnrolledCourse[]> {
+  return db
+    .select({
+      id: courses.id,
+      name: courses.name,
+      term: courses.term,
+      createdAt: courses.createdAt,
+    })
     .from(courseMemberships)
     .innerJoin(courses, eq(courses.id, courseMemberships.courseId))
     .where(
@@ -74,14 +85,36 @@ export async function resolveCourseIdForUser(
         eq(courses.isArchived, false)
       )
     )
-    .orderBy(asc(courses.createdAt))
+    .orderBy(
+      sql`${courseMemberships.selectedAt} desc nulls last`,
+      asc(courses.createdAt),
+      asc(courses.id)
+    )
+}
+
+/**
+ * The course a learner is looking at: the requested one when they actively
+ * belong to it, otherwise the enrolment they last chose as their working
+ * course (setActiveCourse), otherwise their first active enrolment,
+ * otherwise nothing — membership is the authorization boundary, so a learner
+ * is never dropped into a course that has not enrolled them (their work
+ * stays unscoped instead). A requested id outranks the persisted choice but
+ * never stamps it. Admins keep the site-wide fallback: they are global staff
+ * here (every /admin page already works that way), and it lets them walk the
+ * learner surfaces of any course without being on its roster.
+ */
+export async function resolveCourseIdForUser(
+  userId: string,
+  raw?: string | null
+): Promise<string | null> {
+  const memberships = await listEnrolledCourses(userId)
 
   if (raw) {
-    const match = memberships.find((row) => row.courseId === raw)
-    if (match) return match.courseId
+    const match = memberships.find((row) => row.id === raw)
+    if (match) return match.id
   }
 
-  if (memberships.length > 0) return memberships[0].courseId
+  if (memberships.length > 0) return memberships[0].id
 
   const user = await db.select().from(users).where(eq(users.id, userId)).limit(1)
   if (isAdminUser(user[0])) return resolveCourseId(raw)

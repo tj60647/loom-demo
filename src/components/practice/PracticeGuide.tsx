@@ -117,6 +117,22 @@ function resolveTarget(selectors: string[]): { rect: Rect | null; away: boolean 
   return { rect: { top, left, width: right - left, height: bottom - top }, away: false }
 }
 
+/** Union of on-screen element boxes, the shape resolveTarget returns. */
+function unionRects(els: Element[]): Rect | null {
+  let top = Infinity, left = Infinity, right = -Infinity, bottom = -Infinity
+  for (const el of els) {
+    const box = el.getBoundingClientRect()
+    if (box.width === 0 || box.height === 0) continue
+    if (box.bottom < 0 || box.top > window.innerHeight || box.right < 0 || box.left > window.innerWidth) continue
+    top = Math.min(top, box.top)
+    left = Math.min(left, box.left)
+    right = Math.max(right, box.right)
+    bottom = Math.max(bottom, box.bottom)
+  }
+  if (top === Infinity) return null
+  return { top, left, width: right - left, height: bottom - top }
+}
+
 /**
  * The gesture the student is on, inside a beat made of several.
  *
@@ -408,10 +424,21 @@ export default function PracticeGuide() {
       const card = cardRef.current
       // The card FOLLOWS the ring when a beat has moves (TJ, 2026-08-21: the
       // throw beat is select-from-the-warp then throw, "the bubble should
-      // move to the right part of the screen for each"). Anchoring on the
-      // union kept the card parked over the whole working area while the
-      // ring walked the gestures alone. The hole stays the union.
-      const anchor = ring ?? padded
+      // move to the right part of the screen for each"), and a beat with
+      // anchorFind places it beside content-found elements — the capture
+      // beat's proposed lines. Anchoring on the union kept the card parked
+      // over the whole working area. The hole stays the union either way.
+      const anchorEls = step.anchorFind?.(document) ?? []
+      const anchorRect = anchorEls.length ? unionRects(anchorEls) : null
+      const anchorPadded: Rect | null = anchorRect
+        ? {
+            top: Math.max(0, anchorRect.top - PAD),
+            left: Math.max(0, anchorRect.left - PAD),
+            width: anchorRect.width + PAD * 2,
+            height: anchorRect.height + PAD * 2,
+          }
+        : null
+      const anchor = ring ?? anchorPadded ?? padded
       if (card && anchor) {
         const next = place(anchor, { w: card.offsetWidth, h: card.offsetHeight })
         setSpot((was) =>

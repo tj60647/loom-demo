@@ -427,6 +427,10 @@ export default function SandboxLoomProvider({
     // Nothing is debounced here because nothing is sent anywhere; the local
     // write already happened on the keystroke, so a flush has nothing to push.
     flushCloth: () => {},
+    // Same reason: no pending writes to drop, and no course to switch — the
+    // practice loom scopes to nothing. Both are no-ops, present for the type.
+    cancelPendingSaves: () => {},
+    announceCourseSwitch: () => {},
     addEdge,    editEdge,
     removeEdge,
     links: state.links,

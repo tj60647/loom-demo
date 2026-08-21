@@ -8,7 +8,7 @@ import { isBranchPreview, previewLoginDecision, sessionCookieNames } from '@/lib
 
 // Non-production test backdoor: mints a session directly, bypassing OAuth.
 //
-// Three identities, so test data never lands on a real account:
+// Four identities, so test data never lands on a real account:
 // - default          → the admin (tjm), for /admin surfaces.
 // - ?as=testa        → "Test User A", a plain learner who OWNS all graph data
 //                      the suite creates (captures, temp maps). Enrolled in the
@@ -22,6 +22,12 @@ const IDENTITIES = {
   admin: { email: 'tjm@tjmcleish.com', name: 'Test Admin', role: 'ADMIN', membership: null },
   testa: { email: 'test-user-a@loom.local', name: 'Test User A', role: 'USER', membership: 'LEARNER' },
   faculty: { email: 'test-faculty@loom.local', name: 'Test Faculty', role: 'USER', membership: 'FACULTY' },
+  // - ?as=twocourse → "Test Two Courses", the ONLY identity holding two
+  //   enrolments, for the course-switch spec. Dedicated on purpose: testa's
+  //   single-course shelf is a fixture contract other specs assert against,
+  //   and a mid-suite switch by testa would re-scope concurrent workers'
+  //   shelves live. Its second course is created on demand below.
+  twocourse: { email: 'test-two-courses@loom.local', name: 'Test Two Courses', role: 'USER', membership: 'LEARNER' },
 } as const;
 
 /**
@@ -72,6 +78,7 @@ export async function GET(request: Request) {
   const identity =
     asParam === 'testa' ? IDENTITIES.testa
     : asParam === 'faculty' ? IDENTITIES.faculty
+    : asParam === 'twocourse' ? IDENTITIES.twocourse
     : asParam === 'admin' ? IDENTITIES.admin
     : isBranchPreview() ? IDENTITIES.testa
     : IDENTITIES.admin;
@@ -115,8 +122,49 @@ export async function GET(request: Request) {
             ...(faculty ? { sectionId } : {}),
           },
         });
+
+      // The two-course identity's second enrolment, in a fixture course
+      // created on demand — created NOW, so its createdAt is newer than every
+      // seeded course and the suite's oldest-course dependencies
+      // (tests/admin-course-param.spec.ts pins the first course;
+      // tests/signed-out-reading.spec.ts rides the oldest's readings) keep
+      // holding. No course_source rows on purpose: an empty second shelf is
+      // what lets the switch spec SEE the re-scope.
+      if (identity === IDENTITIES.twocourse) {
+        let second = (
+          await db.select().from(courses).where(eq(courses.slug, 'e2e-second-course')).limit(1)
+        )[0];
+        second ??= (
+          await db
+            .insert(courses)
+            .values({
+              slug: 'e2e-second-course',
+              name: 'Second Course (e2e)',
+              term: '',
+              description: 'Fixture for tests/course-switch.spec.ts; carries no readings on purpose.',
+            })
+            .returning()
+        )[0];
+        await db
+          .insert(courseMemberships)
+          .values({ courseId: second.id, userId, role: 'LEARNER' })
+          .onConflictDoUpdate({
+            target: [courseMemberships.courseId, courseMemberships.userId],
+            set: { removedAt: null, role: 'LEARNER' },
+          });
+      }
     }
   }
+
+  // Selection residue is a leak of the same kind the role reset above guards
+  // against: a previous run's course switch (selectedAt, migration 0027)
+  // would land every later sign-in as this account in the wrong course — and
+  // Playwright workers run in parallel. Every backdoor session starts from
+  // "never switched", whichever identity it is.
+  await db
+    .update(courseMemberships)
+    .set({ selectedAt: null })
+    .where(eq(courseMemberships.userId, userId));
 
   // 3. Generate a random session token
   const sessionToken = crypto.randomUUID();
