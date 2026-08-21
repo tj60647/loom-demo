@@ -124,6 +124,17 @@ export type GuideStep = {
   needsText?: boolean
 }
 
+/**
+ * The page the practice reading opens on (TJ, 2026-08-21): straight to words
+ * worth highlighting, instead of the two covers the book leads with. Page 8
+ * of `Oh, the Places You'll Go!` opens on the passage TJ chose for the
+ * guide's first capture — "And you may not find any / you'll want to go
+ * down. / In that case, of course, / you'll head straight out of town." —
+ * verified against source_page.textContent for the practice-loom-reading
+ * seed on 2026-08-21.
+ */
+export const PRACTICE_TEXT_PAGE = 8
+
 export const GUIDE_STEPS: GuideStep[] = [
   {
     key: "arrive",

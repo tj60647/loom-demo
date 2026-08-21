@@ -24,6 +24,7 @@ import PracticeGuide from "@/components/practice/PracticeGuide"
 import PracticeShelf, { type PracticeCard } from "@/components/practice/PracticeShelf"
 import JourneyNav from "@/components/ui/JourneyNav"
 import Workbench, { type WorkbenchSource } from "@/components/Workbench"
+import { PRACTICE_TEXT_PAGE } from "@/lib/practiceGuide"
 import Identity from "@/components/ui/Identity"
 import type { LoomState } from "@/lib/types"
 
@@ -147,7 +148,11 @@ export default function SandboxWorkbench({
       </div>
       <PracticeGuide />
       {opened ? (
-        <Workbench source={workbenchSource} practice isPreviewDeployment={isPreviewDeployment} />
+        // focus.page: open ON WORDS (TJ, 2026-08-21) — the book leads with
+        // two covers, and the guide's first move is a highlight. Page 8
+        // carries the passage the guide proposes; PRACTICE_TEXT_PAGE says
+        // which and why. Same mechanism a search hit uses.
+        <Workbench source={workbenchSource} practice focus={{ page: PRACTICE_TEXT_PAGE }} isPreviewDeployment={isPreviewDeployment} />
       ) : (
         <>
           {/* No scope bar: the real Library has none, and the practice loom's
