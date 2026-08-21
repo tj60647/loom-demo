@@ -1,8 +1,7 @@
-import { addAllowedEmail, getRoster, getStaffViewer, removeAllowedEmail, removeFromRoster, setMemberRole } from "@/actions/admin"
-import { assignMemberSection } from "@/actions/courses"
+import { getRoster, getStaffViewer } from "@/actions/admin"
 import { firstParam, getCourse, listSections, resolveSectionId } from "@/lib/courses"
 import InviteLearners from "@/components/admin/InviteLearners"
-import SectionSelect from "@/components/admin/SectionSelect"
+import RosterTable from "@/components/admin/RosterTable"
 
 type AdminPageSearchParams = {
   course?: string | string[]
@@ -39,129 +38,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     ? courseSections.find((section) => section.id === sectionId)?.name ?? null
     : null
   // Two panels, one population each (TJ, 2026-08-20): the invited who have
-  // not signed in, then the enrolled. The row markup stays shared — a row
-  // knows which controls it carries from its own status, as before.
+  // not signed in, then the enrolled. Each panel is a sortable RosterTable —
+  // the rows and their controls live there now.
   const pending = roster.filter((row) => row.status === "pending")
   const enrolled = roster.filter((row) => row.status !== "pending")
   const pendingCount = pending.length
   const enrolledCount = enrolled.length
-
-  const rosterRow = (person: (typeof roster)[number]) => (
-    <div key={person.userId ?? person.email} className={`rosterrow${person.status === "pending" ? " pendingrow" : ""}`}>
-      <div className="rosterwho">
-        <span className="rostername">{person.name ?? person.email}</span>
-        {person.name ? <span className="rosteremail">{person.email}</span> : null}
-      </div>
-
-      <div className="rosterpills">
-        {person.status === "pending" ? (
-          <span className="pill loose" title="invited — has not signed in, so has no loom yet">
-            not signed in yet
-          </span>
-        ) : (
-          <>
-            {person.role === "FACULTY" && (
-              <span className="pill" title="holds this course's read-side admin view (ruling 18)">
-                faculty
-              </span>
-            )}
-            <span className="pill beaten">{person.conceptsCount} concepts</span>
-            <span className="pill loose">{person.edgesCount} edges</span>
-          </>
-        )}
-      </div>
-
-      {/* Two different writes behind one control, and the pick saves on
-          change (SectionSelect). Once someone exists, their section lives
-          on the membership; before that it lives on the invitation, so
-          placing a pending learner is an upsert of the invitation and
-          they land there on first sign-in. The empty div when the form
-          cannot render holds the grid track, so columns stay aligned for
-          a faculty (read-only) viewer too. */}
-      {isAdmin && courseSections.length > 0 ? (
-        <form action={person.userId ? assignMemberSection : addAllowedEmail}>
-          <input type="hidden" name="courseId" value={courseId} />
-          {person.userId ? (
-            <input type="hidden" name="userId" value={person.userId} />
-          ) : (
-            <input type="hidden" name="email" value={person.email} />
-          )}
-          <SectionSelect
-            name="sectionId"
-            defaultValue={person.sectionId ?? ""}
-            ariaLabel={`Section for ${person.name ?? person.email}`}
-            emptyLabel="No section"
-            options={courseSections}
-          />
-        </form>
-      ) : (
-        <div aria-hidden="true" />
-      )}
-
-      <div className="rosteracts">
-        {person.userId ? (
-          <>
-            {/* Enters Open Loom (src/lib/viewUser.ts): the student's FULL
-                loom, read-only, navigated by the app itself — not the old
-                summary page, which remains routable at /admin/user/[id]. A
-                plain anchor: the enter route needs a document navigation so
-                the providers remount reading the new owner. */}
-            <a
-              href={`/api/view-user/enter?user=${encodeURIComponent(person.userId ?? "")}`}
-              className="btn mini compact"
-              data-tip="their whole loom, read-only — the app navigates their work; exit from the floating Teaching menu"
-            >
-              Open Loom
-            </a>
-            {isAdmin && (
-              <>
-                {/* One reversible toggle (ruling 18): promotion homes
-                    them in the Faculty Section; demotion returns them
-                    to unassigned for deliberate re-placement. */}
-                <form action={setMemberRole}>
-                  <input type="hidden" name="courseId" value={courseId} />
-                  <input type="hidden" name="userId" value={person.userId} />
-                  <input type="hidden" name="role" value={person.role === "FACULTY" ? "LEARNER" : "FACULTY"} />
-                  <button
-                    className="btn ghost mini compact"
-                    type="submit"
-                    data-tip={person.role === "FACULTY"
-                      ? "back to a learner's view — their section resets to unassigned"
-                      : "grants this course's read-side admin view; their own workspace is untouched"}
-                  >
-                    {person.role === "FACULTY" ? "Return to learner" : "Make faculty"}
-                  </button>
-                </form>
-                <form action={removeFromRoster}>
-                  <input type="hidden" name="courseId" value={courseId} />
-                  <input type="hidden" name="userId" value={person.userId} />
-                  <button
-                    className="btn ghost mini compact"
-                    type="submit"
-                    aria-label={`Remove ${person.name ?? person.email} from course`}
-                  >
-                    Remove
-                  </button>
-                </form>
-              </>
-            )}
-          </>
-        ) : isAdmin ? (
-          <form action={removeAllowedEmail}>
-            <input type="hidden" name="courseId" value={courseId} />
-            <input type="hidden" name="email" value={person.email} />
-            <button
-              className="btn ghost mini compact"
-              type="submit"
-              aria-label={`Withdraw the invitation for ${person.email}`}
-            >
-              Withdraw
-            </button>
-          </form>
-        ) : null}
-      </div>
-    </div>
-  )
 
   return (
     <main>
@@ -211,7 +93,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <h2>Invited — not signed in yet</h2>
                 <span className="pill loose">{pendingCount}</span>
               </summary>
-              <div className="card rosterlist" style={{ marginTop: "10px" }}>{pending.map(rosterRow)}</div>
+              <RosterTable people={pending} courseId={courseId} courseSections={courseSections} isAdmin={isAdmin} />
             </details>
           )}
 
@@ -222,7 +104,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <span className="pill loose">{enrolledCount}</span>
             </summary>
             {enrolledCount > 0 ? (
-              <div className="card rosterlist" style={{ marginTop: "10px" }}>{enrolled.map(rosterRow)}</div>
+              <RosterTable people={enrolled} courseId={courseId} courseSections={courseSections} isAdmin={isAdmin} />
             ) : (
               <div className="card empty" style={{ marginTop: "10px" }}>
                 <span className="cap">Nobody has signed in yet — invitations above are waiting</span>

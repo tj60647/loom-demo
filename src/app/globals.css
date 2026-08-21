@@ -1525,20 +1525,28 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* Roster: one learner per row — a roster is scanned, not read, so each entry
    is a line in a list, not a card. The pills column has a fixed basis so the
    section selects line up down the page. */
-/* Roster rows on a SHARED column grid (TJ, 2026-08-21: rows, not cards —
-   "impossible to compare entries" as cards; comparison is the roster's
-   job). Every row lays the same four tracks — who | status and counts |
-   section | actions — and all but the first track is fixed, which is what
-   makes per-row grids agree to the pixel where the old flex-wrap rows
-   drifted. The card experiment lived one review (7477802) and is undone
-   deliberately, not lost: its save-on-change picker and button fix stay. */
+/* The roster as a sortable table (TJ, 2026-08-21: "sortable columns. show
+   roles for all. align columns"). ONE template lays the header and every
+   row — who | role | concepts | edges | section | actions — and all but the
+   first track is fixed, which is what makes per-row grids agree to the
+   pixel where flex-wrap drifted and the card grid (7477802, lived one
+   review) defeated comparison outright. Role is a column of its own for
+   every row because a faculty tag sharing a cell with the counts pushed
+   them out of line — the misalignment that forced this shape. Vertical
+   padding is tight on the same review: the roster is for scanning, and
+   9px rows spent a screen on twelve people. */
 .rosterlist{padding:0}
-.rosterrow{display:grid;grid-template-columns:minmax(200px,1fr) 210px 200px 310px;gap:10px 14px;align-items:center;padding:9px 14px;border-bottom:1px dotted var(--rule)}
+.rosterhead,.rosterrow{display:grid;grid-template-columns:minmax(170px,1fr) 90px 110px 90px 190px 310px;gap:6px 14px;align-items:center;padding:4px 14px}
+.rosterhead{border-bottom:1px solid var(--rule);padding-top:7px;padding-bottom:7px}
+.rosterhead button{background:none;border:none;padding:0;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;text-align:left}
+.rosterhead button:hover{color:var(--ink)}
+.rosterhead button.on{color:var(--ochre)}
+.rosterrow{border-bottom:1px dotted var(--rule)}
 .rosterrow:last-child{border-bottom:none}
 .rosterwho{min-width:0}
 .rostername{display:block;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rosteremail{display:block;font-family:var(--mono);font-size:11px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rosterpills{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rosterdash{color:var(--dot)}
 .rosterrow form{display:flex;gap:6px;align-items:center;margin:0}
 .rosteracts{display:flex;gap:6px;align-items:center;justify-content:flex-end}
 /* An invitation not yet taken up is quieter than an enrolled learner, but
