@@ -31,7 +31,10 @@ export default function ClothFold({ openOnArrival = false }: {
   /** A search hit named this cloth — see below. */
   openOnArrival?: boolean
 } = {}) {
-  const { activeCloth, updateCloth, flushCloth, isLoading, scope, flash, state, scoped, scopeMaps, resetReading } = useLoom()
+  // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the fields
+  // become plain text and "start this reading over" is not drawn — the cloth
+  // is the student's name for their work, not the viewer's to change.
+  const { activeCloth, updateCloth, flushCloth, isLoading, scope, flash, state, scoped, scopeMaps, resetReading, readOnly } = useLoom()
   const { byId } = useReadings()
   const titleOf = (id: string) => byId.get(id)?.title ?? id
   const scopeLabel = scopeLabelOf(scope.key, titleOf)
@@ -123,26 +126,51 @@ export default function ClothFold({ openOnArrival = false }: {
         and carries its <i>own</i> title, one-line and description. Keep several projections and
         each keeps its own; they can say quite different things about the same cloth.
       </p>
-      <div className="form-row">
-        <span className="label">Cloth Title</span>
-        <input
-          id="clothTitle"
-          value={title}
-          onChange={(e) => updateCloth({ title: e.target.value })}
-          onBlur={flushCloth}
-          placeholder="a sentence or headline — what your reading of it says"
-          maxLength={200}
-        />
-      </div>
-      <div className="form-row">
-        <span className="label">Cloth Description</span>
-        <textarea
-          value={description}
-          onChange={(e) => updateCloth({ description: e.target.value })}
-          onBlur={flushCloth}
-          placeholder="your short interpretation of the reading"
-        />
-      </div>
+      {/* Plain text in Open Loom: the student's title and description stay
+          readable; only the fields go (TJ, 2026-08-21). */}
+      {readOnly ? (
+        <>
+          <div className="form-row">
+            <span className="label">Cloth Title</span>
+            {title.trim() ? (
+              <p className="oconcept-def" style={{ margin: 0 }}>{title}</p>
+            ) : (
+              <p className="oconcept-def empty" style={{ margin: 0 }}>untitled</p>
+            )}
+          </div>
+          <div className="form-row">
+            <span className="label">Cloth Description</span>
+            {description.trim() ? (
+              <p className="oconcept-def" style={{ margin: 0 }}>{description}</p>
+            ) : (
+              <p className="oconcept-def empty" style={{ margin: 0 }}>no description yet</p>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="form-row">
+            <span className="label">Cloth Title</span>
+            <input
+              id="clothTitle"
+              value={title}
+              onChange={(e) => updateCloth({ title: e.target.value })}
+              onBlur={flushCloth}
+              placeholder="a sentence or headline — what your reading of it says"
+              maxLength={200}
+            />
+          </div>
+          <div className="form-row">
+            <span className="label">Cloth Description</span>
+            <textarea
+              value={description}
+              onChange={(e) => updateCloth({ description: e.target.value })}
+              onBlur={flushCloth}
+              placeholder="your short interpretation of the reading"
+            />
+          </div>
+        </>
+      )}
       <div className="clothfoot">
         {/* "Save cloth" stood here beside these two until 2026-08-13, three
             buttons in a row reading SAVE CLOTH · DOWNLOAD CLOTH .JSON ·
@@ -164,8 +192,9 @@ export default function ClothFold({ openOnArrival = false }: {
 
       {/* Ruled off and last, below the download — the order is the advice:
           keep a copy where you made it, then clear. Only drawn inside a
-          reading, and only when there is something here to clear. */}
-      {soleSource && somethingHere && (
+          reading, and only when there is something here to clear — and never
+          in Open Loom, where the work is the student's (TJ, 2026-08-21). */}
+      {!readOnly && soleSource && somethingHere && (
         <div className="clothdanger">
           {!arming ? (
             <button className="btn ghost mini clothreset" onClick={() => setArming(true)}>

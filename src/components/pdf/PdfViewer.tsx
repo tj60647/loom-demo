@@ -138,7 +138,11 @@ type HighlightEntry = {
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
   onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
-  const { state, scoped, addConcept, editConcept, addPassageConcept, unfilePassage, editPassageNote } = useLoom();
+  // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the
+  // student's highlights, rail cards, search and page-turning all stay — they
+  // are the mode — while the capture affordance never appears and the rail
+  // hosts are handed no write handlers, so their cards draw no ×, + or field.
+  const { state, scoped, addConcept, editConcept, addPassageConcept, unfilePassage, editPassageNote, readOnly } = useLoom();
   // The confirm and its wording live in the hook, so this button and Your
   // work's make the same promise about what a delete takes with it.
   const removePassageWithConfirm = useRemovePassage();
@@ -3138,12 +3142,15 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 concepts={state.concepts}
                 onOpenPassage={gotoOpenPassage}
                 onOpenConcept={gotoOpenConcept}
-                onUnfile={unfilePassage}
-                onRemovePassage={removePassageWithConfirm}
-                onCreateConcept={addConcept}
-                onAddConcept={addPassageConcept}
-                onEditConcept={editConcept}
-                onEditNote={editPassageNote}
+                /* Open Loom passes no write handler at all — the rail card
+                   draws an affordance only when its handler exists, so this is
+                   the whole gate (TJ, 2026-08-21). */
+                onUnfile={readOnly ? undefined : unfilePassage}
+                onRemovePassage={readOnly ? undefined : removePassageWithConfirm}
+                onCreateConcept={readOnly ? undefined : addConcept}
+                onAddConcept={readOnly ? undefined : addPassageConcept}
+                onEditConcept={readOnly ? undefined : editConcept}
+                onEditNote={readOnly ? undefined : editPassageNote}
                 draft={railDraft}
               >
                 <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
@@ -3243,12 +3250,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               concepts={state.concepts}
               onOpenPassage={gotoOpenPassage}
               onOpenConcept={gotoOpenConcept}
-              onUnfile={unfilePassage}
-              onRemovePassage={removePassageWithConfirm}
-              onCreateConcept={addConcept}
-              onAddConcept={addPassageConcept}
-              onEditConcept={editConcept}
-              onEditNote={editPassageNote}
+              /* Same gate as the page-mode rail above (TJ, 2026-08-21). */
+              onUnfile={readOnly ? undefined : unfilePassage}
+              onRemovePassage={readOnly ? undefined : removePassageWithConfirm}
+              onCreateConcept={readOnly ? undefined : addConcept}
+              onAddConcept={readOnly ? undefined : addPassageConcept}
+              onEditConcept={readOnly ? undefined : editConcept}
+              onEditNote={readOnly ? undefined : editPassageNote}
               draft={railDraft}
               onAspect={acceptAspect}
               manifest={manifest}
@@ -3398,8 +3406,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         </div>
       )}
 
-      {/* Floating Capture Button */}
-      {highlightRect && (
+      {/* Floating Capture Button. Never in Open Loom (TJ, 2026-08-21):
+          selecting text stays free — reading is selecting — but the selection
+          arms nothing. Gated at the render rather than in handleSelection so
+          the selection-measuring effect keeps one shape in both modes. */}
+      {highlightRect && !readOnly && (
         <button 
           id="captureNow"
           className="btn mini"

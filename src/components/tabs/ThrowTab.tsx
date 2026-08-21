@@ -79,7 +79,10 @@ export default function ThrowTab({ onGotoPassage, pair }: {
   // 2026-08-09 only that — while the evidence check, the duplicate-pair guard
   // and the coined-label vocabulary all read the whole graph, because those
   // are facts about the student rather than about this bench.
-  const { state, scoped, scope, addEdge, editEdge, removeEdge, attachLink, flash, setUndoStack, setRedoStack , editConcept } = useLoom()
+  // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the warp
+  // and the thread list stay readable — cards open, evidence and doors alive —
+  // while the bench, the step rail and every fold that writes are not drawn.
+  const { state, scoped, scope, addEdge, editEdge, removeEdge, attachLink, flash, setUndoStack, setRedoStack , editConcept, readOnly } = useLoom()
   const { byId: readingsById } = useReadings()
   const titleOf = (id: string) => readingsById.get(id)?.title ?? id
   /* The warp's concept popover lived here — state, a top-layer element and the
@@ -396,13 +399,16 @@ export default function ThrowTab({ onGotoPassage, pair }: {
       concepts={state.concepts}
       titleOf={titleOf}
       mode="pick"
+      /* In Open Loom the card drops its Select button and its fields; the head
+         still opens it, so the warp stays a readable list (TJ, 2026-08-21). */
+      readOnly={readOnly}
       onGotoPassage={onGotoPassage}
       /* 02 opens to the same three sections as 01 and 04 (TJ, 2026-08-18). No
          unfile: this station links concepts, it does not keep their filings. */
       edit={{
         isOpen: false,
         onToggle: () => {},
-        onRename: (input) => renameConcept(c, input),
+        onRename: readOnly ? undefined : (input) => renameConcept(c, input),
         onEditDef: (def) => editConcept(c.id, { def }),
       }}
       pick={pairA === c.id ? 1 : pairB === c.id ? 2 : null}
@@ -427,6 +433,19 @@ export default function ThrowTab({ onGotoPassage, pair }: {
    */
   const threadRow = (e: typeof state.edges[number]) => {
     const current = labelOfEdge(e, state.links)
+    // Open Loom reads the row in the card's own read mode — trip, sentence and
+    // the label pill, no folds and no remove (TJ, 2026-08-21).
+    if (readOnly) {
+      return (
+        <ThreadCard
+          key={e.id}
+          thread={e}
+          from={conceptById(e.fromId)}
+          to={conceptById(e.toId)}
+          links={state.links}
+        />
+      )
+    }
     return (
       <ThreadCard
         key={e.id}
@@ -478,7 +497,11 @@ export default function ThrowTab({ onGotoPassage, pair }: {
 
       {/* Four pills reading "pick · pick · say · throw" said the shape of the
           move but not the move. Numbered, named, and with the current step
-          spelled out underneath, so the bar teaches instead of labelling. */}
+          spelled out underneath, so the bar teaches instead of labelling.
+          Not in Open Loom: the four moves are the throw, and the throw is not
+          offered there (TJ, 2026-08-21). */}
+      {!readOnly && (
+      <>
       <div className="rail steprail">
         {STEPS.map((step, r) => (
           <span key={r} style={{ display: 'contents' }}>
@@ -490,6 +513,8 @@ export default function ThrowTab({ onGotoPassage, pair }: {
         ))}
       </div>
       <p className="hint steprailnote">{STEPS[railN]?.says}</p>
+      </>
+      )}
       <div className="three">
         <div className="card" id="warp">
           <h2 className="cardhead">
@@ -498,7 +523,8 @@ export default function ThrowTab({ onGotoPassage, pair }: {
                 one more concept, coined where you are looking at concepts (TJ,
                 2026-08-18). It opens the shared NameConceptCard rather than a
                 field of its own, so the three homes cannot drift. */}
-            <button
+            {/* Not in Open Loom — coining is the student's act (TJ, 2026-08-21). */}
+            {!readOnly && <button
               type="button"
               className="pchip-add"
               onClick={() => setCoining((v) => !v)}
@@ -511,19 +537,28 @@ export default function ThrowTab({ onGotoPassage, pair }: {
                  and when you would want it. */
               aria-label="Add a concept before you have found evidence in the reading"
               title="Add a concept before you have found evidence in the reading"
-            >+</button>
+            >+</button>}
           </h2>
-          {coining && (
+          {!readOnly && coining && (
             <NameConceptCard
               onAdd={coinConcept}
               onDone={() => setCoining(false)}
             />
           )}
-          <p className="do">{doLine}</p>
+          {/* The do-line narrates picking, which Open Loom does not offer; the
+              hint keeps only the half that is still true (TJ, 2026-08-21). */}
+          {!readOnly && <p className="do">{doLine}</p>}
+          {readOnly ? (
+            <p className="hint">
+              The concepts <b>this reading</b> evidences — the ones a passage was
+              captured for here. Tap a name to open it.
+            </p>
+          ) : (
           <p className="hint">
             The concepts <b>this reading</b> evidences — the ones you captured a
             passage for here. Select one, then a second — or tap a name to open it.
           </p>
+          )}
           {/* Ruled 2026-08-08 (TJ): linking works on this reading's concepts.
               A concept you met elsewhere joins the warp the honest way — you
               find a passage HERE that embodies it and file it under that same
@@ -542,6 +577,10 @@ export default function ThrowTab({ onGotoPassage, pair }: {
           </div>
         </div>
 
+        {/* The whole bench is the act of creation, so Open Loom does not draw
+            it; `.three` is auto-fit, so the two remaining cards fold to a
+            clean pair (TJ, 2026-08-21). */}
+        {!readOnly && (
         <div className="card" id="throwBench">
           <h2>Throw a thread</h2>
           <p className="hint calm">When two are picked, say how they hang together — long and awkward is fine. The description <i>is</i> the thread. A good check: does it read aloud as a claim you&apos;d defend in section?</p>
@@ -605,6 +644,7 @@ export default function ThrowTab({ onGotoPassage, pair }: {
             </p>
           </div>
         </div>
+        )}
 
         {/* The threads are their own column, not a strip under the bench (TJ,
             2026-08-12: "this seems like it is better suited to 3 cols"). The
@@ -641,7 +681,9 @@ export default function ThrowTab({ onGotoPassage, pair }: {
               it once you have written the same relation a few times. Shown
               only with threads on screen — with none, it explains a control
               nobody can see. */}
-          {orderedEdges.length > 0 && (
+          {/* Not in Open Loom: it explains a control the rows there do not
+              carry (TJ, 2026-08-21). */}
+          {orderedEdges.length > 0 && !readOnly && (
             <p className="hint">
               As a thread matures you can promote its description to a <b>label</b> — one
               short word for the relation, chosen because it captures the essence of what

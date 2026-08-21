@@ -144,7 +144,10 @@ export function RailCardBody({
               onClick={() => onOpenConcept?.(concept.id)}
               title={`Open “${conceptNameText(concept)}” in your work`}
             ><ConceptName concept={concept} /></button>
-            {!readOnly && (
+            {/* Presence-gated as well as zoom-gated: Open Loom's viewer
+                (PdfViewer, TJ 2026-08-21) passes no onUnfile, so the × is not
+                drawn there at any zoom. */}
+            {!readOnly && onUnfile && (
               <button
                 type="button"
                 className="pchip-x"
@@ -158,8 +161,11 @@ export function RailCardBody({
         {/* Click-through, not an inline field: cards are CSS-scaled when a
             side crowds, so a field in here would loop — typing grows the card,
             height changes the scale, and the scale moves every card on the
-            side including the one under the cursor. */}
-        {!readOnly && (
+            side including the one under the cursor.
+
+            Gated on the handler too: in Open Loom the host has no add path,
+            so a + would open nothing (TJ, 2026-08-21). */}
+        {!readOnly && onAddConcept && (
           <button
             type="button"
             className="pdf-railcard-add"
@@ -185,7 +191,12 @@ export function RailCardBody({
           This is why the host's empty-card test drops its note clause at the
           same threshold: a card carrying only a note now draws nothing, so it
           must not be drawn at all. See SpreadCanvasView. */}
-      {!readOnly && (
+      {/* And below the zoom gate, a second one: with no onEditNote (Open Loom,
+          TJ 2026-08-21) a WRITTEN note still shows — it is the student's own
+          words and stays a door to the work — but the empty state draws
+          nothing, because "add a passage note" is an invitation the viewer
+          cannot take. */}
+      {!readOnly && (canEditNote || passage.note) && (
         editingNote ? (
           /* WRITTEN HERE, not in Your work (TJ, 2026-08-19: "the passage rail
              card passage note should be editable in place"). Same contract as
@@ -592,7 +603,9 @@ export default function ConceptRails({
                   concepts={c.concepts}
                   onOpenPassage={onOpenPassage}
                   onOpenConcept={onOpenConcept}
-                  onAddConcept={toggleAddConcept}
+                  /* The + only exists when the editor it opens can (Open Loom
+                     passes neither creator nor adder — TJ, 2026-08-21). */
+                  onAddConcept={onCreateConcept && onAddConcept ? toggleAddConcept : undefined}
                   addConceptExpanded={activeAddPassageId === id}
                   addConceptControls={activeAddPassageId === id ? `add-concept-${id}` : undefined}
                   onUnfile={onUnfile}

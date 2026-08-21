@@ -104,12 +104,18 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
    */
   onThrowPair?: (fromId: string, toId: string) => void
 } = {}) {
+  // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21). What stays
+  // is every read: switching among the student's projections (`selectMap` is
+  // deliberately live), the board and its card menus, the counts, the
+  // downloads. What goes is every gesture that writes — new/rename/delete,
+  // tier chips, sort-list reorder, board drags, pin, and the read's two fields,
+  // which render as plain text.
   const {
     state, scopedState, scope,
     activeMap, scopeMaps, selectMap, addMap, renameMap, removeMap,
     setMapTiers, setMapRead, setMapEssence, flushMapText,
     setView, ensureActiveMap,
-    flash, studentName,
+    flash, studentName, readOnly,
   } = useLoom()
   const { titleOf } = useReadings()
   const { confirm } = useDialog()
@@ -448,6 +454,12 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
   }
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    // Open Loom: no gesture arms at all (TJ, 2026-08-21). Refusing here, where
+    // every drag is born, is what keeps a card from visually moving and then
+    // snapping back when the provider refuses the setView on pointer-up — the
+    // live geometry (`setLive`/`setBend`) is written during the move, before
+    // anything asks the provider.
+    if (readOnly) return
     // A drag is already live — a second finger must not hijack the gesture.
     if (dragCard.current || dragEdge.current) return
     const target = e.target as Element
@@ -640,15 +652,22 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
             onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectMap(m.id) } }}
           >{m.name}</span>
         ))}
-        <button
+        {/* Not in Open Loom — a new projection is the student's to start
+            (TJ, 2026-08-21). */}
+        {!readOnly && <button
           className="btn ghost mini"
           id="newMap"
           data-tip="start another projection of the same concepts — a different reading of them"
           onClick={() => void addMap().catch(e => flash(e instanceof Error ? e.message : "could not start a projection"))}
-        >+ New projection</button>
+        >+ New projection</button>}
       </span>
       {activeMap && (
         <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          {/* Plain text in Open Loom; the downloads stay — taking a copy is a
+              read (TJ, 2026-08-21). */}
+          {readOnly ? (
+            <span style={{ fontSize: 12 }}>{activeMap.name}</span>
+          ) : (
           <input
             aria-label="Rename this projection"
             value={activeMap.name}
@@ -656,6 +675,7 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
             onBlur={flushMapText}
             style={{ width: 140, fontSize: 12, padding: "4px 7px" }}
           />
+          )}
           {/* Named like every other download since 2026-08-12 (TJ): four pairs
               of "keep .json" on four stations meant the object you were taking
               depended on remembering which one you were looking at. */}
@@ -671,7 +691,7 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
             data-tip="this projection as a readable outline — notes, Obsidian, an agent"
             onClick={handleKeepMapMd}
           >download projection .md</button>
-          <button className="btn ghost mini" data-tip="delete this projection — concepts and threads stay" onClick={handleDeleteMap}>delete</button>
+          {!readOnly && <button className="btn ghost mini" data-tip="delete this projection — concepts and threads stay" onClick={handleDeleteMap}>delete</button>}
         </span>
       )}
     </div>
@@ -722,16 +742,25 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
       <div className="card">
         <div className="heading-with-info">
           <h2>Sort <span className="n" id="triageCount">{scopedState.concepts.length ? `(${onCount} of ${scopedState.concepts.length} on the board)` : ""}</span></h2>
-          <button
+          {/* Not in Open Loom — one gesture, thirty writes (TJ, 2026-08-21). */}
+          {!readOnly && <button
             className="btn ghost mini compact"
             id="makeAllPrimary"
             disabled={!scopedState.concepts.length}
             data-tip="tiers every concept primary in one gesture — you demote from there"
             onClick={makeAllPrimary}
-          >make all primary</button>
+          >make all primary</button>}
         </div>
+        {/* The instructions narrate sorting; Open Loom shows the tiers the
+            student gave and says only that (TJ, 2026-08-21). */}
+        {readOnly ? (
+          <p className="hint">The tiers this projection gives each concept: <b>P</b>rimary · <b>S</b>econdary · <b>T</b>ertiary · <b>–</b> set aside. Sorted concepts stand on the board.</p>
+        ) : (
+        <>
         <p className="do">Give each concept a tier: <b>P</b>rimary (the projection hangs on it) · <b>S</b>econdary · <b>T</b>ertiary (example / detail) · <b>–</b> set aside. Sorted concepts land on the board below.</p>
         <p className="hint">A–Z until you say otherwise: drag a row by its handle — or focus the handle and press ↑ / ↓ — to re-order this list, and your sequence sticks. That re-sequences the list only; the board, the counts and the concept-map kit are untouched. <b>Make all primary</b> is a starting point, not a recommendation: it puts everything on the top tier in one move so you can demote from there.</p>
+        </>
+        )}
         <div id="triageList" onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropAt(null) }}>
           {!scopedState.concepts.length ? (
             <div className="empty">
@@ -749,6 +778,9 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
               onDragOver={e => onRowDragOver(e, i)}
               onDrop={onRowDrop}
             >
+              {/* No handle in Open Loom: re-ordering persists into the view row
+                  (TJ, 2026-08-21). */}
+              {!readOnly && (
               <span
                 className="thandle"
                 role="button"
@@ -776,12 +808,26 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
                   ))}
                 </svg>
               </span>
+              )}
               <span className="tlabel"><ConceptName concept={c} /></span>
+              {/* Inert in Open Loom: the chips still SAY the tier — the lit one
+                  is the student's sort — but no press re-tiers (TJ, 2026-08-21). */}
               <span className="tierchips">
                 {TIERS.map(([k, name]) => (
-                  <span key={k} className={`tchip${tierOf(c.id) === k ? " on" : ""}`} title={name.toLowerCase()} onClick={() => setTier(c, k)}>{k.toUpperCase()}</span>
+                  <span
+                    key={k}
+                    className={`tchip${tierOf(c.id) === k ? " on" : ""}`}
+                    title={name.toLowerCase()}
+                    onClick={readOnly ? undefined : () => setTier(c, k)}
+                    style={readOnly ? { cursor: "default" } : undefined}
+                  >{k.toUpperCase()}</span>
                 ))}
-                <span className={`tchip off${tierOf(c.id) === "x" ? " on" : ""}`} title="set aside" onClick={() => setTier(c, "x")}>–</span>
+                <span
+                  className={`tchip off${tierOf(c.id) === "x" ? " on" : ""}`}
+                  title="set aside"
+                  onClick={readOnly ? undefined : () => setTier(c, "x")}
+                  style={readOnly ? { cursor: "default" } : undefined}
+                >–</span>
               </span>
             </div>
           ))}
@@ -790,7 +836,13 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
 
       <div className="card">
         <h2>The board</h2>
+        {/* The read-only line keeps the ⋮ half — the menu is a read — and
+            drops the drag narration (TJ, 2026-08-21). */}
+        {readOnly ? (
+          <p className="hint">The projection as the student arranged it — general above, specific below. Each card carries its own <b>⋮</b> — its description and the passages behind it.</p>
+        ) : (
         <p className="hint">Drag cards to arrange — general above, specific below. Dropping a card into another band re-tiers it. Drag a <i>line</i> to bow it out of the way and re-seat its label. Each card carries its own <b>⋮</b> — its description and the passages behind it, on the same card you meet a concept on everywhere else.</p>
+        )}
 
       {/* position:relative anchors the card menus, which are HTML over the SVG. */}
       <div id="tableWrap" style={{ position: "relative", overflowX: "auto", border: "1px solid var(--rule)", borderRadius: 4, background: "#f4f2ec" }}>
@@ -855,9 +907,11 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
                   strokeDasharray={named ? undefined : "5 4"}
                   markerEnd={`url(#${named ? "ctArrowNamed" : "ctArrowLoose"})`}
                 />
-                {/* wide invisible twin — the drag handle for bending */}
-                <path d={d} fill="none" stroke="rgba(0,0,0,0)" strokeWidth={14} cursor="grab" data-ebend={e.id}>
-                  <title>{`“${e.sentence}” — drag to bend this line`}</title>
+                {/* wide invisible twin — the drag handle for bending. In Open
+                    Loom onPointerDown refuses every gesture, so it is only the
+                    hover title; the cursor and the title say so. */}
+                <path d={d} fill="none" stroke="rgba(0,0,0,0)" strokeWidth={14} cursor={readOnly ? "default" : "grab"} data-ebend={e.id}>
+                  <title>{readOnly ? `“${e.sentence}”` : `“${e.sentence}” — drag to bend this line`}</title>
                 </path>
                 {/* label at the curve's apex, wrapped rather than cut */}
                 <text
@@ -875,7 +929,7 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
             const pos = effPos[c.id], w = cardW(c), h = cardH(c)
             const twoLine = isPinned(c)
             return (
-              <g key={c.id} cursor="grab" data-card={c.id}>
+              <g key={c.id} cursor={readOnly ? "default" : "grab"} data-card={c.id}>
                 <rect x={pos.x} y={pos.y} width={w} height={h} rx={4} fill="#fff" stroke="var(--ochre)" strokeWidth={1.2} />
                 <text x={pos.x + w / 2} y={pos.y + (twoLine ? 19 : h / 2 + 4)} textAnchor="middle" fontFamily='"Newsreader",Georgia,serif' fontSize={12.5} fill={conceptName(c).unlabeled ? "var(--ink-soft)" : "var(--ink)"}>
                   {short(conceptNameText(c), Math.floor(w / 6.4))}
@@ -972,8 +1026,10 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
             />
             {/* Pinning is the board's own gesture — it puts the gloss on the
                 card you are arranging — so it lives here rather than in the
-                shared card. Only offered when there is a description to pin. */}
-            {menuConcept.def && (
+                shared card. Only offered when there is a description to pin,
+                and never in Open Loom: pins are geometry in the map's view row
+                (TJ, 2026-08-21). */}
+            {!readOnly && menuConcept.def && (
               <button
                 type="button"
                 className="btn ghost mini compact"
@@ -1009,6 +1065,25 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
       <div className="card">
         <h2>Your read of this projection {activeMap ? <span className="n">&ldquo;{activeMap.name}&rdquo; — its one-line and paragraph travel with it</span> : <span className="n">starts with your first sort</span>}</h2>
         <p className="readq">In a sentence — what is this reading <i>about</i>?</p>
+        {/* Plain text in Open Loom (TJ, 2026-08-21): the one-line and the
+            paragraph are the student's read of their own projection, which is
+            most of what a staff viewer came to see. */}
+        {readOnly ? (
+          <>
+            {activeMap?.essence?.trim() ? (
+              <p className="oconcept-def" id="mapEssence" style={{ margin: 0 }}>{activeMap.essence}</p>
+            ) : (
+              <p className="oconcept-def empty" id="mapEssence" style={{ margin: 0 }}>no one-line yet</p>
+            )}
+            <p className="hint" style={{ marginTop: 8 }}>The read of this projection, in the student&apos;s own words.</p>
+            {activeMap?.read?.trim() ? (
+              <p className="oconcept-def" id="yourRead2" style={{ margin: 0 }}>{activeMap.read}</p>
+            ) : (
+              <p className="oconcept-def empty" id="yourRead2" style={{ margin: 0 }}>no paragraph yet</p>
+            )}
+          </>
+        ) : (
+        <>
         {/* `.tinput` for the app's input styling AND its width:100%. A bare
             <input> takes the browser's ~177px default, which was merely odd
             across a full-width card and reads as broken in a column. */}
@@ -1028,6 +1103,8 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
           onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapRead(m.id, v)) }}
           onBlur={flushMapText}
         />
+        </>
+        )}
         {/* The kit, explained in a sentence rather than in a button (TJ,
             2026-08-12: the label "was doing more work than it should"). Every
             other box in this station says what it is above the control; this

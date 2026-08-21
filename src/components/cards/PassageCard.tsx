@@ -70,6 +70,7 @@ export default function PassageCard({
   onGoto,
   hideConceptId,
   edit,
+  readOnly = false,
 }: {
   passage: Passage
   /** The student's whole concept list, for resolving this passage's filings. */
@@ -92,6 +93,15 @@ export default function PassageCard({
   hideConceptId?: string
   /** Required by `mode="edit"`; ignored otherwise. */
   edit?: PassageCardEdit
+  /**
+   * Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): a staff viewer reading a
+   * STUDENT's loom. The edit row is where this card decides to draw its own
+   * controls — the note field, the chip ×, the + and "remove passage" — so the
+   * flag lives here rather than in the host's handler list. The note renders
+   * as plain text (it is the student's data, and the mode exists to show it);
+   * the quotation stays a door, which is a read.
+   */
+  readOnly?: boolean
 }) {
   /**
    * The + gets focus back when the card it opened goes away — the same restore
@@ -175,6 +185,17 @@ export default function PassageCard({
             LoomProvider writes `note` optimistically, and remounting on the
             saved value is what keeps the field from going stale without
             fighting the caret. */}
+        {/* Plain text in Open Loom (TJ, 2026-08-21): the note is the student's
+            own words and stays visible; only the field goes. Absent, nothing is
+            drawn — "what struck you" is not an invitation a viewer can take. */}
+        {readOnly ? (
+          passage.note ? (
+            <div className="pblock">
+              <span className="label">Note <span className="labelsay">— why these words were kept</span></span>
+              <div className="passagenote">{passage.note}</div>
+            </div>
+          ) : null
+        ) : (
         <div className="pblock">
           <span className="label">Note <span className="labelsay">— why you kept these words</span></span>
           <textarea
@@ -187,11 +208,14 @@ export default function PassageCard({
             }}
           />
         </div>
+        )}
 
         {/* The destructive act sits with the PASSAGE's own material — its
             quotation and its note — and above the concepts, which are a
             different subject (TJ, 2026-08-18, showing the order he wants).
-            Quiet, and still the only thing here that destroys anything. */}
+            Quiet, and still the only thing here that destroys anything.
+            Not drawn in Open Loom, with the other affordances. */}
+        {!readOnly && (
         <div className="src rm-actions" style={{ marginTop: "8px" }}>
           <button
             type="button"
@@ -202,6 +226,7 @@ export default function PassageCard({
             remove passage
           </button>
         </div>
+        )}
 
         <div className="pblock">
           <span className="label">
@@ -221,6 +246,7 @@ export default function PassageCard({
             {filedUnder.map((c) => (
               <span key={c.id} className="pchip">
                 <ConceptName concept={c} />
+                {!readOnly && (
                 <button
                   type="button"
                   className="pchip-x"
@@ -228,8 +254,10 @@ export default function PassageCard({
                   aria-label={`Remove ${conceptNameText(c)} from this passage`}
                   title={`Remove “${conceptNameText(c)}” from this passage. The passage stays.`}
                 >×</button>
+                )}
               </span>
             ))}
+            {!readOnly && (
             <button
               type="button"
               ref={addButtonRef}
@@ -244,8 +272,9 @@ export default function PassageCard({
               title="Add a concept to this passage"
               data-add-concept-for={passage.id}
             >+</button>
+            )}
           </div>
-          {edit.addOpen && (
+          {!readOnly && edit.addOpen && (
             <div id={addCardId}>
             <AddConceptCard
               passage={passage}

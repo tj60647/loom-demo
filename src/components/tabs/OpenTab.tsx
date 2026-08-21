@@ -57,7 +57,11 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
   // — otherwise capturing a concept met in an earlier text would mint a
   // duplicate instead of joining its evidence (loom-model-build.md §2:
   // identity is by object, not label string).
-  const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, addPassageConcept, unfilePassage, editPassageNote, flash } = useLoom()
+  // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the capture
+  // form and every add/remove affordance go; the log itself — the student's
+  // passages and concepts, both views, the row expands — is what the mode
+  // exists to show, so all of that stays.
+  const { state, scope, scoped, isLoading, addConcept, addPassage, editConcept, addPassageConcept, unfilePassage, editPassageNote, flash, readOnly } = useLoom()
   const { byId, titleOf } = useReadings()
   // Shared with the margin rail card, so the two dialogs cannot drift apart.
   const removePassageWithConfirm = useRemovePassage()
@@ -602,8 +606,11 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
             column — read once, then scrolled past on every visit for the rest
             of the course. The list itself is self-evident once you have used
             it once; the reference-only view, which is a whole page and is where
-            a student meets capture with no text beside it, keeps them. */}
-        {!compact && (
+            a student meets capture with no text beside it, keeps them.
+
+            Not in Open Loom: both sentences coach the AUTHOR toward edits the
+            viewer cannot make (TJ, 2026-08-21). */}
+        {!compact && !readOnly && (
           <>
             <p className="do calm">Everything you capture from this reading lands here, A–Z.</p>
             <p className="hint">Click a row to open it — edit the description, or file the same passage under another concept. When you have a handful, go to <b>02 — Linking</b> and start connecting them.</p>
@@ -705,13 +712,16 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
                 concepts={state.concepts}
                 titleOf={titleOf}
                 mode="edit"
+                readOnly={readOnly}
                 onGotoPassage={onGotoPassage}
                 edit={{
                   isOpen: !!isOpen,
                   onToggle: () => toggleRow(concept.id),
-                  onRename: (input) => handleRename(concept, input),
+                  /* Not passed in Open Loom, so the field is not drawn — the
+                     same rule as a host that cannot rename. */
+                  onRename: readOnly ? undefined : (input) => handleRename(concept, input),
                   onEditDef: (def) => editConcept(concept.id, { def }),
-                  onUnfilePassage: (passageId) => unfilePassage(passageId, concept.id),
+                  onUnfilePassage: readOnly ? undefined : (passageId) => unfilePassage(passageId, concept.id),
                 }}
               />
             )
@@ -766,6 +776,7 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
               concepts={state.concepts}
               titleOf={titleOf}
               mode="edit"
+              readOnly={readOnly}
               onGoto={onGotoPassage}
               edit={{
                 onEditNote: (note) => editPassageNote(b.id, note),
@@ -790,7 +801,9 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
             UNLABELED belongs to the passages, because that is where an
             unlabeled passage now lives — its group left the concept view when
             the passage view arrived. */}
-        {view === "passages" && unlabeled.length > 0 && (
+        {/* Second-person coaching toward an act ("name it") — the student's,
+            not a viewer's, so Open Loom does not draw it (TJ, 2026-08-21). */}
+        {view === "passages" && unlabeled.length > 0 && !readOnly && (
           <p className="ghostnote" style={{ marginTop: "10px" }}>
             <b>Unlabeled</b> is a state, not a fault — the passage is captured and it is
             yours. Name it when the word arrives, or never.
@@ -799,7 +812,10 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
 
         {/* And this one is about the CONCEPT list: what it holds, what it
             leaves out, and where the rest of your vocabulary is. */}
-        {view === "concepts" && scoped.outside.length > 0 && (
+        {/* "…offered as you type a concept above" is false in Open Loom — there
+            is no field above — so the note is not drawn there; the Vocabulary
+            station itself stays reachable from the journey bar (TJ, 2026-08-21). */}
+        {view === "concepts" && scoped.outside.length > 0 && !readOnly && (
           <p className="ghostnote" style={{ marginTop: "10px" }}>
             This list is this reading&apos;s work. Concepts you named in other readings
             are still offered as you type a concept above — filing a passage from here
@@ -824,7 +840,8 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
             evidence is a statement about your vocabulary, not about any passage
             on this page — under a list of passages it read as a form belonging
             to the row above it. */}
-        {view === "concepts" && (
+        {/* Never in Open Loom — coining is the student's act (TJ, 2026-08-21). */}
+        {view === "concepts" && !readOnly && (
         <NameConceptCard
           listId={listId}
           /* The homonym confirm rides with the act, in useCoinConcept — it
@@ -866,7 +883,16 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
 
   // No text to select from — a reference-only reading the student minted for
   // something the library does not hold. Here typing IS the only doorway, so
-  // the form leads.
+  // the form leads — except in Open Loom, where capture is not offered and the
+  // log stands alone (TJ, 2026-08-21).
+  if (readOnly) {
+    return (
+      <>
+        <ClothFold openOnArrival={openClothFold} />
+        {logCard}
+      </>
+    )
+  }
   return (
     <>
       {conceptOptions}

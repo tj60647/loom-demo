@@ -78,10 +78,13 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
    *  may be a reading that is not the one open. Workbench routes it. */
   onGotoPassage?: (passage: Passage) => void
 } = {}) {
+  // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the two
+  // FILTERS and both lists stay — browsing the student's holdings is the mode
+  // — while the coin controls go and every field renders as plain text.
   const {
     state, scope, scoped,
     editConcept, removeConcept, mergeConcepts, editEdge, flash, unfilePassage,
-    addLink, editLink,
+    addLink, editLink, readOnly,
   } = useLoom()
   const { titleOf, course } = useReadings()
   const isStaff = !!course?.isStaff
@@ -334,7 +337,8 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                 one more concept, coined where you are looking at concepts (TJ,
                 2026-08-18). It opens the shared NameConceptCard rather than a
                 field of its own, so the three homes cannot drift. */}
-            <button
+            {/* Not in Open Loom — coining is the student's act (TJ, 2026-08-21). */}
+            {!readOnly && <button
               type="button"
               className="pchip-add"
               onClick={() => setCoiningConcept((v) => !v)}
@@ -348,21 +352,30 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                  looking in. One control, one sentence, wherever you meet it. */
               aria-label="Add a concept before you have found evidence in the reading"
               title="Add a concept before you have found evidence in the reading"
-            >+</button>
+            >+</button>}
           </h2>
-          {coiningConcept && (
+          {!readOnly && coiningConcept && (
             <NameConceptCard
               listId="conceptOptions"
               onAdd={coinConcept}
               onDone={() => setCoiningConcept(false)}
             />
           )}
+          {/* The read-only line drops the verbs — "edit" and "remove" name acts
+              the mode refuses (TJ, 2026-08-21). */}
+          {readOnly ? (
+            <p className="hint">
+              Click a concept to open it — its description, and the readings that
+              evidence it. Two rows with the same name are two concepts, which is legal.
+            </p>
+          ) : (
           <p className="hint">
             Click a concept to open it — edit its description, and see which readings
             evidence it. Two rows with the same name are two concepts, which is legal:
             if they are one idea, file the passages under the one you are keeping and
             remove the other.
           </p>
+          )}
           <div className="quietrow" style={{ marginBottom: "10px" }}>
             <input
               id="conceptFilter"
@@ -403,17 +416,21 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                   concepts={state.concepts}
                   titleOf={readingName}
                   mode="edit"
+                  readOnly={readOnly}
                   edit={{
                     isOpen: !!isOpen,
                     onToggle: () => setOpenConcepts((p) => ({ ...p, [concept.id]: !p[concept.id] })),
                     /* 04 renames too (TJ, 2026-08-18: "the vocabulary concept
                        card does not show concept as a name i can change"). The
                        dialog is the shared one, so the homonym warning reads
-                       the same here as it does in Your work. */
-                    onRename: (input: HTMLInputElement) => renameConcept(concept, input),
-                    onUnfilePassage: (passageId: string) => unfilePassage(passageId, concept.id),
+                       the same here as it does in Your work. Not in Open Loom
+                       — not passed, so the field is not drawn. */
+                    onRename: readOnly ? undefined : (input: HTMLInputElement) => renameConcept(concept, input),
+                    onUnfilePassage: readOnly ? undefined : (passageId: string) => unfilePassage(passageId, concept.id),
                     onEditDef: (def: string) => { editConcept(concept.id, { def }); flash("description saved") },
-                    body: (
+                    /* 04's own acts — merge and remove — are the STUDENT's;
+                       Open Loom passes no body (TJ, 2026-08-21). */
+                    body: readOnly ? undefined : (
                       <>
                         {/* The Description field is the CARD's now — one
                             textarea, drawn by ConceptCard for every station
@@ -477,11 +494,21 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
             Link Labels{" "}
             <span className="n">{linkRows.length ? `(${linkRows.length})` : ""}</span>
           </h2>
+          {/* The read-only line drops the coaching verb, as the Concepts hint
+              does (TJ, 2026-08-21). */}
+          {readOnly ? (
+            <p className="hint">
+              The words used to label the relations themselves — across every reading.
+              A label reached for again is a word becoming the student&apos;s; open one to
+              read its description and the threads that use it.
+            </p>
+          ) : (
           <p className="hint">
             The words you use to label the relations themselves — yours, across every
             reading. A label you reach for again is a word becoming yours; open one to
             give it your own description and read the threads that use it.
           </p>
+          )}
           <div className="quietrow" style={{ marginBottom: "10px" }}>
             <input
               id="labelFilter"
@@ -504,6 +531,9 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
               so it is the plainest verb instead. The handler is still `coin()`
               and the event is still `link.coin`: the record keeps its own
               names. */}
+          {/* Not in Open Loom — a coin field is an invitation to write into
+              somebody else's vocabulary (TJ, 2026-08-21). */}
+          {!readOnly && (
           <div className="quietrow" style={{ marginBottom: "10px", gap: "6px" }}>
             <input
               id="coinLabel"
@@ -517,6 +547,7 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
               {coining ? "…" : "Add"}
             </button>
           </div>
+          )}
 
           <div className="scrollbox">
             {linkRows.length === 0 && (
@@ -552,6 +583,14 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                           sentence below, which belongs to that pair. */}
                       <div className="defrow">
                         <span className="label">Link Description</span>
+                        {/* Plain text in Open Loom (TJ, 2026-08-21). */}
+                        {readOnly ? (
+                          link.description ? (
+                            <p className="oconcept-def" style={{ margin: 0 }}>{link.description}</p>
+                          ) : (
+                            <p className="oconcept-def empty" style={{ margin: 0 }}>no description yet</p>
+                          )
+                        ) : (
                         <input
                           className="linkOwnDescription"
                           placeholder="what this relation means, in your words"
@@ -563,6 +602,7 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                             }
                           }}
                         />
+                        )}
                       </div>
                       {edges.length === 0 && (
                         <p className="hint" style={{ marginTop: "8px" }}>
@@ -585,6 +625,14 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                           </div>
                           <div className="defrow" style={{ marginTop: "6px" }}>
                             <span className="label">Description</span>
+                            {/* Plain text in Open Loom (TJ, 2026-08-21). */}
+                            {readOnly ? (
+                              edge.sentence ? (
+                                <p className="oconcept-def" style={{ margin: 0 }}>&ldquo;{edge.sentence}&rdquo;</p>
+                              ) : (
+                                <p className="oconcept-def empty" style={{ margin: 0 }}>not described</p>
+                              )
+                            ) : (
                             <input
                               className="linkDescription"
                               placeholder="the sentence this thread reads as…"
@@ -596,6 +644,7 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
                                 }
                               }}
                             />
+                            )}
                           </div>
                         </div>
                       ))}
@@ -606,7 +655,9 @@ export default function VocabularyTab({ initialConceptFilter, initialLabelFilter
             })}
           </div>
 
-          {looseLinks.length > 0 && (
+          {/* An instruction to go and label — the student's move, so Open Loom
+              does not draw it (TJ, 2026-08-21). */}
+          {looseLinks.length > 0 && !readOnly && (
             <p className="ghostnote" style={{ marginTop: "10px" }}>
               {looseLinks.length} link{looseLinks.length !== 1 ? "s carry" : " carries"} a
               description but no label yet — label one on <b>02 · Linking</b> so a word can
