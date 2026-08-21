@@ -13,6 +13,10 @@ const STATES = [
   { file: 'playwright/.auth/user.json', query: '' },
   { file: 'playwright/.auth/testa.json', query: '?as=testa' },
   { file: 'playwright/.auth/faculty.json', query: '?as=faculty' },
+  // "Test Two Courses" — the only identity enrolled twice, for the
+  // course-switch spec alone. Never reuse it elsewhere: its whole point is
+  // that switching it re-scopes nothing any other spec is looking at.
+  { file: 'playwright/.auth/twocourse.json', query: '?as=twocourse' },
 ];
 
 async function globalSetup(config: FullConfig) {

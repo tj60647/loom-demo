@@ -294,6 +294,7 @@ async function checkRoster() {
   const stamp = `check-auth-${Date.now()}`
   const learner = `${stamp}@loom.check`
   let courseId = ""
+  let secondCourseId = ""
   let userId = ""
   let facultyUserId = ""
 
@@ -388,10 +389,43 @@ async function checkRoster() {
     check("the admin is recognised without a roster row", isAdminUser({ email: admin }), true)
     check("  and may sign in", await emailHasAppAccess(admin), true)
     check("  however github spells it", await emailHasAppAccess(" TJM@TJMcLeish.com "), true)
+
+    // The working-course choice (selectedAt, migration 0027): written only by
+    // setActiveCourse, read only as the resolver's first ORDER BY key. These
+    // are SQL-ordering facts — nulls-last, soft-remove filtering, the
+    // archived-course join — so they are asserted against real rows. The
+    // learner above is active again (the reinstatement checks) and holds one
+    // membership; this gives them a second, NEWER course.
+    const { resolveCourseIdForUser } = await import("../src/lib/courses")
+    secondCourseId = (
+      await db
+        .insert(courses)
+        .values({ slug: `${stamp}-2`, name: "Auth check second (temporary)", term: "check" })
+        .returning({ id: courses.id })
+    )[0].id
+    await db.insert(courseMemberships).values({ courseId: secondCourseId, userId, role: "LEARNER" })
+    const membershipIn = (cid: string) =>
+      and(eq(courseMemberships.courseId, cid), eq(courseMemberships.userId, userId))
+
+    check("two courses, never switched: the oldest wins", await resolveCourseIdForUser(userId), courseId)
+
+    await db.update(courseMemberships).set({ selectedAt: new Date() }).where(membershipIn(secondCourseId))
+    check("a stamped selection outranks the oldest", await resolveCourseIdForUser(userId), secondCourseId)
+    check("  a requested course outranks the stamp", await resolveCourseIdForUser(userId, courseId), courseId)
+    check("  and requesting never re-stamps — the selection still stands", await resolveCourseIdForUser(userId), secondCourseId)
+
+    await db.update(courseMemberships).set({ removedAt: new Date() }).where(membershipIn(secondCourseId))
+    check("a removed membership's stamp goes quiet", await resolveCourseIdForUser(userId), courseId)
+    await db.update(courseMemberships).set({ removedAt: null }).where(membershipIn(secondCourseId))
+    check("  reinstatement resurrects it — back where they were working", await resolveCourseIdForUser(userId), secondCourseId)
+
+    await db.update(courses).set({ isArchived: true }).where(eq(courses.id, secondCourseId))
+    check("an archived course's stamp sleeps too", await resolveCourseIdForUser(userId), courseId)
   } finally {
     if (userId) await db.delete(users).where(eq(users.id, userId))
     if (facultyUserId) await db.delete(users).where(eq(users.id, facultyUserId))
     if (courseId) await db.delete(courses).where(eq(courses.id, courseId))
+    if (secondCourseId) await db.delete(courses).where(eq(courses.id, secondCourseId))
   }
 }
 
