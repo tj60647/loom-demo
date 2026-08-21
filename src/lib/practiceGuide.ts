@@ -122,6 +122,16 @@ export type GuideStep = {
    * covers, where "drag across a line or two" points at a picture.
    */
   needsText?: boolean
+  /**
+   * Elements to place the CARD beside, found by content — CSS cannot match
+   * text, and the capture beat wants the bubble next to the lines TJ
+   * proposed rather than parked at the stage's top edge (TJ, 2026-08-21:
+   * "could be closer to the text, no?"). Placement only: never the hole
+   * (sandbox.spec measures .guideglow as the cutout — check-practice-guide
+   * guards this) and never a constraint — the selection stays the
+   * student's. Falls back to the targets' union when it finds nothing.
+   */
+  anchorFind?: (doc: Document) => Element[]
 }
 
 /**
@@ -155,6 +165,16 @@ export const GUIDE_STEPS: GuideStep[] = [
     // cutout on the layer would light one page and dim the other — and a drag
     // across the spread would start lit and end in the dark.
     targets: [".pdf-stage", "#captureNow"],
+    // The CARD sits beside the passage's own lines instead of the stage's
+    // top edge (TJ, 2026-08-21: "could be closer to the text, no?"). NOT a
+    // move — check-practice-guide forbids walking this beat, because
+    // sandbox.spec measures .guideglow as the mask's cutout. Placement only;
+    // the hole stays the whole stage and any selection completes the beat.
+    anchorFind: (doc) => {
+      const line = /may not find any|want to go down|in that case, of course|head straight out of town/i
+      return Array.from(doc.querySelectorAll(".react-pdf__Page__textContent span"))
+        .filter((span) => line.test(span.textContent ?? ""))
+    },
     overlay: "mask",
     handOff: true,
     needsText: true,
