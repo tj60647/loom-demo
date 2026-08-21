@@ -104,7 +104,7 @@ export async function getLibrarySources({ includeArchived = false } = {}) {
 export async function getLibraryOverview({ includeArchived = true } = {}) {
   await requireAdmin()
 
-  const [library, scores, memberships, allCourses, revisions] = await Promise.all([
+  const [library, scores, memberships, allCourses, revisions, people] = await Promise.all([
     db.select().from(sources).orderBy(asc(sources.title)),
     db.select().from(sourceScores),
     db
@@ -118,10 +118,15 @@ export async function getLibraryOverview({ includeArchived = true } = {}) {
       .from(courseSources),
     db.select().from(courses).orderBy(asc(courses.createdAt)),
     db.select().from(sourceRevisions).orderBy(asc(sourceRevisions.createdAt)),
+    // Who added each own-reading: the badge names the student (TJ,
+    // 2026-08-21, "badge them"). The whole user table is smaller than a
+    // per-row lookup would cost.
+    db.select({ id: users.id, name: users.name, email: users.email }).from(users),
   ])
 
   const scoreBySource = new Map(scores.map((score) => [score.sourceId, score]))
   const courseById = new Map(allCourses.map((course) => [course.id, course]))
+  const personById = new Map(people.map((person) => [person.id, person]))
 
   // A revision row exists only for a file that REPLACED another, so the
   // original upload has none and a reading's version is its revision count + 1.
@@ -141,6 +146,14 @@ export async function getLibraryOverview({ includeArchived = true } = {}) {
       ...source,
       score: scoreBySource.get(source.id) ?? null,
       revisions: revisionsBySource.get(source.id) ?? [],
+      // Only an own-reading names its owner — for the course library the
+      // uploader is an admin detail nobody asked to badge.
+      owner: source.isOwn && source.createdByUserId
+        ? (() => {
+            const person = personById.get(source.createdByUserId)
+            return person?.name ?? person?.email ?? "unknown"
+          })()
+        : null,
       courses: memberships
         .filter((row) => row.sourceId === source.id)
         .flatMap((row) => {

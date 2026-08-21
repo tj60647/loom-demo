@@ -148,7 +148,17 @@ export default async function AdminLibraryPage({
                       <div>
                         <div className="heading-with-info">
                           <h3 style={{ margin: "0 0 4px 0", fontSize: "16px" }}>{reading.title}</h3>
-                          {reading.courses.length === 0 ? (
+                          {reading.isOwn ? (
+                            /* A student's own reading is not "in no course" —
+                               no course was ever meant to include it. Slate,
+                               named for its owner (TJ, 2026-08-21). */
+                            <span
+                              className="pill own"
+                              title={`${reading.owner} added this for themselves — it sits on their shelf only`}
+                            >
+                              own · {reading.owner}
+                            </span>
+                          ) : reading.courses.length === 0 ? (
                             <span className="pill loose">In no course</span>
                           ) : (
                             reading.courses.map((course) => (
