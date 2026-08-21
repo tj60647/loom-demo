@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react"
 import { addAllowedEmail, removeAllowedEmail, removeFromRoster, setMemberRole } from "@/actions/admin"
 import { assignMemberSection } from "@/actions/courses"
-import SectionSelect from "@/components/admin/SectionSelect"
+import AutoSaveSelect from "@/components/admin/AutoSaveSelect"
+import { useDialog } from "@/components/providers/DialogProvider"
 
 /**
  * The roster as a sortable table (TJ, 2026-08-21: "sortable columns. show
@@ -47,6 +48,7 @@ export default function RosterTable({
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("name")
   const [dir, setDir] = useState<"asc" | "desc">("asc")
+  const { confirm } = useDialog()
 
   const sorted = useMemo(() => {
     const byName = (a: RosterPerson, b: RosterPerson) =>
@@ -111,6 +113,27 @@ export default function RosterTable({
               <span className="pill loose" title="invited — has not signed in, so has no loom yet">
                 invited
               </span>
+            ) : isAdmin && person.userId ? (
+              /* The role IS the control (TJ, 2026-08-21: "just a set role
+                 dropdown" — the toggle button column was the long way round).
+                 Reversible by the same select, so it saves on change like the
+                 section pick. Ruling 18 still holds server-side: promotion
+                 homes them in the Faculty Section, demotion returns them to
+                 unassigned. */
+              <form action={setMemberRole}>
+                <input type="hidden" name="courseId" value={courseId} />
+                <input type="hidden" name="userId" value={person.userId} />
+                <AutoSaveSelect
+                  name="role"
+                  defaultValue={person.role}
+                  ariaLabel={`Role for ${person.name ?? person.email}`}
+                  title="faculty holds this course's read-side admin view; demotion returns them to unassigned for re-placement"
+                  options={[
+                    { value: "LEARNER", label: "learner" },
+                    { value: "FACULTY", label: "faculty" },
+                  ]}
+                />
+              </form>
             ) : person.role === "FACULTY" ? (
               <span className="pill" title="holds this course's read-side admin view (ruling 18)">
                 faculty
@@ -150,12 +173,12 @@ export default function RosterTable({
               ) : (
                 <input type="hidden" name="email" value={person.email} />
               )}
-              <SectionSelect
+              <AutoSaveSelect
                 name="sectionId"
                 defaultValue={person.sectionId ?? ""}
                 ariaLabel={`Section for ${person.name ?? person.email}`}
                 emptyLabel="No section"
-                options={courseSections}
+                options={courseSections.map((s) => ({ value: s.id, label: s.name }))}
               />
             </form>
           ) : (
@@ -175,42 +198,38 @@ export default function RosterTable({
                     owner. */}
                 <a
                   href={`/api/view-user/enter?user=${encodeURIComponent(person.userId)}`}
-                  className="btn mini compact"
+                  className="btn mini compact openloom"
                   data-tip="their whole loom, read-only — the app navigates their work; exit from the floating Teaching menu"
                 >
                   Open Loom
                 </a>
                 {isAdmin && (
-                  <>
-                    {/* One reversible toggle (ruling 18): promotion homes
-                        them in the Faculty Section; demotion returns them
-                        to unassigned for deliberate re-placement. */}
-                    <form action={setMemberRole}>
-                      <input type="hidden" name="courseId" value={courseId} />
-                      <input type="hidden" name="userId" value={person.userId} />
-                      <input type="hidden" name="role" value={person.role === "FACULTY" ? "LEARNER" : "FACULTY"} />
-                      <button
-                        className="btn ghost mini compact"
-                        type="submit"
-                        data-tip={person.role === "FACULTY"
-                          ? "back to a learner's view — their section resets to unassigned"
-                          : "grants this course's read-side admin view; their own workspace is untouched"}
-                      >
-                        {person.role === "FACULTY" ? "Return to learner" : "Make faculty"}
-                      </button>
-                    </form>
-                    <form action={removeFromRoster}>
-                      <input type="hidden" name="courseId" value={courseId} />
-                      <input type="hidden" name="userId" value={person.userId} />
-                      <button
-                        className="btn ghost mini compact"
-                        type="submit"
-                        aria-label={`Remove ${person.name ?? person.email} from course`}
-                      >
-                        Remove
-                      </button>
-                    </form>
-                  </>
+                  /* Removal confirms first (TJ, 2026-08-21) — the one roster
+                     write whose undo is a fresh invitation rather than the
+                     same control. FormData is read BEFORE the await: the
+                     form element nulls off the event once the dialog opens. */
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      const formData = new FormData(event.currentTarget)
+                      void confirm({
+                        title: `Remove ${person.name ?? person.email} from the course?`,
+                        body: "Their access to this course ends — other courses are untouched, and their work is kept. Re-inviting them brings it all back.",
+                        confirmLabel: "Remove",
+                        danger: true,
+                      }).then((ok) => { if (ok) return removeFromRoster(formData) })
+                    }}
+                  >
+                    <input type="hidden" name="courseId" value={courseId} />
+                    <input type="hidden" name="userId" value={person.userId} />
+                    <button
+                      className="btn ghost mini compact"
+                      type="submit"
+                      aria-label={`Remove ${person.name ?? person.email} from course`}
+                    >
+                      Remove
+                    </button>
+                  </form>
                 )}
               </>
             ) : isAdmin ? (
