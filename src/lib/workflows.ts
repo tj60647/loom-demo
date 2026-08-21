@@ -66,6 +66,7 @@ const student: Flow = {
     "src/components/tabs/*.tsx",
     "src/actions/loom.ts",
     "src/components/ui/MyLoomModal.tsx (my loom · start over)",
+    "src/components/ui/CourseSwitch.tsx · src/actions/courses.ts (setActiveCourse)",
   ],
   nodes: [
     { id: "invited", label: "Invited by email", where: "an instructor, on /admin", kind: "start" },
@@ -80,6 +81,14 @@ const student: Flow = {
     // reaches the arc below. It returns to the Library because that is where
     // the real work starts.
     { id: "practice", label: "Try the moves first — nothing is kept", where: "/sandbox — the real interface over a practice loom" },
+    // A side trip like `practice`, not a step — and for the one-course
+    // student not even a control: the header's course label only becomes the
+    // switch when a second active enrolment gives it a choice (TJ,
+    // 2026-08-21: one class needs no disambiguation, no dropdown). The
+    // switch is a full navigation on purpose — the whole workbench belongs
+    // to one course at a time, so picking the other course reloads into its
+    // shelf.
+    { id: "switch", label: "Switch course — the label is a control when you carry more than one", where: "the header's course name, on every page" },
     { id: "open", label: "Open a reading — the card is the door", where: "reading card → /reading/[id]; it opens your Cloth for that reading" },
     { id: "read", label: "Read the text", where: "01 · Reading" },
     { id: "ahead", label: "Or name a concept you expect, and gloss it — then read for support", where: "01 · Reading — shows as “no evidence” until a passage backs it" },
@@ -168,6 +177,8 @@ const student: Flow = {
     { from: "library", to: "open" },
     { from: "library", to: "practice", label: "practise" },
     { from: "practice", to: "library", label: "nothing kept", back: true },
+    { from: "library", to: "switch", label: "more than one course" },
+    { from: "switch", to: "library", label: "the other shelf", back: true },
     { from: "open", to: "read" },
     { from: "read", to: "ahead" },
     { from: "read", to: "capture" },
