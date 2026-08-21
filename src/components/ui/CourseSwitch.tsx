@@ -14,9 +14,11 @@ import { type ActiveCourse } from "@/components/providers/ReadingsProvider"
  * quieter than the name (the v14 ruling AuthButton carried; the span moved
  * here unchanged). When the account holds a second active enrolment the
  * context is a CHOICE, so the label is where the choice lives: same glyphs,
- * same ochre, plus an 8px caret — 12px against the header's 11-character
- * slack at the 1280 floor (Header.tsx's width note; the rejected
- * "full screen app" wrap cost ~32px).
+ * same ochre, plus an 8px caret — measured 12.0px of width on the running
+ * app at 1280 (trigger 299.4px vs plain span 287.4px, same text) against
+ * the header's 11-character (~87px) slack. For scale: the "full screen app"
+ * label Header.tsx rejected overflowed by ~32px of width, and the wrap that
+ * causes costs 52px of the scarce vertical axis (Header.tsx's own note).
  *
  * Who never sees the menu: single-course accounts (nothing to disambiguate —
  * TJ, 2026-08-21), Open Loom viewers and membership-less admins (the server
