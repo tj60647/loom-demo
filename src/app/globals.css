@@ -713,6 +713,10 @@ textarea{min-height:62px;resize:vertical;line-height:1.45}
    the admin library it sits beside course pills and must read as a different
    KIND of row at a glance (TJ, 2026-08-21: "badge them. color code them."). */
 .pill.own{color:var(--slate);border:1px solid var(--slate)}
+/* The badge alone was too subtle (TJ, same day) — the whole card wears the
+   wash, so an own-reading reads as a different kind of row from across the
+   page, not on close inspection. */
+.card.owncard{background:rgba(92,114,135,.09);border-color:rgba(92,114,135,.45)}
 .act{font-family:var(--mono);font-size:10px;color:var(--sage);cursor:pointer;letter-spacing:.04em}
 .act:hover{text-decoration:underline}
 /* .act and .rm sit on <a>, <summary> and <button> alike; strip the native

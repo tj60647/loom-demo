@@ -128,7 +128,7 @@ export default async function AdminLibraryPage({
                     : ""
 
               return (
-                <div className="card" key={reading.id} style={{ padding: "20px" }}>
+                <div className={`card${reading.isOwn ? " owncard" : ""}`} key={reading.id} style={{ padding: "20px" }}>
                   <div style={{ display: "flex", gap: "18px", alignItems: "stretch", flexWrap: "wrap" }}>
                     <SourceThumbnail sourceId={reading.id} title={reading.title} fixedHeight={220} />
 
