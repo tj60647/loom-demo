@@ -24,6 +24,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { getSources } from "@/actions/sources"
 import { resolveCourseIdForUser } from "@/lib/courses"
+import { resolveViewTarget } from "@/lib/viewUserServer"
 import { SNIPPET_OPEN, SNIPPET_CLOSE } from "@/lib/searchText"
 
 /** ts_headline options; markers documented in src/lib/searchText.ts. */
@@ -287,7 +288,12 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
 
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return empty
-  const userId = session.user.id
+  // Open Loom (src/lib/viewUser.ts): a staff viewer searching inside a
+  // student's loom searches the student's rows. The two shelf searches need
+  // no such line — they scope through getSources(), which already resolves
+  // the target.
+  const viewing = await resolveViewTarget(session.user.id)
+  const userId = viewing?.userId ?? session.user.id
 
   const query = normalizeQuery(rawQuery)
   if (query.length < 2) return empty

@@ -2,6 +2,7 @@
 
 import { db } from "@/db"
 import { viewingAsStudent } from "@/lib/viewAsServer"
+import { resolveViewTarget } from "@/lib/viewUserServer"
 import { courseMemberships, courses, sections } from "@/db/schema"
 import { and, asc, eq, isNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
@@ -36,7 +37,16 @@ export async function getActiveCourse() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return null
 
-  const courseId = await resolveCourseIdForUser(session.user.id)
+  // Open Loom (src/lib/viewUser.ts): inside a student's loom the active
+  // course is the STUDENT's, and the staff flags mask to false exactly as
+  // the student lens masks them — every staff surface goes quiet together,
+  // and the floating Teaching menu is the one staff control left standing.
+  // `viewingUser` rides along so the chrome can say whose loom this is.
+  const viewing = await resolveViewTarget(session.user.id)
+
+  const courseId = viewing
+    ? viewing.courseId
+    : await resolveCourseIdForUser(session.user.id)
   if (!courseId) return null
 
   const course = await getCourse(courseId)
@@ -69,8 +79,8 @@ export async function getActiveCourse() {
   // exactly one purpose: drawing the control that takes the lens off again.
   // Without it a staff member could put the lens on and have no way back.
   const asStudent = staffTruly && (await viewingAsStudent())
-  const isAdmin = adminTruly && !asStudent
-  const isStaff = staffTruly && !asStudent
+  const isAdmin = adminTruly && !asStudent && !viewing
+  const isStaff = staffTruly && !asStudent && !viewing
 
   // The sections a staff viewer may overlay. Empty for a student — they see no
   // Overlay control at all, so the list would only be a leak of names.
@@ -86,6 +96,7 @@ export async function getActiveCourse() {
     id: course.id, name: course.name, term: course.term,
     isStaff, isAdmin, sections: courseSections,
     staffTruly, viewingAsStudent: asStudent,
+    viewingUser: viewing ? { id: viewing.userId, name: viewing.name ?? viewing.email } : null,
   }
 }
 

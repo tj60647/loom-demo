@@ -96,9 +96,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <div className="rosteracts">
         {person.userId ? (
           <>
+            {/* Enters Open Loom (src/lib/viewUser.ts): the student's FULL
+                loom, read-only, navigated by the app itself — not the old
+                summary page, which remains routable at /admin/user/[id]. A
+                plain anchor: the enter route needs a document navigation so
+                the providers remount reading the new owner. */}
             <a
-              href={`/admin/user/${person.userId}?course=${encodeURIComponent(courseId)}`}
+              href={`/api/view-user/enter?user=${encodeURIComponent(person.userId ?? "")}`}
               className="btn mini compact"
+              data-tip="their whole loom, read-only — the app navigates their work; exit from the floating Teaching menu"
             >
               Open Loom
             </a>

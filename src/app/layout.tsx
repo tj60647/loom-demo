@@ -5,6 +5,7 @@ import { LoomProvider } from "@/components/providers/LoomProvider";
 import { ReadingsProvider } from "@/components/providers/ReadingsProvider";
 import { DialogProvider } from "@/components/providers/DialogProvider";
 import Header from "@/components/ui/Header";
+import TeachingFloat from "@/components/ui/TeachingFloat";
 import TipLayer from "@/components/ui/TipLayer";
 import { isBranchPreview } from "@/lib/previewLogin";
 
@@ -50,6 +51,10 @@ export default function RootLayout({
                     the same reason the walkthrough was: [data-tip] is on
                     controls in the header and across the pages. */}
                 <TipLayer />
+                {/* Open Loom's floating Teaching menu. Renders nothing unless
+                    the view-user cookie names a target the server authorizes,
+                    so mounting it unconditionally is free. */}
+                <TeachingFloat />
                 {children}
               </DialogProvider>
             </ReadingsProvider>

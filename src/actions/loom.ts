@@ -8,6 +8,7 @@ import type { PgColumn } from "drizzle-orm/pg-core"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { resolveCourseIdForUser } from "@/lib/courses"
+import { resolveViewTarget } from "@/lib/viewUserServer"
 import { scopeFromKey, scopeOf } from "@/lib/scope"
 import type { Passage, CardTableView, GraphEvent, Link, LoomMap, LoomViews, PassageTier, Tier } from "@/lib/types"
 import { textLayerProjection } from "@/lib/pdfText"
@@ -145,8 +146,17 @@ async function pruneViews(
 }
 
 export async function getUserLoomData() {
-  const userId = await getUserId()
-  const courseId = await resolveActiveCourseId(userId)
+  const viewerId = await getUserId()
+  // Open Loom (src/lib/viewUser.ts): a staff viewer may be reading a
+  // student's loom. The swap is READ-side only — resolveActiveCourseId
+  // performs adoption WRITES and must never run with someone else's id, so
+  // the view path takes the write-free course resolution instead (the same
+  // split searchLoom already makes).
+  const viewing = await resolveViewTarget(viewerId)
+  const userId = viewing?.userId ?? viewerId
+  const courseId = viewing
+    ? await resolveCourseIdForUser(userId)
+    : await resolveActiveCourseId(userId)
 
   // Capture order is meaning: the arc map's "warp in reading order" and the
   // coding log both assume rows come back in the order they were made.
@@ -1084,8 +1094,14 @@ export async function saveView(key: string, data: CardTableView) {
  * eras replay from the snapshot on their graph.import / graph.example event.)
  */
 export async function getGraphEvents(): Promise<GraphEvent[]> {
-  const userId = await getUserId()
-  const courseId = await resolveActiveCourseId(userId)
+  const viewerId = await getUserId()
+  // Same Open Loom swap as getUserLoomData, same write-hazard rule: the
+  // adoption-writing course resolver only ever runs for the viewer's own id.
+  const viewing = await resolveViewTarget(viewerId)
+  const userId = viewing?.userId ?? viewerId
+  const courseId = viewing
+    ? await resolveCourseIdForUser(userId)
+    : await resolveActiveCourseId(userId)
 
   const recorded = await db.select().from(graphEvents)
     .where(and(eq(graphEvents.userId, userId), inCourse(graphEvents.courseId, courseId)))

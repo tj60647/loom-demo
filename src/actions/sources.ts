@@ -2,6 +2,7 @@
 
 import { db } from "@/db"
 import { viewingAsStudent } from "@/lib/viewAsServer"
+import { resolveViewTarget } from "@/lib/viewUserServer"
 import {
   passages,
   courseMemberships,
@@ -228,8 +229,14 @@ export async function getCourseSources(courseIdRaw?: string | null) {
 export async function getSources(courseIdRaw?: string | null) {
   const session = await getServerSession(authOptions)
 
-  const courseId = session?.user?.id
-    ? await resolveCourseIdForUser(session.user.id, courseIdRaw)
+  // Open Loom (src/lib/viewUser.ts): the shelf becomes the STUDENT's shelf —
+  // their course resolution, their own readings, and never the admin lens,
+  // because the student it belongs to could not see an unpublished row.
+  const viewing = await resolveViewTarget(session?.user?.id)
+  const shelfOwnerId = viewing?.userId ?? session?.user?.id
+
+  const courseId = shelfOwnerId
+    ? await resolveCourseIdForUser(shelfOwnerId, courseIdRaw)
     : await resolveCourseId(courseIdRaw)
 
   // An admin's shelf includes UNPUBLISHED readings; a student's does not. The
@@ -237,7 +244,7 @@ export async function getSources(courseIdRaw?: string | null) {
   // student can see (TJ, 2026-08-09). It only ever NARROWS — withhold, never
   // grant. Deliberately not applied to `authorizeSourceAccess` below: that is
   // an authorization path, and the lens is a display preference.
-  const admin = isAdminUser(session?.user) && !(await viewingAsStudent())
+  const admin = isAdminUser(session?.user) && !(await viewingAsStudent()) && !viewing
 
   const rows = courseId
     ? await db
@@ -251,14 +258,14 @@ export async function getSources(courseIdRaw?: string | null) {
         )
     : []
 
-  const mine = session?.user?.id
+  const mine = shelfOwnerId
     ? await db
         .select()
         .from(sources)
         .where(
           and(
             eq(sources.isOwn, true),
-            eq(sources.createdByUserId, session.user.id),
+            eq(sources.createdByUserId, shelfOwnerId),
             eq(sources.isArchived, false)
           )
         )
