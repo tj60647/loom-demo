@@ -2,6 +2,7 @@ import { addAllowedEmail, getRoster, getStaffViewer, removeAllowedEmail, removeF
 import { assignMemberSection } from "@/actions/courses"
 import { firstParam, getCourse, listSections, resolveSectionId } from "@/lib/courses"
 import InviteLearners from "@/components/admin/InviteLearners"
+import SectionSelect from "@/components/admin/SectionSelect"
 
 type AdminPageSearchParams = {
   course?: string | string[]
@@ -44,56 +45,55 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const pendingCount = pending.length
   const enrolledCount = enrolled.length
 
-  const rosterRow = (person: (typeof roster)[number]) => (
-    <div key={person.userId ?? person.email} className={`rosterrow${person.status === "pending" ? " pendingrow" : ""}`}>
-      <div className="rosterwho">
-        <span className="rostername">{person.name ?? person.email}</span>
-        {person.name ? <span className="rosteremail">{person.email}</span> : null}
-      </div>
-
-      <div className="rosterpills">
+  const rosterCard = (person: (typeof roster)[number]) => (
+    <div key={person.userId ?? person.email} className={`card rostercard${person.status === "pending" ? " pending" : ""}`}>
+      <div className="rcardhead">
+        <div className="rosterwho">
+          <span className="rostername">{person.name ?? person.email}</span>
+          {person.name ? <span className="rosteremail">{person.email}</span> : null}
+        </div>
         {person.status === "pending" ? (
           <span className="pill loose" title="invited — has not signed in, so has no loom yet">
             not signed in yet
           </span>
-        ) : (
-          <>
-            {person.role === "FACULTY" && (
-              <span className="pill" title="holds this course's read-side admin view (ruling 18)">
-                faculty
-              </span>
-            )}
-            <span className="pill beaten">{person.conceptsCount} concepts</span>
-            <span className="pill loose">{person.edgesCount} edges</span>
-          </>
-        )}
+        ) : person.role === "FACULTY" ? (
+          <span className="pill" title="holds this course's read-side admin view (ruling 18)">
+            faculty
+          </span>
+        ) : null}
       </div>
 
-      {/* Two different writes behind one control. Once someone exists,
-          their section lives on the membership; before that it lives on
-          the invitation, so placing a pending learner is an upsert of
-          the invitation and they land there on first sign-in. */}
-      {isAdmin && courseSections.length > 0 ? (
-        <form action={person.userId ? assignMemberSection : addAllowedEmail}>
-          <input type="hidden" name="courseId" value={courseId} />
-          {person.userId ? (
-            <input type="hidden" name="userId" value={person.userId} />
-          ) : (
-            <input type="hidden" name="email" value={person.email} />
-          )}
-          <select name="sectionId" className="tinput inline" defaultValue={person.sectionId ?? ""} aria-label={`Section for ${person.name ?? person.email}`}>
-            <option value="">No section</option>
-            {courseSections.map((section) => (
-              <option key={section.id} value={section.id}>{section.name}</option>
-            ))}
-          </select>
-          <button className="btn ghost mini compact" type="submit">
-            {person.userId ? "Assign" : "Place"}
-          </button>
-        </form>
-      ) : null}
+      {person.status !== "pending" && (
+        <div className="rosterpills">
+          <span className="pill beaten">{person.conceptsCount} concepts</span>
+          <span className="pill loose">{person.edgesCount} edges</span>
+        </div>
+      )}
 
-      <div className="rosteracts">
+      <div className="rcardacts">
+        {/* Two different writes behind one control, and the pick saves on
+            change (SectionSelect). Once someone exists, their section lives
+            on the membership; before that it lives on the invitation, so
+            placing a pending learner is an upsert of the invitation and
+            they land there on first sign-in. */}
+        {isAdmin && courseSections.length > 0 ? (
+          <form className="sectionpick" action={person.userId ? assignMemberSection : addAllowedEmail}>
+            <input type="hidden" name="courseId" value={courseId} />
+            {person.userId ? (
+              <input type="hidden" name="userId" value={person.userId} />
+            ) : (
+              <input type="hidden" name="email" value={person.email} />
+            )}
+            <SectionSelect
+              name="sectionId"
+              defaultValue={person.sectionId ?? ""}
+              ariaLabel={`Section for ${person.name ?? person.email}`}
+              emptyLabel="No section"
+              options={courseSections}
+            />
+          </form>
+        ) : null}
+
         {person.userId ? (
           <>
             {/* Enters Open Loom (src/lib/viewUser.ts): the student's FULL
@@ -205,7 +205,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <h2>Invited — not signed in yet</h2>
                 <span className="pill loose">{pendingCount}</span>
               </summary>
-              <div className="card rosterlist" style={{ marginTop: "10px" }}>{pending.map(rosterRow)}</div>
+              <div className="rostergrid">{pending.map(rosterCard)}</div>
             </details>
           )}
 
@@ -216,7 +216,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <span className="pill loose">{enrolledCount}</span>
             </summary>
             {enrolledCount > 0 ? (
-              <div className="card rosterlist" style={{ marginTop: "10px" }}>{enrolled.map(rosterRow)}</div>
+              <div className="rostergrid">{enrolled.map(rosterCard)}</div>
             ) : (
               <div className="card empty" style={{ marginTop: "10px" }}>
                 <span className="cap">Nobody has signed in yet — invitations above are waiting</span>

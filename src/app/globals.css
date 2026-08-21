@@ -60,7 +60,10 @@ header input{font-family:var(--body);font-size:15px;background:#fff;border:1px s
    save an auto-width control: its width is content + padding + border, so the
    box grew 2px every time it opened and nudged the whole row. Same box in both
    states; only the colour changes. */
-.btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:1px solid transparent;border-radius:3px;padding:7px 11px;cursor:pointer}
+/* text-decoration:none because a .btn is as often an <a> as a <button>, and
+   the browser's default underline read as "underlined text button" on every
+   anchor wearing this class (TJ, 2026-08-20, the roster's Open Loom). */
+.btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);border:1px solid transparent;border-radius:3px;padding:7px 11px;cursor:pointer;text-decoration:none}
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
 /* No min-height (TJ, 2026-08-17). It was 36px, and on an 11px label that is
    ~7px of empty box above and below the words — which is why every place that
@@ -1522,25 +1525,41 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* Roster: one learner per row — a roster is scanned, not read, so each entry
    is a line in a list, not a card. The pills column has a fixed basis so the
    section selects line up down the page. */
-.rosterlist{padding:0}
-.rosterrow{display:flex;align-items:center;gap:10px 14px;padding:9px 14px;border-bottom:1px dotted var(--rule);flex-wrap:wrap}
-.rosterrow:last-child{border-bottom:none}
-.rosterwho{flex:1 1 200px;min-width:0}
+/* Roster entry cards (TJ, 2026-08-20: "let the rows be roster entry cards").
+   A grid of equal cards aligns what the old flex-wrap rows never could —
+   the column minimum is the card's own, 340px, so the grid folds on content
+   and never at a device width (contracts.md §2c-iii; the 860px media query
+   that rode with the rows died with them). Inside a card the controls row
+   pins to the bottom, so actions align across a row of cards whatever the
+   name and pill lines above them wrapped to. */
+.rostergrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin-top:10px}
+.rostercard{display:flex;flex-direction:column;gap:9px;padding:13px 14px}
+.rcardhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.rcardhead .rosterwho{min-width:0}
 .rostername{display:block;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rosteremail{display:block;font-family:var(--mono);font-size:11px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rosterpills{display:flex;gap:8px;align-items:center;flex:0 0 175px;flex-wrap:wrap}
-@media(max-width:860px){.rosterpills{flex:0 1 auto}}
-.rosterrow form{display:flex;gap:6px;align-items:center;margin:0}
-.rosteracts{display:flex;gap:6px;align-items:center;margin-left:auto}
+.rosterpills{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 /* An invitation not yet taken up is quieter than an enrolled learner, but
-   still legible — it is the row that needs chasing. */
-.rosterrow.pendingrow .rostername{color:var(--ink-soft);font-style:italic}
+   still legible — it is the card that needs chasing. */
+.rostercard.pending .rostername{color:var(--ink-soft);font-style:italic}
+.rcardacts{display:flex;gap:6px;align-items:center;margin-top:auto;flex-wrap:wrap}
+.rcardacts form{display:flex;gap:6px;align-items:center;margin:0}
+.rcardacts .sectionpick{margin-right:auto}
 /* Invite learners starts folded: inviting is occasional, scanning the roster
    is the daily visit. Same twirl idiom as .bandtoggle/.distilltoggle. */
 .invitefold summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}
 .invitefold summary::-webkit-details-marker{display:none}
 .invitefold summary .tw{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--ochre);transition:transform .15s}
 .invitefold[open] summary .tw{transform:rotate(90deg)}
+/* Open Loom's floating Teaching menu. The links are rows with a hover wash,
+   never underlined text (TJ, 2026-08-20); Exit is the one .btn in it. The
+   identity line is the header — whose loom the viewer is inside must never
+   be ambiguous. */
+.teachfloat{position:fixed;right:18px;bottom:58px;z-index:60;width:225px;padding:12px 14px;box-shadow:0 4px 18px rgba(0,0,0,.14)}
+.teachfloat .whose{display:block;margin-bottom:9px;padding-bottom:8px;border-bottom:1px solid var(--rule)}
+.teachfloat nav{display:flex;flex-direction:column;gap:1px;margin-bottom:10px}
+.teachfloat nav a{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft);text-decoration:none;padding:5px 8px;border-radius:3px;transition:background-color .12s ease,color .12s ease}
+.teachfloat nav a:hover{background:var(--paper-2);color:var(--ink)}
 .invitereport{border-left:2px solid var(--rule);padding-left:11px;margin-top:4px}
 .invitereport p{font-size:14px;line-height:1.45;margin:0 0 6px}
 .invitereport p:last-child{margin-bottom:0}

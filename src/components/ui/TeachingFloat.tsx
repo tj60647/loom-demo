@@ -30,28 +30,19 @@ export default async function TeachingFloat() {
   ]
 
   return (
-    <aside
-      aria-label="Teaching — you are viewing a student's loom"
-      className="card"
-      style={{
-        position: "fixed",
-        right: "18px",
-        bottom: "58px",
-        zIndex: 60,
-        padding: "12px 14px",
-        maxWidth: "240px",
-        boxShadow: "0 4px 18px rgba(0,0,0,0.14)",
-      }}
-    >
-      <span className="cap" style={{ display: "block", textTransform: "none", marginBottom: "8px" }}>
+    <aside aria-label="Teaching — you are viewing a student's loom" className="card teachfloat">
+      {/* Whose loom this is, as the header — the one fact that must never be
+          ambiguous inside the mode. */}
+      <span className="whose cap" style={{ textTransform: "none" }}>
         read only — <b>{viewing.name ?? viewing.email}</b>&apos;s loom
       </span>
-      <nav style={{ display: "flex", flexWrap: "wrap", gap: "6px 10px", marginBottom: "10px" }}>
-        {/* Plain anchors on purpose: leaving a student's loom for a Teaching
-            page is a full navigation, and the providers must remount to stop
-            reading the student (same rule as the enter/exit routes). */}
+      {/* Rows with a hover wash, not underlined links (TJ, 2026-08-20). Plain
+          anchors on purpose: leaving a student's loom for a Teaching page is a
+          full navigation, and the providers must remount to stop reading the
+          student (same rule as the enter/exit routes). */}
+      <nav>
         {teaching.map((item) => (
-          <a key={item.label} href={item.href} className="cap" style={{ textTransform: "none" }}>
+          <a key={item.label} href={item.href}>
             {item.label}
           </a>
         ))}
