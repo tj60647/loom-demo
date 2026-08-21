@@ -80,7 +80,11 @@ export default async function ReadingPage({
       <main>
         <div className="empty" style={{ marginTop: "100px" }}>
           <h2>That reading isn&apos;t among your readings.</h2>
-          <span className="cap">it may not be published to your course yet</span>
+          {/* Two honest reasons, both named: unpublished, or published to a
+              DIFFERENT course of yours — since a bookmark can outlive a course
+              switch, "not published yet" alone would half-lie to a two-course
+              student whose link is fine and whose working course is not. */}
+          <span className="cap">it may not be published to your course yet — or it belongs to another of your courses</span>
           <p style={{ marginTop: 18 }}>
             <Link className="btn ghost mini" href="/">‹ back to your readings</Link>
           </p>
