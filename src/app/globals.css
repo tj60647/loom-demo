@@ -1525,26 +1525,25 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* Roster: one learner per row — a roster is scanned, not read, so each entry
    is a line in a list, not a card. The pills column has a fixed basis so the
    section selects line up down the page. */
-/* Roster entry cards (TJ, 2026-08-20: "let the rows be roster entry cards").
-   A grid of equal cards aligns what the old flex-wrap rows never could —
-   the column minimum is the card's own, 340px, so the grid folds on content
-   and never at a device width (contracts.md §2c-iii; the 860px media query
-   that rode with the rows died with them). Inside a card the controls row
-   pins to the bottom, so actions align across a row of cards whatever the
-   name and pill lines above them wrapped to. */
-.rostergrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin-top:10px}
-.rostercard{display:flex;flex-direction:column;gap:9px;padding:13px 14px}
-.rcardhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-.rcardhead .rosterwho{min-width:0}
+/* Roster rows on a SHARED column grid (TJ, 2026-08-21: rows, not cards —
+   "impossible to compare entries" as cards; comparison is the roster's
+   job). Every row lays the same four tracks — who | status and counts |
+   section | actions — and all but the first track is fixed, which is what
+   makes per-row grids agree to the pixel where the old flex-wrap rows
+   drifted. The card experiment lived one review (7477802) and is undone
+   deliberately, not lost: its save-on-change picker and button fix stay. */
+.rosterlist{padding:0}
+.rosterrow{display:grid;grid-template-columns:minmax(200px,1fr) 210px 200px 310px;gap:10px 14px;align-items:center;padding:9px 14px;border-bottom:1px dotted var(--rule)}
+.rosterrow:last-child{border-bottom:none}
+.rosterwho{min-width:0}
 .rostername{display:block;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rosteremail{display:block;font-family:var(--mono);font-size:11px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rosterpills{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rosterrow form{display:flex;gap:6px;align-items:center;margin:0}
+.rosteracts{display:flex;gap:6px;align-items:center;justify-content:flex-end}
 /* An invitation not yet taken up is quieter than an enrolled learner, but
-   still legible — it is the card that needs chasing. */
-.rostercard.pending .rostername{color:var(--ink-soft);font-style:italic}
-.rcardacts{display:flex;gap:6px;align-items:center;margin-top:auto;flex-wrap:wrap}
-.rcardacts form{display:flex;gap:6px;align-items:center;margin:0}
-.rcardacts .sectionpick{margin-right:auto}
+   still legible — it is the row that needs chasing. */
+.rosterrow.pendingrow .rostername{color:var(--ink-soft);font-style:italic}
 /* Invite learners starts folded: inviting is occasional, scanning the roster
    is the daily visit. Same twirl idiom as .bandtoggle/.distilltoggle. */
 .invitefold summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}
