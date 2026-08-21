@@ -60,6 +60,17 @@ const CONCEPT_PATTERNS: { like: string; from: string }[] = [
 
 const SOURCE_PATTERNS: { like: string; from: string }[] = [
   { like: "A book carded by the journey suite ______", from: "journey-learner.spec.ts" },
+  // reuse-seam's three books were never listed here, so every local run
+  // against the dev database left them behind — ~150 by the time the
+  // Readings page made the pile visible (TJ, 2026-08-21: "are they noise?").
+  { like: "a carded book ______", from: "reuse-seam.spec.ts" },
+  { like: "first carded book ______", from: "reuse-seam.spec.ts" },
+  { like: "second carded book ______", from: "reuse-seam.spec.ts" },
+  // No producer in the tree for either probe — retired specs' debris, which
+  // is exactly what the header of this file says a pattern outliving its
+  // spec looks like. Two rows each on dev when added.
+  { like: "Doorway probe ______", from: "a retired spec — no producer in the tree (2026-08-21)" },
+  { like: "Parity probe ______", from: "a retired spec — no producer in the tree (2026-08-21)" },
 ]
 
 /**
@@ -71,6 +82,9 @@ const SOURCE_PATTERNS: { like: string; from: string }[] = [
  */
 const PASSAGE_PATTERNS: { like: string; from: string }[] = [
   { like: "A passage typed by the journey suite%", from: "journey-learner.spec.ts" },
+  // reuse-seam types every passage as "A passage supporting <label>." — one
+  // stem covers both its concepts.
+  { like: "A passage supporting %", from: "reuse-seam.spec.ts" },
 ]
 
 async function main() {
