@@ -406,8 +406,14 @@ export default function PracticeGuide() {
       setRing((was) => (near(was, ring) || (was === null && ring === null) ? was : ring))
 
       const card = cardRef.current
-      if (card && padded) {
-        const next = place(padded, { w: card.offsetWidth, h: card.offsetHeight })
+      // The card FOLLOWS the ring when a beat has moves (TJ, 2026-08-21: the
+      // throw beat is select-from-the-warp then throw, "the bubble should
+      // move to the right part of the screen for each"). Anchoring on the
+      // union kept the card parked over the whole working area while the
+      // ring walked the gestures alone. The hole stays the union.
+      const anchor = ring ?? padded
+      if (card && anchor) {
+        const next = place(anchor, { w: card.offsetWidth, h: card.offsetHeight })
         setSpot((was) =>
           was && was.side === next.side &&
           Math.abs(was.top - next.top) < 1 &&
@@ -416,7 +422,7 @@ export default function PracticeGuide() {
             ? was
             : next
         )
-      } else if (!padded) {
+      } else if (!anchor) {
         setSpot((was) => (was === null ? was : null))
       }
       // The app's own dialogs sit at z 10000 and would bury the guide. When
@@ -595,17 +601,19 @@ export default function PracticeGuide() {
               guide has misread, and a separate skip control would be a second
               button meaning the same thing.
 
-              On the LAST beat it closes the guide instead of advancing. It
-              used to be `disabled={last}`, so the copy said "Press next" over
-              a dead button and the guide had no ending at all (TJ, 2026-08-12:
-              *"the instructions are to press next, but the next is not
-              active"*). Closing is what finishing means here — the reopen chip
-              stays, so nothing is lost by pressing it. */}
+              On the LAST beat it EXITS the guide — a document navigation back
+              to the real shelf (TJ, 2026-08-21: "clicking done on the last
+              slide should exit guide"). Merely hiding the card left the
+              student parked in the sandbox behind a reopen chip, which is a
+              pause, not an ending; finishing the walkthrough should end the
+              walkthrough. The guide link in the header is the way back in.
+              (Before 2026-08-12 the button was `disabled={last}` and the
+              guide had no ending at all.) */}
           <button
             className={ready ? "btn mini gnext gpulse" : "btn ghost mini"}
-            onClick={() => (last ? setOpen(false) : show(at + 1))}
+            onClick={() => (last ? window.location.assign("/") : show(at + 1))}
           >
-            {last ? (ready ? "done ›" : "close ›") : ready ? "next ›" : "skip ›"}
+            {last ? (ready ? "done ›" : "exit ›") : ready ? "next ›" : "skip ›"}
           </button>
           {/* Only when the target is on the page and off the screen — a button
               that is always there is one more thing to read. When it IS there
