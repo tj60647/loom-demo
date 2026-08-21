@@ -244,12 +244,14 @@ test.describe("The guide", () => {
     await expect(page.locator(".guidepop .gdone")).not.toContainText("Press next")
     await finish.click()
 
-    // It closes, and it can be got back — the guide is never a one-way door.
+    // Done EXITS (TJ, 2026-08-21: "clicking done on the last slide should
+    // exit guide") — a document navigation back to the real shelf, not a
+    // hide behind a reopen chip. Finishing the walkthrough ends it; the
+    // header's guide link is the way back in, and it still works.
+    await expect(page).toHaveURL(/\/$/, { timeout: 20_000 })
     await expect(page.locator(".guidepop")).toHaveCount(0)
-    const reopen = page.locator(".guideopen")
-    await expect(reopen).toContainText("8/8")
-    await reopen.click()
-    await expect(page.locator(".guidepop")).toBeVisible()
+    await page.goto("/sandbox")
+    await expect(page.locator(".guidepop")).toBeVisible({ timeout: 30_000 })
   })
 
   test("scrolling away from the glow leaves a way back to it", async ({ page }) => {
