@@ -1,11 +1,8 @@
 import { getServerSession } from "next-auth/next"
 import { redirect } from "next/navigation"
-import { and, eq, isNull } from "drizzle-orm"
 
-import { db } from "@/db"
-import { courseMemberships } from "@/db/schema"
 import { authOptions, isAdminUser } from "@/lib/auth"
-import { resolveCourseIdForUser } from "@/lib/courses"
+import { listFacultyCourseIds } from "@/lib/courses"
 import { viewingAsStudent } from "@/lib/viewAsServer"
 import WorkflowsBoard from "@/components/admin/WorkflowsBoard"
 import MetaPage from "@/components/ui/MetaPage"
@@ -25,8 +22,10 @@ import MetaPage from "@/components/ui/MetaPage"
  * the seam between them.
  *
  * The page holds no course data whatsoever — no roster, no graph, nothing
- * per-student — so nothing here needs a course-scoped gate. Signed in is the
- * whole requirement.
+ * per-student — so staff-ness here is faculty-on-ANY-live-course
+ * (listFacultyCourseIds, the same list /admin gates on), never the working
+ * course: that is a choice now (selectedAt), and switching into a course you
+ * study in must not change which flows you may read.
  */
 export default async function WorkflowsPage() {
   const session = await getServerSession(authOptions)
@@ -34,19 +33,10 @@ export default async function WorkflowsPage() {
 
   let isStaff = isAdminUser(session.user)
   if (!isStaff) {
-    const courseId = await resolveCourseIdForUser(session.user.id)
-    if (courseId) {
-      const membership = await db
-        .select({ role: courseMemberships.role })
-        .from(courseMemberships)
-        .where(and(
-          eq(courseMemberships.courseId, courseId),
-          eq(courseMemberships.userId, session.user.id),
-          isNull(courseMemberships.removedAt)
-        ))
-        .limit(1)
-      isStaff = membership[0]?.role === "FACULTY"
-    }
+    // Faculty on ANY live course — see the header note. Reading the winning
+    // course here would flip a faculty member's page between three flows and
+    // one whenever they switch into a course they study in.
+    isStaff = (await listFacultyCourseIds(session.user.id)).length > 0
   }
   // The student lens (TJ, 2026-08-09). Staff read all three flows and a student
   // reads their own, so without this "view as student" would still show three —

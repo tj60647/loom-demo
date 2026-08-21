@@ -1,11 +1,8 @@
 import { getServerSession } from "next-auth/next"
 import { redirect } from "next/navigation"
-import { and, eq, isNull } from "drizzle-orm"
 
-import { db } from "@/db"
-import { courseMemberships } from "@/db/schema"
 import { authOptions, isAdminUser } from "@/lib/auth"
-import { resolveCourseIdForUser } from "@/lib/courses"
+import { listFacultyCourseIds } from "@/lib/courses"
 import RoleMatrix from "@/components/admin/RoleMatrix"
 import MetaPage from "@/components/ui/MetaPage"
 
@@ -32,19 +29,12 @@ export default async function Page() {
 
   let isStaff = isAdminUser(session.user)
   if (!isStaff) {
-    const courseId = await resolveCourseIdForUser(session.user.id)
-    if (courseId) {
-      const membership = await db
-        .select({ role: courseMemberships.role })
-        .from(courseMemberships)
-        .where(and(
-          eq(courseMemberships.courseId, courseId),
-          eq(courseMemberships.userId, session.user.id),
-          isNull(courseMemberships.removedAt)
-        ))
-        .limit(1)
-      isStaff = membership[0]?.role === "FACULTY"
-    }
+    // Faculty on ANY live course, not faculty-in-the-working-course — the
+    // same list /admin gates on (getStaffViewer → listFacultyCourseIds).
+    // The working course is a choice now (selectedAt), and switching into a
+    // course you study in must not eject you from a meta page that holds no
+    // course data at all.
+    isStaff = (await listFacultyCourseIds(session.user.id)).length > 0
   }
   if (!isStaff) redirect("/")
 
