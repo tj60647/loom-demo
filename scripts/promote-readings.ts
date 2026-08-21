@@ -70,7 +70,7 @@ const to = neon(toUrl)
 
 const normTitle = (t: string) => t.trim().toLowerCase().replace(/\s+/g, " ")
 
-async function columnsOf(sql: ReturnType<typeof neon>, table: string): Promise<string[]> {
+async function columnsOf(sql: typeof from, table: string): Promise<string[]> {
   const rows = await sql.query(
     `select column_name from information_schema.columns where table_schema='public' and table_name=$1`,
     [table]
