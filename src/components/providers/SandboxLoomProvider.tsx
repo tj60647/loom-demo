@@ -404,6 +404,8 @@ export default function SandboxLoomProvider({
   }, [])
 
   const value: LoomContextType = {
+    // The practice loom is always the visitor's own — never a student's.
+    readOnly: false,
     state,
     scope,
     scoped,

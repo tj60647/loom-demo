@@ -8,6 +8,9 @@ import Header from "@/components/ui/Header";
 import TeachingFloat from "@/components/ui/TeachingFloat";
 import TipLayer from "@/components/ui/TipLayer";
 import { isBranchPreview } from "@/lib/previewLogin";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { resolveViewTarget } from "@/lib/viewUserServer";
 
 // Which deployment this is. VERCEL_ENV is "production" only on the real
 // site; the dev alias builds as "preview" and local `next dev` leaves it
@@ -29,16 +32,22 @@ export const metadata: Metadata = {
   icons: { icon: isProduction ? "/icon.svg" : "/icon-dev.svg" },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Open Loom: when the view-user cookie names a target the server
+  // authorizes, the whole tree renders a student's loom — LoomProvider
+  // needs to know so every mutating gesture refuses (its readOnly guard).
+  const session = await getServerSession(authOptions);
+  const viewing = await resolveViewTarget(session?.user?.id);
+
   return (
     <html lang="en">
       <body>
         <AuthProvider>
-          <LoomProvider>
+          <LoomProvider readOnly={!!viewing}>
             <ReadingsProvider>
               <DialogProvider>
                 <Header deployEnv={deployEnv} isBranchPreview={branchPreview} />

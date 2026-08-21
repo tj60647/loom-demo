@@ -42,6 +42,16 @@ export type ReadingResetCounts = { passages: number; cloths: number; maps: numbe
  */
 export interface LoomContextType {
   /**
+   * Open Loom (src/lib/viewUser.ts): true when the state below is a
+   * STUDENT's loom a staff viewer is reading. Every mutating function in
+   * this context refuses with a flash when set — the server was always safe
+   * (writes derive their owner from the session), but the optimistic client
+   * state made an edit LOOK like it landed on the student's work, which is
+   * worse than refusing (TJ, 2026-08-21: "why in read only mode can i edit
+   * a students work?"). Stations also read it to hide their controls.
+   */
+  readOnly: boolean
+  /**
    * The WHOLE graph, always. Each object's own download slices it at the
    * point of export; nothing else does (red line #5).
    */
@@ -167,7 +177,7 @@ export const LoomContext = createContext<LoomContextType | null>(null)
 
 const blankState = (): LoomState => ({ concepts: [], passages: [], edges: [], links: [], maps: [], cloths: [], views: emptyViews() })
 
-export function LoomProvider({ children }: { children: ReactNode }) {
+export function LoomProvider({ children, readOnly = false }: { children: ReactNode; readOnly?: boolean }) {
   const { data: session } = useSession()
   const [state, setState] = useState<LoomState>(blankState())
   const [isLoading, setIsLoading] = useState(true)
@@ -969,23 +979,56 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     return counts
   }, [cancelPendingSaves, applyTruth])
 
+  // Open Loom's guard, at the chokepoint. Every mutating member of the
+  // context flows through here, so ONE refusal covers every station — the
+  // pattern this repo prefers to a check at each of thirty call sites. The
+  // server never needed protecting (writes derive their owner from the
+  // session); what this kills is the optimistic client update that made an
+  // edit LOOK like it landed on the student's work. `selectMap` stays live —
+  // purely local, and browsing the student's projections is reading. The
+  // refusal returns undefined where callers expect a created object; that is
+  // accepted debris on paths the read-only UI pass will hide, and honest
+  // beside the flash that names why nothing happened.
+  const refuse = useCallback(async () => {
+    flash("read-only — this is a student's loom; nothing was changed")
+    return undefined
+  }, [flash]) as unknown
+
+  const value: LoomContextType = {
+    readOnly,
+    state, scope, scoped, scopedState, isLoading,
+    studentName: session?.user?.name || "",
+    addConcept, editConcept, removeConcept, mergeConcepts,
+    addPassage, removePassage, addPassageConcept, unfilePassage, attributePassages, editPassageNote,
+    activeCloth, updateCloth, flushCloth,
+    addEdge, editEdge, removeEdge,
+    links: state.links, addLink, editLink, attachLink,
+    maps: state.maps, scopeMaps, activeMap,
+    selectMap, addMap, renameMap, removeMap,
+    setMapTiers, setMapRead, setMapEssence, flushMapText,
+    setView, ensureActiveMap,
+    resetLoom, resetReading,
+    flashMsg, flash,
+    undoStack, setUndoStack, redoStack, setRedoStack
+  }
+
+  const refusals = {
+    addConcept: refuse, editConcept: refuse, removeConcept: refuse, mergeConcepts: refuse,
+    addPassage: refuse, removePassage: refuse, addPassageConcept: refuse, unfilePassage: refuse,
+    attributePassages: refuse, editPassageNote: refuse,
+    updateCloth: refuse, flushCloth: refuse,
+    addEdge: refuse, editEdge: refuse, removeEdge: refuse,
+    addLink: refuse, editLink: refuse, attachLink: refuse,
+    addMap: refuse, renameMap: refuse, removeMap: refuse,
+    setMapTiers: refuse, setMapRead: refuse, setMapEssence: refuse, flushMapText: refuse,
+    setView: refuse, ensureActiveMap: refuse,
+    resetLoom: refuse, resetReading: refuse,
+    // satisfies: a typo'd key would otherwise ADD a dead member instead of
+    // replacing a live one, and the unknown-cast below would hide it.
+  } satisfies Partial<Record<keyof LoomContextType, unknown>> as Partial<LoomContextType>
+
   return (
-    <LoomContext.Provider value={{
-      state, scope, scoped, scopedState, isLoading,
-      studentName: session?.user?.name || "",
-      addConcept, editConcept, removeConcept, mergeConcepts,
-      addPassage, removePassage, addPassageConcept, unfilePassage, attributePassages, editPassageNote,
-      activeCloth, updateCloth, flushCloth,
-      addEdge, editEdge, removeEdge,
-      links: state.links, addLink, editLink, attachLink,
-      maps: state.maps, scopeMaps, activeMap,
-      selectMap, addMap, renameMap, removeMap,
-      setMapTiers, setMapRead, setMapEssence, flushMapText,
-      setView, ensureActiveMap,
-      resetLoom, resetReading,
-      flashMsg, flash,
-      undoStack, setUndoStack, redoStack, setRedoStack
-    }}>
+    <LoomContext.Provider value={readOnly ? { ...value, ...refusals } : value}>
       {children}
     </LoomContext.Provider>
   )
