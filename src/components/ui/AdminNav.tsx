@@ -78,7 +78,9 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
     // holds one navigation rather than swapping between two. What is left is
     // not a menu: it is the scope every page below reads, and it belongs beside
     // them rather than in a bar about where you can go.
-    <nav style={{ marginBottom: "20px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+    // No marginBottom: the strip runs flush under the journey bar now, and
+    // the gap to the content below is .adminbody's own padding (2026-08-21).
+    <nav style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
       {/* Left, not right: with the tabs gone this row holds only the scope, and
           a lone pair of pickers pushed to the far edge of an empty bar read as
           leftovers. They line up with the page heading underneath instead. */}

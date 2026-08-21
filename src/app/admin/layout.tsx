@@ -59,9 +59,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           is what "capabilities are additive" means in navigation. No station
           is active here: /admin is not a step on the student's arc. */}
       <JourneyNav active={null} />
-      <div className="adminshell" style={{ padding: "20px 20px 0" }}>
+      {/* No padding on the shell: it was what inset the course strip from
+          both edges and dropped it below the journey bar (TJ, 2026-08-21:
+          "why the gap?"). The strip is a full-bleed bar like the journey
+          bar above it — the global nav rule already dresses it so — and
+          the content's inset lives on the scrolling body instead. */}
+      <div className="adminshell">
         <AdminNav courses={navCourses} />
-        <div className="adminbody">{children}</div>
+        <div className="adminbody" style={{ padding: "20px 20px 0" }}>{children}</div>
       </div>
     </>
   )
