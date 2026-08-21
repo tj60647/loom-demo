@@ -187,23 +187,36 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
       ) : (
         <>
+          {/* Both folds share the invite fold's disclosure idiom (.invitefold
+              summary + .tw), without its card wrapper — the list keeps its own
+              flush card. Open by default: collapsing is for tucking a settled
+              panel away, not for hiding the roster on arrival. The count pill
+              is what keeps a collapsed panel legible. */}
           {pendingCount > 0 && (
-            <section style={{ marginBottom: "24px" }}>
-              <h2 style={{ marginBottom: "10px" }}>Invited — not signed in yet</h2>
-              <div className="card rosterlist">{pending.map(rosterRow)}</div>
-            </section>
+            <details className="invitefold" open style={{ marginBottom: "24px" }}>
+              <summary>
+                <span className="tw">▸</span>
+                <h2>Invited — not signed in yet</h2>
+                <span className="pill loose">{pendingCount}</span>
+              </summary>
+              <div className="card rosterlist" style={{ marginTop: "10px" }}>{pending.map(rosterRow)}</div>
+            </details>
           )}
 
-          <section>
-            <h2 style={{ marginBottom: "10px" }}>Enrolled</h2>
+          <details className="invitefold" open>
+            <summary>
+              <span className="tw">▸</span>
+              <h2>Enrolled</h2>
+              <span className="pill loose">{enrolledCount}</span>
+            </summary>
             {enrolledCount > 0 ? (
-              <div className="card rosterlist">{enrolled.map(rosterRow)}</div>
+              <div className="card rosterlist" style={{ marginTop: "10px" }}>{enrolled.map(rosterRow)}</div>
             ) : (
-              <div className="card empty">
+              <div className="card empty" style={{ marginTop: "10px" }}>
                 <span className="cap">Nobody has signed in yet — invitations above are waiting</span>
               </div>
             )}
-          </section>
+          </details>
 
           {isAdmin && (
             <p className="hint" style={{ fontSize: "12.5px", marginTop: "10px" }}>
