@@ -24,7 +24,9 @@ test("faculty enter /admin bare and land on their own course's roster", async ({
   await page.goto("/admin")
 
   await expect(page).toHaveURL(/\/admin$/, { timeout: 15_000 })
-  await expect(page.getByRole("heading", { name: "Roster" })).toBeVisible({ timeout: 15_000 })
+  // The h1 left on 2026-08-21 (the journey bar's highlighted tab names the
+  // page); the roster's own tabs lead, Enrolled active by default.
+  await expect(page.locator(".rostertabs a.on", { hasText: "Enrolled" })).toBeVisible({ timeout: 15_000 })
   // getStaffViewer resolved a course for them rather than redirecting home:
   // the roster names it and carries rows.
   await expect(page.locator(".rosterrow", { hasText: "Test User A" })).toHaveCount(1)
@@ -61,18 +63,20 @@ test("the nav offers the read side only — no Readings, no Courses", async ({ p
 
 test("the roster is readable but carries none of its write controls", async ({ page }) => {
   await page.goto("/admin")
-  await expect(page.getByRole("heading", { name: "Roster" })).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator(".rostertabs a.on", { hasText: "Enrolled" })).toBeVisible({ timeout: 15_000 })
   await expect(page.locator(".rosterrow").first()).toBeVisible()
 
   // Every admin-only control on this page, absent. A form rendered for someone
-  // whose submit would redirect is the failure this guards against.
+  // whose submit would redirect is the failure this guards against. The
+  // Assign/Place and role-toggle buttons became save-on-change dropdowns on
+  // 2026-08-21 — for faculty neither select renders, and the Invite tab is
+  // not offered at all.
+  await expect(page.locator(".rostertabs a", { hasText: "Invite learners" })).toHaveCount(0)
   await expect(page.locator(".invitefold")).toHaveCount(0)
-  await expect(page.getByRole("button", { name: "Make faculty" })).toHaveCount(0)
-  await expect(page.getByRole("button", { name: "Return to learner" })).toHaveCount(0)
+  await expect(page.locator('select[name="role"]')).toHaveCount(0)
+  await expect(page.locator('select[name="sectionId"]')).toHaveCount(0)
   await expect(page.getByRole("button", { name: /^Remove / })).toHaveCount(0)
   await expect(page.getByRole("button", { name: /^Withdraw the invitation/ })).toHaveCount(0)
-  await expect(page.getByRole("button", { name: "Assign", exact: true })).toHaveCount(0)
-  await expect(page.getByRole("button", { name: "Place", exact: true })).toHaveCount(0)
 
   // What they DO hold: the way into a student's work.
   await expect(page.getByRole("link", { name: "Open Loom" }).first()).toBeVisible()
@@ -84,11 +88,22 @@ test("a student's loom opens read-only from the roster", async ({ page }) => {
   await expect(rowA).toHaveCount(1, { timeout: 15_000 })
   await rowA.getByRole("link", { name: "Open Loom" }).click()
 
-  await expect(page).toHaveURL(/\/admin\/user\//, { timeout: 15_000 })
-  await expect(page.getByRole("heading", { name: "Student Loom (Read-Only)" })).toBeVisible()
-  // Seeded work, actually rendered — not an empty shell that would pass every
-  // assertion above while the read gate silently returned nothing.
-  await expect(page.locator(".clabel", { hasText: "object worlds" })).toBeVisible({ timeout: 15_000 })
+  // Open Loom (2026-08-21) is the app itself reading the student's loom —
+  // a document navigation landing on their Library, with the float naming
+  // whose loom this is. The old summary page remains routable, unlinked.
+  await expect(page).toHaveURL(/\/$/, { timeout: 20_000 })
+  const float = page.locator(".teachfloat")
+  await expect(float).toBeVisible({ timeout: 15_000 })
+  await expect(float).toContainText("Test User A")
+  // In-mode the staff group leaves the journey bar — getActiveCourse masks
+  // the staff flags the way the student lens does, and the float is the one
+  // staff surface left standing.
+  await expect(page.locator('nav[aria-label="The journey"] .staffgroup a')).toHaveCount(0)
+
+  // The way back: Exit lands on the Roster with the float gone.
+  await float.getByRole("link", { name: "Exit" }).click()
+  await expect(page).toHaveURL(/\/admin/, { timeout: 20_000 })
+  await expect(page.locator(".teachfloat")).toHaveCount(0)
 })
 
 test("the cohort graph renders for faculty", async ({ page }) => {
