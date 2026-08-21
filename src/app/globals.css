@@ -1581,8 +1581,10 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* Open Loom's float: whose loom this is, Download loom, Exit — nothing
    else (TJ, 2026-08-21; the Teaching link rows lived a day, 23ecf9c to
    here). The identity line is the header — whose loom the viewer is inside
-   must never be ambiguous. */
-.teachfloat{position:fixed;right:18px;bottom:58px;z-index:60;padding:12px 14px;box-shadow:0 4px 18px rgba(0,0,0,.14)}
+   must never be ambiguous. Top-right, not bottom (TJ, same day: the corner
+   was "easy to overlook"): 104px clears the journey bar, measured 93px
+   tall on the running app at 1920. */
+.teachfloat{position:fixed;right:18px;top:104px;z-index:60;padding:12px 14px;box-shadow:0 4px 18px rgba(0,0,0,.14)}
 .teachfloat .whose{display:block;margin-bottom:9px;padding-bottom:8px;border-bottom:1px solid var(--rule)}
 .invitereport{border-left:2px solid var(--rule);padding-left:11px;margin-top:4px}
 .invitereport p{font-size:14px;line-height:1.45;margin:0 0 6px}
