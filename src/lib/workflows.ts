@@ -217,7 +217,7 @@ const faculty: Flow = {
     { id: "gate", label: "FACULTY on a live course?", where: "listFacultyCourseIds", kind: "decision" },
     { id: "home", label: "Returned to the shelf", where: "/", kind: "denied" },
     { id: "roster", label: "Roster — who is enrolled, who has not signed in, their counts", where: "/admin (read-only)" },
-    { id: "loom", label: "Open Loom — the student's full journey, read-only, in the app itself", where: "/api/view-user/enter → the app; exit via the floating Teaching menu" },
+    { id: "loom", label: "Open Loom — the student's full journey, read-only, in the app itself", where: "/api/view-user/enter → the app; the float holds Download loom and Exit" },
     { id: "cohort", label: "Cohort Graph — the section's woven concepts", where: "/admin/aggregate" },
     { id: "shut", label: "Readings and Courses stay admin's", where: "both redirect", kind: "denied" },
     { id: "own", label: "Their own reading and weaving, untouched", where: "the same bar, same click — capabilities are additive", kind: "end" },

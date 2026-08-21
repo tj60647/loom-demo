@@ -255,6 +255,19 @@ export const CAPABILITIES: Capability[] = [
     enforcement: "server",
   },
   {
+    id: "student-loom-export",
+    name: "Download the viewed student's loom, whole (Open Loom only)",
+    group: "Roster",
+    student: { verdict: "no" },
+    faculty: { verdict: "qualified", note: "only inside Open Loom, same gate as the mode itself" },
+    admin: { verdict: "yes" },
+    // The route 404s outside the mode, and the reads it packages re-run the
+    // resolver's gate themselves. A student's own export stays client-side
+    // (object-download above) — this is not a general export door.
+    gate: { file: "src/lib/viewUserServer.ts", symbol: "resolveViewTarget" },
+    enforcement: "server",
+  },
+  {
     id: "cohort-graph",
     name: "Cohort Graph — the section's woven concepts",
     group: "Roster",

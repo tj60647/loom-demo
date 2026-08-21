@@ -1578,15 +1578,12 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .invitefold summary::-webkit-details-marker{display:none}
 .invitefold summary .tw{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--ochre);transition:transform .15s}
 .invitefold[open] summary .tw{transform:rotate(90deg)}
-/* Open Loom's floating Teaching menu. The links are rows with a hover wash,
-   never underlined text (TJ, 2026-08-20); Exit is the one .btn in it. The
-   identity line is the header — whose loom the viewer is inside must never
-   be ambiguous. */
-.teachfloat{position:fixed;right:18px;bottom:58px;z-index:60;width:225px;padding:12px 14px;box-shadow:0 4px 18px rgba(0,0,0,.14)}
+/* Open Loom's float: whose loom this is, Download loom, Exit — nothing
+   else (TJ, 2026-08-21; the Teaching link rows lived a day, 23ecf9c to
+   here). The identity line is the header — whose loom the viewer is inside
+   must never be ambiguous. */
+.teachfloat{position:fixed;right:18px;bottom:58px;z-index:60;padding:12px 14px;box-shadow:0 4px 18px rgba(0,0,0,.14)}
 .teachfloat .whose{display:block;margin-bottom:9px;padding-bottom:8px;border-bottom:1px solid var(--rule)}
-.teachfloat nav{display:flex;flex-direction:column;gap:1px;margin-bottom:10px}
-.teachfloat nav a{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft);text-decoration:none;padding:5px 8px;border-radius:3px;transition:background-color .12s ease,color .12s ease}
-.teachfloat nav a:hover{background:var(--paper-2);color:var(--ink)}
 .invitereport{border-left:2px solid var(--rule);padding-left:11px;margin-top:4px}
 .invitereport p{font-size:14px;line-height:1.45;margin:0 0 6px}
 .invitereport p:last-child{margin-bottom:0}
