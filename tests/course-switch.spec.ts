@@ -50,21 +50,40 @@ async function switchTo(page: Page, courseName: string) {
     await page.keyboard.press("Escape")
     return
   }
-  await Promise.all([
-    // A FULL document load to "/", not a soft refresh — the assertion that
-    // the whole workbench realm is torn down with the old course.
-    page.waitForURL("**/", { waitUntil: "load" }),
-    item.click(),
-  ])
+  // waitForURL cannot guard this navigation: the page already sits at "/",
+  // and playwright-core resolves waitForURL immediately for an
+  // already-matching URL (verified against 1.61's implementation) — so it
+  // would assert nothing. A marker on the old document does what the guard
+  // must: it survives any soft refresh and dies only with the document, so
+  // its absence once the label has changed IS the full load.
+  await page.evaluate(() => {
+    ;(window as unknown as { __loomPreSwitch?: boolean }).__loomPreSwitch = true
+  })
+  await item.click()
+  // The label change carries the wait: a server-action round trip plus a
+  // full document load on a dev server needs more than the 5s expect default.
+  await expect(trigger(page)).toHaveText(rx(courseName), { timeout: 20_000 })
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __loomPreSwitch?: boolean }).__loomPreSwitch
+    )
+  ).toBeUndefined()
 }
 
 test.describe("one course", () => {
   test.use({ storageState: "playwright/.auth/testa.json" })
 
   test("a single-course account gets the plain label, no dropdown", async ({ page }) => {
+    // Armed before goto: the negatives below are only meaningful once the
+    // course payload has actually arrived — .weekhead is no readiness signal
+    // (the always-rendered "your own readings" section carries one too).
+    const coursePayload = page.waitForResponse(
+      (r) => r.url().includes("/api/course") && r.ok(),
+      { timeout: 20_000 }
+    )
     await page.goto("/")
-    // The shelf proves the course context loaded before the negative below.
-    await expect(page.locator(".weekhead").first()).toBeVisible({ timeout: 15_000 })
+    await coursePayload
+    await expect(page.locator("header span.label").first()).toBeVisible()
     await expect(page.locator(".courseswitch")).toHaveCount(0)
     await expect(page.getByRole("button", { name: /courses; switch/ })).toHaveCount(0)
   })
@@ -98,10 +117,10 @@ test.describe("two courses", () => {
 
     await switchTo(page, SECOND)
 
-    // The header names the other course and the shelf is ITS shelf — the
-    // fixture course carries no readings, so the honest empty state is the
-    // proof the re-scope reached the data, not just the label.
-    await expect(trigger(page)).toHaveText(rx(SECOND))
+    // The shelf is now the OTHER course's shelf — the fixture course carries
+    // no readings, so the honest empty state is the proof the re-scope
+    // reached the data, not just the label (switchTo already asserted the
+    // label and the full document load).
     await expect(page.locator(".empty")).toContainText(/no readings published/i, { timeout: 15_000 })
 
     // Server-side, not a cookie: a brand-new document with only the session
@@ -111,16 +130,29 @@ test.describe("two courses", () => {
 
     // Back to the seeded course: the readings return. Leaves the account in
     // its oldest course for whoever runs next (test-login re-nulls the stamp
-    // at the next global-setup regardless).
-    const first = page
-      .getByRole("menu", { name: "Your courses" })
-      .getByRole("menuitemradio")
-      .first()
+    // at the next global-setup regardless). Same marker guard as switchTo —
+    // the unchecked row is the seeded course, whichever its name. The wait
+    // is the LABEL leaving the fixture course: .weekhead cannot carry it,
+    // because "your own readings" renders one on every shelf and the old
+    // document would satisfy it before the navigation lands.
     await trigger(page).click()
-    const firstName = (await first.textContent()) ?? ""
-    if (!firstName.includes(SECOND)) {
-      await Promise.all([page.waitForURL("**/", { waitUntil: "load" }), first.click()])
-      await expect(page.locator(".weekhead").first()).toBeVisible({ timeout: 15_000 })
-    }
+    const other = page
+      .getByRole("menu", { name: "Your courses" })
+      .getByRole("menuitemradio", { checked: false })
+    await page.evaluate(() => {
+      ;(window as unknown as { __loomPreSwitch?: boolean }).__loomPreSwitch = true
+    })
+    await other.click()
+    await expect(trigger(page)).not.toHaveText(rx(SECOND), { timeout: 20_000 })
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __loomPreSwitch?: boolean }).__loomPreSwitch
+      )
+    ).toBeUndefined()
+    // And the seeded course's actual week sections are back — the own-readings
+    // weekhead alone would not prove that.
+    await expect(
+      page.locator(".weekhead").filter({ hasText: /week/i }).first()
+    ).toBeVisible({ timeout: 15_000 })
   })
 })
