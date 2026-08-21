@@ -7,6 +7,7 @@ type AdminPageSearchParams = {
   course?: string | string[]
   section?: string | string[]
   view?: string | string[]
+  filter?: string | string[]
 }
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<AdminPageSearchParams> }) {
@@ -38,60 +39,81 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const sectionName = sectionId
     ? courseSections.find((section) => section.id === sectionId)?.name ?? null
     : null
-  const pending = roster.filter((row) => row.status === "pending")
   const enrolled = roster.filter((row) => row.status !== "pending")
-  const pendingCount = pending.length
   const enrolledCount = enrolled.length
+  // Invited means EVERYONE who was asked (TJ, 2026-08-21) — the pending AND
+  // the enrolled who arrived by invitation — with a filter narrowing to the
+  // silent. getRoster marks enrolled rows with `invited` for exactly this.
+  const invitedAll = roster.filter((row) => row.invited)
+  const noResponse = roster.filter((row) => row.status === "pending")
+  const noResponseCount = noResponse.length
 
-  // Two tabs, one population each (TJ, 2026-08-21: "maybe tabs go here for
-  // invited, enrolled" — they replaced the stacked folds). Enrolled leads:
-  // it is the daily visit. The invite panel lives on the Invited tab, with
-  // the people it produces. Plain links, so the view survives reload and
-  // the back button, and the server component stays one.
-  const view = firstParam(resolved.view) === "invited" ? "invited" : "enrolled"
-  const tabHref = (v: string) =>
-    `/admin?course=${encodeURIComponent(courseId)}${sectionId ? `&section=${encodeURIComponent(sectionId)}` : ""}&view=${v}`
+  // Three tabs (TJ, 2026-08-21): Enrolled — the daily visit — leads; Invited
+  // is the invitation's ledger; Invite learners is the write surface and
+  // shows only to the admin who holds it. Plain links, so the view survives
+  // reload and the back button, and the server component stays one.
+  const requestedView = firstParam(resolved.view)
+  const view =
+    requestedView === "invited" ? "invited"
+    : requestedView === "invite" && isAdmin ? "invite"
+    : "enrolled"
+  const filterNoResponse = view === "invited" && firstParam(resolved.filter) === "noresponse"
+  const baseHref = `/admin?course=${encodeURIComponent(courseId)}${sectionId ? `&section=${encodeURIComponent(sectionId)}` : ""}`
+  const invitedPeople = filterNoResponse ? noResponse : invitedAll
 
   return (
     <main>
       {/* No h1: the Teaching nav's highlighted Roster tab already names the
           page (TJ, 2026-08-21). */}
       <div className="rostertabs">
-        <a className={view === "enrolled" ? "on" : undefined} href={tabHref("enrolled")}>
+        <a className={view === "enrolled" ? "on" : undefined} href={`${baseHref}&view=enrolled`}>
           Enrolled <span className="pill loose">{enrolledCount}</span>
         </a>
-        <a className={view === "invited" ? "on" : undefined} href={tabHref("invited")}>
-          Invited <span className="pill loose">{pendingCount}</span>
+        <a className={view === "invited" ? "on" : undefined} href={`${baseHref}&view=invited`}>
+          Invited <span className="pill loose">{invitedAll.length}</span>
         </a>
+        {isAdmin && (
+          <a className={view === "invite" ? "on" : undefined} href={`${baseHref}&view=invite`}>
+            Invite learners
+          </a>
+        )}
         <span className="rostertabsline">
           {course?.name}
           {sectionName ? ` · ${sectionName}` : " · all sections"}
         </span>
       </div>
 
-      {view === "invited" ? (
+      {view === "invite" ? (
+        <div className="card">
+          <h2>Invite learners</h2>
+          <p className="hint" style={{ marginTop: "10px" }}>
+            Sign-in succeeds for anyone invited to or enrolled in a course. A learner joins this
+            course the first time they sign in with the GitHub email you invite here, landing in
+            whichever section you gave them — you can move them afterwards. An invitation
+            addressed to the Faculty Section enrols as faculty: they get this course&apos;s
+            read-side admin view alongside their own workspace.
+          </p>
+          <InviteLearners courseId={courseId} sections={courseSections} />
+        </div>
+      ) : view === "invited" ? (
         <>
-          {isAdmin && (
-            <details className="card invitefold" style={{ marginBottom: "24px" }}>
-              <summary>
-                <span className="tw">▸</span>
-                <h2>Invite learners</h2>
-              </summary>
-              <p className="hint" style={{ marginTop: "10px" }}>
-                Sign-in succeeds for anyone invited to or enrolled in a course. A learner joins this
-                course the first time they sign in with the GitHub email you invite here, landing in
-                whichever section you gave them — you can move them afterwards. An invitation
-                addressed to the Faculty Section enrols as faculty: they get this course&apos;s
-                read-side admin view alongside their own workspace.
-              </p>
-              <InviteLearners courseId={courseId} sections={courseSections} />
-            </details>
-          )}
-          {pendingCount > 0 ? (
-            <RosterTable people={pending} courseId={courseId} courseSections={courseSections} isAdmin={isAdmin} />
+          {/* The one filter: the silent. Everyone else on this tab already
+              answered by enrolling. */}
+          <div className="rosterfilter">
+            <a
+              className={filterNoResponse ? "on" : undefined}
+              href={`${baseHref}&view=invited${filterNoResponse ? "" : "&filter=noresponse"}`}
+            >
+              {filterNoResponse ? "▣" : "▢"} no response yet <span className="pill loose">{noResponseCount}</span>
+            </a>
+          </div>
+          {invitedPeople.length > 0 ? (
+            <RosterTable people={invitedPeople} courseId={courseId} courseSections={courseSections} isAdmin={isAdmin} />
           ) : (
             <div className="card empty">
-              <span className="cap">No open invitations — everyone invited has signed in</span>
+              <span className="cap">
+                {filterNoResponse ? "No silence — everyone invited has signed in" : "Nobody has been invited yet"}
+              </span>
             </div>
           )}
         </>

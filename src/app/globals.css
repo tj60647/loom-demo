@@ -1545,6 +1545,12 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .rostertabs a:hover{color:var(--ink)}
 .rostertabs a.on{color:var(--ink);border-bottom-color:var(--ochre)}
 .rostertabsline{margin-left:auto;font-size:13px;color:var(--ink-soft);padding-right:4px}
+/* The Invited tab's one filter — a checkbox-shaped link, since the state
+   lives in the URL like the tabs do. */
+.rosterfilter{display:flex;margin-bottom:10px}
+.rosterfilter a{display:flex;gap:7px;align-items:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft);text-decoration:none;padding:4px 8px;border:1px solid var(--rule);border-radius:3px}
+.rosterfilter a:hover{color:var(--ink);border-color:var(--ink)}
+.rosterfilter a.on{color:var(--ink);border-color:var(--ochre)}
 .rosterlist{padding:0}
 .rosterhead,.rosterrow{display:grid;grid-template-columns:minmax(170px,1fr) 130px 110px 90px 190px 200px;gap:6px 14px;align-items:center;padding:4px 14px}
 .rosterhead{border-bottom:1px solid var(--rule);padding-top:7px;padding-bottom:7px}
