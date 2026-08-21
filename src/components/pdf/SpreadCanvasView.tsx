@@ -1603,7 +1603,10 @@ export default function SpreadCanvasView({
                       concepts={c.concepts}
                       onOpenPassage={onOpenPassage}
                       onOpenConcept={onOpenConcept}
-                      onAddConcept={toggleAddConcept}
+                      /* The + only exists when the editor it opens can (Open
+                         Loom passes neither creator nor adder — the same gate
+                         as page mode's rail, TJ 2026-08-21). */
+                      onAddConcept={onCreateConcept && onAddConcept ? toggleAddConcept : undefined}
                       addConceptExpanded={activeAddPassageId === id}
                       addConceptControls={activeAddPassageId === id ? `canvas-add-concept-${id}` : undefined}
                       onUnfile={onUnfile}

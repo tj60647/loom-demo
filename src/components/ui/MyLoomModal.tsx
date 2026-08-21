@@ -53,7 +53,10 @@ export default function MyLoomModal({
   onClose: () => void
   allowReset: boolean
 }) {
-  const { state, resetLoom, flash } = useLoom()
+  // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the counts
+  // are the STUDENT's and stay — the mirror is the mode's whole point — but
+  // the one verb in the dialog is not offered over somebody else's work.
+  const { state, resetLoom, flash, readOnly } = useLoom()
   const { titleOf } = useReadings()
   const [arming, setArming] = useState(false)
   const [typed, setTyped] = useState("")
@@ -236,7 +239,7 @@ export default function MyLoomModal({
           </>
         )}
 
-        {allowReset && (
+        {allowReset && !readOnly && (
           <div className="myloom-danger">
             <h3>Start over</h3>
             {!arming ? (

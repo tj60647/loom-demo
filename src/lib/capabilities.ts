@@ -242,6 +242,32 @@ export const CAPABILITIES: Capability[] = [
     enforcement: "server",
   },
   {
+    id: "student-loom-open",
+    name: "Open Loom — a student's full journey, read-only, in the app itself",
+    group: "Roster",
+    student: { verdict: "no" },
+    faculty: { verdict: "qualified", note: "actively enrolled students of their own courses; the target's removal ends it" },
+    admin: { verdict: "yes" },
+    // The cookie only SELECTS; this is the gate every read re-runs. Writes
+    // never consult it — every mutation still derives its owner from the
+    // session (see loom.ts getUserId and the resetLoom doctrine).
+    gate: { file: "src/lib/viewUserServer.ts", symbol: "authorizeViewTarget" },
+    enforcement: "server",
+  },
+  {
+    id: "student-loom-export",
+    name: "Download the viewed student's loom, whole (Open Loom only)",
+    group: "Roster",
+    student: { verdict: "no" },
+    faculty: { verdict: "qualified", note: "only inside Open Loom, same gate as the mode itself" },
+    admin: { verdict: "yes" },
+    // The route 404s outside the mode, and the reads it packages re-run the
+    // resolver's gate themselves. A student's own export stays client-side
+    // (object-download above) — this is not a general export door.
+    gate: { file: "src/lib/viewUserServer.ts", symbol: "resolveViewTarget" },
+    enforcement: "server",
+  },
+  {
     id: "cohort-graph",
     name: "Cohort Graph — the section's woven concepts",
     group: "Roster",

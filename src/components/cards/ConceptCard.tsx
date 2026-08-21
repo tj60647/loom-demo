@@ -75,6 +75,7 @@ export default function ConceptCard({
   edit,
   pick = null,
   onPick,
+  readOnly = false,
 }: {
   concept: Concept
   /** This concept's evidence, in capture order — SCOPED by the caller. See
@@ -117,6 +118,15 @@ export default function ConceptCard({
   /** Required by `mode="pick"`; which slot this concept is loaded into. */
   pick?: 1 | 2 | null
   onPick?: () => void
+  /**
+   * Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): a staff viewer reading a
+   * STUDENT's loom. The card is the one that decides to draw its own fields —
+   * the Description textarea renders unconditionally in the edit body — so the
+   * flag lives here rather than at each of the three hosts. It turns the
+   * fields into plain text and drops the pick button and the unfile; the row
+   * still opens, because reading the evidence is the point of the mode.
+   */
+  readOnly?: boolean
 }) {
   /**
    * The warp card opens in place, like Your work's (TJ, 2026-08-18: "the dot
@@ -188,7 +198,9 @@ export default function ConceptCard({
    */
   const cardBody = edit ? (
     <div className="lbody">
-      {edit.onRename && (
+      {/* No rename field in Open Loom: the head already carries the name, and
+          a field would invite an edit the provider refuses (TJ, 2026-08-21). */}
+      {!readOnly && edit.onRename && (
         <div className="defrow">
           <span className="label">Concept</span>
           {/* Uncontrolled and keyed on the label: the rename can be rolled back
@@ -205,16 +217,27 @@ export default function ConceptCard({
         <span className="label">Description</span>
         {/* A textarea, not an input (TJ, 2026-08-17: "the description should
             wrap so we can read it all"). A gloss is up to 100 words by the
-            model; on one line you could read about eight of them. */}
-        <textarea
-          className="conceptdef conceptDescription"
-          rows={2}
-          placeholder="in your words; same sense across your sources?"
-          defaultValue={concept.def ?? ""}
-          onBlur={(e) => {
-            if (e.target.value !== (concept.def ?? "")) edit.onEditDef(e.target.value)
-          }}
-        />
+            model; on one line you could read about eight of them.
+
+            Plain text in Open Loom — the student's gloss, shown as the read
+            branch shows it, in a field-shaped row so the card keeps its shape. */}
+        {readOnly ? (
+          concept.def ? (
+            <p className="oconcept-def" style={{ margin: 0 }}>{concept.def}</p>
+          ) : (
+            <p className="oconcept-def empty" style={{ margin: 0 }}>no working description yet</p>
+          )
+        ) : (
+          <textarea
+            className="conceptdef conceptDescription"
+            rows={2}
+            placeholder="in your words; same sense across your sources?"
+            defaultValue={concept.def ?? ""}
+            onBlur={(e) => {
+              if (e.target.value !== (concept.def ?? "")) edit.onEditDef(e.target.value)
+            }}
+          />
+        )}
       </div>
 
       {here > 0 ? (
@@ -252,7 +275,7 @@ export default function ConceptCard({
                     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGotoPassage?.(b) }
                   }}
                 >&quot;{b.content}&quot;</div>
-                {edit.onUnfilePassage && (
+                {!readOnly && edit.onUnfilePassage && (
                   <div className="src rm-actions" style={{ marginTop: "6px" }}>
                     <button
                       type="button"
@@ -308,7 +331,10 @@ export default function ConceptCard({
               with a button dropped on it. The slot number rides the button:
               `PICKED 1` says both that it is on the bench and which half of
               the pair it is, and leaves the evidence count where it was. */}
-          <button
+          {/* No pick button in Open Loom: picking loads the throw bench, and
+              the bench is not drawn there (TJ, 2026-08-21). The head still
+              opens the card — reading the warp is what the mode is for. */}
+          {!readOnly && <button
             type="button"
             className="cselect"
             aria-pressed={!!pick}
@@ -324,7 +350,7 @@ export default function ConceptCard({
                  strokeLinecap="round" strokeLinejoin="round">
               <polyline points="9 6 15 12 9 18" />
             </svg>
-          </button>
+          </button>}
         </div>
         {/* The same body every concept card opens to. 02 gained the
             Concept and Description fields with it (TJ, 2026-08-18) — the card

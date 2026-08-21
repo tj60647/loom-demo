@@ -31,7 +31,10 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
   // See the note in Workbench: `status` is what distinguishes "nobody is
   // signed in" from "we have not asked yet".
   const { data: session, status } = useSession()
-  const { state, isLoading } = useLoom()
+  // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the shelf
+  // shows the STUDENT's library — cards, tallies, cloth rows all stay — but
+  // nothing that would add to it or take from it is drawn.
+  const { state, isLoading, readOnly } = useLoom()
   const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
   const tallies = useMemo(() => tallyByReading(state), [state])
   const { confirm, notify } = useDialog()
@@ -224,7 +227,7 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
                 In the cloth row rather than on the card face: the card is the
                 door to the reading, and a destructive control inside a door is
                 a mis-click waiting to happen. */}
-            {s.isOwn && (
+            {s.isOwn && !readOnly && (
               <button
                 className="btn ghost mini compact shelfremove"
                 onClick={() => removeOwn(s)}
@@ -289,6 +292,10 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
             library does not hold. Reading-first needs every passage to have a
             door, so a self-found paper gets a card rather than becoming an
             untethered passage. */}
+        {/* In Open Loom the section stands only when the student HAS own
+            readings — their cards are data; the add button and its explainer
+            are an invitation, and go (TJ, 2026-08-21). */}
+        {(ownReadings.length > 0 || !readOnly) && (
         <section style={{ marginBottom: 26 }}>
           <div className="weekhead">
             <span className="cap">your own readings</span>
@@ -297,8 +304,9 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
           {ownReadings.length > 0 && (
             <div className="shelfgrid" style={{ marginBottom: 12 }}>{ownReadings.map(readingCard)}</div>
           )}
-          <AddOwnReading onAdded={refresh} />
+          {!readOnly && <AddOwnReading onAdded={refresh} />}
         </section>
+        )}
 
         {/* The worked example used to sit here — a finished weave loaded into
             the student's OWN loom, whose only exit was Keep's reset. Both went
@@ -395,7 +403,10 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
  * wrong would file someone's evidence under the wrong text (red line #2).
  */
 function Untethered({ readings }: { readings: ReadingMeta[] }) {
-  const { state, attributePassages } = useLoom()
+  // Open Loom keeps the count — an unplaced passage is a true fact about the
+  // student's loom — and drops the picker: placing is the student's answer,
+  // never the viewer's (TJ, 2026-08-21).
+  const { state, attributePassages, readOnly } = useLoom()
   const [picked, setPicked] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -427,17 +438,27 @@ function Untethered({ readings }: { readings: ReadingMeta[] }) {
   return (
     <div className="card" style={{ marginBottom: 20 }}>
       <h2>Passages with no reading <span className="n">counted, not corrected</span></h2>
+      {/* The read-only line drops the instruction — its control is not drawn
+          there (TJ, 2026-08-21). */}
+      {readOnly ? (
+        <p className="hint">
+          Captured before a reading was open, so they sit outside every card on the
+          shelf. Only the student can say which reading each set came from.
+        </p>
+      ) : (
       <p className="hint">
         These were captured before a reading was open, so they sit outside every card on
         your shelf. Say which reading each set came from and they find their place. Loom
         will not guess for you — a wrong guess would file your evidence under the wrong text.
       </p>
+      )}
       {groups.map(([key, ids]) => (
         <div key={key} className="untethered">
           <div className="untetheredsrc">
             {key === "\u0000no citation" ? <i>no citation given</i> : key}
             <span className="n"> · {ids.length} passage{ids.length !== 1 ? "s" : ""}</span>
           </div>
+          {!readOnly && (
           <div className="quietrow">
             <select
               className="tinput inline"
@@ -457,6 +478,7 @@ function Untethered({ readings }: { readings: ReadingMeta[] }) {
               {busy === key ? "Placing…" : "Place"}
             </button>
           </div>
+          )}
         </div>
       ))}
     </div>

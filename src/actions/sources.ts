@@ -2,6 +2,7 @@
 
 import { db } from "@/db"
 import { viewingAsStudent } from "@/lib/viewAsServer"
+import { resolveViewTarget } from "@/lib/viewUserServer"
 import {
   passages,
   courseMemberships,
@@ -103,7 +104,7 @@ export async function getLibrarySources({ includeArchived = false } = {}) {
 export async function getLibraryOverview({ includeArchived = true } = {}) {
   await requireAdmin()
 
-  const [library, scores, memberships, allCourses, revisions] = await Promise.all([
+  const [library, scores, memberships, allCourses, revisions, people] = await Promise.all([
     db.select().from(sources).orderBy(asc(sources.title)),
     db.select().from(sourceScores),
     db
@@ -117,10 +118,15 @@ export async function getLibraryOverview({ includeArchived = true } = {}) {
       .from(courseSources),
     db.select().from(courses).orderBy(asc(courses.createdAt)),
     db.select().from(sourceRevisions).orderBy(asc(sourceRevisions.createdAt)),
+    // Who added each own-reading: the badge names the student (TJ,
+    // 2026-08-21, "badge them"). The whole user table is smaller than a
+    // per-row lookup would cost.
+    db.select({ id: users.id, name: users.name, email: users.email }).from(users),
   ])
 
   const scoreBySource = new Map(scores.map((score) => [score.sourceId, score]))
   const courseById = new Map(allCourses.map((course) => [course.id, course]))
+  const personById = new Map(people.map((person) => [person.id, person]))
 
   // A revision row exists only for a file that REPLACED another, so the
   // original upload has none and a reading's version is its revision count + 1.
@@ -140,6 +146,14 @@ export async function getLibraryOverview({ includeArchived = true } = {}) {
       ...source,
       score: scoreBySource.get(source.id) ?? null,
       revisions: revisionsBySource.get(source.id) ?? [],
+      // Only an own-reading names its owner — for the course library the
+      // uploader is an admin detail nobody asked to badge.
+      owner: source.isOwn && source.createdByUserId
+        ? (() => {
+            const person = personById.get(source.createdByUserId)
+            return person?.name ?? person?.email ?? "unknown"
+          })()
+        : null,
       courses: memberships
         .filter((row) => row.sourceId === source.id)
         .flatMap((row) => {
@@ -228,8 +242,14 @@ export async function getCourseSources(courseIdRaw?: string | null) {
 export async function getSources(courseIdRaw?: string | null) {
   const session = await getServerSession(authOptions)
 
-  const courseId = session?.user?.id
-    ? await resolveCourseIdForUser(session.user.id, courseIdRaw)
+  // Open Loom (src/lib/viewUser.ts): the shelf becomes the STUDENT's shelf —
+  // their course resolution, their own readings, and never the admin lens,
+  // because the student it belongs to could not see an unpublished row.
+  const viewing = await resolveViewTarget(session?.user?.id)
+  const shelfOwnerId = viewing?.userId ?? session?.user?.id
+
+  const courseId = shelfOwnerId
+    ? await resolveCourseIdForUser(shelfOwnerId, courseIdRaw)
     : await resolveCourseId(courseIdRaw)
 
   // An admin's shelf includes UNPUBLISHED readings; a student's does not. The
@@ -237,7 +257,7 @@ export async function getSources(courseIdRaw?: string | null) {
   // student can see (TJ, 2026-08-09). It only ever NARROWS — withhold, never
   // grant. Deliberately not applied to `authorizeSourceAccess` below: that is
   // an authorization path, and the lens is a display preference.
-  const admin = isAdminUser(session?.user) && !(await viewingAsStudent())
+  const admin = isAdminUser(session?.user) && !(await viewingAsStudent()) && !viewing
 
   const rows = courseId
     ? await db
@@ -251,14 +271,14 @@ export async function getSources(courseIdRaw?: string | null) {
         )
     : []
 
-  const mine = session?.user?.id
+  const mine = shelfOwnerId
     ? await db
         .select()
         .from(sources)
         .where(
           and(
             eq(sources.isOwn, true),
-            eq(sources.createdByUserId, session.user.id),
+            eq(sources.createdByUserId, shelfOwnerId),
             eq(sources.isArchived, false)
           )
         )

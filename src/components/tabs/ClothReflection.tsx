@@ -80,9 +80,13 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
   // edges have both ends in scope by construction, so every concept lookup
   // below resolves. Bridges are named but not drawn: they are 02 Linking's
   // material, and drawing half a thread would be a lie.
+  // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the cloth,
+  // the legend, the record view and the scrubber all stay — they are the read
+  // — while pair-picking never arms, because the only thing a completed pair
+  // can do is open the create-thread card.
   const {
     scopedState: state, flash, addEdge, links, addLink, attachLink,
-    addMap, setMapTiers, selectMap, scopeMaps,
+    addMap, setMapTiers, selectMap, scopeMaps, readOnly,
   } = useLoom()
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
   /**
@@ -817,7 +821,11 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
           download sits with them so it is in the same place in both. */}
       <div className="mapbar" style={{ marginBottom: 8 }}>
         <span className="hint" style={{ margin: 0 }}>
-          Warp in reading order; weft arcs across.{SHOW_PROMPTS
+          Warp in reading order; weft arcs across.{readOnly
+            /* Open Loom: picking is off (below), so the sentence naming it
+               would be false there (TJ, 2026-08-21). */
+            ? ""
+            : SHOW_PROMPTS
             ? " Click a prompt beside this to trace it here — or click a concept/arc directly to pull it."
             /* It said "Click a concept or arc to trace it" until 2026-08-18,
                which stopped being true the moment SHOW_TRACE went off: the
@@ -864,9 +872,12 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
             glow={showLog && log.scrubbed && log.glowId ? { id: log.glowId, seq: log.pulse } : null}
             /* Only one of the two can own the click. Tracing is off here and
                pairing takes it; flip SHOW_TRACE back on and this has to be
-               reconsidered rather than merely coexist. */
-            pair={SHOW_TRACE ? [] : livePair}
-            onPickConcept={SHOW_TRACE ? undefined : pickConcept}
+               reconsidered rather than merely coexist. In Open Loom neither
+               owns it: a completed pair's only offer is the create-thread
+               card, so picking never arms and the popover never opens
+               (TJ, 2026-08-21). */
+            pair={SHOW_TRACE || readOnly ? [] : livePair}
+            onPickConcept={SHOW_TRACE || readOnly ? undefined : pickConcept}
           />
         )}
       </div>

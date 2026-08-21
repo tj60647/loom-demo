@@ -88,10 +88,16 @@ test.describe("The thread card", () => {
     test.use({ storageState: "playwright/.auth/user.json" })
 
     test("/admin/user/[id] draws the same card — and no longer pills an unlabelled thread", async ({ page }) => {
+      // The roster's Open Loom became the read-only mode's door on
+      // 2026-08-21; the summary page this test exercises is still routable,
+      // just unlinked — reach it by the id the enter link carries.
       await page.goto("/admin")
-      const person = page.locator('a[href^="/admin/user/"]').first()
-      await expect(person).toBeVisible({ timeout: 20_000 })
-      await person.click()
+      const door = page.locator("a.openloom").first()
+      await expect(door).toBeVisible({ timeout: 20_000 })
+      const href = await door.getAttribute("href")
+      const userId = new URL(href ?? "", "http://resolve.invalid").searchParams.get("user")
+      expect(userId, "the enter link carries the student's id").toBeTruthy()
+      await page.goto(`/admin/user/${userId}`)
       await expect(page.getByRole("heading", { name: "Student Loom (Read-Only)" })).toBeVisible({ timeout: 20_000 })
       await expect(page.locator(".thread").first()).toBeVisible({ timeout: 20_000 })
 

@@ -47,9 +47,19 @@ jobs:
   provision:
     # Fork PRs never receive secrets, so this would fail for reasons the branch
     # cannot fix. Skipped rather than red — the same rule the e2e gate follows.
+    #
+    # head.ref != 'dev': a promotion PR (dev → master) must never run here.
+    # Provisioning pins DATABASE_URL to the PR's HEAD branch — and for a
+    # promotion PR that branch is `dev`, so the pin REPLACES the dev alias's
+    # standing DATABASE_URL (deployments.md invariant 1) and teardown then
+    # deletes both the per-PR database and the pin, leaving the alias built
+    # against a database that no longer exists. This happened with PRs #25
+    # and #26 on 2026-08-20: every query from the dev alias failed until the
+    # standing variable was restored by hand.
     if: >-
       github.event.action != 'closed' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref != 'dev'
     runs-on: ubuntu-latest
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
@@ -158,9 +168,13 @@ jobs:
           echo "It is deleted when this PR closes." >> "$GITHUB_STEP_SUMMARY"
 
   teardown:
+    # head.ref != 'dev' for the same reason as provision: a promotion PR's
+    # head branch is the dev alias's branch, and unpinning DATABASE_URL for
+    # it removes the alias's standing variable, not a per-PR pin.
     if: >-
       github.event.action == 'closed' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref != 'dev'
     runs-on: ubuntu-latest
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
