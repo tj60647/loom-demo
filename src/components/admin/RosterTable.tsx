@@ -94,10 +94,11 @@ export default function RosterTable({
     <div className="card rosterlist" style={{ marginTop: "10px" }}>
       <div className="rosterhead">
         {head("name", "name")}
-        {head("role", "role")}
+        <span className="rostercol">open loom</span>
         {head("concepts", "concepts")}
         {head("edges", "edges")}
         {head("section", "section")}
+        {head("role", "role")}
         <span aria-hidden="true" />
       </div>
 
@@ -109,37 +110,21 @@ export default function RosterTable({
           </div>
 
           <div>
-            {person.status === "pending" ? (
-              <span className="pill loose" title="invited — has not signed in, so has no loom yet">
-                invited
-              </span>
-            ) : isAdmin && person.userId ? (
-              /* The role IS the control (TJ, 2026-08-21: "just a set role
-                 dropdown" — the toggle button column was the long way round).
-                 Reversible by the same select, so it saves on change like the
-                 section pick. Ruling 18 still holds server-side: promotion
-                 homes them in the Faculty Section, demotion returns them to
-                 unassigned. */
-              <form action={setMemberRole}>
-                <input type="hidden" name="courseId" value={courseId} />
-                <input type="hidden" name="userId" value={person.userId} />
-                <AutoSaveSelect
-                  name="role"
-                  defaultValue={person.role}
-                  ariaLabel={`Role for ${person.name ?? person.email}`}
-                  title="faculty holds this course's read-side admin view; demotion returns them to unassigned for re-placement"
-                  options={[
-                    { value: "LEARNER", label: "learner" },
-                    { value: "FACULTY", label: "faculty" },
-                  ]}
-                />
-              </form>
-            ) : person.role === "FACULTY" ? (
-              <span className="pill" title="holds this course's read-side admin view (ruling 18)">
-                faculty
-              </span>
+            {person.userId ? (
+              /* The roster's one door into a student's work, right beside
+                 the name (TJ, 2026-08-21 column order). Enters Open Loom
+                 (src/lib/viewUser.ts) — a plain anchor: the enter route
+                 needs a document navigation so the providers remount
+                 reading the new owner. */
+              <a
+                href={`/api/view-user/enter?user=${encodeURIComponent(person.userId)}`}
+                className="btn mini compact openloom"
+                data-tip="their whole loom, read-only — the app navigates their work; exit from the float"
+              >
+                Open Loom
+              </a>
             ) : (
-              <span className="pill loose">learner</span>
+              <span className="rosterdash" title="no loom until they sign in">—</span>
             )}
           </div>
 
@@ -187,52 +172,74 @@ export default function RosterTable({
             </div>
           )}
 
+          <div>
+            {person.status === "pending" ? (
+              <span className="pill loose" title="invited — has not signed in, so has no loom yet">
+                invited
+              </span>
+            ) : isAdmin && person.userId ? (
+              /* The role IS the control (TJ, 2026-08-21: "just a set role
+                 dropdown" — the toggle button column was the long way round).
+                 Reversible by the same select, so it saves on change like the
+                 section pick. Ruling 18 still holds server-side: promotion
+                 homes them in the Faculty Section, demotion returns them to
+                 unassigned. */
+              <form action={setMemberRole}>
+                <input type="hidden" name="courseId" value={courseId} />
+                <input type="hidden" name="userId" value={person.userId} />
+                <AutoSaveSelect
+                  name="role"
+                  defaultValue={person.role}
+                  ariaLabel={`Role for ${person.name ?? person.email}`}
+                  title="faculty holds this course's read-side admin view; demotion returns them to unassigned for re-placement"
+                  options={[
+                    { value: "LEARNER", label: "learner" },
+                    { value: "FACULTY", label: "faculty" },
+                  ]}
+                />
+              </form>
+            ) : person.role === "FACULTY" ? (
+              <span className="pill" title="holds this course's read-side admin view (ruling 18)">
+                faculty
+              </span>
+            ) : (
+              <span className="pill loose">learner</span>
+            )}
+          </div>
+
           <div className="rosteracts">
-            {person.userId ? (
-              <>
-                {/* Enters Open Loom (src/lib/viewUser.ts): the student's FULL
-                    loom, read-only, navigated by the app itself — not the old
-                    summary page, which remains routable at /admin/user/[id].
-                    A plain anchor: the enter route needs a document
-                    navigation so the providers remount reading the new
-                    owner. */}
-                <a
-                  href={`/api/view-user/enter?user=${encodeURIComponent(person.userId)}`}
-                  className="btn mini compact openloom"
-                  data-tip="their whole loom, read-only — the app navigates their work; exit from the floating Teaching menu"
+            {person.userId && isAdmin ? (
+              /* Removal confirms first (TJ, 2026-08-21) — the one roster
+                 write whose undo is a fresh invitation rather than the same
+                 control. The dialog's body carries what the page's hint
+                 paragraph used to say (it read as a lost tooltip under the
+                 table — TJ, same day); the data-tip is the glance version.
+                 FormData is read BEFORE the await: the form element nulls
+                 off the event once the dialog opens. */
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  const formData = new FormData(event.currentTarget)
+                  void confirm({
+                    title: `Remove ${person.name ?? person.email} from the course?`,
+                    body: "Their access to this course ends — other courses are untouched, and their work is kept. Re-inviting them brings it all back.",
+                    confirmLabel: "Remove",
+                    danger: true,
+                  }).then((ok) => { if (ok) return removeFromRoster(formData) })
+                }}
+              >
+                <input type="hidden" name="courseId" value={courseId} />
+                <input type="hidden" name="userId" value={person.userId} />
+                <button
+                  className="btn ghost mini compact"
+                  type="submit"
+                  aria-label={`Remove ${person.name ?? person.email} from course`}
+                  data-tip="access to this course ends; their work is kept — re-inviting brings it back"
                 >
-                  Open Loom
-                </a>
-                {isAdmin && (
-                  /* Removal confirms first (TJ, 2026-08-21) — the one roster
-                     write whose undo is a fresh invitation rather than the
-                     same control. FormData is read BEFORE the await: the
-                     form element nulls off the event once the dialog opens. */
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      const formData = new FormData(event.currentTarget)
-                      void confirm({
-                        title: `Remove ${person.name ?? person.email} from the course?`,
-                        body: "Their access to this course ends — other courses are untouched, and their work is kept. Re-inviting them brings it all back.",
-                        confirmLabel: "Remove",
-                        danger: true,
-                      }).then((ok) => { if (ok) return removeFromRoster(formData) })
-                    }}
-                  >
-                    <input type="hidden" name="courseId" value={courseId} />
-                    <input type="hidden" name="userId" value={person.userId} />
-                    <button
-                      className="btn ghost mini compact"
-                      type="submit"
-                      aria-label={`Remove ${person.name ?? person.email} from course`}
-                    >
-                      Remove
-                    </button>
-                  </form>
-                )}
-              </>
-            ) : isAdmin ? (
+                  Remove
+                </button>
+              </form>
+            ) : !person.userId && isAdmin ? (
               <form action={removeAllowedEmail}>
                 <input type="hidden" name="courseId" value={courseId} />
                 <input type="hidden" name="email" value={person.email} />

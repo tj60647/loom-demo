@@ -128,12 +128,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               </span>
             </div>
           )}
-          {isAdmin && enrolledCount > 0 && (
-            <p className="hint" style={{ fontSize: "12.5px", marginTop: "10px" }}>
-              Removing an enrolled learner ends their access to this course only — other courses are
-              untouched, and their work is kept. Re-inviting them brings it all back.
-            </p>
-          )}
+          {/* The removal explainer left this spot (TJ, 2026-08-21: "feels
+              like a tooltip, it gets lost in the footer") — it lives in the
+              Remove confirm's body now, read at the moment of decision, with
+              a data-tip on the button for the glance. */}
         </>
       )}
     </main>
