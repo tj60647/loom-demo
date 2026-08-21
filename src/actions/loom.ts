@@ -151,11 +151,14 @@ export async function getUserLoomData() {
   // student's loom. The swap is READ-side only — resolveActiveCourseId
   // performs adoption WRITES and must never run with someone else's id, so
   // the view path takes the write-free course resolution instead (the same
-  // split searchLoom already makes).
+  // split searchLoom already makes). viewing.courseId rides as the requested
+  // course: the mode is PINNED to the course that authorized it, so the loom
+  // on screen cannot flip when the student switches their own working course
+  // (selectedAt) — and it always matches the course the header names.
   const viewing = await resolveViewTarget(viewerId)
   const userId = viewing?.userId ?? viewerId
   const courseId = viewing
-    ? await resolveCourseIdForUser(userId)
+    ? await resolveCourseIdForUser(userId, viewing.courseId)
     : await resolveActiveCourseId(userId)
 
   // Capture order is meaning: the arc map's "warp in reading order" and the
@@ -1095,12 +1098,13 @@ export async function saveView(key: string, data: CardTableView) {
  */
 export async function getGraphEvents(): Promise<GraphEvent[]> {
   const viewerId = await getUserId()
-  // Same Open Loom swap as getUserLoomData, same write-hazard rule: the
-  // adoption-writing course resolver only ever runs for the viewer's own id.
+  // Same Open Loom swap as getUserLoomData, same write-hazard rule (the
+  // adoption-writing course resolver only ever runs for the viewer's own id)
+  // and the same pin: the mode reads the course that authorized it.
   const viewing = await resolveViewTarget(viewerId)
   const userId = viewing?.userId ?? viewerId
   const courseId = viewing
-    ? await resolveCourseIdForUser(userId)
+    ? await resolveCourseIdForUser(userId, viewing.courseId)
     : await resolveActiveCourseId(userId)
 
   const recorded = await db.select().from(graphEvents)

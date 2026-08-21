@@ -115,9 +115,11 @@ export default function RosterTable({
                  the name (TJ, 2026-08-21 column order). Enters Open Loom
                  (src/lib/viewUser.ts) — a plain anchor: the enter route
                  needs a document navigation so the providers remount
-                 reading the new owner. */
+                 reading the new owner. Carries THIS roster's course, so the
+                 loom that opens is the one this table was showing counts
+                 for — not whichever course the student last selected. */
               <a
-                href={`/api/view-user/enter?user=${encodeURIComponent(person.userId)}`}
+                href={`/api/view-user/enter?user=${encodeURIComponent(person.userId)}&course=${encodeURIComponent(courseId)}`}
                 className="btn mini compact openloom"
                 data-tip="their whole loom, read-only — the app navigates their work; exit from the float"
               >
