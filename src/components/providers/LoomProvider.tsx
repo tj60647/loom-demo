@@ -164,6 +164,22 @@ export interface LoomContextType {
    * evidence, which is a state the app names rather than a fault.
    */
   resetReading: (sourceId: string) => Promise<ReadingResetCounts>
+  /**
+   * Drop every debounced write still waiting — cloth text, map text, view
+   * geometry — without sending it. The course switch's quiesce step: text is
+   * FLUSHED first (the student's words belong in the course they were typed
+   * in), then this kills the 500ms view timers, which have no flush and
+   * would otherwise fire mid-switch and resolve the NEW course server-side.
+   */
+  cancelPendingSaves: () => void
+  /**
+   * Tell every OTHER tab a course switch happened. Siblings cancel their own
+   * pending writes and hard-reload (the effect below); the posting channel
+   * never receives its own message, so the switching tab is not raced. Lives
+   * here, not in ReadingsProvider, because the state that must die before
+   * the reload is this provider's.
+   */
+  announceCourseSwitch: () => void
   /** Transient status line (v14's saveDot): '· saved ·', '· copied ·', errors. */
   flashMsg: string | null
   flash: (msg: string) => void
@@ -959,6 +975,32 @@ export function LoomProvider({ children, readOnly = false }: { children: ReactNo
     pendingViews.current = new Map()
   }, [])
 
+  // Cross-tab course switch. The switching tab announces AFTER the stamp; a
+  // sibling that merely reloaded would then fire its own pagehide flush and
+  // send course A's pending text into course B (the server resolves the
+  // course at action time, and by then the stamp is committed). So a sibling
+  // CANCELS first — dropping at most the debounce window of keystrokes in a
+  // background tab — and reloads into the new course clean. The posting
+  // channel object never receives its own message, so the switching tab
+  // (which flushed BEFORE the stamp) is untouched.
+  const courseChannel = useRef<BroadcastChannel | null>(null)
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return
+    const channel = new BroadcastChannel("loom-course-switch")
+    courseChannel.current = channel
+    channel.onmessage = () => {
+      cancelPendingSaves()
+      window.location.reload()
+    }
+    return () => {
+      courseChannel.current = null
+      channel.close()
+    }
+  }, [cancelPendingSaves])
+  const announceCourseSwitch = useCallback(() => {
+    courseChannel.current?.postMessage("switched")
+  }, [])
+
   const resetLoom = useCallback(async () => {
     cancelPendingSaves()
     const counts = await resetLoomAction()
@@ -1008,6 +1050,7 @@ export function LoomProvider({ children, readOnly = false }: { children: ReactNo
     setMapTiers, setMapRead, setMapEssence, flushMapText,
     setView, ensureActiveMap,
     resetLoom, resetReading,
+    cancelPendingSaves, announceCourseSwitch,
     flashMsg, flash,
     undoStack, setUndoStack, redoStack, setRedoStack
   }

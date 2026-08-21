@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { setActiveCourse } from "@/actions/courses"
 import { useLoom } from "@/components/providers/LoomProvider"
-import { useReadings, type ActiveCourse } from "@/components/providers/ReadingsProvider"
+import { type ActiveCourse } from "@/components/providers/ReadingsProvider"
 
 /**
  * The course label, and the switch it becomes when one person carries more
@@ -28,8 +28,7 @@ import { useReadings, type ActiveCourse } from "@/components/providers/ReadingsP
  * handler's comment says why the order is the design.
  */
 export default function CourseSwitch({ course }: { course: ActiveCourse }) {
-  const { flushCloth, flushMapText, flash } = useLoom()
-  const { announceCourseSwitch } = useReadings()
+  const { flushCloth, flushMapText, cancelPendingSaves, announceCourseSwitch, flash } = useLoom()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const hostRef = useRef<HTMLSpanElement>(null)
@@ -81,9 +80,12 @@ export default function CourseSwitch({ course }: { course: ActiveCourse }) {
       // course before setActiveCourse runs — and LoomProvider's pagehide
       // flush then finds nothing left to send after the stamp. Navigating
       // first would do the opposite: the unload flush would carry the last
-      // keystrokes into the NEW course.
+      // keystrokes into the NEW course. Then CANCEL what has no flush — the
+      // 500ms view-geometry timers — so none fires during the await and
+      // lands, mis-scoped, after the stamp.
       flushCloth()
       flushMapText()
+      cancelPendingSaves()
       await setActiveCourse(id)
       // Every other tab hard-reloads out of the old course; the posting
       // channel never hears its own message, so this tab is not raced.

@@ -7,7 +7,7 @@
 // (2010)". All of them want the same small list, and none of them should
 // re-fetch it.
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { getSources, getActiveCourse } from "@/lib/reads"
 
@@ -78,12 +78,6 @@ type ReadingsContextValue = {
   titleOf: (sourceId: string | null | undefined) => string
   /** Re-read the shelf, e.g. after the student adds a reading of their own. */
   refresh: () => void
-  /** Tell every OTHER tab a course switch happened, so none keeps a mounted
-   *  workbench writing into the newly selected course (actions resolve the
-   *  active course server-side at action time). The posting channel never
-   *  receives its own message, so the switching tab — already navigating —
-   *  is not raced. */
-  announceCourseSwitch: () => void
 }
 
 const ReadingsContext = createContext<ReadingsContextValue | null>(null)
@@ -95,25 +89,6 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
-
-  // A course switch is a full navigation in the tab that made it; this
-  // channel is for every OTHER tab, whose mounted workbench would otherwise
-  // keep writing — and be stamped, server-side, into the newly selected
-  // course. A hard reload re-resolves everything against the new choice.
-  // Lives here rather than in CourseSwitch so the posting object and the
-  // listening objects are distinct per document: a channel never receives
-  // its own postMessage, so the switching tab is not raced mid-navigation.
-  const channelRef = useRef<BroadcastChannel | null>(null)
-  useEffect(() => {
-    if (typeof BroadcastChannel === "undefined") return
-    const channel = new BroadcastChannel("loom-course-switch")
-    channelRef.current = channel
-    channel.onmessage = () => window.location.reload()
-    return () => {
-      channelRef.current = null
-      channel.close()
-    }
-  }, [])
 
   useEffect(() => {
     // Deferred rather than set synchronously, the way LoomProvider does it: a
@@ -162,7 +137,6 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
       error,
       titleOf: (sourceId) => (sourceId && byId.get(sourceId)?.title) || "another reading",
       refresh: () => setNonce((n) => n + 1),
-      announceCourseSwitch: () => channelRef.current?.postMessage("switched"),
     }
   }, [readings, course, isLoading, error])
 
