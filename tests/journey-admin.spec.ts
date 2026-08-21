@@ -16,11 +16,14 @@ const INVITEE = "pw-journey-invitee@loom.local"
 
 test("roster shows enrolled demo learners with their counts", async ({ page }) => {
   await page.goto("/admin")
-  await expect(page.getByRole("heading", { name: "Roster" })).toBeVisible({ timeout: 15_000 })
+  // The h1 left on 2026-08-21; the roster's tabs lead, Enrolled active.
+  await expect(page.locator(".rostertabs a.on", { hasText: "Enrolled" })).toBeVisible({ timeout: 15_000 })
 
   const rowA = page.locator(".rosterrow", { hasText: "Test User A" })
   await expect(rowA, "seed missing — run `npm run seed:demo` first").toHaveCount(1)
-  await expect(rowA.locator(".pill", { hasText: /\d+ concepts/ })).toBeVisible()
+  // Counts became number-only pills in their own sortable columns — the
+  // concepts pill is the beaten one, the header names the column.
+  await expect(rowA.locator(".pill.beaten", { hasText: /^\d+$/ })).toBeVisible()
   await expect(rowA.getByRole("link", { name: "Open Loom" })).toBeVisible()
 
   await expect(page.locator(".rosterrow", { hasText: "Test User B" })).toHaveCount(1)
@@ -28,15 +31,19 @@ test("roster shows enrolled demo learners with their counts", async ({ page }) =
 
 test("an invitation is issued, appears pending, and is withdrawn", async ({ page }) => {
   await page.goto("/admin")
-  // The invite form starts folded; the summary is the only way in.
-  await page.locator(".invitefold summary").click()
+  // The invite form left its fold for a tab of its own (2026-08-21), and the
+  // pending appear on the Invited tab — the invitation's ledger.
+  await page.locator(".rostertabs a", { hasText: "Invite learners" }).click()
   await page.locator("textarea[name=emails]").fill(INVITEE)
   await page.getByRole("button", { name: "Invite", exact: true }).click()
 
   await expect(page.locator(".invitereport")).toContainText("1 invited", { timeout: 15_000 })
+  await page.locator(".rostertabs a", { hasText: "Invited" }).first().click()
   const pending = page.locator(".rosterrow.pendingrow", { hasText: INVITEE })
   await expect(pending).toHaveCount(1, { timeout: 15_000 })
-  await expect(pending.getByText("not signed in yet")).toBeVisible()
+  // The role column says "invited" for a pending row; the old phrase lives
+  // in its title.
+  await expect(pending.locator(".pill", { hasText: "invited" })).toBeVisible()
 
   await pending.getByRole("button", { name: /Withdraw the invitation/ }).click()
   await expect(page.locator(".rosterrow", { hasText: INVITEE })).toHaveCount(0, { timeout: 15_000 })
@@ -46,11 +53,18 @@ test("the per-student view renders Test User A's loom read-only", async ({ page 
   await page.goto("/admin")
   const rowA = page.locator(".rosterrow", { hasText: "Test User A" })
   await rowA.getByRole("link", { name: "Open Loom" }).click()
-  await expect(page).toHaveURL(/\/admin\/user\//, { timeout: 15_000 })
-  // Seeded graph is visible in the concepts list. (Plain getByText traps
-  // itself on the hidden SVG <title> tooltips, which carry the sentences.)
-  await expect(page.locator(".clabel", { hasText: "object worlds" })).toBeVisible({ timeout: 15_000 })
-  await expect(page.locator(".clabel", { hasText: "community of practice" })).toBeVisible()
+
+  // Open Loom (2026-08-21): the app itself, reading A's loom — the float
+  // names them and carries the whole-loom download; faculty.spec walks the
+  // exit. The old summary page remains routable, unlinked.
+  await expect(page).toHaveURL(/\/$/, { timeout: 20_000 })
+  const float = page.locator(".teachfloat")
+  await expect(float).toBeVisible({ timeout: 15_000 })
+  await expect(float).toContainText("Test User A")
+  await expect(float.getByRole("link", { name: "Download loom" })).toBeVisible()
+  // Leave the mode so no later test reads A's loom by accident.
+  await float.getByRole("link", { name: "Exit" }).click()
+  await expect(page).toHaveURL(/\/admin/, { timeout: 20_000 })
 })
 
 test("courses: schedule controls render for the course's readings", async ({ page }) => {
