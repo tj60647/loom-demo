@@ -11,10 +11,14 @@ export type ViewTarget = {
   email: string | null
   /** The course the view is PINNED to: the roster's course when the enter
    * link named one, else the first authorized course by a deterministic
-   * order. Every read in the mode scopes to this id (loom, shelf, search,
-   * header), passed as the resolver's requested course — so what the viewer
-   * reads cannot flip when the student switches their own working course
-   * (selectedAt), and it always matches the header naming it. */
+   * order — always a LIVE course the target actively belongs to, which is
+   * what lets the guarantee hold: every read in the mode passes this id as
+   * the resolver's requested course, and the resolver matches requests
+   * against live enrolments only, so an archived pin would silently fall
+   * back to the student's own selection and show one course's work under
+   * another's name. Every read scopes to this id (loom, shelf, search,
+   * header), so what the viewer reads cannot flip when the student switches
+   * their own working course (selectedAt). */
   courseId: string
 }
 
@@ -37,17 +41,27 @@ export async function authorizeViewTarget(
 ): Promise<ViewTarget | null> {
   if (!viewerId || !targetId || viewerId === targetId) return null
 
-  // Deterministic and unarchived-first. The pick used to be raw row order —
+  // Deterministic and LIVE courses only. The pick used to be raw row order —
   // undefined in Postgres — so which loom opened depended on the plan, and
   // under selectedAt it would have drifted with the student's own switching.
-  // Archived courses sort LAST rather than out, so an admin can still reach
-  // the loom of a student whose only course is archived.
+  // Archived courses are excluded outright, not sorted last: every read in
+  // the mode passes the pin through resolveCourseIdForUser, whose enrolment
+  // list is live-only — an archived pin would never match there, so the
+  // header would name the archived course while the loom silently showed
+  // whichever live course the student's own selection resolves to. A view
+  // whose course is archived mid-session falls to another shared live
+  // course at the next per-read re-check, or ends silently (the same
+  // fallback as any unauthorized cookie: the viewer's own loom).
   const targetMemberships = await db
     .select({ courseId: courseMemberships.courseId })
     .from(courseMemberships)
     .innerJoin(courses, eq(courses.id, courseMemberships.courseId))
-    .where(and(eq(courseMemberships.userId, targetId), isNull(courseMemberships.removedAt)))
-    .orderBy(asc(courses.isArchived), asc(courses.createdAt), asc(courses.id))
+    .where(and(
+      eq(courseMemberships.userId, targetId),
+      isNull(courseMemberships.removedAt),
+      eq(courses.isArchived, false)
+    ))
+    .orderBy(asc(courses.createdAt), asc(courses.id))
   if (targetMemberships.length === 0) return null
   const targetCourseIds = targetMemberships.map((m) => m.courseId)
 
