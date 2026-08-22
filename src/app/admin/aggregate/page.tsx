@@ -5,6 +5,8 @@ import type { LoomState } from "@/lib/types"
 
 type AggregatePageSearchParams = {
   course?: string | string[]
+  source?: string | string[]
+  student?: string | string[]
   section?: string | string[]
 }
 
@@ -38,7 +40,12 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   let aggregateUnavailable = false
 
   try {
-    const aggregate = await getAggregateLoomData(courseId, sectionId)
+    const aggregate = await getAggregateLoomData(
+      courseId,
+      sectionId,
+      firstParam(resolvedSearchParams.source),
+      firstParam(resolvedSearchParams.student)
+    )
     concepts = aggregate.concepts
     passages = aggregate.passages
     edges = aggregate.edges

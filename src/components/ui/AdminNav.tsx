@@ -10,7 +10,29 @@ export type AdminNavCourse = {
   term: string
   isArchived: boolean
   sections: { id: string; name: string }[]
+  /** The course's readings, syllabus order — the READING picker's options.
+   *  `week` is null for an unscheduled one, which sorts last. */
+  readings: { id: string; title: string; week: number | null }[]
+  /** Its learners, name order, each with the section they sit in. */
+  students: { id: string; name: string; sectionId: string | null }[]
 }
+
+/**
+ * WHICH SCOPES A PAGE ACTUALLY READS.
+ *
+ * The strip is one control set shared by every Teaching surface, and a picker
+ * that scopes nothing on the page under it is exactly the incongruity this
+ * strip was fixed for once already (TJ, 2026-08-21, the Courses catalog). So
+ * each page declares what it reads, and the strip draws only that.
+ */
+const SCOPES: Record<string, { section: boolean; reading: boolean; student: boolean }> = {
+  // The catalog's panels always show every section, and a course is the whole
+  // subject of the page.
+  "/admin/courses": { section: false, reading: false, student: false },
+  // The cohort map narrows by all four (TJ, 2026-08-22).
+  "/admin/aggregate": { section: true, reading: true, student: true },
+}
+const DEFAULT_SCOPE = { section: true, reading: false, student: false }
 
 // Layouts don't receive searchParams, so the nav resolves the active course and
 // section from the URL itself. This mirrors resolveCourseId/resolveSectionId on
@@ -29,6 +51,7 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
   // select would name a course the page is not showing. Excluding it instead
   // lets the healing effect below correct the URL to what is on screen.
   const onCatalog = pathname === "/admin/courses"
+  const scope = SCOPES[pathname] ?? DEFAULT_SCOPE
   const candidates = onCatalog ? courses : courses.filter((course) => !course.isArchived)
   const liveCourses = courses.filter((course) => !course.isArchived)
 
@@ -49,6 +72,17 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
   const activeCourseId = activeCourse?.id ?? null
   const activeSectionId = activeSection?.id ?? null
 
+  const sourceParam = searchParams.get("source")
+  const activeSource = activeCourse?.readings.find((r) => r.id === sourceParam) ?? null
+  const studentParam = searchParams.get("student")
+  // The student list follows the SECTION picker: narrowing to a section and
+  // then being offered someone from another one would be a control arguing
+  // with the control beside it.
+  const studentsHere = (activeCourse?.students ?? []).filter(
+    (st) => !activeSectionId || st.sectionId === activeSectionId
+  )
+  const activeStudent = studentsHere.find((st) => st.id === studentParam) ?? null
+
   // A URL is a claim about what the page shows. When ?course= resolves to
   // nothing — a course deleted after the link was minted, or a typo — the
   // fallback above quietly shows the first course while the address keeps the
@@ -65,27 +99,52 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
     courseParam === null ||
     (activeCourse !== null && (activeCourse.id === courseParam || activeCourse.slug === courseParam))
   const sectionParamResolves = sectionParam === null || activeSection !== null
+  const sourceParamResolves = sourceParam === null || activeSource !== null
+  const studentParamResolves = studentParam === null || activeStudent !== null
   useEffect(() => {
-    if (courseParamResolves && sectionParamResolves) return
+    if (courseParamResolves && sectionParamResolves && sourceParamResolves && studentParamResolves) {
+      return
+    }
     const next = new URLSearchParams(searchParams.toString())
     if (!courseParamResolves) {
       if (activeCourseId) next.set("course", activeCourseId)
       else next.delete("course")
     }
     if (!sectionParamResolves) next.delete("section")
+    if (!sourceParamResolves) next.delete("source")
+    if (!studentParamResolves) next.delete("student")
     const query = next.toString()
     router.replace(query ? `${pathname}?${query}` : pathname)
-  }, [courseParamResolves, sectionParamResolves, activeCourseId, pathname, router, searchParams])
+  }, [
+    courseParamResolves,
+    sectionParamResolves,
+    sourceParamResolves,
+    studentParamResolves,
+    activeCourseId,
+    pathname,
+    router,
+    searchParams,
+  ])
 
-  const navigate = (courseId: string | null, sectionId: string | null) => {
+  const push = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams.toString())
-    if (courseId) next.set("course", courseId)
-    else next.delete("course")
-    if (sectionId) next.set("section", sectionId)
-    else next.delete("section")
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value)
+      else next.delete(key)
+    }
     const query = next.toString()
     router.push(query ? `${pathname}?${query}` : pathname)
   }
+
+  /**
+   * Changing course clears everything under it: section ids are scoped to a
+   * course, a reading belongs to one course's list, and a student is enrolled
+   * in one. Carrying any of them across would silently resolve to nothing.
+   * Changing SECTION clears only the student, for the same reason the student
+   * list is filtered by section above.
+   */
+  const navigate = (courseId: string | null, sectionId: string | null) =>
+    push({ course: courseId, section: sectionId, source: null, student: null })
 
   return (
     // Which course, and which section — and nothing else. The tabs that used to
@@ -137,7 +196,7 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
                 course scope only — its panels always show every section —
                 and a control that scopes nothing on the page below it is
                 exactly the incongruity this strip is for (TJ, 2026-08-21). */}
-            {!onCatalog && activeCourse && activeCourse.sections.length > 0 && (
+            {scope.section && activeCourse && activeCourse.sections.length > 0 && (
               <>
                 <span className="label">Section</span>
                 <select
@@ -145,11 +204,59 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
                   value={activeSectionId ?? ""}
                   aria-label="Select active section"
                   style={{ minWidth: "160px" }}
-                  onChange={(event) => navigate(activeCourseId, event.target.value || null)}
+                  onChange={(event) =>
+                    push({ section: event.target.value || null, student: null })
+                  }
                 >
                   <option value="">All sections</option>
                   {activeCourse.sections.map((section) => (
                     <option key={section.id} value={section.id}>{section.name}</option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            {/* READING, to the right of Section (TJ, 2026-08-22), with an
+                "All readings" the way the section picker has "All sections":
+                the whole course is the resting state and one reading is the
+                narrowing, never the other way round. */}
+            {scope.reading && activeCourse && activeCourse.readings.length > 0 && (
+              <>
+                <span className="label">Reading</span>
+                <select
+                  className="tinput inline"
+                  value={activeSource?.id ?? ""}
+                  aria-label="Select active reading"
+                  style={{ minWidth: "180px", maxWidth: "280px" }}
+                  onChange={(event) => push({ source: event.target.value || null })}
+                >
+                  <option value="">All readings</option>
+                  {activeCourse.readings.map((reading) => (
+                    <option key={reading.id} value={reading.id}>
+                      {reading.week != null ? `W${reading.week} · ` : ""}
+                      {reading.title}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            {/* STUDENT, defaulting to all of them (TJ, 2026-08-22). The list
+                follows the section picker, so the two cannot disagree about
+                whose work is in view. */}
+            {scope.student && activeCourse && studentsHere.length > 0 && (
+              <>
+                <span className="label">Student</span>
+                <select
+                  className="tinput inline"
+                  value={activeStudent?.id ?? ""}
+                  aria-label="Select active student"
+                  style={{ minWidth: "160px" }}
+                  onChange={(event) => push({ student: event.target.value || null })}
+                >
+                  <option value="">All students</option>
+                  {studentsHere.map((st) => (
+                    <option key={st.id} value={st.id}>{st.name}</option>
                   ))}
                 </select>
               </>

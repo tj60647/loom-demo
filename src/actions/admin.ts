@@ -591,7 +591,22 @@ async function foldConceptIds<T extends { id: string }>(passageRows: T[]): Promi
 
 export async function getAggregateLoomData(
   courseIdRaw?: string | null,
-  sectionIdRaw?: string | null
+  sectionIdRaw?: string | null,
+  /**
+   * Narrow to ONE reading, and/or to ONE student (TJ, 2026-08-22). Both are
+   * "all" when absent, the way the section picker's "All sections" is.
+   *
+   * A student is filtered where a section already is — on the member set, so
+   * every later query narrows with it and nothing has to be re-checked. A
+   * READING has no column on a concept or a thread to filter by: only a
+   * passage carries `sourceId`. So the reading narrows the passages, and the
+   * concepts are the ones those passages evidence, and the threads are the
+   * ones running between concepts that survive. That is the honest reading of
+   * "this reading's part of the weave" — a concept coined against another text
+   * is not in this one merely because its owner also read this one.
+   */
+  sourceIdRaw?: string | null,
+  studentIdRaw?: string | null
 ) {
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) {
@@ -600,7 +615,11 @@ export async function getAggregateLoomData(
   await checkCourseFaculty(courseId)
 
   const sectionId = await resolveSectionId(courseId, sectionIdRaw)
-  const userIds = await getMemberIds(courseId, sectionId)
+  const memberIds = await getMemberIds(courseId, sectionId)
+  // An unknown student id narrows to nobody rather than silently widening to
+  // everybody — the same discipline resolveSectionId keeps for a dead section.
+  const studentId = studentIdRaw?.trim() || null
+  const userIds = studentId ? memberIds.filter((id) => id === studentId) : memberIds
 
   if (userIds.length === 0) {
     return { concepts: [], passages: [], edges: [], members: [], passagesUnavailable: false }
@@ -624,11 +643,34 @@ export async function getAggregateLoomData(
   const members = memberRows.map((u) => ({ id: u.id, name: u.name || u.email }))
 
   try {
+    const sourceId = sourceIdRaw?.trim() || null
     const allPassages = await db
       .select()
       .from(passages)
-      .where(and(eq(passages.courseId, courseId), inArray(passages.userId, userIds)))
-    return { concepts: allConcepts, passages: await foldConceptIds(allPassages), edges: allEdges, members, passagesUnavailable: false }
+      .where(
+        and(
+          eq(passages.courseId, courseId),
+          inArray(passages.userId, userIds),
+          sourceId ? eq(passages.sourceId, sourceId) : undefined
+        )
+      )
+    const folded = await foldConceptIds(allPassages)
+    if (!sourceId) {
+      return { concepts: allConcepts, passages: folded, edges: allEdges, members, passagesUnavailable: false }
+    }
+    // Evidenced HERE: the concepts these passages point at, and the threads
+    // whose ends both survive that. A thread with one end outside the reading
+    // is not a thread within it.
+    const here = new Set(folded.flatMap((b) => b.conceptIds))
+    const scopedConcepts = allConcepts.filter((c) => here.has(c.id))
+    const scopedEdges = allEdges.filter((e) => here.has(e.fromId) && here.has(e.toId))
+    return {
+      concepts: scopedConcepts,
+      passages: folded,
+      edges: scopedEdges,
+      members,
+      passagesUnavailable: false,
+    }
   } catch (error) {
     // Fail soft so aggregate map still renders if passage schema/data is temporarily inconsistent.
     console.error("[getAggregateLoomData] Failed to load passages for aggregate view", error)

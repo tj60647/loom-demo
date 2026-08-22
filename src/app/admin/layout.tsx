@@ -5,8 +5,8 @@ import AdminNav, { type AdminNavCourse } from "@/components/ui/AdminNav"
 import Identity from "@/components/ui/Identity"
 import JourneyNav from "@/components/ui/JourneyNav"
 import { db } from "@/db"
-import { sections } from "@/db/schema"
-import { asc } from "drizzle-orm"
+import { courseMemberships, courseSources, sections, sources, users } from "@/db/schema"
+import { and, asc, eq, isNull } from "drizzle-orm"
 import { listCourses, listFacultyCourseIds } from "@/lib/courses"
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -32,9 +32,40 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // resolve on /admin/courses (the catalog page selects them by ?course=)
   // and filters them out everywhere else. Faculty stay live-only, as
   // listFacultyCourseIds already scopes them.
-  const [allCourseRows, sectionRows] = await Promise.all([
+  // Readings and students ride along for the same reason sections do: the
+  // strip's pickers are the scope every page below reads, and a layout cannot
+  // see searchParams to know which course is active. One query each, for
+  // every course at once, indexed by course on the client.
+  const [allCourseRows, sectionRows, readingRows, memberRows] = await Promise.all([
     listCourses({ includeArchived: true }),
     db.select().from(sections).orderBy(asc(sections.name)),
+    // Queried here rather than through getReadingsByCourse(): that action is
+    // requireAdmin-gated, and THIS LAYOUT ALSO SERVES FACULTY — calling it
+    // threw "Unauthorized" and took the whole Teaching shell down for them.
+    // The rows are scoped by the courses this viewer already resolved below,
+    // so the gate it would have applied is the gate that is already here.
+    db
+      .select({
+        courseId: courseSources.courseId,
+        sourceId: courseSources.sourceId,
+        week: courseSources.week,
+        position: courseSources.position,
+        title: sources.title,
+      })
+      .from(courseSources)
+      .innerJoin(sources, eq(sources.id, courseSources.sourceId)),
+    db
+      .select({
+        courseId: courseMemberships.courseId,
+        sectionId: courseMemberships.sectionId,
+        userId: users.id,
+        name: users.name,
+        email: users.email,
+      })
+      .from(courseMemberships)
+      .innerJoin(users, eq(users.id, courseMemberships.userId))
+      .where(and(isNull(courseMemberships.removedAt), eq(courseMemberships.role, "LEARNER")))
+      .orderBy(asc(users.name), asc(users.email)),
   ])
   const courseRows = admin
     ? allCourseRows
@@ -51,6 +82,25 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     sections: sectionRows
       .filter((section) => section.courseId === course.id)
       .map((section) => ({ id: section.id, name: section.name })),
+    // Syllabus order — week, then order within the week, then title, with
+    // the unscheduled last. A reading names its WEEK in the picker (TJ,
+    // 2026-08-22: "let readings have a week number in them"), because that is
+    // how a syllabus is spoken about and 31 titles sorted alphabetically is
+    // not a syllabus.
+    readings: readingRows
+      .filter((r) => r.courseId === course.id)
+      .sort(
+        (a, b) =>
+          (a.week ?? Number.MAX_SAFE_INTEGER) - (b.week ?? Number.MAX_SAFE_INTEGER) ||
+          a.position - b.position ||
+          a.title.localeCompare(b.title)
+      )
+      .map((r) => ({ id: r.sourceId, title: r.title, week: r.week })),
+    // LEARNERS only: the picker narrows a cohort view to one student's work,
+    // and faculty have none of their own to look at here.
+    students: memberRows
+      .filter((m) => m.courseId === course.id)
+      .map((m) => ({ id: m.userId, name: m.name || m.email, sectionId: m.sectionId })),
   }))
 
   return (
