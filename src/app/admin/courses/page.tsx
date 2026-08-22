@@ -44,7 +44,9 @@ export default async function AdminCoursesPage({
   ])
 
   return (
-    <main>
+    // `workwide`: the console takes the work-surface measure (globals.css,
+    // next to .station-work) instead of the 1100px reading measure.
+    <main className="workwide">
       <h1>Courses</h1>
       <p className="tasksub" style={{ marginBottom: "20px" }}>
         Create courses and their sections. Readings live in one shared set and are

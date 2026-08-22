@@ -199,6 +199,12 @@ main{padding:24px max(26px,calc((100% - var(--measure,1100px))/2)) 86px;margin:0
 /* The workbench stations (01–04). Three columns come out at ~530px each here —
    the width each card had when this station was two columns. */
 main.station-work{--measure:1680px}
+/* The admin course console. A management surface, not prose (contracts.md
+   §2c-iii: work surfaces take the room they are given) — 1100px kept its
+   catalog and panels to a reading column. Same measure as the stations
+   above, none of their :has() column machinery: this main scrolls normally
+   inside .adminbody. */
+main.workwide{--measure:1680px}
 .panel{display:none} .panel.active{display:block}
 /* 00 · Reading hands its whole height to the viewer, which scrolls itself.
    No padding, no page scroll — the text is the thing on this station. */
