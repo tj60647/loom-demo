@@ -754,22 +754,59 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
 #map{display:block;width:100%;height:400px;touch-action:none;user-select:none;-webkit-user-select:none}
 
 /* ===== the cohort canvas (admin/aggregate) =====
-   The drawing is the surface, and its lists ride over it (TJ, 2026-08-22: "i
-   think the graph should be a canvase with menus floating over the corners, a
-   floating footer with data about selection, and the usual headers"). Before
-   this the two lists sat in a `.two` grid BELOW the cloth, so reading a
-   concept off the drawing and finding it in a list were a page-scroll apart.
-   The headers stay — this replaces where the lists sit, not the page's own
-   heading. */
-.cohortcanvas{position:relative}
+   A MAP APPLICATION, not an illustration with a caption (TJ, 2026-08-22: "the
+   map or graph needs to fill the screen like a google map or other
+   application, cad, where the drawing is primary… the text is annotations for
+   a map"). The first cut of this kept the page's h1, subtitle, card frame and
+   a read-out below the drawing, which is exactly the figure-with-caption
+   shape he ruled against: "why is there 'padding' around the graph? this
+   whole thing is unnecessary and redundant."
+
+   So the canvas is the viewport below the shell's bars, edge to edge, and
+   every piece of text that used to surround it floats on it. */
+/* Bottom padding clears the shell's fixed identity footer, measured at 34px
+   on the running app — it is `position:fixed` over the window, so a canvas
+   that took the full height would put its labels and its read-out underneath
+   it. Every other admin page clears it with main's own 86px bottom padding;
+   a map has no such padding, so it reserves exactly the band. */
+main.canvasfull{padding:0 0 34px;margin:0;height:100%;overflow:hidden;box-sizing:border-box}
+/* The shell insets every admin page by 20px; a map cannot be inset and still
+   reach its own edges. `:has()` lets the page opt out without the layout
+   needing to know which route it is rendering — the same technique
+   `main.station-work:has(…)` already uses above. */
+.adminbody{padding:20px 20px 0}
+.adminbody:has(> main.canvasfull){padding:0}
+.cohortcanvas{position:relative;height:100%;background:#f4f2ec}
+/* No border, no radius, no card: the drawing meets the window.
+
+   The bottom padding RESERVES the resting read-out's band, because an arc
+   diagram puts its nodes and their rotated labels along the bottom — measured
+   at 1920 without it, 64 of 161 labels ran under the bar. 86px = the bar's
+   67px resting height + its 14px inset + 5. An opened disclosure grows past
+   the reserve and does cover labels; that is a transient the reader asked
+   for, unlike a permanent overlap they did not. */
+.cohortcanvas #mapWrap{border:0;border-radius:0;height:100%;background:transparent;
+  padding-bottom:86px;box-sizing:border-box}
+.cohortcanvas #map{height:100%}
+/* The page's own name heads the LEFT panel rather than floating beside it.
+   As a separate chip it collided with the menu below it the moment the scope
+   line wrapped to three lines — the panel's top is a constant and the chip's
+   height is not. One panel, title then list, is also what a map application
+   does with its left rail. */
+.canvastitle{border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:8px}
+.canvastitle h1{font-size:20px;margin:0}
+.canvastitle .sub{display:block;font-size:12px;color:var(--ink-soft);margin-top:2px}
+.canvastitle .warn{display:block;font-size:12px;color:var(--red);margin-top:4px}
 /* Over the drawing's top corners. Held to a third of the width so the middle
    of the warp — where the long arcs rise — stays clear, and to 44% of the
    canvas so the baseline and its labels are never covered. */
-.canvasmenu{position:absolute;top:56px;width:min(32%,340px);max-height:44%;z-index:3;
+.canvasmenu{position:absolute;width:min(32%,340px);max-height:44%;z-index:3;
   display:flex;flex-direction:column;
   background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:10px 12px;
   box-shadow:0 1px 10px rgba(0,0,0,.06)}
-.canvasmenu.atleft{left:14px} .canvasmenu.atright{right:14px}
+/* The left panel carries the page title, so it is allowed to be taller. */
+.canvasmenu.atleft{left:14px;top:14px;max-height:60%}
+.canvasmenu.atright{right:14px;top:14px}
 .canvasmenu h2{font-size:15px;margin:0 0 2px}
 .canvasmenu .hint{font-size:12.5px;margin:0 0 7px}
 /* The list inside gives up the shared clamp and takes what the card has left,
@@ -782,14 +819,37 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
 .canvasmenu .crow{padding:7px 9px;gap:8px}
 .canvasmenu .crow .clabel{font-size:14.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .canvasmenu .crow .cap{flex:none;font-size:9px}
-/* The footer says what is selected, over the foot of the canvas. Its own
-   pointer-events so the drawing beneath keeps every click the bar does not
-   want; `left/right` rather than a width so a long sentence wraps inside the
-   canvas instead of pushing it. */
+/* THE READ-OUT, on the foot of the canvas — ONE LINE until asked.
+
+   It sat below the drawing as a column of page, and TJ pointed at it: "this
+   whole thing is unnecessary and redundant, i excluded it from the example i
+   shared." Moving it onto the canvas at 42% height was the same mistake in a
+   new place — a bar that covered the warp it annotates, which is why the
+   evidence is now behind a disclosure and the resting state is a single row.
+   The map stays the thing you are looking at.
+
+   The nodes and their labels live at the BOTTOM of an arc diagram, which is
+   exactly where a footer wants to be, so the ceiling is deliberately low: at
+   30% an opened read-out still leaves the baseline and most labels visible,
+   and it scrolls rather than growing. */
 .canvasfoot{position:absolute;left:14px;right:14px;bottom:14px;z-index:3;
-  display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;
-  background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:8px 12px;
+  max-height:30%;overflow-y:auto;
+  background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:8px 13px;
   box-shadow:0 1px 10px rgba(0,0,0,.06)}
+/* The resting line: subject, author, counts, and the sentence or definition. */
+.canvasfoot .threadhead{margin:0;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+.canvasfoot .footsaid{font-size:14px;font-style:italic;color:var(--ink-soft)}
+.canvasfoot .passagequote{margin:6px 0 8px}
+/* The evidence, folded. Same twirl idiom as every other disclosure here. */
+.canvasfoot .footmore{margin-top:7px}
+.canvasfoot .footmore > summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+.canvasfoot .footmore > summary::-webkit-details-marker{display:none}
+.canvasfoot .footmore > summary:hover{color:var(--ink)}
+.canvasfoot .footmore > summary .tw{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--ochre);transition:transform .15s}
+.canvasfoot .footmore[open] > summary .tw{transform:rotate(90deg)}
+/* Nothing selected: one quiet line, not an empty panel. */
+.canvasfoot.idle{color:var(--ink-soft);font-size:13px}
 .canvasfoot .who{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
 .canvasfoot .said{font-size:14px;font-style:italic;color:var(--ink-soft);min-width:0}
 .canvasfoot .subject{font-family:var(--display);font-size:16px;color:var(--red)}

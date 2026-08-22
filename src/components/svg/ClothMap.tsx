@@ -48,6 +48,7 @@ export default function ClothMap({
   onPickConcept,
   trace = SHOW_TRACE,
   height = 400,
+  fill = false,
 }: {
   state: LoomState,
   readSel: ReadSel,
@@ -101,9 +102,20 @@ export default function ClothMap({
    * more space to the graph").
    */
   height?: number,
+  /**
+   * Fill the container instead of taking `height`. For the map surface, where
+   * the drawing IS the page and its height is the window's, not a number
+   * chosen here (TJ, 2026-08-22: "the map or graph needs to fill the screen
+   * like a google map").
+   *
+   * No feedback loop: the svg's CSS height stays 100% and the observed height
+   * is used for GEOMETRY only, so measuring can never change what is measured.
+   */
+  fill?: boolean,
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [width, setWidth] = useState(720)
+  const [measuredH, setMeasuredH] = useState(400)
   /**
    * The hit circles, by concept id. The popover anchors to the NODE, not to
    * the glyph that was clicked: aiming at a concept's name and aiming at its
@@ -127,12 +139,16 @@ export default function ClothMap({
       // frame. 480 is the narrowest the warp still reads at; below it
       // `#mapWrap` scrolls rather than hiding anything.
       if (w > 0) setWidth(Math.max(w, 480))
+      // 360 floor: below it the arcs have nowhere to rise and the labels
+      // collide with the baseline. A shorter container scrolls instead.
+      const h = entries[0]?.contentRect.height ?? 0
+      if (h > 0) setMeasuredH(Math.max(h, 360))
     })
     observer.observe(svg)
     return () => observer.disconnect()
   }, [])
 
-  const H = height
+  const H = fill ? measuredH : height
   const baseY = H - 128
   const mL = 46
   // Room for the LAST label, which is drawn from the node and rotated 30° into
@@ -203,7 +219,11 @@ export default function ClothMap({
   // raw CSS pixels, so a 480-wide warp inside a narrower element is cut off
   // rather than scaled down. With the minimum real, `#mapWrap` scrolls.
   return (
-    <svg ref={svgRef} id="map" style={{ width: "100%", minWidth: 480, height: H, touchAction: "none" }}>
+    <svg
+      ref={svgRef}
+      id="map"
+      style={{ width: "100%", minWidth: 480, height: fill ? "100%" : H, touchAction: "none" }}
+    >
       <defs>
         <marker id="arwS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="var(--sage)" />

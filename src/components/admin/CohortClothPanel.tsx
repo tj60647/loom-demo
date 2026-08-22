@@ -1,12 +1,23 @@
 "use client"
 
-// The cohort map with its material laid out. Mirrors the student's 03 ·
-// Knowledge Graph cloth pane — the cloth on top, what is selected read out
-// beneath it — but where
-// the student weaves a read, the instructor inspects the weaving: a concept
-// opens the passages behind it, an arc opens its thread, and the full concept
-// and thread lists sit below the map. Every quote and sentence is shown as
-// the student's own, with attribution — counted and quoted, never judged.
+// THE COHORT MAP, and everything else floating on it.
+//
+// This is a map application, not a figure with a caption (TJ, 2026-08-22:
+// "the map or graph needs to fill the screen like a google map or other
+// application, cad, where the drawing is primary… you are treating the graph
+// like an illustration for the text, it is not. the text is annotations for a
+// map"). The drawing takes the whole viewport below the shell's bars; the
+// title, the two lists and the read-out are overlays on it.
+//
+// What went, and why it was not content: the h1 and subtitle above the
+// canvas, the card frame around it, and the read-out below it — "this whole
+// thing is unnecessary and redundant, i excluded it from the example i
+// shared". The read-out's CONTENT stayed and moved onto the canvas: the
+// passages behind a concept live nowhere else in the app.
+//
+// The instructor inspects the weaving: a concept opens the passages behind
+// it, an arc opens its thread. Every quote and sentence is shown as the
+// student's own, with attribution — counted and quoted, never judged.
 //
 // CHOOSING HAPPENS IN BOTH PLACES AGAIN (TJ, 2026-08-22: "in the graph the
 // links and the nodes should be selectable", and "selected concepts or links
@@ -32,22 +43,24 @@ import { conceptNameText } from "@/lib/conceptName"
 
 type ReadSel = { type: "concept" | "edge" | "hub"; id?: string; ids?: string[] } | null
 
-/**
- * The canvas is taller than the 400px pane a cloth gets elsewhere, because
- * this one is the surface rather than a figure above a read-out: the lists
- * ride on it and the long arcs need room to clear the short ones (ClothMap's
- * `height`). 620 measured at 1680 — the warp's labels end ~115px under the
- * baseline, and the menus at 44% stop well above it.
- */
-const CANVAS_H = 620
 
 export default function CohortClothPanel({
   state,
   names,
+  courseLabel,
+  scopeHint,
+  aggregateUnavailable = false,
+  passagesUnavailable = false,
 }: {
   state: LoomState
   /** userId → display name, for attributing concepts, passages, and threads. */
   names: Record<string, string>
+  /** "Design Frameworks · all sections" — the scope, for the title chip. */
+  courseLabel: string
+  /** The per-section note, when the graph is showing every section. */
+  scopeHint: string
+  aggregateUnavailable?: boolean
+  passagesUnavailable?: boolean
 }) {
   const [readSel, setReadSel] = useState<ReadSel>(null)
 
@@ -89,55 +102,7 @@ export default function CohortClothPanel({
   )
 
 
-  /**
-   * The floating footer: what is selected, in one line, over the foot of the
-   * canvas (TJ, 2026-08-22: "a floating footer with data about selection").
-   *
-   * Deliberately NOT `.threadhead` — that class belongs to the read-out below
-   * and a second one would make `page.locator(".threadhead", …)` ambiguous in
-   * journey-admin. This is a head, not a copy of the pane: it names the
-   * subject and its author, and for a thread its sentence, and stops.
-   */
-  let foot = null
-  if (readSel?.type === "concept" && readSel.id) {
-    const c = conceptById.get(readSel.id)
-    if (c) {
-      const crossings = state.edges.filter((e) => e.fromId === c.id || e.toId === c.id).length
-      const count = passagesByConcept.get(c.id)?.length ?? 0
-      foot = (
-        <div className="canvasfoot">
-          <span className="subject">{conceptNameText(c)}</span>
-          <span className="who">
-            {who(c.userId)} · {crossings} crossing{crossings !== 1 ? "s" : ""} · {count} passage
-            {count !== 1 ? "s" : ""}
-          </span>
-          {c.def ? <span className="said">{c.def}</span> : null}
-        </div>
-      )
-    }
-  } else if (readSel?.type === "edge" && readSel.id) {
-    const e = state.edges.find((x) => x.id === readSel.id)
-    if (e) {
-      const from = conceptById.get(e.fromId)
-      const to = conceptById.get(e.toId)
-      const label = labelOf(e, state.links)
-      foot = (
-        <div className="canvasfoot">
-          <span className="subject">{from ? conceptNameText(from) : "?"}</span>
-          {label ? (
-            <span className="vpill">{label}</span>
-          ) : (
-            <span className="vpill loosev">description</span>
-          )}
-          <span className="subject">{to ? conceptNameText(to) : "?"}</span>
-          <span className="who">{who(e.userId)}</span>
-          {e.sentence ? <span className="said">&ldquo;{e.sentence}&rdquo;</span> : null}
-        </div>
-      )
-    }
-  }
-
-  // What is selected, read out under the map — the student idiom, admin-voiced.
+  // What is selected, read out ON the map — the student idiom, admin-voiced.
   let pane = null
   if (readSel?.type === "concept" && readSel.id) {
     const concept = conceptById.get(readSel.id)
@@ -147,49 +112,56 @@ export default function CohortClothPanel({
         (e) => e.fromId === concept.id || e.toId === concept.id
       )
       pane = (
-        <div style={{ marginTop: "16px" }}>
+        <div>
+          {/* The resting line. Everything the map cannot say about this
+              concept — who owns it, how many threads cross it, what it
+              means — and nothing that would grow the bar over the warp. */}
           <div className="threadhead">
             <span className="red">{conceptNameText(concept)}</span>
             <span className="n">
-              {" "}· {who(concept.userId)} · {crossings.length} crossing{crossings.length !== 1 ? "s" : ""} ·{" "}
+              {who(concept.userId)} · {crossings.length} crossing{crossings.length !== 1 ? "s" : ""} ·{" "}
               {conceptPassages.length} passage{conceptPassages.length !== 1 ? "s" : ""}
             </span>
+            {concept.def ? <span className="footsaid">{concept.def}</span> : null}
           </div>
-          {concept.def ? <p className="cardmenudef">{concept.def}</p> : null}
 
-          <span className="cap" style={{ display: "block", marginTop: "8px" }}>
-            the passages behind it
-          </span>
-          {conceptPassages.length === 0 ? (
-            <p className="ghostnote" style={{ color: "var(--red)" }}>
-              No evidence — this concept traces to no captured passage yet.
-            </p>
-          ) : (
-            conceptPassages.map(passageQuote)
-          )}
+          {/* The evidence, folded. It is the page's whole purpose — "a concept
+              opens the passages behind it" — so it stays reachable, but it
+              opens on a click rather than pushing the map aside by default. */}
+          <details className="footmore">
+            <summary>
+              <span className="tw">▸</span>
+              the passages behind it ({conceptPassages.length})
+              {crossings.length > 0 ? ` · the threads through it (${crossings.length})` : ""}
+            </summary>
+            {conceptPassages.length === 0 ? (
+              <p className="ghostnote" style={{ color: "var(--red)" }}>
+                No evidence — this concept traces to no captured passage yet.
+              </p>
+            ) : (
+              conceptPassages.map(passageQuote)
+            )}
 
-          {crossings.length > 0 && (
-            <>
-              <span className="cap" style={{ display: "block", marginTop: "10px" }}>
-                the threads through it
-              </span>
-              {/* The same card as the list below the map — these ARE those
-                  threads, seen from one of their ends, and drawing them a
-                  second way was how `.readitem` and `.thread` came to say the
-                  same thing differently. */}
-              {crossings.map((e) => (
-                <ThreadCard
-                  key={e.id}
-                  thread={e}
-                  from={conceptById.get(e.fromId)}
-                  to={conceptById.get(e.toId)}
-                  links={state.links}
-                  by={who(e.userId)}
-                  onSelect={() => selectEdge(e.id)}
-                />
-              ))}
-            </>
-          )}
+            {crossings.length > 0 && (
+              <>
+                {/* The same card as the Threads list on the canvas — these ARE
+                    those threads, seen from one of their ends, and drawing them
+                    a second way was how `.readitem` and `.thread` came to say
+                    the same thing differently. */}
+                {crossings.map((e) => (
+                  <ThreadCard
+                    key={e.id}
+                    thread={e}
+                    from={conceptById.get(e.fromId)}
+                    to={conceptById.get(e.toId)}
+                    links={state.links}
+                    by={who(e.userId)}
+                    onSelect={() => selectEdge(e.id)}
+                  />
+                ))}
+              </>
+            )}
+          </details>
         </div>
       )
     }
@@ -200,9 +172,9 @@ export default function CohortClothPanel({
         (c): c is NonNullable<typeof c> => Boolean(c)
       )
       pane = (
-        <div style={{ marginTop: "16px" }}>
-          {/* The pane's HEADING, not a card: it names what is being read out
-              below it, in the red the panel uses for a selection, and the card
+        <div>
+          {/* The read-out's HEADING, not a card: it names what is being read
+              out below it, in the red the panel uses for a selection, and the card
               for this same thread is already lit in the list. Its label is
               resolved the card's way though — `labelOf` first, the legacy
               `handle` only as a fallback — because a thread carrying a Link
@@ -213,41 +185,34 @@ export default function CohortClothPanel({
               ? <span className="vpill">{labelOf(edge, state.links)}</span>
               : <span className="vpill loosev">description</span>}{" "}
             <span className="red">{ends[1] ? conceptNameText(ends[1]) : "?"}</span>
-            <span className="n"> · {who(edge.userId)}</span>
+            <span className="n">{who(edge.userId)}</span>
+            {edge.sentence ? <span className="footsaid">&ldquo;{edge.sentence}&rdquo;</span> : null}
           </div>
-          <p style={{ fontSize: "15.5px", fontStyle: "italic", margin: "8px 0 14px" }}>
-            &ldquo;{edge.sentence}&rdquo;
-          </p>
-          {ends.map((c) => (
-            <div key={c.id} style={{ marginBottom: "16px" }}>
-              <div className="label" style={{ marginTop: "8px" }}><ConceptName concept={c} /></div>
-              {c.def ? (
-                <div style={{ fontSize: "13.5px", color: "var(--ink-soft)" }}>{c.def}</div>
-              ) : null}
-              {(passagesByConcept.get(c.id) ?? []).map(passageQuote)}
-            </div>
-          ))}
+
+          <details className="footmore">
+            <summary>
+              <span className="tw">▸</span>
+              the passages behind both ends (
+              {ends.reduce((n, c) => n + (passagesByConcept.get(c.id) ?? []).length, 0)})
+            </summary>
+            {ends.map((c) => (
+              <div key={c.id} style={{ marginBottom: "12px" }}>
+                <div className="label" style={{ marginTop: "8px" }}><ConceptName concept={c} /></div>
+                {c.def ? (
+                  <div style={{ fontSize: "13.5px", color: "var(--ink-soft)" }}>{c.def}</div>
+                ) : null}
+                {(passagesByConcept.get(c.id) ?? []).map(passageQuote)}
+              </div>
+            ))}
+          </details>
         </div>
       )
     }
-  } else {
-    pane = (
-      <p className="empty" style={{ marginTop: "16px" }}>
-        Pick a concept or a thread — on the cloth or in the lists below — to read it out here.
-      </p>
-    )
   }
 
   return (
     <>
-      <div className="card cohortcanvas">
-        <div className="mapbar">
-          <span className="label">The collective cloth</span>
-          <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
-            {state.concepts.length} concepts, {state.edges.length} threads, {state.passages.length} passages.
-            Pick a concept or a thread — on the cloth or in the lists over it — to read it out below.
-          </span>
-        </div>
+      <div className="cohortcanvas">
         <div id="mapWrap">
           {/* The drawing selects, and shows what is selected (TJ, 2026-08-22:
               "selected concepts or links should highlight in the graph. in
@@ -258,18 +223,36 @@ export default function CohortClothPanel({
               lights the others. The panel→drawing direction is new: before
               this the cloth was passed a hard `null` and could not show a
               selection even when one existed. */}
-          <ClothMap
-            state={state}
-            readSel={readSel}
-            setReadSel={setReadSel}
-            trace
-            height={CANVAS_H}
-          />
+          <ClothMap state={state} readSel={readSel} setReadSel={setReadSel} trace fill />
         </div>
 
         {/* The lists ride ON the canvas, at its top corners, so a concept read
             off the drawing is found without leaving it. */}
         <aside className="canvasmenu atleft">
+          {/* The page's own name heads this panel — a real <h1>, so the
+              document keeps its structure and faculty.spec still finds it,
+              but costing the map no height. It was a chip of its own for one
+              revision and collided with this panel the moment its scope line
+              wrapped: the panel's top is a constant, the chip's height is
+              not. */}
+          <div className="canvastitle">
+            <h1>Cohort Graph</h1>
+            <span className="sub">
+              {state.concepts.length} concepts · {state.edges.length} threads ·{" "}
+              {state.passages.length} passages · {courseLabel}
+            </span>
+            {scopeHint ? <span className="sub">{scopeHint}</span> : null}
+            {aggregateUnavailable && (
+              <span className="warn">
+                Aggregate data is temporarily unavailable. Check recent migrations and server logs.
+              </span>
+            )}
+            {passagesUnavailable && (
+              <span className="warn">
+                Passage records could not be loaded. The concept/thread graph is still shown.
+              </span>
+            )}
+          </div>
           <h2>
             Concepts <span className="n">{state.concepts.length}</span>
           </h2>
@@ -334,13 +317,15 @@ export default function CohortClothPanel({
           )}
         </aside>
 
-        {foot}
+        {/* The read-out, on the canvas. There is exactly one now: it used to
+            sit below the drawing as a second column of page, which is the
+            figure-with-caption shape TJ ruled against — "this is the
+            unnecessary part". The CONTENT stays (the passages behind a
+            concept live nowhere else); the furniture around it goes. */}
+        <div className={`canvasfoot${pane ? "" : " idle"}`}>
+          {pane ?? "Pick a concept or a thread — on the cloth or in the lists over it — to read it out here."}
+        </div>
       </div>
-
-      {/* The read-out proper — the passages, the thread cards, the whole
-          evidence — below the canvas, where it has room to be long. The
-          floating footer above is its one-line head, not a second copy. */}
-      {pane}
     </>
   )
 }

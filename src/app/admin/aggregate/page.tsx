@@ -53,33 +53,25 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   const names = Object.fromEntries(members.map((member) => [member.id, member.name]))
 
   return (
-    // `workwide`: the cloth is a work surface, not prose. At the 1100 measure
-    // 94 concepts sat ~11px apart with their labels overlapping into a smear
-    // (measured at 1920 before this); the canvas also carries its own lists
-    // now. Same 1680 the courses console and the workbench stations take.
-    <main className="workwide">
-      <h1>Cohort Graph</h1>
-      <p className="tasksub" style={{ marginBottom: "20px" }}>
-        A macro view of concepts, passages, and threads across {course?.name ?? "this course"}
-        {sectionName ? ` · ${sectionName}` : " · all sections"}.
-        {sectionName ? "" : " Quilting happens per section — pick one in the nav to scope this graph."}
-      </p>
-
-      {aggregateUnavailable && (
-        <p className="tasksub" style={{ marginBottom: "12px", color: "var(--red)" }}>
-          Aggregate data is temporarily unavailable. Check recent migrations and server logs.
-        </p>
-      )}
-
-      {passagesUnavailable && (
-        <p className="tasksub" style={{ marginBottom: "12px", color: "var(--red)" }}>
-          Passage records could not be loaded. The concept/thread graph is still shown.
-        </p>
-      )}
-      
-      <div style={{ marginTop: "20px", marginBottom: "40px" }}>
-        <CohortClothPanel state={state} names={names} />
-      </div>
+    // THE MAP IS THE PAGE (TJ, 2026-08-22: "the map or graph needs to fill the
+    // screen like a google map or other application, cad, where the drawing is
+    // primary… you are treating the graph like an illustration for the text,
+    // it is not. the text is annotations for a map").
+    //
+    // So this main takes no measure, no padding and no scroll of its own: it
+    // is the viewport below the shell's bars, and everything that was page
+    // furniture around the drawing — the h1, the subtitle, the read-out — now
+    // floats ON the canvas as annotation. `.station-reading` is the same shape
+    // for the same reason: with the text open the station IS the text.
+    <main className="canvasfull">
+      <CohortClothPanel
+        state={state}
+        names={names}
+        courseLabel={`${course?.name ?? "this course"}${sectionName ? ` · ${sectionName}` : " · all sections"}`}
+        scopeHint={sectionName ? "" : "Quilting happens per section — pick one in the nav to scope this graph."}
+        aggregateUnavailable={aggregateUnavailable}
+        passagesUnavailable={passagesUnavailable}
+      />
     </main>
   )
 }

@@ -74,7 +74,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           the content's inset lives on the scrolling body instead. */}
       <div className="adminshell">
         <AdminNav courses={navCourses} />
-        <div className="adminbody" style={{ padding: "20px 20px 0" }}>{children}</div>
+        {/* The inset lives in globals.css now, not here, so a page that must
+            reach the window's own edges can opt out of it — the Cohort Graph
+            is a map and cannot be inset (`.adminbody:has(> main.canvasfull)`).
+            An inline style could not be overridden by any rule. */}
+        <div className="adminbody">{children}</div>
       </div>
       {/* The workbench footer's identity half (TJ, 2026-08-21: the courses
           page "doesn't tell me who I am"), on every admin page for the same

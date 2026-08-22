@@ -127,10 +127,16 @@ test("the cohort map renders the section's woven concepts", async ({ page }) => 
   await expect(page.locator(".crow", { hasText: "object worlds" }).first()).toBeVisible()
   await expect(page.locator(".thread .sent").first()).toBeVisible()
 
-  // A concept opens the passages behind it — the student's own captures, with
-  // attribution — plus the threads that cross it.
+  // A concept reads out on the canvas — who owns it, its counts — and opens
+  // the passages behind it, the student's own captures with attribution,
+  // plus the threads that cross it.
+  //
+  // The evidence is FOLDED since 2026-08-22: this is a map, and a read-out
+  // that unfolded by default covered the warp it annotates. The resting line
+  // is asserted first, then the fold is opened for the passages.
   await page.locator(".crow", { hasText: "object worlds" }).first().click()
   await expect(page.locator(".threadhead", { hasText: "object worlds" })).toBeVisible()
+  await page.locator(".canvasfoot .footmore > summary").click()
   await expect(page.locator(".passagequote").first()).toBeVisible()
   await expect(page.locator(".passagequote").first()).toContainText("Test User A")
 })
