@@ -821,9 +821,14 @@ main.canvasfull{padding:0 0 34px;margin:0;height:100%;overflow:hidden;box-sizing
    2026-08-22: "let the concept cards be sortable and filterable… the threads
    panel is the same"). `.tinput` is width:100% by default and `.tinput.inline`
    opts back out — the field takes the room, the select takes its content. */
-.canvasfilter{display:flex;gap:7px;align-items:center;padding-bottom:8px;flex:none}
-.canvasfilter .tinput{font-size:13px;padding:5px 7px;min-width:0}
-.canvasfilter select.tinput.inline{font-size:12.5px;padding:5px 6px}
+.canvasfilter{display:flex;gap:6px;align-items:center;padding-bottom:8px;flex:none}
+/* The FIELD is the only thing that may shrink. Given `flex:1` alone, the
+   select and the two buttons shrank with it and the sort read "nan" and
+   "fror" — a truncated control is worse than a narrow field, because the
+   field still shows what you typed. */
+.canvasfilter .tinput{flex:1 1 auto;font-size:13px;padding:5px 7px;min-width:40px;width:auto}
+.canvasfilter select.tinput.inline{flex:0 0 auto;font-size:12.5px;padding:5px 4px;width:auto;min-width:0}
+.canvasfilter .btn.iconly{flex:0 0 auto;padding:4px 6px;font-size:12px;line-height:1}
 /* A <details> puts its content in a `::details-content` box, so THAT is the
    flex item, not the .scrollbox inside it — without this the list ignored the
    panel's max-height and ran down the map with no panel under it. Both rules
@@ -858,6 +863,15 @@ main.canvasfull{padding:0 0 34px;margin:0;height:100%;overflow:hidden;box-sizing
    the same inset bar .crow.picked has always had. */
 .crow.ywcard.ywmini.picked{box-shadow:inset 3px 0 var(--ochre);background:rgba(168,132,63,.1)}
 .crow.ywcard.ywmini:focus-visible{outline:2px solid var(--sage);outline-offset:-2px}
+/* ThreadCard, minified. The card's own trip is 15px and names its ends in
+   <b> — right on a page where the card IS the content, too loud in a 316px
+   list beside 14.5px concept names and 10px captions (TJ, 2026-08-22: "the
+   thread text seems kinda big relative to all the other text on the screen.
+   and bold seems unnecessary"). The ends carry the weight of being the only
+   thing on the card; they do not need the weight of bold as well. */
+.canvasmenu .thread{padding:7px 9px}
+.canvasmenu .thread .trip{font-size:13.5px;gap:3px 6px}
+.canvasmenu .thread .trip b{font-weight:400}
 /* THE READ-OUT, on the foot of the canvas — ONE LINE until asked.
 
    It sat below the drawing as a column of page, and TJ pointed at it: "this

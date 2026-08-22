@@ -111,7 +111,7 @@ export default function ThreadCard({
   by?: string
   selected?: boolean
   /** Makes the whole card a target — the cohort list's "read this one out". */
-  onSelect?: () => void
+  onSelect?: (event?: React.MouseEvent | React.KeyboardEvent) => void
   /** Required by `mode="edit"`; ignored otherwise. */
   edit?: ThreadCardEdit
   /**
@@ -170,10 +170,10 @@ export default function ThreadCard({
       role={onSelect ? "button" : undefined}
       tabIndex={onSelect ? 0 : undefined}
       aria-pressed={onSelect ? selected : undefined}
-      onClick={onSelect}
+      onClick={(e) => onSelect?.(e)}
       onKeyDown={(e) => {
         if (!onSelect) return
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect() }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(e) }
       }}
     >
       {/* THE TRIP OPENS THE CARD, the way a concept's name opens its own (TJ,

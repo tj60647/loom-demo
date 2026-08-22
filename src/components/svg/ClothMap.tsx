@@ -5,7 +5,23 @@ import type { LoomState } from "@/lib/types"
 import { adjacency, componentOf } from "@/lib/clothMath"
 import { conceptNameText } from "@/lib/conceptName"
 
-type ReadSel = { type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean } | null
+type ReadSel = {
+  type: "concept" | "edge" | "hub",
+  id?: string,
+  ids?: string[],
+  /**
+   * Threads chosen in their own right, for a `hub` that is a SELECTION rather
+   * than a neighbourhood — the Cohort Graph's multi-select (TJ, 2026-08-22:
+   * "we should be able to select more than one concept, or more than one
+   * thread"). Each lights, and so do both of its ends: a lit arc reaching two
+   * faded dots would read as an arc to nowhere.
+   *
+   * 03's prompts pass `ids` alone and are untouched by this.
+   */
+  edgeIds?: string[],
+  promptIdx?: number,
+  gap?: boolean,
+} | null
 
 /**
  * What just happened, if anything (TJ, 2026-08-12: "the latest event needs a
@@ -192,13 +208,19 @@ export default function ClothMap({
     const comp = componentOf(readSel.id, adjacency(state.edges))
     selNodes = comp.nodes
     selEdges = new Set(comp.edges.map(e => e.id))
-  } else if (trace && readSel?.type === "hub" && readSel.ids) {
-    const ids = readSel.ids
+  } else if (trace && readSel?.type === "hub" && (readSel.ids || readSel.edgeIds)) {
+    const ids = readSel.ids ?? []
     const nodes = new Set(ids)
-    const edgeIds = new Set<string>()
+    const edgeIds = new Set<string>(readSel.edgeIds ?? [])
     state.edges.forEach(e => {
+      // A chosen concept lights the threads that touch it...
       if (ids.includes(e.fromId) || ids.includes(e.toId)) {
         edgeIds.add(e.id)
+        nodes.add(e.fromId)
+        nodes.add(e.toId)
+      }
+      // ...and a chosen thread lights both of its ends.
+      if (edgeIds.has(e.id)) {
         nodes.add(e.fromId)
         nodes.add(e.toId)
       }

@@ -42,7 +42,13 @@ import ThreadCard from "@/components/cards/ThreadCard"
 import { labelOf } from "@/lib/linkResolve"
 import { conceptNameText } from "@/lib/conceptName"
 
-type ReadSel = { type: "concept" | "edge" | "hub"; id?: string; ids?: string[] } | null
+type ReadSel = {
+  type: "concept" | "edge" | "hub"
+  id?: string
+  ids?: string[]
+  /** Threads chosen in their own right — see ClothMap's ReadSel. */
+  edgeIds?: string[]
+} | null
 
 type ConceptSort = "name" | "author" | "passages" | "crossings"
 type ThreadSort = "from" | "author" | "described"
@@ -78,7 +84,15 @@ export default function CohortClothPanel({
   aggregateUnavailable?: boolean
   passagesUnavailable?: boolean
 }) {
-  const [readSel, setReadSel] = useState<ReadSel>(null)
+  /**
+   * WHAT IS CHOSEN — sets, not one thing (TJ, 2026-08-22: "we should be able
+   * to select more than one concept, or more than one thread"). A plain click
+   * replaces the selection with the one row; ctrl/cmd/shift-click adds or
+   * removes, which is the selection gesture every list in every OS uses, and
+   * "select all" fills them from whatever the filter is currently showing.
+   */
+  const [selConcepts, setSelConcepts] = useState<string[]>([])
+  const [selThreads, setSelThreads] = useState<string[]>([])
   // Sort and filter per panel (TJ, 2026-08-22: "let the concept cards be
   // sortable and filterable. the threads panel is the same"). Local state,
   // not the URL: the course and section in the query string are the SCOPE —
@@ -185,12 +199,48 @@ export default function CohortClothPanel({
     })
   }, [state.edges, state.links, threadQuery, threadSort, conceptById, who])
 
-  const selectConcept = (id: string) => {
-    setReadSel(readSel?.type === "concept" && readSel.id === id ? null : { type: "concept", id })
+  /** Ctrl, cmd or shift means "and this one too"; a bare click means "this". */
+  const additive = (e?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) =>
+    !!(e && (e.ctrlKey || e.metaKey || e.shiftKey))
+
+  const toggle = (list: string[], id: string) =>
+    list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
+
+  const selectConcept = (id: string, add = false) => {
+    if (add) {
+      setSelConcepts((cur) => toggle(cur, id))
+      return
+    }
+    // A bare click on the row already chosen clears it, as it always has.
+    const only = selConcepts.length === 1 && selConcepts[0] === id && selThreads.length === 0
+    setSelConcepts(only ? [] : [id])
+    setSelThreads([])
   }
-  const selectEdge = (id: string) => {
-    setReadSel(readSel?.type === "edge" && readSel.id === id ? null : { type: "edge", id })
+
+  const selectEdge = (id: string, add = false) => {
+    if (add) {
+      setSelThreads((cur) => toggle(cur, id))
+      return
+    }
+    const only = selThreads.length === 1 && selThreads[0] === id && selConcepts.length === 0
+    setSelThreads(only ? [] : [id])
+    setSelConcepts([])
   }
+
+  /**
+   * What the drawing is told. One of anything keeps its own type, so a single
+   * concept still lights its whole connected component and a single thread
+   * still draws red — the behaviours that existed before multi-select. Any
+   * other combination is a `hub`: exactly what was chosen, and its ends.
+   */
+  const readSel: ReadSel =
+    selConcepts.length === 1 && selThreads.length === 0
+      ? { type: "concept", id: selConcepts[0] }
+      : selThreads.length === 1 && selConcepts.length === 0
+        ? { type: "edge", id: selThreads[0] }
+        : selConcepts.length || selThreads.length
+          ? { type: "hub", ids: selConcepts, edgeIds: selThreads }
+          : null
 
   const passageQuote = (b: Passage) => (
     <div key={b.id} className="passagequote">
@@ -268,6 +318,56 @@ export default function CohortClothPanel({
         </div>
       )
     }
+  } else if (readSel?.type === "hub") {
+    // MANY CHOSEN. The read-out names what is lit rather than trying to be
+    // every card at once: a panel that grew a detail block per selection
+    // would be the wall of text this canvas exists without.
+    const n = selConcepts.length
+    const m = selThreads.length
+    pane = (
+      <div>
+        <div className="threadhead">
+          <span className="red">
+            {n ? `${n} concept${n !== 1 ? "s" : ""}` : ""}
+            {n && m ? " · " : ""}
+            {m ? `${m} thread${m !== 1 ? "s" : ""}` : ""}
+          </span>
+          <span className="n">lit on the map</span>
+          <span className="footsaid">
+            Pick one on its own to read it out — ctrl or shift click adds and removes.
+          </span>
+        </div>
+        <details className="footmore">
+          <summary>
+            <span className="tw">▸</span>
+            what is selected
+          </summary>
+          {selConcepts.map((id) => {
+            const c = conceptById.get(id)
+            return c ? (
+              <div key={id} className="label" style={{ marginTop: "6px" }}>
+                <ConceptName concept={c} />
+              </div>
+            ) : null
+          })}
+          {selThreads.map((id) => {
+            const e = state.edges.find((x) => x.id === id)
+            if (!e) return null
+            return (
+              <ThreadCard
+                key={id}
+                thread={e}
+                from={conceptById.get(e.fromId)}
+                to={conceptById.get(e.toId)}
+                links={state.links}
+                by={who(e.userId)}
+                onSelect={() => selectEdge(e.id)}
+              />
+            )
+          })}
+        </details>
+      </div>
+    )
   } else if (readSel?.type === "edge" && readSel.id) {
     const edge = state.edges.find((e) => e.id === readSel.id)
     if (edge) {
@@ -326,7 +426,25 @@ export default function CohortClothPanel({
               lights the others. The panel→drawing direction is new: before
               this the cloth was passed a hard `null` and could not show a
               selection even when one existed. */}
-          <ClothMap state={state} readSel={readSel} setReadSel={setReadSel} trace fill />
+          <ClothMap
+            state={state}
+            readSel={readSel}
+            // The drawing has no modifier keys to offer — a click on a node or
+            // an arc is the plain "this one" gesture; the lists are where a
+            // selection is built up.
+            setReadSel={(s) => {
+              if (!s) {
+                setSelConcepts([])
+                setSelThreads([])
+              } else if (s.type === "concept" && s.id) {
+                selectConcept(s.id)
+              } else if (s.type === "edge" && s.id) {
+                selectEdge(s.id)
+              }
+            }}
+            trace
+            fill
+          />
         </div>
 
         {/* The lists ride ON the canvas, at its top corners, so a concept read
@@ -389,6 +507,25 @@ export default function CohortClothPanel({
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
+            {/* SELECT ALL takes what the filter is SHOWING, not the whole
+                course — that is what makes a filter worth having (TJ,
+                2026-08-22: "to make the filters more useful, add a select all
+                and clear butoons"). Glyph plus an aria-label and a tip, since
+                a lone glyph names itself to nobody. */}
+            <button
+              type="button"
+              className="btn ghost mini compact iconly"
+              aria-label={`Select all ${shownConcepts.length} shown concepts`}
+              data-tip="light every concept the filter is showing"
+              onClick={() => setSelConcepts(shownConcepts.map((c) => c.id))}
+            >✓</button>
+            <button
+              type="button"
+              className="btn ghost mini compact iconly"
+              aria-label="Clear the concept selection"
+              data-tip="clear the concept selection"
+              onClick={() => setSelConcepts([])}
+            >✕</button>
           </div>
           {state.concepts.length === 0 ? (
             <p className="empty">Nothing woven yet.</p>
@@ -411,8 +548,8 @@ export default function CohortClothPanel({
                   key={c.id}
                   concept={c}
                   compact
-                  selected={readSel?.type === "concept" && readSel.id === c.id}
-                  onSelect={() => selectConcept(c.id)}
+                  selected={selConcepts.includes(c.id)}
+                  onSelect={(e) => selectConcept(c.id, additive(e))}
                 />
               ))}
             </div>
@@ -445,6 +582,20 @@ export default function CohortClothPanel({
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
+            <button
+              type="button"
+              className="btn ghost mini compact iconly"
+              aria-label={`Select all ${shownThreads.length} shown threads`}
+              data-tip="light every thread the filter is showing"
+              onClick={() => setSelThreads(shownThreads.map((e) => e.id))}
+            >✓</button>
+            <button
+              type="button"
+              className="btn ghost mini compact iconly"
+              aria-label="Clear the thread selection"
+              data-tip="clear the thread selection"
+              onClick={() => setSelThreads([])}
+            >✕</button>
           </div>
           {state.edges.length === 0 ? (
             <p className="empty">Nothing thrown yet.</p>
@@ -467,8 +618,8 @@ export default function CohortClothPanel({
                   to={conceptById.get(e.toId)}
                   links={state.links}
                   compact
-                  selected={readSel?.type === "edge" && readSel.id === e.id}
-                  onSelect={() => selectEdge(e.id)}
+                  selected={selThreads.includes(e.id)}
+                  onSelect={(ev) => selectEdge(e.id, additive(ev))}
                 />
               ))}
             </div>

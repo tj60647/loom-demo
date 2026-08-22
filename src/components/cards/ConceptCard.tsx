@@ -154,8 +154,10 @@ export default function ConceptCard({
   compact?: boolean
   /** Lit, in the compact list — the row the map is showing. */
   selected?: boolean
-  /** Makes the whole row a target, and gives it a keyboard. */
-  onSelect?: () => void
+  /** Makes the whole row a target, and gives it a keyboard. Handed the
+   *  event, so a host can read ctrl/cmd/shift and treat the click as "and
+   *  this one too" — the Cohort Graph's multi-select. */
+  onSelect?: (event?: React.MouseEvent | React.KeyboardEvent) => void
 }) {
   /**
    * The warp card opens in place, like Your work's (TJ, 2026-08-18: "the dot
@@ -343,11 +345,11 @@ export default function ConceptCard({
           role: "button" as const,
           tabIndex: 0,
           "aria-pressed": selected,
-          onClick: onSelect,
+          onClick: (e: React.MouseEvent) => onSelect(e),
           onKeyDown: (e: React.KeyboardEvent) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault()
-              onSelect()
+              onSelect(e)
             }
           },
         }
