@@ -776,6 +776,26 @@ main.canvasfull{padding:0 0 34px;margin:0;height:100%;overflow:hidden;box-sizing
    `main.station-work:has(…)` already uses above. */
 .adminbody{padding:20px 20px 0}
 .adminbody:has(> main.canvasfull){padding:0}
+/* ===== the Heatmaps tab =====
+   A WARM RAMP, and only here (TJ, 2026-08-22: "we need a more heatmap like
+   color palette, grey is not great" — scoped to this tab on his ruling).
+
+   Everywhere else the overlay stays slate, because on the reading station
+   heat shares the page with two other marks and the three "must never read as
+   each other": own passage is yellow, a search hit is sage, and a warm heat
+   at its palest step drifts toward that yellow. This tab has no capture and
+   no search, so heat is the only mark on the page and can take the colour the
+   thing is actually named after.
+
+   One token, because the ramp is one hue at five alphas and PdfViewer now
+   reads `--heat-rgb` for every one of them — the live wash, its overline, the
+   legend swatches, the status bar, and the rects redrawn on the Canvas.
+
+   #c8451e = rgb(200,69,30). Checked rather than chosen by eye: over white the
+   five steps run #f8e9e4 → #e29e8a, lightness strictly decreasing, and ink
+   (#1a1916) over them holds 14.87 → 7.95 contrast, every step far above the
+   4.5 floor. */
+.heatpage{--heat-rgb:200, 69, 30}
 .cohortcanvas{position:relative;height:100%;background:#f4f2ec}
 /* No border, no radius, no card: the drawing meets the window.
 

@@ -186,6 +186,15 @@ export const CAPABILITIES: Capability[] = [
     enforcement: "server",
   },
   {
+    id: "overlay-heatmaps",
+    name: "Heatmaps — the Passages Overlay on its own tab",
+    group: "Overlays",
+    student: { verdict: "no", note: "the same 2026-08-08 ruling: students never meet overlays" },
+    faculty: { verdict: "yes" }, admin: { verdict: "yes" },
+    gate: { file: "src/actions/overlays.ts", symbol: "overlayViewer" },
+    enforcement: "server",
+  },
+  {
     id: "overlay-vocabulary",
     name: "Vocabulary Overlay — what others named",
     group: "Overlays",

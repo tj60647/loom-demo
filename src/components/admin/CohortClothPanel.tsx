@@ -33,7 +33,7 @@
 // One `readSel` serves the drawing, both lists and the read-out, so a choice
 // made anywhere lights everywhere.
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import ClothMap from "@/components/svg/ClothMap"
 import type { Passage, LoomState } from "@/lib/types"
 import ConceptName from "@/components/ui/ConceptName"
@@ -119,7 +119,20 @@ export default function CohortClothPanel({
    * selection that snapped back to the student on every render would be a
    * picker fighting the map. It re-runs only when the NAME changes.
    */
+  /**
+   * Guarded by the LAST NAME APPLIED, not by the effect's own deps. Keyed on
+   * `state` as well, the effect re-ran whenever the server handed down a new
+   * array identity — and wiped whatever the reader had selected by hand. It
+   * also ran once on mount with no name at all, clearing a selection made in
+   * that first tick, which is exactly what journey-admin caught: a concept
+   * clicked immediately after load lost its read-out.
+   *
+   * So: act only when the chosen student actually changes.
+   */
+  const appliedEmphasis = useRef<string | null | undefined>(undefined)
   useEffect(() => {
+    if (appliedEmphasis.current === emphasisUserId) return
+    appliedEmphasis.current = emphasisUserId
     // Deferred rather than set synchronously in the effect body, the way
     // ReadingsProvider and LoomProvider already do it: a setState in an
     // effect body cascades renders, and eslint fails the build for it.

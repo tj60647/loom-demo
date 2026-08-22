@@ -1806,31 +1806,31 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            handlers: it is a comparison, and clicking it should do exactly what
            clicking the paper does. */
         .loom-overlay-heat {
-          background-color: rgba(64, 84, 112, 0.12);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.12);
           /* A rule ABOVE the words as well as a wash behind them. Your own
              highlight nests inside this mark and paints its yellow over the
              wash — and "did anyone else mark the words I marked?" is the most
              interesting thing this view can answer, so the section's mark has
              to survive underneath your own. Yellow underlines; slate
              overlines; neither hides the other. */
-          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.40);
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.40);
           color: inherit;
         }
         .loom-overlay-heat[data-heat="2"] {
-          background-color: rgba(64, 84, 112, 0.20);
-          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.55);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.20);
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.55);
         }
         .loom-overlay-heat[data-heat="3"] {
-          background-color: rgba(64, 84, 112, 0.28);
-          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.70);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.28);
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.70);
         }
         .loom-overlay-heat[data-heat="4"] {
-          background-color: rgba(64, 84, 112, 0.36);
-          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.82);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.36);
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.82);
         }
         .loom-overlay-heat[data-heat="5"] {
-          background-color: rgba(64, 84, 112, 0.44);
-          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.95);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.44);
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.95);
         }
         .pdf-overlay-ctl {
           display: flex;
@@ -1844,7 +1844,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           gap: 6px 14px;
           padding: 7px 20px;
           border-bottom: 1px solid var(--rule);
-          background: rgba(64, 84, 112, 0.05);
+          background: rgba(var(--heat-rgb, 64, 84, 112), 0.05);
           font-size: 13px;
           color: var(--ink-soft);
           flex: 0 0 auto;
@@ -1856,13 +1856,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           display: inline-block;
           width: 15px;
           height: 12px;
-          background: rgba(64, 84, 112, 0.12);
-          box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.40);
+          background: rgba(var(--heat-rgb, 64, 84, 112), 0.12);
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.40);
         }
-        .pdf-overlay-scale i:nth-child(2) { background: rgba(64, 84, 112, 0.20); box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.55); }
-        .pdf-overlay-scale i:nth-child(3) { background: rgba(64, 84, 112, 0.28); box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.70); }
-        .pdf-overlay-scale i:nth-child(4) { background: rgba(64, 84, 112, 0.36); box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.82); }
-        .pdf-overlay-scale i:nth-child(5) { background: rgba(64, 84, 112, 0.44); box-shadow: inset 0 2px 0 rgba(64, 84, 112, 0.95); }
+        .pdf-overlay-scale i:nth-child(2) { background: rgba(var(--heat-rgb, 64, 84, 112), 0.20); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.55); }
+        .pdf-overlay-scale i:nth-child(3) { background: rgba(var(--heat-rgb, 64, 84, 112), 0.28); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.70); }
+        .pdf-overlay-scale i:nth-child(4) { background: rgba(var(--heat-rgb, 64, 84, 112), 0.36); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.82); }
+        .pdf-overlay-scale i:nth-child(5) { background: rgba(var(--heat-rgb, 64, 84, 112), 0.44); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.95); }
         .pdf-search-panel {
           position: absolute;
           top: 64px;
@@ -2420,15 +2420,15 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           overflow: visible;
         }
         .pdf-kept-heat rect {
-          fill: rgba(64, 84, 112, 0.12);
-          stroke: rgba(64, 84, 112, 0.40);
+          fill: rgba(var(--heat-rgb, 64, 84, 112), 0.12);
+          stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.40);
           stroke-width: 1;
           vector-effect: non-scaling-stroke;
         }
-        .pdf-kept-heat rect[data-heat="2"] { fill: rgba(64, 84, 112, 0.20); stroke: rgba(64, 84, 112, 0.55); }
-        .pdf-kept-heat rect[data-heat="3"] { fill: rgba(64, 84, 112, 0.28); stroke: rgba(64, 84, 112, 0.70); }
-        .pdf-kept-heat rect[data-heat="4"] { fill: rgba(64, 84, 112, 0.36); stroke: rgba(64, 84, 112, 0.82); }
-        .pdf-kept-heat rect[data-heat="5"] { fill: rgba(64, 84, 112, 0.44); stroke: rgba(64, 84, 112, 0.95); }
+        .pdf-kept-heat rect[data-heat="2"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.20); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.55); }
+        .pdf-kept-heat rect[data-heat="3"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.28); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.70); }
+        .pdf-kept-heat rect[data-heat="4"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.36); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.82); }
+        .pdf-kept-heat rect[data-heat="5"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.44); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.95); }
         .pdf-rail-leaders path {
           stroke: rgba(255, 204, 0, 0.8);
           stroke-width: 1.5;

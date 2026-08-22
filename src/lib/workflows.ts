@@ -230,6 +230,7 @@ const faculty: Flow = {
     { id: "roster", label: "Roster — who is enrolled, who has not signed in, their counts", where: "/admin (read-only)" },
     { id: "loom", label: "Open Loom — the student's full journey, read-only, in the app itself", where: "/api/view-user/enter → the app; the float holds Download loom and Exit" },
     { id: "cohort", label: "Cohort Graph — the section's woven concepts", where: "/admin/aggregate" },
+    { id: "heat", label: "Heatmaps — where the section marked, on the page", where: "/admin/heatmaps · the Passages Overlay, Section · Cohort only" },
     { id: "shut", label: "Readings and Courses stay admin's", where: "both redirect", kind: "denied" },
     { id: "own", label: "Their own reading and weaving, untouched", where: "the same bar, same click — capabilities are additive", kind: "end" },
   ],
@@ -243,8 +244,10 @@ const faculty: Flow = {
     { from: "gate", to: "roster", label: "their course only" },
     { from: "roster", to: "loom" },
     { from: "roster", to: "cohort" },
+    { from: "roster", to: "heat" },
     { from: "roster", to: "shut", label: "if they try" },
     { from: "cohort", to: "own" },
+    { from: "heat", to: "own" },
     { from: "loom", to: "roster", label: "back to the list", back: true },
   ],
 }
@@ -256,6 +259,7 @@ const admin: Flow = {
     "Builds the course: its sections and schedule, the shared library of readings, and the roster of people in it.",
   sources: [
     "src/app/admin/courses/page.tsx",
+    "src/app/admin/heatmaps/page.tsx",
     "src/app/admin/library/page.tsx",
     "src/actions/sources.ts · src/actions/courses.ts · src/actions/admin.ts",
     "src/components/library/RepairPanel.tsx",
@@ -274,7 +278,7 @@ const admin: Flow = {
     { id: "schedule", label: "Add to the course and schedule by week", where: "inline on /admin/courses, or /admin/library — arrives hidden unless the score passed; Reveal publishes it" },
     { id: "invite", label: "Invite learners in bulk — one email per line, optionally with a section", where: "/admin" },
     { id: "place", label: "Place them, promote faculty, remove", where: "/admin · removal is soft, work survives" },
-    { id: "watch", label: "Roster · a student's loom · Cohort Graph", where: "/admin · /admin/aggregate", kind: "end" },
+    { id: "watch", label: "Roster · a student's loom · Cohort Graph · Heatmaps", where: "/admin · /admin/aggregate · /admin/heatmaps", kind: "end" },
   ],
   edges: [
     { from: "signin", to: "course" },

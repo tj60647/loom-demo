@@ -149,7 +149,10 @@ test("the student lens hides every staff surface, and gives a way back", async (
   const staff = nav.locator(".staffgroup a")
 
   await expect(pill).toHaveText("Faculty", { timeout: 15_000 })
-  await expect(staff).toHaveCount(4)   // Roster · Cohort Graph · Workflows · Access
+  // Heatmaps joined the group on 2026-08-22, beside the Cohort Graph: it is
+  // built on the Passages Overlay, which is a FACULTY capability, so faculty
+  // see it and the group is five.
+  await expect(staff).toHaveCount(5)   // Roster · Cohort Graph · Heatmaps · Workflows · Access
 
   await page.locator("header button", { hasText: "View as student" }).click()
 
@@ -177,7 +180,7 @@ test("the student lens hides every staff surface, and gives a way back", async (
   await page.goto("/")
   await page.locator("header button", { hasText: "Viewing as student" }).click()
   await expect(pill).toHaveText("Faculty", { timeout: 15_000 })
-  await expect(staff).toHaveCount(4)
+  await expect(staff).toHaveCount(5)
 })
 
 test("Workflows and Access wear Courses' shape, and Access is staff only", async ({ page }) => {

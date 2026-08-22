@@ -25,12 +25,25 @@ export type AdminNavCourse = {
  * strip was fixed for once already (TJ, 2026-08-21, the Courses catalog). So
  * each page declares what it reads, and the strip draws only that.
  */
-const SCOPES: Record<string, { section: boolean; reading: boolean; student: boolean }> = {
+const SCOPES: Record<
+  string,
+  { section: boolean; reading: boolean; student: boolean; oneReading?: boolean }
+> = {
   // The catalog's panels always show every section, and a course is the whole
   // subject of the page.
   "/admin/courses": { section: false, reading: false, student: false },
   // The cohort map narrows by all four (TJ, 2026-08-22).
   "/admin/aggregate": { section: true, reading: true, student: true },
+  /**
+   * Heatmaps takes the same strip minus the student, and its reading picker
+   * has no "All readings": heat is laid on the PAGES of one text, and there
+   * is no page to draw for all of them.
+   *
+   * The student is absent by RULING, not by omission — ruling 28 puts
+   * overlays at Section · Cohort granularity and forbids anything that
+   * "resolves to one" person (docs/loom-model-build.md §Overlays).
+   */
+  "/admin/heatmaps": { section: true, reading: true, student: false, oneReading: true },
 }
 const DEFAULT_SCOPE = { section: true, reading: false, student: false }
 
@@ -247,7 +260,7 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
                   style={{ minWidth: "180px", maxWidth: "280px" }}
                   onChange={(event) => push({ source: event.target.value || null })}
                 >
-                  <option value="">All readings</option>
+                  {!scope.oneReading && <option value="">All readings</option>}
                   {activeCourse.readings.map((reading) => (
                     <option key={reading.id} value={reading.id}>
                       {reading.week != null ? `W${reading.week} · ` : ""}

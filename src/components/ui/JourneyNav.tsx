@@ -137,6 +137,12 @@ const STAFF_ITEMS: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/admin/library", label: "Readings", adminOnly: true },
   { href: "/admin", label: "Roster" },
   { href: "/admin/aggregate", label: "Cohort Graph" },
+  // Beside the Cohort Graph because it answers the neighbouring question
+  // (TJ, 2026-08-22): that one is what the cohort MADE of the readings, this
+  // one is where on the page they were reading. Not adminOnly — the Passages
+  // Overlay it is built on is a faculty capability, gated `isStaff` in the
+  // viewer, and faculty are the people who teach the section it compares.
+  { href: "/admin/heatmaps", label: "Heatmaps" },
   // Not an admin surface — a student who types /workflows still reads their
   // own flow, but the header stopped offering it on 2026-08-17 (277f7cb; see
   // HeaderMenu.tsx), so for staff this is the only link to it.
