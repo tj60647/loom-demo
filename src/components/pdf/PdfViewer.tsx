@@ -1905,6 +1905,39 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           align-items: center;
           gap: 6px;
         }
+        /* FLOATING, on the Heatmaps tab. In flow the bar is an extra header
+           row, so turning the overlay on changed the stage's height and the
+           canvas re-laid out and re-rendered under the reader — the page
+           moved because they asked what the shading meant (TJ, 2026-08-22:
+           "the current additive hearder is causing a resize of the
+           canvas/page. this is not what we want").
+
+           Floating it costs no height at all. pointer-events are off on the
+           band and back on for its contents, the same discipline the fixed
+           footer keeps: a strip laid over a drawing must not eat the drags
+           and clicks belonging to the page under it. */
+        .pdf-overlay-bar.floating {
+          position: absolute;
+          /* BOTTOM-LEFT, not the top: .pdf-shell is the positioning context
+             and it starts at the toolbar, so a top-anchored band would cover
+             the controls. The minimap holds the bottom-RIGHT corner, so this
+             corner is the one that is free. */
+          left: 12px;
+          bottom: 12px;
+          right: auto;
+          max-width: min(70%, 760px);
+          z-index: 4;
+          border: 1px solid var(--rule);
+          border-bottom: 1px solid var(--rule);
+          border-radius: 4px;
+          padding: 7px 12px;
+          background: var(--paper);
+          box-shadow: 0 1px 10px rgba(0, 0, 0, 0.08);
+          pointer-events: none;
+        }
+        .pdf-overlay-bar.floating > * {
+          pointer-events: auto;
+        }
         .pdf-overlay-bar {
           display: flex;
           align-items: center;
@@ -3112,7 +3145,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           reason here — you have not coded this reading yet — is the point of
           the gate rather than a fault. */}
       {overlayBand && sourceId && (
-        <div className="pdf-overlay-bar" role="status">
+        <div className={`pdf-overlay-bar${noOwnWork ? " floating" : ""}`} role="status">
           {!overlay && overlayBusy && (
             <span>reading {overlayBand === "section" ? "that section" : "the cohort"}…</span>
           )}
