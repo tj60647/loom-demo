@@ -1925,7 +1925,16 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           left: 12px;
           bottom: 12px;
           right: auto;
-          max-width: min(70%, 760px);
+          /* FOUR ROWS, not a wrapped strip (TJ, 2026-08-22). The four are the
+             count sentence, the scale, the unplaced tally and the dropped-run
+             tally — the last two appear only when they are non-zero, so the
+             box is usually two rows and never more than four. Stacked they
+             read as a legend; wrapped across the page they read as a header,
+             which is what this stopped being. */
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 5px;
+          max-width: min(38%, 400px);
           z-index: 4;
           border: 1px solid var(--rule);
           border-bottom: 1px solid var(--rule);
@@ -3184,7 +3193,6 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               {overlay.droppedSpans > 0 && (
                 <span className="cap">{overlay.droppedSpans} runs past the display limit</span>
               )}
-              <span className="cap">counted, not judged · no names</span>
             </>
           )}
         </div>
