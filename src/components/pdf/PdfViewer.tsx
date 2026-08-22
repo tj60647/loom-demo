@@ -2407,6 +2407,28 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           stroke-width: 1;
           vector-effect: non-scaling-stroke;
         }
+        /* The redrawn Passages Overlay, in the SAME steps the live mark uses
+           (.loom-overlay-heat) — at fit-all a page that has never been
+           promoted carries no text layer, so without these the overlay
+           vanished in Canvas while passages and search hits stayed. The five
+           fills match the live wash exactly; the 2px overline becomes a top
+           stroke, since an SVG rect has no inset shadow. */
+        .pdf-kept-heat {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          overflow: visible;
+        }
+        .pdf-kept-heat rect {
+          fill: rgba(64, 84, 112, 0.12);
+          stroke: rgba(64, 84, 112, 0.40);
+          stroke-width: 1;
+          vector-effect: non-scaling-stroke;
+        }
+        .pdf-kept-heat rect[data-heat="2"] { fill: rgba(64, 84, 112, 0.20); stroke: rgba(64, 84, 112, 0.55); }
+        .pdf-kept-heat rect[data-heat="3"] { fill: rgba(64, 84, 112, 0.28); stroke: rgba(64, 84, 112, 0.70); }
+        .pdf-kept-heat rect[data-heat="4"] { fill: rgba(64, 84, 112, 0.36); stroke: rgba(64, 84, 112, 0.82); }
+        .pdf-kept-heat rect[data-heat="5"] { fill: rgba(64, 84, 112, 0.44); stroke: rgba(64, 84, 112, 0.95); }
         .pdf-rail-leaders path {
           stroke: rgba(255, 204, 0, 0.8);
           stroke-width: 1.5;

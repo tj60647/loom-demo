@@ -177,6 +177,9 @@ type Anchor = {
  *  crosses lines is several of these, and mark.js may split one passage over
  *  several elements, so a passage owns a list rather than a box. */
 type MarkRect = { x: number; y: number; w: number; h: number };
+/** A heat rect carries its step, so the wash can deepen with the count the
+ *  way the live mark's `data-heat` does. */
+type HeatRect = MarkRect & { level: number };
 
 export default function SpreadCanvasView({
   pdf,
@@ -290,6 +293,15 @@ export default function SpreadCanvasView({
    * goes on listing the hits. Seven pages match, the drawing shows none.
    */
   const [searchRects, setSearchRects] = useState<Record<number, MarkRect[]>>({});
+  /**
+   * The Passages Overlay, remembered per page like the search hits above.
+   * Heat rides the text layer (mark.js on character offsets), and at fit-all
+   * every slot is an impostor with no text — so before this the overlay
+   * simply vanished in Canvas while passages and search hits stayed, which
+   * read as "nobody marked this reading" rather than "nothing is measured
+   * here" (TJ, 2026-08-22, asking for the canvas view on the Heatmaps tab).
+   */
+  const [heatRects, setHeatRects] = useState<Record<number, HeatRect[]>>({});
   const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
   const [passageCardHeights, setPassageCardHeights] = useState<Record<string, number>>({});
   const [activeAddPassageId, setActiveAddPassageId] = useState<string | null>(null);
@@ -1154,6 +1166,36 @@ export default function SpreadCanvasView({
       for (const n of seen) delete merged[n];
       return { ...merged, ...nextSearch };
     });
+
+    // Heat, measured in the same pass and replaced per page on the same rule:
+    // a page whose layer is up is the authority on its own marks, and a page
+    // whose layer is gone keeps what was last measured.
+    const nextHeat: Record<number, HeatRect[]> = {};
+    for (const mark of canvas.querySelectorAll<HTMLElement>(".loom-overlay-heat")) {
+      const pageEl = mark.closest<HTMLElement>(".react-pdf__Page");
+      const pageNum = Number(pageEl?.getAttribute("data-page-number"));
+      if (!pageEl || !pageNum) continue;
+      const s2 = layout.spreads[Math.floor((pageNum - 1) / 2)];
+      if (!s2) continue;
+      const level = Number(mark.getAttribute("data-heat")) || 1;
+      const pr = pageEl.getBoundingClientRect();
+      const px = pageX(layout, s2, pageNum, basePageWidth);
+      for (const r of mark.getClientRects()) {
+        if (r.width === 0 && r.height === 0) continue;
+        (nextHeat[pageNum] ??= []).push({
+          x: px + (r.left - pr.left) / k,
+          y: s2.y + (r.top - pr.top) / k,
+          w: r.width / k,
+          h: r.height / k,
+          level,
+        });
+      }
+    }
+    setHeatRects((prev) => {
+      const merged = { ...prev };
+      for (const n of seen) delete merged[n];
+      return { ...merged, ...nextHeat };
+    });
     setAnchors((prev) => {
       if (Object.keys(next).length === 0) return prev;
       const merged = { ...prev, ...next };
@@ -1330,6 +1372,16 @@ export default function SpreadCanvasView({
     return out;
   }, [searchRects, pageView]);
 
+  /** Heat for pages whose text layer is gone — the same rule, same reason. */
+  const keptHeatMarks = useMemo(() => {
+    const out: HeatRect[] = [];
+    for (const [page, rects] of Object.entries(heatRects)) {
+      if (pageView[Number(page)]) continue;
+      out.push(...rects);
+    }
+    return out;
+  }, [heatRects, pageView]);
+
   const cards = useMemo(() => {
     if (!cardsOn || !layout) return [];
     const out: { passage: Passage; concepts: Concept[]; anchor: Anchor }[] = [];
@@ -1487,6 +1539,18 @@ export default function SpreadCanvasView({
             the page, not furniture above it. aria-hidden like the leaders —
             the passage is reachable from its card and from Your work, and
             this is a redraw of a mark, not a second control. */}
+        {/* Redrawn heat, painted BEFORE the passage marks so a capture still
+            sits on top of the section's wash — the same order the live text
+            layer uses, where heat is marked first and own highlights nest
+            inside it. */}
+        {keptHeatMarks.length > 0 && (
+          <svg className="pdf-kept-heat" width={layout.canvasW} height={layout.canvasH} aria-hidden="true">
+            {keptHeatMarks.map((m, i) => (
+              <rect key={i} x={m.x} y={m.y} width={m.w} height={m.h} data-heat={m.level} />
+            ))}
+          </svg>
+        )}
+
         {keptMarks.length > 0 && (
           <svg className="pdf-kept-marks" width={layout.canvasW} height={layout.canvasH} aria-hidden="true">
             {keptMarks.map((m, i) => (
