@@ -302,13 +302,50 @@ export default async function AdminCoursesPage({
                   ) : (
                     <div className="scrollbox" style={{ marginTop: "10px" }}>
                       {readings.map((reading) => (
-                        <div key={reading.id} className="lrow" style={{ padding: "10px 12px" }}>
-                          <div style={{ display: "flex", gap: "10px", alignItems: "baseline", flexWrap: "wrap" }}>
-                            <span style={{ fontSize: "15px", flex: "1 1 220px", minWidth: 0 }}>
+                        <div key={reading.id} className="lrow" style={{ padding: "8px 12px" }}>
+                          {/* One line per reading (TJ, 2026-08-21: "the
+                              readings list cards could just be one row"): what
+                              the reading IS — title, author, pills — reads
+                              left; what you can DO reads right, in the same
+                              .actrow container, so the Schedule foldout still
+                              lands on its own full-width line below (.actrow
+                              .foldout) and no control moves when it opens.
+                              Pills and buttons keep their never-the-same-shape
+                              rule — except Remove, which wears the red pill
+                              every destructive act in the admin wears. Title
+                              flexes and ellipsizes; the author is capped so a
+                              long name cannot push the controls off the line. */}
+                          <div className="actrow" style={{ alignItems: "center" }}>
+                            <span
+                              style={{
+                                fontSize: "15px",
+                                flex: "1 1 220px",
+                                minWidth: 0,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
                               {reading.title}
                             </span>
                             {reading.author ? (
-                              <span className="hint" style={{ fontSize: "13px" }}>{reading.author}</span>
+                              <span
+                                className="hint"
+                                style={{
+                                  fontSize: "13px",
+                                  maxWidth: "24ch",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  // .card .hint carries margin:2px 0 14px for
+                                  // prose hints; as a flex item here that 14px
+                                  // inflated the line from 29px to 36px
+                                  // (measured on the running app at 1920).
+                                  margin: 0,
+                                }}
+                              >
+                                {reading.author}
+                              </span>
                             ) : null}
                             <span className={`pill ${reading.link.week != null ? "beaten" : "loose"}`}>
                               {reading.link.week != null ? `Week ${reading.link.week}` : "Unscheduled"}
@@ -319,16 +356,6 @@ export default async function AdminCoursesPage({
                             <span className={`pill ${reading.link.isVisible ? "beaten" : "loose"}`}>
                               {reading.link.isVisible ? "Visible" : "Hidden"}
                             </span>
-                          </div>
-
-                          {/* The same one-row-of-equal-buttons set as a library
-                              card's: whatever a button discloses opens in a
-                              .foldout below the row, so no button ever moves.
-                              Pills above are what the reading *is*; buttons
-                              here are what you can *do* — never the same shape,
-                              except Remove, which wears the red pill every
-                              destructive act in the admin wears. */}
-                          <div className="actrow" style={{ marginTop: "8px" }}>
                             <details>
                               <summary
                                 className="btn ghost mini"
