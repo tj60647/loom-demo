@@ -33,7 +33,7 @@
 // One `readSel` serves the drawing, both lists and the read-out, so a choice
 // made anywhere lights everywhere.
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import ClothMap from "@/components/svg/ClothMap"
 import type { Passage, LoomState } from "@/lib/types"
 import ConceptName from "@/components/ui/ConceptName"
@@ -77,12 +77,22 @@ export default function CohortClothPanel({
   names,
   aggregateUnavailable = false,
   passagesUnavailable = false,
+  emphasisUserId = null,
 }: {
   state: LoomState
   /** userId → display name, for attributing concepts, passages, and threads. */
   names: Record<string, string>
   aggregateUnavailable?: boolean
   passagesUnavailable?: boolean
+  /**
+   * A student to LIGHT rather than to filter by — cohort mode's student
+   * picker (TJ, 2026-08-22). Their concepts and threads become the selection,
+   * so the map keeps every other student's work and fades it, which is the
+   * whole difference between "where do they sit in this" and "what did they
+   * do". Null when no student is chosen, or in individual mode where the map
+   * is already theirs alone.
+   */
+  emphasisUserId?: string | null
 }) {
   /**
    * WHAT IS CHOSEN — sets, not one thing (TJ, 2026-08-22: "we should be able
@@ -102,6 +112,28 @@ export default function CohortClothPanel({
   const [conceptQuery, setConceptQuery] = useState("")
   const [threadSort, setThreadSort] = useState<ThreadSort>("from")
   const [threadQuery, setThreadQuery] = useState("")
+
+  /**
+   * The chosen student's work becomes the selection. An effect and not a
+   * derived value: once it has landed the reader may click freely, and a
+   * selection that snapped back to the student on every render would be a
+   * picker fighting the map. It re-runs only when the NAME changes.
+   */
+  useEffect(() => {
+    // Deferred rather than set synchronously in the effect body, the way
+    // ReadingsProvider and LoomProvider already do it: a setState in an
+    // effect body cascades renders, and eslint fails the build for it.
+    const apply = window.setTimeout(() => {
+      if (!emphasisUserId) {
+        setSelConcepts([])
+        setSelThreads([])
+        return
+      }
+      setSelConcepts(state.concepts.filter((c) => c.userId === emphasisUserId).map((c) => c.id))
+      setSelThreads(state.edges.filter((e) => e.userId === emphasisUserId).map((e) => e.id))
+    }, 0)
+    return () => window.clearTimeout(apply)
+  }, [emphasisUserId, state.concepts, state.edges])
 
   const conceptById = useMemo(
     () => new Map(state.concepts.map((c) => [c.id, c])),

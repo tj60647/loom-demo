@@ -83,6 +83,23 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
   )
   const activeStudent = studentsHere.find((st) => st.id === studentParam) ?? null
 
+  /**
+   * WHAT THE STUDENT PICKER MEANS (TJ, 2026-08-22: "let there be a small
+   * toggle for 'individual/cohort graph' and student becomes emphasis in
+   * cohort mode").
+   *
+   * Two different questions, and they want opposite treatments of the same
+   * map. COHORT asks "where does this student sit in the whole?" — the map
+   * keeps its full shape and their work lights against everyone else's.
+   * INDIVIDUAL asks "what has this student woven?" — the map is redrawn from
+   * their rows alone, so the warp is theirs and nothing else is on it.
+   *
+   * Cohort is the resting state: this is the Cohort Graph, and a filter that
+   * silently shrank the whole map the moment a name was chosen was the
+   * behaviour this toggle exists to make deliberate.
+   */
+  const individual = searchParams.get("graph") === "individual"
+
   // A URL is a claim about what the page shows. When ?course= resolves to
   // nothing — a course deleted after the link was minted, or a typo — the
   // fallback above quietly shows the first course while the address keeps the
@@ -144,7 +161,7 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
    * list is filtered by section above.
    */
   const navigate = (courseId: string | null, sectionId: string | null) =>
-    push({ course: courseId, section: sectionId, source: null, student: null })
+    push({ course: courseId, section: sectionId, source: null, student: null, graph: null })
 
   return (
     // Which course, and which section — and nothing else. The tabs that used to
@@ -205,7 +222,7 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
                   aria-label="Select active section"
                   style={{ minWidth: "160px" }}
                   onChange={(event) =>
-                    push({ section: event.target.value || null, student: null })
+                    push({ section: event.target.value || null, student: null, graph: null })
                   }
                 >
                   <option value="">All sections</option>
@@ -252,13 +269,39 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
                   value={activeStudent?.id ?? ""}
                   aria-label="Select active student"
                   style={{ minWidth: "160px" }}
-                  onChange={(event) => push({ student: event.target.value || null })}
+                  onChange={(event) =>
+                    push({
+                      student: event.target.value || null,
+                      graph: event.target.value ? searchParams.get("graph") : null,
+                    })
+                  }
                 >
                   <option value="">All students</option>
                   {studentsHere.map((st) => (
                     <option key={st.id} value={st.id}>{st.name}</option>
                   ))}
                 </select>
+                {/* Only once a name is chosen: with "All students" the two
+                    modes draw the same map, and a control whose two states
+                    look identical teaches nothing. */}
+                {activeStudent && (
+                  <span className="segmented navseg" role="group" aria-label="How the student is shown">
+                    <button
+                      type="button"
+                      className={`btn mini ${individual ? "ghost" : ""}`}
+                      aria-pressed={!individual}
+                      data-tip="their work lit against the whole cohort's"
+                      onClick={() => push({ graph: null })}
+                    >Cohort</button>
+                    <button
+                      type="button"
+                      className={`btn mini ${individual ? "" : "ghost"}`}
+                      aria-pressed={individual}
+                      data-tip="the map redrawn from their work alone"
+                      onClick={() => push({ graph: "individual" })}
+                    >Individual</button>
+                  </span>
+                )}
               </>
             )}
           </>

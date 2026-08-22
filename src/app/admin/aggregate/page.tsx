@@ -7,6 +7,7 @@ type AggregatePageSearchParams = {
   course?: string | string[]
   source?: string | string[]
   student?: string | string[]
+  graph?: string | string[]
   section?: string | string[]
 }
 
@@ -31,6 +32,8 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   // being shown, so the page repeating it was one more thing over the map
   // (TJ, 2026-08-22: "the course is visible").
   const sectionId = await resolveSectionId(courseId, firstParam(resolvedSearchParams.section))
+  const studentId = firstParam(resolvedSearchParams.student) ?? null
+  const individual = firstParam(resolvedSearchParams.graph) === "individual"
 
   let concepts: LoomState["concepts"] = []
   let passages: LoomState["passages"] = []
@@ -40,11 +43,15 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   let aggregateUnavailable = false
 
   try {
+    // THE STUDENT IS A FILTER ONLY IN INDIVIDUAL MODE. In cohort mode the
+    // query keeps the whole class and the name is handed to the panel as
+    // emphasis instead, so the map holds its shape and their work lights
+    // inside it (TJ, 2026-08-22).
     const aggregate = await getAggregateLoomData(
       courseId,
       sectionId,
       firstParam(resolvedSearchParams.source),
-      firstParam(resolvedSearchParams.student)
+      individual ? studentId : null
     )
     concepts = aggregate.concepts
     passages = aggregate.passages
@@ -74,6 +81,10 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
       <CohortClothPanel
         state={state}
         names={names}
+        // Null in individual mode: the map is already only their work, and
+        // lighting all of it against nothing would say less than the plain
+        // drawing does.
+        emphasisUserId={individual ? null : studentId}
         aggregateUnavailable={aggregateUnavailable}
         passagesUnavailable={passagesUnavailable}
       />
