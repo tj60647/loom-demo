@@ -291,6 +291,13 @@ const admin: Flow = {
     { from: "schedule", to: "invite" },
     { from: "invite", to: "place" },
     { from: "place", to: "watch" },
+    // A section's lead is a reference to one of the course's FACULTY since
+    // migration 0028, and faculty are promoted at `place` — downstream of
+    // where sections are built. So naming leads is a genuine return, drawn
+    // here rather than left as an undepicted step. Optional, hence a back
+    // edge and not a reordering: a section may be created with no lead and
+    // given one whenever faculty exist.
+    { from: "place", to: "course", label: "name the section leads", back: true },
     { from: "watch", to: "upload", label: "next week's reading", back: true },
   ],
 }
