@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions, isAdminUser } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import AdminNav, { type AdminNavCourse } from "@/components/ui/AdminNav"
+import Identity from "@/components/ui/Identity"
 import JourneyNav from "@/components/ui/JourneyNav"
 import { db } from "@/db"
 import { sections } from "@/db/schema"
@@ -68,6 +69,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <AdminNav courses={navCourses} />
         <div className="adminbody" style={{ padding: "20px 20px 0" }}>{children}</div>
       </div>
+      {/* The workbench footer's identity half (TJ, 2026-08-21: the courses
+          page "doesn't tell me who I am"), on every admin page for the same
+          reason it is on the workbench: who is signed in, and the way out.
+          The <footer> rule is a fixed full-width strip with pointer-events
+          off — only .footid inside Identity takes clicks back — and the
+          pages' own <main> already ends in the base rule's 86px bottom
+          padding, which is what scrolled content clears it by (globals.css,
+          the `footer` and `main` rules). No right half: the workbench's
+          names the open reading, and no admin page has one. */}
+      <footer>
+        <Identity />
+      </footer>
     </>
   )
 }
