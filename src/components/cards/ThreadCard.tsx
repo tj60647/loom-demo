@@ -222,7 +222,14 @@ export default function ThreadCard({
         </div>
       ) : null}
 
-      <div className="tmeta">
+      {/* WITHHELD under `compact` (TJ, 2026-08-22: "the thread cards do not
+          need description"). What the pill says — label / description / not
+          described — is already legible in `.trip` above it, where a label
+          draws `.v` and an unlabelled thread draws `.tarrow` instead: the
+          state is the mark, not a second word for it. On every other surface
+          the pill stays, and it is still what the cloth's solid-vs-dashed
+          arcs agree with. */}
+      {!compact && <div className="tmeta">
         {/* WHAT THIS THREAD IS, in one word. Sage and solid once a label has
             been distilled out of the sentence, grey and dashed while the
             sentence is the whole of it — the same two states the cloth draws
@@ -239,7 +246,7 @@ export default function ThreadCard({
         {mode === "edit" && edit && (
           <span className="rm" onClick={edit.onRemove}>remove</span>
         )}
-      </div>
+      </div>}
 
       {mode === "edit" && edit?.open && (
         /* THE SIBLINGS' BODY, in the siblings' order: what it says, then what

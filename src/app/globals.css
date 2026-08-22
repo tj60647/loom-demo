@@ -844,9 +844,20 @@ main.canvasfull{padding:0 0 34px;margin:0;height:100%;overflow:hidden;box-sizing
    `white-space:nowrap` — in a 340px panel that pushed the row wider than its
    box and put a horizontal scrollbar under the list. The name gives way
    instead: it ellipsizes, and the tally keeps its one line. */
-.canvasmenu .crow{padding:7px 9px;gap:8px}
-.canvasmenu .crow .clabel{font-size:14.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.canvasmenu .crow .cap{flex:none;font-size:9px}
+/* ConceptCard, minified — the design system's card reduced to its identity
+   (`.ywmini`). `.crow.ywcard` neutralises .crow's own flex/padding so the
+   card's own head can lay the row, which is why the padding comes back here
+   rather than on .crow. One line, ellipsized: the panel is 316px and the
+   list is read to find a name, not to study one. */
+.crow.ywcard.ywmini{padding:0;border-bottom:1px dotted var(--rule);border-radius:4px;cursor:pointer}
+.crow.ywcard.ywmini:last-child{border-bottom:0}
+.crow.ywcard.ywmini .lhead{padding:7px 9px;cursor:pointer}
+.crow.ywcard.ywmini .lconcept{font-size:14.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crow.ywcard.ywmini:hover{background:rgba(168,132,63,.08)}
+/* The one lit row, in the ochre wash every "this is the open one" wears, with
+   the same inset bar .crow.picked has always had. */
+.crow.ywcard.ywmini.picked{box-shadow:inset 3px 0 var(--ochre);background:rgba(168,132,63,.1)}
+.crow.ywcard.ywmini:focus-visible{outline:2px solid var(--sage);outline-offset:-2px}
 /* THE READ-OUT, on the foot of the canvas — ONE LINE until asked.
 
    It sat below the drawing as a column of page, and TJ pointed at it: "this

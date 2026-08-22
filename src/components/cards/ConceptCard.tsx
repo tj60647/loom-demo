@@ -62,9 +62,9 @@ export type ConceptCardEdit = {
 
 export default function ConceptCard({
   concept,
-  passages,
-  concepts,
-  titleOf,
+  passages = [],
+  concepts = [],
+  titleOf = (id) => id,
   mode = "read",
   onGotoPassage,
   /** Evidence from OTHER readings, counted rather than listed. */
@@ -76,14 +76,20 @@ export default function ConceptCard({
   pick = null,
   onPick,
   readOnly = false,
+  compact = false,
+  selected = false,
+  onSelect,
 }: {
   concept: Concept
   /** This concept's evidence, in capture order — SCOPED by the caller. See
-   *  `noEvidence`, which is not derived from this. */
-  passages: Passage[]
+   *  `noEvidence`, which is not derived from this. Required by every mode
+   *  that draws evidence; `compact` draws none, so it passes none — the same
+   *  "required by that mode, ignored otherwise" shape `edit` and `pick`
+   *  already have. */
+  passages?: Passage[]
   /** The whole concept list, so a passage can name its other filings. */
-  concepts: Concept[]
-  titleOf: (sourceId: string) => string
+  concepts?: Concept[]
+  titleOf?: (sourceId: string) => string
   mode?: ConceptCardMode
   onGotoPassage?: (passage: Passage) => void
   elsewhere?: number
@@ -127,6 +133,29 @@ export default function ConceptCard({
    * still opens, because reading the evidence is the point of the mode.
    */
   readOnly?: boolean
+  /**
+   * THE CARD MINIFIED: its identity and nothing else — the concept's name.
+   *
+   * The Cohort Graph's Concepts panel is a 316px list of every concept in a
+   * course, ridden over a map, and read to FIND one rather than to study it.
+   * It used to hand-roll a `<div className="crow">` with the name, the
+   * student and a passage tally — a lookalike of this card rather than this
+   * card, while the Threads panel beside it used the shared ThreadCard. Now
+   * both panels are the design system's own component, reduced.
+   *
+   * Neither the student nor the tally is drawn (TJ, 2026-08-22: "the concept
+   * cards do not need student name or passage count"); the read-out says both
+   * about whichever concept is picked.
+   *
+   * `.crow`, `.clabel`, `.lconcept` and `data-concept-id` are kept because
+   * seven spec files and OpenTab's focus effects reach in by them — the same
+   * reason `pick` mode keeps them.
+   */
+  compact?: boolean
+  /** Lit, in the compact list — the row the map is showing. */
+  selected?: boolean
+  /** Makes the whole row a target, and gives it a keyboard. */
+  onSelect?: () => void
 }) {
   /**
    * The warp card opens in place, like Your work's (TJ, 2026-08-18: "the dot
@@ -305,6 +334,36 @@ export default function ConceptCard({
       {edit.body}
     </div>
   ) : null
+
+  // The minified card: identity, selectable, and nothing else. Before the
+  // modes below, because it answers with none of their furniture.
+  if (compact) {
+    const press = onSelect
+      ? {
+          role: "button" as const,
+          tabIndex: 0,
+          "aria-pressed": selected,
+          onClick: onSelect,
+          onKeyDown: (e: React.KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              onSelect()
+            }
+          },
+        }
+      : {}
+    return (
+      <div
+        data-concept-id={concept.id}
+        className={`crow ywcard ywconcept ywmini${selected ? " picked" : ""}`}
+        {...press}
+      >
+        <div className="lhead">
+          <div className="lconcept clabel"><ConceptName concept={concept} /></div>
+        </div>
+      </div>
+    )
+  }
 
   if (mode === "pick" && onPick) {
     return (

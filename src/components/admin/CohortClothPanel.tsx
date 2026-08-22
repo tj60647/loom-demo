@@ -37,6 +37,7 @@ import { useCallback, useMemo, useState } from "react"
 import ClothMap from "@/components/svg/ClothMap"
 import type { Passage, LoomState } from "@/lib/types"
 import ConceptName from "@/components/ui/ConceptName"
+import ConceptCard from "@/components/cards/ConceptCard"
 import ThreadCard from "@/components/cards/ThreadCard"
 import { labelOf } from "@/lib/linkResolve"
 import { conceptNameText } from "@/lib/conceptName"
@@ -397,21 +398,23 @@ export default function CohortClothPanel({
             <p className="empty">No concept matches &ldquo;{conceptQuery.trim()}&rdquo;.</p>
           ) : (
             <div className="scrollbox">
-              {shownConcepts.map((c) => {
-                const count = passagesByConcept.get(c.id)?.length ?? 0
-                return (
-                  <div
-                    key={c.id}
-                    className={`crow${readSel?.type === "concept" && readSel.id === c.id ? " picked" : ""}`}
-                    onClick={() => selectConcept(c.id)}
-                  >
-                    <span className="clabel"><ConceptName concept={c} /></span>
-                    <span className="cap" style={{ whiteSpace: "nowrap" }}>
-                      {who(c.userId)} · {count} passage{count !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                )
-              })}
+              {/* THE SHARED CARD, minified — the same move the Threads list
+                  beside it makes. This was a hand-rolled `<div class="crow">`
+                  carrying the name, the student and a passage tally: a
+                  lookalike of ConceptCard rather than ConceptCard, while its
+                  neighbour used the real ThreadCard. Neither the student nor
+                  the tally is drawn now (TJ, 2026-08-22: "the concept cards
+                  do not need student name or passage count") — the read-out
+                  says both about whichever one is picked. */}
+              {shownConcepts.map((c) => (
+                <ConceptCard
+                  key={c.id}
+                  concept={c}
+                  compact
+                  selected={readSel?.type === "concept" && readSel.id === c.id}
+                  onSelect={() => selectConcept(c.id)}
+                />
+              ))}
             </div>
           )}
         </details>

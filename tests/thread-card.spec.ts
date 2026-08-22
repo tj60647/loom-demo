@@ -114,21 +114,32 @@ test.describe("The thread card", () => {
     test("/admin/aggregate draws the same card, reduced, and says whose each thread is when asked", async ({ page }) => {
       await page.goto("/admin/aggregate")
       await expect(page.locator(".thread").first()).toBeVisible({ timeout: 30_000 })
-      // The invariant this file exists for holds on the reduced card too: the
-      // pill is what `compact` keeps.
-      await pillsMatchLabels(page, "/admin/aggregate")
 
       // THE LIST IS COMPACT since 2026-08-22 (TJ: "the thread cards need to
-      // be simpler, jsut show the thread, not description or contributor,
-      // that will show up below when selected"). So the list's cards carry
-      // neither sentence nor attribution — asserted as ZERO rather than left
-      // unstated, since "no .sent anywhere" would otherwise let the shared
-      // helper's sentence checks pass vacuously here.
+      // be simpler, jsut show the thread, not description or contributor",
+      // then "the thread cards do not need description"). Sentence,
+      // attribution and the state pill are all withheld — asserted as ZERO
+      // rather than left unstated, since absence would otherwise let the
+      // shared helper's checks pass vacuously here.
       const list = page.locator(".canvasmenu.atright")
       const n = await list.locator(".thread[data-edge-id]").count()
       expect(n, "no thread cards — the fixture is empty").toBeGreaterThan(0)
       await expect(list.locator(".thread .sent")).toHaveCount(0)
-      await expect(list.locator(".thread .tmeta .cap")).toHaveCount(0)
+      await expect(list.locator(".thread .tmeta")).toHaveCount(0)
+
+      // THE INVARIANT SURVIVES, in the trip rather than in the meta.
+      // `pillsMatchLabels` cannot be used here — it counts the state pill
+      // this card no longer draws — but what it guards is unchanged: a label
+      // shows as `.v`, its absence as `.tarrow`, and every card shows exactly
+      // one of the two. That is the same claim, read off the marks that are
+      // left.
+      const v = await list.locator(".thread .v").count()
+      const arrows = await list.locator(".thread .tarrow").count()
+      expect(v + arrows, "/admin/aggregate: every card says what it is, exactly once").toBe(n)
+      await expect(
+        list.locator(".thread:has(.v):has(.tarrow)"),
+        "/admin/aggregate: no card shows both a label and an arrow"
+      ).toHaveCount(0)
 
       // "Below when selected" is the other half of the same sentence, and it
       // is where attribution went — this is still the only surface with more
