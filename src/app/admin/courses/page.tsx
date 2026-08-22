@@ -512,13 +512,44 @@ export default async function AdminCoursesPage({
                       {courseSectionRows.map((section) => {
                         const count = memberships.filter((m) => m.sectionId === section.id).length
                         return (
-                          <div key={section.id} className="lrow" style={{ padding: "10px 12px" }}>
-                            <div style={{ display: "flex", gap: "10px", alignItems: "baseline", flexWrap: "wrap" }}>
-                              <span style={{ fontSize: "15px", flex: 1 }}>{section.name}</span>
-                              {section.lead ? <span className="hint" style={{ fontSize: "13px" }}>{section.lead}</span> : null}
+                          <div key={section.id} className="lrow" style={{ padding: "8px 12px" }}>
+                            {/* One line per section, the reading rows' shape
+                                (TJ, 2026-08-21: "section cards could be a
+                                single row"): name · lead · count read left,
+                                the three quiet verbs read right, and the edit
+                                foldout drops to its own full-width line below
+                                (.actrow .foldout). The lead hint zeroes the
+                                .card .hint prose margin like the author span
+                                above, for the same 7px reason. */}
+                            <div className="actrow" style={{ alignItems: "center" }}>
+                              <span
+                                style={{
+                                  fontSize: "15px",
+                                  flex: "1 1 220px",
+                                  minWidth: 0,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                {section.name}
+                              </span>
+                              {section.lead ? (
+                                <span
+                                  className="hint"
+                                  style={{
+                                    fontSize: "13px",
+                                    maxWidth: "24ch",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    margin: 0,
+                                  }}
+                                >
+                                  {section.lead}
+                                </span>
+                              ) : null}
                               <span className="pill beaten">{count} learner{count !== 1 ? "s" : ""}</span>
-                            </div>
-                            <div className="actrow" style={{ marginTop: "8px" }}>
                               {/* Sections are built here; people are invited on
                                   the Roster page. Without this link that is two
                                   pages with nothing joining them. Withheld when
