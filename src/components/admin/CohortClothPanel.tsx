@@ -43,22 +43,22 @@ import { conceptNameText } from "@/lib/conceptName"
 
 type ReadSel = { type: "concept" | "edge" | "hub"; id?: string; ids?: string[] } | null
 
+/** The panels' instructions, shown on hover rather than standing on the map. */
+const CONCEPTS_TIP =
+  "Every concept in the cohort's weave. Click one to light it on the map and open the passages behind it."
+const THREADS_TIP =
+  "Every thread thrown across the cohort. Click one to light it on the map and read it out below."
+
 
 export default function CohortClothPanel({
   state,
   names,
-  courseLabel,
-  scopeHint,
   aggregateUnavailable = false,
   passagesUnavailable = false,
 }: {
   state: LoomState
   /** userId → display name, for attributing concepts, passages, and threads. */
   names: Record<string, string>
-  /** "Design Frameworks · all sections" — the scope, for the title chip. */
-  courseLabel: string
-  /** The per-section note, when the graph is showing every section. */
-  scopeHint: string
   aggregateUnavailable?: boolean
   passagesUnavailable?: boolean
 }) {
@@ -228,38 +228,45 @@ export default function CohortClothPanel({
 
         {/* The lists ride ON the canvas, at its top corners, so a concept read
             off the drawing is found without leaving it. */}
-        <aside className="canvasmenu atleft">
-          {/* The page's own name heads this panel — a real <h1>, so the
-              document keeps its structure and faculty.spec still finds it,
-              but costing the map no height. It was a chip of its own for one
-              revision and collided with this panel the moment its scope line
-              wrapped: the panel's top is a constant, the chip's height is
-              not. */}
-          <div className="canvastitle">
-            <h1>Cohort Graph</h1>
-            <span className="sub">
-              {state.concepts.length} concepts · {state.edges.length} threads ·{" "}
-              {state.passages.length} passages · {courseLabel}
-            </span>
-            {scopeHint ? <span className="sub">{scopeHint}</span> : null}
+        {/* The page names itself for a screen reader and for nothing else.
+            The visible title said "Cohort Graph" under a selected Cohort
+            Graph tab, beside a course strip already naming the course, over a
+            hint about quilting — TJ, 2026-08-22: "this seems unnecessary, the
+            cohort graph tab is selected, the course is visible, quilting is
+            irrelevant." None of that told a reader anything the chrome had
+            not. The heading itself stays because a document with no h1 has no
+            structure to hold on to; it simply takes no pixels. */}
+        <h1 className="visually-hidden">Cohort Graph</h1>
+
+        {/* A failed read is the one thing the map cannot show by drawing, so
+            it says so in the open. Only rendered when something is wrong. */}
+        {(aggregateUnavailable || passagesUnavailable) && (
+          <div className="canvasnotice">
             {aggregateUnavailable && (
-              <span className="warn">
-                Aggregate data is temporarily unavailable. Check recent migrations and server logs.
-              </span>
+              <span>Aggregate data is temporarily unavailable. Check recent migrations and server logs.</span>
             )}
             {passagesUnavailable && (
-              <span className="warn">
-                Passage records could not be loaded. The concept/thread graph is still shown.
-              </span>
+              <span>Passage records could not be loaded. The concept/thread graph is still shown.</span>
             )}
           </div>
-          <h2>
-            Concepts <span className="n">{state.concepts.length}</span>
-          </h2>
-          <p className="hint">
-            Every concept in the cohort&apos;s weave. Click one to light it here and open the
-            passages behind it.
-          </p>
+        )}
+
+        {/* Both panels fold (TJ, 2026-08-22: "let the concepts panel be
+            collapsible, same with threads") — on a map, a panel you are not
+            using is in the way of the thing you are. `open` by default: they
+            are how you find anything here.
+
+            Their instructions are tips rather than standing prose (TJ: "this
+            should be a tooltip or mouseover") — a line telling you to click
+            the list costs the panel three lines forever and tells you once.
+            Carried on aria-label too, since a tip is mouse-only. */}
+        <details className="canvasmenu atleft" open>
+          <summary data-tip={CONCEPTS_TIP} aria-label={`Concepts — ${CONCEPTS_TIP}`}>
+            <span className="tw">▸</span>
+            <h2>
+              Concepts <span className="n">{state.concepts.length}</span>
+            </h2>
+          </summary>
           {state.concepts.length === 0 ? (
             <p className="empty">Nothing woven yet.</p>
           ) : (
@@ -281,16 +288,15 @@ export default function CohortClothPanel({
               })}
             </div>
           )}
-        </aside>
+        </details>
 
-        <aside className="canvasmenu atright">
-          <h2>
-            Threads <span className="n">{state.edges.length}</span>
-          </h2>
-          <p className="hint">
-            Every thread thrown across the cohort — each in its student&apos;s own sentence. Click
-            one to light it here.
-          </p>
+        <details className="canvasmenu atright" open>
+          <summary data-tip={THREADS_TIP} aria-label={`Threads — ${THREADS_TIP}`}>
+            <span className="tw">▸</span>
+            <h2>
+              Threads <span className="n">{state.edges.length}</span>
+            </h2>
+          </summary>
           {state.edges.length === 0 ? (
             <p className="empty">Nothing thrown yet.</p>
           ) : (
@@ -315,7 +321,7 @@ export default function CohortClothPanel({
               ))}
             </div>
           )}
-        </aside>
+        </details>
 
         {/* The read-out, on the canvas. There is exactly one now: it used to
             sit below the drawing as a second column of page, which is the

@@ -807,8 +807,29 @@ main.canvasfull{padding:0 0 34px;margin:0;height:100%;overflow:hidden;box-sizing
 /* The left panel carries the page title, so it is allowed to be taller. */
 .canvasmenu.atleft{left:14px;top:14px;max-height:60%}
 .canvasmenu.atright{right:14px;top:14px}
-.canvasmenu h2{font-size:15px;margin:0 0 2px}
-.canvasmenu .hint{font-size:12.5px;margin:0 0 7px}
+.canvasmenu h2{font-size:15px;margin:0}
+/* The fold. A panel you are not using is in the way of the map you are, so
+   both close to their own heading — same twirl idiom as .invitefold and
+   .panelfold. Closed, the panel is one 34px row. */
+.canvasmenu > summary{display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none;padding-bottom:7px}
+.canvasmenu > summary::-webkit-details-marker{display:none}
+.canvasmenu > summary .tw{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--ochre);transition:transform .15s}
+.canvasmenu[open] > summary .tw{transform:rotate(90deg)}
+/* Closed, it must not hold 44% of the canvas open on nothing. */
+.canvasmenu:not([open]){max-height:none}
+/* A <details> puts its content in a `::details-content` box, so THAT is the
+   flex item, not the .scrollbox inside it — without this the list ignored the
+   panel's max-height and ran down the map with no panel under it. Both rules
+   carry the same intent so engines that flatten straight to the child behave
+   identically, the way `.actrow details::details-content` already does. */
+.canvasmenu::details-content{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.canvasmenu > .scrollbox,.canvasmenu > .empty{flex:1 1 auto;min-height:0}
+.canvasmenu{overflow:hidden}
+/* A failed read, said in the open — the one thing a drawing cannot show. */
+.canvasnotice{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:4;
+  display:flex;flex-direction:column;gap:3px;max-width:min(46%,560px);
+  background:var(--paper);border:1px solid var(--red);border-radius:4px;padding:8px 12px;
+  color:var(--red);font-size:13px;box-shadow:0 1px 10px rgba(0,0,0,.06)}
 /* The list inside gives up the shared clamp and takes what the card has left,
    so the panel is one scroller and not a scroller inside a scroller. */
 .canvasmenu .scrollbox{flex:1 1 auto;min-height:60px;max-height:none;border:0;background:transparent;overflow-x:hidden}

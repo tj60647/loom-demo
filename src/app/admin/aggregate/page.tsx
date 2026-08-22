@@ -1,6 +1,6 @@
 import { getAggregateLoomData, getStaffViewer } from "@/actions/admin"
 import CohortClothPanel from "@/components/admin/CohortClothPanel"
-import { firstParam, getCourse, listSections, resolveSectionId } from "@/lib/courses"
+import { firstParam, resolveSectionId } from "@/lib/courses"
 import type { LoomState } from "@/lib/types"
 
 type AggregatePageSearchParams = {
@@ -24,11 +24,11 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     )
   }
 
+  // The section still SCOPES the query; it no longer needs naming on screen.
+  // The course strip above the canvas says which course and which section is
+  // being shown, so the page repeating it was one more thing over the map
+  // (TJ, 2026-08-22: "the course is visible").
   const sectionId = await resolveSectionId(courseId, firstParam(resolvedSearchParams.section))
-  const [course, courseSections] = await Promise.all([getCourse(courseId), listSections(courseId)])
-  const sectionName = sectionId
-    ? courseSections.find((section) => section.id === sectionId)?.name ?? null
-    : null
 
   let concepts: LoomState["concepts"] = []
   let passages: LoomState["passages"] = []
@@ -67,8 +67,6 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
       <CohortClothPanel
         state={state}
         names={names}
-        courseLabel={`${course?.name ?? "this course"}${sectionName ? ` · ${sectionName}` : " · all sections"}`}
-        scopeHint={sectionName ? "" : "Quilting happens per section — pick one in the nav to scope this graph."}
         aggregateUnavailable={aggregateUnavailable}
         passagesUnavailable={passagesUnavailable}
       />
