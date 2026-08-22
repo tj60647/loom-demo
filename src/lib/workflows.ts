@@ -271,7 +271,7 @@ const admin: Flow = {
     { id: "decide", label: "Decide — accept a transcription", where: "act 3 · a person, always" },
     { id: "writepdf", label: "Write a repaired revision", where: "act 4 · re-ingested and rescored" },
     { id: "metadata", label: "Draft and accept the metadata", where: "/admin/library" },
-    { id: "schedule", label: "Add to the course and schedule by week", where: "/admin/library · /admin/courses — arrives hidden unless the score passed; Reveal publishes it" },
+    { id: "schedule", label: "Add to the course and schedule by week", where: "inline on /admin/courses, or /admin/library — arrives hidden unless the score passed; Reveal publishes it" },
     { id: "invite", label: "Invite learners in bulk — one email per line, optionally with a section", where: "/admin" },
     { id: "place", label: "Place them, promote faculty, remove", where: "/admin · removal is soft, work survives" },
     { id: "watch", label: "Roster · a student's loom · Cohort Graph", where: "/admin · /admin/aggregate", kind: "end" },

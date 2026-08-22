@@ -8,6 +8,8 @@ import {
   updateSection,
 } from "@/actions/courses"
 import {
+  addSourceToCourse,
+  getLibrarySources,
   getReadingsByCourse,
   removeSourceFromCourse,
   setCourseSourceVisibility,
@@ -33,15 +35,19 @@ export default async function AdminCoursesPage({
   const resolved = await searchParams
   const courseParam = firstParam(resolved.course) ?? null
 
-  const [allCourses, allSections, allMemberships, readingsByCourse] = await Promise.all([
-    listCourses({ includeArchived: true }),
-    db.select().from(sections).orderBy(asc(sections.name)),
-    db
-      .select({ courseId: courseMemberships.courseId, sectionId: courseMemberships.sectionId })
-      .from(courseMemberships)
-      .where(isNull(courseMemberships.removedAt)),
-    getReadingsByCourse(),
-  ])
+  const [allCourses, allSections, allMemberships, readingsByCourse, librarySources] =
+    await Promise.all([
+      listCourses({ includeArchived: true }),
+      db.select().from(sections).orderBy(asc(sections.name)),
+      db
+        .select({ courseId: courseMemberships.courseId, sectionId: courseMemberships.sectionId })
+        .from(courseMemberships)
+        .where(isNull(courseMemberships.removedAt)),
+      getReadingsByCourse(),
+      // The whole unarchived library, title order — the Readings panel's add
+      // dropdown offers what is not already in the selected course.
+      getLibrarySources(),
+    ])
 
   // Master–detail (TJ, 2026-08-21): the scope strip's course picker and this
   // page's content select the SAME course — before this the strip said one
@@ -159,6 +165,8 @@ export default async function AdminCoursesPage({
             const readings = readingsByCourse.get(course.id) ?? []
             const readingCount = readings.length
             const unassigned = memberships.filter((m) => !m.sectionId).length
+            const inCourse = new Set(readings.map((r) => r.id))
+            const addable = librarySources.filter((s) => !inCourse.has(s.id))
 
             return (
               <section
@@ -296,8 +304,7 @@ export default async function AdminCoursesPage({
 
                   {readings.length === 0 ? (
                     <p className="hint" style={{ marginTop: "8px" }}>
-                      No readings yet — add them from the{" "}
-                      <a href={`/admin/library?course=${course.id}`}>Readings tab</a>.
+                      No readings yet — add one below.
                     </p>
                   ) : (
                     <div className="scrollbox" style={{ marginTop: "10px" }}>
@@ -467,6 +474,48 @@ export default async function AdminCoursesPage({
                         </div>
                       ))}
                     </div>
+                  )}
+
+                  {/* Adding is a pick from the shared library (TJ, 2026-08-21:
+                      "i should be able to add readings via dropdown") — the
+                      same addSourceToCourse the library's Add to Course picker
+                      posts. It lands unscheduled, core, and hidden unless its
+                      text-layer score passed (sources.ts computes isVisible
+                      from the score, not from a form field), so the next acts
+                      are Schedule and Reveal on the new row. Uploading NEW
+                      files stays on the Readings tab. */}
+                  {addable.length > 0 ? (
+                    <form action={addSourceToCourse} className="quietrow" style={{ marginTop: "12px" }}>
+                      <input type="hidden" name="courseId" value={course.id} />
+                      <select
+                        name="sourceId"
+                        className="tinput inline"
+                        required
+                        defaultValue=""
+                        style={{ flex: 1, minWidth: 0 }}
+                      >
+                        <option value="" disabled>
+                          Add a reading from the library…
+                        </option>
+                        {addable.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.author ? `${s.title} — ${s.author}` : s.title}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn mini"
+                        type="submit"
+                        data-tip="Include in this course — it arrives unscheduled, and hidden unless its text score passed"
+                      >
+                        Add Reading
+                      </button>
+                    </form>
+                  ) : (
+                    <p className="hint" style={{ marginTop: "12px", marginBottom: 0 }}>
+                      Every library reading is already in this course — upload new ones on the
+                      Readings tab.
+                    </p>
                   )}
                 </details>
 

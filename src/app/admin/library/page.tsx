@@ -37,10 +37,12 @@ export const maxDuration = 300
 /**
  * The Readings tab: every reading in the library, on its own terms.
  *
- * Course membership is shown here as a badge and edited with "Add to course",
- * but a reading is never *scoped* to a course on this page — that view belongs
- * to the Courses tab, which lists each course's full reading list. The `?course`
- * param only pre-selects a default in the add-to-course pickers.
+ * Course membership is shown here as a badge and edited with "Add to course" —
+ * one of two doors: since 2026-08-21 a course's own Readings panel adds from
+ * the library inline, posting the same addSourceToCourse. A reading is never
+ * *scoped* to a course on this page — that view belongs to the Courses tab,
+ * which lists each course's full reading list. The `?course` param only
+ * pre-selects a default in the add-to-course pickers.
  */
 export default async function AdminLibraryPage({
   searchParams,
