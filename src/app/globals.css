@@ -1674,6 +1674,23 @@ a.catrow.on{background:rgba(168,132,63,.08)}
    the road not taken is legible without ticking anything. The pill shape is
    borrowed from the row's status pills on purpose: this control sets exactly
    the pill it looks like. */
+/* A foldout whose fields are all small — a week, an order, a two-way choice,
+   a name — lays out on ONE line instead of stacking. `.form-row` is a column
+   by design (line 280) and right for forms of prose-width fields; inherited
+   by three number-sized controls it spent 290px of height on them (measured
+   on the running app at 1536: WEEK 30 · input 37 · ORDER 30 · input 37 ·
+   WEIGHT 30 · radios 33 · hint 24 · SAVE 27, plus 11px row margins). TJ,
+   2026-08-22: "this seems like it could be more efficient."
+   Labels sit beside their field, inputs size to their content, and the
+   trailing hint is last so it is what wraps when the line runs out. */
+.foldline{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.foldline .form-row{flex-direction:row;align-items:center;gap:8px;margin-bottom:0}
+.foldline .form-row input{width:auto}
+/* Number fields are as wide as the numbers they hold: week is 1–20, order a
+   small integer. Centred because a 2-character value in a 150px default box
+   reads as a mistake. */
+.foldline input.numin{width:66px;text-align:center}
+.foldline .hint{margin:0;font-size:13px}
 .radiorow{display:flex;flex-wrap:wrap;gap:8px}
 .radiopick{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;
   letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);background:#fff;

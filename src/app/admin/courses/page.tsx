@@ -389,27 +389,30 @@ export default async function AdminCoursesPage({
                               >
                                 Schedule
                               </summary>
-                              <form
-                                className="foldout"
-                                action={updateCourseSourceSchedule}
-                                style={{ display: "grid", gap: "8px", maxWidth: "420px" }}
-                              >
+                              <form className="foldout foldline" action={updateCourseSourceSchedule}>
                                 <input type="hidden" name="courseId" value={course.id} />
                                 <input type="hidden" name="sourceId" value={reading.id} />
                                 <div className="form-row">
                                   <span className="label">Week</span>
                                   <input
+                                    className="numin"
                                     name="week"
                                     type="number"
                                     min="1"
                                     max="20"
                                     defaultValue={reading.link.week ?? ""}
-                                    placeholder="Unscheduled"
+                                    // The placeholder carried "Unscheduled"
+                                    // when the box was 400px wide; in a 66px
+                                    // one it renders as "Unsch…". The empty
+                                    // field means unscheduled and the row's
+                                    // own pill says so in words.
+                                    placeholder="—"
                                   />
                                 </div>
                                 <div className="form-row">
                                   <span className="label">Order Within Week</span>
                                   <input
+                                    className="numin"
                                     name="position"
                                     type="number"
                                     min="0"
@@ -442,18 +445,22 @@ export default async function AdminCoursesPage({
                                       Supplemental
                                     </label>
                                   </div>
-                                  <p className="hint" style={{ margin: "4px 0 0", fontSize: "13px" }}>
-                                    Students graph the core readings; supplemental ones sit alongside.
-                                  </p>
                                 </div>
                                 <button
                                   className="btn mini"
                                   type="submit"
-                                  style={{ justifySelf: "start" }}
                                   data-tip="Save the schedule for this course only"
                                 >
                                   Save schedule
                                 </button>
+                                {/* Last on the line, so this is what wraps when
+                                    the row runs out of width — never a control.
+                                    It stays visible text rather than becoming a
+                                    tip: it explains what Core MEANS, and a tip
+                                    is mouse-only. */}
+                                <span className="hint">
+                                  Students graph the core readings; supplemental ones sit alongside.
+                                </span>
                               </form>
                             </details>
 
@@ -655,16 +662,17 @@ export default async function AdminCoursesPage({
                                 <summary className="act" data-tip="Edit the section name and lead">
                                   edit
                                 </summary>
-                                <form
-                                  className="foldout"
-                                  action={updateSection}
-                                  style={{ display: "grid", gap: "8px", maxWidth: "420px" }}
-                                >
+                                <form className="foldout foldline" action={updateSection}>
                                   <input type="hidden" name="courseId" value={course.id} />
                                   <input type="hidden" name="sectionId" value={section.id} />
                                   <div className="form-row">
                                     <span className="label">Name</span>
-                                    <input name="name" defaultValue={section.name} required />
+                                    <input
+                                      name="name"
+                                      defaultValue={section.name}
+                                      required
+                                      style={{ width: "220px" }}
+                                    />
                                   </div>
                                   <div className="form-row">
                                     <span className="label">Lead</span>
@@ -702,21 +710,22 @@ export default async function AdminCoursesPage({
                                         </option>
                                       ))}
                                     </select>
-                                    {facultyOptions.length === 0 ? (
-                                      <p className="hint" style={{ margin: "4px 0 0", fontSize: "13px" }}>
-                                        Leads are chosen from this course&apos;s faculty — promote
-                                        someone on the roster first.
-                                      </p>
-                                    ) : null}
                                   </div>
                                   <button
                                     className="btn mini"
                                     type="submit"
-                                    style={{ justifySelf: "start" }}
                                     data-tip="Save the section name and lead"
                                   >
                                     Save Section
                                   </button>
+                                  {/* Last on the line, so this is what wraps
+                                      when the row runs out — never a control. */}
+                                  {facultyOptions.length === 0 ? (
+                                    <span className="hint">
+                                      Leads are chosen from this course&apos;s faculty — promote
+                                      someone on the roster first.
+                                    </span>
+                                  ) : null}
                                 </form>
                               </details>
                               <form action={deleteSection}>
