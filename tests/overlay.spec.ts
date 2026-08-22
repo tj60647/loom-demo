@@ -62,7 +62,13 @@ test("the passages overlay shades the section's marks, deepest where they agree"
   await expect(bar).toContainText(/\d+ of \d+ in (that section|the cohort) (has|have) marked this reading/, {
     timeout: 20_000,
   })
-  await expect(bar).toContainText("counted, not judged · no names")
+  // The scale NAMES ITS ENDS, because it is relative to this reading's own
+  // densest run — the darkest step is "this many people marked the same words
+  // here", not a fixed number. Replaces the "counted, not judged · no names"
+  // line, removed from this bar on 2026-08-22 (TJ); the discipline it named is
+  // enforced in src/actions/overlays.ts, which selects no name and no content,
+  // and is asserted at the end of this test rather than by reading a sentence.
+  await expect(bar.locator(".pdf-overlay-scale")).toContainText(/\d+ marked the same words/)
 
   // The shading itself. Which page carries it depends on where the seed's
   // sentence picker landed, so walk the spreads — but WAIT on each one before
@@ -91,8 +97,13 @@ test("the passages overlay shades the section's marks, deepest where they agree"
   // and how many of them are peers depends on who is looking (the viewer is
   // always excluded). Pinning "2" broke the moment this spec became a faculty
   // viewer, for whom A is a peer too.
+  //
+  // Step 5 joined the list when the shading became relative to the reading's
+  // densest run rather than an absolute count (2026-08-22): which step a
+  // twice-marked run lands on now depends on the rest of the page, and the
+  // claim under test is "deeper where they agree", not a particular shade.
   await expect(
-    page.locator('.loom-overlay-heat[data-heat="2"], .loom-overlay-heat[data-heat="3"], .loom-overlay-heat[data-heat="4"]').first()
+    page.locator('.loom-overlay-heat[data-heat="2"], .loom-overlay-heat[data-heat="3"], .loom-overlay-heat[data-heat="4"], .loom-overlay-heat[data-heat="5"]').first()
   ).toBeVisible({ timeout: 15_000 })
   // The comparison is never a door into anybody: no names, and no handlers.
   await expect(heat.first()).toHaveAttribute("aria-hidden", "true")

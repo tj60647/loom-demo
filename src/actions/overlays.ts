@@ -72,8 +72,17 @@ import {
  * The most heat spans one reading's overlay may carry. A span is emitted per
  * change in depth, so this is only reachable on a heavily-marked long text;
  * whatever it cuts is reported as `droppedSpans` rather than vanishing.
+ *
+ * RAISED FROM 4000 for the cohort this is being built for rather than the one
+ * in the dev branch: one reading is expected to carry ~60 looms (TJ,
+ * 2026-08-22). Depth changes at each capture's two ends, so the ceiling is
+ * about 2 spans per passage before overlap coalesces them — 60 people at 20
+ * passages each puts the worst case near 2,400, and 4000 left almost no room
+ * above the expected load. A span serializes to about 40 characters of JSON
+ * (`{"start":12345,"end":12456,"count":7},`), so this cap is roughly 480KB
+ * uncompressed, on a faculty view that fetches it once per reading.
  */
-const MAX_SPANS = 4000
+const MAX_SPANS = 12000
 
 /**
  * Above this many in-scope concepts the edge query stops naming them and
@@ -263,24 +272,65 @@ export async function getPassagesOverlay(
     anchored.set(page, list)
   })
 
+  const pageNumbers = [...counts.keys()].sort((a, b) => a - b)
+  const measured = pageNumbers.map((pageNumber) => ({
+    pageNumber,
+    all: heatSpans(anchored.get(pageNumber) ?? []),
+  }))
+
+  const totalSpans = measured.reduce((sum, page) => sum + page.all.length, 0)
+  // The scale is taken before anything is dropped, so a payload that had to be
+  // trimmed still shades on the same range as one that did not.
+  const maxCount = measured.reduce(
+    (top, page) => page.all.reduce((inner, span) => Math.max(inner, span.count), top),
+    0
+  )
+
+  /**
+   * TRIMMING IS BY DENSITY AND BY SHARE, not by the order pages happen to come
+   * in.
+   *
+   * The budget used to be spent front to back: page 1 took what it needed and
+   * whatever was left over reached page 40. That holds fine at four
+   * contributors and fails exactly when this view starts to matter — one
+   * reading is expected to carry ~60 looms (TJ, 2026-08-22) — and it fails
+   * INVISIBLY, because a starved page is not a blank page with a warning on
+   * it, it is a page that looks as though nobody read it. "The back half of
+   * the reading is cold" is a claim about the cohort, and the payload budget
+   * must never be the thing making it.
+   *
+   * So every page keeps a share proportional to what it measured, and inside a
+   * page the FAINTEST runs go first. That bias is deliberate and worth stating:
+   * dropping the runs one person marked keeps the places many did, which is
+   * what the reader came for. The count of what went is on screen either way.
+   */
+  const keepFor = (spanCount: number) =>
+    totalSpans <= MAX_SPANS
+      ? spanCount
+      : Math.max(1, Math.floor((MAX_SPANS * spanCount) / totalSpans))
+
   const pages: PageHeat[] = []
-  let budget = MAX_SPANS
   let droppedSpans = 0
 
-  ;[...counts.keys()]
-    .sort((a, b) => a - b)
-    .forEach((pageNumber) => {
-      const all = heatSpans(anchored.get(pageNumber) ?? [])
-      const spans = all.slice(0, Math.max(0, budget))
-      budget -= spans.length
-      droppedSpans += all.length - spans.length
-      pages.push({
-        pageNumber,
-        count: counts.get(pageNumber)!,
-        contentHash: pageHashes.get(pageNumber) ?? "",
-        spans,
-      })
+  measured.forEach(({ pageNumber, all }) => {
+    const keep = keepFor(all.length)
+    const spans =
+      keep >= all.length
+        ? all
+        : [...all]
+            .sort((a, b) => b.count - a.count || a.start - b.start)
+            .slice(0, keep)
+            // Back into document order: everything downstream walks spans and
+            // items together in one forward pass.
+            .sort((a, b) => a.start - b.start)
+    droppedSpans += all.length - spans.length
+    pages.push({
+      pageNumber,
+      count: counts.get(pageNumber)!,
+      contentHash: pageHashes.get(pageNumber) ?? "",
+      spans,
     })
+  })
 
   return {
     ...base,
@@ -289,6 +339,7 @@ export async function getPassagesOverlay(
     pages,
     unanchored,
     droppedSpans,
+    maxCount,
   }
 }
 

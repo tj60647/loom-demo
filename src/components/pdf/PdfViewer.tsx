@@ -22,6 +22,13 @@ import { hitTermsOf } from '@/lib/searchText';
 import Snippet from '@/components/ui/Snippet';
 import { Passage, Concept } from '@/lib/types';
 import { hashText } from '@/lib/hash';
+import {
+  heatBand,
+  projectHeatSpans,
+  textLayerString,
+  type HeatRect,
+  type HeatTextItem,
+} from '@/lib/heatRects';
 import Mark from 'mark.js';
 
 // Served from our own origin, copied out of react-pdf's pdfjs-dist by
@@ -1019,6 +1026,77 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     setPdfProxy(pdf);
   }
 
+  /**
+   * THE HISTOGRAM, PLACED — every marked run on every page, as geometry, with
+   * no page rendered and no text layer consulted.
+   *
+   * TJ, 2026-08-22: "i want passages. i want to be able to look at the canvas
+   * and see where everyone has been. one strategy would be to have a histogram
+   * by word in the document and then render in the various views." This is
+   * that, and it is exact rather than approximate: highlight offsets index the
+   * text-layer string, which is the pdf.js items' `str` concatenated with
+   * nothing between them, so a running sum over `getTextContent()` gives every
+   * item its offsets and `item.transform` gives its box. See src/lib/heatRects.ts.
+   *
+   * Rects come back normalized to the page, so the SAME projection serves 1
+   * page, 2 pages and the canvas at any zoom — the "render in the various
+   * views" half of the ask, done once rather than per view.
+   *
+   * `getTextContent()` needs no rasterisation, and pdf.js caches it per page,
+   * so pages the reader later opens do not pay for it twice. Only pages the
+   * overlay says carry marks are asked for.
+   */
+  const [heatRectsByPage, setHeatRectsByPage] = useState<Record<number, HeatRect[]>>({});
+
+  useEffect(() => {
+    const pages = overlay?.pages?.filter((page) => page.spans.length > 0) ?? [];
+    let live = true;
+
+    // Deferred, the same discipline the rest of this file's state resets keep:
+    // a setState in an effect BODY cascades a render, and turning the overlay
+    // off has to clear the projection without one.
+    const start = window.setTimeout(async () => {
+      if (!pdfProxy || pages.length === 0) {
+        setHeatRectsByPage((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+        return;
+      }
+      const next: Record<number, HeatRect[]> = {};
+      for (const heat of pages) {
+        if (!live) return;
+        try {
+          const page = await pdfProxy.getPage(heat.pageNumber);
+          const content = await page.getTextContent();
+          const items = content.items as HeatTextItem[];
+
+          /**
+           * The same absolute hash gate the marking pass applies, asked one
+           * step earlier. The overlay carries offsets and never the other
+           * student's text, so there is nothing to fuzzy-match against: a page
+           * whose text has drifted from what the offsets were measured on
+           * shades nothing and stays counted in the status line, because
+           * shading the wrong sentence is worse than shading none.
+           */
+          if (hashText(textLayerString(items)) !== heat.contentHash) continue;
+
+          const viewport = page.getViewport({ scale: 1 });
+          next[heat.pageNumber] = projectHeatSpans(
+            items,
+            { width: viewport.width, height: viewport.height },
+            heat.spans
+          );
+        } catch (error) {
+          console.warn(`[Loom PDF] Page ${heat.pageNumber} heat could not be placed`, error);
+        }
+      }
+      if (live) setHeatRectsByPage(next);
+    }, 0);
+
+    return () => {
+      live = false;
+      window.clearTimeout(start);
+    };
+  }, [overlay, pdfProxy]);
+
   // Keep passagesRef current (declared above, next to conceptsRef) so the
   // MutationObserver's applier never needs state.passages as a dependency.
   useEffect(() => {
@@ -1335,9 +1413,24 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   className: "loom-overlay-heat",
                   each: (node) => {
                     const el = node as HTMLElement;
-                    // Five steps: past five the shade stops darkening, so a
-                    // popular sentence does not black out the words under it.
-                    el.setAttribute("data-heat", String(Math.min(span.count, 5)));
+                    /**
+                     * Five steps, spread over THIS READING's range rather than
+                     * clamped at five people.
+                     *
+                     * `Math.min(count, 5)` was fine while a busy run meant
+                     * three or four people and became one flat colour the
+                     * moment it meant forty: every run from 5 upwards painted
+                     * identically, so the difference between a sentence half
+                     * the cohort marked and one two people marked disappeared.
+                     * `heatBand` puts the top step on the densest run in the
+                     * reading and the rest on a log ramp under it, which is
+                     * the same scale the canvas draws — so a page looks the
+                     * same whichever view you meet it in.
+                     */
+                    el.setAttribute(
+                      "data-heat",
+                      String(heatBand(span.count, overlayRef.current?.maxCount ?? 1))
+                    );
                     // The count is reported in the status line, in words. A
                     // per-span label would put "3 people" between a screen
                     // reader and every sentence of the reading.
@@ -1961,7 +2054,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         }
         .pdf-overlay-bar b { color: var(--ink); font-weight: 500; }
         .pdf-overlay-scale { display: flex; align-items: center; gap: 4px; }
-        /* The same five steps the page uses, rule included. */
+        /* The same steps the page uses, rule included, addressed by the
+           data-heat attribute rather than by position.
+           THE POSITIONAL SELECTORS WERE WRONG: the "1" label is child 1, so
+           i:nth-child(2) styled the FIRST swatch and the fifth matched no rule
+           at all and fell through to the base fill — the scale ended lighter
+           than it began. Read off the old rules rather than measured: base
+           0.12 with overrides on nth-child(2) through (5), which over a label
+           plus five swatches gives 0.20, 0.28, 0.36, 0.44, 0.12. */
         .pdf-overlay-scale i {
           display: inline-block;
           width: 15px;
@@ -1969,10 +2069,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           background: rgba(var(--heat-rgb, 64, 84, 112), 0.12);
           box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.40);
         }
-        .pdf-overlay-scale i:nth-child(2) { background: rgba(var(--heat-rgb, 64, 84, 112), 0.20); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.55); }
-        .pdf-overlay-scale i:nth-child(3) { background: rgba(var(--heat-rgb, 64, 84, 112), 0.28); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.70); }
-        .pdf-overlay-scale i:nth-child(4) { background: rgba(var(--heat-rgb, 64, 84, 112), 0.36); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.82); }
-        .pdf-overlay-scale i:nth-child(5) { background: rgba(var(--heat-rgb, 64, 84, 112), 0.44); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.95); }
+        .pdf-overlay-scale i[data-heat="2"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.20); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.55); }
+        .pdf-overlay-scale i[data-heat="3"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.28); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.70); }
+        .pdf-overlay-scale i[data-heat="4"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.36); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.82); }
+        .pdf-overlay-scale i[data-heat="5"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.44); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.95); }
         .pdf-search-panel {
           position: absolute;
           top: 64px;
@@ -2517,12 +2617,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           stroke-width: 1;
           vector-effect: non-scaling-stroke;
         }
-        /* The redrawn Passages Overlay, in the SAME steps the live mark uses
-           (.loom-overlay-heat) — at fit-all a page that has never been
-           promoted carries no text layer, so without these the overlay
-           vanished in Canvas while passages and search hits stayed. The five
-           fills match the live wash exactly; the 2px overline becomes a top
-           stroke, since an SVG rect has no inset shadow. */
+        /* The projected Passages Overlay, in the SAME steps the live mark
+           uses (.loom-overlay-heat), because they are the same runs of text
+           placed two ways: mark.js on a rendered text layer in the paged
+           views, item geometry on the canvas where there is no layer to walk.
+           The five fills match the live wash exactly; the 2px overline becomes
+           a top stroke, since an SVG rect has no inset shadow. */
         .pdf-kept-heat {
           position: absolute;
           inset: 0;
@@ -2535,26 +2635,6 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           stroke-width: 1;
           vector-effect: non-scaling-stroke;
         }
-        /* The page-level wash — a whole page tinted at the step of its
-           densest span, for pages no text layer has measured. Deliberately
-           fainter than a span mark at the same step: it is a claim about the
-           page, not about any word on it. */
-        .pdf-page-heat {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          overflow: visible;
-        }
-        .pdf-page-heat rect {
-          fill: rgba(var(--heat-rgb, 64, 84, 112), 0.07);
-          stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.35);
-          stroke-width: 1;
-          vector-effect: non-scaling-stroke;
-        }
-        .pdf-page-heat rect[data-heat="2"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.12); }
-        .pdf-page-heat rect[data-heat="3"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.18); }
-        .pdf-page-heat rect[data-heat="4"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.24); }
-        .pdf-page-heat rect[data-heat="5"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.30); }
         .pdf-kept-heat rect[data-heat="2"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.20); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.55); }
         .pdf-kept-heat rect[data-heat="3"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.28); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.70); }
         .pdf-kept-heat rect[data-heat="4"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.36); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.82); }
@@ -3179,11 +3259,26 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   </>
                 )}.
               </span>
+              {/* The scale NAMES ITS ENDS, because it is relative: the darkest
+                  step is this reading's own densest run, not a fixed number of
+                  people. "more" left a reader to guess whether the dark patches
+                  meant three had agreed or thirty, which is the one thing the
+                  shading is there to tell them. */}
               <span className="pdf-overlay-scale">
-                <span className="cap">fewer</span>
-                <i aria-hidden="true" /><i aria-hidden="true" /><i aria-hidden="true" />
-                <i aria-hidden="true" /><i aria-hidden="true" />
-                <span className="cap">more marked the same words</span>
+                <span className="cap">1</span>
+                {/* As many swatches as the page can actually produce. Below
+                    six people the step is the count itself, so drawing five
+                    when only two shades will ever appear advertises a range
+                    the reading does not have. */}
+                {Array.from(
+                  { length: Math.min(5, Math.max(1, overlay.maxCount)) },
+                  (_unused, step) => (
+                    <i key={step} data-heat={step + 1} aria-hidden="true" />
+                  )
+                )}
+                <span className="cap">
+                  {overlay.maxCount} marked the same words
+                </span>
               </span>
               {overlay.unanchored > 0 && (
                 <span className="cap">
@@ -3407,10 +3502,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               zooms; the toolbar's − / + / Fit drive the same transform. */}
           {viewMode === "matrix" && (
             <SpreadCanvasView
-              /* The overlay's per-page spans, so a page that carries marks is
-                 washed even when no text layer has ever measured it — which
-                 at fit-all is every page. */
-              heatPages={overlay?.pages ?? []}
+              /* The cohort's marks as page-normalized rects, projected from
+                 the overlay's offsets above. The canvas draws them at
+                 whatever size it is drawing each page, so heat is there at
+                 fit-all — where no page has a text layer to measure. */
+              heatRects={heatRectsByPage}
+              heatMax={overlay?.maxCount ?? 1}
               pdf={pdfProxy}
               numPages={numPages ?? 0}
               basePageWidth={matrixBaseWidth}
