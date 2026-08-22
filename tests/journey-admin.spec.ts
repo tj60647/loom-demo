@@ -21,9 +21,18 @@ test("roster shows enrolled demo learners with their counts", async ({ page }) =
 
   const rowA = page.locator(".rosterrow", { hasText: "Test User A" })
   await expect(rowA, "seed missing — run `npm run seed:demo` first").toHaveCount(1)
-  // Counts became number-only pills in their own sortable columns — the
-  // concepts pill is the beaten one, the header names the column.
-  await expect(rowA.locator(".pill.beaten", { hasText: /^\d+$/ })).toBeVisible()
+  // Counts are number-only pills in their own sortable columns; the header
+  // names each one. Three of them since 2026-08-22 — cloths, concepts,
+  // threads — which is why this no longer matches on `.pill.beaten` alone:
+  // cloths and concepts both wear it, and the bare locator resolved to two.
+  // Each carries its breakdown in an aria-label, so asserting on that checks
+  // the number AND that the breakdown reached a non-mouse reader.
+  const stats = rowA.locator(".pill[aria-label]")
+  await expect(stats).toHaveCount(3)
+  await expect(stats.nth(0)).toHaveAttribute("aria-label", /cloth/)
+  await expect(stats.nth(1)).toHaveAttribute("aria-label", /concept/)
+  await expect(stats.nth(2)).toHaveAttribute("aria-label", /thread/)
+  await expect(rowA.locator(".pill", { hasText: /^\d+$/ }).first()).toBeVisible()
   await expect(rowA.getByRole("link", { name: "Open Loom" })).toBeVisible()
 
   await expect(page.locator(".rosterrow", { hasText: "Test User B" })).toHaveCount(1)

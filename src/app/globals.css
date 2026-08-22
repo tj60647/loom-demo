@@ -1584,7 +1584,12 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    edges | section | role | remove — the door right beside the name, the
    counts narrow (number pills need less than their sortable headers), the
    destructive control last. */
-.rosterhead,.rosterrow{display:grid;grid-template-columns:minmax(170px,1fr) 110px 70px 60px 190px 120px 90px;gap:6px 14px;align-items:center;padding:4px 14px}
+/* Eight tracks since 2026-08-22: `cloths` joined the counts (TJ) — a cloth is
+   one reading's work, so it says how many readings a person has actually
+   woven, which the other two numbers cannot. It sits FIRST of the three,
+   container before contents, and takes the same narrow basis: a number pill
+   needs less than its own sortable heading. */
+.rosterhead,.rosterrow{display:grid;grid-template-columns:minmax(170px,1fr) 110px 62px 70px 60px 190px 120px 90px;gap:6px 14px;align-items:center;padding:4px 14px}
 .rosterhead{border-bottom:1px solid var(--rule);padding-top:7px;padding-bottom:7px}
 .rosterhead button{background:none;border:none;padding:0;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;text-align:left}
 .rosterhead button:hover{color:var(--ink)}
