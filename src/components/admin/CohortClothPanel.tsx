@@ -32,6 +32,15 @@ import { conceptNameText } from "@/lib/conceptName"
 
 type ReadSel = { type: "concept" | "edge" | "hub"; id?: string; ids?: string[] } | null
 
+/**
+ * The canvas is taller than the 400px pane a cloth gets elsewhere, because
+ * this one is the surface rather than a figure above a read-out: the lists
+ * ride on it and the long arcs need room to clear the short ones (ClothMap's
+ * `height`). 620 measured at 1680 — the warp's labels end ~115px under the
+ * baseline, and the menus at 44% stop well above it.
+ */
+const CANVAS_H = 620
+
 export default function CohortClothPanel({
   state,
   names,
@@ -79,6 +88,54 @@ export default function CohortClothPanel({
     </div>
   )
 
+
+  /**
+   * The floating footer: what is selected, in one line, over the foot of the
+   * canvas (TJ, 2026-08-22: "a floating footer with data about selection").
+   *
+   * Deliberately NOT `.threadhead` — that class belongs to the read-out below
+   * and a second one would make `page.locator(".threadhead", …)` ambiguous in
+   * journey-admin. This is a head, not a copy of the pane: it names the
+   * subject and its author, and for a thread its sentence, and stops.
+   */
+  let foot = null
+  if (readSel?.type === "concept" && readSel.id) {
+    const c = conceptById.get(readSel.id)
+    if (c) {
+      const crossings = state.edges.filter((e) => e.fromId === c.id || e.toId === c.id).length
+      const count = passagesByConcept.get(c.id)?.length ?? 0
+      foot = (
+        <div className="canvasfoot">
+          <span className="subject">{conceptNameText(c)}</span>
+          <span className="who">
+            {who(c.userId)} · {crossings} crossing{crossings !== 1 ? "s" : ""} · {count} passage
+            {count !== 1 ? "s" : ""}
+          </span>
+          {c.def ? <span className="said">{c.def}</span> : null}
+        </div>
+      )
+    }
+  } else if (readSel?.type === "edge" && readSel.id) {
+    const e = state.edges.find((x) => x.id === readSel.id)
+    if (e) {
+      const from = conceptById.get(e.fromId)
+      const to = conceptById.get(e.toId)
+      const label = labelOf(e, state.links)
+      foot = (
+        <div className="canvasfoot">
+          <span className="subject">{from ? conceptNameText(from) : "?"}</span>
+          {label ? (
+            <span className="vpill">{label}</span>
+          ) : (
+            <span className="vpill loosev">description</span>
+          )}
+          <span className="subject">{to ? conceptNameText(to) : "?"}</span>
+          <span className="who">{who(e.userId)}</span>
+          {e.sentence ? <span className="said">&ldquo;{e.sentence}&rdquo;</span> : null}
+        </div>
+      )
+    }
+  }
 
   // What is selected, read out under the map — the student idiom, admin-voiced.
   let pane = null
@@ -183,12 +240,12 @@ export default function CohortClothPanel({
 
   return (
     <>
-      <div className="card">
+      <div className="card cohortcanvas">
         <div className="mapbar">
           <span className="label">The collective cloth</span>
           <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
             {state.concepts.length} concepts, {state.edges.length} threads, {state.passages.length} passages.
-            Pick a concept or a thread — on the cloth or in the lists below — to read it out here.
+            Pick a concept or a thread — on the cloth or in the lists over it — to read it out below.
           </span>
         </div>
         <div id="mapWrap">
@@ -201,18 +258,23 @@ export default function CohortClothPanel({
               lights the others. The panel→drawing direction is new: before
               this the cloth was passed a hard `null` and could not show a
               selection even when one existed. */}
-          <ClothMap state={state} readSel={readSel} setReadSel={setReadSel} trace />
+          <ClothMap
+            state={state}
+            readSel={readSel}
+            setReadSel={setReadSel}
+            trace
+            height={CANVAS_H}
+          />
         </div>
-        {pane}
-      </div>
 
-      <div className="two" style={{ marginTop: "22px" }}>
-        <div className="card">
+        {/* The lists ride ON the canvas, at its top corners, so a concept read
+            off the drawing is found without leaving it. */}
+        <aside className="canvasmenu atleft">
           <h2>
             Concepts <span className="n">{state.concepts.length}</span>
           </h2>
           <p className="hint">
-            Every concept in the cohort&apos;s weave, in projection order. Click one to open the
+            Every concept in the cohort&apos;s weave. Click one to light it here and open the
             passages behind it.
           </p>
           {state.concepts.length === 0 ? (
@@ -236,15 +298,15 @@ export default function CohortClothPanel({
               })}
             </div>
           )}
-        </div>
+        </aside>
 
-        <div className="card">
+        <aside className="canvasmenu atright">
           <h2>
             Threads <span className="n">{state.edges.length}</span>
           </h2>
           <p className="hint">
             Every thread thrown across the cohort — each in its student&apos;s own sentence. Click
-            one to read it out above.
+            one to light it here.
           </p>
           {state.edges.length === 0 ? (
             <p className="empty">Nothing thrown yet.</p>
@@ -270,8 +332,15 @@ export default function CohortClothPanel({
               ))}
             </div>
           )}
-        </div>
+        </aside>
+
+        {foot}
       </div>
+
+      {/* The read-out proper — the passages, the thread cards, the whole
+          evidence — below the canvas, where it has room to be long. The
+          floating footer above is its one-line head, not a second copy. */}
+      {pane}
     </>
   )
 }

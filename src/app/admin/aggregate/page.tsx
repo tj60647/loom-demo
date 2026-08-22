@@ -53,7 +53,11 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   const names = Object.fromEntries(members.map((member) => [member.id, member.name]))
 
   return (
-    <main>
+    // `workwide`: the cloth is a work surface, not prose. At the 1100 measure
+    // 94 concepts sat ~11px apart with their labels overlapping into a smear
+    // (measured at 1920 before this); the canvas also carries its own lists
+    // now. Same 1680 the courses console and the workbench stations take.
+    <main className="workwide">
       <h1>Cohort Graph</h1>
       <p className="tasksub" style={{ marginBottom: "20px" }}>
         A macro view of concepts, passages, and threads across {course?.name ?? "this course"}

@@ -47,6 +47,7 @@ export default function ClothMap({
   pair = [],
   onPickConcept,
   trace = SHOW_TRACE,
+  height = 400,
 }: {
   state: LoomState,
   readSel: ReadSel,
@@ -88,6 +89,18 @@ export default function ClothMap({
    * below, so a caller that passes both keeps pairing.
    */
   trace?: boolean,
+  /**
+   * How tall to draw, in CSS px. 400 is the pane height every cloth had when
+   * the drawing sat above a read-out in a column.
+   *
+   * It is a prop because arc height is capped by the canvas: `h` maxes at
+   * `baseY - 44`, so at 400 (baseY 272, cap 228) every long span in a wide
+   * cohort flattens onto the same ceiling and the arcs stack into a band. A
+   * taller canvas lets the long ones rise clear of the short ones, which is
+   * most of what makes a 94-concept cloth readable (TJ, 2026-08-22: "give
+   * more space to the graph").
+   */
+  height?: number,
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [width, setWidth] = useState(720)
@@ -119,7 +132,7 @@ export default function ClothMap({
     return () => observer.disconnect()
   }, [])
 
-  const H = 400
+  const H = height
   const baseY = H - 128
   const mL = 46
   // Room for the LAST label, which is drawn from the node and rotated 30° into

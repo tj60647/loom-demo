@@ -752,6 +752,47 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
    broken at exactly the moment the pick landed. The cloth is a picture; the
    names it draws are readable in three other places. */
 #map{display:block;width:100%;height:400px;touch-action:none;user-select:none;-webkit-user-select:none}
+
+/* ===== the cohort canvas (admin/aggregate) =====
+   The drawing is the surface, and its lists ride over it (TJ, 2026-08-22: "i
+   think the graph should be a canvase with menus floating over the corners, a
+   floating footer with data about selection, and the usual headers"). Before
+   this the two lists sat in a `.two` grid BELOW the cloth, so reading a
+   concept off the drawing and finding it in a list were a page-scroll apart.
+   The headers stay — this replaces where the lists sit, not the page's own
+   heading. */
+.cohortcanvas{position:relative}
+/* Over the drawing's top corners. Held to a third of the width so the middle
+   of the warp — where the long arcs rise — stays clear, and to 44% of the
+   canvas so the baseline and its labels are never covered. */
+.canvasmenu{position:absolute;top:56px;width:min(32%,340px);max-height:44%;z-index:3;
+  display:flex;flex-direction:column;
+  background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:10px 12px;
+  box-shadow:0 1px 10px rgba(0,0,0,.06)}
+.canvasmenu.atleft{left:14px} .canvasmenu.atright{right:14px}
+.canvasmenu h2{font-size:15px;margin:0 0 2px}
+.canvasmenu .hint{font-size:12.5px;margin:0 0 7px}
+/* The list inside gives up the shared clamp and takes what the card has left,
+   so the panel is one scroller and not a scroller inside a scroller. */
+.canvasmenu .scrollbox{flex:1 1 auto;min-height:60px;max-height:none;border:0;background:transparent;overflow-x:hidden}
+/* A concept row is name + attribution on one line, and the attribution has
+   `white-space:nowrap` — in a 340px panel that pushed the row wider than its
+   box and put a horizontal scrollbar under the list. The name gives way
+   instead: it ellipsizes, and the tally keeps its one line. */
+.canvasmenu .crow{padding:7px 9px;gap:8px}
+.canvasmenu .crow .clabel{font-size:14.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.canvasmenu .crow .cap{flex:none;font-size:9px}
+/* The footer says what is selected, over the foot of the canvas. Its own
+   pointer-events so the drawing beneath keeps every click the bar does not
+   want; `left/right` rather than a width so a long sentence wraps inside the
+   canvas instead of pushing it. */
+.canvasfoot{position:absolute;left:14px;right:14px;bottom:14px;z-index:3;
+  display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;
+  background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:8px 12px;
+  box-shadow:0 1px 10px rgba(0,0,0,.06)}
+.canvasfoot .who{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
+.canvasfoot .said{font-size:14px;font-style:italic;color:var(--ink-soft);min-width:0}
+.canvasfoot .subject{font-family:var(--display);font-size:16px;color:var(--red)}
 /* The pair's offer. TOP LAYER, via popover="auto" — #mapWrap directly above
    is overflow-x:auto, so it would CLIP an absolutely-positioned card at its
    own edges. That is not a prediction: clipping by an overflow ancestor is
