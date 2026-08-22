@@ -76,12 +76,12 @@ test("courses: schedule controls render for the course's readings", async ({ pag
   await expect(fold).toBeVisible({ timeout: 15_000 })
   await expect(fold.locator("input[name=name]")).toBeHidden()
 
-  // Course controls are one uniform row: Edit Course (disclosure), Archive,
-  // and Delete as the red pill disclosure.
+  // Course controls are one uniform row: Edit Metadata (disclosure — it edits
+  // name/slug/term/description only), Archive, and Delete as the red pill.
   const firstCourse = page
-    .locator("section.card", { has: page.locator("summary", { hasText: "Edit Course" }) })
+    .locator("section.card", { has: page.locator("summary", { hasText: "Edit Metadata" }) })
     .first()
-  await expect(firstCourse.locator("summary", { hasText: "Edit Course" })).toBeVisible()
+  await expect(firstCourse.locator("summary", { hasText: "Edit Metadata" })).toBeVisible()
   await expect(firstCourse.locator("summary.pillbtn", { hasText: "Delete" })).toBeVisible()
 
   // Each reading row shows its Week/Core/Visible pills; the week+position form

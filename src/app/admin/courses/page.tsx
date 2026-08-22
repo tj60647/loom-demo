@@ -132,11 +132,15 @@ export default async function AdminCoursesPage({
                     in a .foldout so the buttons never move (see .actrow). */}
                 <div className="actrow" style={{ marginTop: "14px" }}>
                   <details>
+                    {/* "Metadata", not "Course" (TJ, 2026-08-21): this form
+                        edits the name, slug, term and description only — the
+                        course's readings and sections have their own panels,
+                        and a button called Edit Course promised all three. */}
                     <summary
                       className="btn ghost mini"
                       data-tip="Edit the name, slug, term, and description"
                     >
-                      Edit Course
+                      Edit Metadata
                     </summary>
                     <form
                       className="foldout"
@@ -166,7 +170,7 @@ export default async function AdminCoursesPage({
                         style={{ justifySelf: "start" }}
                         data-tip="Save the course details"
                       >
-                        Save Course
+                        Save Metadata
                       </button>
                     </form>
                   </details>
