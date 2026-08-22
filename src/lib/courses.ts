@@ -152,9 +152,15 @@ export type CourseFacultyMember = {
 
 /**
  * The course's FACULTY members with their names — the option list for a
- * section's lead (sections.leadUserId). Active memberships only, the same
- * filters listFacultyCourseIds applies from the user's side; ordered by name
- * so the dropdown reads like a roll.
+ * section's lead (sections.leadUserId). Active memberships only, ordered by
+ * name so the dropdown reads like a roll.
+ *
+ * NOT the same filters as listFacultyCourseIds, which asks the mirror-image
+ * question: that one adds `courses.isArchived = false`, because it decides
+ * which courses a person may enter. This one is handed a course and lists its
+ * faculty — the courses page reaches archived courses deliberately (its
+ * catalog is the only door to them), and a section there still shows who
+ * leads it.
  */
 export async function listCourseFaculty(courseId: string): Promise<CourseFacultyMember[]> {
   return db

@@ -1167,7 +1167,8 @@ second most common "resolution" is 1536×864 — a panel nobody manufactures, an
    `.matrix .hint` is `64ch`). Work surfaces — warp, bench, thread list, board,
    card lists — take the room they are given. `main` carries `--measure`,
    default **1100px** for reading-shaped pages; `.station-work` raises it to
-   **1680px** for the workbench. One global measure over both was the defect
+   **1680px** for the workbench, and `main.workwide` raises it to the same
+   1680 for an admin work surface. One global measure over both was the defect
    this standard exists to fix: it froze 02's three columns at 348px on every
    screen from a 13" laptop to a 27" monitor.
 2. **Fold on the content's own minimum, never on a device width.** Multi-column
@@ -1200,8 +1201,11 @@ it is the in-app mode `.pdf-shell.fullscreen`, covering Loom's own chrome so
 the text fills the window, and it is now labelled **"just the text"**.
 
 **Not yet done under this standard:** the Library (`/`) and the admin pages
-still sit at the 1100 measure. The shelf is arguably a work surface and would
-take a wider one; that is a look-at-it call, not a mechanical one.
+other than Courses still sit at the 1100 measure. `/admin/courses` took
+`main.workwide` (1680) on 2026-08-22 when it became a master-detail console —
+a catalog table above a detail card, which is a work surface by rule 1. The
+shelf is arguably one too and would take a wider measure; that is a
+look-at-it call, not a mechanical one.
 
 ### 2d. Courses & sections — [src/actions/courses.ts](../src/actions/courses.ts)
 
