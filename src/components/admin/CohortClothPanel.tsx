@@ -8,12 +8,19 @@
 // and thread lists sit below the map. Every quote and sentence is shown as
 // the student's own, with attribution — counted and quoted, never judged.
 //
-// SINCE 2026-08-18 THE CHOOSING IS DONE FROM THE LISTS, not from the drawing
-// (TJ: "all cloths hide/disable trace"). `readSel` still does everything it
-// did — the read-out below, the lit row in each list — but the cloth no longer
-// sets it, because setting it was tracing. The lists carry every concept and
-// every thread, so nothing became unreachable; the copy on this page said
-// "click a concept on the cloth" in four places and now says where to click.
+// CHOOSING HAPPENS IN BOTH PLACES AGAIN (TJ, 2026-08-22: "in the graph the
+// links and the nodes should be selectable", and "selected concepts or links
+// should highlight in the graph").
+//
+// From 2026-08-18 to 2026-08-22 the drawing could neither set the selection
+// nor show it — the lists were the only way in, under the "all cloths
+// hide/disable trace" ruling. That ruling stands for the cloths a student
+// works on, where a node click gathers a pair for a throw; this one is
+// read-only, so nothing competes for the click. `trace` on ClothMap is what
+// scopes it here rather than everywhere.
+//
+// One `readSel` serves the drawing, both lists and the read-out, so a choice
+// made anywhere lights everywhere.
 
 import { useMemo, useState } from "react"
 import ClothMap from "@/components/svg/ClothMap"
@@ -169,7 +176,7 @@ export default function CohortClothPanel({
   } else {
     pane = (
       <p className="empty" style={{ marginTop: "16px" }}>
-        Pick a concept or a thread from the lists below to read it out here.
+        Pick a concept or a thread — on the cloth or in the lists below — to read it out here.
       </p>
     )
   }
@@ -181,14 +188,20 @@ export default function CohortClothPanel({
           <span className="label">The collective cloth</span>
           <span style={{ color: "var(--ink-soft)", fontSize: "13px" }}>
             {state.concepts.length} concepts, {state.edges.length} threads, {state.passages.length} passages.
-            Pick a concept or a thread from the lists below to read it out here.
+            Pick a concept or a thread — on the cloth or in the lists below — to read it out here.
           </span>
         </div>
         <div id="mapWrap">
-          {/* The drawing, and only the drawing. `readSel` is still this
-              panel's — it lights a row in each list below and fills the
-              read-out — but the cloth neither draws it nor sets it. */}
-          <ClothMap state={state} readSel={null} setReadSel={() => {}} />
+          {/* The drawing selects, and shows what is selected (TJ, 2026-08-22:
+              "selected concepts or links should highlight in the graph. in
+              the graph the links and the nodes should be selectable").
+
+              One `readSel` now serves three surfaces at once — the drawing,
+              the two lists, and the read-out — so choosing in any of them
+              lights the others. The panel→drawing direction is new: before
+              this the cloth was passed a hard `null` and could not show a
+              selection even when one existed. */}
+          <ClothMap state={state} readSel={readSel} setReadSel={setReadSel} trace />
         </div>
         {pane}
       </div>
