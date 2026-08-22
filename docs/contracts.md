@@ -779,7 +779,7 @@ directly, and the `source_page` it creates has never carried the foreign key
 | Table | Columns | Keys / notes |
 | --- | --- | --- |
 | `course` | id · slug UNIQUE · name · term `''` · description `''` · isArchived false · createdAt | |
-| `section` | id · courseId CASCADE · slug · name · lead `''` · createdAt | UNIQUE (courseId, slug) |
+| `section` | id · courseId CASCADE · slug · name · lead `''` (legacy text, display fallback since 0028) · leadUserId → user SET NULL · createdAt | UNIQUE (courseId, slug) |
 | `course_membership` | courseId CASCADE · userId CASCADE · sectionId SET NULL · role default `'LEARNER'` · createdAt · **removedAt nullable** | PK (courseId, userId). `removedAt` = soft removal (0013); every membership read filters `IS NULL`. `role = 'FACULTY'` (set via `setMemberRole`, P3.12) grants the course's read-side admin actions; every course carries a `faculty` Section (ruling 18, ensured lazily) |
 | `course_allowed_email` | courseId CASCADE · email · sectionId SET NULL · createdAt | PK (courseId, email). An invitation. Grants app access to that email in **any** course context until deleted |
 

@@ -59,7 +59,19 @@ export const sections = pgTable(
       .references(() => courses.id, { onDelete: "cascade" }),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
+    // Legacy free-text "Instructor of record" (migration 0006). Since
+    // migration 0028 the lead is leadUserId below; this column is read only
+    // as a display fallback for rows written before the reference existed,
+    // and the actions stop writing it (a set reference clears it, so the
+    // two can never disagree).
     lead: text("lead").default("").notNull(),
+    // The section's lead, chosen from the course's FACULTY members (TJ,
+    // 2026-08-21: "the lead should be a dropdown of course faculty").
+    // set-null like courseMemberships.sectionId: deleting the user unsets
+    // the lead rather than deleting the section.
+    leadUserId: text("leadUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (section) => ({

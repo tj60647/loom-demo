@@ -17,9 +17,9 @@ import {
 } from "@/actions/sources"
 import { checkAdmin } from "@/actions/admin"
 import { db } from "@/db"
-import { courseMemberships, sections } from "@/db/schema"
-import { asc, isNull } from "drizzle-orm"
-import { listCourses, firstParam } from "@/lib/courses"
+import { courseMemberships, sections, users } from "@/db/schema"
+import { asc, inArray, isNull } from "drizzle-orm"
+import { listCourses, listCourseFaculty, firstParam } from "@/lib/courses"
 
 type CoursesPageSearchParams = {
   course?: string | string[]
@@ -68,6 +68,25 @@ export default async function AdminCoursesPage({
     ...allCourses.filter((c) => !c.isArchived),
     ...allCourses.filter((c) => c.isArchived),
   ]
+
+  // The selected course's lead machinery (migration 0028): its FACULTY as
+  // the dropdowns' options, and a name for every referenced lead — queried
+  // from users directly, not from the faculty list, because a lead who was
+  // since demoted or removed still has a name the row must say.
+  const selectedSections = selected ? allSections.filter((s) => s.courseId === selected.id) : []
+  const leadIds = [
+    ...new Set(selectedSections.map((s) => s.leadUserId).filter((v): v is string => v !== null)),
+  ]
+  const [facultyOptions, leadRows] = await Promise.all([
+    selected ? listCourseFaculty(selected.id) : Promise.resolve([]),
+    leadIds.length
+      ? db
+          .select({ id: users.id, name: users.name, email: users.email })
+          .from(users)
+          .where(inArray(users.id, leadIds))
+      : Promise.resolve([]),
+  ])
+  const leadName = new Map(leadRows.map((u) => [u.id, u.name || u.email]))
 
   return (
     // `workwide`: the console takes the work-surface measure (globals.css,
@@ -560,6 +579,25 @@ export default async function AdminCoursesPage({
                     <div className="scrollbox" style={{ marginTop: "10px" }}>
                       {courseSectionRows.map((section) => {
                         const count = memberships.filter((m) => m.sectionId === section.id).length
+                        // The reference wins; the free-text column is only a
+                        // display fallback for pre-0028 rows (see schema.ts).
+                        const leadDisplay = section.leadUserId
+                          ? leadName.get(section.leadUserId) ?? null
+                          : section.lead || null
+                        const leadInFaculty =
+                          section.leadUserId !== null &&
+                          facultyOptions.some((f) => f.userId === section.leadUserId)
+                        // The edit select's resting value: the reference when
+                        // it is offerable, the keep-sentinel when there is a
+                        // lead the option list cannot name (legacy text, or a
+                        // demoted member) — updateSection leaves those rows
+                        // untouched — and "no lead" only when there is truly
+                        // none.
+                        const leadDefault = leadInFaculty
+                          ? section.leadUserId!
+                          : section.leadUserId || section.lead
+                            ? "__keep__"
+                            : ""
                         return (
                           <div key={section.id} className="lrow" style={{ padding: "8px 12px" }}>
                             {/* One line per section, the reading rows' shape
@@ -583,7 +621,7 @@ export default async function AdminCoursesPage({
                               >
                                 {section.name}
                               </span>
-                              {section.lead ? (
+                              {leadDisplay ? (
                                 <span
                                   className="hint"
                                   style={{
@@ -595,7 +633,7 @@ export default async function AdminCoursesPage({
                                     margin: 0,
                                   }}
                                 >
-                                  {section.lead}
+                                  {leadDisplay}
                                 </span>
                               ) : null}
                               <span className="pill beaten">{count} learner{count !== 1 ? "s" : ""}</span>
@@ -630,7 +668,46 @@ export default async function AdminCoursesPage({
                                   </div>
                                   <div className="form-row">
                                     <span className="label">Lead</span>
-                                    <input name="lead" defaultValue={section.lead} placeholder="Instructor of record" />
+                                    <select
+                                      // Keyed by its default: after a save the
+                                      // RSC update reconciles the node and an
+                                      // uncontrolled select keeps its old DOM
+                                      // state — which here was "" (No lead), so
+                                      // a follow-up rename would post "" and
+                                      // wipe the lead just set (walked on the
+                                      // running app, 2026-08-21). A changed key
+                                      // remounts it onto the fresh default.
+                                      key={leadDefault}
+                                      name="leadUserId"
+                                      className="tinput inline"
+                                      defaultValue={leadDefault}
+                                      aria-label="Section lead — chosen from this course's faculty"
+                                    >
+                                      {/* A lead the option list cannot name —
+                                          legacy free text, or a member since
+                                          demoted — stays put behind the keep
+                                          sentinel until a real choice is
+                                          made, so a rename cannot wipe it. */}
+                                      {leadDefault === "__keep__" ? (
+                                        <option value="__keep__">
+                                          {section.leadUserId
+                                            ? `${leadName.get(section.leadUserId) ?? "current lead"} — no longer faculty`
+                                            : `${section.lead} — free text`}
+                                        </option>
+                                      ) : null}
+                                      <option value="">No lead</option>
+                                      {facultyOptions.map((f) => (
+                                        <option key={f.userId} value={f.userId}>
+                                          {f.name || f.email}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {facultyOptions.length === 0 ? (
+                                      <p className="hint" style={{ margin: "4px 0 0", fontSize: "13px" }}>
+                                        Leads are chosen from this course&apos;s faculty — promote
+                                        someone on the roster first.
+                                      </p>
+                                    ) : null}
                                   </div>
                                   <button
                                     className="btn mini"
@@ -663,7 +740,27 @@ export default async function AdminCoursesPage({
                   <form action={createSection} className="quietrow" style={{ marginTop: "12px" }}>
                     <input type="hidden" name="courseId" value={course.id} />
                     <input name="name" placeholder="Section name, e.g. Section 1 — Hugh" required />
-                    <input name="lead" placeholder="Lead (optional)" />
+                    {/* The lead is a choice from the course's faculty, not
+                        free text (TJ, 2026-08-21) — createSection validates
+                        the membership again server-side. */}
+                    <select
+                      name="leadUserId"
+                      className="tinput inline"
+                      defaultValue=""
+                      aria-label="Section lead — chosen from this course's faculty"
+                      data-tip={
+                        facultyOptions.length === 0
+                          ? "No faculty in this course yet — promote on the roster, then set the lead"
+                          : "Optional — the course's faculty"
+                      }
+                    >
+                      <option value="">Lead — none</option>
+                      {facultyOptions.map((f) => (
+                        <option key={f.userId} value={f.userId}>
+                          {f.name || f.email}
+                        </option>
+                      ))}
+                    </select>
                     <button className="btn mini" type="submit" data-tip="Create this section in the course">
                       Add Section
                     </button>

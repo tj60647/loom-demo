@@ -144,6 +144,33 @@ export async function listFacultyCourseIds(userId: string): Promise<string[]> {
   return rows.map((row) => row.courseId)
 }
 
+export type CourseFacultyMember = {
+  userId: string
+  name: string | null
+  email: string
+}
+
+/**
+ * The course's FACULTY members with their names — the option list for a
+ * section's lead (sections.leadUserId). Active memberships only, the same
+ * filters listFacultyCourseIds applies from the user's side; ordered by name
+ * so the dropdown reads like a roll.
+ */
+export async function listCourseFaculty(courseId: string): Promise<CourseFacultyMember[]> {
+  return db
+    .select({ userId: courseMemberships.userId, name: users.name, email: users.email })
+    .from(courseMemberships)
+    .innerJoin(users, eq(users.id, courseMemberships.userId))
+    .where(
+      and(
+        eq(courseMemberships.courseId, courseId),
+        eq(courseMemberships.role, "FACULTY"),
+        isNull(courseMemberships.removedAt)
+      )
+    )
+    .orderBy(asc(users.name), asc(users.email))
+}
+
 /**
  * Every course carries a Faculty Section (ruling 18) — the faculty's
  * data-model home; pedagogically they rotate among the discussion sections.
