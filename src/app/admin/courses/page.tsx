@@ -323,7 +323,9 @@ export default async function AdminCoursesPage({
 
                   {readings.length === 0 ? (
                     <p className="hint" style={{ marginTop: "8px" }}>
-                      No readings yet — add one below.
+                      {librarySources.length === 0
+                        ? "No readings yet — and the library is empty. Upload one on the Readings tab."
+                        : "No readings yet — add one below."}
                     </p>
                   ) : (
                     <div className="scrollbox" style={{ marginTop: "10px" }}>
@@ -538,9 +540,15 @@ export default async function AdminCoursesPage({
                       </button>
                     </form>
                   ) : (
+                    // Two different empty states, not one: an exhausted
+                    // library and a bare one. `addable` is empty in both, and
+                    // saying "already in this course" to an admin whose
+                    // library holds nothing is false — and on a fresh install
+                    // it is the only sentence this panel would show.
                     <p className="hint" style={{ marginTop: "12px", marginBottom: 0 }}>
-                      Every library reading is already in this course — upload new ones on the
-                      Readings tab.
+                      {librarySources.length === 0
+                        ? "The library is empty — upload a reading on the Readings tab."
+                        : "Every library reading is already in this course — upload new ones on the Readings tab."}
                     </p>
                   )}
                 </details>
@@ -613,8 +621,15 @@ export default async function AdminCoursesPage({
                                 the three quiet verbs read right, and the edit
                                 foldout drops to its own full-width line below
                                 (.actrow .foldout). The lead hint zeroes the
-                                .card .hint prose margin like the author span
-                                above, for the same 7px reason. */}
+                                .card .hint prose margin for the same reason
+                                the author span above does — though not by the
+                                same amount: measured at 1280, restoring the
+                                margin takes this row 43px → 53px (10px),
+                                where the reading row goes 46 → 53 (7px). Both
+                                land on 53 because the hint's margin box is
+                                what sets the line either way; the rows differ
+                                because this one carries .act links and .rm
+                                where the reading row carries .btn.mini. */}
                             <div className="actrow" style={{ alignItems: "center" }}>
                               <span
                                 style={{
