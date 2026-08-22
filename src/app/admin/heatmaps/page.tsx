@@ -9,6 +9,7 @@ type HeatmapsPageSearchParams = {
   course?: string | string[]
   section?: string | string[]
   source?: string | string[]
+  student?: string | string[]
 }
 
 /**
@@ -23,15 +24,18 @@ type HeatmapsPageSearchParams = {
  * Overlay picker, with the scope strip above choosing the course, the section
  * and the reading.
  *
- * NO STUDENT PICKER, and that is a rule rather than an omission. Ruling 28
- * (docs/loom-model-build.md §Overlays; src/actions/overlays.ts decision 2)
- * puts overlays at "Discussion Section · Cohort" granularity and says nothing
- * here "returns a name, an id, or anything that resolves to one. Counts are of
- * PEOPLE, never of rows that carry an author." A picker naming one student
- * would make this heat resolve to a person, which is the one thing the
- * overlay is built not to do. The Cohort Graph next door names students
- * openly — its passages carry attribution by design — so the two surfaces
- * differ on purpose, not by accident.
+ * THE STUDENT PICKER IS A RULING CHANGE, made deliberately. Ruling 28 put
+ * overlays at "Discussion Section · Cohort" and forbade anything that
+ * resolves to one person; TJ added the picker on 2026-08-22 knowing that, and
+ * docs/loom-model-build.md §Overlays now records the change with its date.
+ *
+ * It widens no access. Open Loom already lets a faculty member read one named
+ * student's whole loom with their highlights on the page (`student-loom-open`,
+ * 2026-08-21) — this is a second door onto work that door already opens. The
+ * SECTION and COHORT bands keep their anonymity untouched: they still count
+ * people and still name nobody, which is what stops a comparison becoming
+ * surveillance. Only the third band names anyone, and only to staff who could
+ * already look.
  */
 export default async function HeatmapsPage({
   searchParams,
@@ -86,7 +90,11 @@ export default async function HeatmapsPage({
 
       {reading ? (
         reading.storageKey ? (
-          <HeatmapReader sourceId={reading.id} title={reading.title} />
+          <HeatmapReader
+            sourceId={reading.id}
+            title={reading.title}
+            studentId={firstParam(resolved.student) ?? null}
+          />
         ) : (
           <div className="card empty" style={{ margin: "20px" }}>
             <span className="cap">

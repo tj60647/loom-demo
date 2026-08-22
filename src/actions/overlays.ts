@@ -15,9 +15,24 @@
  *    protected a *student's* first read, and there is no student viewer left.
  *    Scope is now the peers' coded readings (see below), and no capture check
  *    remains in this file.
- * 2. SECTION AND COHORT ONLY. No per-person band ships in v1, so nothing here
- *    returns a name, an id, or anything that resolves to one. Counts are of
- *    PEOPLE, never of rows that carry an author.
+ * 2. SECTION AND COHORT WERE THE ONLY BANDS — AND A THIRD JOINED THEM.
+ *    Until 2026-08-22 no per-person band shipped: nothing here returned a
+ *    name, an id, or anything that resolved to one, and counts were of PEOPLE
+ *    rather than of rows carrying an author. TJ asked for a student picker on
+ *    the Heatmaps tab that day, so `band: "student"` now exists and DOES
+ *    resolve to one person.
+ *
+ *    What it does not do is widen what staff may see. Open Loom already lets
+ *    a faculty member read one named student's whole loom, highlights on the
+ *    page included (capability `student-loom-open`, ruled 2026-08-21) — so
+ *    this is a second door onto work that door already opens, not a new
+ *    disclosure. The anonymity of the SECTION and COHORT bands is untouched:
+ *    they still count people and still name nobody, which is what kept a
+ *    comparison from becoming surveillance.
+ *
+ *    A student band is refused unless the viewer may see that student — the
+ *    same membership check the other bands run, plus the target being a
+ *    LEARNER of the viewer's own course.
  * 3. SHARED OBJECTS ONLY. Highlight spans, Concept Labels and Descriptions,
  *    Link Labels and Descriptions. Never Notes, Questions, Pull-quote flags,
  *    Passage Tiers, Cloth Titles/Descriptions or Projection text — the margin
@@ -118,10 +133,13 @@ async function peersOf(
   /** Which section, when the viewer chose one. Staff pick any section of the
    *  course; without it this falls back to the viewer's own, which is what a
    *  section band meant before the picker (TJ, 2026-08-08). */
-  sectionId?: string | null
+  sectionId?: string | null,
+  /** Required by `band: "student"`; ignored otherwise. */
+  studentId?: string | null
 ): Promise<string[] | Blocked> {
   const section = sectionId ?? viewer.sectionId
   if (band === "section" && !section) return { blocked: "no-section" }
+  if (band === "student" && !studentId) return { blocked: "no-peers" }
 
   const rows = await db
     .select({ userId: courseMemberships.userId })
@@ -140,7 +158,11 @@ async function peersOf(
         // cohort' would be the instructor pre-coding the text". A positive
         // match cannot rot the same way when another role string appears.
         eq(courseMemberships.role, "LEARNER"),
-        ...(band === "section" ? [eq(courseMemberships.sectionId, section!)] : [])
+        ...(band === "section" ? [eq(courseMemberships.sectionId, section!)] : []),
+        // The student band is the peer query narrowed to one person — so it
+        // inherits every check above, and a target who is not a LEARNER of
+        // this course simply yields nobody rather than an error.
+        ...(band === "student" ? [eq(courseMemberships.userId, studentId!)] : [])
       )
     )
 
@@ -169,7 +191,8 @@ async function codedBy(userIds: string[]): Promise<string[]> {
 export async function getPassagesOverlay(
   sourceIdRaw: string,
   band: OverlayBand = "section",
-  sectionId?: string | null
+  sectionId?: string | null,
+  studentId?: string | null
 ): Promise<PassagesOverlay> {
   const sourceId = (sourceIdRaw ?? "").trim()
   if (!sourceId) return emptyPassagesOverlay(band, "not-coded")
@@ -182,7 +205,7 @@ export async function getPassagesOverlay(
   // no student here to protect. An instructor seeing where a section marked is
   // the job (they already have /admin/aggregate, ungated).
 
-  const peers = await peersOf(viewer, band, sectionId)
+  const peers = await peersOf(viewer, band, sectionId, studentId)
   if (isBlocked(peers)) return emptyPassagesOverlay(band, peers.blocked)
   if (peers.length === 0) return emptyPassagesOverlay(band, "no-peers")
 

@@ -19,18 +19,25 @@ const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: fal
 export default function HeatmapReader({
   sourceId,
   title,
+  studentId,
 }: {
   sourceId: string
   title: string
+  /** Chosen in the scope strip; null means the whole class, by band. */
+  studentId: string | null
 }) {
   return (
     <PdfViewer
       url={`/api/readings/${sourceId}`}
       sourceName={title}
       sourceId={sourceId}
-      // No capture side here: this tab reads a cohort's marks, it does not
-      // make any. `workOpen` false and no toggle means the Your-work panel
-      // never opens, so nothing offers to write into the viewer's own loom.
+      // Nothing of the reader's own: no Your work panel or toggle, no PDF
+      // download, and the margin cards start hidden behind their own toggle
+      // (TJ, 2026-08-22: "'your work' does not make sense to show, nor
+      // download" — and "the heatmap should have a 'passage card' visibility
+      // toggle. default is hidden").
+      noOwnWork
+      overlayStudentId={studentId}
       workOpen={false}
       onToggleWork={() => {}}
     />

@@ -129,14 +129,23 @@ export default function CohortClothPanel({
    *
    * So: act only when the chosen student actually changes.
    */
-  const appliedEmphasis = useRef<string | null | undefined>(undefined)
+  // Seeded with null, NOT undefined: mounting with no student chosen is not a
+  // change, so the effect must do nothing. Seeded undefined it ran once on
+  // every mount and cleared — and because the clear is deferred by a tick, a
+  // concept clicked immediately after load was wiped a moment later. That is
+  // a race, so it passed alone and failed under a loaded suite, which is the
+  // worst way for it to be found.
+  const appliedEmphasis = useRef<string | null | undefined>(null)
   useEffect(() => {
     if (appliedEmphasis.current === emphasisUserId) return
-    appliedEmphasis.current = emphasisUserId
+    // Stamped inside the callback, not before it — see the same guard in
+    // PdfViewer: set first, a StrictMode double-invoke cancels the first
+    // run's timer and then skips the second, so nothing ever applies.
     // Deferred rather than set synchronously in the effect body, the way
     // ReadingsProvider and LoomProvider already do it: a setState in an
     // effect body cascades renders, and eslint fails the build for it.
     const apply = window.setTimeout(() => {
+      appliedEmphasis.current = emphasisUserId
       if (!emphasisUserId) {
         setSelConcepts([])
         setSelThreads([])

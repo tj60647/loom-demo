@@ -43,7 +43,7 @@ const SCOPES: Record<
    * overlays at Section · Cohort granularity and forbids anything that
    * "resolves to one" person (docs/loom-model-build.md §Overlays).
    */
-  "/admin/heatmaps": { section: true, reading: true, student: false, oneReading: true },
+  "/admin/heatmaps": { section: true, reading: true, student: true, oneReading: true },
 }
 const DEFAULT_SCOPE = { section: true, reading: false, student: false }
 

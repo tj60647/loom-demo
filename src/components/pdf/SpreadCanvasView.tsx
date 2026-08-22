@@ -203,6 +203,7 @@ export default function SpreadCanvasView({
   onEditNote,
   draft,
   onAspect,
+  heatPages = [],
   zoomMultiplier,
   onZoomMultiplier,
   onZoomRange,
@@ -249,6 +250,8 @@ export default function SpreadCanvasView({
   draft?: { passage: Passage; card: React.ReactNode } | null;
   onAspect: (a: number) => void;
   /** The toolbar's zoom multiplier (− / + / Fit drive it): 1 = the whole canvas fits the stage. */
+  /** The overlay's per-page spans, for the page-level wash at fit-all. */
+  heatPages?: { pageNumber: number; spans: { count: number }[] }[];
   zoomMultiplier: number;
   onZoomMultiplier: (m: number) => void;
   /** Reports this document's zoom ceiling (a multiplier), so the toolbar's
@@ -302,6 +305,8 @@ export default function SpreadCanvasView({
    * here" (TJ, 2026-08-22, asking for the canvas view on the Heatmaps tab).
    */
   const [heatRects, setHeatRects] = useState<Record<number, HeatRect[]>>({});
+
+
   const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
   const [passageCardHeights, setPassageCardHeights] = useState<Record<string, number>>({});
   const [activeAddPassageId, setActiveAddPassageId] = useState<string | null>(null);
@@ -1372,6 +1377,41 @@ export default function SpreadCanvasView({
     return out;
   }, [searchRects, pageView]);
 
+  /**
+   * WHERE THE MARKS ARE, WITHOUT READING THE WORDS.
+   *
+   * Span rects need a live text layer, and at fit-all every slot is an
+   * impostor — so a reader who opened Canvas first saw a clean 60-page
+   * contact sheet with no heat anywhere, which says "nobody marked this"
+   * rather than "no page here has been measured" (TJ, 2026-08-22: "why dont i
+   * see highlights?").
+   *
+   * At this zoom the words are unreadable anyway, so the honest mark is the
+   * PAGE: each one that carries heat is washed at the step of its densest
+   * span. Pages whose layer HAS been up keep their precise rects and take no
+   * wash — otherwise the two would stack and the same passage would read
+   * hotter for having been visited.
+   */
+  const pageHeat = useMemo(() => {
+    if (!layout) return [];
+    const out: { x: number; y: number; w: number; h: number; level: number }[] = [];
+    for (const page of heatPages) {
+      const p = page.pageNumber;
+      if (heatRects[p]?.length) continue;
+      const level = Math.min(5, Math.max(1, ...page.spans.map((sp) => sp.count)));
+      const s2 = layout.spreads[Math.floor((p - 1) / 2)];
+      if (!s2) continue;
+      out.push({
+        x: pageX(layout, s2, p, basePageWidth),
+        y: s2.y,
+        w: basePageWidth,
+        h: layout.unitH,
+        level,
+      });
+    }
+    return out;
+  }, [heatPages, heatRects, layout, basePageWidth]);
+
   /** Heat for pages whose text layer is gone — the same rule, same reason. */
   const keptHeatMarks = useMemo(() => {
     const out: HeatRect[] = [];
@@ -1539,6 +1579,16 @@ export default function SpreadCanvasView({
             the page, not furniture above it. aria-hidden like the leaders —
             the passage is reachable from its card and from Your work, and
             this is a redraw of a mark, not a second control. */}
+        {/* The page-level wash: pages that carry marks but have never been
+            measured. Painted first, under everything. */}
+        {pageHeat.length > 0 && (
+          <svg className="pdf-page-heat" width={layout.canvasW} height={layout.canvasH} aria-hidden="true">
+            {pageHeat.map((m, i) => (
+              <rect key={i} x={m.x} y={m.y} width={m.w} height={m.h} data-heat={m.level} />
+            ))}
+          </svg>
+        )}
+
         {/* Redrawn heat, painted BEFORE the passage marks so a capture still
             sits on top of the section's wash — the same order the live text
             layer uses, where heat is marked first and own highlights nest

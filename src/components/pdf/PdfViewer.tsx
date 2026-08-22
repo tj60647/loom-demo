@@ -61,6 +61,29 @@ interface PdfViewerProps {
    * knows exactly (TJ, 2026-08-09).
    */
   onPageChange?: (pageNumber: number) => void;
+  /**
+   * NOTHING OF THE READER'S OWN. For a surface that reads someone else's
+   * marks rather than making any — the Heatmaps tab (TJ, 2026-08-22: "in the
+   * heatmaps view, 'your work' does not make sense to show, nor download").
+   *
+   * Withholds the Your work panel and its toggle, the PDF download, and the
+   * margin rail cards. The reading is the cohort's here; a panel of your own
+   * captures beside it, with a `remove passage` on each, is an invitation to
+   * edit a loom you did not come to look at.
+   *
+   * Your own HIGHLIGHTS stay on the text: they are marks on the page rather
+   * than a panel about you, and "did anyone else mark the words I marked?" is
+   * the question the overlay exists to answer.
+   */
+  noOwnWork?: boolean;
+  /**
+   * A student chosen OUTSIDE the viewer — the Heatmaps tab's own picker in
+   * the scope strip (TJ, 2026-08-22). When set, the overlay reads that one
+   * person's marks instead of a band, and the in-toolbar Overlay picker steps
+   * aside: two controls arguing over the same wash would be the incongruity
+   * the scope strip exists to avoid.
+   */
+  overlayStudentId?: string | null;
   /** Whether Your work — this reading's Capture Log — is slid out. */
   workOpen?: boolean;
   /** Slide it out, or send it back. Since the 2026-08-08 merge the text and
@@ -137,7 +160,7 @@ type HighlightEntry = {
 };
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
-  onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel }: PdfViewerProps) {
+  onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel, noOwnWork = false, overlayStudentId = null }: PdfViewerProps) {
   // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the
   // student's highlights, rail cards, search and page-turning all stay — they
   // are the mode — while the capture affordance never appears and the rail
@@ -187,11 +210,22 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * the open spread drawn as a card beside its page. Off by default and not
    * persisted — the same standing as viewMode itself.
    */
-  // The rails stand permanently (TJ, 2026-08-17). The Cards toggle is gone:
-  // a control that hides the margin is a control that hides where the work
-  // is. Kept as a name rather than inlined `true` so the three places that
-  // ask "are the margins showing?" still read as one decision.
-  const railsOn = true;
+  /**
+   * ARE THE MARGIN CARDS SHOWING?
+   *
+   * On the reading station they stand permanently (TJ, 2026-08-17): "a
+   * control that hides the margin is a control that hides where the work is",
+   * and the Cards toggle went with that ruling.
+   *
+   * `noOwnWork` inverts both halves of that reasoning. The margin there is
+   * not where YOUR work is — it is someone else's, on a page you came to read
+   * the cohort's heat on — so the cards start hidden and a toggle brings them
+   * back (TJ, 2026-08-22: "the heatmap should have a 'passage card'
+   * visibility toggle. default is hidden"). One name still, so the four
+   * places that ask the question read one decision.
+   */
+  const [cardsShown, setCardsShown] = useState(false);
+  const railsOn = noOwnWork ? cardsShown : true;
   // Covers the whole window, chrome included — the reading takes the screen.
   const [isFullscreen, setIsFullscreen] = useState(false);
   /**
@@ -1021,7 +1055,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   useEffect(() => {
     if (!overlayBand || !sourceId) return;
     let cancelled = false;
-    getPassagesOverlay(sourceId, overlayBand, overlaySection || null)
+    getPassagesOverlay(
+      sourceId,
+      overlayBand,
+      overlaySection || null,
+      overlayBand === "student" ? overlayStudentId : null
+    )
       .then((data) => { if (!cancelled) setOverlay(data); })
       .catch((error) => {
         // A failed comparison is not a failed reading: drop the heat, leave
@@ -1031,7 +1070,36 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       })
       .finally(() => { if (!cancelled) setOverlayBusy(false); });
     return () => { cancelled = true; };
-  }, [overlayBand, overlaySection, sourceId, ownCaptureCount]);
+  }, [overlayBand, overlaySection, sourceId, ownCaptureCount, overlayStudentId]);
+
+  /**
+   * The strip's student picker drives the wash directly: choosing a name
+   * turns the overlay on for that person, and clearing it puts the wash away
+   * rather than silently falling back to a band nobody asked for.
+   *
+   * Deferred, like every other state change this file makes from an effect.
+   */
+  // Seeded null for the same reason CohortClothPanel's twin is: mounting with
+  // no student chosen is not a change, and turning an overlay off that was
+  // never on is work with a race attached.
+  const appliedStudent = useRef<string | null | undefined>(null);
+  useEffect(() => {
+    if (appliedStudent.current === overlayStudentId) return;
+    // The ref is stamped INSIDE the callback, not before it. Stamped first, a
+    // StrictMode double-invoke defeated the guard: the first run scheduled
+    // and its cleanup cancelled, and the second run saw the ref already
+    // matching and scheduled nothing — so the band was never set at all.
+    const apply = window.setTimeout(() => {
+      appliedStudent.current = overlayStudentId;
+      if (overlayStudentId) {
+        chooseOverlayBand("student", null);
+      } else {
+        setOverlayBand(null);
+        setOverlay(null);
+      }
+    }, 0);
+    return () => window.clearTimeout(apply);
+  }, [overlayStudentId, chooseOverlayBand]);
 
   // Find in this reading: the effect only schedules the debounced fetch —
   // state resets happen in the handlers (close, clear), never synchronously
@@ -2425,6 +2493,26 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           stroke-width: 1;
           vector-effect: non-scaling-stroke;
         }
+        /* The page-level wash — a whole page tinted at the step of its
+           densest span, for pages no text layer has measured. Deliberately
+           fainter than a span mark at the same step: it is a claim about the
+           page, not about any word on it. */
+        .pdf-page-heat {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          overflow: visible;
+        }
+        .pdf-page-heat rect {
+          fill: rgba(var(--heat-rgb, 64, 84, 112), 0.07);
+          stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.35);
+          stroke-width: 1;
+          vector-effect: non-scaling-stroke;
+        }
+        .pdf-page-heat rect[data-heat="2"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.12); }
+        .pdf-page-heat rect[data-heat="3"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.18); }
+        .pdf-page-heat rect[data-heat="4"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.24); }
+        .pdf-page-heat rect[data-heat="5"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.30); }
         .pdf-kept-heat rect[data-heat="2"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.20); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.55); }
         .pdf-kept-heat rect[data-heat="3"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.28); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.70); }
         .pdf-kept-heat rect[data-heat="4"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.36); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.82); }
@@ -2734,7 +2822,18 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               reader's eye at the exact moment their attention was already
               moving. Filled-vs-ghost says which state it is in — the same way
               Page/Strip/Matrix do — and aria-expanded says it properly. */}
-          <button
+          {noOwnWork && (
+            <button
+              className={`btn mini${cardsShown ? "" : " ghost"}`}
+              onClick={() => setCardsShown((v) => !v)}
+              aria-pressed={cardsShown}
+              aria-label="Show the passage cards in the margin"
+              data-tip="the cards for each marked passage, in the margin"
+            >
+              {isNarrow ? "▤" : "Passage cards"}
+            </button>
+          )}
+          {!noOwnWork && <button
             id="yourwork-toggle"
             ref={workToggleRef}
             className={`btn mini${workOpen ? "" : " ghost"}`}
@@ -2747,7 +2846,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             {isNarrow
               ? (workCount ? `☰ ${workCount}` : "☰")
               : (workCount ? `Your work · ${workCount}` : "Your work")}
-          </button>
+          </button>}
         </div>
 
         {!isNarrow && (
@@ -2881,7 +2980,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               here because they hold their own learner surfaces alongside the
               faculty view. No names and no third band, so nothing here
               resolves to a person. Off until asked for. */}
-          {sourceId && isStaff && (
+          {sourceId && isStaff && !overlayStudentId && (
             <div className="pdf-overlay-ctl" role="group" aria-label="Compare your marks with others">
               {!isNarrow && <span className="label">Overlay</span>}
               {/* A picker, not two buttons (TJ, 2026-08-08): faculty teach across
@@ -2890,7 +2989,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               <select
                 className="tinput inline"
                 aria-label="Which section to compare"
-                value={overlayBand ? overlaySection : "off"}
+                /* "all" for the cohort band, not the empty string it stores:
+                   `overlaySection` is "" for a cohort comparison, no option
+                   carries that value, and the browser fell back to the first
+                   one — so the control read "off" while the wash was on and
+                   the status bar was reporting it (TJ saw exactly this on the
+                   Heatmaps tab, 2026-08-22). */
+                value={overlayBand === "cohort" ? "all" : overlayBand ? overlaySection : "off"}
                 onChange={(e) => {
                   const v = e.target.value;
                   if (v === "off") { setOverlayBand(null); setOverlay(null); return; }
@@ -2954,7 +3059,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               and a link is the thing a browser already knows how to resume,
               copy and open in a new tab. `.btn.mini` so it sits in the row as
               a peer of its neighbours rather than as prose wearing a border. */}
-          {sourceId && (
+          {sourceId && !noOwnWork && (
             <a
               className="btn ghost mini"
               href={`/api/readings/${sourceId}?download=1`}
@@ -3261,6 +3366,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               zooms; the toolbar's − / + / Fit drive the same transform. */}
           {viewMode === "matrix" && (
             <SpreadCanvasView
+              /* The overlay's per-page spans, so a page that carries marks is
+                 washed even when no text layer has ever measured it — which
+                 at fit-all is every page. */
+              heatPages={overlay?.pages ?? []}
               pdf={pdfProxy}
               numPages={numPages ?? 0}
               basePageWidth={matrixBaseWidth}
@@ -3303,7 +3412,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           40ms later, and scrollIntoView on an element with no layout box
           silently does nothing, which is how someone who pressed "In your
           work" landed at the top of the list instead of on their passage. */}
-      {workPanel && (
+      {workPanel && !noOwnWork && (
         <aside
           id="yourwork"
           className="yourwork"
