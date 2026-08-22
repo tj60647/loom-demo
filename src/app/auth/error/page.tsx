@@ -1,5 +1,6 @@
 import Link from "next/link"
 import GithubSignInButton from "@/components/ui/GithubSignInButton"
+import WrongSiteHint from "@/components/ui/WrongSiteHint"
 import { ROSTER_CONTACT_EMAIL, signInMessage } from "@/lib/signIn"
 
 /**
@@ -45,6 +46,10 @@ export default async function AuthErrorPage({ searchParams }: AuthErrorPageProps
             address is on your github account.
           </span>
         )}
+
+        {/* Every code on this page is a refusal, so the wrong-site pointer
+            (when the deployment shows one at all) belongs on all of them. */}
+        <WrongSiteHint />
 
         <div style={{ marginTop: "20px", display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap" }}>
           {message.retry && <GithubSignInButton className="btn" />}

@@ -3,6 +3,7 @@ import GithubSignInButton from "@/components/ui/GithubSignInButton"
 import GuestEmailSignIn from "@/components/ui/GuestEmailSignIn"
 import NoGithubAccountHelp from "@/components/ui/NoGithubAccountHelp"
 import PreviewDoor from "@/components/ui/PreviewDoor"
+import WrongSiteHint from "@/components/ui/WrongSiteHint"
 import { isBranchPreview, previewLoginNeedsKey } from "@/lib/previewLogin"
 import { emailSignInConfigured } from "@/lib/auth"
 import { ROSTER_CONTACT_EMAIL, signInMessage } from "@/lib/signIn"
@@ -58,6 +59,10 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
             which email address is on your github account.
           </span>
         )}
+
+        {/* Only when a sign-in has bounced back here: the plain invitation is
+            not a refusal, and the site-wide dev indication already covers it. */}
+        {failed && <WrongSiteHint />}
 
         {/* On a preview the GitHub button is not merely useless, it is
             misleading: it is the obvious thing to press and it fails on

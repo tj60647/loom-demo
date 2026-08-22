@@ -24,6 +24,7 @@ import {
   normalizeEmail,
   resolveIdentityEmail,
   SIGN_IN_ERROR,
+  showWrongSiteHint,
   signInErrorUrl,
   signInMessage,
   verifiedCandidates,
@@ -267,6 +268,16 @@ async function main() {
     signInErrorUrl(SIGN_IN_ERROR.noVerifiedEmail),
     "/auth/error?error=NoVerifiedEmail"
   )
+
+  console.log("\nthe wrong-site pointer — production never shows it, everywhere else does")
+
+  check("confirmed production shows no pointer", showWrongSiteHint({ VERCEL_ENV: "production" }), false)
+  check("the tester site and every branch preview show it", showWrongSiteHint({ VERCEL_ENV: "preview" }), true)
+  check("local dev, with no VERCEL_ENV at all, shows it", showWrongSiteHint({}), true)
+  // The same direction check-preview-login walks: a value that is not exactly
+  // "production" is not production, and the cost of being wrong here is one
+  // redundant sentence, not a wrong-site pointer on the production screen.
+  check("a misspelt value fails toward showing", showWrongSiteHint({ VERCEL_ENV: "Production" }), true)
 
   if (process.argv.includes("--db")) await checkRoster()
 
