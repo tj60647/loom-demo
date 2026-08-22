@@ -1614,6 +1614,13 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .invitefold summary::-webkit-details-marker,.panelfold summary::-webkit-details-marker{display:none}
 .invitefold summary .tw,.panelfold summary .tw{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--ochre);transition:transform .15s}
 .invitefold[open] summary .tw,.panelfold[open] summary .tw{transform:rotate(90deg)}
+/* The count beside a panel heading is a `.hint`, and `.card .hint` carries
+   `margin:2px 0 14px` for prose (line 279). In a centred flex summary the
+   MARGIN box is what centres, so the count sat 6.0px above the heading and
+   11.5px of a 35.5px summary was its margin (measured on the running app at
+   1280: summary 35.5, h3 24, centres 812.4 vs 818.4). Same trap the reading
+   author and section lead spans hit inline. */
+.panelfold > summary .hint{margin:0}
 
 /* ===== the course catalog (admin/courses) ===== */
 /* The roster's table idiom on the course catalog: ONE grid template lays the
