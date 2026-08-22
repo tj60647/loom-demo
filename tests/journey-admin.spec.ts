@@ -122,10 +122,13 @@ test("the cohort map renders the section's woven concepts", async ({ page }) => 
   // label, not the hidden <title> tooltip.
   await expect(page.locator("svg text", { hasText: "object worlds" }).first()).toBeVisible({ timeout: 20_000 })
 
-  // The cloth's material is listed, not only drawn: every concept and every
-  // thread, each attributed to its student.
+  // The cloth's material is listed, not only drawn: every concept, and every
+  // thread as the thread itself. The thread list stopped carrying each
+  // sentence on 2026-08-22 — it is a list of 67 you scan, and the description
+  // belongs to the one you pick — so what is asserted here is the pair of
+  // ends every card still names.
   await expect(page.locator(".crow", { hasText: "object worlds" }).first()).toBeVisible()
-  await expect(page.locator(".thread .sent").first()).toBeVisible()
+  await expect(page.locator(".canvasmenu.atright .thread .trip").first()).toBeVisible()
 
   // A concept reads out on the canvas — who owns it, its counts — and opens
   // the passages behind it, the student's own captures with attribution,

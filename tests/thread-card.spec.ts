@@ -111,15 +111,32 @@ test.describe("The thread card", () => {
       ).toHaveCount(0)
     })
 
-    test("/admin/aggregate draws the same card, and says whose each thread is", async ({ page }) => {
+    test("/admin/aggregate draws the same card, reduced, and says whose each thread is when asked", async ({ page }) => {
       await page.goto("/admin/aggregate")
       await expect(page.locator(".thread").first()).toBeVisible({ timeout: 30_000 })
+      // The invariant this file exists for holds on the reduced card too: the
+      // pill is what `compact` keeps.
       await pillsMatchLabels(page, "/admin/aggregate")
 
-      // Attribution is a PROP of the shared card here, not a different row —
-      // this is the only surface with more than one student in it.
-      const n = await page.locator(".thread[data-edge-id]").count()
-      await expect(page.locator(".thread .tmeta .cap")).toHaveCount(n)
+      // THE LIST IS COMPACT since 2026-08-22 (TJ: "the thread cards need to
+      // be simpler, jsut show the thread, not description or contributor,
+      // that will show up below when selected"). So the list's cards carry
+      // neither sentence nor attribution — asserted as ZERO rather than left
+      // unstated, since "no .sent anywhere" would otherwise let the shared
+      // helper's sentence checks pass vacuously here.
+      const list = page.locator(".canvasmenu.atright")
+      const n = await list.locator(".thread[data-edge-id]").count()
+      expect(n, "no thread cards — the fixture is empty").toBeGreaterThan(0)
+      await expect(list.locator(".thread .sent")).toHaveCount(0)
+      await expect(list.locator(".thread .tmeta .cap")).toHaveCount(0)
+
+      // "Below when selected" is the other half of the same sentence, and it
+      // is where attribution went — this is still the only surface with more
+      // than one student in it, so it must still say whose a thread is.
+      await list.locator(".thread[data-edge-id]").first().click()
+      const readout = page.locator(".canvasfoot")
+      await expect(readout.locator(".threadhead")).toBeVisible()
+      await expect(readout.locator(".threadhead .n")).not.toBeEmpty()
     })
   })
 })

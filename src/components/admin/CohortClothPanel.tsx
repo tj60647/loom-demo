@@ -33,7 +33,7 @@
 // One `readSel` serves the drawing, both lists and the read-out, so a choice
 // made anywhere lights everywhere.
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import ClothMap from "@/components/svg/ClothMap"
 import type { Passage, LoomState } from "@/lib/types"
 import ConceptName from "@/components/ui/ConceptName"
@@ -42,6 +42,21 @@ import { labelOf } from "@/lib/linkResolve"
 import { conceptNameText } from "@/lib/conceptName"
 
 type ReadSel = { type: "concept" | "edge" | "hub"; id?: string; ids?: string[] } | null
+
+type ConceptSort = "name" | "author" | "passages" | "crossings"
+type ThreadSort = "from" | "author" | "described"
+
+const CONCEPT_SORTS: { value: ConceptSort; label: string }[] = [
+  { value: "name", label: "name" },
+  { value: "author", label: "student" },
+  { value: "passages", label: "passages" },
+  { value: "crossings", label: "crossings" },
+]
+const THREAD_SORTS: { value: ThreadSort; label: string }[] = [
+  { value: "from", label: "from" },
+  { value: "author", label: "student" },
+  { value: "described", label: "described" },
+]
 
 /** The panels' instructions, shown on hover rather than standing on the map. */
 const CONCEPTS_TIP =
@@ -63,6 +78,15 @@ export default function CohortClothPanel({
   passagesUnavailable?: boolean
 }) {
   const [readSel, setReadSel] = useState<ReadSel>(null)
+  // Sort and filter per panel (TJ, 2026-08-22: "let the concept cards be
+  // sortable and filterable. the threads panel is the same"). Local state,
+  // not the URL: the course and section in the query string are the SCOPE —
+  // what the map is of — and how a reader has arranged one of its lists is
+  // not something to carry into a link or a back button.
+  const [conceptSort, setConceptSort] = useState<ConceptSort>("name")
+  const [conceptQuery, setConceptQuery] = useState("")
+  const [threadSort, setThreadSort] = useState<ThreadSort>("from")
+  const [threadQuery, setThreadQuery] = useState("")
 
   const conceptById = useMemo(
     () => new Map(state.concepts.map((c) => [c.id, c])),
@@ -80,7 +104,85 @@ export default function CohortClothPanel({
     return map
   }, [state.passages])
 
-  const who = (userId: string) => names[userId] ?? "unknown"
+  // useCallback so the sort/filter memos below can depend on it honestly
+  // rather than on `names` while calling this — the two would drift the day
+  // someone changed what "unknown" means.
+  const who = useCallback((userId: string) => names[userId] ?? "unknown", [names])
+
+  /** How many threads cross each concept. Once, not per row: sorting by it
+   *  otherwise costs concepts × edges on every keystroke in the filter. */
+  const degree = useMemo(() => {
+    const d = new Map<string, number>()
+    state.edges.forEach((e) => {
+      d.set(e.fromId, (d.get(e.fromId) ?? 0) + 1)
+      d.set(e.toId, (d.get(e.toId) ?? 0) + 1)
+    })
+    return d
+  }, [state.edges])
+
+  // Filter then sort, both panels. The filter is a plain substring over what
+  // the row SHOWS — its name and its student — because that is what a reader
+  // is looking at when they decide to narrow it.
+  const shownConcepts = useMemo(() => {
+    const q = conceptQuery.trim().toLowerCase()
+    const rows = q
+      ? state.concepts.filter(
+          (c) =>
+            conceptNameText(c).toLowerCase().includes(q) || who(c.userId).toLowerCase().includes(q)
+        )
+      : [...state.concepts]
+    // Name is the tiebreak everywhere, so equal counts read alphabetically
+    // rather than in the query's arbitrary row order.
+    const byName = (a: typeof rows[number], b: typeof rows[number]) =>
+      conceptNameText(a).localeCompare(conceptNameText(b))
+    return rows.sort((a, b) => {
+      switch (conceptSort) {
+        case "author":
+          return who(a.userId).localeCompare(who(b.userId)) || byName(a, b)
+        case "passages":
+          return (
+            (passagesByConcept.get(b.id)?.length ?? 0) - (passagesByConcept.get(a.id)?.length ?? 0) ||
+            byName(a, b)
+          )
+        case "crossings":
+          return (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0) || byName(a, b)
+        default:
+          return byName(a, b)
+      }
+    })
+  }, [state.concepts, conceptQuery, conceptSort, passagesByConcept, degree, who])
+
+  const shownThreads = useMemo(() => {
+    const nameOf = (id: string) => {
+      const c = conceptById.get(id)
+      return c ? conceptNameText(c) : "?"
+    }
+    const q = threadQuery.trim().toLowerCase()
+    const rows = q
+      ? state.edges.filter((e) =>
+          [nameOf(e.fromId), nameOf(e.toId), labelOf(e, state.links), e.sentence, who(e.userId)]
+            .join(" ")
+            .toLowerCase()
+            .includes(q)
+        )
+      : [...state.edges]
+    const byFrom = (a: typeof rows[number], b: typeof rows[number]) =>
+      nameOf(a.fromId).localeCompare(nameOf(b.fromId)) || nameOf(a.toId).localeCompare(nameOf(b.toId))
+    return rows.sort((a, b) => {
+      switch (threadSort) {
+        case "author":
+          return who(a.userId).localeCompare(who(b.userId)) || byFrom(a, b)
+        // Described first — an unsaid thread is the one needing attention, so
+        // it is findable at the other end of the same sort.
+        case "described":
+          return (
+            Number(!!b.sentence.trim()) - Number(!!a.sentence.trim()) || byFrom(a, b)
+          )
+        default:
+          return byFrom(a, b)
+      }
+    })
+  }, [state.edges, state.links, threadQuery, threadSort, conceptById, who])
 
   const selectConcept = (id: string) => {
     setReadSel(readSel?.type === "concept" && readSel.id === id ? null : { type: "concept", id })
@@ -267,11 +369,35 @@ export default function CohortClothPanel({
               Concepts <span className="n">{state.concepts.length}</span>
             </h2>
           </summary>
+          <div className="canvasfilter">
+            <input
+              className="tinput"
+              type="search"
+              value={conceptQuery}
+              placeholder="filter concepts"
+              aria-label="Filter concepts by name or student"
+              onChange={(e) => setConceptQuery(e.target.value)}
+            />
+            <select
+              className="tinput inline"
+              value={conceptSort}
+              aria-label="Sort concepts"
+              onChange={(e) => setConceptSort(e.target.value as ConceptSort)}
+            >
+              {CONCEPT_SORTS.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          </div>
           {state.concepts.length === 0 ? (
             <p className="empty">Nothing woven yet.</p>
+          ) : shownConcepts.length === 0 ? (
+            // A filter that matches nothing says so, rather than showing an
+            // empty box that reads as "the cohort wove nothing".
+            <p className="empty">No concept matches &ldquo;{conceptQuery.trim()}&rdquo;.</p>
           ) : (
             <div className="scrollbox">
-              {state.concepts.map((c) => {
+              {shownConcepts.map((c) => {
                 const count = passagesByConcept.get(c.id)?.length ?? 0
                 return (
                   <div
@@ -297,24 +423,47 @@ export default function CohortClothPanel({
               Threads <span className="n">{state.edges.length}</span>
             </h2>
           </summary>
+          <div className="canvasfilter">
+            <input
+              className="tinput"
+              type="search"
+              value={threadQuery}
+              placeholder="filter threads"
+              aria-label="Filter threads by concept, label, sentence or student"
+              onChange={(e) => setThreadQuery(e.target.value)}
+            />
+            <select
+              className="tinput inline"
+              value={threadSort}
+              aria-label="Sort threads"
+              onChange={(e) => setThreadSort(e.target.value as ThreadSort)}
+            >
+              {THREAD_SORTS.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          </div>
           {state.edges.length === 0 ? (
             <p className="empty">Nothing thrown yet.</p>
+          ) : shownThreads.length === 0 ? (
+            <p className="empty">No thread matches &ldquo;{threadQuery.trim()}&rdquo;.</p>
           ) : (
             <div className="scrollbox">
-              {/* THE SHARED CARD (docs/thread-card.md). `by` and `onSelect`
-                  are props rather than a mode of their own: this is the only
-                  surface with more than one student in it, and the only one
-                  where pressing a thread reads it out — neither makes it a
-                  different card. It also picks up the keyboard for free, which
-                  a bare div with an onClick never had. */}
-              {state.edges.map((e) => (
+              {/* THE SHARED CARD (docs/thread-card.md), `compact` here: from,
+                  label, to and the state pill, and no sentence — this is a
+                  list of 67 you scan, and the description belongs to the one
+                  you pick, in the read-out below. `by` is dropped for the
+                  same reason and needs no flag, being opt-in already.
+                  `onSelect` still makes the whole card a target, which is
+                  also where its keyboard comes from. */}
+              {shownThreads.map((e) => (
                 <ThreadCard
                   key={e.id}
                   thread={e}
                   from={conceptById.get(e.fromId)}
                   to={conceptById.get(e.toId)}
                   links={state.links}
-                  by={who(e.userId)}
+                  compact
                   selected={readSel?.type === "edge" && readSel.id === e.id}
                   onSelect={() => selectEdge(e.id)}
                 />

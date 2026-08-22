@@ -89,6 +89,18 @@ best of the six, made the only one.
 Selection (`selected` + `onSelect`) and attribution (`by`) are **props, not
 modes** — A4 needs both on a read card, and neither is a different card.
 
+**`compact`** (added 2026-08-22) is the same: a prop, not a mode. It withholds
+`.sent`, and the caller that sets it also stops passing `by` — so the card
+reduces to `.trip` plus `.tmeta`'s state pill. The Cohort Graph's Threads
+panel is the only user: it is a 316px list of every thread in the course,
+scanned to find one, and a description on each made a wall (TJ, 2026-08-22:
+"the thread cards need to be simpler, jsut show the thread, not description or
+contributor, that will show up below when selected"). The sentence and the
+student are shown in that page's read-out when a card is picked.
+
+The state pill is NOT optional under `compact`. It is the invariant the card
+exists to hold, and it is what the cloth's solid-vs-dashed arcs agree with.
+
 ### What it fixes by existing
 
 - One pill vocabulary: `.v` in the trip, `.pill` in the meta. `.vpill` is left
