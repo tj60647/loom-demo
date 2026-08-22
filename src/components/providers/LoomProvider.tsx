@@ -67,7 +67,11 @@ export interface LoomContextType {
   /** `scoped` in the shape the tabs consume, so they can swap it for `state`. */
   scopedState: LoomState
   isLoading: boolean
-  /** Signed-in student's display name — graph.student in the export contract. */
+  /**
+   * The display name of whoever OWNS this loom — graph.student in the export
+   * contract. The signed-in user normally; inside Open Loom the student being
+   * viewed, so an export names its subject rather than its downloader.
+   */
   studentName: string
   addConcept: (label: string, def?: string, note?: string) => Promise<Concept>
   editConcept: (id: string, data: Partial<{label: string, def: string, note: string}>) => Promise<void>
@@ -193,7 +197,20 @@ export const LoomContext = createContext<LoomContextType | null>(null)
 
 const blankState = (): LoomState => ({ concepts: [], passages: [], edges: [], links: [], maps: [], cloths: [], views: emptyViews() })
 
-export function LoomProvider({ children, readOnly = false }: { children: ReactNode; readOnly?: boolean }) {
+export function LoomProvider({
+  children,
+  readOnly = false,
+  /**
+   * Whose loom this is when Open Loom is on — the VIEWED student, resolved
+   * server-side in app/layout.tsx. Null outside the mode, when the signed-in
+   * user is the owner and the session name is the right one.
+   */
+  viewingName = null,
+}: {
+  children: ReactNode
+  readOnly?: boolean
+  viewingName?: string | null
+}) {
   const { data: session } = useSession()
   const [state, setState] = useState<LoomState>(blankState())
   const [isLoading, setIsLoading] = useState(true)
@@ -1039,7 +1056,10 @@ export function LoomProvider({ children, readOnly = false }: { children: ReactNo
   const value: LoomContextType = {
     readOnly,
     state, scope, scoped, scopedState, isLoading,
-    studentName: session?.user?.name || "",
+    // The loom's OWNER, which inside Open Loom is not the session user. The
+    // rows already come from the student (actions/loom.ts resolves the owner
+    // the same way); this makes the name every export stamps agree with them.
+    studentName: viewingName || session?.user?.name || "",
     addConcept, editConcept, removeConcept, mergeConcepts,
     addPassage, removePassage, addPassageConcept, unfilePassage, attributePassages, editPassageNote,
     activeCloth, updateCloth, flushCloth,
