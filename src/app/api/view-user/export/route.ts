@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { resolveViewTarget } from "@/lib/viewUserServer"
 import { getUserLoomData, getGraphEvents } from "@/actions/loom"
+import { OPEN_LOOM_FILE_MARKER, fileStamp } from "@/lib/objectExport"
 
 /**
  * Download the viewed student's loom, whole (TJ, 2026-08-21: "a download
@@ -29,10 +30,18 @@ export async function GET() {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
+  // This route exists only inside Open Loom, so EVERY file it serves is a
+  // staff copy — the marker is unconditional here, unlike the object
+  // downloads, which the student also takes (TJ, 2026-08-22).
+  const takenBy = session?.user?.name ?? session?.user?.email ?? "staff"
   const body = JSON.stringify(
     {
       student: { name: viewing.name, email: viewing.email },
       exportedAt: new Date().toISOString(),
+      // Same two keys the object exports carry in `provenance`, spelled the
+      // same way, so one grep finds every staff copy whatever its shape.
+      takenVia: OPEN_LOOM_FILE_MARKER,
+      takenBy,
       loom,
       events,
     },
@@ -43,7 +52,10 @@ export async function GET() {
   return new NextResponse(body, {
     headers: {
       "Content-Type": "application/json",
-      "Content-Disposition": `attachment; filename="${stem}-loom.json"`,
+      // `open-loom.<student>-loom.<stamp>.json` — the marker leads and the
+      // stamp trails, matching objectExportFilename. This file had no stamp
+      // at all, against the 2026-08-12 "anywhere a download is made" ruling.
+      "Content-Disposition": `attachment; filename="${OPEN_LOOM_FILE_MARKER}.${stem}-loom.${fileStamp()}.json"`,
     },
   })
 }

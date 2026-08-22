@@ -21,6 +21,7 @@ import { soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import { buildMapKit, buildMapKitData } from "@/lib/mapKit"
+import { openLoomTake } from "@/lib/objectExport"
 import { buildMapExport, buildMapMarkdown, mapExportFilename, scopeLabelOf } from "@/lib/graphExport"
 import { downloadText } from "@/lib/download"
 import ConceptCard from "@/components/cards/ConceptCard"
@@ -115,7 +116,7 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
     activeMap, scopeMaps, selectMap, addMap, renameMap, removeMap,
     setMapTiers, setMapRead, setMapEssence, flushMapText,
     setView, ensureActiveMap,
-    flash, studentName, readOnly,
+    flash, studentName, readOnly, openLoomViewer,
   } = useLoom()
   const { titleOf } = useReadings()
   const { confirm } = useDialog()
@@ -577,11 +578,20 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
   // so it offers .json as well as .md and its buttons say what they hand over.
   // These two build it; the component does the naming, the stamping and the
   // provenance.
+  // Set only inside Open Loom, and then on every file this tab hands over:
+  // the projection and the kit are staff copies exactly when the loom is
+  // someone else's (TJ, 2026-08-22).
+  const take = () => openLoomTake(openLoomViewer)
+
   const kitMap = () =>
     activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
-  const kitMarkdown = () => buildMapKit(scopedState.concepts, scopedState.edges, studentName, kitMap())
+  const kitMarkdown = () => buildMapKit(scopedState.concepts, scopedState.edges, studentName, kitMap(), take())
   const kitJson = () =>
-    JSON.stringify(buildMapKitData(scopedState.concepts, scopedState.edges, studentName, kitMap()), null, 2)
+    JSON.stringify(
+      buildMapKitData(scopedState.concepts, scopedState.edges, studentName, kitMap(), take()),
+      null,
+      2
+    )
   // The practice guide's last beat listens for this. Harmless in the real app:
   // nothing there is listening.
   const handleKitTaken = () => window.dispatchEvent(new Event("loom:mapkit-taken"))
@@ -592,8 +602,8 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
   const handleKeepMapJson = () => {
     if (!activeMap) return
     downloadText(
-      JSON.stringify(buildMapExport(state, activeMap, studentName, titleOf), null, 2),
-      mapExportFilename(studentName, activeMap.name, "json"),
+      JSON.stringify(buildMapExport(state, activeMap, studentName, titleOf, take()), null, 2),
+      mapExportFilename(studentName, activeMap.name, "json", undefined, !!openLoomViewer),
       "application/json"
     )
     flash(`kept "${activeMap.name}" as .json`)
@@ -602,8 +612,8 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
   const handleKeepMapMd = () => {
     if (!activeMap) return
     downloadText(
-      buildMapMarkdown(state, activeMap, studentName, titleOf),
-      mapExportFilename(studentName, activeMap.name, "md"),
+      buildMapMarkdown(state, activeMap, studentName, titleOf, take()),
+      mapExportFilename(studentName, activeMap.name, "md", undefined, !!openLoomViewer),
       "text/markdown"
     )
     flash(`kept "${activeMap.name}" as .md`)

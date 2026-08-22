@@ -73,6 +73,13 @@ export interface LoomContextType {
    * viewed, so an export names its subject rather than its downloader.
    */
   studentName: string
+  /**
+   * The staff member READING this loom, when Open Loom is on; null otherwise
+   * — so null is the ordinary case and a name is the claim. Exports stamp it
+   * as `provenance.takenBy` and wear the `open-loom` marker when it is set,
+   * which is what separates a roster copy from a student's own submission.
+   */
+  openLoomViewer: string | null
   addConcept: (label: string, def?: string, note?: string) => Promise<Concept>
   editConcept: (id: string, data: Partial<{label: string, def: string, note: string}>) => Promise<void>
   removeConcept: (id: string) => Promise<void>
@@ -1060,6 +1067,10 @@ export function LoomProvider({
     // rows already come from the student (actions/loom.ts resolves the owner
     // the same way); this makes the name every export stamps agree with them.
     studentName: viewingName || session?.user?.name || "",
+    // Inside Open Loom the two identities split, and both matter to a file:
+    // the owner above, and the reader here. `viewingName` is server-decided
+    // (app/layout.tsx), so it — not the session — is what says the mode is on.
+    openLoomViewer: viewingName ? session?.user?.name || session?.user?.email || "staff" : null,
     addConcept, editConcept, removeConcept, mergeConcepts,
     addPassage, removePassage, addPassageConcept, unfilePassage, attributePassages, editPassageNote,
     activeCloth, updateCloth, flushCloth,

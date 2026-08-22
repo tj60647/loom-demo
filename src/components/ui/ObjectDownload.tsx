@@ -49,7 +49,7 @@ export default function ObjectDownload({
   /** Raised after either file is handed over — the guide listens for the kit. */
   onTaken?: () => void
 }) {
-  const { studentName, flash } = useLoom()
+  const { studentName, flash, openLoomViewer } = useLoom()
   const { course } = useReadings()
 
   /**
@@ -58,9 +58,18 @@ export default function ObjectDownload({
    * empty for a learner by design, so there is nothing here to read — and a
    * file that guessed would be worse than one that omits. Stamping it needs a
    * server read (recorded in docs/keep-at-the-object.md).
+   *
+   * `openLoomViewer` is null for a student taking their own copy, so their
+   * files are unchanged; when staff take one inside Open Loom it names them,
+   * and provenanceOf turns that into the `open-loom` marker (TJ, 2026-08-22).
    */
   const provenance = () =>
-    provenanceOf(studentName, course ? `${course.name}${course.term ? ` · ${course.term}` : ""}` : undefined)
+    provenanceOf(
+      studentName,
+      course ? `${course.name}${course.term ? ` · ${course.term}` : ""}` : undefined,
+      undefined,
+      openLoomViewer ?? undefined
+    )
 
   const what = noun ?? kind
 
@@ -70,7 +79,11 @@ export default function ObjectDownload({
         className="btn ghost mini"
         onClick={() => {
           const p = provenance()
-          downloadText(json(p), objectExportFilename(studentName, kind, slug, "json"), "application/json")
+          downloadText(
+            json(p),
+            objectExportFilename(studentName, kind, slug, "json", undefined, !!openLoomViewer),
+            "application/json"
+          )
           flash(`· ${what} downloaded ·`)
           onTaken?.()
         }}
@@ -79,7 +92,11 @@ export default function ObjectDownload({
         className="btn ghost mini"
         onClick={() => {
           const p = provenance()
-          downloadText(markdown(p), objectExportFilename(studentName, kind, slug, "md"), "text/markdown")
+          downloadText(
+            markdown(p),
+            objectExportFilename(studentName, kind, slug, "md", undefined, !!openLoomViewer),
+            "text/markdown"
+          )
           flash(`· ${what} downloaded ·`)
           onTaken?.()
         }}
