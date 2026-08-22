@@ -1605,11 +1605,34 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    still legible — it is the row that needs chasing. */
 .rosterrow.pendingrow .rostername{color:var(--ink-soft);font-style:italic}
 /* Invite learners starts folded: inviting is occasional, scanning the roster
-   is the daily visit. Same twirl idiom as .bandtoggle/.distilltoggle. */
-.invitefold summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}
-.invitefold summary::-webkit-details-marker{display:none}
-.invitefold summary .tw{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--ochre);transition:transform .15s}
-.invitefold[open] summary .tw{transform:rotate(90deg)}
+   is the daily visit. Same twirl idiom as .bandtoggle/.distilltoggle.
+   .panelfold is the same fold for the course detail's Readings and Sections
+   panels (TJ, 2026-08-21: "sub panels could be collapsible") — a separate
+   class, not a reuse, because journey-admin.spec locates the one New Course
+   fold by details.invitefold and two more matches would trip strict mode. */
+.invitefold summary,.panelfold summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}
+.invitefold summary::-webkit-details-marker,.panelfold summary::-webkit-details-marker{display:none}
+.invitefold summary .tw,.panelfold summary .tw{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--ochre);transition:transform .15s}
+.invitefold[open] summary .tw,.panelfold[open] summary .tw{transform:rotate(90deg)}
+
+/* ===== the course catalog (admin/courses) ===== */
+/* The roster's table idiom on the course catalog: ONE grid template lays the
+   header and every row (see .rosterhead above, and its rationale), so the
+   columns agree to the pixel. Rows are anchors — the whole row is the click
+   that selects the course into ?course= — so the grid sits on the <a>. */
+.catlist{padding:0}
+.cathead,a.catrow{display:grid;grid-template-columns:minmax(240px,1fr) 140px 90px 90px 90px 110px;gap:6px 14px;align-items:center;padding:6px 14px}
+.cathead{border-bottom:1px solid var(--rule);padding-top:8px;padding-bottom:8px}
+.cathead span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+a.catrow{border-bottom:1px dotted var(--rule);color:inherit;text-decoration:none}
+a.catrow:last-child{border-bottom:none}
+a.catrow:hover{background:rgba(0,0,0,.025)}
+/* The selected course wears the ochre open wash the coding log's open row
+   wears (.lrow.open) — the catalog and the detail below it are one thing. */
+a.catrow.on{background:rgba(168,132,63,.08)}
+.catname{font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.catterm{font-size:13px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.catnum{font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
 /* Open Loom's float: whose loom this is, Download loom, Exit — nothing
    else (TJ, 2026-08-21; the Teaching link rows lived a day, 23ecf9c to
    here). The identity line is the header — whose loom the viewer is inside

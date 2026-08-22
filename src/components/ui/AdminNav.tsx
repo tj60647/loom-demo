@@ -8,6 +8,7 @@ export type AdminNavCourse = {
   slug: string
   name: string
   term: string
+  isArchived: boolean
   sections: { id: string; name: string }[]
 }
 
@@ -20,10 +21,25 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
+  // Archived courses resolve on /admin/courses ONLY — the catalog there lists
+  // them and its detail is how they are reached at all (its own comment says
+  // why). Every other admin page resolves live courses, exactly as before:
+  // the roster's server side (getStaffViewer → resolveCourseId) falls back to
+  // a live course for an archived id, and if the nav accepted the id here the
+  // select would name a course the page is not showing. Excluding it instead
+  // lets the healing effect below correct the URL to what is on screen.
+  const onCatalog = pathname === "/admin/courses"
+  const candidates = onCatalog ? courses : courses.filter((course) => !course.isArchived)
+  const liveCourses = courses.filter((course) => !course.isArchived)
+
   const courseParam = searchParams.get("course")
   const activeCourse =
-    courses.find((course) => course.id === courseParam || course.slug === courseParam) ??
-    courses[0] ??
+    candidates.find((course) => course.id === courseParam || course.slug === courseParam) ??
+    // First LIVE course, not candidates[0]: on the catalog page the oldest
+    // course may be archived, and the page's own bare-URL fallback (see
+    // admin/courses/page.tsx) prefers the first live one too.
+    liveCourses[0] ??
+    candidates[0] ??
     null
 
   const sectionParam = searchParams.get("section")
@@ -85,7 +101,7 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
           a lone pair of pickers pushed to the far edge of an empty bar read as
           leftovers. They line up with the page heading underneath instead. */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-        {courses.length === 0 ? (
+        {candidates.length === 0 ? (
           <span className="hint" style={{ fontSize: "13px" }}>No courses yet</span>
         ) : (
           <>
@@ -99,14 +115,29 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
               // course, so carrying one across would silently resolve to null.
               onChange={(event) => navigate(event.target.value, null)}
             >
-              {courses.map((course) => (
+              {/* Live courses always; an archived one only while it is the
+                  active selection (reached from the catalog's rows), so the
+                  select can display it without offering the archive as a
+                  destination. */}
+              {liveCourses.map((course) => (
                 <option key={course.id} value={course.id}>
                   {course.term ? `${course.name} · ${course.term}` : course.name}
                 </option>
               ))}
+              {activeCourse?.isArchived && (
+                <option key={activeCourse.id} value={activeCourse.id}>
+                  {activeCourse.term
+                    ? `${activeCourse.name} · ${activeCourse.term} · archived`
+                    : `${activeCourse.name} · archived`}
+                </option>
+              )}
             </select>
 
-            {activeCourse && activeCourse.sections.length > 0 && (
+            {/* No section picker on the catalog: /admin/courses reads the
+                course scope only — its panels always show every section —
+                and a control that scopes nothing on the page below it is
+                exactly the incongruity this strip is for (TJ, 2026-08-21). */}
+            {!onCatalog && activeCourse && activeCourse.sections.length > 0 && (
               <>
                 <span className="label">Section</span>
                 <select

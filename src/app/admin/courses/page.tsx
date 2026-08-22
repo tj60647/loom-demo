@@ -31,7 +31,7 @@ export default async function AdminCoursesPage({
   await checkAdmin()
 
   const resolved = await searchParams
-  const focusedCourseId = firstParam(resolved.course) ?? null
+  const courseParam = firstParam(resolved.course) ?? null
 
   const [allCourses, allSections, allMemberships, readingsByCourse] = await Promise.all([
     listCourses({ includeArchived: true }),
@@ -42,6 +42,26 @@ export default async function AdminCoursesPage({
       .where(isNull(courseMemberships.removedAt)),
     getReadingsByCourse(),
   ])
+
+  // Master–detail (TJ, 2026-08-21): the scope strip's course picker and this
+  // page's content select the SAME course — before this the strip said one
+  // course and the page listed them all. ?course= takes an id or a slug, the
+  // same match AdminNav applies client-side; a bare or dead URL falls back to
+  // the first live course, again as AdminNav does, so the select and the
+  // detail below never disagree. Archived courses are reachable only by the
+  // catalog rows minting their id here — the strip never offers them.
+  const selected =
+    allCourses.find((c) => c.id === courseParam || c.slug === courseParam) ??
+    allCourses.find((c) => !c.isArchived) ??
+    allCourses[0] ??
+    null
+
+  // Live courses in creation order, then the archive — a catalog is scanned
+  // for the working courses first; the shelf of retired ones reads as a tail.
+  const catalog = [
+    ...allCourses.filter((c) => !c.isArchived),
+    ...allCourses.filter((c) => c.isArchived),
+  ]
 
   return (
     // `workwide`: the console takes the work-surface measure (globals.css,
@@ -94,13 +114,51 @@ export default async function AdminCoursesPage({
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-          {allCourses.map((course) => {
+          {/* The catalog: every course on one line each, archived included —
+              this is the only place an archived course can be reached, since
+              the scope strip offers live ones (AdminNav filters). The row IS
+              the selector: it mints ?course=, the same param the strip's
+              picker writes, so the two controls cannot disagree. */}
+          <div className="card catlist">
+            <div className="cathead">
+              <span>Course</span>
+              <span>Term</span>
+              <span>Learners</span>
+              <span>Sections</span>
+              <span>Readings</span>
+              <span>State</span>
+            </div>
+            {catalog.map((course) => {
+              const learnerCount = allMemberships.filter((m) => m.courseId === course.id).length
+              const sectionCount = allSections.filter((s) => s.courseId === course.id).length
+              const readingCount = (readingsByCourse.get(course.id) ?? []).length
+              return (
+                <a
+                  key={course.id}
+                  className={`catrow${selected?.id === course.id ? " on" : ""}`}
+                  href={`/admin/courses?course=${encodeURIComponent(course.id)}`}
+                  aria-current={selected?.id === course.id ? "true" : undefined}
+                >
+                  <span className="catname">{course.name}</span>
+                  <span className="catterm">{course.term || "—"}</span>
+                  <span className="catnum">{learnerCount}</span>
+                  <span className="catnum">{sectionCount}</span>
+                  <span className="catnum">{readingCount}</span>
+                  <span>
+                    {course.isArchived ? <span className="pill loose">Archived</span> : null}
+                  </span>
+                </a>
+              )
+            })}
+          </div>
+
+          {selected && (() => {
+            const course = selected
             const courseSectionRows = allSections.filter((s) => s.courseId === course.id)
             const memberships = allMemberships.filter((m) => m.courseId === course.id)
             const readings = readingsByCourse.get(course.id) ?? []
             const readingCount = readings.length
             const unassigned = memberships.filter((m) => !m.sectionId).length
-            const isFocused = focusedCourseId === course.id
 
             return (
               <section
@@ -112,7 +170,6 @@ export default async function AdminCoursesPage({
                   <h2 style={{ fontSize: "19px" }}>{course.name}</h2>
                   {course.term ? <span className="pill beaten">{course.term}</span> : null}
                   {course.isArchived ? <span className="pill loose">Archived</span> : null}
-                  {isFocused ? <span className="pickedtag">Active</span> : null}
                 </div>
                 <p className="hint" style={{ marginTop: "4px" }}>
                   <span style={{ fontFamily: "var(--mono)", fontSize: "12px" }}>{course.slug}</span>
@@ -219,13 +276,23 @@ export default async function AdminCoursesPage({
                   </details>
                 </div>
 
-                <div style={{ marginTop: "18px", borderTop: "1px dotted var(--rule)", paddingTop: "14px" }}>
-                  <div className="heading-with-info">
-                    <span className="label">Readings</span>
+                {/* The two halves of what a course IS — its readings and its
+                    sections — as named, collapsible panels (TJ, 2026-08-21:
+                    "sub panels could be collapsible", "read clearly as
+                    panels"). Open by default: folding is for skipping past
+                    one to work in the other, not a place to lose them. */}
+                <details
+                  className="panelfold"
+                  open
+                  style={{ marginTop: "18px", borderTop: "1px dotted var(--rule)", paddingTop: "14px" }}
+                >
+                  <summary>
+                    <span className="tw">▸</span>
+                    <h3 style={{ fontSize: "16px" }}>Readings</h3>
                     <span className="hint" style={{ fontSize: "13px" }}>
                       {readingCount} in this course
                     </span>
-                  </div>
+                  </summary>
 
                   {readings.length === 0 ? (
                     <p className="hint" style={{ marginTop: "8px" }}>
@@ -374,20 +441,43 @@ export default async function AdminCoursesPage({
                       ))}
                     </div>
                   )}
-                </div>
+                </details>
 
-                <div style={{ marginTop: "18px", borderTop: "1px dotted var(--rule)", paddingTop: "14px" }}>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: "12px", flexWrap: "wrap" }}>
-                    <span className="label">Sections</span>
-                    <a
-                      className="act"
-                      style={{ marginLeft: "auto" }}
-                      href={`/admin?course=${encodeURIComponent(course.id)}`}
-                      data-tip="Invite and enrol learners on the Roster tab"
-                    >
-                      {memberships.length} enrolled · invite →
-                    </a>
-                  </div>
+                <details
+                  className="panelfold"
+                  open
+                  style={{ marginTop: "18px", borderTop: "1px dotted var(--rule)", paddingTop: "14px" }}
+                >
+                  <summary>
+                    <span className="tw">▸</span>
+                    <h3 style={{ fontSize: "16px" }}>Sections</h3>
+                    <span className="hint" style={{ fontSize: "13px" }}>
+                      {memberships.length} enrolled
+                      {unassigned > 0 ? ` · ${unassigned} unassigned` : ""}
+                    </span>
+                  </summary>
+                  {/* The roster door — inside the body, not the summary,
+                      where a click would also toggle the fold. Withheld for
+                      an archived course: /admin resolves live courses only
+                      (getStaffViewer → resolveCourseId, which lists
+                      unarchived), so the link would silently land on the
+                      first live course's roster instead. */}
+                  {course.isArchived ? (
+                    <p className="hint" style={{ marginTop: "8px" }}>
+                      The roster only opens for live courses — unarchive to invite or place
+                      learners.
+                    </p>
+                  ) : (
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
+                      <a
+                        className="act"
+                        href={`/admin?course=${encodeURIComponent(course.id)}`}
+                        data-tip="Invite and enrol learners on the Roster tab"
+                      >
+                        invite →
+                      </a>
+                    </div>
+                  )}
                   {courseSectionRows.length === 0 ? (
                     <p className="hint" style={{ marginTop: "8px" }}>No sections yet.</p>
                   ) : (
@@ -404,14 +494,18 @@ export default async function AdminCoursesPage({
                             <div className="actrow" style={{ marginTop: "8px" }}>
                               {/* Sections are built here; people are invited on
                                   the Roster page. Without this link that is two
-                                  pages with nothing joining them. */}
-                              <a
-                                className="act"
-                                href={`/admin?course=${encodeURIComponent(course.id)}&section=${encodeURIComponent(section.id)}`}
-                                data-tip="Open this section's roster"
-                              >
-                                roster →
-                              </a>
+                                  pages with nothing joining them. Withheld when
+                                  archived, like the panel's invite door and for
+                                  the same resolveCourseId reason. */}
+                              {!course.isArchived && (
+                                <a
+                                  className="act"
+                                  href={`/admin?course=${encodeURIComponent(course.id)}&section=${encodeURIComponent(section.id)}`}
+                                  data-tip="Open this section's roster"
+                                >
+                                  roster →
+                                </a>
+                              )}
                               <details>
                                 <summary className="act" data-tip="Edit the section name and lead">
                                   edit
@@ -467,10 +561,10 @@ export default async function AdminCoursesPage({
                       Add Section
                     </button>
                   </form>
-                </div>
+                </details>
               </section>
             )
-          })}
+          })()}
         </div>
       )}
     </main>

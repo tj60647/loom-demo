@@ -28,19 +28,26 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // The nav needs every course's sections up front because layouts can't read
   // searchParams — it resolves the active course/section on the client.
+  // Archived courses ride along for an admin, marked: AdminNav lets them
+  // resolve on /admin/courses (the catalog page selects them by ?course=)
+  // and filters them out everywhere else. Faculty stay live-only, as
+  // listFacultyCourseIds already scopes them.
   const [allCourseRows, sectionRows] = await Promise.all([
-    listCourses(),
+    listCourses({ includeArchived: true }),
     db.select().from(sections).orderBy(asc(sections.name)),
   ])
   const courseRows = admin
     ? allCourseRows
-    : allCourseRows.filter((course) => facultyCourseIds.includes(course.id))
+    : allCourseRows.filter(
+        (course) => !course.isArchived && facultyCourseIds.includes(course.id)
+      )
 
   const navCourses: AdminNavCourse[] = courseRows.map((course) => ({
     id: course.id,
     slug: course.slug,
     name: course.name,
     term: course.term,
+    isArchived: course.isArchived,
     sections: sectionRows
       .filter((section) => section.courseId === course.id)
       .map((section) => ({ id: section.id, name: section.name })),
