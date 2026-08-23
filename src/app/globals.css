@@ -1026,6 +1026,16 @@ footer .footid .label{letter-spacing:.1em}
    instead and one rule does the work from the far side of the tree. */
 body[data-reading-focus] header{display:none}
 
+/* The narrow-screen notice (src/components/ui/NarrowNotice.tsx). A line at the
+   top of the window, in flow rather than fixed: fixed chrome in this app has a
+   history of eating the clicks and the edges beneath it, and this is print —
+   it says what Loom is built for and then gets out of the way for good. It is
+   only ever rendered below 900px, so it needs no media query of its own. */
+.narrownotice{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:8px 14px;border-bottom:1px solid var(--rule);background:var(--paper-2);
+  font-size:13px;line-height:1.45;color:var(--ink-soft)}
+.narrownotice b{color:var(--ink);font-weight:600}
+.narrownotice .btn{margin-left:auto;flex:0 0 auto}
 @media (max-width: 900px){
   header{padding:10px 14px 8px;gap:10px}
   .wordmark{font-size:21px}

@@ -6,6 +6,7 @@ import { ReadingsProvider } from "@/components/providers/ReadingsProvider";
 import { DialogProvider } from "@/components/providers/DialogProvider";
 import Header from "@/components/ui/Header";
 import TeachingFloat from "@/components/ui/TeachingFloat";
+import NarrowNotice from "@/components/ui/NarrowNotice";
 import TipLayer from "@/components/ui/TipLayer";
 import { isBranchPreview } from "@/lib/previewLogin";
 import { getServerSession } from "next-auth/next";
@@ -72,6 +73,11 @@ export default async function RootLayout({
                     the view-user cookie names a target the server authorizes,
                     so mounting it unconditionally is free. */}
                 <TeachingFloat />
+                {/* What Loom is built for, on a screen too small for it.
+                    Mounted once here because it is about the window, not any
+                    page — and it renders nothing at all above 900px, so it
+                    costs every desktop reader a single width check. */}
+                <NarrowNotice />
                 {children}
               </DialogProvider>
             </ReadingsProvider>

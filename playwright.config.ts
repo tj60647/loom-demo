@@ -102,8 +102,34 @@ export default defineConfig({
     },
     {
       name: 'write',
-      testIgnore: READ_ONLY,
+      testIgnore: [...READ_ONLY, 'tablet.spec.ts'],
       use: { ...devices['Desktop Chrome'] },
+    },
+    /**
+     * THE ONE PROJECT THAT IS NOT DESKTOP CHROME.
+     *
+     * Everything above runs Chromium at a desktop size, which is what Loom is
+     * built for (AGENTS.md: floor 1280). This one runs **WebKit at an iPad**,
+     * because a question came in from a real reader — an Apple Pencil would
+     * not select words on an iPad — and the suite had no way to answer it:
+     * two projects, both Desktop Chrome, and WebKit was not even installed.
+     *
+     * WHAT IT CAN SETTLE: that Safari's engine renders the app, that a reading
+     * draws its text layer at a tablet viewport, and that a drag over the
+     * words selects them and arms a capture. All three now hold, and this
+     * exists so they cannot quietly stop holding.
+     *
+     * WHAT IT CANNOT: iPadOS gesture arbitration — whether an Apple Pencil
+     * drag selects or scrolls. That lives in the OS, no emulator has it, and
+     * only a real device can answer it. Nothing here should be read as
+     * evidence about the Pencil.
+     *
+     * Read-only by construction: it drives one spec that captures nothing.
+     */
+    {
+      name: 'tablet',
+      testMatch: ['tablet.spec.ts'],
+      use: { ...devices['iPad Pro 11'] },
     },
   ],
 
