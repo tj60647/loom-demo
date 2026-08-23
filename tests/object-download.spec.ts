@@ -86,6 +86,13 @@ test.describe('Download at the object', () => {
     await expect(page.locator('#map')).toHaveCount(1, { timeout: 15_000 });
     await expect(page.locator('input[aria-label="replay position, in acts"]')).toBeVisible({ timeout: 20_000 });
 
+    // THE LOG'S DOWNLOADS LIVE IN THE LOG'S VIEW (TJ, 2026-08-23: "download
+    // options for the knowledge graph should depend on view"). The cloth card
+    // opens on the cloth, whose own .json/.md/.svg stand here instead, so this
+    // has to ask for the log before asking for its file. The chip said "the
+    // record" until the same day.
+    await page.locator('.mapbar .chip', { hasText: /^the log$/ }).first().click();
+
     // By NAME, not by being the only one: since 2026-08-12 the buttons say
     // what they hand over ("download the log .json"), and the concept-map kit
     // on this same station is an ObjectDownload too — a count of one was

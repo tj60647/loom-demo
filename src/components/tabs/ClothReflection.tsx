@@ -24,6 +24,9 @@ import ThreadCard from "@/components/cards/ThreadCard"
 import { useCaptureLog, CaptureLogScrubber, CaptureLogRows, CaptureLogDownload } from "@/components/ui/HistoryPanel"
 import ConceptName from "@/components/ui/ConceptName"
 import SvgDownload from "@/components/ui/SvgDownload"
+import ObjectDownload from "@/components/ui/ObjectDownload"
+import { useReadings } from "@/components/providers/ReadingsProvider"
+import { buildClothExport, buildClothMarkdown } from "@/lib/objectExport"
 import { conceptNameText } from "@/lib/conceptName"
 
 /**
@@ -88,7 +91,14 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
   const {
     scopedState: state, flash, addEdge, links, addLink, attachLink,
     addMap, setMapTiers, selectMap, scopeMaps, readOnly, studentName,
+    // The cloth's own .json/.md are built from the WHOLE loom narrowed by a
+    // scope key, not from the scoped slice this panel draws — the same pair
+    // ClothFold hands to buildClothExport (ClothFold.tsx:188-189). Aliased,
+    // because `state` above is already the scoped one.
+    state: wholeLoom, scope, activeCloth,
   } = useLoom()
+  const { byId: readingsById } = useReadings()
+  const titleOf = (id: string) => readingsById.get(id)?.title ?? id
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
   /**
    * THE PAIR (TJ, 2026-08-18: "select 2 nodes and throw them … so i think it
@@ -189,6 +199,13 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
    * scrubber stays under both, because it is the position they share.
    */
   const [view, setView] = useState<"cloth" | "record">("cloth")
+  /**
+   * Is the box showing the log rather than the cloth? The chips, the box below
+   * and the downloads beside them all have to agree, and this is the one
+   * condition they read — the mapbar and the box at :941 used to spell it out
+   * separately, which is how the downloads came to ignore the view.
+   */
+  const showingLog = showLog && log.ready && view === "record"
 
   /**
    * THE PAIR, AS IT CAN STILL BE DRAWN AND THROWN — and this is derived rather
@@ -843,34 +860,78 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
         <span style={{ marginLeft: "auto", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
         {showLog && log.ready && (
           <>
+            {/* "the log", not "the record" (TJ, 2026-08-23). The view's own
+                value stays `record` — it is internal, and renaming it would
+                touch every branch that reads it — but the word on screen now
+                matches the thing it switches to, whose downloads say "the
+                log" and whose component is the Capture Log.
+
+                aria-label as well as data-tip, per the contract at
+                globals.css:1245-1249: the bubble is aria-hidden and never
+                appears on keyboard focus, and these chips are tabbable, so a
+                tip carrying meaning the label does not must also be in a
+                label a screen reader reaches. */}
             <span className="chips" style={{ margin: 0, alignItems: "center" }}>
-              {([["cloth", "the cloth"], ["record", "the record"]] as const).map(([v, label]) => (
+              {([
+                ["cloth", "the cloth", "the weave as it stands — concepts along the warp, threads arcing between them"],
+                ["record", "the log", "every act that made it, oldest first — scrub it to fold the cloth back to any moment"],
+              ] as const).map(([v, label, tip]) => (
                 <span
                   key={v}
                   className={`chip${view === v ? " on" : ""}`}
                   role="button"
                   tabIndex={0}
+                  data-tip={tip}
+                  aria-label={`Show ${label}: ${tip}`}
+                  aria-pressed={view === v}
                   onClick={() => setView(v)}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setView(v) } }}
                 >{label}</span>
               ))}
             </span>
-            <CaptureLogDownload log={log} scopeLabel={scopeLabel} />
           </>
         )}
-        {/* The cloth as a picture (TJ, 2026-08-23). Offered in Open Loom too:
-            it takes a drawing of work that door already shows, and the
-            filename carries whose it is. `.clothglow` is dropped — it is a
-            one-second fade around whatever was last touched, and a still of it
-            is an opaque ochre blob rather than part of the weave. */}
-        <SvgDownload
-          target="map"
-          studentName={studentName}
-          kind="cloth"
-          noun="the cloth"
-          tip="the cloth as it stands, as a vector file"
-          drop={[".clothglow"]}
-        />
+        {/**
+         * WHAT YOU CAN TAKE IS WHAT YOU ARE LOOKING AT (TJ, 2026-08-23:
+         * "download options for the knowledge graph should depend on view").
+         *
+         * The chips switch one box between two objects, and the downloads used
+         * to ignore that: the log's two buttons stood beside the cloth's
+         * picture whichever view was open, so on the cloth you were offered a
+         * file of the log, and on the log a picture of the cloth. Each view now
+         * offers its own object and only its own.
+         */}
+        {showingLog ? (
+          <CaptureLogDownload log={log} scopeLabel={scopeLabel} />
+        ) : (
+          <>
+            {/* The cloth whole, in the two formats every other object here
+                offers — the same builders as the cloth's card on 00
+                (ClothFold.tsx:184-190), so one object does not come out two
+                different ways depending on where it was taken from. */}
+            <ObjectDownload
+              kind="cloth"
+              noun="the cloth"
+              slug={activeCloth?.title || scopeLabel || "cloth"}
+              tip="this cloth, whole — its passages, concepts, threads and projections"
+              json={(p) => JSON.stringify(buildClothExport(wholeLoom, scope.key, p, titleOf), null, 2)}
+              markdown={(p) => buildClothMarkdown(wholeLoom, scope.key, p, titleOf)}
+            />
+            {/* And as a picture (TJ, 2026-08-23). Offered in Open Loom too: it
+                takes a drawing of work that door already shows, and the
+                filename carries whose it is. `.clothglow` is dropped — it is a
+                one-second fade around whatever was last touched, and a still of
+                it is an opaque ochre blob rather than part of the weave. */}
+            <SvgDownload
+              target="map"
+              studentName={studentName}
+              kind="cloth"
+              noun="the cloth"
+              tip="the cloth as it stands, as a vector file"
+              drop={[".clothglow"]}
+            />
+          </>
+        )}
         </span>
       </div>
 
@@ -884,7 +945,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
           Both are 400px tall, so the chips swap the contents and the legend,
           the scrubber and everything below them stay exactly where they were. */}
       <div id="mapWrap">
-        {view === "record" && showLog && log.ready ? (
+        {showingLog ? (
           <CaptureLogRows log={log} onShowCloth={() => setView("cloth")} />
         ) : (
           <ClothMap
