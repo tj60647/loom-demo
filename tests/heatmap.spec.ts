@@ -364,13 +364,27 @@ test("every reading that carries marks reaches its own darkest step", async ({ p
    * was never about.
    */
   const reading = page.getByLabel("Select active reading")
-  const options = await reading.locator("option").evaluateAll((opts) =>
-    (opts as HTMLOptionElement[]).map((o) => o.value).filter(Boolean)
+  const all = await reading.locator("option").evaluateAll((opts) =>
+    (opts as HTMLOptionElement[]).map((o) => ({ value: o.value, label: o.textContent ?? "" })).filter((o) => o.value)
   )
-  expect(options.length, "the course must offer at least one reading").toBeGreaterThan(0)
+  expect(all.length, "the course must offer at least one reading").toBeGreaterThan(0)
+
+  /**
+   * THE SEEDED READING GOES FIRST, and that is not a convenience.
+   *
+   * The picker lists readings in syllabus order, and on a fresh seed the only
+   * one carrying cohort marks sits well down that list — CI walked the first
+   * four, found none, and failed with this test's own "no reading has cohort
+   * marks" message. Walking every reading instead would be honest and slow:
+   * each one loads a PDF. So the walk starts where the marks are and takes a
+   * couple of neighbours after it.
+   */
+  const seeded = all.filter((o) => o.label.includes(SEEDED_WITH_MARKS))
+  const others = all.filter((o) => !o.label.includes(SEEDED_WITH_MARKS)).slice(0, 2)
+  const options = [...seeded, ...others].map((o) => o.value)
 
   const tops: { top: number; swatches: number }[] = []
-  for (const value of options.slice(0, 4)) {
+  for (const value of options) {
     await reading.selectOption(value)
     await expect(page).toHaveURL(new RegExp(`source=${value}`), { timeout: 15_000 })
     await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
