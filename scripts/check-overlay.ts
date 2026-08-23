@@ -304,6 +304,32 @@ check(
   [1, 3]
 )
 
+/**
+ * NOTHING LEAVES THE PAGE. On the canvas a rect that runs past its page runs
+ * across the gutter and over its neighbours — TJ, 2026-08-23, of a hairline
+ * crossing three pages: "it should not bridge pages, correct?"
+ *
+ * The projection can produce one honestly: `item.width` is whatever the PDF's
+ * text layer claims, and on a scan it is sometimes an advance that overruns
+ * the page box. Here the item claims to be twice the page wide.
+ */
+const OVERRUN = [{ str: "wide", transform: [1, 0, 0, 10, 10, 80], width: 200, height: 10 }]
+const bled = projectHeatSpans(OVERRUN, PLAIN, [{ start: 0, end: 4, count: 1 }])[0]
+check("a rect never starts past the page", bled.x >= 0 && bled.x <= 1, true)
+check("a rect never ends past the page", +(bled.x + bled.w).toFixed(4) <= 1, true)
+
+/** …and merging must not put back the overrun the clamp just took out. */
+const MERGED = [
+  { str: "ab", transform: [1, 0, 0, 10, 10, 80], width: 20, height: 10 },
+  { str: "cd", transform: [1, 0, 0, 10, 30, 80], width: 400, height: 10 },
+]
+const joined = projectHeatSpans(MERGED, PLAIN, [{ start: 0, end: 4, count: 1 }])
+check(
+  "merging stops at the page edge too",
+  joined.every((r) => +(r.x + r.w).toFixed(4) <= 1),
+  true
+)
+
 check(
   "a partial item is sliced by character, not taken whole",
   projectHeatSpans(items, PLAIN, [{ start: 0, end: 3, count: 1 }]),

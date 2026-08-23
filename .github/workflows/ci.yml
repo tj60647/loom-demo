@@ -48,6 +48,9 @@ jobs:
       # next build evaluates src/db at import; the driver only validates the
       # URL shape unless something queries, and nothing does at build time.
       DATABASE_URL: ${{ secrets.CI_DATABASE_URL || 'postgresql://ci:ci@ci.invalid/ci' }}
+      # Read-only, and only used by the migration drift check below. Absent,
+      # that check skips rather than fails — see scripts/check-prod-migrations.ts.
+      PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
       NEXTAUTH_SECRET: ci-build-only
       NEXTAUTH_URL: http://localhost:3000
       GITHUB_ID: ci-dummy
@@ -64,6 +67,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check   # eslint + tsc
+      # IS PRODUCTION'S SCHEMA READY FOR THE CODE ABOUT TO SHIP TO IT?
+      #
+      # Only on the way into master, because that is the merge that reaches
+      # production. Migration 0028 sat applied-on-dev and unapplied-on-prod for
+      # two days on 2026-08-23, and surfaced as every /admin page throwing
+      # "column section.leadUserId does not exist" AFTER the merge. This asks
+      # before it. Skips (green) with no PROD_DATABASE_URL secret configured.
+      - name: Production migration drift
+        if: github.base_ref == 'master' || github.ref_name == 'master'
+        run: npm run check:prodmigrations
       - run: npm run build
 
   e2e:

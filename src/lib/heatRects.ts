@@ -219,11 +219,34 @@ export function projectHeatSpans(
       const x0 = item.left + (item.width * (from - item.start)) / chars
       const x1 = item.left + (item.width * (to - item.start)) / chars
 
+      /**
+       * CLAMPED TO THE PAGE, always.
+       *
+       * A mark cannot be somewhere the page is not, and on the canvas a rect
+       * that runs past its page runs across the GUTTER and over its
+       * neighbours — TJ, 2026-08-23, of a hairline crossing three pages:
+       * "this red line suggests a problem rendering the heatmap, it should not
+       * bridge pages, correct?" Correct.
+       *
+       * The projection can produce one honestly. `item.width` is whatever the
+       * PDF's text layer claims, and on scans it is sometimes an advance that
+       * overruns the page box; a partial slice of such an item is then wider
+       * than the page it belongs to. Clamping here rather than at the drawing
+       * end means every view inherits it — the canvas, both paged views, and
+       * anything that reads these rects later.
+       *
+       * It clamps rather than drops: an item that overruns still marks the
+       * words it covers, and the part of it that is on the page is the part
+       * that is true.
+       */
+      const left = Math.min(Math.max(x0 / page.width, 0), 1)
+      const right = Math.min(Math.max(x1 / page.width, 0), 1)
+      const top = Math.min(Math.max(item.top / page.height, 0), 1)
       const rect: HeatRect = {
-        x: x0 / page.width,
-        y: item.top / page.height,
-        w: Math.max(x1 - x0, 0) / page.width,
-        h: item.height / page.height,
+        x: left,
+        y: top,
+        w: Math.max(right - left, 0),
+        h: Math.min(item.height / page.height, 1 - top),
         count: span.count,
       }
 
@@ -236,7 +259,9 @@ export function projectHeatSpans(
         rect.x >= last.x &&
         rect.x - (last.x + last.w) < JOINABLE_GAP
       ) {
-        last.w = Math.max(last.w, rect.x + rect.w - last.x)
+        // Never past the page's right edge: merging is what would otherwise
+        // reintroduce the overrun the clamp above just removed.
+        last.w = Math.min(Math.max(last.w, rect.x + rect.w - last.x), 1 - last.x)
         continue
       }
       // A zero-width rect draws nothing, but it is kept above if it extends a
