@@ -169,6 +169,50 @@ test("choosing a student does not resize the scope strip", async ({ page }) => {
   await expect(strip.locator(".navseg")).toHaveCount(0)
 })
 
+/**
+ * SWITCHING READINGS MUST NOT ASK FOR PAGES THE NEW ONE HAS NOT GOT.
+ *
+ * `url`/`sourceId` change together and immediately; the new page count only
+ * arrives when pdf.js has finished loading. While those disagreed, the canvas
+ * held the OLD count against the NEW image base. Measured before the fix,
+ * going from a 60-page reading to a 9-page one: 51 requests for pages 10-60 of
+ * the 9-page document, every one a 404 — and the page-image route reads a 404
+ * as "not rendered yet" and queues a whole-document render behind it, so one
+ * switch also queued 51 redundant generation jobs for a reading that was
+ * already complete.
+ *
+ * This asserts the network, not the pixels, because that is where the damage
+ * was: the canvas looked almost right the whole time.
+ */
+test("switching to a shorter reading asks only for pages it has", async ({ page }) => {
+  const missing: string[] = []
+  page.on("response", (response) => {
+    const url = response.url()
+    if (/\/api\/readings\/[^/]+\/pages\/\d+/.test(url) && response.status() === 404) {
+      missing.push(url.replace(/^.*\/api\/readings\//, ""))
+    }
+  })
+
+  await page.goto("/admin/heatmaps")
+  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+  await expect(heatMarks(page).first()).toBeVisible({ timeout: 25_000 })
+
+  // Object Worlds is 9 pages; the reading this tab opens on is 60. The seed
+  // puts both in this course, which is what makes the mismatch reachable.
+  const reading = page.getByLabel("Select active reading")
+  const short = await reading.locator("option").evaluateAll((opts) => {
+    const found = (opts as HTMLOptionElement[]).find((o) => /object worlds/i.test(o.textContent ?? ""))
+    return found ? found.value : null
+  })
+  expect(short, "the seed must offer Object Worlds in this course").not.toBeNull()
+
+  await reading.selectOption(short!)
+  await expect(page).toHaveURL(new RegExp(`source=${short}`), { timeout: 15_000 })
+  await page.waitForTimeout(6_000)
+
+  expect(missing, `asked for pages the reading does not have: ${missing.join(", ")}`).toEqual([])
+})
+
 test("the legend floats over the page instead of adding a row above it", async ({ page }) => {
   await page.goto("/admin/heatmaps")
   await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })

@@ -200,7 +200,26 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   const courseSections = readings.course?.sections ?? [];
   // Which section is being compared; "" is every section — the cohort.
   const [overlaySection, setOverlaySection] = useState<string>("");
-  const [numPages, setNumPages] = useState<number>();
+  /**
+   * THE LOADED DOCUMENT, AND WHICH URL IT IS — the two together, never apart.
+   *
+   * `numPages` used to be its own state, and it OUTLIVED the reading it
+   * described. Switching readings changes `url` and `sourceId` at once, but
+   * the new page count only arrives when pdf.js has finished loading; until
+   * then the canvas held the OLD count against the NEW `pageImageBase`, and
+   * asked for pages the new reading does not have. Measured on the running
+   * app switching a 60-page reading to a 9-page one: 51 requests for pages
+   * 10-60 of the 9-page document, every one a 404 — and the page-image route
+   * treats a 404 as "not rendered yet" and queues a whole-document render
+   * behind it (its own comment says so), so one switch also queued 51
+   * redundant generation jobs for a reading that was already complete.
+   *
+   * Keeping the url beside the count makes the stale state unrepresentable:
+   * `numPages` below is null until the count belongs to the document actually
+   * being shown, and a canvas with no page count draws no slots at all.
+   */
+  const [loaded, setLoaded] = useState<{ url: string; numPages: number; proxy: PdfDoc } | null>(null);
+  const numPages = loaded?.url === url ? loaded.numPages : undefined;
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [isNarrow, setIsNarrow] = useState(false);
   // One passage can carry several passages — the same span re-filed under a
@@ -319,8 +338,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // one), not to fit-all — a fixed 8× fit-all reached print size on a short
   // paper and stalled at barely reading size on a 132-page scan.
   const [zoomMax, setZoomMax] = useState(8);
-  // The pdf.js document proxy, kept for the matrix canvas's raster path.
-  const [pdfProxy, setPdfProxy] = useState<PdfDoc | null>(null);
+  /**
+   * The pdf.js document proxy, kept for the matrix canvas's raster path — and
+   * gated on the same url as the page count above, for the same reason. A
+   * proxy for the reading you have just navigated away from would raster the
+   * wrong pages, and its worker is about to be torn down under whatever is
+   * still reading it.
+   */
+  const pdfProxy = loaded?.url === url ? loaded.proxy : null;
   // The document's height/width, measured off the first page that renders, so
   // the many-page views can reserve honest space before a page has drawn.
   const [aspect, setAspect] = useState(11 / 8.5);
@@ -1088,11 +1113,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   }, [hideHighlightTooltip]);
 
   function onDocumentLoadSuccess(pdf: PdfDoc): void {
-    setNumPages(pdf.numPages);
-    // The proxy itself, kept for the matrix's raster path: PageRaster renders
-    // straight off pdf.js, so zooming re-rasters pages without touching the
-    // react-pdf tree that owns the text layers.
-    setPdfProxy(pdf);
+    setLoaded({ url, numPages: pdf.numPages, proxy: pdf });
   }
 
   /**
