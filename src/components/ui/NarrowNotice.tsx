@@ -60,15 +60,34 @@ export default function NarrowNotice() {
 
   return (
     <div className="narrownotice" role="note">
-      {/* Short on purpose: at 834 the longer version ran to three rows with
-          the button on its own line, which is a banner rather than a note. */}
+      {/**
+        * ONE SENTENCE, AND IT IS ADVICE.
+        *
+        * It read "Loom is built for a wider screen. Reading and capturing work
+        * here; the cloth and the board want more room." — three claims with no
+        * speech act between them, and TJ said so: "is that an instruction? a
+        * warning? a sentence?" It was none of them, and it explained itself in
+        * words a reader on a tablet has never met. "The cloth" and "the board"
+        * are Loom's names for its own surfaces; someone who has not reached
+        * 03 yet has no referent for either.
+        *
+        * So: what to do, then what it costs. "Works best on" is the advice,
+        * the clause after the dash is what you lose by ignoring it, and every
+        * word in it is a word the reader already has.
+        */}
       <span>
-        Loom is built for a <b>wider screen</b>. Reading and capturing work here;
-        the cloth and the board want more room.
+        Loom works best on a <b>wider screen</b> — you can read and capture passages
+        here, but building your concept map needs more room.
       </span>
+      {/* A × on the sentence's own line, not a word-button under it: spelled
+          out, "dismiss" could not fit beside the text at 834 and took the
+          notice to two rows and 73px — a banner, which is what a note about
+          getting out of the way must not be. The accessible name carries the
+          meaning the glyph cannot. */}
       <button
-        className="btn ghost mini"
+        className="btn ghost mini noticex"
         aria-label="Dismiss this notice"
+        data-tip="hide this — it will not come back"
         onClick={() => {
           try {
             window.localStorage.setItem(DISMISSED, "1")
@@ -78,7 +97,7 @@ export default function NarrowNotice() {
           setShow(false)
         }}
       >
-        dismiss
+        ×
       </button>
     </div>
   )

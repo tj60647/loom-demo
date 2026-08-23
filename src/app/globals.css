@@ -1035,7 +1035,8 @@ body[data-reading-focus] header{display:none}
   padding:8px 14px;border-bottom:1px solid var(--rule);background:var(--paper-2);
   font-size:13px;line-height:1.45;color:var(--ink-soft)}
 .narrownotice b{color:var(--ink);font-weight:600}
-.narrownotice .btn{margin-left:auto;flex:0 0 auto}
+.narrownotice span{flex:1 1 auto;min-width:0}
+.narrownotice .noticex{margin-left:auto;flex:0 0 auto;min-height:0;padding:1px 8px;font-size:14px;line-height:1.2}
 @media (max-width: 900px){
   header{padding:10px 14px 8px;gap:10px}
   .wordmark{font-size:21px}
