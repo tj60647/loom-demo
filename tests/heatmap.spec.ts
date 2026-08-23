@@ -61,9 +61,49 @@ async function pageWithHeat(page: import("@playwright/test").Page) {
   return false
 }
 
-test("the tab opens on the cohort, and shows no work of the viewer's own", async ({ page }) => {
+/**
+ * THE TAB, ON A READING THE SEED ACTUALLY GAVE THE COHORT MARKS.
+ *
+ * Heatmaps opens on the first reading in syllabus order, and on a fresh seed
+ * that reading has nobody's marks on it — CI said so in as many words:
+ * "Nobody in the cohort has marked this reading yet." Every test here that
+ * waits on heat was written against the dev database, which carries months of
+ * real work, and every one of them failed the first time the suite ran on a
+ * seeded one.
+ *
+ * So the reading is CHOSEN, not inherited. "Object Worlds" is the reading
+ * `npm run seed:demo` gives Test Users A, C and D overlapping captures in —
+ * the same reading tests/overlay.spec.ts names for the same reason — and the
+ * failure message says so, because a spec that dies with "element not found"
+ * teaches nothing about a missing seed.
+ */
+const SEEDED_WITH_MARKS = "Object Worlds"
+
+async function openHeatmaps(page: import("@playwright/test").Page, reading?: string) {
   await page.goto("/admin/heatmaps")
   await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+  if (!reading) return
+  const picker = page.getByLabel("Select active reading")
+  const value = await picker.locator("option").evaluateAll(
+    (opts, title) => (opts as HTMLOptionElement[]).find((o) => (o.textContent ?? "").includes(title))?.value ?? null,
+    reading
+  )
+  expect(value, `seed missing "${reading}" — run \`npm run seed:demo\` first`).not.toBeNull()
+  await picker.selectOption(value!)
+  await expect(page).toHaveURL(new RegExp(`source=${value}`), { timeout: 15_000 })
+  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+}
+
+/** The cohort's marks, with the seed named if they are not there. */
+async function expectHeat(page: import("@playwright/test").Page) {
+  await expect(
+    heatMarks(page).first(),
+    `no cohort marks on "${SEEDED_WITH_MARKS}" — run \`npm run seed:demo\`, which seeds the overlapping captures this asserts on`
+  ).toBeVisible({ timeout: 25_000 })
+}
+
+test("the tab opens on the cohort, and shows no work of the viewer's own", async ({ page }) => {
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
 
   /**
    * OPENS ON THE COHORT, unasked (TJ, 2026-08-22: "default overlay should be
@@ -87,7 +127,7 @@ test("the tab opens on the cohort, and shows no work of the viewer's own", async
   await expect(page.getByRole("button", { name: "Canvas" })).toHaveAttribute("aria-pressed", "true")
   // Heat is drawn there with no page rendered at all — the projection exists
   // precisely so fit-all is not a blank contact sheet.
-  await expect(heatMarks(page).first()).toBeVisible({ timeout: 25_000 })
+  await expectHeat(page)
 
   /**
    * NO YELLOW (TJ, 2026-08-22: "why is there any yellow highlight? for the
@@ -122,10 +162,9 @@ test("the tab opens on the cohort, and shows no work of the viewer's own", async
  * screen that none of the numbers describe.
  */
 test("no control offers the viewer their own work back", async ({ page }) => {
-  await page.goto("/admin/heatmaps")
-  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
   // The cohort's heat is there…
-  await expect(heatMarks(page).first()).toBeVisible({ timeout: 25_000 })
+  await expectHeat(page)
   // …and nothing on the toolbar turns the viewer's own marks on.
   await expect(page.getByRole("button", { name: /my marks|passage cards/i })).toHaveCount(0)
   await expect(ownMarks(page)).toHaveCount(0)
@@ -139,8 +178,7 @@ test("no control offers the viewer their own work back", async ({ page }) => {
 })
 
 test("choosing a student does not resize the scope strip", async ({ page }) => {
-  await page.goto("/admin/heatmaps")
-  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+  await openHeatmaps(page)
 
   const strip = page.locator("nav").nth(1)
   const before = await strip.boundingBox()
@@ -193,11 +231,12 @@ test("switching to a shorter reading asks only for pages it has", async ({ page 
     }
   })
 
-  await page.goto("/admin/heatmaps")
-  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
-  await expect(heatMarks(page).first()).toBeVisible({ timeout: 25_000 })
+  // Starts where the tab opens — a LONGER reading — because the whole point is
+  // switching to a shorter one while the old page count is still in hand. It
+  // needs no heat: what it watches is the network, not the wash.
+  await openHeatmaps(page)
 
-  // Object Worlds is 9 pages; the reading this tab opens on is 60. The seed
+  // Object Worlds is 9 pages; the reading this tab opens on has more. The seed
   // puts both in this course, which is what makes the mismatch reachable.
   const reading = page.getByLabel("Select active reading")
   const short = await reading.locator("option").evaluateAll((opts) => {
@@ -223,8 +262,7 @@ test("switching to a shorter reading asks only for pages it has", async ({ page 
  * fill… they dont seem to align" was (TJ, 2026-08-22).
  */
 test("heat is drawn once per page, by the view that owns it", async ({ page }) => {
-  await page.goto("/admin/heatmaps")
-  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
 
   const projected = page.locator(".pdf-kept-heat rect")
   const live = page.locator(".loom-overlay-heat")
@@ -251,8 +289,7 @@ test("heat is drawn once per page, by the view that owns it", async ({ page }) =
 })
 
 test("the legend floats over the page instead of adding a row above it", async ({ page }) => {
-  await page.goto("/admin/heatmaps")
-  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
 
   const bar = page.locator(".pdf-overlay-bar")
   await expect(bar).toBeVisible({ timeout: 20_000 })
@@ -314,8 +351,7 @@ test("the legend floats over the page instead of adding a row above it", async (
  * both rather than on whichever one the tab happens to open.
  */
 test("every reading reaches its own darkest step", async ({ page }) => {
-  await page.goto("/admin/heatmaps")
-  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
 
   const topStep = async () => {
     await expect(page.locator(".pdf-kept-heat rect").first()).toBeVisible({ timeout: 25_000 })
@@ -355,9 +391,8 @@ test("every reading reaches its own darkest step", async ({ page }) => {
  * outlives the band that fetched it.
  */
 test("the overlay can be turned off, and never names anybody", async ({ page }) => {
-  await page.goto("/admin/heatmaps")
-  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
-  await expect(heatMarks(page).first()).toBeVisible({ timeout: 25_000 })
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
+  await expectHeat(page)
 
   /**
    * The comparison is never a door into anybody: the marks are hidden from a

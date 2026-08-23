@@ -91,16 +91,28 @@ test("the card opens the reading, and carries the cloth's name and last edit", a
  * would pass.
  */
 test("the downloads on 03 follow the view, and the chips say what they show", async ({ page }) => {
+  /**
+   * A READING THE SEED GAVE ACTS TO, not whatever card sorts first.
+   *
+   * The chips only exist once the capture log is ready with something in it,
+   * so on a fresh seed they are simply absent from a reading nobody has worked
+   * — CI proved it: the cloth's three downloads were on screen and no chip was.
+   * "Object Worlds" is the reading tests/object-download.spec.ts asks the same
+   * of, for the same reason.
+   */
   await page.goto("/")
-  const card = page.locator(".shelfcard").first()
-  await expect(card).toBeVisible({ timeout: 15_000 })
+  const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
+  await expect(card, "seed missing — run `npm run seed:demo` first").toBeVisible({ timeout: 15_000 })
   await enterReadingFromCard(page, card)
   await page.locator("nav button.station", { hasText: "Knowledge Graph" }).first().click()
 
   const bar = page.locator(".mapbar").first()
   const cloth = bar.locator(".chip", { hasText: /^the cloth$/ })
   const log = bar.locator(".chip", { hasText: /^the log$/ })
-  await expect(cloth).toBeVisible({ timeout: 30_000 })
+  await expect(
+    cloth,
+    "no view chips — the capture log is empty for this reading, so `npm run seed:demo` has not run"
+  ).toBeVisible({ timeout: 30_000 })
 
   // "the log", not "the record" (TJ, same): the word on the chip now matches
   // the object it switches to, whose own downloads say "the log".
