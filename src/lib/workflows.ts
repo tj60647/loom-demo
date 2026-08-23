@@ -230,7 +230,7 @@ const faculty: Flow = {
     { id: "roster", label: "Roster — who is enrolled, who has not signed in, their counts", where: "/admin (read-only)" },
     { id: "loom", label: "Open Loom — the student's full journey, read-only, in the app itself", where: "/api/view-user/enter → the app; the float holds Download loom and Exit" },
     { id: "cohort", label: "Cohort Graph — the section's woven concepts", where: "/admin/aggregate" },
-    { id: "heat", label: "Heatmaps — where the section marked, on the page", where: "/admin/heatmaps · the Passages Overlay, Section · Cohort only" },
+    { id: "heat", label: "Heatmaps — where the cohort marked, on the page", where: "/admin/heatmaps · opens on the cohort; Section, Cohort or one student; no work of the viewer's own" },
     { id: "shut", label: "Readings and Courses stay admin's", where: "both redirect", kind: "denied" },
     { id: "own", label: "Their own reading and weaving, untouched", where: "the same bar, same click — capabilities are additive", kind: "end" },
   ],

@@ -59,16 +59,18 @@ test("the passages overlay shades the section's marks, deepest where they agree"
   const bar = page.locator(".pdf-overlay-bar")
   await expect(bar).toBeVisible({ timeout: 20_000 })
   // Counted in people, and the denominator is stated so a count is readable.
-  await expect(bar).toContainText(/\d+ of \d+ in (that section|the cohort) (has|have) marked this reading/, {
-    timeout: 20_000,
-  })
+  // Terse since 2026-08-22 ("4 of 8 marked · 17 passages · 7 here"): the bar
+  // floats over the page on the Heatmaps tab, where a sentence covered the
+  // text it was describing (TJ: "to wide, to much text"). Which band is being
+  // compared is named by the Overlay picker rather than repeated here.
+  await expect(bar).toContainText(/\d+ of \d+ marked · \d+ passages/, { timeout: 20_000 })
   // The scale NAMES ITS ENDS, because it is relative to this reading's own
   // densest run — the darkest step is "this many people marked the same words
   // here", not a fixed number. Replaces the "counted, not judged · no names"
   // line, removed from this bar on 2026-08-22 (TJ); the discipline it named is
   // enforced in src/actions/overlays.ts, which selects no name and no content,
   // and is asserted at the end of this test rather than by reading a sentence.
-  await expect(bar.locator(".pdf-overlay-scale")).toContainText(/\d+ marked the same words/)
+  await expect(bar.locator(".pdf-overlay-scale")).toContainText(/\d+ people/)
 
   // The shading itself. Which page carries it depends on where the seed's
   // sentence picker landed, so walk the spreads — but WAIT on each one before

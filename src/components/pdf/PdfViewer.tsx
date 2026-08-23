@@ -78,11 +78,25 @@ interface PdfViewerProps {
    * captures beside it, with a `remove passage` on each, is an invitation to
    * edit a loom you did not come to look at.
    *
-   * Your own HIGHLIGHTS stay on the text: they are marks on the page rather
-   * than a panel about you, and "did anyone else mark the words I marked?" is
-   * the question the overlay exists to answer.
+   * YOUR OWN HIGHLIGHTS GO TOO — reversed 2026-08-22. They used to stay, on
+   * the reasoning that a mark on the page is not a panel about you and that
+   * "did anyone else mark the words I marked?" is the overlay's own question.
+   * TJ: "why is there any yellow highlight? for the heatmap view there should
+   * not be." The reasoning was answering the reading station's question on a
+   * surface that does not ask it: this view is of the cohort, and one reader's
+   * yellow sitting in the same page as the cohort's wash is a second claim in
+   * a second colour that nobody came to read. It also misleads — the viewer is
+   * excluded from their own overlay, so their marks are the one set of marks
+   * on screen that the counts do not describe.
    */
   noOwnWork?: boolean;
+  /**
+   * The band the overlay opens on. Undefined leaves it off, which is the
+   * reading station's default and the reason it is not simply derived from
+   * `noOwnWork`: they are two decisions, and a surface could want either
+   * without the other.
+   */
+  defaultOverlayBand?: OverlayBand;
   /**
    * A student chosen OUTSIDE the viewer — the Heatmaps tab's own picker in
    * the scope strip (TJ, 2026-08-22). When set, the overlay reads that one
@@ -167,7 +181,8 @@ type HighlightEntry = {
 };
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
-  onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel, noOwnWork = false, overlayStudentId = null }: PdfViewerProps) {
+  onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel, noOwnWork = false, overlayStudentId = null,
+  defaultOverlayBand }: PdfViewerProps) {
   // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the
   // student's highlights, rail cards, search and page-turning all stay — they
   // are the mode — while the capture affordance never appears and the rail
@@ -218,21 +233,25 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * persisted — the same standing as viewMode itself.
    */
   /**
-   * ARE THE MARGIN CARDS SHOWING?
+   * IS THE VIEWER'S OWN WORK DRAWN — the highlights AND their margin cards?
    *
-   * On the reading station they stand permanently (TJ, 2026-08-17): "a
-   * control that hides the margin is a control that hides where the work is",
-   * and the Cards toggle went with that ruling.
+   * On the reading station, always (TJ, 2026-08-17): "a control that hides the
+   * margin is a control that hides where the work is", and the Cards toggle
+   * went with that ruling.
    *
-   * `noOwnWork` inverts both halves of that reasoning. The margin there is
-   * not where YOUR work is — it is someone else's, on a page you came to read
-   * the cohort's heat on — so the cards start hidden and a toggle brings them
-   * back (TJ, 2026-08-22: "the heatmap should have a 'passage card'
-   * visibility toggle. default is hidden"). One name still, so the four
-   * places that ask the question read one decision.
+   * Where `noOwnWork` is set, NEVER — and not behind a control either. This
+   * was a toggle for about an hour on 2026-08-22, first called "Passage cards"
+   * and then "My marks" once it gated the highlights with them. TJ settled it:
+   * "'my marks' should have no meaning in the heatmaps view." He is right that
+   * a control is the wrong shape for it. The tab answers "where has the cohort
+   * been", the viewer is excluded from their own overlay by construction, so
+   * their marks are the one set on screen that none of the numbers describe —
+   * a second claim in a second colour, and nothing on the page to say so.
+   *
+   * One flag, so the places that ask the question read one decision.
    */
-  const [cardsShown, setCardsShown] = useState(false);
-  const railsOn = noOwnWork ? cardsShown : true;
+  const ownWorkOn = !noOwnWork;
+  const railsOn = ownWorkOn;
   // Covers the whole window, chrome included — the reading takes the screen.
   const [isFullscreen, setIsFullscreen] = useState(false);
   /**
@@ -617,13 +636,27 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // must see the current terms without re-registering.
   const searchTermsRef = useRef<string[]>([]);
 
-  // The Passages Overlay (ruling 28): where OTHER people in this band marked
-  // the same pages, washed under the text in steps. Off by default — the page
-  // is yours first, and the gate below means it cannot open at all until you
-  // have captured a passage here yourself.
-  const [overlayBand, setOverlayBand] = useState<OverlayBand | null>(null);
+  /**
+   * The Passages Overlay (ruling 28): where OTHER people in this band marked
+   * the same pages, washed under the text in steps.
+   *
+   * OFF BY DEFAULT ON THE READING STATION — the page is yours first, and a
+   * comparison you did not ask for is the crowd pre-coding the text.
+   *
+   * ON BY DEFAULT WHERE THE COMPARISON IS THE POINT. A tab called Heatmaps
+   * that opens showing no heat is asking the reader to switch on the only
+   * thing they came for, so `defaultOverlayBand` starts it at the cohort there
+   * (TJ, 2026-08-22: "default overlay should be 'all'"). Set as the INITIAL
+   * state rather than by an effect, so the existing fetch below runs on mount
+   * the same way it runs on a change, and no first paint shows an empty page
+   * that is about to fill.
+   */
+  const [overlayBand, setOverlayBand] = useState<OverlayBand | null>(defaultOverlayBand ?? null);
   const [overlay, setOverlay] = useState<PassagesOverlay | null>(null);
-  const [overlayBusy, setOverlayBusy] = useState(false);
+  // Busy from the start when a band is: otherwise the status bar's "could not
+  // be loaded" branch — which reads !overlay && !busy — flashes an error under
+  // every mount that opens with heat.
+  const [overlayBusy, setOverlayBusy] = useState(Boolean(defaultOverlayBand));
   // Same reason as searchTermsRef: the applier runs from a MutationObserver
   // and must see the current heat without being re-registered.
   const overlayRef = useRef<PassagesOverlay | null>(null);
@@ -767,12 +800,36 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
+    /**
+     * WHERE THE STAGE STARTS, published to CSS.
+     *
+     * The floating overlay legend is positioned from `.pdf-shell`, whose top
+     * edge is the TOOLBAR's. Anchoring it to the top of the PAGES therefore
+     * needs the toolbar's height, and that is not a constant: the toolbar
+     * wraps to a second row when the window is narrow enough.
+     *
+     * Measured with rects against the shell, NOT with offsetTop against the
+     * parent. The stage's parent is `.pdf-body`, not the shell, and its
+     * offsetTop within that is 0 — so the obvious version of this published
+     * "0px" onto an element the legend does not inherit from, and the CSS
+     * fallback quietly did the work. Republished here because a toolbar that
+     * wraps changes the stage's height, which is exactly what this observer
+     * already fires on.
+     */
+    const publishStageTop = () => {
+      const shell = el.closest<HTMLElement>(".pdf-shell");
+      if (!shell) return;
+      const top = el.getBoundingClientRect().top - shell.getBoundingClientRect().top;
+      shell.style.setProperty("--pdf-stage-top", `${Math.round(top)}px`);
+    };
+    publishStageTop();
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const box = entry.contentRect;
         setStage({ w: box.width, h: box.height });
         setContainerWidth(box.width);
       }
+      publishStageTop();
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -1085,6 +1142,18 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             heat.spans
           );
         } catch (error) {
+          /**
+           * A DESTROYED WORKER IS NOT A FAILURE — it is this loop outliving
+           * the document it was reading. pdf.js throws "Cannot read properties
+           * of null (reading 'sendWithPromise')" from getPage once the
+           * transport is torn down, which happens whenever the reading is
+           * switched (and constantly under Fast Refresh). Every remaining page
+           * would throw the same way, so this stops rather than logging a line
+           * per page; the effect re-runs on the new proxy and places the heat
+           * there. Anything else is worth seeing.
+           */
+          const message = error instanceof Error ? error.message : String(error);
+          if (message.includes("sendWithPromise")) return;
           console.warn(`[Loom PDF] Page ${heat.pageNumber} heat could not be placed`, error);
         }
       }
@@ -1099,9 +1168,18 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
   // Keep passagesRef current (declared above, next to conceptsRef) so the
   // MutationObserver's applier never needs state.passages as a dependency.
+  //
+  // EMPTIED, not hidden, where own work is off: this ref is what the marking
+  // pass paints from, so clearing it here is what stops the yellow reaching
+  // the page at all. Filtering further down would have left the marks applied
+  // and merely covered, and the applier's "nothing to mark" sweep reads this
+  // same list to decide when to CLEAR — so an empty list is also what takes
+  // existing marks off when the toggle closes.
   useEffect(() => {
-    passagesRef.current = state.passages.filter(b => (sourceId && b.sourceId === sourceId) || b.source === sourceName);
-  }, [state.passages, sourceName, sourceId]);
+    passagesRef.current = ownWorkOn
+      ? state.passages.filter(b => (sourceId && b.sourceId === sourceId) || b.source === sourceName)
+      : [];
+  }, [state.passages, sourceName, sourceId, ownWorkOn]);
 
   /**
    * How many passages the student has captured in THIS reading. The gate is
@@ -1171,13 +1249,18 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       appliedStudent.current = overlayStudentId;
       if (overlayStudentId) {
         chooseOverlayBand("student", null);
+      } else if (defaultOverlayBand) {
+        // Clearing the picker falls BACK to the surface's default rather than
+        // to nothing: on Heatmaps "All students" means the cohort's heat, not
+        // a blank page.
+        chooseOverlayBand(defaultOverlayBand, null);
       } else {
         setOverlayBand(null);
         setOverlay(null);
       }
     }, 0);
     return () => window.clearTimeout(apply);
-  }, [overlayStudentId, chooseOverlayBand]);
+  }, [overlayStudentId, chooseOverlayBand, defaultOverlayBand]);
 
   // Find in this reading: the effect only schedules the debounced fetch —
   // state resets happen in the handlers (close, clear), never synchronously
@@ -1624,7 +1707,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     // highlight outlives the capture it stood for. Twice per capture, against
     // an observer re-registration that costs one sweep — the same trade the
     // passages list already makes.
-  }, [state.passages, state.concepts, bindHighlightNode, sourceName, searchTerms, overlay, stageEl, draft]); // Re-run when passages, search terms, the draft or the overlay change — and if the stage node itself is replaced
+    // `ownWorkOn` is in here because the toggle changes what is painted
+    // without changing state.passages: without it, pressing My marks would
+    // update the ref above and repaint nothing until something else moved.
+  }, [state.passages, state.concepts, bindHighlightNode, sourceName, searchTerms, overlay, stageEl, draft, ownWorkOn]); // Re-run when passages, search terms, the draft or the overlay change — and if the stage node itself is replaced
 
   /**
    * Is there a rail to draw the draft on?
@@ -1883,6 +1969,21 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // it answers "did that save?" without opening anything.
   const workCount = scoped.passages.length;
 
+  /**
+   * The viewer's own passages as the PAGE should draw them — the same list,
+   * or none of it where own work is off.
+   *
+   * The margin cards, the canvas's redrawn rectangles and the leader lines
+   * from card to highlight all read this, so one flag turns off every yellow
+   * mark at once rather than three of them and a straggler. `scoped.passages`
+   * itself is untouched: Your work counts, exports and the capture log are
+   * about what EXISTS, and this is only about what is drawn.
+   */
+  const ownPassages = useMemo(
+    () => (ownWorkOn ? scoped.passages : []),
+    [ownWorkOn, scoped.passages]
+  );
+
   // The margin cards take real width beside the pages; fit-to-width hands it
   // to them here so the spread still fits without a sideways scroll. Fit-page
   // is left alone — height is unaffected, and "safe center" already lets an
@@ -2011,12 +2112,16 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            and clicks belonging to the page under it. */
         .pdf-overlay-bar.floating {
           position: absolute;
-          /* BOTTOM-LEFT, not the top: .pdf-shell is the positioning context
-             and it starts at the toolbar, so a top-anchored band would cover
-             the controls. The minimap holds the bottom-RIGHT corner, so this
-             corner is the one that is free. */
+          /* TOP-LEFT, over the first page (TJ, 2026-08-22: "should be at top
+             not at bottom"). It was at the bottom because .pdf-shell is the
+             positioning context and starts at the TOOLBAR, so a plain top:12px
+             lands on the controls. --pdf-stage-top carries the measured
+             distance from the shell's top to the stage's, republished by the
+             stage's ResizeObserver, so this sits just below the toolbar at any
+             width and follows it when it wraps. */
           left: 12px;
-          bottom: 12px;
+          top: calc(var(--pdf-stage-top, 44px) + 12px);
+          bottom: auto;
           right: auto;
           /* FOUR ROWS, not a wrapped strip (TJ, 2026-08-22). The four are the
              count sentence, the scale, the unplaced tally and the dropped-run
@@ -2027,7 +2132,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           flex-direction: column;
           align-items: flex-start;
           gap: 5px;
-          max-width: min(38%, 400px);
+          /* Narrow enough to sit over a margin rather than over the text. */
+          max-width: min(26%, 260px);
           z-index: 4;
           border: 1px solid var(--rule);
           border-bottom: 1px solid var(--rule);
@@ -2944,17 +3050,6 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               reader's eye at the exact moment their attention was already
               moving. Filled-vs-ghost says which state it is in — the same way
               Page/Strip/Matrix do — and aria-expanded says it properly. */}
-          {noOwnWork && (
-            <button
-              className={`btn mini${cardsShown ? "" : " ghost"}`}
-              onClick={() => setCardsShown((v) => !v)}
-              aria-pressed={cardsShown}
-              aria-label="Show the passage cards in the margin"
-              data-tip="the cards for each marked passage, in the margin"
-            >
-              {isNarrow ? "▤" : "Passage cards"}
-            </button>
-          )}
           {!noOwnWork && <button
             id="yourwork-toggle"
             ref={workToggleRef}
@@ -3247,23 +3342,31 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </span>
           )}
           {overlay && !overlay.blocked && overlay.contributors > 0 && (
+            /**
+             * TERSE, because it floats over the page (TJ, 2026-08-22: "to wide,
+             * to much text"). A legend laid over a drawing is read at a glance
+             * and covers what is under it the whole time it is open, so it
+             * carries the numbers and drops the sentence they used to sit in:
+             * "4 of 8 in the cohort have marked this reading — 17 passages, 7
+             * on this spread" became "4 of 8 · 17 passages · 7 here". Nothing
+             * is lost that the page does not already say — which band is being
+             * compared is named in the Overlay picker two inches away.
+             */
             <>
               <span>
-                <b>{overlay.contributors}</b> of {overlay.peers} in{" "}
-                {overlay.band === "section" ? "that section" : "the cohort"}{" "}
-                {overlay.contributors === 1 ? "has" : "have"} marked this reading —{" "}
+                <b>{overlay.contributors}</b> of {overlay.peers} marked ·{" "}
                 <b>{overlay.passages}</b> passage{overlay.passages !== 1 ? "s" : ""}
                 {viewMode === "page" && (
                   <>
-                    , <b>{overlayHereCount}</b> on this {isTwoPage ? "spread" : "page"}
+                    {" "}· <b>{overlayHereCount}</b> here
                   </>
-                )}.
+                )}
               </span>
               {/* The scale NAMES ITS ENDS, because it is relative: the darkest
                   step is this reading's own densest run, not a fixed number of
-                  people. "more" left a reader to guess whether the dark patches
-                  meant three had agreed or thirty, which is the one thing the
-                  shading is there to tell them. */}
+                  people. Left to "fewer → more", a reader could not tell
+                  whether the dark patches meant three had agreed or thirty,
+                  which is the one thing the shading is there to tell them. */}
               <span className="pdf-overlay-scale">
                 <span className="cap">1</span>
                 {/* As many swatches as the page can actually produce. Below
@@ -3276,17 +3379,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                     <i key={step} data-heat={step + 1} aria-hidden="true" />
                   )
                 )}
-                <span className="cap">
-                  {overlay.maxCount} marked the same words
-                </span>
+                <span className="cap">{overlay.maxCount} people</span>
               </span>
               {overlay.unanchored > 0 && (
-                <span className="cap">
-                  {overlay.unanchored} not placed on the page
-                </span>
+                <span className="cap">{overlay.unanchored} not placed</span>
               )}
               {overlay.droppedSpans > 0 && (
-                <span className="cap">{overlay.droppedSpans} runs past the display limit</span>
+                <span className="cap">{overlay.droppedSpans} past the limit</span>
               )}
             </>
           )}
@@ -3401,7 +3500,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               <ConceptRails
                 enabled={railsOn && !isNarrow}
                 twoPage={isTwoPage && pageNumber + 1 <= (numPages || 1)}
-                passages={scoped.passages}
+                passages={ownPassages}
                 concepts={state.concepts}
                 onOpenPassage={gotoOpenPassage}
                 onOpenConcept={gotoOpenConcept}
@@ -3515,7 +3614,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               stage={stage}
               stageEl={stageEl}
               cardsOn={railsOn && !isNarrow}
-              passages={scoped.passages}
+              passages={ownPassages}
               concepts={state.concepts}
               onOpenPassage={gotoOpenPassage}
               onOpenConcept={gotoOpenConcept}
@@ -3679,7 +3778,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           selecting text stays free — reading is selecting — but the selection
           arms nothing. Gated at the render rather than in handleSelection so
           the selection-measuring effect keeps one shape in both modes. */}
-      {highlightRect && !readOnly && (
+      {/* …and never where own work is hidden. A capture made here would save
+          a real passage and paint nothing, since the marks it would appear as
+          are the ones this surface is holding back — an action with no visible
+          result reads as a broken button. The reading station is where a
+          capture belongs. */}
+      {highlightRect && !readOnly && ownWorkOn && (
         <button 
           id="captureNow"
           className="btn mini"
