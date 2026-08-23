@@ -284,6 +284,29 @@ export async function deleteCourse(formData: FormData) {
   revalidateAdmin()
 }
 
+/**
+ * Validates a lead choice the way assignMemberSection validates a section:
+ * the id must name an ACTIVE FACULTY membership of THIS course, else null —
+ * a direct POST cannot install an outsider as a section's lead. Returns null
+ * for the empty choice ("no lead") too.
+ */
+async function resolveLeadUserId(courseId: string, raw: string): Promise<string | null> {
+  if (!raw) return null
+  const rows = await db
+    .select({ userId: courseMemberships.userId })
+    .from(courseMemberships)
+    .where(
+      and(
+        eq(courseMemberships.courseId, courseId),
+        eq(courseMemberships.userId, raw),
+        eq(courseMemberships.role, "FACULTY"),
+        isNull(courseMemberships.removedAt)
+      )
+    )
+    .limit(1)
+  return rows[0]?.userId ?? null
+}
+
 export async function createSection(formData: FormData) {
   await requireAdmin()
 
@@ -293,11 +316,13 @@ export async function createSection(formData: FormData) {
 
   const slug = await uniqueSectionSlug(courseId, slugify(readText(formData, "slug") || name))
 
+  // The lead is a reference to a course FACULTY member since migration 0028;
+  // the legacy free-text `lead` is never written for a new section.
   await db.insert(sections).values({
     courseId,
     slug,
     name,
-    lead: readText(formData, "lead"),
+    leadUserId: await resolveLeadUserId(courseId, readText(formData, "leadUserId")),
   })
 
   revalidateAdmin()
@@ -317,9 +342,22 @@ export async function updateSection(formData: FormData) {
     sectionId
   )
 
+  // Three lead choices, one of them easy to miss. "__keep__" is the edit
+  // form's default for a pre-0028 row that still shows its free-text lead:
+  // it touches neither column, so renaming such a section cannot silently
+  // wipe the legacy name. Any other value decides the lead outright — a
+  // validated FACULTY reference, or none — and clears the legacy text with
+  // it, so the two columns can never disagree about who leads.
+  const leadChoice = readText(formData, "leadUserId")
+  const set: Partial<typeof sections.$inferInsert> = { name, slug }
+  if (leadChoice !== "__keep__") {
+    set.leadUserId = await resolveLeadUserId(courseId, leadChoice)
+    set.lead = ""
+  }
+
   await db
     .update(sections)
-    .set({ name, slug, lead: readText(formData, "lead") })
+    .set(set)
     .where(and(eq(sections.id, sectionId), eq(sections.courseId, courseId)))
 
   revalidateAdmin()

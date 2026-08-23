@@ -199,6 +199,12 @@ main{padding:24px max(26px,calc((100% - var(--measure,1100px))/2)) 86px;margin:0
 /* The workbench stations (01–04). Three columns come out at ~530px each here —
    the width each card had when this station was two columns. */
 main.station-work{--measure:1680px}
+/* The admin course console. A management surface, not prose (contracts.md
+   §2c-iii: work surfaces take the room they are given) — 1100px kept its
+   catalog and panels to a reading column. Same measure as the stations
+   above, none of their :has() column machinery: this main scrolls normally
+   inside .adminbody. */
+main.workwide{--measure:1680px}
 .panel{display:none} .panel.active{display:block}
 /* 00 · Reading hands its whole height to the viewer, which scrolls itself.
    No padding, no page scroll — the text is the thing on this station. */
@@ -746,6 +752,180 @@ button.act,button.rm{appearance:none;background:none;border:none;padding:0}
    broken at exactly the moment the pick landed. The cloth is a picture; the
    names it draws are readable in three other places. */
 #map{display:block;width:100%;height:400px;touch-action:none;user-select:none;-webkit-user-select:none}
+
+/* ===== the cohort canvas (admin/aggregate) =====
+   A MAP APPLICATION, not an illustration with a caption (TJ, 2026-08-22: "the
+   map or graph needs to fill the screen like a google map or other
+   application, cad, where the drawing is primary… the text is annotations for
+   a map"). The first cut of this kept the page's h1, subtitle, card frame and
+   a read-out below the drawing, which is exactly the figure-with-caption
+   shape he ruled against: "why is there 'padding' around the graph? this
+   whole thing is unnecessary and redundant."
+
+   So the canvas is the viewport below the shell's bars, edge to edge, and
+   every piece of text that used to surround it floats on it. */
+/* Bottom padding clears the shell's fixed identity footer, measured at 34px
+   on the running app — it is `position:fixed` over the window, so a canvas
+   that took the full height would put its labels and its read-out underneath
+   it. Every other admin page clears it with main's own 86px bottom padding;
+   a map has no such padding, so it reserves exactly the band. */
+main.canvasfull{padding:0 0 34px;margin:0;height:100%;overflow:hidden;box-sizing:border-box}
+/* The shell insets every admin page by 20px; a map cannot be inset and still
+   reach its own edges. `:has()` lets the page opt out without the layout
+   needing to know which route it is rendering — the same technique
+   `main.station-work:has(…)` already uses above. */
+.adminbody{padding:20px 20px 0}
+.adminbody:has(> main.canvasfull){padding:0}
+/* ===== the Heatmaps tab =====
+   A WARM RAMP, and only here (TJ, 2026-08-22: "we need a more heatmap like
+   color palette, grey is not great" — scoped to this tab on his ruling).
+
+   Everywhere else the overlay stays slate, because on the reading station
+   heat shares the page with two other marks and the three "must never read as
+   each other": own passage is yellow, a search hit is sage, and a warm heat
+   at its palest step drifts toward that yellow. This tab has no capture and
+   no search, so heat is the only mark on the page and can take the colour the
+   thing is actually named after.
+
+   One token, because the ramp is one hue at five alphas and PdfViewer now
+   reads `--heat-rgb` for every one of them — the live wash, its overline, the
+   legend swatches, the status bar, and the rects redrawn on the Canvas.
+
+   #c8451e = rgb(200,69,30). Checked rather than chosen by eye: over white the
+   five steps run #f8e9e4 → #e29e8a, lightness strictly decreasing, and ink
+   (#1a1916) over them holds 14.87 → 7.95 contrast, every step far above the
+   4.5 floor. */
+.heatpage{--heat-rgb:200, 69, 30}
+.cohortcanvas{position:relative;height:100%;background:#f4f2ec}
+/* No border, no radius, no card: the drawing meets the window.
+
+   The bottom padding RESERVES the resting read-out's band, because an arc
+   diagram puts its nodes and their rotated labels along the bottom — measured
+   at 1920 without it, 64 of 161 labels ran under the bar. 86px = the bar's
+   67px resting height + its 14px inset + 5. An opened disclosure grows past
+   the reserve and does cover labels; that is a transient the reader asked
+   for, unlike a permanent overlap they did not. */
+.cohortcanvas #mapWrap{border:0;border-radius:0;height:100%;background:transparent;
+  padding-bottom:86px;box-sizing:border-box}
+.cohortcanvas #map{height:100%}
+/* The page's own name heads the LEFT panel rather than floating beside it.
+   As a separate chip it collided with the menu below it the moment the scope
+   line wrapped to three lines — the panel's top is a constant and the chip's
+   height is not. One panel, title then list, is also what a map application
+   does with its left rail. */
+.canvastitle{border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:8px}
+.canvastitle h1{font-size:20px;margin:0}
+.canvastitle .sub{display:block;font-size:12px;color:var(--ink-soft);margin-top:2px}
+.canvastitle .warn{display:block;font-size:12px;color:var(--red);margin-top:4px}
+/* Over the drawing's top corners. Held to a third of the width so the middle
+   of the warp — where the long arcs rise — stays clear, and to 44% of the
+   canvas so the baseline and its labels are never covered. */
+.canvasmenu{position:absolute;width:min(32%,340px);max-height:44%;z-index:3;
+  display:flex;flex-direction:column;
+  background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:10px 12px;
+  box-shadow:0 1px 10px rgba(0,0,0,.06)}
+/* The left panel carries the page title, so it is allowed to be taller. */
+.canvasmenu.atleft{left:14px;top:14px;max-height:60%}
+.canvasmenu.atright{right:14px;top:14px}
+.canvasmenu h2{font-size:15px;margin:0}
+/* The fold. A panel you are not using is in the way of the map you are, so
+   both close to their own heading — same twirl idiom as .invitefold and
+   .panelfold. Closed, the panel is one 34px row. */
+.canvasmenu > summary{display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none;padding-bottom:7px}
+.canvasmenu > summary::-webkit-details-marker{display:none}
+.canvasmenu > summary .tw{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--ochre);transition:transform .15s}
+.canvasmenu[open] > summary .tw{transform:rotate(90deg)}
+/* Closed, it must not hold 44% of the canvas open on nothing. */
+.canvasmenu:not([open]){max-height:none}
+/* Filter and sort, one row, between the heading and the list (TJ,
+   2026-08-22: "let the concept cards be sortable and filterable… the threads
+   panel is the same"). `.tinput` is width:100% by default and `.tinput.inline`
+   opts back out — the field takes the room, the select takes its content. */
+.canvasfilter{display:flex;gap:6px;align-items:center;padding-bottom:8px;flex:none}
+/* The FIELD is the only thing that may shrink. Given `flex:1` alone, the
+   select and the two buttons shrank with it and the sort read "nan" and
+   "fror" — a truncated control is worse than a narrow field, because the
+   field still shows what you typed. */
+.canvasfilter .tinput{flex:1 1 auto;font-size:13px;padding:5px 7px;min-width:40px;width:auto}
+.canvasfilter select.tinput.inline{flex:0 0 auto;font-size:12.5px;padding:5px 4px;width:auto;min-width:0}
+.canvasfilter .btn.iconly{flex:0 0 auto;padding:4px 6px;font-size:12px;line-height:1}
+/* A <details> puts its content in a `::details-content` box, so THAT is the
+   flex item, not the .scrollbox inside it — without this the list ignored the
+   panel's max-height and ran down the map with no panel under it. Both rules
+   carry the same intent so engines that flatten straight to the child behave
+   identically, the way `.actrow details::details-content` already does. */
+.canvasmenu::details-content{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.canvasmenu > .scrollbox,.canvasmenu > .empty{flex:1 1 auto;min-height:0}
+.canvasmenu{overflow:hidden}
+/* A failed read, said in the open — the one thing a drawing cannot show. */
+.canvasnotice{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:4;
+  display:flex;flex-direction:column;gap:3px;max-width:min(46%,560px);
+  background:var(--paper);border:1px solid var(--red);border-radius:4px;padding:8px 12px;
+  color:var(--red);font-size:13px;box-shadow:0 1px 10px rgba(0,0,0,.06)}
+/* The list inside gives up the shared clamp and takes what the card has left,
+   so the panel is one scroller and not a scroller inside a scroller. */
+.canvasmenu .scrollbox{flex:1 1 auto;min-height:60px;max-height:none;border:0;background:transparent;overflow-x:hidden}
+/* A concept row is name + attribution on one line, and the attribution has
+   `white-space:nowrap` — in a 340px panel that pushed the row wider than its
+   box and put a horizontal scrollbar under the list. The name gives way
+   instead: it ellipsizes, and the tally keeps its one line. */
+/* ConceptCard, minified — the design system's card reduced to its identity
+   (`.ywmini`). `.crow.ywcard` neutralises .crow's own flex/padding so the
+   card's own head can lay the row, which is why the padding comes back here
+   rather than on .crow. One line, ellipsized: the panel is 316px and the
+   list is read to find a name, not to study one. */
+.crow.ywcard.ywmini{padding:0;border-bottom:1px dotted var(--rule);border-radius:4px;cursor:pointer}
+.crow.ywcard.ywmini:last-child{border-bottom:0}
+.crow.ywcard.ywmini .lhead{padding:7px 9px;cursor:pointer}
+.crow.ywcard.ywmini .lconcept{font-size:14.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crow.ywcard.ywmini:hover{background:rgba(168,132,63,.08)}
+/* The one lit row, in the ochre wash every "this is the open one" wears, with
+   the same inset bar .crow.picked has always had. */
+.crow.ywcard.ywmini.picked{box-shadow:inset 3px 0 var(--ochre);background:rgba(168,132,63,.1)}
+.crow.ywcard.ywmini:focus-visible{outline:2px solid var(--sage);outline-offset:-2px}
+/* ThreadCard, minified. The card's own trip is 15px and names its ends in
+   <b> — right on a page where the card IS the content, too loud in a 316px
+   list beside 14.5px concept names and 10px captions (TJ, 2026-08-22: "the
+   thread text seems kinda big relative to all the other text on the screen.
+   and bold seems unnecessary"). The ends carry the weight of being the only
+   thing on the card; they do not need the weight of bold as well. */
+.canvasmenu .thread{padding:7px 9px}
+.canvasmenu .thread .trip{font-size:13.5px;gap:3px 6px}
+.canvasmenu .thread .trip b{font-weight:400}
+/* THE READ-OUT, on the foot of the canvas — ONE LINE until asked.
+
+   It sat below the drawing as a column of page, and TJ pointed at it: "this
+   whole thing is unnecessary and redundant, i excluded it from the example i
+   shared." Moving it onto the canvas at 42% height was the same mistake in a
+   new place — a bar that covered the warp it annotates, which is why the
+   evidence is now behind a disclosure and the resting state is a single row.
+   The map stays the thing you are looking at.
+
+   The nodes and their labels live at the BOTTOM of an arc diagram, which is
+   exactly where a footer wants to be, so the ceiling is deliberately low: at
+   30% an opened read-out still leaves the baseline and most labels visible,
+   and it scrolls rather than growing. */
+.canvasfoot{position:absolute;left:14px;right:14px;bottom:14px;z-index:3;
+  max-height:30%;overflow-y:auto;
+  background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:8px 13px;
+  box-shadow:0 1px 10px rgba(0,0,0,.06)}
+/* The resting line: subject, author, counts, and the sentence or definition. */
+.canvasfoot .threadhead{margin:0;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+.canvasfoot .footsaid{font-size:14px;font-style:italic;color:var(--ink-soft)}
+.canvasfoot .passagequote{margin:6px 0 8px}
+/* The evidence, folded. Same twirl idiom as every other disclosure here. */
+.canvasfoot .footmore{margin-top:7px}
+.canvasfoot .footmore > summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+.canvasfoot .footmore > summary::-webkit-details-marker{display:none}
+.canvasfoot .footmore > summary:hover{color:var(--ink)}
+.canvasfoot .footmore > summary .tw{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--ochre);transition:transform .15s}
+.canvasfoot .footmore[open] > summary .tw{transform:rotate(90deg)}
+/* Nothing selected: one quiet line, not an empty panel. */
+.canvasfoot.idle{color:var(--ink-soft);font-size:13px}
+.canvasfoot .who{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
+.canvasfoot .said{font-size:14px;font-style:italic;color:var(--ink-soft);min-width:0}
+.canvasfoot .subject{font-family:var(--display);font-size:16px;color:var(--red)}
 /* The pair's offer. TOP LAYER, via popover="auto" — #mapWrap directly above
    is overflow-x:auto, so it would CLIP an absolutely-positioned card at its
    own edges. That is not a prediction: clipping by an overflow ancestor is
@@ -846,6 +1026,17 @@ footer .footid .label{letter-spacing:.1em}
    instead and one rule does the work from the far side of the tree. */
 body[data-reading-focus] header{display:none}
 
+/* The narrow-screen notice (src/components/ui/NarrowNotice.tsx). A line at the
+   top of the window, in flow rather than fixed: fixed chrome in this app has a
+   history of eating the clicks and the edges beneath it, and this is print —
+   it says what Loom is built for and then gets out of the way for good. It is
+   only ever rendered below 900px, so it needs no media query of its own. */
+.narrownotice{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:8px 14px;border-bottom:1px solid var(--rule);background:var(--paper-2);
+  font-size:13px;line-height:1.45;color:var(--ink-soft)}
+.narrownotice b{color:var(--ink);font-weight:600}
+.narrownotice span{flex:1 1 auto;min-width:0}
+.narrownotice .noticex{margin-left:auto;flex:0 0 auto;min-height:0;padding:1px 8px;font-size:14px;line-height:1.2}
 @media (max-width: 900px){
   header{padding:10px 14px 8px;gap:10px}
   .wordmark{font-size:21px}
@@ -1578,9 +1769,19 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    edges | section | role | remove — the door right beside the name, the
    counts narrow (number pills need less than their sortable headers), the
    destructive control last. */
-.rosterhead,.rosterrow{display:grid;grid-template-columns:minmax(170px,1fr) 110px 70px 60px 190px 120px 90px;gap:6px 14px;align-items:center;padding:4px 14px}
+/* Eight tracks since 2026-08-22: `cloths` joined the counts (TJ) — a cloth is
+   one reading's work, so it says how many readings a person has actually
+   woven, which the other two numbers cannot. It sits FIRST of the three,
+   container before contents, and takes the same narrow basis: a number pill
+   needs less than its own sortable heading. */
+.rosterhead,.rosterrow{display:grid;grid-template-columns:minmax(170px,1fr) 110px 62px 70px 60px 190px 120px 90px;gap:6px 14px;align-items:center;padding:4px 14px}
 .rosterhead{border-bottom:1px solid var(--rule);padding-top:7px;padding-bottom:7px}
 .rosterhead button{background:none;border:none;padding:0;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;text-align:left}
+/* The one header that is not a sort button — `open loom` — had this class in
+   the markup and no rule anywhere, so it fell back to the 17px body serif
+   beside seven 10px mono headings. A header row reads as a row or it reads as
+   a mistake; sortable or not is not a reason to look different. */
+.rosterhead .rostercol{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
 .rosterhead button:hover{color:var(--ink)}
 .rosterhead button.on{color:var(--ochre)}
 .rosterrow{border-bottom:1px dotted var(--rule)}
@@ -1599,11 +1800,41 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    still legible — it is the row that needs chasing. */
 .rosterrow.pendingrow .rostername{color:var(--ink-soft);font-style:italic}
 /* Invite learners starts folded: inviting is occasional, scanning the roster
-   is the daily visit. Same twirl idiom as .bandtoggle/.distilltoggle. */
-.invitefold summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}
-.invitefold summary::-webkit-details-marker{display:none}
-.invitefold summary .tw{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--ochre);transition:transform .15s}
-.invitefold[open] summary .tw{transform:rotate(90deg)}
+   is the daily visit. Same twirl idiom as .bandtoggle/.distilltoggle.
+   .panelfold is the same fold for the course detail's Readings and Sections
+   panels (TJ, 2026-08-21: "sub panels could be collapsible") — a separate
+   class, not a reuse, because journey-admin.spec locates the one New Course
+   fold by details.invitefold and two more matches would trip strict mode. */
+.invitefold summary,.panelfold summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}
+.invitefold summary::-webkit-details-marker,.panelfold summary::-webkit-details-marker{display:none}
+.invitefold summary .tw,.panelfold summary .tw{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--ochre);transition:transform .15s}
+.invitefold[open] summary .tw,.panelfold[open] summary .tw{transform:rotate(90deg)}
+/* The count beside a panel heading is a `.hint`, and `.card .hint` carries
+   `margin:2px 0 14px` for prose (line 279). In a centred flex summary the
+   MARGIN box is what centres, so the count sat 6.0px above the heading and
+   11.5px of a 35.5px summary was its margin (measured on the running app at
+   1280: summary 35.5, h3 24, centres 812.4 vs 818.4). Same trap the reading
+   author and section lead spans hit inline. */
+.panelfold > summary .hint{margin:0}
+
+/* ===== the course catalog (admin/courses) ===== */
+/* The roster's table idiom on the course catalog: ONE grid template lays the
+   header and every row (see .rosterhead above, and its rationale), so the
+   columns agree to the pixel. Rows are anchors — the whole row is the click
+   that selects the course into ?course= — so the grid sits on the <a>. */
+.catlist{padding:0}
+.cathead,a.catrow{display:grid;grid-template-columns:minmax(240px,1fr) 140px 90px 90px 90px 110px;gap:6px 14px;align-items:center;padding:6px 14px}
+.cathead{border-bottom:1px solid var(--rule);padding-top:8px;padding-bottom:8px}
+.cathead span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+a.catrow{border-bottom:1px dotted var(--rule);color:inherit;text-decoration:none}
+a.catrow:last-child{border-bottom:none}
+a.catrow:hover{background:rgba(0,0,0,.025)}
+/* The selected course wears the ochre open wash the coding log's open row
+   wears (.lrow.open) — the catalog and the detail below it are one thing. */
+a.catrow.on{background:rgba(168,132,63,.08)}
+.catname{font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.catterm{font-size:13px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.catnum{font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
 /* Open Loom's float: whose loom this is, Download loom, Exit — nothing
    else (TJ, 2026-08-21; the Teaching link rows lived a day, 23ecf9c to
    here). The identity line is the header — whose loom the viewer is inside
@@ -1645,6 +1876,23 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
    the road not taken is legible without ticking anything. The pill shape is
    borrowed from the row's status pills on purpose: this control sets exactly
    the pill it looks like. */
+/* A foldout whose fields are all small — a week, an order, a two-way choice,
+   a name — lays out on ONE line instead of stacking. `.form-row` is a column
+   by design (line 280) and right for forms of prose-width fields; inherited
+   by three number-sized controls it spent 290px of height on them (measured
+   on the running app at 1536: WEEK 30 · input 37 · ORDER 30 · input 37 ·
+   WEIGHT 30 · radios 33 · hint 24 · SAVE 27, plus 11px row margins). TJ,
+   2026-08-22: "this seems like it could be more efficient."
+   Labels sit beside their field, inputs size to their content, and the
+   trailing hint is last so it is what wraps when the line runs out. */
+.foldline{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.foldline .form-row{flex-direction:row;align-items:center;gap:8px;margin-bottom:0}
+.foldline .form-row input{width:auto}
+/* Number fields are as wide as the numbers they hold: week is 1–20, order a
+   small integer. Centred because a 2-character value in a 150px default box
+   reads as a mistake. */
+.foldline input.numin{width:66px;text-align:center}
+.foldline .hint{margin:0;font-size:13px}
 .radiorow{display:flex;flex-wrap:wrap;gap:8px}
 .radiopick{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;
   letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);background:#fff;

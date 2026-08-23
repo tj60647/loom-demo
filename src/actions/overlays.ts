@@ -15,9 +15,24 @@
  *    protected a *student's* first read, and there is no student viewer left.
  *    Scope is now the peers' coded readings (see below), and no capture check
  *    remains in this file.
- * 2. SECTION AND COHORT ONLY. No per-person band ships in v1, so nothing here
- *    returns a name, an id, or anything that resolves to one. Counts are of
- *    PEOPLE, never of rows that carry an author.
+ * 2. SECTION AND COHORT WERE THE ONLY BANDS — AND A THIRD JOINED THEM.
+ *    Until 2026-08-22 no per-person band shipped: nothing here returned a
+ *    name, an id, or anything that resolved to one, and counts were of PEOPLE
+ *    rather than of rows carrying an author. TJ asked for a student picker on
+ *    the Heatmaps tab that day, so `band: "student"` now exists and DOES
+ *    resolve to one person.
+ *
+ *    What it does not do is widen what staff may see. Open Loom already lets
+ *    a faculty member read one named student's whole loom, highlights on the
+ *    page included (capability `student-loom-open`, ruled 2026-08-21) — so
+ *    this is a second door onto work that door already opens, not a new
+ *    disclosure. The anonymity of the SECTION and COHORT bands is untouched:
+ *    they still count people and still name nobody, which is what kept a
+ *    comparison from becoming surveillance.
+ *
+ *    A student band is refused unless the viewer may see that student — the
+ *    same membership check the other bands run, plus the target being a
+ *    LEARNER of the viewer's own course.
  * 3. SHARED OBJECTS ONLY. Highlight spans, Concept Labels and Descriptions,
  *    Link Labels and Descriptions. Never Notes, Questions, Pull-quote flags,
  *    Passage Tiers, Cloth Titles/Descriptions or Projection text — the margin
@@ -57,8 +72,17 @@ import {
  * The most heat spans one reading's overlay may carry. A span is emitted per
  * change in depth, so this is only reachable on a heavily-marked long text;
  * whatever it cuts is reported as `droppedSpans` rather than vanishing.
+ *
+ * RAISED FROM 4000 for the cohort this is being built for rather than the one
+ * in the dev branch: one reading is expected to carry ~60 looms (TJ,
+ * 2026-08-22). Depth changes at each capture's two ends, so the ceiling is
+ * about 2 spans per passage before overlap coalesces them — 60 people at 20
+ * passages each puts the worst case near 2,400, and 4000 left almost no room
+ * above the expected load. A span serializes to about 40 characters of JSON
+ * (`{"start":12345,"end":12456,"count":7},`), so this cap is roughly 480KB
+ * uncompressed, on a faculty view that fetches it once per reading.
  */
-const MAX_SPANS = 4000
+const MAX_SPANS = 12000
 
 /**
  * Above this many in-scope concepts the edge query stops naming them and
@@ -118,10 +142,13 @@ async function peersOf(
   /** Which section, when the viewer chose one. Staff pick any section of the
    *  course; without it this falls back to the viewer's own, which is what a
    *  section band meant before the picker (TJ, 2026-08-08). */
-  sectionId?: string | null
+  sectionId?: string | null,
+  /** Required by `band: "student"`; ignored otherwise. */
+  studentId?: string | null
 ): Promise<string[] | Blocked> {
   const section = sectionId ?? viewer.sectionId
   if (band === "section" && !section) return { blocked: "no-section" }
+  if (band === "student" && !studentId) return { blocked: "no-peers" }
 
   const rows = await db
     .select({ userId: courseMemberships.userId })
@@ -140,7 +167,11 @@ async function peersOf(
         // cohort' would be the instructor pre-coding the text". A positive
         // match cannot rot the same way when another role string appears.
         eq(courseMemberships.role, "LEARNER"),
-        ...(band === "section" ? [eq(courseMemberships.sectionId, section!)] : [])
+        ...(band === "section" ? [eq(courseMemberships.sectionId, section!)] : []),
+        // The student band is the peer query narrowed to one person — so it
+        // inherits every check above, and a target who is not a LEARNER of
+        // this course simply yields nobody rather than an error.
+        ...(band === "student" ? [eq(courseMemberships.userId, studentId!)] : [])
       )
     )
 
@@ -169,7 +200,8 @@ async function codedBy(userIds: string[]): Promise<string[]> {
 export async function getPassagesOverlay(
   sourceIdRaw: string,
   band: OverlayBand = "section",
-  sectionId?: string | null
+  sectionId?: string | null,
+  studentId?: string | null
 ): Promise<PassagesOverlay> {
   const sourceId = (sourceIdRaw ?? "").trim()
   if (!sourceId) return emptyPassagesOverlay(band, "not-coded")
@@ -182,7 +214,7 @@ export async function getPassagesOverlay(
   // no student here to protect. An instructor seeing where a section marked is
   // the job (they already have /admin/aggregate, ungated).
 
-  const peers = await peersOf(viewer, band, sectionId)
+  const peers = await peersOf(viewer, band, sectionId, studentId)
   if (isBlocked(peers)) return emptyPassagesOverlay(band, peers.blocked)
   if (peers.length === 0) return emptyPassagesOverlay(band, "no-peers")
 
@@ -240,24 +272,65 @@ export async function getPassagesOverlay(
     anchored.set(page, list)
   })
 
+  const pageNumbers = [...counts.keys()].sort((a, b) => a - b)
+  const measured = pageNumbers.map((pageNumber) => ({
+    pageNumber,
+    all: heatSpans(anchored.get(pageNumber) ?? []),
+  }))
+
+  const totalSpans = measured.reduce((sum, page) => sum + page.all.length, 0)
+  // The scale is taken before anything is dropped, so a payload that had to be
+  // trimmed still shades on the same range as one that did not.
+  const maxCount = measured.reduce(
+    (top, page) => page.all.reduce((inner, span) => Math.max(inner, span.count), top),
+    0
+  )
+
+  /**
+   * TRIMMING IS BY DENSITY AND BY SHARE, not by the order pages happen to come
+   * in.
+   *
+   * The budget used to be spent front to back: page 1 took what it needed and
+   * whatever was left over reached page 40. That holds fine at four
+   * contributors and fails exactly when this view starts to matter — one
+   * reading is expected to carry ~60 looms (TJ, 2026-08-22) — and it fails
+   * INVISIBLY, because a starved page is not a blank page with a warning on
+   * it, it is a page that looks as though nobody read it. "The back half of
+   * the reading is cold" is a claim about the cohort, and the payload budget
+   * must never be the thing making it.
+   *
+   * So every page keeps a share proportional to what it measured, and inside a
+   * page the FAINTEST runs go first. That bias is deliberate and worth stating:
+   * dropping the runs one person marked keeps the places many did, which is
+   * what the reader came for. The count of what went is on screen either way.
+   */
+  const keepFor = (spanCount: number) =>
+    totalSpans <= MAX_SPANS
+      ? spanCount
+      : Math.max(1, Math.floor((MAX_SPANS * spanCount) / totalSpans))
+
   const pages: PageHeat[] = []
-  let budget = MAX_SPANS
   let droppedSpans = 0
 
-  ;[...counts.keys()]
-    .sort((a, b) => a - b)
-    .forEach((pageNumber) => {
-      const all = heatSpans(anchored.get(pageNumber) ?? [])
-      const spans = all.slice(0, Math.max(0, budget))
-      budget -= spans.length
-      droppedSpans += all.length - spans.length
-      pages.push({
-        pageNumber,
-        count: counts.get(pageNumber)!,
-        contentHash: pageHashes.get(pageNumber) ?? "",
-        spans,
-      })
+  measured.forEach(({ pageNumber, all }) => {
+    const keep = keepFor(all.length)
+    const spans =
+      keep >= all.length
+        ? all
+        : [...all]
+            .sort((a, b) => b.count - a.count || a.start - b.start)
+            .slice(0, keep)
+            // Back into document order: everything downstream walks spans and
+            // items together in one forward pass.
+            .sort((a, b) => a.start - b.start)
+    droppedSpans += all.length - spans.length
+    pages.push({
+      pageNumber,
+      count: counts.get(pageNumber)!,
+      contentHash: pageHashes.get(pageNumber) ?? "",
+      spans,
     })
+  })
 
   return {
     ...base,
@@ -266,6 +339,7 @@ export async function getPassagesOverlay(
     pages,
     unanchored,
     droppedSpans,
+    maxCount,
   }
 }
 

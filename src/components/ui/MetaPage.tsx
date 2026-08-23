@@ -27,8 +27,11 @@ import JourneyNav from "@/components/ui/JourneyNav"
  *   - the "‹ library" back link, which was a second door to a room the journey
  *     bar's own 00 · Library already opens, directly below it. `Workbench`
  *     dropped its own for that exact reason (TJ, 2026-08-08).
- *   - the footer. Courses and Readings have none, and this is meant to look
- *     like them.
+ *   - the footer. When this was written Courses and Readings had none and this
+ *     frame matched them; on 2026-08-21 the admin shell grew the workbench's
+ *     identity footer (admin/layout.tsx), so the match is now broken the other
+ *     way. Left off here deliberately: these pages are reference, not a place
+ *     someone acts as themselves, and adding it is one line if that changes.
  *
  * No station is `active`: these are not steps on the student's arc. The bar is
  * there so you can leave, and so that where you are stays legible.

@@ -144,6 +144,39 @@ export async function listFacultyCourseIds(userId: string): Promise<string[]> {
   return rows.map((row) => row.courseId)
 }
 
+export type CourseFacultyMember = {
+  userId: string
+  name: string | null
+  email: string
+}
+
+/**
+ * The course's FACULTY members with their names — the option list for a
+ * section's lead (sections.leadUserId). Active memberships only, ordered by
+ * name so the dropdown reads like a roll.
+ *
+ * NOT the same filters as listFacultyCourseIds, which asks the mirror-image
+ * question: that one adds `courses.isArchived = false`, because it decides
+ * which courses a person may enter. This one is handed a course and lists its
+ * faculty — the courses page reaches archived courses deliberately (its
+ * catalog is the only door to them), and a section there still shows who
+ * leads it.
+ */
+export async function listCourseFaculty(courseId: string): Promise<CourseFacultyMember[]> {
+  return db
+    .select({ userId: courseMemberships.userId, name: users.name, email: users.email })
+    .from(courseMemberships)
+    .innerJoin(users, eq(users.id, courseMemberships.userId))
+    .where(
+      and(
+        eq(courseMemberships.courseId, courseId),
+        eq(courseMemberships.role, "FACULTY"),
+        isNull(courseMemberships.removedAt)
+      )
+    )
+    .orderBy(asc(users.name), asc(users.email))
+}
+
 /**
  * Every course carries a Faculty Section (ruling 18) — the faculty's
  * data-model home; pedagogically they rotate among the discussion sections.

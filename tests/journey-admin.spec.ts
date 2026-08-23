@@ -21,9 +21,18 @@ test("roster shows enrolled demo learners with their counts", async ({ page }) =
 
   const rowA = page.locator(".rosterrow", { hasText: "Test User A" })
   await expect(rowA, "seed missing — run `npm run seed:demo` first").toHaveCount(1)
-  // Counts became number-only pills in their own sortable columns — the
-  // concepts pill is the beaten one, the header names the column.
-  await expect(rowA.locator(".pill.beaten", { hasText: /^\d+$/ })).toBeVisible()
+  // Counts are number-only pills in their own sortable columns; the header
+  // names each one. Three of them since 2026-08-22 — cloths, concepts,
+  // threads — which is why this no longer matches on `.pill.beaten` alone:
+  // cloths and concepts both wear it, and the bare locator resolved to two.
+  // Each carries its breakdown in an aria-label, so asserting on that checks
+  // the number AND that the breakdown reached a non-mouse reader.
+  const stats = rowA.locator(".pill[aria-label]")
+  await expect(stats).toHaveCount(3)
+  await expect(stats.nth(0)).toHaveAttribute("aria-label", /cloth/)
+  await expect(stats.nth(1)).toHaveAttribute("aria-label", /concept/)
+  await expect(stats.nth(2)).toHaveAttribute("aria-label", /thread/)
+  await expect(rowA.locator(".pill", { hasText: /^\d+$/ }).first()).toBeVisible()
   await expect(rowA.getByRole("link", { name: "Open Loom" })).toBeVisible()
 
   await expect(page.locator(".rosterrow", { hasText: "Test User B" })).toHaveCount(1)
@@ -76,12 +85,12 @@ test("courses: schedule controls render for the course's readings", async ({ pag
   await expect(fold).toBeVisible({ timeout: 15_000 })
   await expect(fold.locator("input[name=name]")).toBeHidden()
 
-  // Course controls are one uniform row: Edit Course (disclosure), Archive,
-  // and Delete as the red pill disclosure.
+  // Course controls are one uniform row: Edit Metadata (disclosure — it edits
+  // name/slug/term/description only), Archive, and Delete as the red pill.
   const firstCourse = page
-    .locator("section.card", { has: page.locator("summary", { hasText: "Edit Course" }) })
+    .locator("section.card", { has: page.locator("summary", { hasText: "Edit Metadata" }) })
     .first()
-  await expect(firstCourse.locator("summary", { hasText: "Edit Course" })).toBeVisible()
+  await expect(firstCourse.locator("summary", { hasText: "Edit Metadata" })).toBeVisible()
   await expect(firstCourse.locator("summary.pillbtn", { hasText: "Delete" })).toBeVisible()
 
   // Each reading row shows its Week/Core/Visible pills; the week+position form
@@ -113,15 +122,24 @@ test("the cohort map renders the section's woven concepts", async ({ page }) => 
   // label, not the hidden <title> tooltip.
   await expect(page.locator("svg text", { hasText: "object worlds" }).first()).toBeVisible({ timeout: 20_000 })
 
-  // The cloth's material is listed, not only drawn: every concept and every
-  // thread, each attributed to its student.
+  // The cloth's material is listed, not only drawn: every concept, and every
+  // thread as the thread itself. The thread list stopped carrying each
+  // sentence on 2026-08-22 — it is a list of 67 you scan, and the description
+  // belongs to the one you pick — so what is asserted here is the pair of
+  // ends every card still names.
   await expect(page.locator(".crow", { hasText: "object worlds" }).first()).toBeVisible()
-  await expect(page.locator(".thread .sent").first()).toBeVisible()
+  await expect(page.locator(".canvasmenu.atright .thread .trip").first()).toBeVisible()
 
-  // A concept opens the passages behind it — the student's own captures, with
-  // attribution — plus the threads that cross it.
+  // A concept reads out on the canvas — who owns it, its counts — and opens
+  // the passages behind it, the student's own captures with attribution,
+  // plus the threads that cross it.
+  //
+  // The evidence is FOLDED since 2026-08-22: this is a map, and a read-out
+  // that unfolded by default covered the warp it annotates. The resting line
+  // is asserted first, then the fold is opened for the passages.
   await page.locator(".crow", { hasText: "object worlds" }).first().click()
   await expect(page.locator(".threadhead", { hasText: "object worlds" })).toBeVisible()
+  await page.locator(".canvasfoot .footmore > summary").click()
   await expect(page.locator(".passagequote").first()).toBeVisible()
   await expect(page.locator(".passagequote").first()).toContainText("Test User A")
 })

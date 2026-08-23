@@ -81,6 +81,7 @@ export default function ThreadCard({
   mode = "read",
   by,
   selected = false,
+  compact = false,
   onSelect,
   edit,
 }: {
@@ -110,9 +111,27 @@ export default function ThreadCard({
   by?: string
   selected?: boolean
   /** Makes the whole card a target — the cohort list's "read this one out". */
-  onSelect?: () => void
+  onSelect?: (event?: React.MouseEvent | React.KeyboardEvent) => void
   /** Required by `mode="edit"`; ignored otherwise. */
   edit?: ThreadCardEdit
+  /**
+   * The card reduced to the thread itself — from, label, to — and the state
+   * pill that says what it is. The SENTENCE is withheld (TJ, 2026-08-22: "the
+   * thread cards need to be simpler, jsut show the thread, not description or
+   * contributor, that will show up below when selected").
+   *
+   * For a LIST you scan, not a card you read: the cohort's Threads panel is
+   * 316px wide and 67 cards long, and a description on every one of them made
+   * a wall you had to read to find anything. Selecting a card still shows the
+   * sentence in full, in the read-out, which is what "below when selected"
+   * names. The contributor needs no flag — `by` is already opt-in and that
+   * list simply stops passing it.
+   *
+   * The state pill STAYS. It is the one thing the card exists to hold — "a
+   * pill appears if and only if the thread has a label" (thread-card.spec)
+   * — and it is what the drawing's solid-vs-dashed arcs agree with.
+   */
+  compact?: boolean
 }) {
   /**
    * THE LABEL, RESOLVED ONCE. Empty string means unlabelled, which is a legal
@@ -151,10 +170,10 @@ export default function ThreadCard({
       role={onSelect ? "button" : undefined}
       tabIndex={onSelect ? 0 : undefined}
       aria-pressed={onSelect ? selected : undefined}
-      onClick={onSelect}
+      onClick={(e) => onSelect?.(e)}
       onKeyDown={(e) => {
         if (!onSelect) return
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect() }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(e) }
       }}
     >
       {/* THE TRIP OPENS THE CARD, the way a concept's name opens its own (TJ,
@@ -197,13 +216,20 @@ export default function ThreadCard({
           spent on an absence; the pill below says it in one word instead. An
           undescribed thread is legal (P0.3, "you can throw now and write it
           later"), so this is a designation either way — just a cheaper one. */}
-      {thread.sentence.trim() ? (
+      {thread.sentence.trim() && !compact ? (
         <div className={`sent${edit ? " isopen" : ""}`} onClick={edit?.onToggle}>
           &ldquo;{thread.sentence}&rdquo;
         </div>
       ) : null}
 
-      <div className="tmeta">
+      {/* WITHHELD under `compact` (TJ, 2026-08-22: "the thread cards do not
+          need description"). What the pill says — label / description / not
+          described — is already legible in `.trip` above it, where a label
+          draws `.v` and an unlabelled thread draws `.tarrow` instead: the
+          state is the mark, not a second word for it. On every other surface
+          the pill stays, and it is still what the cloth's solid-vs-dashed
+          arcs agree with. */}
+      {!compact && <div className="tmeta">
         {/* WHAT THIS THREAD IS, in one word. Sage and solid once a label has
             been distilled out of the sentence, grey and dashed while the
             sentence is the whole of it — the same two states the cloth draws
@@ -220,7 +246,7 @@ export default function ThreadCard({
         {mode === "edit" && edit && (
           <span className="rm" onClick={edit.onRemove}>remove</span>
         )}
-      </div>
+      </div>}
 
       {mode === "edit" && edit?.open && (
         /* THE SIBLINGS' BODY, in the siblings' order: what it says, then what

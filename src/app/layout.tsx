@@ -6,6 +6,7 @@ import { ReadingsProvider } from "@/components/providers/ReadingsProvider";
 import { DialogProvider } from "@/components/providers/DialogProvider";
 import Header from "@/components/ui/Header";
 import TeachingFloat from "@/components/ui/TeachingFloat";
+import NarrowNotice from "@/components/ui/NarrowNotice";
 import TipLayer from "@/components/ui/TipLayer";
 import { isBranchPreview } from "@/lib/previewLogin";
 import { getServerSession } from "next-auth/next";
@@ -47,7 +48,15 @@ export default async function RootLayout({
     <html lang="en">
       <body>
         <AuthProvider>
-          <LoomProvider readOnly={!!viewing}>
+          {/* The target's NAME rides along with the mode, not just the fact
+              of it: every export stamps `studentName`, and taken from the
+              session that is the staff viewer — so an Open Loom download of
+              a student's work was named after, and attributed to, whoever
+              downloaded it (TJ, 2026-08-22: "when i download a kit from
+              student work, it has my name not the student"). The data was
+              always the student's (actions/loom.ts swaps to viewing.userId);
+              only the attribution was wrong. */}
+          <LoomProvider readOnly={!!viewing} viewingName={viewing?.name ?? viewing?.email ?? null}>
             <ReadingsProvider>
               <DialogProvider>
                 <Header deployEnv={deployEnv} isBranchPreview={branchPreview} />
@@ -64,6 +73,11 @@ export default async function RootLayout({
                     the view-user cookie names a target the server authorizes,
                     so mounting it unconditionally is free. */}
                 <TeachingFloat />
+                {/* What Loom is built for, on a screen too small for it.
+                    Mounted once here because it is about the window, not any
+                    page — and it renders nothing at all above 900px, so it
+                    costs every desktop reader a single width check. */}
+                <NarrowNotice />
                 {children}
               </DialogProvider>
             </ReadingsProvider>

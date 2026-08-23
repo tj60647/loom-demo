@@ -28,12 +28,52 @@ export type RosterPerson = {
   sectionName: string | null
   role: string
   conceptsCount: number
+  conceptsEvidenced: number
   edgesCount: number
+  edgesDescribed: number
+  clothsCount: number
+  clothNames: string[]
 }
 
-type SortKey = "name" | "role" | "concepts" | "edges" | "section"
+type SortKey = "name" | "role" | "cloths" | "concepts" | "edges" | "section"
 
-const NUMERIC: SortKey[] = ["concepts", "edges"]
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+
+/**
+ * What each stat is made of, as a sentence.
+ *
+ * A sentence and not a list because `.tiplayer` is `white-space:normal` at
+ * 240px (globals.css) — a newline would render as a space, so the breakdown
+ * is written the way every other tip in the app is written, separated by ·.
+ *
+ * These strings are also the pills' aria-labels, which is why each one names
+ * its own subject ("3 cloths — …") rather than assuming the column heading:
+ * a screen reader reaches the pill, not the header above it.
+ */
+function clothsTip(p: RosterPerson): string {
+  if (p.clothsCount === 0) return "no cloths yet — a cloth is one reading's work, woven"
+  // Named, up to four: past that the bubble becomes a list nobody reads at a
+  // glance, and the count itself is the answer.
+  const shown = p.clothNames.slice(0, 4).join(", ")
+  const rest = p.clothNames.length - 4
+  return `${plural(p.clothsCount, "cloth")} — ${shown}${rest > 0 ? `, and ${rest} more` : ""}`
+}
+
+function conceptsTip(p: RosterPerson): string {
+  if (p.conceptsCount === 0) return "no concepts yet"
+  const bare = p.conceptsCount - p.conceptsEvidenced
+  return `${plural(p.conceptsCount, "concept")} — ${p.conceptsEvidenced} with a passage behind ${
+    p.conceptsEvidenced === 1 ? "it" : "them"
+  }, ${bare} not yet evidenced`
+}
+
+function threadsTip(p: RosterPerson): string {
+  if (p.edgesCount === 0) return "no threads yet"
+  const unsaid = p.edgesCount - p.edgesDescribed
+  return `${plural(p.edgesCount, "thread")} — ${p.edgesDescribed} with a description, ${unsaid} drawn but unsaid`
+}
+
+const NUMERIC: SortKey[] = ["cloths", "concepts", "edges"]
 
 export default function RosterTable({
   people,
@@ -56,6 +96,7 @@ export default function RosterTable({
     const value: Record<SortKey, (p: RosterPerson) => string | number> = {
       name: (p) => (p.name ?? p.email).toLowerCase(),
       role: (p) => p.role,
+      cloths: (p) => p.clothsCount,
       concepts: (p) => p.conceptsCount,
       edges: (p) => p.edgesCount,
       // "~" sorts unplaced people after every real section name.
@@ -95,8 +136,9 @@ export default function RosterTable({
       <div className="rosterhead">
         {head("name", "name")}
         <span className="rostercol">open loom</span>
+        {head("cloths", "cloths")}
         {head("concepts", "concepts")}
-        {head("edges", "edges")}
+        {head("edges", "threads")}
         {head("section", "section")}
         {head("role", "role")}
         <span aria-hidden="true" />
@@ -130,18 +172,37 @@ export default function RosterTable({
             )}
           </div>
 
+          {/* Each stat discloses what it is made of on hover (TJ,
+              2026-08-22: "the stat pills need mouseover with break down").
+              The breakdown rides in BOTH data-tip and aria-label: a tip is
+              decorative, aria-hidden and mouse-only by construction
+              (TipLayer.tsx), so meaning that lives only there reaches
+              nobody using a keyboard or a screen reader. */}
           <div>
             {person.status === "pending" ? (
               <span className="rosterdash">—</span>
             ) : (
-              <span className="pill beaten">{person.conceptsCount}</span>
+              <span className="pill beaten" data-tip={clothsTip(person)} aria-label={clothsTip(person)}>
+                {person.clothsCount}
+              </span>
             )}
           </div>
           <div>
             {person.status === "pending" ? (
               <span className="rosterdash">—</span>
             ) : (
-              <span className="pill loose">{person.edgesCount}</span>
+              <span className="pill beaten" data-tip={conceptsTip(person)} aria-label={conceptsTip(person)}>
+                {person.conceptsCount}
+              </span>
+            )}
+          </div>
+          <div>
+            {person.status === "pending" ? (
+              <span className="rosterdash">—</span>
+            ) : (
+              <span className="pill loose" data-tip={threadsTip(person)} aria-label={threadsTip(person)}>
+                {person.edgesCount}
+              </span>
             )}
           </div>
 

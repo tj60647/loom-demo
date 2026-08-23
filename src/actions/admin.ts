@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/db"
-import { users, concepts, passages, passageConcepts, edges, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
+import { users, concepts, passages, passageConcepts, edges, cloths, sources, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, emailHasAppAccess, isAdminUser } from "@/lib/auth"
@@ -144,12 +144,37 @@ export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: s
   const allUsers = await db.select().from(users).where(inArray(users.id, userIds))
   const allConcepts = await db.select().from(concepts).where(inArray(concepts.userId, userIds))
   const allEdges = await db.select().from(edges).where(inArray(edges.userId, userIds))
+  // A cloth is one reading's work, so its count says how many readings this
+  // person has actually woven — the stat the roster was missing (TJ,
+  // 2026-08-22: "the roster list needs a stat for 'cloths'"). Scoped by user
+  // like the two beside it; see the note on RosterRow about course scope.
+  const allCloths = await db
+    .select({ userId: cloths.userId, title: cloths.title, scopeKey: cloths.scopeKey })
+    .from(cloths)
+    .where(inArray(cloths.userId, userIds))
+  // Which concepts carry at least one passage — the breakdown behind the
+  // concepts pill. A concept with no passage is coined but not yet evidenced,
+  // which is a real state in the model, not a defect.
+  const evidenced = await db
+    .select({ userId: passages.userId, conceptId: passageConcepts.conceptId })
+    .from(passageConcepts)
+    .innerJoin(passages, eq(passages.id, passageConcepts.passageId))
+    .where(inArray(passages.userId, userIds))
+  const sourceTitle = new Map(
+    (await db.select({ id: sources.id, title: sources.title }).from(sources)).map((s) => [s.id, s.title])
+  )
   const sectionById = new Map(
     (await db.select().from(sections).where(eq(sections.courseId, courseId))).map((s) => [s.id, s])
   )
 
   return allUsers.map((u) => {
     const membership = memberships.find((m) => m.userId === u.id)
+    const mine = allCloths.filter((c) => c.userId === u.id)
+    const evidencedIds = new Set(
+      evidenced.filter((row) => row.userId === u.id).map((row) => row.conceptId)
+    )
+    const myConcepts = allConcepts.filter((c) => c.userId === u.id)
+    const myEdges = allEdges.filter((e) => e.userId === u.id)
     return {
       id: u.id,
       name: u.name || u.email,
@@ -159,8 +184,24 @@ export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: s
         ? sectionById.get(membership.sectionId)?.name ?? null
         : null,
       role: membership?.role ?? "LEARNER",
-      conceptsCount: allConcepts.filter((c) => c.userId === u.id).length,
-      edgesCount: allEdges.filter((e) => e.userId === u.id).length,
+      conceptsCount: myConcepts.length,
+      // Of those concepts, how many a passage stands behind.
+      conceptsEvidenced: myConcepts.filter((c) => evidencedIds.has(c.id)).length,
+      edgesCount: myEdges.length,
+      // A thread whose sentence is written says what the link MEANS; one
+      // without is drawn but unsaid.
+      edgesDescribed: myEdges.filter((e) => (e.sentence ?? "").trim() !== "").length,
+      clothsCount: mine.length,
+      /** The readings woven, named — the cloth's own title, else its reading's. */
+      clothNames: mine.map(
+        (c) =>
+          c.title.trim() ||
+          c.scopeKey
+            .split(",")
+            .map((id) => sourceTitle.get(id) ?? "a reading")
+            .join(" + ") ||
+          "no reading"
+      ),
     }
   })
 }
@@ -177,8 +218,28 @@ export type RosterRow = {
   sectionName: string | null
   /** The per-course role — "FACULTY" gets this course's read-side (ruling 18); "LEARNER" while pending. */
   role: string
+  /**
+   * The three work counts, each with the breakdown its pill discloses on
+   * hover (TJ, 2026-08-22: "the stat pills need mouseover with break down").
+   *
+   * SCOPE, stated because the number does not say it: these count the
+   * person's whole loom, not their work in THIS course. concepts, edges and
+   * cloths all carry a courseId, but getClassData has always filtered on
+   * userId alone, so a student enrolled in two courses shows the same totals
+   * on both rosters. `clothsCount` follows the two beside it rather than
+   * introducing a second meaning of "count" in one row — one scope for the
+   * row, whichever it is. Narrowing all three to the course is a decision,
+   * not a fix, and it is TJ's.
+   */
   conceptsCount: number
+  /** Of those, how many a passage stands behind. */
+  conceptsEvidenced: number
   edgesCount: number
+  /** Of those, how many carry a written Thread Description. */
+  edgesDescribed: number
+  clothsCount: number
+  /** The woven readings by name, for the cloths pill's breakdown. */
+  clothNames: string[]
   /** False for someone enrolled via the site-wide allowlist rather than this course's. */
   invited: boolean
 }
@@ -222,7 +283,11 @@ export async function getRoster(
     sectionName: u.sectionName,
     role: u.role,
     conceptsCount: u.conceptsCount,
+    conceptsEvidenced: u.conceptsEvidenced,
     edgesCount: u.edgesCount,
+    edgesDescribed: u.edgesDescribed,
+    clothsCount: u.clothsCount,
+    clothNames: u.clothNames,
     invited: invitedByEmail.has(u.email.toLowerCase()),
   }))
 
@@ -240,8 +305,13 @@ export async function getRoster(
       sectionId: row.sectionId,
       sectionName: row.sectionId ? sectionById.get(row.sectionId) ?? null : null,
       role: "LEARNER",
+      // A pending invitation has no loom yet, so every count is a true zero.
       conceptsCount: 0,
+      conceptsEvidenced: 0,
       edgesCount: 0,
+      edgesDescribed: 0,
+      clothsCount: 0,
+      clothNames: [],
       invited: true,
     })
   })
@@ -521,7 +591,22 @@ async function foldConceptIds<T extends { id: string }>(passageRows: T[]): Promi
 
 export async function getAggregateLoomData(
   courseIdRaw?: string | null,
-  sectionIdRaw?: string | null
+  sectionIdRaw?: string | null,
+  /**
+   * Narrow to ONE reading, and/or to ONE student (TJ, 2026-08-22). Both are
+   * "all" when absent, the way the section picker's "All sections" is.
+   *
+   * A student is filtered where a section already is — on the member set, so
+   * every later query narrows with it and nothing has to be re-checked. A
+   * READING has no column on a concept or a thread to filter by: only a
+   * passage carries `sourceId`. So the reading narrows the passages, and the
+   * concepts are the ones those passages evidence, and the threads are the
+   * ones running between concepts that survive. That is the honest reading of
+   * "this reading's part of the weave" — a concept coined against another text
+   * is not in this one merely because its owner also read this one.
+   */
+  sourceIdRaw?: string | null,
+  studentIdRaw?: string | null
 ) {
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) {
@@ -530,7 +615,11 @@ export async function getAggregateLoomData(
   await checkCourseFaculty(courseId)
 
   const sectionId = await resolveSectionId(courseId, sectionIdRaw)
-  const userIds = await getMemberIds(courseId, sectionId)
+  const memberIds = await getMemberIds(courseId, sectionId)
+  // An unknown student id narrows to nobody rather than silently widening to
+  // everybody — the same discipline resolveSectionId keeps for a dead section.
+  const studentId = studentIdRaw?.trim() || null
+  const userIds = studentId ? memberIds.filter((id) => id === studentId) : memberIds
 
   if (userIds.length === 0) {
     return { concepts: [], passages: [], edges: [], members: [], passagesUnavailable: false }
@@ -554,11 +643,34 @@ export async function getAggregateLoomData(
   const members = memberRows.map((u) => ({ id: u.id, name: u.name || u.email }))
 
   try {
+    const sourceId = sourceIdRaw?.trim() || null
     const allPassages = await db
       .select()
       .from(passages)
-      .where(and(eq(passages.courseId, courseId), inArray(passages.userId, userIds)))
-    return { concepts: allConcepts, passages: await foldConceptIds(allPassages), edges: allEdges, members, passagesUnavailable: false }
+      .where(
+        and(
+          eq(passages.courseId, courseId),
+          inArray(passages.userId, userIds),
+          sourceId ? eq(passages.sourceId, sourceId) : undefined
+        )
+      )
+    const folded = await foldConceptIds(allPassages)
+    if (!sourceId) {
+      return { concepts: allConcepts, passages: folded, edges: allEdges, members, passagesUnavailable: false }
+    }
+    // Evidenced HERE: the concepts these passages point at, and the threads
+    // whose ends both survive that. A thread with one end outside the reading
+    // is not a thread within it.
+    const here = new Set(folded.flatMap((b) => b.conceptIds))
+    const scopedConcepts = allConcepts.filter((c) => here.has(c.id))
+    const scopedEdges = allEdges.filter((e) => here.has(e.fromId) && here.has(e.toId))
+    return {
+      concepts: scopedConcepts,
+      passages: folded,
+      edges: scopedEdges,
+      members,
+      passagesUnavailable: false,
+    }
   } catch (error) {
     // Fail soft so aggregate map still renders if passage schema/data is temporarily inconsistent.
     console.error("[getAggregateLoomData] Failed to load passages for aggregate view", error)

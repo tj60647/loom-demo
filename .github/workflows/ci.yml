@@ -167,7 +167,10 @@ jobs:
           cache: npm
       - run: npm ci
         if: steps.scope.outputs.run == 'true'
-      - run: npx playwright install --with-deps chromium
+      # WebKit as well as Chromium since 2026-08-23: the `tablet` project runs
+      # Safari's engine at an iPad, which is the only thing in this suite that
+      # can answer a question about Safari. ~59MB, downloaded once per run.
+      - run: npx playwright install --with-deps chromium webkit
         if: steps.scope.outputs.run == 'true'
       - name: Migrate CI database
         if: steps.scope.outputs.run == 'true'
@@ -222,6 +225,9 @@ jobs:
             echo "### e2e — full suite (master), two passes" >> "$GITHUB_STEP_SUMMARY"
             npx playwright test --project=read --workers=2
             npx playwright test --project=write
+            # Safari at an iPad. Its own pass, so a WebKit-only failure reads
+            # as one rather than being blamed on the desktop suite.
+            npx playwright test --project=tablet
           else
             echo "### e2e — smoke subset (dev)" >> "$GITHUB_STEP_SUMMARY"
             echo "Full 22-spec suite runs on the PR into \`master\`." >> "$GITHUB_STEP_SUMMARY"

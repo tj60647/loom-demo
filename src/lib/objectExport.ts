@@ -46,15 +46,79 @@ export type ExportProvenance = {
   section?: string
   /** ISO, stamped by the caller — a file that cannot say when cannot be filed. */
   exportedAt: string
+  /**
+   * Present only on a copy taken by staff inside Open Loom — absent on a
+   * student's own download, so absence is the ordinary case and presence is
+   * the claim (TJ, 2026-08-22: a roster copy "needs a flag that it was a
+   * roster review download and not the student submission").
+   *
+   * "open-loom" is the mode's own name (src/lib/viewUser.ts, capabilities.ts
+   * `student-loom-open`, the roster's `open loom` column) — not "review",
+   * which in this repo means metadata or repair review.
+   */
+  takenVia?: "open-loom"
+  /**
+   * WHO took it. Two staff copies of one student's work are otherwise
+   * identical, and a file that cannot say who pulled it cannot be filed
+   * against the person who did (TJ, 2026-08-22: "we want provenance").
+   */
+  takenBy?: string
 }
 
-export function provenanceOf(student: string, course?: string, section?: string): ExportProvenance {
+export function provenanceOf(
+  student: string,
+  course?: string,
+  section?: string,
+  /** The staff viewer's name when this is an Open Loom copy; omitted otherwise. */
+  takenBy?: string
+): ExportProvenance {
   return {
     student,
     ...(course ? { course } : {}),
     ...(section ? { section } : {}),
     exportedAt: new Date().toISOString(),
+    ...(takenBy ? { takenVia: "open-loom" as const, takenBy } : {}),
   }
+}
+
+/**
+ * The two provenance keys on their own, for the formats that carry a flat
+ * `student` instead of an `ExportProvenance` block — the projection
+ * (graphExport) and the concept-map kit (mapKit). Their shapes are pinned by
+ * docs/contracts.md, so the marker rides as a sibling of `student` rather
+ * than reshaping them; the KEYS are spelled exactly as in the provenance
+ * block, so one grep finds every staff copy whatever the format.
+ */
+export type OpenLoomTake = { takenVia: "open-loom"; takenBy: string }
+
+/** `undefined` for a student's own copy — the shape every builder spreads. */
+export function openLoomTake(takenBy: string | null | undefined): OpenLoomTake | undefined {
+  return takenBy ? { takenVia: "open-loom", takenBy } : undefined
+}
+
+/** The banner for those same flat formats, given a student and a take. */
+export function openLoomTakeLines(student: string, taken?: OpenLoomTake): string[] {
+  if (!taken) return []
+  return openLoomBannerLines({ student, exportedAt: new Date().toISOString(), ...taken })
+}
+
+/**
+ * The Markdown twin of `takenVia` — a blockquote directly under the byline of
+ * every staff copy, so the distinction survives a file being read rather than
+ * parsed. Empty for a student's own download, which is why every caller can
+ * spread it unconditionally.
+ *
+ * Deliberately free of "should"/"must"/"try to"/"consider": the exports carry
+ * no advice, and check-object-export enforces that with a regex over the
+ * vocabulary Markdown.
+ */
+export function openLoomBannerLines(provenance: ExportProvenance): string[] {
+  if (provenance.takenVia !== "open-loom") return []
+  const who = provenance.takenBy ? ` by ${provenance.takenBy}` : ""
+  return [
+    `> **Open Loom copy** — ${provenance.student}'s work, taken${who} on ${provenance.exportedAt}. Not a student submission.`,
+    "",
+  ]
 }
 
 // --- the cloth: one reading's work ---
@@ -165,6 +229,7 @@ export function buildClothMarkdown(
 
   out.push(`# ${data.cloth.title || data.cloth.scopeLabel}`, "")
   out.push(`_${data.cloth.scopeLabel} · ${provenance.student}${where}_`, "")
+  out.push(...openLoomBannerLines(provenance))
   if (data.cloth.description) out.push(data.cloth.description, "")
 
   // Same facts as the .json, in prose (TJ, 2026-08-12: "the json and md files
@@ -277,6 +342,7 @@ export function buildThreadsMarkdown(
   const out: string[] = []
   out.push(`# Threads — ${data.scopeLabel}`, "")
   out.push(`_${provenance.student}${provenance.course ? ` · ${provenance.course}` : ""}_`, "")
+  out.push(...openLoomBannerLines(provenance))
   if (!data.threads.length) {
     out.push("_No threads here yet._")
     return out.join("\n")
@@ -333,6 +399,7 @@ export function buildVocabularyMarkdown(state: LoomState, provenance: ExportProv
   const data = buildVocabularyExport(state, provenance)
   const out: string[] = []
   out.push(`# Vocabulary — ${provenance.student}`, "")
+  out.push(...openLoomBannerLines(provenance))
   out.push(`_every concept and link label you own${provenance.course ? ` · ${provenance.course}` : ""}_`, "")
   out.push(`## Concepts (${data.concepts.length})`, "")
   for (const c of [...data.concepts].sort((a, b) => a.label.localeCompare(b.label))) {
@@ -390,6 +457,7 @@ export function buildLogMarkdown(
   const out: string[] = []
   out.push(`# Capture Log${scopeLabel ? ` — ${scopeLabel}` : ""}`, "")
   out.push(`_${provenance.student}${provenance.course ? ` · ${provenance.course}` : ""} · ${events.length} act${events.length !== 1 ? "s" : ""}_`, "")
+  out.push(...openLoomBannerLines(provenance))
   if (!events.length) {
     out.push("_Nothing recorded here yet._")
     return out.join("\n")
@@ -468,8 +536,32 @@ export function fileStamp(at: Date = new Date()): string {
   return `${p(at.getFullYear() % 100)}${p(at.getMonth() + 1)}${p(at.getDate())}${p(at.getHours())}${p(at.getMinutes())}`
 }
 
-export function objectExportFilename(student: string, kind: string, slug: string, ext: string, at?: Date): string {
+/**
+ * The marker a staff copy wears, leading the filename:
+ * `open-loom.<student>-<slug>.<kind>.<stamp>.<ext>`.
+ *
+ * LEADING, for the same filing reason the stamp trails (TJ, 2026-08-12): a
+ * folder sorts every staff copy into one block instead of interleaving them
+ * with the student's own, and the distinction is the first thing read rather
+ * than something to hunt for mid-name. It also leaves `<kind>.<stamp>.<ext>`
+ * untouched, which is what every consumer matches on — tests/object-download
+ * anchors regexes to that tail, and check-object-export compares a whole
+ * student filename for equality.
+ */
+export const OPEN_LOOM_FILE_MARKER = "open-loom"
+
+export function objectExportFilename(
+  student: string,
+  kind: string,
+  slug: string,
+  ext: string,
+  at?: Date,
+  /** True for a copy taken by staff inside Open Loom. Default off: a
+   *  student's own filename is unchanged by this parameter existing. */
+  takenInOpenLoom = false
+): string {
   const who = (student || "loom").replace(/\s+/g, "_").toLowerCase()
   const what = (slug || kind).replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "").toLowerCase() || kind
-  return `${who}-${what}.${kind}.${fileStamp(at)}.${ext}`
+  const mark = takenInOpenLoom ? `${OPEN_LOOM_FILE_MARKER}.` : ""
+  return `${mark}${who}-${what}.${kind}.${fileStamp(at)}.${ext}`
 }

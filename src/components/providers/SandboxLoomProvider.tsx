@@ -412,6 +412,9 @@ export default function SandboxLoomProvider({
     scopedState,
     isLoading: false,
     studentName: session?.user?.name ?? "you",
+    // The sandbox is always your own: it holds nobody else's work, so there
+    // is no Open Loom here and nothing a copy could be taken from.
+    openLoomViewer: null,
     addConcept,
     editConcept,
     removeConcept,

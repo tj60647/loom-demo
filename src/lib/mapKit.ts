@@ -12,6 +12,7 @@
 // judged: no scoring, no completion states, NO ADVICE". Every heading may say
 // what was counted and how it was ordered. None may say what to do about it.
 
+import { openLoomTakeLines, type OpenLoomTake } from "./objectExport"
 import type { Concept, Edge, Tier } from "./types"
 import { allComponents, degreeOf } from "./clothMath"
 
@@ -27,7 +28,8 @@ export function buildMapKit(
   concepts: Concept[],
   edges: Edge[],
   student: string,
-  map?: { name?: string; essence?: string; tiers?: Record<string, Tier> }
+  map?: { name?: string; essence?: string; tiers?: Record<string, Tier> },
+  taken?: OpenLoomTake
 ): string {
   const NL = "\n"
   const degs = concepts
@@ -40,6 +42,8 @@ export function buildMapKit(
   const tierOf = (c: Concept): Tier => map?.tiers?.[c.id] ?? ""
 
   let out = "CONCEPT-MAP KIT — " + (student || "my weave") + (map?.name ? " — " + map.name : "") + NL
+  const takeLines = openLoomTakeLines(student || "my weave", taken)
+  if (takeLines.length) out += takeLines[0] + NL
   if (map?.essence?.trim()) out += "ONE-LINE: " + map.essence.trim() + NL
   out += "Take this to paper or Figma. You arrange; that is the thinking." + NL + NL
 
@@ -103,13 +107,15 @@ export function buildMapKitData(
   concepts: Concept[],
   edges: Edge[],
   student: string,
-  map?: { name?: string; essence?: string; tiers?: Record<string, Tier> }
+  map?: { name?: string; essence?: string; tiers?: Record<string, Tier> },
+  taken?: OpenLoomTake
 ) {
   const tierOf = (c: Concept): Tier => map?.tiers?.[c.id] ?? ""
   const label = (id: string) => concepts.find((c) => c.id === id)?.label ?? "?"
   return {
     format: "loom-concept-map-kit",
     student: student || "my weave",
+    ...(taken ?? {}),
     projection: map?.name ?? null,
     oneLine: map?.essence?.trim() || null,
     tiers: TIER_GROUPS.map(([tier, name]) => ({

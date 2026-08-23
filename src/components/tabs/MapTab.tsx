@@ -21,10 +21,12 @@ import { soleSourceId } from "@/lib/scope"
 import { sortedByLabel } from "@/lib/utils"
 import { short } from "@/lib/clothMath"
 import { buildMapKit, buildMapKitData } from "@/lib/mapKit"
+import { openLoomTake } from "@/lib/objectExport"
 import { buildMapExport, buildMapMarkdown, mapExportFilename, scopeLabelOf } from "@/lib/graphExport"
 import { downloadText } from "@/lib/download"
 import ConceptCard from "@/components/cards/ConceptCard"
 import ObjectDownload from "@/components/ui/ObjectDownload"
+import SvgDownload from "@/components/ui/SvgDownload"
 import ClothReflection from "@/components/tabs/ClothReflection"
 import ConceptName from "@/components/ui/ConceptName"
 import { conceptName, conceptNameText } from "@/lib/conceptName"
@@ -115,7 +117,7 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
     activeMap, scopeMaps, selectMap, addMap, renameMap, removeMap,
     setMapTiers, setMapRead, setMapEssence, flushMapText,
     setView, ensureActiveMap,
-    flash, studentName, readOnly,
+    flash, studentName, readOnly, openLoomViewer,
   } = useLoom()
   const { titleOf } = useReadings()
   const { confirm } = useDialog()
@@ -577,11 +579,20 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
   // so it offers .json as well as .md and its buttons say what they hand over.
   // These two build it; the component does the naming, the stamping and the
   // provenance.
+  // Set only inside Open Loom, and then on every file this tab hands over:
+  // the projection and the kit are staff copies exactly when the loom is
+  // someone else's (TJ, 2026-08-22).
+  const take = () => openLoomTake(openLoomViewer)
+
   const kitMap = () =>
     activeMap ? { name: activeMap.name, essence: activeMap.essence, tiers: activeMap.tiers } : undefined
-  const kitMarkdown = () => buildMapKit(scopedState.concepts, scopedState.edges, studentName, kitMap())
+  const kitMarkdown = () => buildMapKit(scopedState.concepts, scopedState.edges, studentName, kitMap(), take())
   const kitJson = () =>
-    JSON.stringify(buildMapKitData(scopedState.concepts, scopedState.edges, studentName, kitMap()), null, 2)
+    JSON.stringify(
+      buildMapKitData(scopedState.concepts, scopedState.edges, studentName, kitMap(), take()),
+      null,
+      2
+    )
   // The practice guide's last beat listens for this. Harmless in the real app:
   // nothing there is listening.
   const handleKitTaken = () => window.dispatchEvent(new Event("loom:mapkit-taken"))
@@ -592,8 +603,8 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
   const handleKeepMapJson = () => {
     if (!activeMap) return
     downloadText(
-      JSON.stringify(buildMapExport(state, activeMap, studentName, titleOf), null, 2),
-      mapExportFilename(studentName, activeMap.name, "json"),
+      JSON.stringify(buildMapExport(state, activeMap, studentName, titleOf, take()), null, 2),
+      mapExportFilename(studentName, activeMap.name, "json", undefined, !!openLoomViewer),
       "application/json"
     )
     flash(`kept "${activeMap.name}" as .json`)
@@ -602,8 +613,8 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
   const handleKeepMapMd = () => {
     if (!activeMap) return
     downloadText(
-      buildMapMarkdown(state, activeMap, studentName, titleOf),
-      mapExportFilename(studentName, activeMap.name, "md"),
+      buildMapMarkdown(state, activeMap, studentName, titleOf, take()),
+      mapExportFilename(studentName, activeMap.name, "md", undefined, !!openLoomViewer),
       "text/markdown"
     )
     flash(`kept "${activeMap.name}" as .md`)
@@ -835,7 +846,31 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
       </div>
 
       <div className="card">
-        <h2>The board</h2>
+        {/* The heading row carries the drawing's own download (TJ, 2026-08-23:
+            "move the download svg button to the yellow highlighted area").
+            It sat with "download projection .json/.md" first, which put it a
+            screen above the thing it takes a picture of; here it is at the
+            top-right of the board itself, where a reader is already looking
+            when they decide they want it. The label drops to "download svg"
+            because the h2 beside it already says which drawing. */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: "12px" }}>
+          <h2 style={{ margin: 0 }}>The board</h2>
+          <span style={{ marginLeft: "auto" }}>
+            <SvgDownload
+              target="cardTable"
+              studentName={studentName}
+              kind="board"
+              slug={activeMap?.name}
+              label="download svg"
+              tip="the arrangement as it stands, as a vector file"
+              /* The per-card ⋮ is a control, not part of the drawing: in a
+                 file it is three grey dots on every card inviting a click that
+                 can never happen. It carries data-cardmenu already, so
+                 dropping it costs no change to the board itself. */
+              drop={["[data-cardmenu]"]}
+            />
+          </span>
+        </div>
         {/* The read-only line keeps the ⋮ half — the menu is a read — and
             drops the drag narration (TJ, 2026-08-21). */}
         {readOnly ? (

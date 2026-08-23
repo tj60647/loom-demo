@@ -1,10 +1,13 @@
 import { getAggregateLoomData, getStaffViewer } from "@/actions/admin"
 import CohortClothPanel from "@/components/admin/CohortClothPanel"
-import { firstParam, getCourse, listSections, resolveSectionId } from "@/lib/courses"
+import { firstParam, resolveSectionId } from "@/lib/courses"
 import type { LoomState } from "@/lib/types"
 
 type AggregatePageSearchParams = {
   course?: string | string[]
+  source?: string | string[]
+  student?: string | string[]
+  graph?: string | string[]
   section?: string | string[]
 }
 
@@ -24,11 +27,13 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     )
   }
 
+  // The section still SCOPES the query; it no longer needs naming on screen.
+  // The course strip above the canvas says which course and which section is
+  // being shown, so the page repeating it was one more thing over the map
+  // (TJ, 2026-08-22: "the course is visible").
   const sectionId = await resolveSectionId(courseId, firstParam(resolvedSearchParams.section))
-  const [course, courseSections] = await Promise.all([getCourse(courseId), listSections(courseId)])
-  const sectionName = sectionId
-    ? courseSections.find((section) => section.id === sectionId)?.name ?? null
-    : null
+  const studentId = firstParam(resolvedSearchParams.student) ?? null
+  const individual = firstParam(resolvedSearchParams.graph) === "individual"
 
   let concepts: LoomState["concepts"] = []
   let passages: LoomState["passages"] = []
@@ -38,7 +43,16 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   let aggregateUnavailable = false
 
   try {
-    const aggregate = await getAggregateLoomData(courseId, sectionId)
+    // THE STUDENT IS A FILTER ONLY IN INDIVIDUAL MODE. In cohort mode the
+    // query keeps the whole class and the name is handed to the panel as
+    // emphasis instead, so the map holds its shape and their work lights
+    // inside it (TJ, 2026-08-22).
+    const aggregate = await getAggregateLoomData(
+      courseId,
+      sectionId,
+      firstParam(resolvedSearchParams.source),
+      individual ? studentId : null
+    )
     concepts = aggregate.concepts
     passages = aggregate.passages
     edges = aggregate.edges
@@ -53,29 +67,27 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   const names = Object.fromEntries(members.map((member) => [member.id, member.name]))
 
   return (
-    <main>
-      <h1>Cohort Graph</h1>
-      <p className="tasksub" style={{ marginBottom: "20px" }}>
-        A macro view of concepts, passages, and threads across {course?.name ?? "this course"}
-        {sectionName ? ` · ${sectionName}` : " · all sections"}.
-        {sectionName ? "" : " Quilting happens per section — pick one in the nav to scope this graph."}
-      </p>
-
-      {aggregateUnavailable && (
-        <p className="tasksub" style={{ marginBottom: "12px", color: "var(--red)" }}>
-          Aggregate data is temporarily unavailable. Check recent migrations and server logs.
-        </p>
-      )}
-
-      {passagesUnavailable && (
-        <p className="tasksub" style={{ marginBottom: "12px", color: "var(--red)" }}>
-          Passage records could not be loaded. The concept/thread graph is still shown.
-        </p>
-      )}
-      
-      <div style={{ marginTop: "20px", marginBottom: "40px" }}>
-        <CohortClothPanel state={state} names={names} />
-      </div>
+    // THE MAP IS THE PAGE (TJ, 2026-08-22: "the map or graph needs to fill the
+    // screen like a google map or other application, cad, where the drawing is
+    // primary… you are treating the graph like an illustration for the text,
+    // it is not. the text is annotations for a map").
+    //
+    // So this main takes no measure, no padding and no scroll of its own: it
+    // is the viewport below the shell's bars, and everything that was page
+    // furniture around the drawing — the h1, the subtitle, the read-out — now
+    // floats ON the canvas as annotation. `.station-reading` is the same shape
+    // for the same reason: with the text open the station IS the text.
+    <main className="canvasfull">
+      <CohortClothPanel
+        state={state}
+        names={names}
+        // Null in individual mode: the map is already only their work, and
+        // lighting all of it against nothing would say less than the plain
+        // drawing does.
+        emphasisUserId={individual ? null : studentId}
+        aggregateUnavailable={aggregateUnavailable}
+        passagesUnavailable={passagesUnavailable}
+      />
     </main>
   )
 }

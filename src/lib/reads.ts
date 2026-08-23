@@ -121,11 +121,13 @@ export function getReadingPageManifest(sourceId: string): Promise<ReadingPageMan
 export function getPassagesOverlay(
   sourceId: string,
   band: OverlayBand = "section",
-  sectionId?: string | null
+  sectionId?: string | null,
+  studentId?: string | null
 ): Promise<PassagesOverlay> {
   const section = sectionId ? `&section=${encodeURIComponent(sectionId)}` : ""
+  const student = studentId ? `&student=${encodeURIComponent(studentId)}` : ""
   return readJson<PassagesOverlay>(
-    `/api/overlays/passages?sourceId=${encodeURIComponent(sourceId)}&band=${band}${section}`
+    `/api/overlays/passages?sourceId=${encodeURIComponent(sourceId)}&band=${band}${section}${student}`
   )
 }
 

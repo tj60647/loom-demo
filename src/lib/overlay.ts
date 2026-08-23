@@ -14,7 +14,15 @@
 // Kept pure so `scripts/check-overlay.ts` can assert it without a database.
 
 /** The comparison set. There is no third band: "me + colleague" is not in v1. */
-export type OverlayBand = "section" | "cohort"
+/**
+ * Who the heat is OF.
+ *
+ * `student` joined section and cohort on 2026-08-22 (TJ, asking for a student
+ * picker on the Heatmaps tab). It is the one band that resolves to a person,
+ * which the other two are built never to do — see the ruling note at the top
+ * of src/actions/overlays.ts.
+ */
+export type OverlayBand = "section" | "cohort" | "student"
 
 /**
  * Why an overlay is showing nothing. Every one of these is a state the UI
@@ -211,6 +219,15 @@ export type PassagesOverlay = {
   unanchored: number
   /** Spans dropped by the payload budget. Reported, never a silent cap. */
   droppedSpans: number
+  /**
+   * The densest run in the whole reading — how many people marked the same
+   * words where most did. The top of the shading scale, and the reason the
+   * scale cannot saturate: shades are this reading's own range, not an
+   * absolute clamp that paints 5 people and 60 identically. Measured over
+   * every span, including any the budget then dropped, so the scale does not
+   * shift with the payload.
+   */
+  maxCount: number
 }
 
 export type VocabularyOverlay = {
@@ -241,6 +258,7 @@ export const emptyPassagesOverlay = (
   pages: [],
   unanchored: 0,
   droppedSpans: 0,
+  maxCount: 0,
 })
 
 export const emptyVocabularyOverlay = (

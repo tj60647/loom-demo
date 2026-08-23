@@ -23,6 +23,30 @@
 export const ROSTER_CONTACT_EMAIL = "tjmcleish@berkeley.edu"
 
 /**
+ * Where the real Loom lives — the production alias, per docs/deployments.md
+ * ("Deployments"; `loom-demo.aroughidea.com` is the second alias, currently
+ * broken for OAuth, and is deliberately never named to anyone).
+ */
+export const PRODUCTION_ORIGIN = "https://loom.aroughidea.com"
+
+/**
+ * Whether a refused sign-in should also point at production.
+ *
+ * The person this exists for holds a production account and has arrived at the
+ * tester site: GitHub's round trip succeeds, the dev database's roster refuses
+ * them, and NotOnRoster's repair instructions — add the address to GitHub, ask
+ * to be added — are exactly wrong for them. The wrong site is the thing to say.
+ *
+ * The gate is "show unless the build is confirmed production", the same
+ * fail-safe direction as previewLogin.ts: a missing or misspelt VERCEL_ENV
+ * costs one redundant sentence on a dev deployment, never a wrong-site pointer
+ * on production.
+ */
+export function showWrongSiteHint(env: Record<string, string | undefined> = process.env): boolean {
+  return env.VERCEL_ENV !== "production"
+}
+
+/**
  * Codes Loom raises itself, alongside NextAuth's own. Kept distinct from
  * `AccessDenied` because "GitHub told us nothing we can match on" and "we
  * matched you, and no course has invited that address" need different

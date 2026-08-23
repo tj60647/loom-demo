@@ -37,10 +37,12 @@ export const maxDuration = 300
 /**
  * The Readings tab: every reading in the library, on its own terms.
  *
- * Course membership is shown here as a badge and edited with "Add to course",
- * but a reading is never *scoped* to a course on this page — that view belongs
- * to the Courses tab, which lists each course's full reading list. The `?course`
- * param only pre-selects a default in the add-to-course pickers.
+ * Course membership is shown here as a badge and edited with "Add to course" —
+ * one of two doors: since 2026-08-21 a course's own Readings panel adds from
+ * the library inline, posting the same addSourceToCourse. A reading is never
+ * *scoped* to a course on this page — that view belongs to the Courses tab,
+ * which lists each course's full reading list. The `?course` param only
+ * pre-selects a default in the add-to-course pickers.
  */
 export default async function AdminLibraryPage({
   searchParams,
@@ -245,17 +247,13 @@ export default async function AdminLibraryPage({
                             >
                               Add to Course
                             </summary>
-                            <form
-                              className="foldout"
-                              action={addSourceToCourse}
-                              style={{ display: "grid", gap: "10px", maxWidth: "420px" }}
-                            >
+                            <form className="foldout foldline" action={addSourceToCourse}>
                               <input type="hidden" name="sourceId" value={reading.id} />
                               <div className="form-row">
                                 <span className="label">Course</span>
                                 <select
                                   name="courseId"
-                                  className="tinput"
+                                  className="tinput inline"
                                   defaultValue={
                                     addable.find((course) => course.id === activeCourseId)?.id ??
                                     addable[0].id
@@ -270,10 +268,14 @@ export default async function AdminLibraryPage({
                               </div>
                               <div className="form-row">
                                 <span className="label">Week (Optional)</span>
-                                <input name="week" type="number" min="1" max="20" placeholder="Unscheduled" />
+                                {/* No "Unscheduled" placeholder: it does not fit
+                                    a 66px box. An empty field is unscheduled,
+                                    and the label already says optional. */}
+                                <input className="numin" name="week" type="number" min="1" max="20" />
                               </div>
                               {/* Same pair, same words, as the Courses tab's
-                                  Schedule foldout — one choice with two names. */}
+                                  Schedule foldout — one choice with two names.
+                                  Same one-line shape too, since 2026-08-22. */}
                               <div className="form-row">
                                 <span className="label">Weight</span>
                                 <div className="radiorow">
@@ -286,18 +288,18 @@ export default async function AdminLibraryPage({
                                     Supplemental
                                   </label>
                                 </div>
-                                <p className="hint" style={{ margin: "4px 0 0", fontSize: "13px" }}>
-                                  Students graph the core readings; supplemental ones sit alongside.
-                                </p>
                               </div>
                               <button
                                 className="btn mini"
                                 type="submit"
-                                style={{ justifySelf: "start" }}
                                 data-tip="Add with the chosen course, week, and core status"
                               >
                                 Add to Course
                               </button>
+                              {/* Last on the line, so this is what wraps. */}
+                              <span className="hint">
+                                Students graph the core readings; supplemental ones sit alongside.
+                              </span>
                             </form>
                           </details>
                         ) : (

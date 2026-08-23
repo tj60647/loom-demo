@@ -1,0 +1,2 @@
+ALTER TABLE "section" ADD COLUMN "leadUserId" text;--> statement-breakpoint
+ALTER TABLE "section" ADD CONSTRAINT "section_leadUserId_user_id_fk" FOREIGN KEY ("leadUserId") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;

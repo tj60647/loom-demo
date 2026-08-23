@@ -84,11 +84,21 @@ function revalidateLibrary() {
 /**
  * The whole shared library, independent of any course. This is the set an
  * instructor picks from when building a course reading list.
+ *
+ * SHARED is the operative word: a student's own reading is excluded, always.
+ * `isOwn` means "it sits on their shelf only: it has no course_source row, so
+ * it never reaches anyone else's" (schema.ts) — so an own reading is not part
+ * of the shared library and is not something an instructor may pick. Without
+ * this filter the courses page's add-reading dropdown listed every student's
+ * private upload as a plain `title — author` row, and attaching one put a
+ * card on every classmate's shelf that `authorizeSourceAccess` then refuses
+ * to open. No `includeOwn` option: nothing should want one.
  */
 export async function getLibrarySources({ includeArchived = false } = {}) {
   await requireAdmin()
 
-  const rows = await db.select().from(sources).orderBy(asc(sources.title))
+  const rows = (await db.select().from(sources).orderBy(asc(sources.title)))
+    .filter((source) => !source.isOwn)
   return includeArchived ? rows : rows.filter((source) => !source.isArchived)
 }
 

@@ -11,7 +11,12 @@
 
 import type { CardTableView, LoomExport, LoomMap, LoomState, LoomViews, Tier } from "./types"
 import { scopeFromKey, scopedGraph } from "./scope"
-import { fileStamp } from "./objectExport"
+import {
+  fileStamp,
+  openLoomTakeLines,
+  OPEN_LOOM_FILE_MARKER,
+  type OpenLoomTake,
+} from "./objectExport"
 import { conceptNameText } from "@/lib/conceptName"
 
 const TIER_GROUPS: [Tier, string][] = [
@@ -36,6 +41,9 @@ export const LOOM_MAP_FORMAT = "loom-map"
 export type LoomMapExport = {
   format: typeof LOOM_MAP_FORMAT
   student: string
+  /** Set only on a staff copy taken inside Open Loom — see OpenLoomTake. */
+  takenVia?: "open-loom"
+  takenBy?: string
   map: {
     id: string
     scopeKey: string
@@ -72,7 +80,8 @@ export function buildMapExport(
   state: LoomState,
   map: LoomMap,
   student: string,
-  titleOfSource?: (id: string) => string
+  titleOfSource?: (id: string) => string,
+  taken?: OpenLoomTake
 ): LoomMapExport {
   const scoped = scopedGraph(state, scopeFromKey(map.scopeKey))
   const memberIds = new Set(scoped.concepts.map((c) => c.id))
@@ -87,6 +96,7 @@ export function buildMapExport(
   return {
     format: LOOM_MAP_FORMAT,
     student,
+    ...(taken ?? {}),
     map: {
       id: map.id,
       scopeKey: map.scopeKey,
@@ -162,7 +172,8 @@ export function buildMapMarkdown(
   state: LoomState,
   map: LoomMap,
   student: string,
-  titleOfSource?: (id: string) => string
+  titleOfSource?: (id: string) => string,
+  taken?: OpenLoomTake
 ): string {
   const scoped = scopedGraph(state, scopeFromKey(map.scopeKey))
   // Markdown is prose a person reads, so an unnamed Concept gets its
@@ -176,6 +187,7 @@ export function buildMapMarkdown(
 
   lines.push(`# ${map.name} — a projection of ${scopeLabelOf(map.scopeKey, titleOfSource)}`, "")
   if (student) lines.push(`_${student}_`, "")
+  lines.push(...openLoomTakeLines(student, taken))
   if (map.essence.trim()) lines.push(`**${map.essence.trim()}**`, "")
   if (map.read.trim()) lines.push(map.read.trim(), "")
 
@@ -237,9 +249,15 @@ export function buildMapMarkdown(
   return lines.join("\n")
 }
 
-export function mapExportFilename(student: string, mapName: string, ext: string, at?: Date): string {
+export function mapExportFilename(
+  student: string,
+  mapName: string,
+  ext: string,
+  at?: Date,
+  takenInOpenLoom = false
+): string {
   const name = (student || "loom").replace(/\s+/g, "_").toLowerCase()
   const mapSlug = (mapName || "projection").replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "").toLowerCase() || "projection"
   // Stamped like every other download, last (TJ, 2026-08-12) — see `fileStamp`.
-  return `${name}-${mapSlug}.projection.${fileStamp(at)}.${ext}`
+  return `${takenInOpenLoom ? `${OPEN_LOOM_FILE_MARKER}.` : ""}${name}-${mapSlug}.projection.${fileStamp(at)}.${ext}`
 }

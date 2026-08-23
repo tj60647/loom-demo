@@ -33,6 +33,7 @@ import PageSlot, { type PageTier } from "./PageSlot";
 import { type PdfDoc } from "./PageRaster";
 import { spreadLayout, pageX } from "@/lib/spreadLayout";
 import { layoutRail, railScale } from "@/lib/railLayout";
+import { heatBand } from "@/lib/heatRects";
 import { RailCardBody, RAIL_W } from "./ConceptRail";
 import AddConceptCard from "@/components/cards/AddConceptCard";
 import type { Concept, Passage } from "@/lib/types";
@@ -177,6 +178,9 @@ type Anchor = {
  *  crosses lines is several of these, and mark.js may split one passage over
  *  several elements, so a passage owns a list rather than a box. */
 type MarkRect = { x: number; y: number; w: number; h: number };
+/** A heat rect carries its step, so the wash deepens with the count the same
+ *  way the live text layer's `data-heat` does. */
+type HeatMark = MarkRect & { level: number };
 
 export default function SpreadCanvasView({
   pdf,
@@ -200,6 +204,8 @@ export default function SpreadCanvasView({
   onEditNote,
   draft,
   onAspect,
+  heatRects = {},
+  heatMax = 1,
   zoomMultiplier,
   onZoomMultiplier,
   onZoomRange,
@@ -246,6 +252,21 @@ export default function SpreadCanvasView({
   draft?: { passage: Passage; card: React.ReactNode } | null;
   onAspect: (a: number) => void;
   /** The toolbar's zoom multiplier (− / + / Fit drive it): 1 = the whole canvas fits the stage. */
+  /**
+   * WHERE THE COHORT MARKED, as rectangles normalized to the page box (0..1
+   * on both axes), keyed by page number.
+   *
+   * Projected in the host from the overlay's character offsets — see
+   * src/lib/heatRects.ts — which is what lets the canvas draw real passages
+   * at fit-all, where no page has a text layer to walk (TJ, 2026-08-22: "i
+   * want to be able to look at the canvas and see where everyone has been").
+   * Normalized rather than in canvas units so this view can scale them to
+   * whatever it happens to be drawing a page at, and so the same numbers
+   * serve the paged views.
+   */
+  heatRects?: Record<number, { x: number; y: number; w: number; h: number; count: number }[]>;
+  /** The densest run in the reading — the top of the shading scale. */
+  heatMax?: number;
   zoomMultiplier: number;
   onZoomMultiplier: (m: number) => void;
   /** Reports this document's zoom ceiling (a multiplier), so the toolbar's
@@ -290,6 +311,7 @@ export default function SpreadCanvasView({
    * goes on listing the hits. Seven pages match, the drawing shows none.
    */
   const [searchRects, setSearchRects] = useState<Record<number, MarkRect[]>>({});
+
   const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
   const [passageCardHeights, setPassageCardHeights] = useState<Record<string, number>>({});
   const [activeAddPassageId, setActiveAddPassageId] = useState<string | null>(null);
@@ -1154,6 +1176,10 @@ export default function SpreadCanvasView({
       for (const n of seen) delete merged[n];
       return { ...merged, ...nextSearch };
     });
+
+    // Heat is NOT measured here. It arrives projected from the offsets
+    // themselves (`heatRects`), so it does not depend on a page having been
+    // rendered — which is the whole reason the canvas can show it.
     setAnchors((prev) => {
       if (Object.keys(next).length === 0) return prev;
       const merged = { ...prev, ...next };
@@ -1330,6 +1356,48 @@ export default function SpreadCanvasView({
     return out;
   }, [searchRects, pageView]);
 
+  /**
+   * WHERE THE MARKS ARE, WITHOUT READING THE WORDS.
+   *
+   * Every marked run on every page, at whatever size the page is being drawn —
+   * no text layer, no rendering, no zoom threshold. The projection arrives
+   * normalized to the page box, so placing it is one multiply per rect against
+   * the slot the layout already computed.
+   *
+   * This replaces two stopgaps and is the reason both could go: rects scraped
+   * off a live text layer (which only pages you had visited ever had) and a
+   * flat wash over any page that had marks but no measurement (which said
+   * "something happened on this page" and nothing about where). At fit-all the
+   * words are unreadable, but the SHAPE of a marked paragraph is not — that is
+   * what a reader is looking at a 60-page contact sheet to see.
+   *
+   * Rects are in CANVAS units, like every other overlay here, so they shrink
+   * with the page under the zoom transform rather than being re-derived per
+   * zoom step — a marked line stays exactly as tall as the line it covers at
+   * every scale, which is what makes a marked paragraph read as a block on a
+   * 60-page contact sheet.
+   */
+  const heatMarks = useMemo(() => {
+    if (!layout) return [];
+    const out: HeatMark[] = [];
+    for (const [page, rects] of Object.entries(heatRects)) {
+      const p = Number(page);
+      const s2 = layout.spreads[Math.floor((p - 1) / 2)];
+      if (!s2 || !rects.length) continue;
+      const px = pageX(layout, s2, p, basePageWidth);
+      for (const r of rects) {
+        out.push({
+          x: px + r.x * basePageWidth,
+          y: s2.y + r.y * layout.unitH,
+          w: r.w * basePageWidth,
+          h: r.h * layout.unitH,
+          level: heatBand(r.count, heatMax),
+        });
+      }
+    }
+    return out;
+  }, [heatRects, heatMax, layout, basePageWidth]);
+
   const cards = useMemo(() => {
     if (!cardsOn || !layout) return [];
     const out: { passage: Passage; concepts: Concept[]; anchor: Anchor }[] = [];
@@ -1487,6 +1555,18 @@ export default function SpreadCanvasView({
             the page, not furniture above it. aria-hidden like the leaders —
             the passage is reachable from its card and from Your work, and
             this is a redraw of a mark, not a second control. */}
+        {/* The cohort's marks, painted BEFORE the passage marks so a capture
+            still sits on top of the wash — the same order the live text layer
+            uses, where heat is marked first and own highlights nest inside
+            it. */}
+        {heatMarks.length > 0 && (
+          <svg className="pdf-kept-heat" width={layout.canvasW} height={layout.canvasH} aria-hidden="true">
+            {heatMarks.map((m, i) => (
+              <rect key={i} x={m.x} y={m.y} width={m.w} height={m.h} data-heat={m.level} />
+            ))}
+          </svg>
+        )}
+
         {keptMarks.length > 0 && (
           <svg className="pdf-kept-marks" width={layout.canvasW} height={layout.canvasH} aria-hidden="true">
             {keptMarks.map((m, i) => (

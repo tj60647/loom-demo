@@ -111,15 +111,43 @@ test.describe("The thread card", () => {
       ).toHaveCount(0)
     })
 
-    test("/admin/aggregate draws the same card, and says whose each thread is", async ({ page }) => {
+    test("/admin/aggregate draws the same card, reduced, and says whose each thread is when asked", async ({ page }) => {
       await page.goto("/admin/aggregate")
       await expect(page.locator(".thread").first()).toBeVisible({ timeout: 30_000 })
-      await pillsMatchLabels(page, "/admin/aggregate")
 
-      // Attribution is a PROP of the shared card here, not a different row —
-      // this is the only surface with more than one student in it.
-      const n = await page.locator(".thread[data-edge-id]").count()
-      await expect(page.locator(".thread .tmeta .cap")).toHaveCount(n)
+      // THE LIST IS COMPACT since 2026-08-22 (TJ: "the thread cards need to
+      // be simpler, jsut show the thread, not description or contributor",
+      // then "the thread cards do not need description"). Sentence,
+      // attribution and the state pill are all withheld — asserted as ZERO
+      // rather than left unstated, since absence would otherwise let the
+      // shared helper's checks pass vacuously here.
+      const list = page.locator(".canvasmenu.atright")
+      const n = await list.locator(".thread[data-edge-id]").count()
+      expect(n, "no thread cards — the fixture is empty").toBeGreaterThan(0)
+      await expect(list.locator(".thread .sent")).toHaveCount(0)
+      await expect(list.locator(".thread .tmeta")).toHaveCount(0)
+
+      // THE INVARIANT SURVIVES, in the trip rather than in the meta.
+      // `pillsMatchLabels` cannot be used here — it counts the state pill
+      // this card no longer draws — but what it guards is unchanged: a label
+      // shows as `.v`, its absence as `.tarrow`, and every card shows exactly
+      // one of the two. That is the same claim, read off the marks that are
+      // left.
+      const v = await list.locator(".thread .v").count()
+      const arrows = await list.locator(".thread .tarrow").count()
+      expect(v + arrows, "/admin/aggregate: every card says what it is, exactly once").toBe(n)
+      await expect(
+        list.locator(".thread:has(.v):has(.tarrow)"),
+        "/admin/aggregate: no card shows both a label and an arrow"
+      ).toHaveCount(0)
+
+      // "Below when selected" is the other half of the same sentence, and it
+      // is where attribution went — this is still the only surface with more
+      // than one student in it, so it must still say whose a thread is.
+      await list.locator(".thread[data-edge-id]").first().click()
+      const readout = page.locator(".canvasfoot")
+      await expect(readout.locator(".threadhead")).toBeVisible()
+      await expect(readout.locator(".threadhead .n")).not.toBeEmpty()
     })
   })
 })
