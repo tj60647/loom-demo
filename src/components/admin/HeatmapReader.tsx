@@ -45,6 +45,11 @@ export default function HeatmapReader({
       // student picker still overrides it, and clearing that picker comes
       // back here rather than to a blank page.
       defaultOverlayBand="cohort"
+      // …and on the CANVAS (TJ, 2026-08-22: "let the default heatmap view be
+      // canvas"). The tab asks where a cohort has been across a whole
+      // reading, and only the contact sheet answers that in one look — which
+      // is what the heat was projected into page-normalized geometry for.
+      defaultViewMode="matrix"
       overlayStudentId={studentId}
       workOpen={false}
       onToggleWork={() => {}}

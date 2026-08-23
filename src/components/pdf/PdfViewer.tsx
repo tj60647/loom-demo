@@ -97,6 +97,8 @@ interface PdfViewerProps {
    * without the other.
    */
   defaultOverlayBand?: OverlayBand;
+  /** Which view the reader lands in. Undefined is one page — see the state. */
+  defaultViewMode?: "page" | "strip" | "matrix";
   /**
    * A student chosen OUTSIDE the viewer — the Heatmaps tab's own picker in
    * the scope strip (TJ, 2026-08-22). When set, the overlay reads that one
@@ -182,7 +184,7 @@ type HighlightEntry = {
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
   onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel, noOwnWork = false, overlayStudentId = null,
-  defaultOverlayBand }: PdfViewerProps) {
+  defaultOverlayBand, defaultViewMode }: PdfViewerProps) {
   // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the
   // student's highlights, rail cards, search and page-turning all stay — they
   // are the mode — while the capture affordance never appears and the rail
@@ -226,7 +228,17 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * All of them render ordinary react-pdf pages with their text layers, so a
    * passage can be selected and captured in any of them.
    */
-  const [viewMode, setViewMode] = useState<"page" | "strip" | "matrix">("page");
+  /**
+   * PAGE by default, because the reading station is for reading — one page,
+   * at a size the words can be read at.
+   *
+   * `defaultViewMode` lets a surface open somewhere else. Heatmaps opens on
+   * the CANVAS (TJ, 2026-08-22: "let the default heatmap view be canvas"):
+   * that tab is about where a cohort has been across a whole reading, and a
+   * 60-page contact sheet is where that has a shape at all. One page of it is
+   * a fact about one page.
+   */
+  const [viewMode, setViewMode] = useState<"page" | "strip" | "matrix">(defaultViewMode ?? "page");
   /**
    * Margin cards (the spread canvas's rail, page mode only): each passage on
    * the open spread drawn as a card beside its page. Off by default and not

@@ -19,18 +19,37 @@ test.use({ storageState: "playwright/.auth/faculty.json" })
 test.beforeEach(() => test.setTimeout(120_000))
 
 /**
- * Walk forward until a page carrying the cohort's heat is on screen.
+ * The cohort's heat, wherever this view draws it.
  *
- * Which page that is depends on where the seed's passages landed, so this
+ * TWO MECHANISMS, one claim. On the CANVAS — which is where this tab now opens
+ * — heat is SVG rects projected from the overlay's offsets, because no page at
+ * fit-all has a text layer to walk. In the paged views it is mark.js on the
+ * live text layer. Both are the same runs of text; a spec that knew only one
+ * of them would pass or fail on which view it happened to be in.
+ */
+function heatMarks(page: import("@playwright/test").Page) {
+  return page.locator(".pdf-kept-heat rect, .loom-overlay-heat")
+}
+
+/** Everything the viewer's OWN work is drawn as, in either view. */
+function ownMarks(page: import("@playwright/test").Page) {
+  return page.locator(".loom-passage-highlight, .pdf-kept-marks rect, .pdf-railcard")
+}
+
+/**
+ * Walk forward until a page carrying heat is on screen. Paged views only —
+ * the canvas has every page up at once and needs no walking.
+ *
+ * Which page carries it depends on where the seed's passages landed, so this
  * cannot be a page number. It waits on each spread rather than turning
  * eagerly: the marks are applied from a MutationObserver a tick after the data
  * lands, so a bare count() on arrival reads zero on the very page that has
  * them.
  */
 async function pageWithHeat(page: import("@playwright/test").Page) {
-  const heat = page.locator(".loom-overlay-heat")
   for (let spread = 0; spread < 8; spread += 1) {
-    const found = await heat
+    const found = await page
+      .locator(".loom-overlay-heat")
       .first()
       .waitFor({ state: "visible", timeout: 6_000 })
       .then(() => true, () => false)
@@ -60,7 +79,15 @@ test("the tab opens on the cohort, and shows no work of the viewer's own", async
   // !overlay && !busy — has no window to appear in.
   await expect(bar).not.toContainText("could not be loaded")
 
-  expect(await pageWithHeat(page), "no page of this reading shows the cohort's marks").toBe(true)
+  /**
+   * AND ON THE CANVAS (TJ, 2026-08-22: "let the default heatmap view be
+   * canvas"). The tab asks where a cohort has been across a whole reading,
+   * which only the contact sheet answers in one look.
+   */
+  await expect(page.getByRole("button", { name: "Canvas" })).toHaveAttribute("aria-pressed", "true")
+  // Heat is drawn there with no page rendered at all — the projection exists
+  // precisely so fit-all is not a blank contact sheet.
+  await expect(heatMarks(page).first()).toBeVisible({ timeout: 25_000 })
 
   /**
    * NO YELLOW (TJ, 2026-08-22: "why is there any yellow highlight? for the
@@ -76,8 +103,7 @@ test("the tab opens on the cohort, and shows no work of the viewer's own", async
    * there: 161 highlights and 3 margin cards before, none after, with the
    * cohort's 189 heat marks unchanged.
    */
-  await expect(page.locator(".loom-passage-highlight")).toHaveCount(0)
-  await expect(page.locator(".pdf-railcard")).toHaveCount(0)
+  await expect(ownMarks(page)).toHaveCount(0)
 
   // Nor the surfaces that would put their work back on screen by another door.
   await expect(page.locator("#yourwork-toggle")).toHaveCount(0)
@@ -98,13 +124,18 @@ test("the tab opens on the cohort, and shows no work of the viewer's own", async
 test("no control offers the viewer their own work back", async ({ page }) => {
   await page.goto("/admin/heatmaps")
   await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
-  expect(await pageWithHeat(page), "no page of this reading shows the cohort's marks").toBe(true)
-
   // The cohort's heat is there…
-  expect(await page.locator(".loom-overlay-heat").count()).toBeGreaterThan(0)
+  await expect(heatMarks(page).first()).toBeVisible({ timeout: 25_000 })
   // …and nothing on the toolbar turns the viewer's own marks on.
   await expect(page.getByRole("button", { name: /my marks|passage cards/i })).toHaveCount(0)
-  await expect(page.locator(".loom-passage-highlight")).toHaveCount(0)
+  await expect(ownMarks(page)).toHaveCount(0)
+
+  // Nor in the paged view, where own marks are painted by a different
+  // mechanism (mark.js on the live text layer) and could have survived a fix
+  // that only reached the canvas.
+  await page.getByRole("button", { name: "1 page", exact: true }).click()
+  expect(await pageWithHeat(page), "no page of this reading shows the cohort's marks").toBe(true)
+  await expect(ownMarks(page)).toHaveCount(0)
 })
 
 test("choosing a student does not resize the scope strip", async ({ page }) => {
