@@ -31,6 +31,7 @@ export default function SvgDownload({
   kind,
   slug,
   noun,
+  label,
   tip,
   drop,
 }: {
@@ -43,6 +44,15 @@ export default function SvgDownload({
   kind: string
   slug?: string
   noun?: string
+  /**
+   * The whole button text, when the surrounding heading already says what the
+   * drawing is. The board's card is titled "The board" and this is the only
+   * download in it, so "download the board .svg" says it twice (TJ,
+   * 2026-08-23: "'download svg' as it is alreay in the board area"). The
+   * cloth's keeps the longer form, because it stands beside the Capture Log's
+   * "download the log" pair and has to name which object it hands over.
+   */
+  label?: string
   tip?: string
   /** Selectors dropped before serializing. See SvgExportOptions. */
   drop?: string[]
@@ -81,7 +91,7 @@ export default function SvgDownload({
       onClick={take}
       data-tip={tip ?? "the drawing as it stands, as a vector file"}
     >
-      {said ?? `download ${noun ?? kind} .svg`}
+      {said ?? label ?? `download ${noun ?? kind} .svg`}
     </button>
   )
 }

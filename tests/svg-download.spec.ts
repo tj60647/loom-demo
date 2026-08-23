@@ -30,7 +30,10 @@ test.describe("Download the drawing", () => {
     await expect(page.locator("#cardTable")).toBeVisible({ timeout: 30_000 })
 
     const take = async (label: string) => {
-      const button = page.locator(`button:visible`, { hasText: new RegExp(`^download ${label} \\.svg$`) })
+      // Anchored: "download svg" must not also match "download the cloth .svg".
+      const button = page.locator("button:visible", {
+        hasText: new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
+      })
       await expect(button.first()).toBeVisible({ timeout: 20_000 })
       const [download] = await Promise.all([
         page.waitForEvent("download", { timeout: 25_000 }),
@@ -42,7 +45,17 @@ test.describe("Download the drawing", () => {
       return { name: download.suggestedFilename(), text }
     }
 
-    for (const [label, kind] of [["the cloth", "cloth"], ["the board", "board"]] as const) {
+    /**
+     * The two read differently on purpose. The cloth's button stands beside
+     * the Capture Log's "download the log .json/.md", so it has to name which
+     * object it hands over; the board's sits in the heading row of a card
+     * already titled "The board" and is the only download in it (TJ,
+     * 2026-08-23), so naming it again would say it twice.
+     */
+    for (const [label, kind] of [
+      ["download the cloth .svg", "cloth"],
+      ["download svg", "board"],
+    ] as const) {
       const file = await take(label)
 
       // Same naming as every other object leaving Loom: whose, what, stamped
@@ -85,7 +98,7 @@ test.describe("Download the drawing", () => {
     // cannot answer. It is on screen…
     await expect(page.locator("#cardTable [data-cardmenu]").first()).toBeAttached({ timeout: 20_000 })
 
-    const button = page.locator("button:visible", { hasText: /^download the board \.svg$/ })
+    const button = page.locator("button:visible", { hasText: /^download svg$/ })
     await expect(button.first()).toBeVisible({ timeout: 20_000 })
     const [download] = await Promise.all([
       page.waitForEvent("download", { timeout: 25_000 }),

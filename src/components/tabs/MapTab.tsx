@@ -702,27 +702,6 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
             data-tip="this projection as a readable outline — notes, Obsidian, an agent"
             onClick={handleKeepMapMd}
           >download projection .md</button>
-          {/* …and as the picture it is (TJ, 2026-08-23: "the cloth and the
-              board need a download as svg button"). Beside the other two
-              because it is the same act on the same object: the .json is the
-              projection's data, the .md its outline, and this is the
-              arrangement — where the student put each card, which is the part
-              of a projection the other two formats describe but cannot show.
-              Named for the board rather than the projection, since what it
-              hands over is this drawing of it. */}
-          <SvgDownload
-            target="cardTable"
-            studentName={studentName}
-            kind="board"
-            slug={activeMap.name}
-            noun="the board"
-            tip="the arrangement as it stands, as a vector file"
-            /* The per-card ⋮ is a control, not part of the drawing: in a file
-               it is three grey dots on every card inviting a click that can
-               never happen. It carries data-cardmenu already, so dropping it
-               costs no change to the board itself. */
-            drop={["[data-cardmenu]"]}
-          />
           {!readOnly && <button className="btn ghost mini" data-tip="delete this projection — concepts and threads stay" onClick={handleDeleteMap}>delete</button>}
         </span>
       )}
@@ -867,7 +846,31 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
       </div>
 
       <div className="card">
-        <h2>The board</h2>
+        {/* The heading row carries the drawing's own download (TJ, 2026-08-23:
+            "move the download svg button to the yellow highlighted area").
+            It sat with "download projection .json/.md" first, which put it a
+            screen above the thing it takes a picture of; here it is at the
+            top-right of the board itself, where a reader is already looking
+            when they decide they want it. The label drops to "download svg"
+            because the h2 beside it already says which drawing. */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: "12px" }}>
+          <h2 style={{ margin: 0 }}>The board</h2>
+          <span style={{ marginLeft: "auto" }}>
+            <SvgDownload
+              target="cardTable"
+              studentName={studentName}
+              kind="board"
+              slug={activeMap?.name}
+              label="download svg"
+              tip="the arrangement as it stands, as a vector file"
+              /* The per-card ⋮ is a control, not part of the drawing: in a
+                 file it is three grey dots on every card inviting a click that
+                 can never happen. It carries data-cardmenu already, so
+                 dropping it costs no change to the board itself. */
+              drop={["[data-cardmenu]"]}
+            />
+          </span>
+        </div>
         {/* The read-only line keeps the ⋮ half — the menu is a read — and
             drops the drag narration (TJ, 2026-08-21). */}
         {readOnly ? (
