@@ -107,6 +107,37 @@ test("no control offers the viewer their own work back", async ({ page }) => {
   await expect(page.locator(".loom-passage-highlight")).toHaveCount(0)
 })
 
+test("choosing a student does not resize the scope strip", async ({ page }) => {
+  await page.goto("/admin/heatmaps")
+  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+
+  const strip = page.locator("nav").nth(1)
+  const before = await strip.boundingBox()
+  expect(before).not.toBeNull()
+
+  const picker = page.getByLabel("Select active student")
+  const names = await picker.locator("option").evaluateAll((opts) =>
+    (opts as HTMLOptionElement[]).map((o) => o.value).filter(Boolean)
+  )
+  expect(names.length, "the seed must place at least one student in this course").toBeGreaterThan(0)
+  await picker.selectOption(names[0])
+  await expect(page).toHaveURL(/student=/, { timeout: 15_000 })
+
+  /**
+   * THE STRIP IS THE SAME HEIGHT. The emphasis toggle used to appear here the
+   * moment a name was chosen, and a `btn mini` is taller than a `tinput
+   * inline`, so the row grew and pushed the whole reading surface down (TJ,
+   * 2026-08-22: "the 'course' toolbar changes size when i select a student,
+   * why?"). It is gone from this tab — src/app/admin/heatmaps/page.tsx never
+   * reads ?graph, so it redrew nothing here — and the strip carries a floor
+   * equal to its tallest state so nothing else can do the same again.
+   */
+  const after = await strip.boundingBox()
+  expect(after).not.toBeNull()
+  expect(Math.round(after!.height)).toBe(Math.round(before!.height))
+  await expect(strip.locator(".navseg")).toHaveCount(0)
+})
+
 test("the legend floats over the page instead of adding a row above it", async ({ page }) => {
   await page.goto("/admin/heatmaps")
   await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })

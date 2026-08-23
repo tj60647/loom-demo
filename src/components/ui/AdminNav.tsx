@@ -27,21 +27,40 @@ export type AdminNavCourse = {
  */
 const SCOPES: Record<
   string,
-  { section: boolean; reading: boolean; student: boolean; oneReading?: boolean }
+  {
+    section: boolean
+    reading: boolean
+    student: boolean
+    oneReading?: boolean
+    /** Does the page redraw for `?graph=individual`? Only the one that reads it. */
+    emphasis?: boolean
+  }
 > = {
   // The catalog's panels always show every section, and a course is the whole
   // subject of the page.
   "/admin/courses": { section: false, reading: false, student: false },
-  // The cohort map narrows by all four (TJ, 2026-08-22).
-  "/admin/aggregate": { section: true, reading: true, student: true },
+  // The cohort map narrows by all four (TJ, 2026-08-22), and is the only page
+  // that reads ?graph — see `emphasis` below.
+  "/admin/aggregate": { section: true, reading: true, student: true, emphasis: true },
   /**
-   * Heatmaps takes the same strip minus the student, and its reading picker
-   * has no "All readings": heat is laid on the PAGES of one text, and there
-   * is no page to draw for all of them.
+   * Heatmaps takes the same four, and its reading picker has no "All
+   * readings": heat is laid on the PAGES of one text, and there is no page to
+   * draw for all of them.
    *
-   * The student is absent by RULING, not by omission — ruling 28 puts
-   * overlays at Section · Cohort granularity and forbids anything that
-   * "resolves to one" person (docs/loom-model-build.md §Overlays).
+   * IT TAKES NO EMPHASIS TOGGLE. src/app/admin/heatmaps/page.tsx reads course,
+   * section, source and student and never `graph`, so the control did nothing
+   * there but cost the strip 5px of height the moment a name was chosen —
+   * which pushed the whole reading surface down (TJ, 2026-08-22: "the 'course'
+   * toolbar changes size when i select a student, why?"). Choosing a student
+   * here already switches the overlay to that person's band; there is no
+   * second rendering of them to toggle between.
+   *
+   * The student picker itself is a deliberate change to ruling 28, which had
+   * put overlays at Section · Cohort and forbidden anything resolving to one
+   * person. TJ added it on 2026-08-22 and docs/loom-model-build.md §Overlays
+   * records the change. (An older comment here still said the student was
+   * "absent by RULING" long after the picker shipped — it is removed rather
+   * than corrected, because it described a strip that no longer exists.)
    */
   "/admin/heatmaps": { section: true, reading: true, student: true, oneReading: true },
 }
@@ -185,7 +204,15 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
     // them rather than in a bar about where you can go.
     // No marginBottom: the strip runs flush under the journey bar now, and
     // the gap to the content below is .adminbody's own padding (2026-08-21).
-    <nav style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+    // minHeight: the strip must not change size when a control appears in it.
+    // A `btn mini` is taller than a `tinput inline`, so the emphasis toggle
+    // arriving on the Cohort Graph took the row from 33px to 38px and pushed
+    // everything below it down by 5 — measured on the running app at 1920 the
+    // day it was reported (TJ, 2026-08-22: "the 'course' toolbar changes size
+    // when i select a student, why?"). 38 is that taller state, so the row is
+    // already the size it will need and nothing reflows. It is a floor, not a
+    // height: the strip still grows when it wraps at narrow widths.
+    <nav style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap", minHeight: "38px" }}>
       {/* Left, not right: with the tabs gone this row holds only the scope, and
           a lone pair of pickers pushed to the far edge of an empty bar read as
           leftovers. They line up with the page heading underneath instead. */}
@@ -294,10 +321,11 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
                     <option key={st.id} value={st.id}>{st.name}</option>
                   ))}
                 </select>
-                {/* Only once a name is chosen: with "All students" the two
-                    modes draw the same map, and a control whose two states
-                    look identical teaches nothing. */}
-                {activeStudent && (
+                {/* Only on a page that redraws for it, and only once a name is
+                    chosen: with "All students" the two modes draw the same
+                    map, and a control whose two states look identical teaches
+                    nothing. */}
+                {scope.emphasis && activeStudent && (
                   <span className="segmented navseg" role="group" aria-label="How the student is shown">
                     <button
                       type="button"
