@@ -50,6 +50,13 @@ export default function HeatmapReader({
       // reading, and only the contact sheet answers that in one look — which
       // is what the heat was projected into page-normalized geometry for.
       defaultViewMode="matrix"
+      // The Overlay picker lives HERE and nowhere else (TJ, 2026-08-23: "the
+      // overlay view should only be available in the heatmap, not in
+      // reading"). It sat in the reading toolbar for every staff viewer too,
+      // which made it the same control in two places — and the reading station
+      // is the one where comparing yourself with the cohort is not the
+      // question being asked.
+      overlayPicker
       overlayStudentId={studentId}
       workOpen={false}
       onToggleWork={() => {}}

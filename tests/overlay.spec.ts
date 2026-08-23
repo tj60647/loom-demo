@@ -46,75 +46,34 @@ async function openReadingByHref(page: Page, title: string) {
   await loomLoaded(page)
 }
 
-test("the passages overlay shades the section's marks, deepest where they agree", async ({ page }) => {
+/**
+ * THE READING STATION OFFERS NO OVERLAY AT ALL, ruled 2026-08-23 (TJ: "the
+ * overlay view should only be available in the heatmap, not in reading").
+ *
+ * This test used to be the opposite: it drove the picker in the reading
+ * toolbar and asserted the wash it produced. That behaviour is gone, and what
+ * replaced it is asserted on the tab that owns it now — tests/heatmap.spec.ts
+ * carries the shading, the depth and the scale.
+ *
+ * Worth keeping as a test rather than deleting, because the picker was the
+ * ONLY way to turn an overlay on: with it gone from here, no heat can be
+ * fetched or drawn on the reading station, and that is the claim.
+ */
+test("no overlay is offered on the reading station, not even to faculty", async ({ page }) => {
   await openReadingByHref(page, READING)
   await page.locator("nav button.station", { hasText: "Reading" }).click()
   await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 20_000 })
 
-  // Off until asked for: the page is the student's own first.
+  // The control is gone…
+  await expect(page.getByLabel("Which section to compare")).toHaveCount(0)
+  await expect(page.locator(".pdf-overlay-ctl")).toHaveCount(0)
+
+  // …and with it the only door to the wash, so neither the heat nor the bar
+  // that explains it can appear here.
   await expect(page.locator(".loom-overlay-heat")).toHaveCount(0)
-
-  await page.getByLabel("Which section to compare").selectOption({ label: "All sections" })
-
-  const bar = page.locator(".pdf-overlay-bar")
-  await expect(bar).toBeVisible({ timeout: 20_000 })
-  // Counted in people, and the denominator is stated so a count is readable.
-  // Terse since 2026-08-22 ("4 of 8 marked · 17 passages · 7 here"): the bar
-  // floats over the page on the Heatmaps tab, where a sentence covered the
-  // text it was describing (TJ: "to wide, to much text"). Which band is being
-  // compared is named by the Overlay picker rather than repeated here.
-  await expect(bar).toContainText(/\d+ of \d+ marked · \d+ passages/, { timeout: 20_000 })
-  // The scale NAMES ITS ENDS, because it is relative to this reading's own
-  // densest run — the darkest step is "this many people marked the same words
-  // here", not a fixed number. Replaces the "counted, not judged · no names"
-  // line, removed from this bar on 2026-08-22 (TJ); the discipline it named is
-  // enforced in src/actions/overlays.ts, which selects no name and no content,
-  // and is asserted at the end of this test rather than by reading a sentence.
-  await expect(bar.locator(".pdf-overlay-scale")).toContainText(/\d+ people/)
-
-  // The shading itself. Which page carries it depends on where the seed's
-  // sentence picker landed, so walk the spreads — but WAIT on each one before
-  // turning past it. The marks are applied from a MutationObserver a tick
-  // after the data lands, so a bare count() on arrival reads zero on the very
-  // page that has them, and an eager walk turns past the answer.
-  const heat = page.locator(".loom-overlay-heat")
-  let shaded = false
-  for (let spread = 0; spread < 6 && !shaded; spread += 1) {
-    shaded = await heat
-      .first()
-      .waitFor({ state: "visible", timeout: 6_000 })
-      .then(() => true, () => false)
-    if (shaded) break
-    const next = page.getByRole("button", { name: "Next Page" })
-    if (!(await next.isEnabled())) break
-    await next.click()
-  }
-  expect(shaded, "no page of this reading shows the section's marks").toBe(true)
-
-  // Several people captured the same span, so that run is shaded deeper than
-  // one only a single person marked. This is the whole point of a heatmap — a
-  // per-span count that never resolves to a person.
-  //
-  // Depth, not an exact number: the seed has A, C and D on the same passage,
-  // and how many of them are peers depends on who is looking (the viewer is
-  // always excluded). Pinning "2" broke the moment this spec became a faculty
-  // viewer, for whom A is a peer too.
-  //
-  // Step 5 joined the list when the shading became relative to the reading's
-  // densest run rather than an absolute count (2026-08-22): which step a
-  // twice-marked run lands on now depends on the rest of the page, and the
-  // claim under test is "deeper where they agree", not a particular shade.
-  await expect(
-    page.locator('.loom-overlay-heat[data-heat="2"], .loom-overlay-heat[data-heat="3"], .loom-overlay-heat[data-heat="4"], .loom-overlay-heat[data-heat="5"]').first()
-  ).toBeVisible({ timeout: 15_000 })
-  // The comparison is never a door into anybody: no names, and no handlers.
-  await expect(heat.first()).toHaveAttribute("aria-hidden", "true")
-
-  // Turning it off takes the wash away and leaves the reading as it was.
-  await page.getByLabel("Which section to compare").selectOption("off")
   await expect(page.locator(".pdf-overlay-bar")).toHaveCount(0)
-  await expect(page.locator(".loom-overlay-heat")).toHaveCount(0, { timeout: 15_000 })
-  // Asking for a comparison must never cost you your place in the reading.
+
+  // The reading itself is untouched — this removed a comparison, not a tool.
   await expect(page).toHaveURL(/\/reading\//)
   await expect(page.locator(".pdf-shell")).toBeVisible()
 })

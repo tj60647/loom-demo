@@ -178,6 +178,9 @@ export const CAPABILITIES: Capability[] = [
   // --- Overlays — the inverted one ----------------------------------------
   {
     id: "overlay-passages",
+    // Named for the thing, not the place: it lives on the Heatmaps tab and
+    // nowhere else since 2026-08-23 (TJ), so the row below it is the surface
+    // this capability is reached through rather than a second capability.
     name: "Passages Overlay — where a section marked",
     group: "Overlays",
     student: { verdict: "no", note: "ruled 2026-08-08: students never meet them" },

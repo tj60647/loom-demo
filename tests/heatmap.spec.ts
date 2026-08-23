@@ -343,3 +343,44 @@ test("every reading reaches its own darkest step", async ({ page }) => {
   // And the scale draws the whole ramp, since the whole ramp is in play.
   await expect(page.locator(".pdf-overlay-scale i")).toHaveCount(5)
 })
+
+/**
+ * THE PICKER, AND WHAT IT TURNS OFF.
+ *
+ * These two claims used to live in tests/overlay.spec.ts, driven from the
+ * reading toolbar. The control moved here on 2026-08-23 (TJ: "the overlay view
+ * should only be available in the heatmap, not in reading") and the assertions
+ * moved with it rather than being dropped — turning a comparison OFF is the
+ * half most likely to rot, because nothing on screen complains when a wash
+ * outlives the band that fetched it.
+ */
+test("the overlay can be turned off, and never names anybody", async ({ page }) => {
+  await page.goto("/admin/heatmaps")
+  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+  await expect(heatMarks(page).first()).toBeVisible({ timeout: 25_000 })
+
+  /**
+   * The comparison is never a door into anybody: the marks are hidden from a
+   * screen reader and carry no name, because the counts are the report and
+   * they live in the bar.
+   *
+   * ASSERTED ON BOTH MECHANISMS, at the level each one actually carries it.
+   * The canvas hides the whole projected LAYER, since a rect is not a node a
+   * reader would land on; mark.js hides each mark, because those are real
+   * elements in the text layer. A single assertion against "the first heat
+   * mark" checked the wrong node in one of the two views — which is how this
+   * first failed.
+   */
+  await expect(page.locator(".pdf-kept-heat")).toHaveAttribute("aria-hidden", "true")
+  await expect(page.locator(".pdf-overlay-bar")).not.toContainText("Test User")
+
+  await page.getByRole("button", { name: "1 page", exact: true }).click()
+  expect(await pageWithHeat(page), "no page of this reading shows the cohort's marks").toBe(true)
+  await expect(page.locator(".loom-overlay-heat").first()).toHaveAttribute("aria-hidden", "true")
+
+  // Off takes the wash away and leaves the reading as it was.
+  await page.getByLabel("Which section to compare").selectOption("off")
+  await expect(page.locator(".pdf-overlay-bar")).toHaveCount(0, { timeout: 15_000 })
+  await expect(heatMarks(page)).toHaveCount(0, { timeout: 20_000 })
+  await expect(page.locator("#cardTable, .pdf-shell").first()).toBeVisible()
+})

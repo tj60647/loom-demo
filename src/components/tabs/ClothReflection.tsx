@@ -199,6 +199,17 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
    * scrubber stays under both, because it is the position they share.
    */
   const [view, setView] = useState<"cloth" | "record">("cloth")
+  const clothCardRef = useRef<HTMLDivElement | null>(null)
+  /**
+   * Switch the view, and bring the card the switch happened in back into
+   * sight. `block: "nearest"` on purpose: it scrolls only when the card is
+   * actually out of view, so a reader already looking at it is not jolted by
+   * a control they pressed while watching it.
+   */
+  const showView = (next: "cloth" | "record") => {
+    setView(next)
+    clothCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+  }
   /**
    * Is the box showing the log rather than the cloth? The chips, the box below
    * and the downloads beside them all have to agree, and this is the one
@@ -830,7 +841,24 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
           off the card is a plain full-width block and ClothMap reflows to it.
           Tracing still works by clicking a concept or arc on the cloth itself. */}
       <div className={SHOW_PROMPTS ? "two" : undefined}>
-      <div className="card">
+      {/**
+       * ONE ANCHOR FOR BOTH CHIPS (TJ, 2026-08-23: "the cloth and the log
+       * buttons should both use the same anchor, which is 'the cloth' … that
+       * will cause the display to move to that anchor when the button is
+       * clicked").
+       *
+       * The two views are not the same height — the cloth is a fixed 400px
+       * drawing, the log is a list as long as the record — so switching moved
+       * everything below the card and left the reader looking at whatever had
+       * slid into their view. Scrolling to the card puts the thing they just
+       * asked for back under their eyes, and the same target for both means
+       * the switch feels like one control rather than two.
+       *
+       * A ref, not an href="#cloth": these are toggles, and an anchor would
+       * write a hash into the URL for a control that navigates nowhere. The id
+       * stands too, so the card can be linked from elsewhere.
+       */}
+      <div className="card" id="thecloth" ref={clothCardRef}>
       {/* No "THE CLOTH" label on the card: 03's section heading says it now
           (TJ, 2026-08-12), and the same words twice, six lines apart, read as
           two different things. */}
@@ -884,8 +912,8 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
                   data-tip={tip}
                   aria-label={`Show ${label}: ${tip}`}
                   aria-pressed={view === v}
-                  onClick={() => setView(v)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setView(v) } }}
+                  onClick={() => showView(v)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showView(v) } }}
                 >{label}</span>
               ))}
             </span>
@@ -945,8 +973,10 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
           Both are 400px tall, so the chips swap the contents and the legend,
           the scrubber and everything below them stay exactly where they were. */}
       <div id="mapWrap">
+        {/* onShowCloth goes through the same door as the chip, so a row's
+            "show the cloth" lands the reader in the same place the chip does. */}
         {showingLog ? (
-          <CaptureLogRows log={log} onShowCloth={() => setView("cloth")} />
+          <CaptureLogRows log={log} onShowCloth={() => showView("cloth")} />
         ) : (
           <ClothMap
             state={drawn}

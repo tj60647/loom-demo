@@ -100,6 +100,23 @@ interface PdfViewerProps {
   /** Which view the reader lands in. Undefined is one page — see the state. */
   defaultViewMode?: "page" | "strip" | "matrix";
   /**
+   * Does this surface offer the Overlay picker at all?
+   *
+   * OFF ON THE READING STATION, ruled 2026-08-23 (TJ: "the overlay view should
+   * only be available in the heatmap, not in reading"). It stood in the
+   * reading toolbar for every staff viewer from 2026-08-08 until the Heatmaps
+   * tab existed; since then it has been the same control in two places, and
+   * the reading station is the one where it does not belong. That station is
+   * where a reader reads and captures — their own text, their own marks — and
+   * a comparison with the cohort is a different question asked on a tab built
+   * for it, with the section, reading and student pickers beside it.
+   *
+   * It is the ONLY way to turn an overlay on, so this also settles what the
+   * reading station shows: with no picker, `overlayBand` stays null there and
+   * no heat is ever fetched or drawn.
+   */
+  overlayPicker?: boolean;
+  /**
    * A student chosen OUTSIDE the viewer — the Heatmaps tab's own picker in
    * the scope strip (TJ, 2026-08-22). When set, the overlay reads that one
    * person's marks instead of a band, and the in-toolbar Overlay picker steps
@@ -184,7 +201,7 @@ type HighlightEntry = {
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
   onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel, noOwnWork = false, overlayStudentId = null,
-  defaultOverlayBand, defaultViewMode }: PdfViewerProps) {
+  defaultOverlayBand, defaultViewMode, overlayPicker = false }: PdfViewerProps) {
   // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the
   // student's highlights, rail cards, search and page-turning all stay — they
   // are the mode — while the capture affordance never appears and the rail
@@ -3274,7 +3291,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               here because they hold their own learner surfaces alongside the
               faculty view. No names and no third band, so nothing here
               resolves to a person. Off until asked for. */}
-          {sourceId && isStaff && !overlayStudentId && (
+          {overlayPicker && sourceId && isStaff && !overlayStudentId && (
             <div className="pdf-overlay-ctl" role="group" aria-label="Compare your marks with others">
               {!isNarrow && <span className="label">Overlay</span>}
               {/* A picker, not two buttons (TJ, 2026-08-08): faculty teach across
