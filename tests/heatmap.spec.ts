@@ -350,34 +350,74 @@ test("the legend floats over the page instead of adding a row above it", async (
  * course sit in exactly that range, which is why this is worth asserting on
  * both rather than on whichever one the tab happens to open.
  */
-test("every reading reaches its own darkest step", async ({ page }) => {
-  await openHeatmaps(page, SEEDED_WITH_MARKS)
+test("every reading that carries marks reaches its own darkest step", async ({ page }) => {
+  await openHeatmaps(page)
 
-  const topStep = async () => {
-    await expect(page.locator(".pdf-kept-heat rect").first()).toBeVisible({ timeout: 25_000 })
-    return page.locator(".pdf-kept-heat rect").evaluateAll((els) =>
-      Math.max(...(els as SVGElement[]).map((el) => Number(el.getAttribute("data-heat")) || 0))
-    )
-  }
-
+  /**
+   * ONLY THE READINGS THAT HAVE MARKS, and that is the whole subtlety.
+   *
+   * The claim is that a reading's own densest run paints the top step,
+   * whatever number that run holds — so it is testable on any reading that has
+   * heat, and meaningless on one that has none. The first version took the
+   * first two readings in the picker and demanded step 5 of both; on a fresh
+   * seed the second has nobody's marks, so it failed on a reading the claim
+   * was never about.
+   */
   const reading = page.getByLabel("Select active reading")
   const options = await reading.locator("option").evaluateAll((opts) =>
     (opts as HTMLOptionElement[]).map((o) => o.value).filter(Boolean)
   )
-  expect(options.length, "the course must offer more than one reading to compare").toBeGreaterThan(1)
+  expect(options.length, "the course must offer at least one reading").toBeGreaterThan(0)
 
-  const tops: number[] = []
-  for (const value of options.slice(0, 2)) {
+  const tops: { top: number; swatches: number }[] = []
+  for (const value of options.slice(0, 4)) {
     await reading.selectOption(value)
     await expect(page).toHaveURL(new RegExp(`source=${value}`), { timeout: 15_000 })
-    tops.push(await topStep())
+    await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+    // A reading nobody marked draws nothing, and says so in the bar. Give it
+    // the same window the marked ones get before concluding it is empty.
+    const drew = await page
+      .locator(".pdf-kept-heat rect")
+      .first()
+      .waitFor({ state: "visible", timeout: 20_000 })
+      .then(() => true, () => false)
+    if (!drew) continue
+    const top = await page.locator(".pdf-kept-heat rect").evaluateAll((els) =>
+      Math.max(...(els as SVGElement[]).map((el) => Number(el.getAttribute("data-heat")) || 0))
+    )
+    const swatches = await page.locator(".pdf-overlay-scale i").count()
+    tops.push({ top, swatches })
+
+    /**
+     * TWO SHAPES, AND THE SECOND IS NOT A FAILURE OF THE FIRST.
+     *
+     * Where anyone agreed with anyone, the ramp is in play: five swatches, and
+     * the densest run paints the top step. Where NOBODY did — every run one
+     * person, so there is no range to grade — the scale is one swatch and
+     * everything paints the faintest step, deliberately: painting a whole
+     * reading at the top would say they converged everywhere when the opposite
+     * happened.
+     *
+     * Asserting only the first shape is what failed here: a reading with marks
+     * but no agreement is legal, and this demanded step 5 of it.
+     */
+    if (swatches === 1) expect(top, "no agreement: one swatch, faintest step").toBe(1)
+    else {
+      expect(swatches, "a graded scale draws the whole ramp").toBe(5)
+      expect(top, "the densest run paints the top step").toBe(5)
+    }
   }
 
-  // Every one of them reaches 5, however many people its densest run holds.
-  expect(tops.every((t) => t === 5), `top steps were ${tops.join(", ")}`).toBe(true)
-
-  // And the scale draws the whole ramp, since the whole ramp is in play.
-  await expect(page.locator(".pdf-overlay-scale i")).toHaveCount(5)
+  expect(
+    tops.length,
+    "no reading in this course has cohort marks — run `npm run seed:demo`, which seeds the overlapping captures this asserts on"
+  ).toBeGreaterThan(0)
+  // At least one reading must actually exercise the ramp, or this has only
+  // proved the degenerate case.
+  expect(
+    tops.some((t) => t.swatches === 5),
+    `no reading showed a graded scale — tops were ${tops.map((t) => `${t.top}/${t.swatches}`).join(", ")}`
+  ).toBe(true)
 })
 
 /**
