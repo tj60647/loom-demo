@@ -133,9 +133,9 @@ test("the downloads on 03 follow the view, and the chips say what they show", as
   const labels = () => bar.locator("button").allTextContents()
 
   await expect.poll(labels, { timeout: 20_000 }).toEqual([
-    "download the cloth .json",
-    "download the cloth .md",
-    "download the cloth .svg",
+    "download .json",
+    "download .md",
+    "download .svg",
   ])
 
   await log.click()
@@ -148,8 +148,8 @@ test("the downloads on 03 follow the view, and the chips say what they show", as
   // assertion above.
   await cloth.click()
   await expect.poll(labels, { timeout: 20_000 }).toEqual([
-    "download the cloth .json",
-    "download the cloth .md",
-    "download the cloth .svg",
+    "download .json",
+    "download .md",
+    "download .svg",
   ])
 })

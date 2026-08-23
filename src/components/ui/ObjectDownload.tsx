@@ -71,7 +71,15 @@ export default function ObjectDownload({
       openLoomViewer ?? undefined
     )
 
-  const what = noun ?? kind
+  /**
+   * An EMPTY noun is a deliberate choice, not a missing one: it drops the
+   * object's name from the label where the surrounding card already says it.
+   * The cloth's bar uses it: three buttons in a row all naming the same
+   * object, in a card that is already the cloth's.
+   * `?? kind` alone could not express it, since "" is not nullish.
+   */
+  const what = noun === "" ? "" : noun ?? kind
+  const label = (ext: string) => (what ? `download ${what} .${ext}` : `download .${ext}`)
 
   return (
     <span className="objdl" id={id} data-tip={tip}>
@@ -87,7 +95,7 @@ export default function ObjectDownload({
           flash(`· ${what} downloaded ·`)
           onTaken?.()
         }}
-      >download {what} .json</button>
+      >{label("json")}</button>
       <button
         className="btn ghost mini"
         onClick={() => {
@@ -100,7 +108,7 @@ export default function ObjectDownload({
           flash(`· ${what} downloaded ·`)
           onTaken?.()
         }}
-      >download {what} .md</button>
+      >{label("md")}</button>
     </span>
   )
 }
