@@ -31,6 +31,10 @@ import {
 } from '@/lib/heatRects';
 import Mark from 'mark.js';
 
+/** Stable empties: a fresh [] in a default would re-run every memo that reads it. */
+const EMPTY_PASSAGES: Passage[] = [];
+const EMPTY_CONCEPTS: Concept[] = [];
+
 // Served from our own origin, copied out of react-pdf's pdfjs-dist by
 // scripts/copy-pdf-worker.mjs at prebuild/predev. This was `//unpkg.com/...`,
 // which put a third party on the critical path of every reading: with unpkg
@@ -117,6 +121,20 @@ interface PdfViewerProps {
    */
   overlayPicker?: boolean;
   /**
+   * ONE OTHER PERSON'S PASSAGES, to draw as margin cards behind a toggle.
+   *
+   * Only ever one student's (TJ, 2026-08-23: "make it available only when 1
+   * student is selected"). Asked of a whole cohort this would be ~900 cards on
+   * one reading at the scale Heatmaps is built for — a wall, not a margin.
+   * Empty means the toggle does not exist at all, which is how "All students"
+   * turns the feature off without a second flag.
+   *
+   * These are NOT the viewer's own work, so nothing here may write: the card's
+   * edit affordances are withheld at the call site.
+   */
+  scopePassages?: Passage[];
+  scopeConcepts?: Concept[];
+  /**
    * A student chosen OUTSIDE the viewer — the Heatmaps tab's own picker in
    * the scope strip (TJ, 2026-08-22). When set, the overlay reads that one
    * person's marks instead of a band, and the in-toolbar Overlay picker steps
@@ -201,7 +219,8 @@ type HighlightEntry = {
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
   onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel, noOwnWork = false, overlayStudentId = null,
-  defaultOverlayBand, defaultViewMode, overlayPicker = false }: PdfViewerProps) {
+  defaultOverlayBand, defaultViewMode, overlayPicker = false,
+  scopePassages = EMPTY_PASSAGES, scopeConcepts = EMPTY_CONCEPTS }: PdfViewerProps) {
   // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the
   // student's highlights, rail cards, search and page-turning all stay — they
   // are the mode — while the capture affordance never appears and the rail
@@ -300,6 +319,28 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    */
   const ownWorkOn = !noOwnWork;
   const railsOn = ownWorkOn;
+  /**
+   * ONE STUDENT'S CARDS, behind a control (TJ, 2026-08-23: "heatmaps should
+   * have a show cards/hide cards toggle for the heatmap view", then "make it
+   * available only when 1 student is selected").
+   *
+   * THIS DOES NOT REOPEN THE RULING ABOVE. That one is about the VIEWER's own
+   * marks, which on this tab are the one set on screen that none of the
+   * numbers describe. These are the chosen student's, and once a student is
+   * chosen they are precisely what the numbers describe: the heat says where
+   * they read, the cards say what they made of it. One question, two halves.
+   *
+   * The server sends passages only when exactly one student is chosen, so an
+   * empty list is how "All students" turns this off — no second flag, and no
+   * way for the control to appear over a cohort's worth of cards.
+   *
+   * OFF UNTIL ASKED FOR, like the overlay picker beside it: the tab opens on
+   * the question of where the cohort has been, and a full margin answers a
+   * different one.
+   */
+  const scopeCardsAvailable = scopePassages.length > 0;
+  const [scopeCardsOn, setScopeCardsOn] = useState(false);
+  const showingScopeCards = scopeCardsAvailable && scopeCardsOn;
   // Covers the whole window, chrome included — the reading takes the screen.
   const [isFullscreen, setIsFullscreen] = useState(false);
   /**
@@ -1796,7 +1837,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * they would eat the page. Where there is nowhere to put a card, the modal
    * is still the capture — see the draft state's own note on why it stayed.
    */
-  const railAvailable = railsOn && !isNarrow && (viewMode === "page" || viewMode === "matrix");
+  const railAvailable = (railsOn || showingScopeCards) && !isNarrow && (viewMode === "page" || viewMode === "matrix");
 
   const handleCaptureClick = () => {
     if (!highlightRect) return;
@@ -2061,11 +2102,29 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     [ownWorkOn, scoped.passages]
   );
 
+  /**
+   * WHAT THE MARGIN DRAWS. One or the other, never both: the viewer's own
+   * work on the reading station, the chosen student's on Heatmaps, where
+   * `ownPassages` is empty by the ruling above. Two sets of cards in one
+   * margin would be two people's claims in one column with nothing on the
+   * card to say whose.
+   */
+  const cardPassages = showingScopeCards ? scopePassages : ownPassages;
+  const cardConcepts = showingScopeCards ? scopeConcepts : state.concepts;
+  /**
+   * Every write withheld while someone else's cards are on screen — the note,
+   * the filing, the removal, and the two navigations, which would send the
+   * viewer to a passage id their own tabs do not hold. `readOnly` cannot be
+   * relied on here: it is Open Loom's flag and is false for a faculty member
+   * reading their own Heatmaps tab (app/layout.tsx passes `!!viewing`).
+   */
+  const cardsWritable = !readOnly && !showingScopeCards;
+
   // The margin cards take real width beside the pages; fit-to-width hands it
   // to them here so the spread still fits without a sideways scroll. Fit-page
   // is left alone — height is unaffected, and "safe center" already lets an
   // overflowing spread scroll rather than clipping its start edge.
-  const railSpace = railsOn && !isNarrow && viewMode === "page"
+  const railSpace = (railsOn || showingScopeCards) && !isNarrow && viewMode === "page"
     ? (isTwoPage ? 2 : 1) * (RAIL_W + 12)
     : 0;
 
@@ -3323,6 +3382,27 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </div>
           )}
 
+          {/* SHOW CARDS / HIDE CARDS — the chosen student's margin, on request
+              (TJ, 2026-08-23). It stands where the Overlay picker stands and
+              the two never appear together: the picker is for choosing a band
+              to compare against and is hidden once a student is chosen, which
+              is the same condition that gives this control anything to show.
+
+              The label says what the click DOES, not what the state is, so
+              the button reads as an instruction either way round. */}
+          {scopeCardsAvailable && !isNarrow && (
+            <button
+              className={`btn mini ${scopeCardsOn ? "" : "ghost"}`}
+              onClick={() => setScopeCardsOn((on) => !on)}
+              aria-pressed={scopeCardsOn}
+              data-tip={
+                scopeCardsOn
+                  ? "hide this student's passage cards"
+                  : "show this student's passage cards in the margin"
+              }
+            >{scopeCardsOn ? "hide cards" : "show cards"}</button>
+          )}
+
           {/* Only where there is canonical page text to search — a viewer
               without a sourceId has no pages on record to ask. */}
           {sourceId && (
@@ -3622,22 +3702,23 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               </button>}
 
               <ConceptRails
-                enabled={railsOn && !isNarrow}
+                enabled={(railsOn || showingScopeCards) && !isNarrow}
                 twoPage={isTwoPage && pageNumber + 1 <= (numPages || 1)}
-                passages={ownPassages}
-                concepts={state.concepts}
-                onOpenPassage={gotoOpenPassage}
-                onOpenConcept={gotoOpenConcept}
+                passages={cardPassages}
+                concepts={cardConcepts}
+                onOpenPassage={cardsWritable ? gotoOpenPassage : undefined}
+                onOpenConcept={cardsWritable ? gotoOpenConcept : undefined}
                 /* Open Loom passes no write handler at all — the rail card
                    draws an affordance only when its handler exists, so this is
-                   the whole gate (TJ, 2026-08-21). */
-                onUnfile={readOnly ? undefined : unfilePassage}
-                onRemovePassage={readOnly ? undefined : removePassageWithConfirm}
-                onCreateConcept={readOnly ? undefined : addConcept}
-                onAddConcept={readOnly ? undefined : addPassageConcept}
-                onEditConcept={readOnly ? undefined : editConcept}
-                onEditNote={readOnly ? undefined : editPassageNote}
-                draft={railDraft}
+                   the whole gate (TJ, 2026-08-21). Heatmaps' scope cards take
+                   the same gate for the same reason: see `cardEdit`. */
+                onUnfile={cardsWritable ? unfilePassage : undefined}
+                onRemovePassage={cardsWritable ? removePassageWithConfirm : undefined}
+                onCreateConcept={cardsWritable ? addConcept : undefined}
+                onAddConcept={cardsWritable ? addPassageConcept : undefined}
+                onEditConcept={cardsWritable ? editConcept : undefined}
+                onEditNote={cardsWritable ? editPassageNote : undefined}
+                draft={showingScopeCards ? null : railDraft}
               >
                 <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
                   {/* The same slot the matrix reads through, at native tier:
@@ -3737,19 +3818,19 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               aspect={aspect}
               stage={stage}
               stageEl={stageEl}
-              cardsOn={railsOn && !isNarrow}
-              passages={ownPassages}
-              concepts={state.concepts}
-              onOpenPassage={gotoOpenPassage}
-              onOpenConcept={gotoOpenConcept}
+              cardsOn={(railsOn || showingScopeCards) && !isNarrow}
+              passages={cardPassages}
+              concepts={cardConcepts}
+              onOpenPassage={cardsWritable ? gotoOpenPassage : undefined}
+              onOpenConcept={cardsWritable ? gotoOpenConcept : undefined}
               /* Same gate as the page-mode rail above (TJ, 2026-08-21). */
-              onUnfile={readOnly ? undefined : unfilePassage}
-              onRemovePassage={readOnly ? undefined : removePassageWithConfirm}
-              onCreateConcept={readOnly ? undefined : addConcept}
-              onAddConcept={readOnly ? undefined : addPassageConcept}
-              onEditConcept={readOnly ? undefined : editConcept}
-              onEditNote={readOnly ? undefined : editPassageNote}
-              draft={railDraft}
+              onUnfile={cardsWritable ? unfilePassage : undefined}
+              onRemovePassage={cardsWritable ? removePassageWithConfirm : undefined}
+              onCreateConcept={cardsWritable ? addConcept : undefined}
+              onAddConcept={cardsWritable ? addPassageConcept : undefined}
+              onEditConcept={cardsWritable ? editConcept : undefined}
+              onEditNote={cardsWritable ? editPassageNote : undefined}
+              draft={showingScopeCards ? null : railDraft}
               onAspect={acceptAspect}
               manifest={manifest}
               pageImageBase={pageImageBase}

@@ -473,3 +473,90 @@ test("the overlay can be turned off, and never names anybody", async ({ page }) 
   await expect(heatMarks(page)).toHaveCount(0, { timeout: 20_000 })
   await expect(page.locator("#cardTable, .pdf-shell").first()).toBeVisible()
 })
+
+/**
+ * ONE STUDENT'S CARDS, on request (TJ, 2026-08-23: "heatmaps should have a
+ * show cards/hide cards toggle for the heatmap view", then "make it available
+ * only when 1 student is selected").
+ *
+ * Both halves of that instruction are load-bearing and neither is obvious from
+ * the markup, so both are asserted here. The availability rule is not a
+ * courtesy: this tab is built for ~60 looms on a reading, where the whole
+ * cohort's cards would be a wall of several hundred in a margin meant for a
+ * few dozen. The server enforces it by sending no passages at all unless one
+ * student is chosen — which is why the control's absence, not merely its
+ * disabled state, is what gets checked.
+ */
+/**
+ * NAMED, NOT THE FIRST IN THE LIST. The control only exists where the chosen
+ * student has passages in the open reading, and the picker holds the whole
+ * course — faculty, the two-course fixture and several people who have never
+ * touched this reading. Taking option[1] chose one of those and the spec
+ * failed on an empty roster rather than on the rule it is about.
+ *
+ * Test User A for the same reason SEEDED_WITH_MARKS names this reading: the
+ * seed gives A captures here, and overlay.spec.ts already leans on it.
+ */
+async function chooseAStudent(page: import("@playwright/test").Page, name = "Test User A") {
+  const picker = page.getByLabel("Select active student")
+  const id = await picker.locator("option").evaluateAll(
+    (opts, who) => (opts as HTMLOptionElement[]).find((o) => (o.textContent ?? "").trim() === who)?.value ?? null,
+    name
+  )
+  expect(id, `seed missing "${name}" — run \`npm run seed:demo\``).not.toBeNull()
+  await picker.selectOption(id!)
+  await expect(page).toHaveURL(/student=/, { timeout: 15_000 })
+  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+}
+
+const cardsToggle = (page: import("@playwright/test").Page) =>
+  page.getByRole("button", { name: /^(show|hide) cards$/i })
+
+test("the cards toggle exists only once a single student is chosen", async ({ page }) => {
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
+
+  // All students: no control, because there is nothing it could honestly show.
+  await expect(cardsToggle(page)).toHaveCount(0)
+
+  await chooseAStudent(page)
+  await expect(cardsToggle(page)).toHaveCount(1)
+
+  /**
+   * And it opens CLOSED. The tab's question is where the cohort has been; a
+   * margin already full of cards answers a different one before being asked.
+   * This is also what keeps the two tests above true — they assert no cards
+   * are on screen, and they would go on passing for the wrong reason if the
+   * default here ever flipped.
+   */
+  await expect(cardsToggle(page)).toHaveText(/show cards/i)
+  await expect(page.locator(".pdf-railcard")).toHaveCount(0)
+})
+
+test("the cards it shows are the student's, and nothing on them writes", async ({ page }) => {
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
+  await chooseAStudent(page)
+
+  await cardsToggle(page).click()
+  await expect(page.locator(".pdf-railcard").first()).toBeVisible({ timeout: 25_000 })
+  await expect(cardsToggle(page)).toHaveText(/hide cards/i)
+
+  /**
+   * NOT ONE WRITE AFFORDANCE. These cards are another person's work shown to
+   * staff, and every handler that would change them is withheld at the call
+   * site rather than hidden with CSS — the rail draws an affordance only where
+   * its handler exists (ConceptRail), so an absent button is the gate itself.
+   *
+   * `readOnly` could not be the gate: that flag is Open Loom's, and it is
+   * false for a faculty member reading their own Heatmaps tab
+   * (src/app/layout.tsx passes `readOnly={!!viewing}`). A spec that assumed
+   * otherwise would pass while the affordances were live.
+   */
+  const rails = page.locator(".pdf-railcard")
+  await expect(rails.locator("[data-cardmenu]")).toHaveCount(0)
+  await expect(rails.locator("textarea, [contenteditable='true']")).toHaveCount(0)
+  await expect(rails.getByRole("button", { name: "+", exact: true })).toHaveCount(0)
+
+  // And it puts them away again.
+  await cardsToggle(page).click()
+  await expect(page.locator(".pdf-railcard")).toHaveCount(0)
+})
