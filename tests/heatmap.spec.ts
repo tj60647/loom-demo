@@ -213,6 +213,43 @@ test("switching to a shorter reading asks only for pages it has", async ({ page 
   expect(missing, `asked for pages the reading does not have: ${missing.join(", ")}`).toEqual([])
 })
 
+/**
+ * ONE MECHANISM PER VIEW. Heat has two ways of being drawn — mark.js on a live
+ * text layer, and the projection the canvas needs because at fit-all there is
+ * no text layer to walk — and on the canvas both fired the moment a page grew
+ * big enough to be promoted. The same runs painted twice from two different
+ * boxes (a text-layer span is the line's full height, a projected rect is the
+ * font's), which is what "a border, a line at the top of the rect, and then a
+ * fill… they dont seem to align" was (TJ, 2026-08-22).
+ */
+test("heat is drawn once per page, by the view that owns it", async ({ page }) => {
+  await page.goto("/admin/heatmaps")
+  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+
+  const projected = page.locator(".pdf-kept-heat rect")
+  const live = page.locator(".loom-overlay-heat")
+
+  // The canvas draws its own and lets mark.js draw none…
+  await expect(projected.first()).toBeVisible({ timeout: 25_000 })
+  await expect(live).toHaveCount(0)
+
+  // …at every zoom, including one deep enough to promote pages to real text
+  // layers, which is where the double-paint used to start.
+  for (let step = 0; step < 5; step += 1) {
+    await page.getByRole("button", { name: "Zoom in" }).click()
+    await page.waitForTimeout(700)
+  }
+  await page.waitForTimeout(4_000)
+  await expect(live).toHaveCount(0)
+  await expect(projected.first()).toBeVisible()
+
+  // The paged view is the other way round: mark.js paints, nothing is
+  // projected over it.
+  await page.getByRole("button", { name: "1 page", exact: true }).click()
+  expect(await pageWithHeat(page), "no page of this reading shows the cohort's marks").toBe(true)
+  await expect(projected).toHaveCount(0)
+})
+
 test("the legend floats over the page instead of adding a row above it", async ({ page }) => {
   await page.goto("/admin/heatmaps")
   await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })

@@ -672,6 +672,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // Read by the highlight applier (and its MutationObserver callback), which
   // must see the current terms without re-registering.
   const searchTermsRef = useRef<string[]>([]);
+  // Same reason: the applier must know which view it is marking in, so a page
+  // promoted inside the canvas does not take marks the canvas already draws.
+  const viewModeRef = useRef<"page" | "strip" | "matrix">("page");
 
   /**
    * The Passages Overlay (ruling 28): where OTHER people in this band marked
@@ -1440,6 +1443,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   useEffect(() => {
     searchTermsRef.current = searchTerms;
     overlayRef.current = overlay;
+    // Read by the applier, which runs from a MutationObserver as well as from
+    // here: a page promoted inside the canvas must not pick up marks the
+    // canvas is already drawing.
+    viewModeRef.current = viewMode;
     if (!containerRef.current) return;
     let debounceTimer: NodeJS.Timeout;
 
@@ -1463,7 +1470,23 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
        */
       const d = draftRef.current;
       const passages = d ? [...passagesRef.current, draftAsPassage(d, sourceName)] : passagesRef.current;
-      const heatPages = overlayRef.current?.pages ?? [];
+      /**
+       * ONE MECHANISM PER VIEW, never two on one page.
+       *
+       * Heat has two ways of being drawn: mark.js on a live text layer, and
+       * the projection from offsets that the canvas needs because at fit-all
+       * there is no text layer to walk. On the canvas BOTH were happening the
+       * moment a page grew big enough to be promoted — the same runs painted
+       * twice, from two different boxes (a text-layer span is the line's full
+       * height; a projected rect is the font's), so they disagreed by a pixel
+       * or two and read as a border, an overline and a fill that would not
+       * line up (TJ, 2026-08-22: "why does highlighting have a border, a line
+       * at the top of the rect, and then a fill? they dont seem to align").
+       *
+       * The canvas owns its heat, so mark.js does not paint any there. The
+       * paged views have no projection drawn over them and keep theirs.
+       */
+      const heatPages = viewModeRef.current === "matrix" ? [] : (overlayRef.current?.pages ?? []);
       /**
        * Nothing to mark is not nothing to DO: the unmark below lives inside
        * the loop, so returning here also skipped clearing whatever is already
@@ -1747,7 +1770,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     // `ownWorkOn` is in here because the toggle changes what is painted
     // without changing state.passages: without it, pressing My marks would
     // update the ref above and repaint nothing until something else moved.
-  }, [state.passages, state.concepts, bindHighlightNode, sourceName, searchTerms, overlay, stageEl, draft, ownWorkOn]); // Re-run when passages, search terms, the draft or the overlay change — and if the stage node itself is replaced
+  }, [state.passages, state.concepts, bindHighlightNode, sourceName, searchTerms, overlay, stageEl, draft, ownWorkOn, viewMode]); // Re-run when passages, search terms, the draft or the overlay change — and if the stage node itself is replaced, or the view changes (heat belongs to the canvas there)
 
   /**
    * Is there a rail to draw the draft on?
@@ -2772,16 +2795,26 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           pointer-events: none;
           overflow: visible;
         }
+        /* FILL ONLY — no stroke. The ramp is one hue at five alphas, and the
+           alpha is the whole encoding: how many people marked these words.
+           A 1px non-scaling stroke at a CONSTANT alpha broke that, because it
+           adds the same ink to every rect no matter what it is worth — a
+           step-1 run wearing a 0.40 border reads darker than a step-3 run
+           without one, which inverts the scale it is supposed to serve. It
+           also dominated at fit-all, where the border was a large share of a
+           rect a few pixels tall (TJ, 2026-08-22: "why does highlighting have
+           a border… they dont seem to align with each other").
+           The live text layer keeps its 2px overline: there the wash sits
+           under real text at reading size and needs an edge to be findable,
+           and since the canvas now owns its own heat the two never appear on
+           one page to disagree. */
         .pdf-kept-heat rect {
           fill: rgba(var(--heat-rgb, 64, 84, 112), 0.12);
-          stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.40);
-          stroke-width: 1;
-          vector-effect: non-scaling-stroke;
         }
-        .pdf-kept-heat rect[data-heat="2"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.20); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.55); }
-        .pdf-kept-heat rect[data-heat="3"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.28); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.70); }
-        .pdf-kept-heat rect[data-heat="4"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.36); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.82); }
-        .pdf-kept-heat rect[data-heat="5"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.44); stroke: rgba(var(--heat-rgb, 64, 84, 112), 0.95); }
+        .pdf-kept-heat rect[data-heat="2"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.20); }
+        .pdf-kept-heat rect[data-heat="3"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.28); }
+        .pdf-kept-heat rect[data-heat="4"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.36); }
+        .pdf-kept-heat rect[data-heat="5"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.44); }
         .pdf-rail-leaders path {
           stroke: rgba(255, 204, 0, 0.8);
           stroke-width: 1.5;
