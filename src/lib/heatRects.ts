@@ -20,20 +20,32 @@
  * gives every item its exact `[start, end)` in the same coordinate system the
  * offsets are already in. No matching, no search, no fuzz.
  *
- * The geometry half is the derivation `src/lib/garbleRegion.ts` already uses to
- * turn an item into a box: `transform[4]`/`transform[5]` are the item's origin
- * in PDF user space (y up from the bottom), `width`/`height` its extent in the
- * same units, so the top edge is `viewportHeight - transform[5] - height`.
+ * The geometry half goes THROUGH THE VIEWPORT TRANSFORM, the same way pdf.js
+ * positions its own text layer: `transform(viewport.transform, item.transform)`
+ * and then top-left = `[tx[4], tx[5] - fontHeight]`.
+ *
+ * IT DID NOT, AT FIRST, and the error was visible. The first version took the
+ * text matrix as page coordinates directly — `left = transform[4]`,
+ * `top = height - transform[5] - itemHeight`, which is what
+ * `src/lib/garbleRegion.ts` does. That is only right when the page box starts
+ * at the origin and the page is unrotated. On this library's scans it does
+ * not: measured against mark.js on the live text layer, over 16 runs on one
+ * page of "Object Worlds", every projected rect sat 2.37-2.68% of the page
+ * width to the RIGHT of the words it claimed (TJ: "the highlight and text
+ * locations... look off"). That is the CropBox origin, which the viewport
+ * transform subtracts and the naive formula does not. Widths were already
+ * within 0.6% and are unchanged.
  *
  * Output is NORMALIZED to the page box (0..1 on both axes) so one projection
  * serves every view: 1 page, 2 pages, and the canvas at any zoom all multiply
  * by the page slot they happen to be drawing.
  *
  * LIMITS, named rather than discovered later:
- * - Horizontal text is assumed. A rotated or vertical item gets a box from the
- *   same formula, which will be wrong for it. `getTextContent()` exposes no
- *   per-glyph boxes, so nothing here can do better; academic PDFs are the
- *   readings this serves.
+ * - Horizontal text is assumed. The viewport transform handles a rotated
+ *   PAGE, but an item rotated WITHIN the page (a sideways figure caption) gets
+ *   an upright box around its origin, which will be wrong for it.
+ *   `getTextContent()` exposes no per-glyph boxes, so nothing here can do
+ *   better; academic PDFs are the readings this serves.
  * - Within one item the slice is proportional to CHARACTER COUNT, not to glyph
  *   advances, so a partial item's edges sit within a character or two of the
  *   truth on proportional fonts. Items are short runs — pdf.js splits at most
@@ -81,6 +93,39 @@ const SAME_LINE = 0.002
 const JOINABLE_GAP = 0.004
 
 /**
+ * The page box a projection is made against: the size `getViewport({scale: 1})`
+ * reports, and the transform it carries.
+ */
+export type HeatViewport = {
+  width: number
+  height: number
+  /**
+   * `viewport.transform`. Omitted, this falls back to the flip that an
+   * unrotated page box anchored at the origin would have — which is what the
+   * naive formula assumed, and is wrong on any page with a CropBox offset.
+   */
+  transform?: number[]
+}
+
+/**
+ * Multiply two 2D affine matrices, `m1` applied after `m2`.
+ *
+ * The same composition pdf.js's own `Util.transform` performs, written out
+ * rather than imported: this module is pure so `scripts/check-overlay.ts` can
+ * assert it without pulling pdf.js into a plain script.
+ */
+function compose(m1: number[], m2: number[]): number[] {
+  return [
+    m1[0] * m2[0] + m1[2] * m2[1],
+    m1[1] * m2[0] + m1[3] * m2[1],
+    m1[0] * m2[2] + m1[2] * m2[3],
+    m1[1] * m2[2] + m1[3] * m2[3],
+    m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+    m1[1] * m2[4] + m1[3] * m2[5] + m1[5],
+  ]
+}
+
+/**
  * Item boxes with their offsets, in one pass over the text content.
  *
  * Every item is placed, including the ones with no width: an empty or
@@ -88,8 +133,11 @@ const JOINABLE_GAP = 0.004
  * every offset after it — the one bug in this file that would be silent and
  * catastrophic, since it would shade the wrong sentences rather than none.
  */
-export function placeItems(items: HeatTextItem[], pageHeight: number): PlacedItem[] {
+export function placeItems(items: HeatTextItem[], page: HeatViewport): PlacedItem[] {
   const placed: PlacedItem[] = []
+  // The flip an unrotated page anchored at (0,0) would carry. Only a fallback:
+  // a real viewport's transform also carries the box origin and any rotation.
+  const viewport = page.transform ?? [1, 0, 0, -1, 0, page.height]
   let offset = 0
 
   for (const item of items) {
@@ -98,16 +146,18 @@ export function placeItems(items: HeatTextItem[], pageHeight: number): PlacedIte
     offset += text.length
     if (text.length === 0) continue
 
-    const transform = item.transform ?? [1, 0, 0, 1, 0, 0]
-    // The font's own height when pdf.js gives one, otherwise the vertical
-    // scale out of the text matrix — which is what its height is derived from
-    // anyway, and is never 0 on a real item.
-    const height = item.height || Math.abs(transform[3]) || 0
+    const tx = compose(viewport, item.transform ?? [1, 0, 0, 1, 0, 0])
+    // The height pdf.js gives its own text-layer div: the length of the
+    // transformed vertical axis, which already carries the font size, the
+    // text matrix's scale and the viewport's.
+    const height = Math.hypot(tx[2], tx[3]) || item.height || 0
     placed.push({
       start,
       end: offset,
-      left: transform[4],
-      top: pageHeight - transform[5] - height,
+      left: tx[4],
+      // tx[5] is the BASELINE in page coordinates, y down. The box stands on
+      // it, so its top is one font-height above.
+      top: tx[5] - height,
       width: item.width ?? 0,
       height,
     })
@@ -139,12 +189,12 @@ export function textLayerString(items: HeatTextItem[]): string {
  */
 export function projectHeatSpans(
   items: HeatTextItem[],
-  page: { width: number; height: number },
+  page: HeatViewport,
   spans: HeatSpanInput[]
 ): HeatRect[] {
   if (!spans.length || !(page.width > 0) || !(page.height > 0)) return []
 
-  const placed = placeItems(items, page.height)
+  const placed = placeItems(items, page)
   if (!placed.length) return []
 
   const out: HeatRect[] = []

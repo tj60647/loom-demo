@@ -1171,7 +1171,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           const viewport = page.getViewport({ scale: 1 });
           next[heat.pageNumber] = projectHeatSpans(
             items,
-            { width: viewport.width, height: viewport.height },
+            // The TRANSFORM travels with the size. Without it the projection
+            // assumes a page box anchored at the origin, and every rect on a
+            // cropped scan lands right of its words — measured at 2.4% of the
+            // page width on this library before it was passed.
+            { width: viewport.width, height: viewport.height, transform: viewport.transform },
             heat.spans
           );
         } catch (error) {

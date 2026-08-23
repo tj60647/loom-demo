@@ -227,7 +227,10 @@ const items = [
 
 check("the text layer string is the item strings, joined by nothing", textLayerString(items), "Hello worldagain")
 
-check("an item knows its own offsets", placeItems(items, 100).map((i) => [i.start, i.end]), [
+/** An unrotated page anchored at the origin: what the naive formula assumed. */
+const PLAIN = { width: 100, height: 100 }
+
+check("an item knows its own offsets", placeItems(items, PLAIN).map((i) => [i.start, i.end]), [
   [0, 6],
   [6, 11],
   [11, 16],
@@ -235,35 +238,66 @@ check("an item knows its own offsets", placeItems(items, 100).map((i) => [i.star
 
 check(
   "the box is measured DOWN from the top, not up from the baseline",
-  placeItems(items, 100)[0].top,
+  placeItems(items, PLAIN)[0].top,
   100 - 80 - 10
+)
+
+/**
+ * THE CROPBOX OFFSET, which is the bug this file did not catch the first time.
+ *
+ * A page whose box does not start at the origin carries the shift in its
+ * viewport transform, and pdf.js's own text layer goes through that transform.
+ * The first version of placeItems read the text matrix as page coordinates
+ * directly, so on this library's scans every rect sat 2.4% of the page width
+ * right of its words — measured against mark.js on the live text layer, and
+ * invisible to a test that only ever passed an origin-anchored page.
+ *
+ * Here the box starts 14.7pt in, exactly what the flip's translation carries.
+ */
+const CROPPED = { width: 100, height: 100, transform: [1, 0, 0, -1, -14.7, 100] }
+check(
+  "a page box that does not start at the origin shifts the boxes with it",
+  +placeItems(items, CROPPED)[0].left.toFixed(4),
+  +(10 - 14.7).toFixed(4)
+)
+check(
+  "and does not disturb the vertical, which the flip already carried",
+  placeItems(items, CROPPED)[0].top,
+  placeItems(items, PLAIN)[0].top
+)
+
+/** A page rotated 90 degrees: width and height swap, and x/y trade places. */
+check(
+  "a rotated page is not read as an upright one",
+  placeItems(items, { width: 100, height: 100, transform: [0, 1, 1, 0, 0, 0] })[0],
+  { start: 0, end: 6, left: 80, top: 0, width: 30, height: 10 }
 )
 
 /** An empty item still advances nothing, and must not shift what follows. */
 check(
   "a zero-length item does not move the offsets after it",
-  placeItems([{ str: "ab", transform: [1, 0, 0, 1, 0, 1], width: 2, height: 1 }, { str: "" }, { str: "cd", transform: [1, 0, 0, 1, 2, 1], width: 2, height: 1 }], 10)
+  placeItems([{ str: "ab", transform: [1, 0, 0, 1, 0, 1], width: 2, height: 1 }, { str: "" }, { str: "cd", transform: [1, 0, 0, 1, 2, 1], width: 2, height: 1 }], { width: 10, height: 10 })
     .map((i) => [i.start, i.end]),
   [[0, 2], [2, 4]]
 )
 
-check("nothing marked projects to nothing", projectHeatSpans(items, { width: 100, height: 100 }, []), [])
+check("nothing marked projects to nothing", projectHeatSpans(items, PLAIN, []), [])
 
 check(
   "a run across two items on one line comes back as ONE rect",
-  projectHeatSpans(items, { width: 100, height: 100 }, [{ start: 0, end: 11, count: 1 }]),
+  projectHeatSpans(items, PLAIN, [{ start: 0, end: 11, count: 1 }]),
   [{ x: 0.1, y: 0.1, w: 0.55, h: 0.1, count: 1 }]
 )
 
 check(
   "a run across a line break does not — two lines are two rects",
-  projectHeatSpans(items, { width: 100, height: 100 }, [{ start: 0, end: 16, count: 1 }]).length,
+  projectHeatSpans(items, PLAIN, [{ start: 0, end: 16, count: 1 }]).length,
   2
 )
 
 check(
   "runs of DIFFERENT depth stay apart even when they touch",
-  projectHeatSpans(items, { width: 100, height: 100 }, [
+  projectHeatSpans(items, PLAIN, [
     { start: 0, end: 6, count: 1 },
     { start: 6, end: 11, count: 3 },
   ]).map((r) => r.count),
@@ -272,7 +306,7 @@ check(
 
 check(
   "a partial item is sliced by character, not taken whole",
-  projectHeatSpans(items, { width: 100, height: 100 }, [{ start: 0, end: 3, count: 1 }]),
+  projectHeatSpans(items, PLAIN, [{ start: 0, end: 3, count: 1 }]),
   [{ x: 0.1, y: 0.1, w: 0.15, h: 0.1, count: 1 }]
 )
 
