@@ -300,3 +300,46 @@ test("the legend floats over the page instead of adding a row above it", async (
   const onPage = await edges()
   expect(onPage.some(Boolean), "paged swatches keep the overline, like the marks").toBe(false)
 })
+
+/**
+ * THE DARKEST STEP IS REACHED IN EVERY READING, because the scale is fully
+ * relative: the densest run in a reading paints the top, whatever number that
+ * run happens to be (TJ, 2026-08-22, of two readings side by side: "the
+ * darkest color in each is different, correct? why?").
+ *
+ * It replaced a hybrid — the step WAS the count below six people, a ramp above
+ * five — under which a reading where two people converged could never reach
+ * its own top step while one where three did could. Both readings in this
+ * course sit in exactly that range, which is why this is worth asserting on
+ * both rather than on whichever one the tab happens to open.
+ */
+test("every reading reaches its own darkest step", async ({ page }) => {
+  await page.goto("/admin/heatmaps")
+  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+
+  const topStep = async () => {
+    await expect(page.locator(".pdf-kept-heat rect").first()).toBeVisible({ timeout: 25_000 })
+    return page.locator(".pdf-kept-heat rect").evaluateAll((els) =>
+      Math.max(...(els as SVGElement[]).map((el) => Number(el.getAttribute("data-heat")) || 0))
+    )
+  }
+
+  const reading = page.getByLabel("Select active reading")
+  const options = await reading.locator("option").evaluateAll((opts) =>
+    (opts as HTMLOptionElement[]).map((o) => o.value).filter(Boolean)
+  )
+  expect(options.length, "the course must offer more than one reading to compare").toBeGreaterThan(1)
+
+  const tops: number[] = []
+  for (const value of options.slice(0, 2)) {
+    await reading.selectOption(value)
+    await expect(page).toHaveURL(new RegExp(`source=${value}`), { timeout: 15_000 })
+    tops.push(await topStep())
+  }
+
+  // Every one of them reaches 5, however many people its densest run holds.
+  expect(tops.every((t) => t === 5), `top steps were ${tops.join(", ")}`).toBe(true)
+
+  // And the scale draws the whole ramp, since the whole ramp is in play.
+  await expect(page.locator(".pdf-overlay-scale i")).toHaveCount(5)
+})

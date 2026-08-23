@@ -3472,19 +3472,20 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 */}
               <span
                 className={`pdf-overlay-scale${viewMode === "matrix" ? " flat" : ""}`}
-                data-tip="the most people who marked the same words in this reading. Up to five the step is the count itself, so readings compare directly; past five the steps ramp over this reading's own range. You are never in the count — an overlay always leaves the viewer out."
+                data-tip="the darkest step is the densest run in THIS reading, whatever number that is — the scale is its own range, so shades never compare between readings; read the number, not the colour. You are never in the count: an overlay always leaves the viewer out."
               >
                 <span className="cap">1</span>
-                {/* As many swatches as the page can actually produce. Below
-                    six people the step is the count itself, so drawing five
-                    when only two shades will ever appear advertises a range
-                    the reading does not have. */}
-                {Array.from(
-                  { length: Math.min(5, Math.max(1, overlay.maxCount)) },
-                  (_unused, step) => (
-                    <i key={step} data-heat={step + 1} aria-hidden="true" />
-                  )
-                )}
+                {/* THE WHOLE RAMP, because the whole ramp is in play. The
+                    scale is fully relative, so a reading whose densest run is
+                    three people still spreads those three counts across the
+                    five steps — drawing three swatches would describe a scale
+                    the page is not using. The one exception is a reading where
+                    nobody agreed with anybody: there is no range then, every
+                    run paints the faintest step, and one swatch is the whole
+                    truth. */}
+                {(overlay.maxCount <= 1 ? [1] : [1, 2, 3, 4, 5]).map((step) => (
+                  <i key={step} data-heat={step} aria-hidden="true" />
+                ))}
                 <span className="cap">{overlay.maxCount} people</span>
               </span>
               {overlay.unanchored > 0 && (

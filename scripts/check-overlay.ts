@@ -312,14 +312,25 @@ check(
 
 console.log("\nheatBand — five steps over THIS reading's range")
 check("nobody is no step", heatBand(0, 10), 0)
-check("one person, one step, when one is all there is", heatBand(1, 1), 1)
 /**
- * The step IS the count while the densest run is small. Stretching a range of
- * 2 across five steps would paint "two agreed" in the shade reserved for the
- * strongest convergence in the reading.
+ * FULLY RELATIVE (TJ, 2026-08-22): the densest run in a reading is the darkest
+ * step, whatever number it happens to be. These are the lines that changed
+ * when the hybrid went — under it, two-of-two painted step 2, so a quiet
+ * reading could never reach the top of its own scale and two readings could be
+ * compared by colour at small counts but not at large ones.
  */
-check("two of two is step 2, not step 5", heatBand(2, 2), 2)
+check("two of two is the top step, not step 2", heatBand(2, 2), 5)
+check("three of three is the top step too", heatBand(3, 3), 5)
 check("five of five is the top step", heatBand(5, 5), 5)
+check("one against a peak of three is still the faintest", heatBand(1, 3), 1)
+
+/**
+ * NO RANGE TO GRADE is the one case the rule cannot be followed literally.
+ * Everyone marked alone, so every run is simultaneously the densest — and
+ * painting a whole reading at the top step would say they converged
+ * everywhere, when what happened is the opposite.
+ */
+check("nobody agreeing with anybody is the faintest, not the darkest", heatBand(1, 1), 1)
 /**
  * The case this is built for: ~60 looms on one reading (TJ, 2026-08-22). The
  * ramp must not saturate — the old absolute min(count, 5) painted 5 people and

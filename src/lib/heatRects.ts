@@ -251,32 +251,42 @@ export function projectHeatSpans(
 /**
  * How dark a count paints, 1..5.
  *
- * LOG, NOT LINEAR, and that choice is about the dataset this is built for
- * rather than the one in the dev branch today. Agreement has a long tail: with
- * 60 looms on one reading, most runs carry one or two people and the densest
- * carries a few dozen, so a linear ramp would put nearly every mark in step 1
- * and spend four fifths of the scale on a handful of sentences. On a log ramp
- * the middle of the distribution uses the middle of the scale.
+ * FULLY RELATIVE (TJ, 2026-08-22): the densest run in a reading always paints
+ * the darkest step, and everything else is graded back from it. A shade means
+ * "this much of the agreement that happened HERE" — never a number of people,
+ * and never anything that survives being carried to another reading.
  *
- * The scale is relative to this reading's own densest run, so it cannot
- * saturate: the old absolute `min(count, 5)` painted everything from 5 people
- * to 60 the same shade, which at cohort scale is one flat colour.
+ * The rule it replaced was a hybrid, and the hybrid was the problem: below six
+ * people the step WAS the count, above five it ramped, so the same ink meant a
+ * number in a quiet reading and a proportion in a busy one. TJ met it twice
+ * from the outside — first "why does object worlds appear darker than learning
+ * to learn", then, of two screenshots, "the darkest color in each is
+ * different, correct? why?" Both times the answer was true and neither was
+ * guessable from the page. A scale that needs that answer is the wrong scale.
  *
- * Against a densest run of 37 the steps change at 3, 6, 11 and 18 — asserted
- * in scripts/check-overlay.ts, and worth knowing before reading a page: the
- * darkest shade means roughly half of everyone who marked the reading at all
- * marked those words.
+ * What it costs, stated because it is now the standing behaviour: two readings
+ * cannot be compared by colour at all. A reading where three people converged
+ * and one where thirty did are drawn identically; only the legend's "N people"
+ * separates them. That is the trade TJ chose, against being able to compare
+ * readings.
+ *
+ * LOG, NOT LINEAR, within that. Agreement has a long tail: with 60 looms most
+ * runs carry one or two people and the densest carries a few dozen, so a
+ * linear ramp would put nearly every mark in step 1 and spend four fifths of
+ * the scale on a handful of sentences. Against a densest run of 37 the steps
+ * change at 3, 6, 11 and 18 — asserted in scripts/check-overlay.ts.
  */
 export function heatBand(count: number, maxCount: number): number {
   if (!(count > 0)) return 0
-  // One person everywhere means no agreement to grade. The faintest step is
-  // the honest one, and the legend says what the top of the scale is worth.
+  /**
+   * NO RANGE TO GRADE. Everyone marked alone and nobody agreed with anybody,
+   * so there is no densest run to be darkest — every run is the same fact.
+   * The faintest step is the honest one: painting a whole reading at the top
+   * would say "they converged everywhere" when what happened is the opposite.
+   * My call, not TJ's, and the one place his "fully relative" rule has to be
+   * given a meaning rather than followed literally.
+   */
   if (maxCount <= 1) return 1
-  // Five or fewer people at the densest run: the step IS the count. Stretching
-  // a range of 2 across all five steps would paint "two people agreed" in the
-  // shade reserved for the strongest convergence in the reading, which on a
-  // quiet reading is most of the page.
-  if (maxCount <= 5) return Math.min(5, count)
   const position = Math.log(Math.min(count, maxCount)) / Math.log(maxCount)
   return Math.min(5, Math.max(1, 1 + Math.floor(position * 4.999)))
 }
