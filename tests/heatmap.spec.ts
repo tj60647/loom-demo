@@ -276,4 +276,27 @@ test("the legend floats over the page instead of adding a row above it", async (
 
   // Narrow enough to sit over a margin rather than across the text.
   expect(box!.width).toBeLessThanOrEqual(260)
+
+  /**
+   * THE SWATCHES SHOW WHAT THE PAGE SHOWS. The canvas draws heat as fill
+   * alone; the paged views keep the 2px overline mark.js gives it. A legend
+   * that disagrees with the marks it floats over is worse than no legend, so
+   * it follows the view (TJ, 2026-08-22: "the legend needs reworking to
+   * match").
+   */
+  const edges = () =>
+    page.locator(".pdf-overlay-scale i").evaluateAll((els) =>
+      (els as HTMLElement[]).map((el) => getComputedStyle(el).boxShadow === "none")
+    )
+  // The bar appears while the comparison is still being read, carrying only
+  // "reading the cohort…" — the scale arrives with the counts.
+  await expect(page.locator(".pdf-overlay-scale i").first()).toBeAttached({ timeout: 25_000 })
+  const onCanvas = await edges()
+  expect(onCanvas.length, "the scale draws a swatch per step the reading can reach").toBeGreaterThan(0)
+  expect(onCanvas.every(Boolean), "canvas swatches are flat, like the rects").toBe(true)
+
+  await page.getByRole("button", { name: "1 page", exact: true }).click()
+  await page.waitForTimeout(2_000)
+  const onPage = await edges()
+  expect(onPage.some(Boolean), "paged swatches keep the overline, like the marks").toBe(false)
 })

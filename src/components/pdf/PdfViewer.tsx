@@ -2220,6 +2220,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         }
         .pdf-overlay-bar b { color: var(--ink); font-weight: 500; }
         .pdf-overlay-scale { display: flex; align-items: center; gap: 4px; }
+
         /* The same steps the page uses, rule included, addressed by the
            data-heat attribute rather than by position.
            THE POSITIONAL SELECTORS WERE WRONG: the "1" label is child 1, so
@@ -2239,6 +2240,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         .pdf-overlay-scale i[data-heat="3"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.28); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.70); }
         .pdf-overlay-scale i[data-heat="4"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.36); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.82); }
         .pdf-overlay-scale i[data-heat="5"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.44); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.95); }
+        /* Fill only, like the canvas draws. See the flat note at the markup.
+           AFTER the per-step rules and carrying [data-heat] itself: the step
+           rules are 0,2,1 and so is a plain .flat i, so an earlier or plainer
+           rule loses the tie and only the first swatch went flat. */
+        .pdf-overlay-scale.flat i,
+        .pdf-overlay-scale.flat i[data-heat] { box-shadow: none; }
         .pdf-search-panel {
           position: absolute;
           top: 64px;
@@ -3432,12 +3439,41 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                   </>
                 )}
               </span>
-              {/* The scale NAMES ITS ENDS, because it is relative: the darkest
-                  step is this reading's own densest run, not a fixed number of
-                  people. Left to "fewer → more", a reader could not tell
-                  whether the dark patches meant three had agreed or thirty,
-                  which is the one thing the shading is there to tell them. */}
-              <span className="pdf-overlay-scale">
+              {/**
+                * The scale NAMES ITS ENDS, because it is RELATIVE: the darkest
+                * step is this reading's own densest run, not a fixed number of
+                * people. Left to "fewer → more", a reader could not tell
+                * whether the dark patches meant three had agreed or thirty,
+                * which is the one thing the shading is there to tell them.
+                *
+                * Per-reading is TJ's choice, made on 2026-08-22 when asked
+                * whether the scale should instead run across every reading in
+                * the course. But it is only HALF relative, and the tooltip has
+                * to say which half, because the difference is visible: below
+                * six people the step IS the count (heatBand), so two readings
+                * with small peaks compare directly; only past five does it
+                * become a ramp over this reading's own range.
+                *
+                * That is what TJ noticed the same day — "why does object
+                * worlds appear darker than learning to learn, at least for the
+                * max?" Measured against the dev database: both readings peak
+                * at three people, but the overlay excludes the VIEWER from
+                * their own comparison, and he was one of the three on Learning
+                * How to Learn's densest run. Take him out and its peak is two,
+                * which paints step 2 against Object Worlds' step 3. Both
+                * facts — the count-below-six rule and the viewer's absence
+                * from it — are in the tooltip, because either one alone
+                * makes the other look like a bug.
+                *
+                * `flat` matches the swatches to the marks actually on screen:
+                * the canvas draws fill only, the paged views keep their
+                * overline, and a legend that disagrees with the page it floats
+                * over is worse than no legend.
+                */}
+              <span
+                className={`pdf-overlay-scale${viewMode === "matrix" ? " flat" : ""}`}
+                data-tip="the most people who marked the same words in this reading. Up to five the step is the count itself, so readings compare directly; past five the steps ramp over this reading's own range. You are never in the count — an overlay always leaves the viewer out."
+              >
                 <span className="cap">1</span>
                 {/* As many swatches as the page can actually produce. Below
                     six people the step is the count itself, so drawing five
