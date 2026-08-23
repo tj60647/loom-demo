@@ -23,6 +23,7 @@ import ClothMap, { SHOW_TRACE } from "@/components/svg/ClothMap"
 import ThreadCard from "@/components/cards/ThreadCard"
 import { useCaptureLog, CaptureLogScrubber, CaptureLogRows, CaptureLogDownload } from "@/components/ui/HistoryPanel"
 import ConceptName from "@/components/ui/ConceptName"
+import SvgDownload from "@/components/ui/SvgDownload"
 import { conceptNameText } from "@/lib/conceptName"
 
 /**
@@ -86,7 +87,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
   // can do is open the create-thread card.
   const {
     scopedState: state, flash, addEdge, links, addLink, attachLink,
-    addMap, setMapTiers, selectMap, scopeMaps, readOnly,
+    addMap, setMapTiers, selectMap, scopeMaps, readOnly, studentName,
   } = useLoom()
   const [readSel, setReadSel] = useState<{type: "concept" | "edge" | "hub", id?: string, ids?: string[], promptIdx?: number, gap?: boolean} | null>(null)
   /**
@@ -833,9 +834,16 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
             : " Click a concept, then shift-click a second, to link them on 02."}
           {showLog && " Scrub below to see how it grew."}
         </span>
+        {/* The right-hand end of the bar: what you can take away, and (when
+            there is a record) which of the two views you are looking at. One
+            group so the SVG button keeps the same place whether or not the
+            record is there — it used to be the chips that carried
+            `marginLeft:auto`, which put the take-away controls somewhere else
+            on a cloth with no log. */}
+        <span style={{ marginLeft: "auto", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
         {showLog && log.ready && (
           <>
-            <span className="chips" style={{ margin: 0, marginLeft: "auto", alignItems: "center" }}>
+            <span className="chips" style={{ margin: 0, alignItems: "center" }}>
               {([["cloth", "the cloth"], ["record", "the record"]] as const).map(([v, label]) => (
                 <span
                   key={v}
@@ -850,6 +858,20 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
             <CaptureLogDownload log={log} scopeLabel={scopeLabel} />
           </>
         )}
+        {/* The cloth as a picture (TJ, 2026-08-23). Offered in Open Loom too:
+            it takes a drawing of work that door already shows, and the
+            filename carries whose it is. `.clothglow` is dropped — it is a
+            one-second fade around whatever was last touched, and a still of it
+            is an opaque ochre blob rather than part of the weave. */}
+        <SvgDownload
+          target="map"
+          studentName={studentName}
+          kind="cloth"
+          noun="the cloth"
+          tip="the cloth as it stands, as a vector file"
+          drop={[".clothglow"]}
+        />
+        </span>
       </div>
 
       {/* ONE box, two views (see `view` above). The cloth draws the student's
