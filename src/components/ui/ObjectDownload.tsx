@@ -80,6 +80,15 @@ export default function ObjectDownload({
    */
   const what = noun === "" ? "" : noun ?? kind
   const label = (ext: string) => (what ? `download ${what} .${ext}` : `download .${ext}`)
+  /**
+   * THE TOAST STILL HAS TO NAME SOMETHING. `what` is deliberately empty where
+   * the card around the button already says which object it is, and that is
+   * right for the label — but the flash appears away from the card, and an
+   * empty name left it reading "·  downloaded ·" with a hole in the middle.
+   * It falls back to the kind, which is the object's name in every case but
+   * the hyphenated ones.
+   */
+  const said = what || kind
 
   return (
     <span className="objdl" id={id} data-tip={tip}>
@@ -92,7 +101,7 @@ export default function ObjectDownload({
             objectExportFilename(studentName, kind, slug, "json", undefined, !!openLoomViewer),
             "application/json"
           )
-          flash(`· ${what} downloaded ·`)
+          flash(`· ${said} downloaded ·`)
           onTaken?.()
         }}
       >{label("json")}</button>
@@ -105,7 +114,7 @@ export default function ObjectDownload({
             objectExportFilename(studentName, kind, slug, "md", undefined, !!openLoomViewer),
             "text/markdown"
           )
-          flash(`· ${what} downloaded ·`)
+          flash(`· ${said} downloaded ·`)
           onTaken?.()
         }}
       >{label("md")}</button>
