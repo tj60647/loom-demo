@@ -2,12 +2,14 @@ import { getRoster, getStaffViewer } from "@/actions/admin"
 import { firstParam, getCourse, listSections, resolveSectionId } from "@/lib/courses"
 import InviteLearners from "@/components/admin/InviteLearners"
 import RosterTable from "@/components/admin/RosterTable"
+import RosterDownload from "@/components/admin/RosterDownload"
 
 type AdminPageSearchParams = {
   course?: string | string[]
   section?: string | string[]
   view?: string | string[]
   filter?: string | string[]
+  role?: string | string[]
 }
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<AdminPageSearchParams> }) {
@@ -58,8 +60,37 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     : requestedView === "invite" && isAdmin ? "invite"
     : "enrolled"
   const filterNoResponse = view === "invited" && firstParam(resolved.filter) === "noresponse"
+  /**
+   * THE ROLE FILTER (TJ, 2026-08-24: "we should be able to filter by role and
+   * section"). Section already narrows the whole page through getRoster; role
+   * is the other half and had no control at all — it was a per-row select and
+   * nothing more, so "mail the faculty" or "mail only learners" meant reading
+   * the column and copying by hand.
+   *
+   * Enrolled only, and that is not an oversight: a pending invitation has no
+   * role yet. It gets one when the person first signs in, from the section the
+   * invitation named (src/lib/auth.ts, enrolInvitedCourses), so filtering the
+   * Invited tab by role would filter on a value that does not exist.
+   */
+  const roleParam = (firstParam(resolved.role) ?? "").toLowerCase()
+  const roleFilter = roleParam === "learner" || roleParam === "faculty" ? roleParam : null
   const baseHref = `/admin?course=${encodeURIComponent(courseId)}${sectionId ? `&section=${encodeURIComponent(sectionId)}` : ""}`
   const invitedPeople = filterNoResponse ? noResponse : invitedAll
+  const enrolledPeople = roleFilter
+    ? enrolled.filter((row) => (row.role ?? "").toLowerCase() === roleFilter)
+    : enrolled
+
+  // What the filters narrowed to, said once — the table renders it, the
+  // download names it in the file, and neither can drift from the other.
+  const shown = view === "invited" ? invitedPeople : enrolledPeople
+  const scope = [
+    view,
+    view === "invited" && filterNoResponse ? "no_response" : "",
+    view === "enrolled" && roleFilter ? roleFilter : "",
+    sectionName ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ")
 
   return (
     <main>
@@ -106,6 +137,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             >
               {filterNoResponse ? "▣" : "▢"} no response yet <span className="pill loose">{noResponseCount}</span>
             </a>
+            <RosterDownload people={invitedPeople} courseName={course?.name} scope={scope} />
           </div>
           {invitedPeople.length > 0 ? (
             <RosterTable people={invitedPeople} courseId={courseId} courseSections={courseSections} isAdmin={isAdmin} />
@@ -119,12 +151,39 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </>
       ) : (
         <>
-          {enrolledCount > 0 ? (
-            <RosterTable people={enrolled} courseId={courseId} courseSections={courseSections} isAdmin={isAdmin} />
+          {/* Role, alongside the section picker in the strip above. Links, not
+              a select, for the same reason the tabs are links: the view
+              survives a reload and the back button, and the page stays one
+              server component. */}
+          <div className="rosterfilter">
+            {([
+              ["all", "everyone", null],
+              ["learner", "learners", "learner"],
+              ["faculty", "faculty", "faculty"],
+            ] as const).map(([key, label, value]) => (
+              <a
+                key={key}
+                className={roleFilter === value ? "on" : undefined}
+                href={`${baseHref}&view=enrolled${value ? `&role=${value}` : ""}`}
+              >
+                {roleFilter === value ? "▣" : "▢"} {label}{" "}
+                <span className="pill loose">
+                  {value ? enrolled.filter((row) => (row.role ?? "").toLowerCase() === value).length : enrolledCount}
+                </span>
+              </a>
+            ))}
+            <RosterDownload people={enrolledPeople} courseName={course?.name} scope={scope} />
+          </div>
+          {enrolledPeople.length > 0 ? (
+            <RosterTable people={enrolledPeople} courseId={courseId} courseSections={courseSections} isAdmin={isAdmin} />
           ) : (
             <div className="card empty">
               <span className="cap">
-                {sectionName ? `Nobody enrolled in ${sectionName} yet` : "Nobody has signed in yet — see the Invited tab"}
+                {roleFilter
+                  ? `Nobody enrolled${sectionName ? ` in ${sectionName}` : ""} holds the ${roleFilter} role`
+                  : sectionName
+                    ? `Nobody enrolled in ${sectionName} yet`
+                    : "Nobody has signed in yet — see the Invited tab"}
               </span>
             </div>
           )}
