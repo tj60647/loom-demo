@@ -6,7 +6,7 @@ import Identity from "@/components/ui/Identity"
 import JourneyNav from "@/components/ui/JourneyNav"
 import { db } from "@/db"
 import { courseMemberships, courseSources, sections, sources, users } from "@/db/schema"
-import { and, asc, eq, isNull } from "drizzle-orm"
+import { and, asc, eq, isNull, sql } from "drizzle-orm"
 import { listCourses, listFacultyCourseIds } from "@/lib/courses"
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -65,7 +65,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       .from(courseMemberships)
       .innerJoin(users, eq(users.id, courseMemberships.userId))
       .where(and(isNull(courseMemberships.removedAt), eq(courseMemberships.role, "LEARNER")))
-      .orderBy(asc(users.name), asc(users.email)),
+      /**
+       * CASE-INSENSITIVE, because this database sorts by character code. Its
+       * collation is C.UTF-8, so a plain `order by name` files every capital
+       * before every lowercase letter — "Adam, Banana, Rachel Li, Zoe, adam,
+       * banana, gavinddo" — which reads as alphabetical-but-broken to anyone
+       * scanning for a name (TJ, 2026-08-24: "why is alphabetical case
+       * dependent for the student dropdown?"). Measured against the dev
+       * database on that date; `lower()` gives the order a reader expects.
+       */
+      .orderBy(asc(sql`lower(${users.name})`), asc(sql`lower(${users.email})`)),
   ])
   const courseRows = admin
     ? allCourseRows
