@@ -1,6 +1,51 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap');
 
 :root{
+  /* ===== the heat ramp — ONE definition, five steps =====
+     How many students marked a run of text, as one hue at five alphas. It is
+     defined here because it used to be written out three times — the live text
+     layer, the legend swatches, and the canvas rects — and three copies of a
+     scale is how a legend comes to disagree with the page it floats over.
+     That has already happened once here, when positional selectors left the
+     legend ending lighter than it began.
+
+     The steps were solved, not chosen by eye, against #c8451e over white paper
+     (2026-08-23):
+
+       step  alpha  colour    L*     ink on it   text under it, on canvas
+       1     .18    #f5ded7   90.0   13.61       14.36
+       2     .27    #f0cdc2   85.0   11.89       11.35
+       3     .36    #ebbcae   80.0   10.34        8.71
+       4     .46    #e6a998   74.5    8.80        6.31
+       5     .55    #e19983   69.7    7.58        4.65
+
+     Three properties, and each one is a constraint the old ramp failed or
+     nearly failed:
+
+     - STEP 1 IS VISIBLY MARKED. It sits 10.0 L* below bare paper; the old .12
+       sat 6.7 below it, which on a scan reads as a smudge. This matters most
+       where it is least obvious: choose one student on Heatmaps and EVERY run
+       is step 1, because one reader cannot disagree with themselves — so the
+       faintest step is the entire view (TJ, 2026-08-23: "1 is a valid
+       bincount").
+     - THE STEPS ARE EVENLY SPACED IN PERCEPTION. ΔL* of 5.0, 5.0, 5.5, 4.9 —
+       even in L*, not in alpha, because equal alpha steps are not equal
+       lightness steps and the eye reads lightness.
+     - THE WORDS SURVIVE THE DARKEST STEP. Two different sums: in the paged
+       views the wash sits BEHIND the text, so what matters is ink #1a1916 on
+       the composite (7.58 at step 5). On the canvas the rect is painted OVER
+       the page image, so a black glyph becomes alpha x hue and the paper
+       becomes the composite — 4.65 at step 5, against the 4.5 floor. That
+       second sum is the binding one and it is invisible in the first: it is
+       what stops the ramp going darker, and why step 5 is .55 and not the .73
+       an evenly-spread ramp would have wanted. */
+  --heat-1:.18;--heat-2:.27;--heat-3:.36;--heat-4:.46;--heat-5:.55;
+  /* The paged views draw a 2px rule above the wash as well — under real text
+     at reading size a flat wash is hard to find an edge on. Stronger than the
+     fill at every step, and monotonic with it. The canvas draws no rule at
+     all: a constant-alpha edge on a 3px rect is most of the rect, which
+     inverts the scale (TJ, 2026-08-22). */
+  --heat-rule-1:.40;--heat-rule-2:.55;--heat-rule-3:.70;--heat-rule-4:.82;--heat-rule-5:.95;
   --paper:#edebe3;--paper-2:#e5e2d8;--ink:#1a1916;--ink-soft:#6b675c;
   --rule:#cbc7ba;--dot:#c3bfb1;
   --grey:#a39f92;        /* quiet glyphs, loose picks */
@@ -791,10 +836,10 @@ main.canvasfull{padding:0 0 34px;margin:0;height:100%;overflow:hidden;box-sizing
    reads `--heat-rgb` for every one of them — the live wash, its overline, the
    legend swatches, the status bar, and the rects redrawn on the Canvas.
 
-   #c8451e = rgb(200,69,30). Checked rather than chosen by eye: over white the
-   five steps run #f8e9e4 → #e29e8a, lightness strictly decreasing, and ink
-   (#1a1916) over them holds 14.87 → 7.95 contrast, every step far above the
-   4.5 floor. */
+   #c8451e = rgb(200,69,30) — the HUE only. The five alphas it is drawn at,
+   and the arithmetic behind them, are the `--heat-1…5` block at the top of
+   this file; this token exists so the ramp can be warm here and stay slate
+   everywhere else. */
 .heatpage{--heat-rgb:200, 69, 30}
 .cohortcanvas{position:relative;height:100%;background:#f4f2ec}
 /* No border, no radius, no card: the drawing meets the window.

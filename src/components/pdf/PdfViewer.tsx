@@ -2204,31 +2204,31 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            handlers: it is a comparison, and clicking it should do exactly what
            clicking the paper does. */
         .loom-overlay-heat {
-          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.12);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-1));
           /* A rule ABOVE the words as well as a wash behind them. Your own
              highlight nests inside this mark and paints its yellow over the
              wash — and "did anyone else mark the words I marked?" is the most
              interesting thing this view can answer, so the section's mark has
              to survive underneath your own. Yellow underlines; slate
              overlines; neither hides the other. */
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.40);
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-1));
           color: inherit;
         }
         .loom-overlay-heat[data-heat="2"] {
-          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.20);
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.55);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-2));
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-2));
         }
         .loom-overlay-heat[data-heat="3"] {
-          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.28);
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.70);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-3));
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-3));
         }
         .loom-overlay-heat[data-heat="4"] {
-          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.36);
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.82);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-4));
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-4));
         }
         .loom-overlay-heat[data-heat="5"] {
-          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.44);
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.95);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-5));
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-5));
         }
         .pdf-overlay-ctl {
           display: flex;
@@ -2310,13 +2310,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           display: inline-block;
           width: 15px;
           height: 12px;
-          background: rgba(var(--heat-rgb, 64, 84, 112), 0.12);
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.40);
+          background: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-1));
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-1));
         }
-        .pdf-overlay-scale i[data-heat="2"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.20); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.55); }
-        .pdf-overlay-scale i[data-heat="3"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.28); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.70); }
-        .pdf-overlay-scale i[data-heat="4"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.36); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.82); }
-        .pdf-overlay-scale i[data-heat="5"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.44); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.95); }
+        .pdf-overlay-scale i[data-heat="2"] { background: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-2)); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-2)); }
+        .pdf-overlay-scale i[data-heat="3"] { background: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-3)); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-3)); }
+        .pdf-overlay-scale i[data-heat="4"] { background: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-4)); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-4)); }
+        .pdf-overlay-scale i[data-heat="5"] { background: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-5)); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-5)); }
         /* Fill only, like the canvas draws. See the flat note at the markup.
            AFTER the per-step rules and carrying [data-heat] itself: the step
            rules are 0,2,1 and so is a plain .flat i, so an earlier or plainer
@@ -2893,12 +2893,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            and since the canvas now owns its own heat the two never appear on
            one page to disagree. */
         .pdf-kept-heat rect {
-          fill: rgba(var(--heat-rgb, 64, 84, 112), 0.12);
+          fill: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-1));
         }
-        .pdf-kept-heat rect[data-heat="2"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.20); }
-        .pdf-kept-heat rect[data-heat="3"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.28); }
-        .pdf-kept-heat rect[data-heat="4"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.36); }
-        .pdf-kept-heat rect[data-heat="5"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.44); }
+        .pdf-kept-heat rect[data-heat="2"] { fill: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-2)); }
+        .pdf-kept-heat rect[data-heat="3"] { fill: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-3)); }
+        .pdf-kept-heat rect[data-heat="4"] { fill: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-4)); }
+        .pdf-kept-heat rect[data-heat="5"] { fill: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-5)); }
         .pdf-rail-leaders path {
           stroke: rgba(255, 204, 0, 0.8);
           stroke-width: 1.5;
