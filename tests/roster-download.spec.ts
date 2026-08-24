@@ -153,3 +153,36 @@ test("the role chips are a set, and the download honours the set", async ({ page
   await chips(page).nth(1).click()
   await expect(page).toHaveURL(/role=faculty(?!,)/, { timeout: 15_000 })
 })
+
+/**
+ * FIND SOMEBODY BY EMAIL (TJ, 2026-08-24). The question it answers is "is this
+ * address on the roster, and in what state" — which is why it has to cross the
+ * tabs. An address may be invited, enrolled, or invited and still silent, and
+ * a find that only searched the open tab would answer "no" to a question about
+ * the course.
+ */
+test("a find crosses the tabs and every section", async ({ page }) => {
+  // Standing on Enrolled, look for somebody who exists only as an invitation.
+  await page.goto("/admin?view=enrolled")
+  await expect(page.locator(".rosterfind input[name=find]")).toBeVisible({ timeout: 20_000 })
+
+  await page.locator(".rosterfind input[name=find]").fill("test-invited")
+  await page.locator(".rosterfind button").click()
+  await expect(page).toHaveURL(/find=test-invited/, { timeout: 15_000 })
+
+  const note = page.locator(".rosterfilter .cap")
+  await expect(note, "the seed must carry the invited-never-signed-in address").toContainText(
+    /matching "test-invited"/
+  )
+  // The scope is stated, because a "no" only means something with it attached.
+  await expect(note).toContainText(/every section, invited and enrolled/)
+  await expect(page.locator("body")).toContainText("test-invited@loom.local")
+
+  // A miss says so plainly, and says where to go next.
+  await page.goto("/admin?view=enrolled&find=glunk%40berkeley.edu")
+  await expect(page.locator(".rosterfilter .cap")).toContainText(
+    /nothing matching "glunk@berkeley.edu" anywhere in this course/,
+    { timeout: 20_000 }
+  )
+  await expect(page.locator(".card.empty")).toContainText(/Not on this roster/)
+})
