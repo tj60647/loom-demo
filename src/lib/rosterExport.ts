@@ -44,10 +44,13 @@ export function emailList(rows: RosterExportRow[]): string {
   for (const row of rows) {
     const email = (row.email ?? "").trim()
     if (!email) continue
-    // One address once, however many rows carry it. A person enrolled AND
-    // still holding an invitation is two rows on the Invited tab by design
-    // (getRoster marks enrolled rows `invited`), and mailing them twice is
-    // the kind of thing a list like this is blamed for.
+    // One address once, however many rows carry it. DEFENSIVE rather than
+    // required: `getRoster` skips the pending row for an address that is
+    // already enrolled (src/actions/admin.ts:296), and course_allowed_email
+    // is unique per (courseId, email), so today nothing upstream can hand
+    // this the same address twice. It costs a Set to stay true if that ever
+    // changes, and mailing somebody twice is what a list like this gets
+    // blamed for.
     const key = email.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)

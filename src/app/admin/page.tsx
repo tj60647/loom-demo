@@ -140,9 +140,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     ? enrolled.filter((row) => roleFilter.has((row.role ?? "").toLowerCase()))
     : enrolled
 
-  // What the filters narrowed to, said once — the table renders it, the
-  // download names it in the file, and neither can drift from the other.
-  const shown = view === "invited" ? invitedPeople : enrolledPeople
   const scope = [
     view,
     view === "invited" && filterNoResponse ? "no_response" : "",

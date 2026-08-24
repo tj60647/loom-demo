@@ -109,7 +109,7 @@ export default function RosterFind({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="find by email"
+            placeholder="find by email or name"
             aria-label="Find someone by email address"
             data-tip="find anyone on this roster by address or name — every section, invited and enrolled"
           />
