@@ -36,8 +36,33 @@ test.describe('PDF Viewer and Highlighting', () => {
       // Go to Page 2 (simulating user turning page)
       await page.getByRole('button', { name: 'Next Page' }).click();
 
-      // Wait a moment for page 2 to render
-      await page.waitForTimeout(1000);
+      /**
+       * WAIT FOR WORDS, NOT FOR A CLOCK.
+       *
+       * This was `waitForTimeout(1000)`, which is long enough for a small PDF
+       * and not for a large one. Measured on the running app, turning to page
+       * 2 of Boundary Objects — a 35-page scan — the text layers hold 0 spans
+       * at 1s and 93 and 105 at 7s. The element is attached the whole time,
+       * so every locator-based wait is already satisfied; only the CONTENT
+       * arrives late, which is why the selection below came back empty and
+       * the assertion read "expected >= 80, received 0".
+       *
+       * The layer is torn down and rebuilt across the turn, so this asks the
+       * document each time rather than holding a handle that goes stale.
+       */
+      await expect
+        .poll(
+          () =>
+            page.evaluate(() => {
+              const layer = document.querySelector('.react-pdf__Page__textContent');
+              if (!layer) return 0;
+              return Array.from(layer.querySelectorAll('span')).filter(
+                (s) => (s.textContent ?? '').trim().length > 0
+              ).length;
+            }),
+          { timeout: 20_000, message: 'page 2 never rendered a text layer with words in it' }
+        )
+        .toBeGreaterThan(0);
 
       // Select a FULL PASSAGE — a run of consecutive text-layer lines adding
       // up to a real excerpt — never a stray fragment of a word. The selection
