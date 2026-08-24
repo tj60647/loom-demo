@@ -125,7 +125,18 @@ export default function RosterTable({
   }
 
   const head = (key: SortKey, label: string) => (
-    <button type="button" className={sortKey === key ? "on" : undefined} onClick={() => sortBy(key)}>
+    <button
+      type="button"
+      className={sortKey === key ? "on" : undefined}
+      onClick={() => sortBy(key)}
+      /* The tip says what the NEXT click does, not what the column is — the
+         header already says that, and the arrow only says where you are. */
+      data-tip={
+        sortKey === key
+          ? `sort by ${label}, ${dir === "asc" ? "descending" : "ascending"}`
+          : `sort by ${label}`
+      }
+    >
       {label}
       {sortKey === key ? (dir === "asc" ? " ▲" : " ▼") : null}
     </button>
@@ -310,6 +321,7 @@ export default function RosterTable({
                   className="btn ghost mini compact"
                   type="submit"
                   aria-label={`Withdraw the invitation for ${person.email}`}
+                  data-tip="cancel this invitation — nobody has signed in on it, so there is no work to keep"
                 >
                   Withdraw
                 </button>
