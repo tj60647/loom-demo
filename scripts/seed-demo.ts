@@ -16,8 +16,10 @@
  *     their own, and they share two labels between them so the Vocabulary
  *     overlay counts a word at two people rather than only ever at one.
  *
- * Passages are pulled verbatim from the `source_page` rows with their canonical
- * offsets and content hashes, so they highlight precisely in the PDF viewer.
+ * Passages are pulled from the `source_page` rows with their canonical offsets
+ * and content hashes, so they highlight precisely in the PDF viewer — and
+ * their text is the string the browser's selection would have returned, line
+ * breaks included, not the offset string those offsets index (`sliceAsSelected`).
  * Concepts attach through `passage_concept` (P0.1, renamed by 0023); tiers
  * live per map only; a cloth per reading carries the student's read paragraph
  * — matching what the actions would have produced, so the seeded account is
@@ -58,9 +60,13 @@ const USER_D = { email: "test-user-d@loom.local", name: "Test User D" }
  * all readings for a couple of them? and not just random things but reasonable
  * data").
  *
- * A-D above are untouched and stay exactly as they were: every spec in the
- * suite is written against their fixtures, and several pin their concept
- * labels by name. These five are additive.
+ * A-D above keep their concepts, passages, threads and projections exactly as
+ * they were — every spec in the suite is written against those fixtures, and
+ * several pin their concept labels by name. Two things about them DID change
+ * on 2026-08-24, and neither is additive: their passage text is now the string
+ * a selection would produce rather than the offset string (see
+ * `sliceAsSelected`), and C and D gained the cloth every worked reading should
+ * have had. Both were defects they shared with everyone else.
  *
  * WHAT THEY EXIST TO MAKE REACHABLE, measured before they were written:
  *
@@ -115,8 +121,77 @@ const READING_B = "Communities of practice" // Wenger (any edition/paper)
 
 type PageRow = { pageNumber: number; textContent: string; contentHash: string }
 
+/**
+ * THE STRING A SELECTION WOULD HAVE PRODUCED.
+ *
+ * Two different strings are in play and the seed used the wrong one. Offsets
+ * index the TEXT-LAYER string — pdf.js items concatenated with nothing between
+ * them (heatRects.textLayerString) — while `passage.content` is what the
+ * browser hands back from a selection, which carries a newline at every line
+ * break because each item is its own span.
+ *
+ * Stored page text keeps those breaks as LINE_SEPARATOR (a newline) and
+ * `textLayerProjection` strips them to recover the offset string. Slicing THAT
+ * welds words across every line break: the seed was storing "conferenceon
+ * technological literacy" and "the apocalypse ofreturning to nuclear dust"
+ * where a reader would have selected "conference" + newline + "on
+ * technological literacy"
+ * (TJ, 2026-08-24: "are they really selections or are they generated some
+ * other way, they have no spaces like a text i select would do").
+ *
+ * So this walks the stored text, counting only the characters the projection
+ * keeps, and returns the stored slice — separators included, which is exactly
+ * what the browser would have given. Verified against three passages captured
+ * through the UI on the dev database: the stored slice reproduces the content
+ * the app saved, character for character.
+ */
+function sliceAsSelected(stored: string, start: number, end: number): string {
+  let projected = 0
+  let from = -1
+  let to = -1
+  for (let i = 0; i < stored.length; i++) {
+    // A separator is not in the projection, so it advances the stored index
+    // and not the projected one. That difference IS the mapping.
+    if (stored[i] === "\n") continue
+    if (projected === start && from < 0) from = i
+    if (projected === end) { to = i; break }
+    projected++
+  }
+  if (from < 0) return ""
+  // A trailing separator would be a line break with nothing after it — the
+  // selection ends at the last character, not at the break past it.
+  return stored.slice(from, to < 0 ? stored.length : to).replace(/\n+$/, "")
+}
+
+/**
+ * IS THIS A SENTENCE SOMEBODY WOULD MARK, or the front of the book?
+ *
+ * The 120–420-character rule below is happy to match a title page: the seed
+ * was handing out "BOB GOWIN Department of Education New York State College of
+ * Agriculture" and a run of ISBNs off a copyright page — 14 of 124 passages,
+ * measured 2026-08-24. They are legal captures and nobody would ever make one,
+ * which is the whole difference TJ asked for ("not just random things but
+ * reasonable data").
+ *
+ * Front matter is a pile of names and titles: mostly capitalised tokens, with
+ * few of the lowercase function words that hold a sentence together. Prose on
+ * these scans runs well under a third capitalised, and a masthead well over
+ * half, so the line sits at 45% with room either side of it.
+ */
+function readsAsProse(text: string) {
+  const words = text.split(/[\s\n]+/).filter((w) => /[A-Za-z]/.test(w))
+  if (words.length < 8) return false
+  const capitalised = words.filter((w) => /^[A-Z]/.test(w)).length
+  if (capitalised / words.length > 0.45) return false
+  // A copyright page can slip under that on ISBNs alone, which carry no
+  // capitals at all — so a run that is mostly digits is out too.
+  const digits = text.replace(/[^0-9]/g, "").length
+  return digits / text.length < 0.15
+}
+
 /** Find a real sentence on a page: starts with a capital, ends with a stop,
- *  120–420 chars. `skip` picks later sentences so passages don't collide. */
+ *  120–420 chars, and reads as prose. `skip` picks later sentences so passages
+ *  don't collide. */
 function pickPassage(pages: PageRow[], fromPage: number, skip = 0):
   { content: string; pageNumber: number; startOffset: number; endOffset: number; pageContentHash: string } {
   const re = /[A-Z][^.?!]{120,420}[.?!]/g
@@ -125,11 +200,14 @@ function pickPassage(pages: PageRow[], fromPage: number, skip = 0):
     // text — the two differ by the line boundaries extractPdfPageText records.
     // Matching against the stored text would mint offsets that are correct for
     // no string anyone ever reads.
-    const found = [...textLayerProjection(page.textContent).matchAll(re)]
+    const found = [...textLayerProjection(page.textContent).matchAll(re)].filter((m) =>
+      readsAsProse(m[0])
+    )
     if (found.length > skip) {
       const m = found[skip]
       return {
-        content: m[0],
+        // The offsets are the projection's; the CONTENT is the selection's.
+        content: sliceAsSelected(page.textContent, m.index, m.index + m[0].length),
         pageNumber: page.pageNumber,
         startOffset: m.index,
         endOffset: m.index + m[0].length,
@@ -541,6 +619,124 @@ async function main() {
   }
 
   /**
+   * WHAT EACH STUDENT HAS ALREADY COINED.
+   *
+   * A Concept belongs to the USER, not to a reading, and it gathers evidence
+   * as the student meets the same idea again — the journey's own words are
+   * "name the concept it evidences" and then, three steps later, "see what
+   * recurs" (src/lib/workflows.ts). The seed did the opposite: it minted two
+   * NEW concept rows on every call, once per reading, so Test User F ended up
+   * with 62 concepts across 7 labels and twelve separate concepts all called
+   * "citation as claim" (TJ, 2026-08-24: "test user f seems to have multiple
+   * copies of the same concept. how is this possible?").
+   *
+   * Nothing in the app forbids it — `createConcept` does not dedupe by label,
+   * and two concepts may honestly share a name. But a student reuses one: the
+   * add-concept card offers what they already hold, and picking it is the
+   * ordinary gesture. Twelve copies is not a student, it is a loop.
+   *
+   * So each of these ledgers is one person's vocabulary. A label is coined the
+   * first time it is needed and reused every time after, which is also what
+   * gives the fixture a concept with evidence from a dozen readings — the
+   * thing the weave is for, and which no seeded account had.
+   */
+  const ledgers = new Map<string, {
+    concepts: Map<string, string>
+    links: Map<string, string>
+    threads: Set<string>
+  }>()
+  const ledgerFor = (userId: string) => {
+    let led = ledgers.get(userId)
+    if (!led) {
+      led = { concepts: new Map(), links: new Map(), threads: new Set() }
+      ledgers.set(userId, led)
+    }
+    return led
+  }
+
+  /** Coin a concept once; hand back the same one every time after. */
+  const conceptFor = async (user: { id: string }, label: string, def: string) => {
+    const led = ledgerFor(user.id)
+    const held = led.concepts.get(label)
+    if (held) return held
+    const [made] = await db.insert(concepts).values({
+      userId: user.id, courseId: course.id, label, def, note: "", createdAt: at(),
+    }).returning()
+    led.concepts.set(label, made.id)
+    return made.id
+  }
+
+  /**
+   * One thread between one pair, coined once.
+   *
+   * The same bug one level up: with the concepts reused, a thread minted per
+   * reading would put thirty-one identical edges between the same two cards —
+   * a board with one connector drawn thirty-one times. A thread is a claim
+   * about two concepts, and it is made once.
+   *
+   * Links dedupe case-insensitively per person, the way `resolveLink` does in
+   * src/actions/loom.ts.
+   */
+  const threadFor = async (
+    user: { id: string }, fromId: string, toId: string, sentence: string, handle: string
+  ) => {
+    const led = ledgerFor(user.id)
+    const pair = `${fromId}>${toId}`
+    if (led.threads.has(pair)) return
+    led.threads.add(pair)
+
+    const key = handle.trim().toLowerCase()
+    let linkId = led.links.get(key)
+    if (!linkId) {
+      const [link] = await db.insert(links).values({
+        userId: user.id, courseId: course.id, label: handle.trim(), description: "", createdAt: at(),
+      }).returning()
+      linkId = link.id
+      led.links.set(key, linkId)
+    }
+    await db.insert(edges).values({
+      userId: user.id, courseId: course.id, fromId, toId,
+      sentence, handle: handle.trim(), linkId, createdAt: at(),
+    })
+  }
+
+  /**
+   * THE WORKSPACE THE WORK WAS DONE IN.
+   *
+   * A `cloth` row is the per-scope identity — the title and the read paragraph
+   * a student writes on 03 — and only `saveCloth` ever writes one. The seed
+   * called that path for Test User A alone, so every other seeded account had
+   * concepts, passages, threads and projections and no cloth at all (TJ,
+   * 2026-08-24: "how can a user have concepts but no cloths?").
+   *
+   * Legal, since a cloth exists only once you name one. But it is not a
+   * picture of anybody who did the work, and it is the reading's own heading
+   * on 03, so those accounts opened the station with nothing at the top of it.
+   *
+   * One per reading the student worked, which is the shape A already has.
+   */
+  const clothFor = async (user: { id: string }, scopeKey: string, title: string, description: string) => {
+    await db.insert(cloths).values({
+      userId: user.id, courseId: course.id, scopeKey, title, description,
+      createdAt: at(), updatedAt: at(),
+    }).onConflictDoNothing()
+  }
+
+  /**
+   * The two colleagues get theirs too. They were seeded long before E-I and
+   * had the same gap for the same reason — nothing in the seed had ever
+   * called the cloth path except Test User A's own block.
+   */
+  await clothFor(userC, srcA.id, labelA.slice(0, 60),
+    "Two trades talking past each other, and the meeting is where that gets fixed.")
+  await clothFor(userC, srcB.id, labelB.slice(0, 60),
+    "Belonging first, competence after — that order is the argument.")
+  await clothFor(userD, srcA.id, labelA.slice(0, 60),
+    "What nobody could say out loud is sitting in the finished object.")
+  await clothFor(userD, srcB.id, labelB.slice(0, 60),
+    "You learn this by standing next to it, not by being told it.")
+
+  /**
    * One student's work in one reading: two passages, each filed under a concept
    * of their own, and a thread between those two concepts.
    *
@@ -567,10 +763,13 @@ async function main() {
   ) => {
     const first = DEEP_LABELS[labelIndex % DEEP_LABELS.length]
     const second = DEEP_LABELS[(labelIndex + 1) % DEEP_LABELS.length]
-    const made = await db.insert(concepts).values([
-      { userId: user.id, courseId: course.id, label: first[0], def: first[1], note: "", createdAt: at() },
-      { userId: user.id, courseId: course.id, label: second[0], def: second[1], note: "", createdAt: at() },
-    ]).returning()
+    // Coined on first meeting, reused on every one after — so by the end of
+    // the syllabus these five labels each carry evidence from a dozen
+    // readings, which is what a concept is for and what no seeded account had.
+    const made = [
+      { id: await conceptFor(user, first[0], first[1]) },
+      { id: await conceptFor(user, second[0], second[1]) },
+    ]
 
     const picks = [pickPassage(reading.pages, 2, 0), pickPassage(reading.pages, 3, 0)]
     const rows = picks.map((pick, i) => ({
@@ -601,11 +800,11 @@ async function main() {
     filings.push({ passageId: rows[1].id, conceptId: made[1].id, createdAt: rows[1].createdAt })
     await db.insert(passageConcepts).values(filings)
 
-    await db.insert(edges).values(await withLinks([{
-      userId: user.id, courseId: course.id, fromId: made[0].id, toId: made[1].id,
-      sentence: "The first is the instrument the second gets read with.",
-      handle: "is read through", createdAt: at(),
-    }]))
+    await threadFor(
+      user, made[0].id, made[1].id,
+      "The first is the instrument the second gets read with.",
+      "is read through"
+    )
 
     return { concepts: made, passages: rows }
   }
@@ -671,6 +870,11 @@ async function main() {
     await projectReading(userE, reading, e.concepts, i === 0)
     const f = await workReading(userF, reading, i + 2)
     await projectReading(userF, reading, f.concepts)
+    // The station's own heading, written by anyone who worked here.
+    await clothFor(userE, reading.id, reading.title.slice(0, 60),
+      "Read for what it hands me to read the next one with: the apparatus first, the argument second.")
+    await clothFor(userF, reading.id, reading.title.slice(0, 60),
+      "I keep coming back to the same few ideas here, which is either the reading or me.")
     deepPassages += e.passages.length + f.passages.length
     deepMaps += 2
   }
@@ -691,9 +895,10 @@ async function main() {
   if (ladder) {
     const depth = async (people: { id: string }[], pick: ReturnType<typeof pickPassage>, label: string) => {
       for (const u of people) {
-        const [c] = await db.insert(concepts).values({
-          userId: u.id, courseId: course.id, label, def: "A run the cohort converged on.", note: "", createdAt: at(),
-        }).returning()
+        // Through the ledger like everything else: E and F meet these labels
+        // once each, and a second visit would otherwise mint a second copy —
+        // the same duplication this seed was full of.
+        const conceptId = await conceptFor(u, label, "A run the cohort converged on.")
         const row = {
           id: crypto.randomUUID(), userId: u.id, courseId: course.id,
           source: labelA, sourceId: srcA.id, location: `p. ${pick.pageNumber}`,
@@ -701,7 +906,7 @@ async function main() {
           endOffset: pick.endOffset, pageContentHash: pick.pageContentHash, createdAt: at(),
         }
         await db.insert(passages).values(row)
-        await db.insert(passageConcepts).values({ passageId: row.id, conceptId: c.id, createdAt: row.createdAt })
+        await db.insert(passageConcepts).values({ passageId: row.id, conceptId, createdAt: row.createdAt })
       }
     }
     /**
@@ -720,6 +925,13 @@ async function main() {
     await depth([userG, userH, userI], sharedA, "the converged sentence") // → 8
     await depth([userE, userF, userG, userH], pickPassage(pagesA, 2, 4), "the middle run") // → 4
     await depth([userE, userF], pickPassage(pagesA, 2, 5), "the quiet run") // → 2
+
+    // G, H and I work in this one reading and nowhere else, so this is the
+    // only station they have — and without a cloth it opened unnamed.
+    for (const u of [userG, userH, userI]) {
+      await clothFor(u, srcA.id, labelA.slice(0, 60),
+        "One sentence in here is doing the work of the whole chapter.")
+    }
   }
 
   /**
