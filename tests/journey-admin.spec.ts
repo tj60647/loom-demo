@@ -254,3 +254,39 @@ test("the cohort read-out says a thread between its two concepts", async ({ page
   // The badge that used to stand there is gone from every read-out.
   await expect(page.locator(".threadhead .vpill", { hasText: /^description$/ })).toHaveCount(0)
 })
+
+/**
+ * A THREAD WITH NOTHING TO SAY KEEPS THE CARDS' ARROW (TJ, 2026-08-24: "in the
+ * threads we use an arrow, right? maybe the side not is ... something like
+ * that that matches language").
+ *
+ * ThreadCard draws `.tarrow` between the ends of an unlabelled thread and
+ * calls the state "not described" on its pill. The read-out now says both the
+ * same way, so the two surfaces and the cloth's dashed arc agree.
+ */
+test("an undescribed thread reads as an arrow, and says what is missing", async ({ page }) => {
+  await page.goto("/admin/aggregate")
+  const cards = page.locator(".ywthread")
+  await expect(cards.first()).toBeVisible({ timeout: 30_000 })
+
+  const head = page.locator(".threadhead")
+  let found = false
+  const tries = Math.min(await cards.count(), 8)
+  for (let i = 0; i < tries; i += 1) {
+    await cards.nth(i).click()
+    await expect(head).toBeVisible({ timeout: 15_000 })
+    const parts = await head.evaluate((el) =>
+      Array.from(el.children).map((child) => child.className)
+    )
+    if (parts[1]?.includes("tarrow")) {
+      // An arrow between the two concepts, never a stand-in word.
+      expect(parts[0]).toContain("red")
+      expect(parts[2]).toContain("red")
+      // And the absence named once, to the side, in the cards' own words.
+      await expect(head.locator(".vpill")).toHaveText("not described")
+      found = true
+      break
+    }
+  }
+  expect(found, "the seed must carry one thread with neither a label nor a description").toBe(true)
+})

@@ -1040,6 +1040,9 @@ main.canvasfull{padding:0 0 34px;margin:0;height:100%;overflow:hidden;box-sizing
    coined. Smaller and italic against the two red nouns, so the row reads as
    one sentence rather than as three chips in a line. */
 .threadhead .said{font-size:15px;font-style:italic;color:var(--ink-soft)}
+/* The same arrow the thread CARDS draw between the ends of an unlabelled
+   thread (.thread .tarrow), so the read-out and the list speak one idiom. */
+.threadhead .tarrow{font-family:var(--mono);font-size:12px;color:var(--grey)}
 .threadhead .n{font-family:var(--mono);font-size:11px;color:var(--grey)}
 .report .cap{display:block;margin:13px 0 3px;color:var(--ink-soft)}
 .report .line{font-size:14.5px;padding:1px 0}

@@ -470,14 +470,27 @@ export default function CohortClothPanel({
             {said ? (
               <span className="said">{said}</span>
             ) : (
-              /* Neither a Link nor a description: a thread drawn and never
-                 spoken. Still the dashed pill, because there is no sentence
-                 to put here and a gap would read as a rendering fault. */
-              <span className="vpill loosev">unlabeled</span>
+              /* THE ARROW THE CARDS DRAW (TJ, 2026-08-24: "in the threads we
+                 use an arrow, right?"). ThreadCard puts `.tarrow` between the
+                 ends of a thread carrying no label, and its comment gives the
+                 reason a stand-in WORD is wrong there: a glyph inside the
+                 label pill reads as "labelled", which is the mistake
+                 /admin/user/[id] made until it adopted that card. Bare here
+                 for the same reason. What is missing is said once, to the
+                 side, below. */
+              <span className="tarrow" aria-hidden="true">→</span>
             )}
             <span className="red">{ends[1] ? conceptNameText(ends[1]) : "?"}</span>
             <span className="n">{who(edge.userId)}</span>
             {trailing ? <span className="footsaid">&ldquo;{trailing}&rdquo;</span> : null}
+            {/* THE CARD'S OWN WORDS FOR THE ABSENCE. "not described" rather
+                than a phrase invented here: it is what ThreadCard's pill says
+                in this exact state, and that card's comment settled why —
+                "a thread with no label AND no sentence has not been described
+                at all, and calling that 'description' was the one inaccurate
+                thing on the card". The read-out and the cards now agree, and
+                the cloth's dashed arc agrees with both. */}
+            {said ? null : <span className="vpill loosev">not described</span>}
           </div>
 
           <details className="footmore">
