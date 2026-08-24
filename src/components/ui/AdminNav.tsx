@@ -110,9 +110,23 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
   // The student list follows the SECTION picker: narrowing to a section and
   // then being offered someone from another one would be a control arguing
   // with the control beside it.
-  const studentsHere = (activeCourse?.students ?? []).filter(
-    (st) => !activeSectionId || st.sectionId === activeSectionId
-  )
+  /**
+   * BY NAME, WITH "ALL STUDENTS" HELD AT THE TOP (TJ, 2026-08-24: "the student
+   * dropdown should be in alphabetical order. keep all students at the top").
+   *
+   * The order was whatever the roster query returned, which is neither
+   * alphabetical nor stable enough to learn — and a picker of sixty names you
+   * cannot scan is a picker you scroll twice. "All students" keeps its place
+   * as the option markup's first child rather than joining the sort: it is the
+   * scope you come back to, not one of the people.
+   *
+   * `localeCompare` rather than `<`, since this roster carries names in more
+   * than one script and a code-point sort files them by encoding.
+   */
+  const studentsHere = (activeCourse?.students ?? [])
+    .filter((st) => !activeSectionId || st.sectionId === activeSectionId)
+    .slice()
+    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""))
   const activeStudent = studentsHere.find((st) => st.id === studentParam) ?? null
 
   /**
