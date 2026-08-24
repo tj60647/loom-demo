@@ -204,3 +204,53 @@ test.describe("authorization boundary", () => {
     await expect(page).toHaveURL(/\/$/, { timeout: 15_000 })
   })
 })
+
+/**
+ * A THREAD READS AS A SENTENCE (TJ, 2026-08-24: "let put the label, or if no
+ * label is available the description, between the concepts instead of the
+ * badge. this way it reads more like a sentence, which i believe was the
+ * intention").
+ *
+ * The read-out used to put a sage badge between the two concepts — or, with no
+ * Link on the thread, a dashed pill reading the literal word "description" —
+ * and trail the thread's own words after the author's name. Three facts in a
+ * row, with the one that joins the concepts not standing between them.
+ */
+test("the cohort read-out says a thread between its two concepts", async ({ page }) => {
+  await page.goto("/admin/aggregate")
+  const cards = page.locator(".ywthread")
+  await expect(cards.first()).toBeVisible({ timeout: 30_000 })
+
+  /**
+   * Some threads are drawn and never spoken — no Link, no description — and
+   * those keep a dashed pill, since a gap would read as a rendering fault. So
+   * this walks until it finds one with something to say rather than assuming
+   * the first seeded thread has any.
+   */
+  let spoken: string | null = null
+  const head = page.locator(".threadhead")
+  const tries = Math.min(await cards.count(), 8)
+  for (let i = 0; i < tries; i += 1) {
+    await cards.nth(i).click()
+    await expect(head).toBeVisible({ timeout: 15_000 })
+    const shape = await head.evaluate((el) =>
+      Array.from(el.children).map((child) => child.className)
+    )
+    if (shape[1]?.includes("said")) {
+      // BETWEEN the two concepts, which is the whole change: a red name, what
+      // the student said, the other red name.
+      expect(shape[0]).toContain("red")
+      expect(shape[2]).toContain("red")
+      spoken = (await head.locator(".said").innerText()).trim()
+      break
+    }
+  }
+
+  expect(spoken, "no seeded thread carries a label or a description — run `npm run seed:demo`").not.toBeNull()
+  expect(spoken!.length).toBeGreaterThan(0)
+  // And it is the student's words, never the name of the field they are in.
+  expect(spoken).not.toBe("description")
+
+  // The badge that used to stand there is gone from every read-out.
+  await expect(page.locator(".threadhead .vpill", { hasText: /^description$/ })).toHaveCount(0)
+})

@@ -1035,6 +1035,11 @@ main.canvasfull{padding:0 0 34px;margin:0;height:100%;overflow:hidden;box-sizing
 .readitem .sent{font-size:14.5px;font-style:italic;color:var(--ink-soft);margin-top:3px}
 .threadhead{font-family:var(--display);font-size:19px;line-height:1.35;margin-bottom:2px}
 .threadhead .red{color:var(--red)}
+/* What the student SAID, standing between the two concepts it joins (TJ,
+   2026-08-24) — the Link Label, or the Thread Description where no Link was
+   coined. Smaller and italic against the two red nouns, so the row reads as
+   one sentence rather than as three chips in a line. */
+.threadhead .said{font-size:15px;font-style:italic;color:var(--ink-soft)}
 .threadhead .n{font-family:var(--mono);font-size:11px;color:var(--grey)}
 .report .cap{display:block;margin:13px 0 3px;color:var(--ink-soft)}
 .report .line{font-size:14.5px;padding:1px 0}

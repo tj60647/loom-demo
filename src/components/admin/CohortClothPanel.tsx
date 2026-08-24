@@ -428,6 +428,16 @@ export default function CohortClothPanel({
       const ends = [conceptById.get(edge.fromId), conceptById.get(edge.toId)].filter(
         (c): c is NonNullable<typeof c> => Boolean(c)
       )
+      /**
+       * What stands between the two concepts, and what is left to trail.
+       * `labelOf` before the legacy `handle`, the same resolution the cards
+       * use — a thread carrying a Link object and an empty handle used to
+       * read as unlabelled here.
+       */
+      const label = (labelOf(edge, state.links) ?? "").trim()
+      const description = (edge.sentence ?? "").trim()
+      const said = label || description
+      const trailing = label && description ? description : ""
       pane = (
         <div>
           {/* The read-out's HEADING, not a card: it names what is being read
@@ -436,14 +446,38 @@ export default function CohortClothPanel({
               resolved the card's way though — `labelOf` first, the legacy
               `handle` only as a fallback — because a thread carrying a Link
               object and an empty handle used to read as unlabelled here. */}
+          {/*
+            READ IT AS THE SENTENCE IT IS (TJ, 2026-08-24: "let put the label,
+            or if no label is available the description, between the concepts
+            instead of the badge. this way it reads more like a sentence,
+            which i believe was the intention").
+
+            It used to be a sage BADGE between the two concepts — or, with no
+            Link on the thread, a dashed pill reading the literal word
+            "description" — while the thread's own words trailed after the
+            author's name in quotes. Three facts in a row, and the one that
+            joins the two concepts was the one not standing between them.
+
+            So the middle is what the student SAID: the Link Label first, and
+            the Thread Description where no Link was ever coined. A thread
+            carrying both keeps its description trailing, because the label is
+            the short name for the claim and the description is the claim —
+            losing it to avoid a repetition would cost more than the
+            repetition.
+          */}
           <div className="threadhead">
-            <span className="red">{ends[0] ? conceptNameText(ends[0]) : "?"}</span>{" "}
-            {labelOf(edge, state.links)
-              ? <span className="vpill">{labelOf(edge, state.links)}</span>
-              : <span className="vpill loosev">description</span>}{" "}
+            <span className="red">{ends[0] ? conceptNameText(ends[0]) : "?"}</span>
+            {said ? (
+              <span className="said">{said}</span>
+            ) : (
+              /* Neither a Link nor a description: a thread drawn and never
+                 spoken. Still the dashed pill, because there is no sentence
+                 to put here and a gap would read as a rendering fault. */
+              <span className="vpill loosev">unlabeled</span>
+            )}
             <span className="red">{ends[1] ? conceptNameText(ends[1]) : "?"}</span>
             <span className="n">{who(edge.userId)}</span>
-            {edge.sentence ? <span className="footsaid">&ldquo;{edge.sentence}&rdquo;</span> : null}
+            {trailing ? <span className="footsaid">&ldquo;{trailing}&rdquo;</span> : null}
           </div>
 
           <details className="footmore">
