@@ -266,13 +266,32 @@ test("the cohort read-out says a thread between its two concepts", async ({ page
  */
 test("an undescribed thread reads as an arrow, and says what is missing", async ({ page }) => {
   await page.goto("/admin/aggregate")
+  await expect(page.locator(".ywthread").first()).toBeVisible({ timeout: 30_000 })
+
+  /**
+   * NARROWED TO THE FIXTURE, not walked from the top of a list of seventy.
+   *
+   * The first version clicked the first eight thread cards looking for a bare
+   * one. That passed here and failed on CI, and the difference was the
+   * database rather than the code: every bare thread on the dev machine
+   * belonged to a REAL person, and the seed had none at all. It has one now —
+   * Test User D's "object world talk → apprenticeship", thrown and never
+   * spoken — but there is no reason it should sort into the first eight of
+   * however many the cohort has drawn.
+   *
+   * "apprenticeship" is D's alone among the seeded vocabularies, so the panel
+   * filter cuts the list to that person's two threads: one described, one
+   * not. Which is which is exactly what the read-out is being asked.
+   */
+  await page.locator('input[placeholder="filter threads"]').fill("apprenticeship")
   const cards = page.locator(".ywthread")
-  await expect(cards.first()).toBeVisible({ timeout: 30_000 })
+  await expect(cards.first()).toBeVisible({ timeout: 15_000 })
+  const count = await cards.count()
+  expect(count, "the seed must give Test User D threads onto 'apprenticeship'").toBeGreaterThan(0)
 
   const head = page.locator(".threadhead")
   let found = false
-  const tries = Math.min(await cards.count(), 8)
-  for (let i = 0; i < tries; i += 1) {
+  for (let i = 0; i < count; i += 1) {
     await cards.nth(i).click()
     await expect(head).toBeVisible({ timeout: 15_000 })
     const parts = await head.evaluate((el) =>
