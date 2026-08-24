@@ -71,7 +71,24 @@ export default function ObjectDownload({
       openLoomViewer ?? undefined
     )
 
-  const what = noun ?? kind
+  /**
+   * An EMPTY noun is a deliberate choice, not a missing one: it drops the
+   * object's name from the label where the surrounding card already says it.
+   * The cloth's bar uses it: three buttons in a row all naming the same
+   * object, in a card that is already the cloth's.
+   * `?? kind` alone could not express it, since "" is not nullish.
+   */
+  const what = noun === "" ? "" : noun ?? kind
+  const label = (ext: string) => (what ? `download ${what} .${ext}` : `download .${ext}`)
+  /**
+   * THE TOAST STILL HAS TO NAME SOMETHING. `what` is deliberately empty where
+   * the card around the button already says which object it is, and that is
+   * right for the label — but the flash appears away from the card, and an
+   * empty name left it reading "·  downloaded ·" with a hole in the middle.
+   * It falls back to the kind, which is the object's name in every case but
+   * the hyphenated ones.
+   */
+  const said = what || kind
 
   return (
     <span className="objdl" id={id} data-tip={tip}>
@@ -84,10 +101,10 @@ export default function ObjectDownload({
             objectExportFilename(studentName, kind, slug, "json", undefined, !!openLoomViewer),
             "application/json"
           )
-          flash(`· ${what} downloaded ·`)
+          flash(`· ${said} downloaded ·`)
           onTaken?.()
         }}
-      >download {what} .json</button>
+      >{label("json")}</button>
       <button
         className="btn ghost mini"
         onClick={() => {
@@ -97,10 +114,10 @@ export default function ObjectDownload({
             objectExportFilename(studentName, kind, slug, "md", undefined, !!openLoomViewer),
             "text/markdown"
           )
-          flash(`· ${what} downloaded ·`)
+          flash(`· ${said} downloaded ·`)
           onTaken?.()
         }}
-      >download {what} .md</button>
+      >{label("md")}</button>
     </span>
   )
 }

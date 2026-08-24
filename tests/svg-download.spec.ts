@@ -30,7 +30,9 @@ test.describe("Download the drawing", () => {
     await expect(page.locator("#cardTable")).toBeVisible({ timeout: 30_000 })
 
     const take = async (label: string) => {
-      // Anchored: "download svg" must not also match "download the cloth .svg".
+      // Anchored, and it earns its keep: the two labels are now "download svg"
+      // and "download .svg", so an unanchored hasText match on the board's
+      // would find the cloth's as well.
       const button = page.locator("button:visible", {
         hasText: new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
       })
@@ -46,14 +48,14 @@ test.describe("Download the drawing", () => {
     }
 
     /**
-     * The two read differently on purpose. The cloth's button stands beside
-     * the Capture Log's "download the log .json/.md", so it has to name which
-     * object it hands over; the board's sits in the heading row of a card
-     * already titled "The board" and is the only download in it (TJ,
-     * 2026-08-23), so naming it again would say it twice.
+     * Neither label names its object, and for the reason TJ gave for the
+     * board's: where the button sits already says it (2026-08-23, "'download
+     * svg' as it is already in the board area"). The cloth's three stand in
+     * the cloth's own bar and the log's never appear beside them, because the
+     * downloads follow the view.
      */
     for (const [label, kind] of [
-      ["download the cloth .svg", "cloth"],
+      ["download .svg", "cloth"],
       ["download svg", "board"],
     ] as const) {
       const file = await take(label)

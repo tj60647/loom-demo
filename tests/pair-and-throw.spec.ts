@@ -51,12 +51,31 @@ async function openTheCloth(page: Page) {
 async function pressNode(page: Page, i: number, opts: { shift?: boolean } = {}) {
   const node = nodesOf(page).nth(i)
   await expect(node).toBeVisible({ timeout: 15_000 })
-  await node.scrollIntoViewIfNeeded()
-  const box = (await node.boundingBox())!
-  const onScreen = await page.evaluate(
-    ([x, y]) => !!document.elementFromPoint(x, y)?.closest("#map"),
-    [box.x + box.width / 2, box.y + box.height / 2]
-  )
+  /**
+   * CENTRED, not merely "into view".
+   *
+   * `scrollIntoViewIfNeeded` does nothing for a node that is already inside
+   * the viewport — including one resting in its last 28px, under the identity
+   * footer. The band is `pointer-events:none` but `.footid` hands them back
+   * (globals.css), so the bottom-left of the cloth sits under a live Sign out
+   * button: measured at 1280x720, node 0 at y=712 with `.footid` spanning
+   * 692-720, and `elementFromPoint` there returns BUTTON "Sign out". The
+   * click would have signed the tester out rather than picking a concept.
+   *
+   * This is a resting-position problem, not a layout one — `main` reserves
+   * 86px below its content for exactly this chrome, so there is always
+   * somewhere to centre to. What put node 0 in the band on 2026-08-24 was the
+   * cloth moving down 37px when 03's download buttons wrapped the mapbar from
+   * 26px to 63px; measured by hiding them again, which returns node 0 to
+   * y=675 and the pixel to the map.
+   */
+  await node.evaluate((el) => el.scrollIntoView({ block: "center", inline: "center" }))
+  // ONE evaluate: measuring the box in Playwright and hit-testing in the page
+  // are two round trips, and a reflow between them tests a stale pixel.
+  const onScreen = await node.evaluate((el) => {
+    const b = el.getBoundingClientRect()
+    return !!document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)?.closest("#map")
+  })
   expect(onScreen, "the concept being pressed must be on screen, not under the chrome").toBe(true)
   await node.click(opts.shift ? { modifiers: ["Shift"] } : undefined)
 }

@@ -937,9 +937,21 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
                 offers — the same builders as the cloth's card on 00
                 (ClothFold.tsx:184-190), so one object does not come out two
                 different ways depending on where it was taken from. */}
+            {/* SHORT LABELS, for the reason TJ gave for the board's: the noun
+                is already said by where the button is. These three stand in
+                the cloth's own bar, and since the downloads follow the view
+                the log's never appear beside them — so "the cloth" in all
+                three was the object named three times in a row with nothing
+                to distinguish it from.
+
+                (It is NOT a fix for this bar wrapping to two rows at 1280.
+                I thought it was and measured: the bar is 63px and two rows
+                with the short labels too — the hint sentence alone fills the
+                first row. Shorter buttons are worth having anyway; they just
+                do not buy a line.) */}
             <ObjectDownload
               kind="cloth"
-              noun="the cloth"
+              noun=""
               slug={activeCloth?.title || scopeLabel || "cloth"}
               tip="this cloth, whole — its passages, concepts, threads and projections"
               json={(p) => JSON.stringify(buildClothExport(wholeLoom, scope.key, p, titleOf), null, 2)}
@@ -954,7 +966,7 @@ export default function ClothReflection({ onProjectionCreated, showLog = false, 
               target="map"
               studentName={studentName}
               kind="cloth"
-              noun="the cloth"
+              label="download .svg"
               tip="the cloth as it stands, as a vector file"
               drop={[".clothglow"]}
             />

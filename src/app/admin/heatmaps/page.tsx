@@ -1,4 +1,4 @@
-import { getStaffViewer } from "@/actions/admin"
+import { getAggregateLoomData, getStaffViewer } from "@/actions/admin"
 import HeatmapReader from "@/components/admin/HeatmapReader"
 import { db } from "@/db"
 import { courseSources, sources } from "@/db/schema"
@@ -58,7 +58,8 @@ export default async function HeatmapsPage({
 
   // Resolved but not displayed: the section is what the Overlay picker inside
   // the viewer compares against, and the strip above is where it is chosen.
-  await resolveSectionId(courseId, firstParam(resolved.section))
+  const sectionId = await resolveSectionId(courseId, firstParam(resolved.section))
+  const studentId = firstParam(resolved.student) ?? null
 
   // Syllabus order, the same ordering the strip's picker uses, so "the first
   // reading" means the same thing in both places.
@@ -81,6 +82,28 @@ export default async function HeatmapsPage({
   // picker omits its "All readings" here for the same reason.
   const reading = readings.find((r) => r.id === wanted) ?? readings[0] ?? null
 
+  /**
+   * ONE STUDENT'S PASSAGES, AND ONLY WHEN ONE IS CHOSEN (TJ, 2026-08-23:
+   * "make it available only when 1 student is selected").
+   *
+   * That single condition is what makes cards possible here at all. Asked of
+   * the whole cohort, one reading is ~900 passages at the scale this is built
+   * for — a wall rather than a margin. Asked of one person it is a few dozen,
+   * which is what a margin is for.
+   *
+   * It also makes the tab coherent: with a student chosen the overlay is
+   * already showing THEIR marks, so the heat says where they read and the
+   * cards say what they made of it — two halves of one answer rather than two
+   * unrelated layers.
+   *
+   * The same query the Cohort Graph runs (ruling 18, faculty read-side), so
+   * this discloses nothing that /admin/aggregate did not already show.
+   */
+  const scope =
+    studentId && reading
+      ? await getAggregateLoomData(courseId, sectionId, reading.id, studentId)
+      : null
+
   return (
     <main className="canvasfull heatpage">
       {/* A real <h1> for the document, costing the reader no room — the same
@@ -93,7 +116,9 @@ export default async function HeatmapsPage({
           <HeatmapReader
             sourceId={reading.id}
             title={reading.title}
-            studentId={firstParam(resolved.student) ?? null}
+            studentId={studentId}
+            scopePassages={scope?.passages ?? []}
+            scopeConcepts={scope?.concepts ?? []}
           />
         ) : (
           <div className="card empty" style={{ margin: "20px" }}>

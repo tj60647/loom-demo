@@ -60,6 +60,7 @@ import {
   emptyVocabularyOverlay,
   groupTerms,
   heatSpans,
+  mergeIntervals,
   type Interval,
   type OverlayBand,
   type OverlayBlock,
@@ -244,7 +245,13 @@ export async function getPassagesOverlay(
   )
 
   const counts = new Map<number, number>()
-  const anchored = new Map<number, Interval[]>()
+  /**
+   * Page → student → that student's own runs. The userId is kept all the way
+   * to the sweep now, because the number the page draws is a number of
+   * STUDENTS (TJ, 2026-08-23: "it is how many students highlighted a passage")
+   * and this map is the only place that still knows whose a run is.
+   */
+  const anchored = new Map<number, Map<string, Interval[]>>()
   let unanchored = 0
 
   rows.forEach((row) => {
@@ -267,15 +274,26 @@ export async function getPassagesOverlay(
       unanchored += 1
       return
     }
-    const list = anchored.get(page) ?? []
-    list.push({ start: row.startOffset, end: row.endOffset })
-    anchored.set(page, list)
+    const byStudent = anchored.get(page) ?? new Map<string, Interval[]>()
+    const mine = byStudent.get(row.userId) ?? []
+    mine.push({ start: row.startOffset, end: row.endOffset })
+    byStudent.set(row.userId, mine)
+    anchored.set(page, byStudent)
   })
 
   const pageNumbers = [...counts.keys()].sort((a, b) => a - b)
+  /**
+   * EACH STUDENT UNIONED WITH THEMSELVES BEFORE THE SWEEP, so the depth the
+   * sweep reports is a count of people rather than a count of captures. A
+   * student who highlighted the same sentence twice used to raise the run by
+   * two and darken it by two steps; now they raise it by one, which is what
+   * the legend has always claimed the number meant.
+   */
   const measured = pageNumbers.map((pageNumber) => ({
     pageNumber,
-    all: heatSpans(anchored.get(pageNumber) ?? []),
+    all: heatSpans(
+      [...(anchored.get(pageNumber)?.values() ?? [])].flatMap((runs) => mergeIntervals(runs))
+    ),
   }))
 
   const totalSpans = measured.reduce((sum, page) => sum + page.all.length, 0)

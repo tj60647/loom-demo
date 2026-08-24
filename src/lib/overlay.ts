@@ -52,10 +52,57 @@ export type HeatSpan = { start: number; end: number; count: number }
 export type Interval = { start: number; end: number }
 
 /**
+ * ONE PERSON'S OWN CAPTURES, UNIONED into disjoint runs.
+ *
+ * `heatSpans` below counts INTERVALS, not people — it never sees a userId. So
+ * the count means "how many students marked these words" only if each student
+ * arrives as at most one interval over any character, and nothing stops a
+ * student capturing overlapping text twice: `passage` carries no uniqueness
+ * constraint on offsets and the capture path has no overlap guard.
+ *
+ * It was happening. Measured on the dev database 2026-08-23: 11 runs drew a
+ * count higher than the number of people who marked them — The Mathematical
+ * Theory of Communication p4 drew 5 where 3 students marked, and four other
+ * readings drew 4 where 2 did. The legend prints that number with the word
+ * "students" beside it, so the page was making a false claim, two steps too
+ * dark, about how much a cohort agreed.
+ *
+ * TJ settled the semantics on 2026-08-23: "it is how many students
+ * highlighted a passage. so 1 is a valid bincount."
+ */
+export function mergeIntervals(intervals: Interval[]): Interval[] {
+  const clean = intervals
+    .map(({ start, end }) => ({
+      start: Math.max(0, Math.floor(Math.min(start, end))),
+      end: Math.max(0, Math.ceil(Math.max(start, end))),
+    }))
+    .filter(({ start, end }) => Number.isFinite(start) && Number.isFinite(end) && end > start)
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+
+  const merged: Interval[] = []
+  for (const run of clean) {
+    const last = merged[merged.length - 1]
+    // TOUCHING COUNTS AS ONE. Two captures that meet exactly at a boundary
+    // (`last.end === run.start`) are one continuous run of text for this
+    // person; left separate they open and close at the same offset, which the
+    // sweep reads as a depth of one either side and never double-counts — but
+    // it does emit a boundary, and a page of them is a payload that grows with
+    // one person's habits rather than with what the cohort marked.
+    if (last && run.start <= last.end) last.end = Math.max(last.end, run.end)
+    else merged.push({ ...run })
+  }
+  return merged
+}
+
+/**
  * Disjoint runs carrying their overlap depth, from arbitrarily overlapping
  * captures. A sweep line: every capture opens at its start and closes at its
- * end, and the depth between two consecutive boundaries is how many people
- * marked the characters in between.
+ * end, and the depth between two consecutive boundaries is how many INTERVALS
+ * cover the characters in between.
+ *
+ * Intervals, not people — this function never sees a userId. Callers that want
+ * a count of people must pass each person through `mergeIntervals` first; see
+ * `getPassagesOverlay`, which is the only caller that draws a scale from it.
  *
  * Offsets index characters, so a run is whole characters: a fractional or
  * reversed pair is repaired to the widest sensible run rather than dropped —

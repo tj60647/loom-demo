@@ -13,6 +13,7 @@
  */
 
 import dynamic from "next/dynamic"
+import type { Concept, Passage } from "@/lib/types"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer"), { ssr: false })
 
@@ -20,11 +21,21 @@ export default function HeatmapReader({
   sourceId,
   title,
   studentId,
+  scopePassages,
+  scopeConcepts,
 }: {
   sourceId: string
   title: string
   /** Chosen in the scope strip; null means the whole class, by band. */
   studentId: string | null
+  /**
+   * The chosen student's passages in this reading, and the concepts they
+   * evidence — empty unless exactly one student is chosen (TJ, 2026-08-23:
+   * "make it available only when 1 student is selected"). Fetched on the
+   * server so the viewer needs no route of its own; see the page.
+   */
+  scopePassages: Passage[]
+  scopeConcepts: Concept[]
 }) {
   return (
     <PdfViewer
@@ -58,6 +69,10 @@ export default function HeatmapReader({
       // question being asked.
       overlayPicker
       overlayStudentId={studentId}
+      // The cards the toggle shows, and the concepts they are filed under.
+      // Empty for "All students", which is what hides the toggle entirely.
+      scopePassages={scopePassages}
+      scopeConcepts={scopeConcepts}
       workOpen={false}
       onToggleWork={() => {}}
     />

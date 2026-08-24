@@ -13,7 +13,7 @@
  * who files the same label under four passages must not read as four people
  * agreeing with themselves.
  */
-import { groupTerms, heatSpans, overlayKey } from "../src/lib/overlay"
+import { groupTerms, heatSpans, mergeIntervals, overlayKey } from "../src/lib/overlay"
 import { heatBand, placeItems, projectHeatSpans, textLayerString } from "../src/lib/heatRects"
 
 let failures = 0
@@ -83,6 +83,90 @@ check(
     { start: 20, end: 30, count: 1 },
   ]
 )
+/**
+ * THE COUNTING UNIT, on the passages side.
+ *
+ * The header above says the unit of an overlay count is PEOPLE, not rows, and
+ * the vocabulary overlay has always honoured it — `groupTerms` counts distinct
+ * people. The passages overlay did not: it dropped the userId before the sweep
+ * and drew the number of overlapping CAPTURES. Measured on the dev database
+ * 2026-08-23, 11 runs drew more than the number of people who marked them, the
+ * worst drawing 5 for 3 students.
+ *
+ * These assert the fix at the level it was made: one student's own captures
+ * are unioned before the sweep sees them, so depth is people.
+ */
+console.log("\nmergeIntervals — one student's own captures, unioned")
+check("nothing is nothing", mergeIntervals([]), [])
+check(
+  "two overlapping captures by one student are one run",
+  mergeIntervals([
+    { start: 10, end: 30 },
+    { start: 20, end: 40 },
+  ]),
+  [{ start: 10, end: 40 }]
+)
+check(
+  "captures that merely touch are one run",
+  mergeIntervals([
+    { start: 10, end: 20 },
+    { start: 20, end: 30 },
+  ]),
+  [{ start: 10, end: 30 }]
+)
+check(
+  "a capture wholly inside another disappears into it",
+  mergeIntervals([
+    { start: 10, end: 40 },
+    { start: 15, end: 20 },
+  ]),
+  [{ start: 10, end: 40 }]
+)
+check(
+  "captures with a gap between them stay two runs",
+  mergeIntervals([
+    { start: 10, end: 20 },
+    { start: 25, end: 30 },
+  ]),
+  [
+    { start: 10, end: 20 },
+    { start: 25, end: 30 },
+  ]
+)
+check("it is order-independent", mergeIntervals([
+  { start: 25, end: 30 },
+  { start: 10, end: 20 },
+  { start: 15, end: 26 },
+]), [{ start: 10, end: 30 }])
+check("the same repairs heatSpans makes", mergeIntervals([{ start: 20.6, end: 10.2 }]), [
+  { start: 10, end: 21 },
+])
+check("an empty capture contributes nothing", mergeIntervals([{ start: 7, end: 7 }]), [])
+
+/**
+ * AND THE TWO TOGETHER, which is the claim the page actually makes. Three
+ * students on one sentence, one of whom marked it twice: the run is three
+ * deep, not four.
+ */
+const twiceMarked = [
+  [{ start: 10, end: 40 }, { start: 20, end: 50 }], // one student, two captures
+  [{ start: 15, end: 45 }],
+  [{ start: 15, end: 45 }],
+]
+check(
+  "a student who marked the same words twice counts once",
+  heatSpans(twiceMarked.flatMap((runs) => mergeIntervals(runs))).reduce(
+    (top, span) => Math.max(top, span.count),
+    0
+  ),
+  3
+)
+check(
+  "and without the union it was four — the bug, kept as a witness",
+  heatSpans(twiceMarked.flat()).reduce((top, span) => Math.max(top, span.count), 0),
+  4
+)
+
 check("an empty span contributes nothing", heatSpans([{ start: 7, end: 7 }]), [])
 check(
   "a reversed pair is read as the run it spans, not dropped",
@@ -302,6 +386,32 @@ check(
     { start: 6, end: 11, count: 3 },
   ]).map((r) => r.count),
   [1, 3]
+)
+
+/**
+ * NOTHING LEAVES THE PAGE. On the canvas a rect that runs past its page runs
+ * across the gutter and over its neighbours — TJ, 2026-08-23, of a hairline
+ * crossing three pages: "it should not bridge pages, correct?"
+ *
+ * The projection can produce one honestly: `item.width` is whatever the PDF's
+ * text layer claims, and on a scan it is sometimes an advance that overruns
+ * the page box. Here the item claims to be twice the page wide.
+ */
+const OVERRUN = [{ str: "wide", transform: [1, 0, 0, 10, 10, 80], width: 200, height: 10 }]
+const bled = projectHeatSpans(OVERRUN, PLAIN, [{ start: 0, end: 4, count: 1 }])[0]
+check("a rect never starts past the page", bled.x >= 0 && bled.x <= 1, true)
+check("a rect never ends past the page", +(bled.x + bled.w).toFixed(4) <= 1, true)
+
+/** …and merging must not put back the overrun the clamp just took out. */
+const MERGED = [
+  { str: "ab", transform: [1, 0, 0, 10, 10, 80], width: 20, height: 10 },
+  { str: "cd", transform: [1, 0, 0, 10, 30, 80], width: 400, height: 10 },
+]
+const joined = projectHeatSpans(MERGED, PLAIN, [{ start: 0, end: 4, count: 1 }])
+check(
+  "merging stops at the page edge too",
+  joined.every((r) => +(r.x + r.w).toFixed(4) <= 1),
+  true
 )
 
 check(

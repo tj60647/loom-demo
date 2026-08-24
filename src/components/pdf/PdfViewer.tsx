@@ -31,6 +31,10 @@ import {
 } from '@/lib/heatRects';
 import Mark from 'mark.js';
 
+/** Stable empties: a fresh [] in a default would re-run every memo that reads it. */
+const EMPTY_PASSAGES: Passage[] = [];
+const EMPTY_CONCEPTS: Concept[] = [];
+
 // Served from our own origin, copied out of react-pdf's pdfjs-dist by
 // scripts/copy-pdf-worker.mjs at prebuild/predev. This was `//unpkg.com/...`,
 // which put a third party on the critical path of every reading: with unpkg
@@ -117,6 +121,20 @@ interface PdfViewerProps {
    */
   overlayPicker?: boolean;
   /**
+   * ONE OTHER PERSON'S PASSAGES, to draw as margin cards behind a toggle.
+   *
+   * Only ever one student's (TJ, 2026-08-23: "make it available only when 1
+   * student is selected"). Asked of a whole cohort this would be ~900 cards on
+   * one reading at the scale Heatmaps is built for — a wall, not a margin.
+   * Empty means the toggle does not exist at all, which is how "All students"
+   * turns the feature off without a second flag.
+   *
+   * These are NOT the viewer's own work, so nothing here may write: the card's
+   * edit affordances are withheld at the call site.
+   */
+  scopePassages?: Passage[];
+  scopeConcepts?: Concept[];
+  /**
    * A student chosen OUTSIDE the viewer — the Heatmaps tab's own picker in
    * the scope strip (TJ, 2026-08-22). When set, the overlay reads that one
    * person's marks instead of a band, and the in-toolbar Overlay picker steps
@@ -201,7 +219,8 @@ type HighlightEntry = {
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
   onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel, noOwnWork = false, overlayStudentId = null,
-  defaultOverlayBand, defaultViewMode, overlayPicker = false }: PdfViewerProps) {
+  defaultOverlayBand, defaultViewMode, overlayPicker = false,
+  scopePassages = EMPTY_PASSAGES, scopeConcepts = EMPTY_CONCEPTS }: PdfViewerProps) {
   // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the
   // student's highlights, rail cards, search and page-turning all stay — they
   // are the mode — while the capture affordance never appears and the rail
@@ -300,6 +319,49 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    */
   const ownWorkOn = !noOwnWork;
   const railsOn = ownWorkOn;
+  /**
+   * ONE STUDENT'S CARDS, behind a control (TJ, 2026-08-23: "heatmaps should
+   * have a show cards/hide cards toggle for the heatmap view", then "make it
+   * available only when 1 student is selected").
+   *
+   * THIS DOES NOT REOPEN THE RULING ABOVE. That one is about the VIEWER's own
+   * marks, which on this tab are the one set on screen that none of the
+   * numbers describe. These are the chosen student's, and once a student is
+   * chosen they are precisely what the numbers describe: the heat says where
+   * they read, the cards say what they made of it. One question, two halves.
+   *
+   * The server sends passages only when exactly one student is chosen, so an
+   * empty list is how "All students" turns this off — no second flag, and no
+   * way for the control to appear over a cohort's worth of cards.
+   *
+   * OFF UNTIL ASKED FOR, like the overlay picker beside it: the tab opens on
+   * the question of where the cohort has been, and a full margin answers a
+   * different one.
+   */
+  const scopeCardsAvailable = scopePassages.length > 0;
+  /**
+   * WHICH STUDENT THE CARDS WERE ASKED FOR, rather than a bare on/off.
+   *
+   * The picker changes `overlayStudentId` without remounting this component,
+   * so a plain boolean survived the change and the next student's cards were
+   * already on screen — measured 2026-08-24: show cards for one student, pick
+   * another from the strip, and five of THEIR cards appear under a button
+   * reading "hide cards" that nobody pressed. "Off until asked for" has to
+   * mean asked for about the person you are looking at.
+   *
+   * Holding the id instead of a flag makes that a DERIVED fact rather than
+   * something to remember to reset: the moment the chosen student differs
+   * from the one the cards were asked for, they are not shown. No effect, no
+   * synchronised setState, and no third state to keep in step.
+   *
+   * It also means coming BACK to that student restores their cards, which is
+   * deliberate: the request was about them, and honouring it where it was made
+   * is not the same as showing somebody else's work unasked. That is the
+   * distinction a bare boolean could not draw.
+   */
+  const [cardsAskedFor, setCardsAskedFor] = useState<string | null>(null);
+  const showingScopeCards =
+    scopeCardsAvailable && cardsAskedFor !== null && cardsAskedFor === overlayStudentId;
   // Covers the whole window, chrome included — the reading takes the screen.
   const [isFullscreen, setIsFullscreen] = useState(false);
   /**
@@ -1796,7 +1858,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * they would eat the page. Where there is nowhere to put a card, the modal
    * is still the capture — see the draft state's own note on why it stayed.
    */
-  const railAvailable = railsOn && !isNarrow && (viewMode === "page" || viewMode === "matrix");
+  const railAvailable = (railsOn || showingScopeCards) && !isNarrow && (viewMode === "page" || viewMode === "matrix");
 
   const handleCaptureClick = () => {
     if (!highlightRect) return;
@@ -2061,11 +2123,29 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     [ownWorkOn, scoped.passages]
   );
 
+  /**
+   * WHAT THE MARGIN DRAWS. One or the other, never both: the viewer's own
+   * work on the reading station, the chosen student's on Heatmaps, where
+   * `ownPassages` is empty by the ruling above. Two sets of cards in one
+   * margin would be two people's claims in one column with nothing on the
+   * card to say whose.
+   */
+  const cardPassages = showingScopeCards ? scopePassages : ownPassages;
+  const cardConcepts = showingScopeCards ? scopeConcepts : state.concepts;
+  /**
+   * Every write withheld while someone else's cards are on screen — the note,
+   * the filing, the removal, and the two navigations, which would send the
+   * viewer to a passage id their own tabs do not hold. `readOnly` cannot be
+   * relied on here: it is Open Loom's flag and is false for a faculty member
+   * reading their own Heatmaps tab (app/layout.tsx passes `!!viewing`).
+   */
+  const cardsWritable = !readOnly && !showingScopeCards;
+
   // The margin cards take real width beside the pages; fit-to-width hands it
   // to them here so the spread still fits without a sideways scroll. Fit-page
   // is left alone — height is unaffected, and "safe center" already lets an
   // overflowing spread scroll rather than clipping its start edge.
-  const railSpace = railsOn && !isNarrow && viewMode === "page"
+  const railSpace = (railsOn || showingScopeCards) && !isNarrow && viewMode === "page"
     ? (isTwoPage ? 2 : 1) * (RAIL_W + 12)
     : 0;
 
@@ -2145,31 +2225,31 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            handlers: it is a comparison, and clicking it should do exactly what
            clicking the paper does. */
         .loom-overlay-heat {
-          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.12);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-1));
           /* A rule ABOVE the words as well as a wash behind them. Your own
              highlight nests inside this mark and paints its yellow over the
              wash — and "did anyone else mark the words I marked?" is the most
              interesting thing this view can answer, so the section's mark has
              to survive underneath your own. Yellow underlines; slate
              overlines; neither hides the other. */
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.40);
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-1));
           color: inherit;
         }
         .loom-overlay-heat[data-heat="2"] {
-          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.20);
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.55);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-2));
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-2));
         }
         .loom-overlay-heat[data-heat="3"] {
-          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.28);
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.70);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-3));
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-3));
         }
         .loom-overlay-heat[data-heat="4"] {
-          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.36);
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.82);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-4));
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-4));
         }
         .loom-overlay-heat[data-heat="5"] {
-          background-color: rgba(var(--heat-rgb, 64, 84, 112), 0.44);
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.95);
+          background-color: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-5));
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-5));
         }
         .pdf-overlay-ctl {
           display: flex;
@@ -2239,24 +2319,25 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         .pdf-overlay-scale { display: flex; align-items: center; gap: 4px; }
 
         /* The same steps the page uses, rule included, addressed by the
-           data-heat attribute rather than by position.
+           data-heat attribute rather than by position — and reading the same
+           --heat-N tokens the page reads, so the legend cannot describe a
+           scale the page is not drawing.
            THE POSITIONAL SELECTORS WERE WRONG: the "1" label is child 1, so
            i:nth-child(2) styled the FIRST swatch and the fifth matched no rule
            at all and fell through to the base fill — the scale ended lighter
-           than it began. Read off the old rules rather than measured: base
-           0.12 with overrides on nth-child(2) through (5), which over a label
-           plus five swatches gives 0.20, 0.28, 0.36, 0.44, 0.12. */
+           than it began, which is the failure the shared tokens now make
+           impossible to reintroduce by editing one copy of three. */
         .pdf-overlay-scale i {
           display: inline-block;
           width: 15px;
           height: 12px;
-          background: rgba(var(--heat-rgb, 64, 84, 112), 0.12);
-          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.40);
+          background: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-1));
+          box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-1));
         }
-        .pdf-overlay-scale i[data-heat="2"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.20); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.55); }
-        .pdf-overlay-scale i[data-heat="3"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.28); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.70); }
-        .pdf-overlay-scale i[data-heat="4"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.36); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.82); }
-        .pdf-overlay-scale i[data-heat="5"] { background: rgba(var(--heat-rgb, 64, 84, 112), 0.44); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), 0.95); }
+        .pdf-overlay-scale i[data-heat="2"] { background: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-2)); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-2)); }
+        .pdf-overlay-scale i[data-heat="3"] { background: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-3)); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-3)); }
+        .pdf-overlay-scale i[data-heat="4"] { background: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-4)); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-4)); }
+        .pdf-overlay-scale i[data-heat="5"] { background: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-5)); box-shadow: inset 0 2px 0 rgba(var(--heat-rgb, 64, 84, 112), var(--heat-rule-5)); }
         /* Fill only, like the canvas draws. See the flat note at the markup.
            AFTER the per-step rules and carrying [data-heat] itself: the step
            rules are 0,2,1 and so is a plain .flat i, so an earlier or plainer
@@ -2833,12 +2914,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            and since the canvas now owns its own heat the two never appear on
            one page to disagree. */
         .pdf-kept-heat rect {
-          fill: rgba(var(--heat-rgb, 64, 84, 112), 0.12);
+          fill: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-1));
         }
-        .pdf-kept-heat rect[data-heat="2"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.20); }
-        .pdf-kept-heat rect[data-heat="3"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.28); }
-        .pdf-kept-heat rect[data-heat="4"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.36); }
-        .pdf-kept-heat rect[data-heat="5"] { fill: rgba(var(--heat-rgb, 64, 84, 112), 0.44); }
+        .pdf-kept-heat rect[data-heat="2"] { fill: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-2)); }
+        .pdf-kept-heat rect[data-heat="3"] { fill: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-3)); }
+        .pdf-kept-heat rect[data-heat="4"] { fill: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-4)); }
+        .pdf-kept-heat rect[data-heat="5"] { fill: rgba(var(--heat-rgb, 64, 84, 112), var(--heat-5)); }
         .pdf-rail-leaders path {
           stroke: rgba(255, 204, 0, 0.8);
           stroke-width: 1.5;
@@ -3323,6 +3404,27 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             </div>
           )}
 
+          {/* SHOW CARDS / HIDE CARDS — the chosen student's margin, on request
+              (TJ, 2026-08-23). It stands where the Overlay picker stands and
+              the two never appear together: the picker is for choosing a band
+              to compare against and is hidden once a student is chosen, which
+              is the same condition that gives this control anything to show.
+
+              The label says what the click DOES, not what the state is, so
+              the button reads as an instruction either way round. */}
+          {scopeCardsAvailable && !isNarrow && (
+            <button
+              className={`btn mini ${showingScopeCards ? "" : "ghost"}`}
+              onClick={() => setCardsAskedFor(showingScopeCards ? null : overlayStudentId)}
+              aria-pressed={showingScopeCards}
+              data-tip={
+                showingScopeCards
+                  ? "hide this student's passage cards"
+                  : "show this student's passage cards in the margin"
+              }
+            >{showingScopeCards ? "hide cards" : "show cards"}</button>
+          )}
+
           {/* Only where there is canonical page text to search — a viewer
               without a sourceId has no pages on record to ask. */}
           {sourceId && (
@@ -3448,7 +3550,17 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
              */
             <>
               <span>
-                <b>{overlay.contributors}</b> of {overlay.peers} marked ·{" "}
+                {/* "1 of 1 marked" is a tautology, and it was on screen the
+                    whole time a single student was chosen on Heatmaps: the
+                    band IS that one person, so the fraction can only ever read
+                    1 of 1. Below two peers the count of who marked says
+                    nothing the picker has not already said, and the passages
+                    are the fact worth the room. */}
+                {overlay.peers > 1 && (
+                  <>
+                    <b>{overlay.contributors}</b> of {overlay.peers} marked ·{" "}
+                  </>
+                )}
                 <b>{overlay.passages}</b> passage{overlay.passages !== 1 ? "s" : ""}
                 {viewMode === "page" && (
                   <>
@@ -3503,7 +3615,15 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 {(overlay.maxCount <= 1 ? [1] : [1, 2, 3, 4, 5]).map((step) => (
                   <i key={step} data-heat={step} aria-hidden="true" />
                 ))}
-                <span className="cap">{overlay.maxCount} people</span>
+                {/* STUDENTS, and singular when there is one. "1 people" was
+                    on screen for every single-student view. The word is
+                    `students` rather than `people` because that is exactly who
+                    is counted: peers are matched positively on role LEARNER
+                    (actions/overlays.ts), so faculty and instructors are not
+                    in this number and never were. */}
+                <span className="cap">
+                  {overlay.maxCount} student{overlay.maxCount === 1 ? "" : "s"}
+                </span>
               </span>
               {overlay.unanchored > 0 && (
                 <span className="cap">{overlay.unanchored} not placed</span>
@@ -3622,22 +3742,23 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               </button>}
 
               <ConceptRails
-                enabled={railsOn && !isNarrow}
+                enabled={(railsOn || showingScopeCards) && !isNarrow}
                 twoPage={isTwoPage && pageNumber + 1 <= (numPages || 1)}
-                passages={ownPassages}
-                concepts={state.concepts}
-                onOpenPassage={gotoOpenPassage}
-                onOpenConcept={gotoOpenConcept}
+                passages={cardPassages}
+                concepts={cardConcepts}
+                onOpenPassage={cardsWritable ? gotoOpenPassage : undefined}
+                onOpenConcept={cardsWritable ? gotoOpenConcept : undefined}
                 /* Open Loom passes no write handler at all — the rail card
                    draws an affordance only when its handler exists, so this is
-                   the whole gate (TJ, 2026-08-21). */
-                onUnfile={readOnly ? undefined : unfilePassage}
-                onRemovePassage={readOnly ? undefined : removePassageWithConfirm}
-                onCreateConcept={readOnly ? undefined : addConcept}
-                onAddConcept={readOnly ? undefined : addPassageConcept}
-                onEditConcept={readOnly ? undefined : editConcept}
-                onEditNote={readOnly ? undefined : editPassageNote}
-                draft={railDraft}
+                   the whole gate (TJ, 2026-08-21). Heatmaps' scope cards take
+                   the same gate for the same reason: see `cardEdit`. */
+                onUnfile={cardsWritable ? unfilePassage : undefined}
+                onRemovePassage={cardsWritable ? removePassageWithConfirm : undefined}
+                onCreateConcept={cardsWritable ? addConcept : undefined}
+                onAddConcept={cardsWritable ? addPassageConcept : undefined}
+                onEditConcept={cardsWritable ? editConcept : undefined}
+                onEditNote={cardsWritable ? editPassageNote : undefined}
+                draft={showingScopeCards ? null : railDraft}
               >
                 <div style={{ display: "flex", gap: "20px", justifyContent: "center", boxShadow: "0 0 20px rgba(0,0,0,0.05)" }}>
                   {/* The same slot the matrix reads through, at native tier:
@@ -3737,19 +3858,19 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               aspect={aspect}
               stage={stage}
               stageEl={stageEl}
-              cardsOn={railsOn && !isNarrow}
-              passages={ownPassages}
-              concepts={state.concepts}
-              onOpenPassage={gotoOpenPassage}
-              onOpenConcept={gotoOpenConcept}
+              cardsOn={(railsOn || showingScopeCards) && !isNarrow}
+              passages={cardPassages}
+              concepts={cardConcepts}
+              onOpenPassage={cardsWritable ? gotoOpenPassage : undefined}
+              onOpenConcept={cardsWritable ? gotoOpenConcept : undefined}
               /* Same gate as the page-mode rail above (TJ, 2026-08-21). */
-              onUnfile={readOnly ? undefined : unfilePassage}
-              onRemovePassage={readOnly ? undefined : removePassageWithConfirm}
-              onCreateConcept={readOnly ? undefined : addConcept}
-              onAddConcept={readOnly ? undefined : addPassageConcept}
-              onEditConcept={readOnly ? undefined : editConcept}
-              onEditNote={readOnly ? undefined : editPassageNote}
-              draft={railDraft}
+              onUnfile={cardsWritable ? unfilePassage : undefined}
+              onRemovePassage={cardsWritable ? removePassageWithConfirm : undefined}
+              onCreateConcept={cardsWritable ? addConcept : undefined}
+              onAddConcept={cardsWritable ? addPassageConcept : undefined}
+              onEditConcept={cardsWritable ? editConcept : undefined}
+              onEditNote={cardsWritable ? editPassageNote : undefined}
+              draft={showingScopeCards ? null : railDraft}
               onAspect={acceptAspect}
               manifest={manifest}
               pageImageBase={pageImageBase}
