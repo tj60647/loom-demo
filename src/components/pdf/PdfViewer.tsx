@@ -2298,13 +2298,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         .pdf-overlay-scale { display: flex; align-items: center; gap: 4px; }
 
         /* The same steps the page uses, rule included, addressed by the
-           data-heat attribute rather than by position.
+           data-heat attribute rather than by position — and reading the same
+           --heat-N tokens the page reads, so the legend cannot describe a
+           scale the page is not drawing.
            THE POSITIONAL SELECTORS WERE WRONG: the "1" label is child 1, so
            i:nth-child(2) styled the FIRST swatch and the fifth matched no rule
            at all and fell through to the base fill — the scale ended lighter
-           than it began. Read off the old rules rather than measured: base
-           0.12 with overrides on nth-child(2) through (5), which over a label
-           plus five swatches gives 0.20, 0.28, 0.36, 0.44, 0.12. */
+           than it began, which is the failure the shared tokens now make
+           impossible to reintroduce by editing one copy of three. */
         .pdf-overlay-scale i {
           display: inline-block;
           width: 15px;
@@ -3528,7 +3529,17 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
              */
             <>
               <span>
-                <b>{overlay.contributors}</b> of {overlay.peers} marked ·{" "}
+                {/* "1 of 1 marked" is a tautology, and it was on screen the
+                    whole time a single student was chosen on Heatmaps: the
+                    band IS that one person, so the fraction can only ever read
+                    1 of 1. Below two peers the count of who marked says
+                    nothing the picker has not already said, and the passages
+                    are the fact worth the room. */}
+                {overlay.peers > 1 && (
+                  <>
+                    <b>{overlay.contributors}</b> of {overlay.peers} marked ·{" "}
+                  </>
+                )}
                 <b>{overlay.passages}</b> passage{overlay.passages !== 1 ? "s" : ""}
                 {viewMode === "page" && (
                   <>
@@ -3583,7 +3594,15 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 {(overlay.maxCount <= 1 ? [1] : [1, 2, 3, 4, 5]).map((step) => (
                   <i key={step} data-heat={step} aria-hidden="true" />
                 ))}
-                <span className="cap">{overlay.maxCount} people</span>
+                {/* STUDENTS, and singular when there is one. "1 people" was
+                    on screen for every single-student view. The word is
+                    `students` rather than `people` because that is exactly who
+                    is counted: peers are matched positively on role LEARNER
+                    (actions/overlays.ts), so faculty and instructors are not
+                    in this number and never were. */}
+                <span className="cap">
+                  {overlay.maxCount} student{overlay.maxCount === 1 ? "" : "s"}
+                </span>
               </span>
               {overlay.unanchored > 0 && (
                 <span className="cap">{overlay.unanchored} not placed</span>

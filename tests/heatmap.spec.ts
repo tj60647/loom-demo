@@ -560,3 +560,38 @@ test("the cards it shows are the student's, and nothing on them writes", async (
   await cardsToggle(page).click()
   await expect(page.locator(".pdf-railcard")).toHaveCount(0)
 })
+
+/**
+ * WHAT THE LEGEND CLAIMS, in the case that exposed it.
+ *
+ * With one student chosen the bar read "1 of 1 marked · 4 passages" and
+ * "1 people": a fraction that can only ever be 1 of 1, and a plural for one
+ * person. Both were on screen for every single-student view.
+ *
+ * "students" rather than "people" is not a synonym chosen for tone — peers are
+ * matched positively on role LEARNER (actions/overlays.ts), so faculty and
+ * instructors are not in the number and the word says so.
+ */
+test("the legend counts students, and says it in the singular", async ({ page }) => {
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
+  const bar = page.locator(".pdf-overlay-bar")
+
+  /**
+   * NO TRAILING WORD BOUNDARY. The bar is a flex row of separate spans, so
+   * innerText runs them together: the scale's "1" cap, the swatches and the
+   * top cap read as "...33 passages18 students4 not placed". A  after
+   * "students" would sit between "s" and "4" -- two word characters, so no
+   * boundary at all, and the assertion failed on text that was correct.
+   */
+  // The cohort: a fraction worth reading, and a plural that is true.
+  await expect(bar).toContainText(/\d+ of \d+ marked/)
+  await expect(bar).toContainText(/\d+ students/i)
+
+  await chooseAStudent(page)
+  await expect(bar).toContainText(/1 student/i)
+  // Not "1 students", and not the tautology.
+  await expect(bar).not.toContainText(/1 students/i)
+  await expect(bar).not.toContainText(/of 1 marked/i)
+  // The word it used to use for a count that was never people.
+  await expect(bar).not.toContainText(/people/i)
+})
