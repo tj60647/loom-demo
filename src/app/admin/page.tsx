@@ -72,12 +72,43 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
    * invitation named (src/lib/auth.ts, enrolInvitedCourses), so filtering the
    * Invited tab by role would filter on a value that does not exist.
    */
-  const roleParam = (firstParam(resolved.role) ?? "").toLowerCase()
-  const roleFilter = roleParam === "learner" || roleParam === "faculty" ? roleParam : null
+  const ROLE_CHIPS = [
+    { value: "learner", label: "learners" },
+    { value: "faculty", label: "faculty" },
+  ] as const
+  /**
+   * A SET, NOT A CHOICE (TJ, 2026-08-24: "we should be able to pick more than
+   * one of these"). The chips were already drawn as checkboxes — ▢ and ▣ —
+   * so the control promised a set and behaved as a radio group. This makes it
+   * mean what it looks like.
+   *
+   * Comma-separated in the URL, so a narrowed roster survives a reload and can
+   * be pasted to a colleague — the same reason the tabs above are links.
+   *
+   * THE TWO ROLES ARE NAMED, not derived from the rows, because those are the
+   * two `setMemberRole` will write (src/actions/admin.ts:106) and the two TJ
+   * asked for. A third does exist: `enrolInvitedCourses` gives an admin who
+   * joins by invitation INSTRUCTOR (src/lib/auth.ts:289). That is why
+   * "everyone" stays rather than being spelled "both chips ticked" — with
+   * both ticked an INSTRUCTOR is filtered OUT, and only "everyone" shows the
+   * whole enrolment. Unknown values in the URL are dropped rather than
+   * narrowing to nothing.
+   */
+  const roleFilter = new Set(
+    (firstParam(resolved.role) ?? "")
+      .toLowerCase()
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => ROLE_CHIPS.some((chip) => chip.value === part))
+  )
+  const roleHref = (roles: Set<string>) => {
+    const value = [...roles].sort().join(",")
+    return `${baseHref}&view=enrolled${value ? `&role=${value}` : ""}`
+  }
   const baseHref = `/admin?course=${encodeURIComponent(courseId)}${sectionId ? `&section=${encodeURIComponent(sectionId)}` : ""}`
   const invitedPeople = filterNoResponse ? noResponse : invitedAll
-  const enrolledPeople = roleFilter
-    ? enrolled.filter((row) => (row.role ?? "").toLowerCase() === roleFilter)
+  const enrolledPeople = roleFilter.size
+    ? enrolled.filter((row) => roleFilter.has((row.role ?? "").toLowerCase()))
     : enrolled
 
   // What the filters narrowed to, said once — the table renders it, the
@@ -86,7 +117,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const scope = [
     view,
     view === "invited" && filterNoResponse ? "no_response" : "",
-    view === "enrolled" && roleFilter ? roleFilter : "",
+    view === "enrolled" && roleFilter.size ? [...roleFilter].sort().join("_") : "",
     sectionName ?? "",
   ]
     .filter(Boolean)
@@ -156,22 +187,28 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               survives a reload and the back button, and the page stays one
               server component. */}
           <div className="rosterfilter">
-            {([
-              ["all", "everyone", null],
-              ["learner", "learners", "learner"],
-              ["faculty", "faculty", "faculty"],
-            ] as const).map(([key, label, value]) => (
-              <a
-                key={key}
-                className={roleFilter === value ? "on" : undefined}
-                href={`${baseHref}&view=enrolled${value ? `&role=${value}` : ""}`}
-              >
-                {roleFilter === value ? "▣" : "▢"} {label}{" "}
-                <span className="pill loose">
-                  {value ? enrolled.filter((row) => (row.role ?? "").toLowerCase() === value).length : enrolledCount}
-                </span>
-              </a>
-            ))}
+            {/* "Everyone" is the reset: it clears the set rather than being a
+                third value in it. Ticked exactly when nothing else is. */}
+            <a className={roleFilter.size === 0 ? "on" : undefined} href={roleHref(new Set())}>
+              {roleFilter.size === 0 ? "▣" : "▢"} everyone <span className="pill loose">{enrolledCount}</span>
+            </a>
+            {ROLE_CHIPS.map(({ value, label }) => {
+              const picked = roleFilter.has(value)
+              // Each chip's link carries the set it WOULD produce — ticking
+              // adds, unticking removes — so one click changes one thing and
+              // the URL always states the whole filter.
+              const next = new Set(roleFilter)
+              if (picked) next.delete(value)
+              else next.add(value)
+              return (
+                <a key={value} className={picked ? "on" : undefined} href={roleHref(next)}>
+                  {picked ? "▣" : "▢"} {label}{" "}
+                  <span className="pill loose">
+                    {enrolled.filter((row) => (row.role ?? "").toLowerCase() === value).length}
+                  </span>
+                </a>
+              )
+            })}
             <RosterDownload people={enrolledPeople} courseName={course?.name} scope={scope} />
           </div>
           {enrolledPeople.length > 0 ? (
@@ -179,8 +216,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           ) : (
             <div className="card empty">
               <span className="cap">
-                {roleFilter
-                  ? `Nobody enrolled${sectionName ? ` in ${sectionName}` : ""} holds the ${roleFilter} role`
+                {roleFilter.size
+                  ? `Nobody enrolled${sectionName ? ` in ${sectionName}` : ""} is ${[...roleFilter].sort().join(" or ")}`
                   : sectionName
                     ? `Nobody enrolled in ${sectionName} yet`
                     : "Nobody has signed in yet — see the Invited tab"}

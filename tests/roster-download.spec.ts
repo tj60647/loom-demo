@@ -122,3 +122,34 @@ test("on the Invited tab it exports the invitations, silent ones alone when aske
   expect(file.text.split(",").length).toBe(silent)
   expect(file.name).toMatch(/invited_no_response\.roster\.\d{10}\.txt$/)
 })
+
+/**
+ * MORE THAN ONE ROLE AT ONCE (TJ, 2026-08-24: "we should be able to pick more
+ * than one of these"). The chips were drawn as checkboxes and behaved as a
+ * radio group; what makes that a bug rather than a preference is that the
+ * glyph promised a set.
+ */
+test("the role chips are a set, and the download honours the set", async ({ page }) => {
+  await page.goto("/admin?view=enrolled")
+  await expect(chips(page).first()).toBeVisible({ timeout: 20_000 })
+  const learners = await claimedCount(await chips(page).nth(1).innerText())
+  const faculty = await claimedCount(await chips(page).nth(2).innerText())
+
+  await chips(page).nth(1).click()
+  await expect(page).toHaveURL(/role=learner/, { timeout: 15_000 })
+
+  // Ticking a SECOND chip adds to the set rather than replacing it — this is
+  // the whole change, and a radio group passes every other assertion here.
+  await chips(page).nth(2).click()
+  await expect(page).toHaveURL(/role=faculty,learner/, { timeout: 15_000 })
+  await expect(chips(page).nth(1)).toHaveClass(/on/)
+  await expect(chips(page).nth(2)).toHaveClass(/on/)
+
+  const both = await take(page, 0)
+  expect(both.text.split(",").length).toBe(learners + faculty)
+  expect(both.name).toMatch(/enrolled_faculty_learner\.roster\./)
+
+  // Unticking removes just that one.
+  await chips(page).nth(1).click()
+  await expect(page).toHaveURL(/role=faculty(?!,)/, { timeout: 15_000 })
+})
