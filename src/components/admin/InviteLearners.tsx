@@ -57,7 +57,12 @@ export default function InviteLearners({
             </select>
           </>
         ) : null}
-        <button className="btn mini nowrapbtn" type="submit" disabled={pending}>
+        <button
+          className="btn mini nowrapbtn"
+          type="submit"
+          disabled={pending}
+          data-tip="add these addresses to the roster — each may then sign in with the GitHub account that has confirmed it"
+        >
           {pending ? "Inviting…" : "Invite"}
         </button>
       </div>

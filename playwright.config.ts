@@ -44,6 +44,7 @@ const READ_ONLY = [
   'pdf-fit.spec.ts',         // fit modes
   'practice-guide.spec.ts',  // "Requires seed:demo. Writes nothing"
   'reading-search.spec.ts',  // "Search is read-only: nothing to clean up"
+  'roster-download.spec.ts', // reads the roster and downloads it; writes nothing
   'sandbox.spec.ts',         // the practice loom — nothing kept is its premise
   'workflows.spec.ts',       // renders three diagrams
 ];
