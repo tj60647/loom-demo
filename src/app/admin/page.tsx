@@ -156,25 +156,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     <main>
       {/* No h1: the Teaching nav's highlighted Roster tab already names the
           page (TJ, 2026-08-21). */}
-      <div className="rostertabs">
-        <a className={view === "enrolled" ? "on" : undefined} href={`${baseHref}&view=enrolled`}>
-          Enrolled <span className="pill loose">{enrolledCount}</span>
-        </a>
-        <a className={view === "invited" ? "on" : undefined} href={`${baseHref}&view=invited`}>
-          Invited <span className="pill loose">{invitedAll.length}</span>
-        </a>
-        {isAdmin && (
-          <a className={view === "invite" ? "on" : undefined} href={`${baseHref}&view=invite`}>
-            Invite learners
-          </a>
-        )}
-
-        <span className="rostertabsline">
-          {course?.name}
-          {sectionName ? ` · ${sectionName}` : " · all sections"}
-        </span>
-      </div>
-
+      {/* The tabs row is handed to RosterFind in two halves so the find box
+          can sit BETWEEN Invited and Invite learners (TJ, 2026-08-24): the
+          two reading tabs, then the way to a row, then the write surface. The
+          links stay server-rendered — only the box between them is client. */}
       <RosterFind
         all={courseRoster}
         initial={find}
@@ -182,6 +167,41 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         courseSections={courseSections}
         isAdmin={isAdmin}
         courseName={course?.name}
+        tabsBefore={
+          <>
+            <a
+              className={view === "enrolled" ? "on" : undefined}
+              href={`${baseHref}&view=enrolled`}
+              data-tip="everyone who has signed in and joined this course"
+            >
+              Enrolled <span className="pill loose">{enrolledCount}</span>
+            </a>
+            <a
+              className={view === "invited" ? "on" : undefined}
+              href={`${baseHref}&view=invited`}
+              data-tip="everyone who was asked — those still to answer, and those who have"
+            >
+              Invited <span className="pill loose">{invitedAll.length}</span>
+            </a>
+          </>
+        }
+        tabsAfter={
+          <>
+            {isAdmin && (
+              <a
+                className={view === "invite" ? "on" : undefined}
+                href={`${baseHref}&view=invite`}
+                data-tip="add addresses to this course's roster"
+              >
+                Invite learners
+              </a>
+            )}
+            <span className="rostertabsline">
+              {course?.name}
+              {sectionName ? ` · ${sectionName}` : " · all sections"}
+            </span>
+          </>
+        }
       >
       {      view === "invite" ? (
         <div className="card">

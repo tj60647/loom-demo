@@ -39,6 +39,8 @@ export default function RosterFind({
   courseSections,
   isAdmin,
   courseName,
+  tabsBefore,
+  tabsAfter,
   children,
 }: {
   /**
@@ -54,7 +56,14 @@ export default function RosterFind({
   courseSections: { id: string; name: string }[]
   isAdmin: boolean
   courseName: string | null | undefined
-  /** The tabs and their tables, server-rendered. Shown when nothing is typed. */
+  /**
+   * The tabs row, in two halves, so the box can sit between the reading tabs
+   * and the write one (TJ, 2026-08-24: "find goes between the 'invited' and
+   * 'invite'"). They arrive server-rendered and are passed straight through.
+   */
+  tabsBefore: React.ReactNode
+  tabsAfter: React.ReactNode
+  /** The tab bodies, server-rendered. Shown when nothing is typed. */
   children: React.ReactNode
 }) {
   const [query, setQuery] = useState(initial)
@@ -91,27 +100,33 @@ export default function RosterFind({
 
   return (
     <>
-      <div className="rosterfind">
-        <input
-          ref={inputRef}
-          className="tinput inline"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="find by email"
-          aria-label="Find someone by email address"
-        />
-        {query && (
-          <button
-            className="btn mini ghost"
-            onClick={() => {
-              setQuery("")
-              inputRef.current?.focus()
-            }}
-          >
-            clear
-          </button>
-        )}
+      <div className="rostertabs">
+        {tabsBefore}
+        <div className="rosterfind">
+          <input
+            ref={inputRef}
+            className="tinput inline"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="find by email"
+            aria-label="Find someone by email address"
+            data-tip="find anyone on this roster by address or name — every section, invited and enrolled"
+          />
+          {query && (
+            <button
+              className="btn mini ghost"
+              onClick={() => {
+                setQuery("")
+                inputRef.current?.focus()
+              }}
+              data-tip="clear the search and go back to the tab"
+            >
+              clear
+            </button>
+          )}
+        </div>
+        {tabsAfter}
       </div>
 
       {needle ? (
