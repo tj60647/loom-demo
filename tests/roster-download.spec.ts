@@ -155,34 +155,55 @@ test("the role chips are a set, and the download honours the set", async ({ page
 })
 
 /**
- * FIND SOMEBODY BY EMAIL (TJ, 2026-08-24). The question it answers is "is this
- * address on the roster, and in what state" — which is why it has to cross the
- * tabs. An address may be invited, enrolled, or invited and still silent, and
- * a find that only searched the open tab would answer "no" to a question about
- * the course.
+ * FIND SOMEBODY BY EMAIL, AS YOU TYPE (TJ, 2026-08-24: "can the find be done
+ * as the field is completed?").
+ *
+ * Two things are being asserted and only one of them is the filtering. The
+ * other is that TYPING COSTS NOTHING: the first version submitted a GET form,
+ * so every search was a database round trip and a navigation, and a navigation
+ * takes the focus out of the field. The count of document requests during
+ * typing is what proves that is gone — filtering rows the page already holds
+ * cannot regress into a query per keystroke without this number moving.
+ *
+ * It also crosses the tabs and the section picker, because the question is
+ * "is this address on the roster, and in what state" — a search that read only
+ * the open tab would answer "no" to a question about the course.
  */
-test("a find crosses the tabs and every section", async ({ page }) => {
-  // Standing on Enrolled, look for somebody who exists only as an invitation.
+test("a find filters as you type, without asking the server", async ({ page }) => {
   await page.goto("/admin?view=enrolled")
-  await expect(page.locator(".rosterfind input[name=find]")).toBeVisible({ timeout: 20_000 })
+  const box = page.locator(".rosterfind input[type=search]")
+  await expect(box).toBeVisible({ timeout: 20_000 })
 
-  await page.locator(".rosterfind input[name=find]").fill("test-invited")
-  await page.locator(".rosterfind button").click()
-  await expect(page).toHaveURL(/find=test-invited/, { timeout: 15_000 })
+  let documents = 0
+  page.on("request", (request) => {
+    if (request.resourceType() === "document") documents += 1
+  })
 
+  // Standing on Enrolled, look for somebody who exists only as an invitation.
+  await box.type("test-invited", { delay: 25 })
   const note = page.locator(".rosterfilter .cap")
   await expect(note, "the seed must carry the invited-never-signed-in address").toContainText(
-    /matching "test-invited"/
+    /matching "test-invited"/,
+    { timeout: 10_000 }
   )
-  // The scope is stated, because a "no" only means something with it attached.
   await expect(note).toContainText(/every section, invited and enrolled/)
   await expect(page.locator("body")).toContainText("test-invited@loom.local")
 
+  expect(documents, "typing must not fetch a page").toBe(0)
+  // The field keeps the focus, which a navigation would have taken.
+  await expect(box).toBeFocused()
+
+  // The address bar still carries the search, so it can be reloaded or pasted.
+  await expect(page).toHaveURL(/find=test-invited/)
+
   // A miss says so plainly, and says where to go next.
-  await page.goto("/admin?view=enrolled&find=glunk%40berkeley.edu")
-  await expect(page.locator(".rosterfilter .cap")).toContainText(
-    /nothing matching "glunk@berkeley.edu" anywhere in this course/,
-    { timeout: 20_000 }
-  )
+  await box.fill("glunk@berkeley.edu")
+  await expect(note).toContainText(/nothing matching "glunk@berkeley.edu" anywhere in this course/)
   await expect(page.locator(".card.empty")).toContainText(/Not on this roster/)
+
+  // Clearing hands the tab back.
+  await box.fill("")
+  await expect(chips(page)).toHaveCount(3)
+  await expect(page).not.toHaveURL(/find=/)
+  expect(documents, "clearing must not fetch a page either").toBe(0)
 })

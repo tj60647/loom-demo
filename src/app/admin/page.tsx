@@ -3,6 +3,7 @@ import { firstParam, getCourse, listSections, resolveSectionId } from "@/lib/cou
 import InviteLearners from "@/components/admin/InviteLearners"
 import RosterTable from "@/components/admin/RosterTable"
 import RosterDownload from "@/components/admin/RosterDownload"
+import RosterFind from "@/components/admin/RosterFind"
 
 type AdminPageSearchParams = {
   course?: string | string[]
@@ -45,13 +46,25 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
    * reason — you are asking about a person, not about a section.
    */
   const find = (firstParam(resolved.find) ?? "").trim().toLowerCase()
-  const [course, courseSections, roster] = await Promise.all([
+  const [course, courseSections, courseRoster] = await Promise.all([
     getCourse(courseId),
     listSections(courseId),
-    // Widened while finding, so a search reaches people the section picker
-    // would have hidden.
-    getRoster(courseId, find ? null : sectionId),
+    /**
+     * THE WHOLE COURSE, ALWAYS — every section, so the find in the browser has
+     * everything it could be asked for and never needs a request of its own.
+     * The section picker then narrows in memory, one line below.
+     *
+     * This is the same row filter `getRoster` would have applied: enrolled
+     * rows come from `getClassData`, which filters on
+     * `courseMemberships.sectionId` (src/actions/admin.ts:135), and pending
+     * invitations on the section the invitation named — one rule, and every
+     * row already carries `sectionId`.
+     */
+    getRoster(courseId, null),
   ])
+  const roster = sectionId
+    ? courseRoster.filter((row) => row.sectionId === sectionId)
+    : courseRoster
 
   const sectionName = sectionId
     ? courseSections.find((section) => section.id === sectionId)?.name ?? null
@@ -122,29 +135,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
   const baseHref = `/admin?course=${encodeURIComponent(courseId)}${sectionId ? `&section=${encodeURIComponent(sectionId)}` : ""}`
   const invitedPeople = filterNoResponse ? noResponse : invitedAll
-  /**
-   * Substring, not exact. A professor pasting an address wants it found; a
-   * professor typing "kzhang" wants it found too, and the difference between
-   * `kzhang4918@berkeley.edu` and `kzhang.4918@berkeley.edu` is exactly the
-   * kind of thing this is for — an exact match would report "not on the
-   * roster" for a near-miss, which is the wrong answer to the real question.
-   * Names match as well, since the roster shows them.
-   */
-  const found = find
-    ? roster.filter(
-        (row) =>
-          row.email.toLowerCase().includes(find) || (row.name ?? "").toLowerCase().includes(find)
-      )
-    : []
+
   const enrolledPeople = roleFilter.size
     ? enrolled.filter((row) => roleFilter.has((row.role ?? "").toLowerCase()))
     : enrolled
 
   // What the filters narrowed to, said once — the table renders it, the
   // download names it in the file, and neither can drift from the other.
-  const shown = find ? found : view === "invited" ? invitedPeople : enrolledPeople
+  const shown = view === "invited" ? invitedPeople : enrolledPeople
   const scope = [
-    find ? "found" : view,
+    view,
     view === "invited" && filterNoResponse ? "no_response" : "",
     view === "enrolled" && roleFilter.size ? [...roleFilter].sort().join("_") : "",
     sectionName ?? "",
@@ -168,58 +168,22 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             Invite learners
           </a>
         )}
-        {/* A plain GET form, so a find survives a reload and can be pasted to
-            a colleague, and the page stays one server component with no
-            client state to keep in step. */}
-        <form className="rosterfind" action="/admin" method="get">
-          <input type="hidden" name="course" value={courseId} />
-          {sectionId && <input type="hidden" name="section" value={sectionId} />}
-          <input type="hidden" name="view" value={view} />
-          <input
-            className="tinput inline"
-            type="search"
-            name="find"
-            defaultValue={find}
-            placeholder="find by email"
-            aria-label="Find someone by email address"
-          />
-          <button className="btn mini ghost" type="submit">find</button>
-        </form>
+
         <span className="rostertabsline">
           {course?.name}
           {sectionName ? ` · ${sectionName}` : " · all sections"}
         </span>
       </div>
 
-      {find ? (
-        <>
-          {/* What was searched and how wide, because the answer only means
-              something with its scope attached — a "no" here is a no for the
-              whole course, not for the tab that happened to be open. */}
-          <div className="rosterfilter">
-            <span className="cap" style={{ padding: "4px 0" }}>
-              {found.length === 0
-                ? `nothing matching "${find}" anywhere in this course`
-                : `${found.length} matching "${find}" — every section, invited and enrolled`}
-            </span>
-            <span style={{ marginLeft: "auto", display: "flex", gap: "6px", alignItems: "center" }}>
-              {/* The same rule as everywhere else on this page: the download
-                  hands over the rows on screen, which here are the matches. */}
-              <RosterDownload people={found} courseName={course?.name} scope={scope} />
-              <a className="btn mini ghost" href={`${baseHref}&view=${view}`}>clear</a>
-            </span>
-          </div>
-          {found.length > 0 ? (
-            <RosterTable people={found} courseId={courseId} courseSections={courseSections} isAdmin={isAdmin} />
-          ) : (
-            <div className="card empty">
-              <span className="cap">
-                Not on this roster. Check the spelling, or invite the address on the Invite learners tab.
-              </span>
-            </div>
-          )}
-        </>
-      ) : view === "invite" ? (
+      <RosterFind
+        all={courseRoster}
+        initial={find}
+        courseId={courseId}
+        courseSections={courseSections}
+        isAdmin={isAdmin}
+        courseName={course?.name}
+      >
+      {      view === "invite" ? (
         <div className="card">
           <h2>Invite learners</h2>
           <p className="hint" style={{ marginTop: "10px" }}>
@@ -304,6 +268,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               a data-tip on the button for the glance. */}
         </>
       )}
+      </RosterFind>
     </main>
   )
 }
