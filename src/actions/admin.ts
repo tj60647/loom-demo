@@ -126,7 +126,18 @@ export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: s
   const sectionId = await resolveSectionId(courseId, sectionIdRaw)
 
   const memberships = await db
-    .select({ userId: courseMemberships.userId, sectionId: courseMemberships.sectionId, role: courseMemberships.role })
+    .select({
+      userId: courseMemberships.userId,
+      sectionId: courseMemberships.sectionId,
+      role: courseMemberships.role,
+      // WHEN THEY ACCEPTED. The membership row is written by
+      // enrolInvitedCourses the first time they sign in (src/lib/auth.ts), so
+      // its createdAt is the moment the invitation was taken up. It survives a
+      // soft-remove and reinstatement — that branch clears removedAt only —
+      // which is right: the date is when they first joined, not when somebody
+      // last changed their mind.
+      createdAt: courseMemberships.createdAt,
+    })
     .from(courseMemberships)
     .where(
       and(
@@ -184,6 +195,7 @@ export async function getClassData(courseIdRaw?: string | null, sectionIdRaw?: s
         ? sectionById.get(membership.sectionId)?.name ?? null
         : null,
       role: membership?.role ?? "LEARNER",
+      acceptedAt: membership?.createdAt ?? null,
       conceptsCount: myConcepts.length,
       // Of those concepts, how many a passage stands behind.
       conceptsEvidenced: myConcepts.filter((c) => evidencedIds.has(c.id)).length,
@@ -218,6 +230,22 @@ export type RosterRow = {
   sectionName: string | null
   /** The per-course role — "FACULTY" gets this course's read-side (ruling 18); "LEARNER" while pending. */
   role: string
+  /**
+   * WHEN THEY WERE ASKED, and WHEN THEY ANSWERED (TJ, 2026-08-24: "the roster
+   * needs an invited date and an accepted date").
+   *
+   * Both already existed as columns and neither needed a migration: `invited`
+   * is `course_allowed_email.createdAt`, `accepted` is
+   * `course_membership.createdAt`.
+   *
+   * Either may be null, and the pair is the useful part. No invitation and an
+   * acceptance means somebody enrolled by a route that left no invitation
+   * behind, or the invitation was withdrawn after they joined. An invitation
+   * and no acceptance is the silence the Invited tab is about — and the gap
+   * between the two dates is how long that silence has lasted.
+   */
+  invitedAt: Date | null
+  acceptedAt: Date | null
   /**
    * The three work counts, each with the breakdown its pill discloses on
    * hover (TJ, 2026-08-22: "the stat pills need mouseover with break down").
@@ -265,7 +293,12 @@ export async function getRoster(
   const [enrolled, invited, courseSections] = await Promise.all([
     getClassData(courseId, sectionId),
     db
-      .select({ email: courseAllowedEmails.email, sectionId: courseAllowedEmails.sectionId })
+      .select({
+        email: courseAllowedEmails.email,
+        sectionId: courseAllowedEmails.sectionId,
+        // WHEN THEY WERE ASKED.
+        createdAt: courseAllowedEmails.createdAt,
+      })
       .from(courseAllowedEmails)
       .where(eq(courseAllowedEmails.courseId, courseId)),
     db.select().from(sections).where(eq(sections.courseId, courseId)),
@@ -289,6 +322,10 @@ export async function getRoster(
     clothsCount: u.clothsCount,
     clothNames: u.clothNames,
     invited: invitedByEmail.has(u.email.toLowerCase()),
+    // Null where no invitation stands: enrolled by another route, or invited
+    // and then withdrawn after they had already joined.
+    invitedAt: invitedByEmail.get(u.email.toLowerCase())?.createdAt ?? null,
+    acceptedAt: u.acceptedAt,
   }))
 
   const enrolledEmails = new Set(enrolled.map((u) => u.email.toLowerCase()))
@@ -313,6 +350,9 @@ export async function getRoster(
       clothsCount: 0,
       clothNames: [],
       invited: true,
+      invitedAt: row.createdAt,
+      // Nobody has signed in on this invitation — that is what pending means.
+      acceptedAt: null,
     })
   })
 

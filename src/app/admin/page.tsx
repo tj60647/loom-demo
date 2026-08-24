@@ -150,7 +150,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     .join(" ")
 
   return (
-    <main>
+    /* `workwide`, the measure the admin course console already uses: a roster
+       is a management surface, not prose (globals.css, contracts.md §2c-iii).
+       At the 1100px reading measure the row needed 1128px and scrolled
+       sideways the moment the invited and accepted dates were added —
+       measured at 1280 AND 1536, identically, because the cap was the measure
+       and never the viewport. */
+    <main className="workwide">
       {/* No h1: the Teaching nav's highlighted Roster tab already names the
           page (TJ, 2026-08-21). */}
       {/* The tabs row is handed to RosterFind in two halves so the find box

@@ -207,3 +207,69 @@ test("a find filters as you type, without asking the server", async ({ page }) =
   await expect(page).not.toHaveURL(/find=/)
   expect(documents, "clearing must not fetch a page either").toBe(0)
 })
+
+/**
+ * WHEN THEY WERE ASKED, AND WHEN THEY ANSWERED (TJ, 2026-08-24: "the roster
+ * needs an invited date and an accepted date. keep them small, and sortable").
+ *
+ * Neither date needed a migration: `invited` is `course_allowed_email
+ * .createdAt` and `accepted` is `course_membership.createdAt`, written by
+ * `enrolInvitedCourses` the first time somebody signs in.
+ */
+test("the roster shows when each person was invited and when they accepted", async ({ page }) => {
+  await page.goto("/admin?view=invited")
+  const headers = page.locator(".rosterhead button")
+  await expect(headers.first()).toBeVisible({ timeout: 20_000 })
+
+  const labels = await headers.evaluateAll((els) =>
+    els.map((el) => (el.textContent ?? "").replace(/[▲▼]/g, "").trim())
+  )
+  expect(labels).toContain("invited")
+  expect(labels).toContain("accepted")
+
+  /**
+   * A PENDING ROW HAS AN INVITED DATE AND NO ACCEPTED ONE. That pair is the
+   * whole point of the two columns — the gap between them is how long the
+   * silence has lasted — so a spec that only checked the columns existed
+   * would pass on two columns of em dashes.
+   */
+  const pending = page.locator(".rosterrow.pendingrow").first()
+  await expect(pending).toBeVisible({ timeout: 20_000 })
+  const stamps = pending.locator(".rosterstamp")
+  await expect(stamps).toHaveCount(2)
+  await expect(stamps.nth(0)).toHaveText(/^\d{1,2}\/\d{1,2}$/)
+  await expect(stamps.nth(1)).toHaveText("—")
+
+  // Sortable, like every other column: clicking reorders rather than doing
+  // nothing, and clicking again reverses.
+  const firstName = () => page.locator(".rosterrow .rostername").first().innerText()
+  const before = await firstName()
+  await page.locator(".rosterhead button", { hasText: /^invited/ }).click()
+  await expect(page.locator(".rosterhead button.on")).toHaveText(/invited/)
+  const asc = await firstName()
+  await page.locator(".rosterhead button", { hasText: /^invited/ }).click()
+  const desc = await firstName()
+  expect([before, asc, desc].some((name) => name !== before) || asc !== desc).toBe(true)
+})
+
+/**
+ * THE ROW FITS THE CARD IT IS IN.
+ *
+ * Adding the two dates pushed the row to 1128px inside a card the reading
+ * measure capped at 1098 — so it scrolled sideways, identically at 1280 and
+ * 1536, because the cap was the measure and never the viewport. The page now
+ * carries `workwide`, the measure the admin course console already uses.
+ * Asserted at the floor, where it is tightest.
+ */
+test("the roster does not scroll sideways at the desktop floor", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto("/admin?view=enrolled")
+  await expect(page.locator(".rosterlist")).toBeVisible({ timeout: 20_000 })
+
+  const fit = await page.locator(".rosterlist").evaluate((el) => ({
+    over: el.scrollWidth - el.clientWidth,
+    bodyOver: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  }))
+  expect(fit.over, "the roster row must fit its card at 1280").toBeLessThanOrEqual(0)
+  expect(fit.bodyOver, "and the page must not scroll sideways either").toBeLessThanOrEqual(0)
+})

@@ -33,9 +33,12 @@ export type RosterPerson = {
   edgesDescribed: number
   clothsCount: number
   clothNames: string[]
+  /** When they were asked, and when they answered. Either may be null. */
+  invitedAt: Date | string | null
+  acceptedAt: Date | string | null
 }
 
-type SortKey = "name" | "role" | "cloths" | "concepts" | "edges" | "section"
+type SortKey = "name" | "role" | "cloths" | "concepts" | "edges" | "section" | "invited" | "accepted"
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
@@ -73,7 +76,34 @@ function threadsTip(p: RosterPerson): string {
   return `${plural(p.edgesCount, "thread")} — ${p.edgesDescribed} with a description, ${unsaid} drawn but unsaid`
 }
 
-const NUMERIC: SortKey[] = ["cloths", "concepts", "edges"]
+const NUMERIC: SortKey[] = ["cloths", "concepts", "edges", "invited", "accepted"]
+
+/**
+ * A date small enough for a 58px column: day and month, no year, no time.
+ *
+ * The year is dropped because a roster is read within one term — and where it
+ * is not, the full stamp is one hover away in the tip rather than four
+ * characters wider on every row, on every row that has a date at all.
+ *
+ * A route through the app can hand these over as Date or as an ISO string:
+ * `getRoster` returns Date objects, but this is a client component and
+ * anything that crossed a JSON boundary arrives as a string.
+ */
+const asDate = (value: Date | string | null): Date | null => {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+const stamp = (value: Date | string | null): string => {
+  const date = asDate(value)
+  return date ? `${date.getDate()}/${date.getMonth() + 1}` : "—"
+}
+const stampTip = (value: Date | string | null, said: string): string => {
+  const date = asDate(value)
+  return date ? `${said} ${date.toLocaleDateString()}` : `not ${said.replace(/ed$/, "ed")} — no date on record`
+}
+/** Sortable as a number; the undated sort last either way. */
+const stampOrder = (value: Date | string | null): number => asDate(value)?.getTime() ?? 0
 
 export default function RosterTable({
   people,
@@ -101,6 +131,8 @@ export default function RosterTable({
       edges: (p) => p.edgesCount,
       // "~" sorts unplaced people after every real section name.
       section: (p) => (p.sectionName ?? "~unassigned").toLowerCase(),
+      invited: (p) => stampOrder(p.invitedAt),
+      accepted: (p) => stampOrder(p.acceptedAt),
     }
     const get = value[sortKey]
     const flip = dir === "asc" ? 1 : -1
@@ -150,6 +182,8 @@ export default function RosterTable({
         {head("cloths", "cloths")}
         {head("concepts", "concepts")}
         {head("edges", "threads")}
+        {head("invited", "invited")}
+        {head("accepted", "accepted")}
         {head("section", "section")}
         {head("role", "role")}
         <span aria-hidden="true" />
@@ -215,6 +249,28 @@ export default function RosterTable({
                 {person.edgesCount}
               </span>
             )}
+          </div>
+
+          {/*
+            WHEN THEY WERE ASKED, AND WHEN THEY ANSWERED (TJ, 2026-08-24).
+            Day and month only — the full date rides in the tip and the
+            aria-label, for the reason the stat pills give above: a tip is
+            decorative and mouse-only by construction (TipLayer.tsx), so
+            meaning that lives only there reaches nobody on a keyboard.
+
+            An em dash where there is no date, which is a real state rather
+            than missing data: no invitation on record for somebody enrolled,
+            and no acceptance for somebody who has not signed in.
+          */}
+          <div>
+            <span className="rosterstamp" data-tip={stampTip(person.invitedAt, "invited")} aria-label={stampTip(person.invitedAt, "invited")}>
+              {stamp(person.invitedAt)}
+            </span>
+          </div>
+          <div>
+            <span className="rosterstamp" data-tip={stampTip(person.acceptedAt, "accepted")} aria-label={stampTip(person.acceptedAt, "accepted")}>
+              {stamp(person.acceptedAt)}
+            </span>
           </div>
 
           {/* Two different writes behind one control, and the pick saves on
