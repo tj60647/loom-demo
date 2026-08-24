@@ -27,11 +27,43 @@ async function claimedCount(text: string): Promise<number> {
   return match ? Number(match[1]) : NaN
 }
 
+/**
+ * PRESS IT AGAIN IF THE FIRST PRESS FELL ON A DEAD BUTTON.
+ *
+ * The download is built in the browser — RosterDownload is a client component
+ * that shapes the file and hands it over — so before hydration the button is
+ * on screen, visible and enabled, and does NOTHING when clicked. Playwright is
+ * happy: it found a visible element and pressed it. The event simply never
+ * comes, and the failure reads as "Timeout 25000ms exceeded while waiting for
+ * event download", which sounds like a slow download and is not one.
+ *
+ * This is the same hydration-dependent click the CI workflow already records
+ * against object-download's practice-loom entry (.github/workflows/ci.yml),
+ * and it is why that file caps the read pass at two workers. One dev server
+ * compiling routes on demand cannot hydrate four pages at once.
+ *
+ * So: a short wait, and one more press. A second press on a LIVE button is
+ * harmless — it downloads the same file twice and the first event is the one
+ * read — where a single press on a dead one is a false failure.
+ */
 async function take(page: Page, index: number) {
-  const [download] = await Promise.all([
-    page.waitForEvent("download", { timeout: 25_000 }),
-    buttons(page).nth(index).click(),
-  ])
+  const button = buttons(page).nth(index)
+  await expect(button).toBeEnabled({ timeout: 20_000 })
+
+  // The second press costs nothing when the first worked: the wait is armed
+  // BEFORE the click, so a live button resolves it immediately and the loop
+  // ends. Only a dead press pays the six seconds.
+  let download = null
+  for (let attempt = 0; attempt < 2 && !download; attempt += 1) {
+    const arriving = page
+      .waitForEvent("download", { timeout: attempt === 0 ? 6_000 : 20_000 })
+      .catch(() => null)
+    await button.click()
+    download = await arriving
+  }
+  // A throw rather than an expect, so the reads below narrow: two dead presses
+  // is a broken button, and saying so beats a null-pointer three lines later.
+  if (!download) throw new Error("the download button was pressed twice and produced nothing")
   const stream = await download.createReadStream()
   let text = ""
   for await (const chunk of stream) text += chunk
