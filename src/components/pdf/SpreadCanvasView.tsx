@@ -206,6 +206,7 @@ export default function SpreadCanvasView({
   onAspect,
   heatRects = {},
   heatMax = 1,
+  heatPeers = 0,
   zoomMultiplier,
   onZoomMultiplier,
   onZoomRange,
@@ -267,6 +268,9 @@ export default function SpreadCanvasView({
   heatRects?: Record<number, { x: number; y: number; w: number; h: number; count: number }[]>;
   /** The densest run in the reading — the top of the shading scale. */
   heatMax?: number;
+  /** How many people the band holds. One has no convergence to grade, so
+   *  their marks sit at the top of their own scale — see heatBand. */
+  heatPeers?: number;
   zoomMultiplier: number;
   onZoomMultiplier: (m: number) => void;
   /** Reports this document's zoom ceiling (a multiplier), so the toolbar's
@@ -1391,7 +1395,7 @@ export default function SpreadCanvasView({
           y: s2.y + r.y * layout.unitH,
           w: r.w * basePageWidth,
           h: r.h * layout.unitH,
-          level: heatBand(r.count, heatMax),
+          level: heatBand(r.count, heatMax, heatPeers),
         });
       }
     }
