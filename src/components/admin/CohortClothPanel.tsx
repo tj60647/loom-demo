@@ -282,6 +282,41 @@ export default function CohortClothPanel({
   }
 
   /**
+   * PICKING ON THE DRAWING REVEALS THE CARD (TJ, 2026-08-24: "should selecting
+   * a node or a link in the graph change what is shown in the concepts and
+   * threads? like we had selected one in their respective panels?").
+   *
+   * It already CHANGED it — the panels have always marked the picked card,
+   * `picked` on a concept and `sel` on a thread — but with 104 concepts and 69
+   * threads in two scrollboxes the mark was usually below the fold. Measured
+   * before this: picking a thread off the cloth marked its card at y=576 while
+   * the panel's box ended at 480 and its scrollTop stayed 0. A selection you
+   * cannot see is the same as no selection.
+   *
+   * `block: "nearest"` so a card already on screen is left exactly where it
+   * is: clicking a card must never make the list jump under the cursor, which
+   * is the failure mode of scrolling on every selection.
+   *
+   * Deferred a frame because the lists re-render with the new mark, and the
+   * element scrolled has to be the one that came out of that render.
+   */
+  const picked = `${selConcepts.join(",")}|${selThreads.join(",")}`
+  useEffect(() => {
+    const one = selConcepts.length === 1 && selThreads.length === 0
+    const oneThread = selThreads.length === 1 && selConcepts.length === 0
+    if (!one && !oneThread) return
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .querySelector(one ? ".canvasmenu .ywconcept.picked" : ".canvasmenu .ywthread.sel")
+        ?.scrollIntoView({ block: "nearest" })
+    })
+    return () => window.cancelAnimationFrame(frame)
+    // `picked` is the selection as one string — the arrays are rebuilt each
+    // render and would re-run this on every one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picked])
+
+  /**
    * What the drawing is told. One of anything keeps its own type, so a single
    * concept still lights its whole connected component and a single thread
    * still draws red — the behaviours that existed before multi-select. Any

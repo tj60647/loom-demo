@@ -290,3 +290,49 @@ test("an undescribed thread reads as an arrow, and says what is missing", async 
   }
   expect(found, "the seed must carry one thread with neither a label nor a description").toBe(true)
 })
+
+/**
+ * PICKING ON THE DRAWING REVEALS THE CARD (TJ, 2026-08-24: "should selecting a
+ * node or a link in the graph change what is shown in the concepts and
+ * threads? like we had selected one in their respective panels?").
+ *
+ * It always CHANGED it — the panels have marked the picked card all along —
+ * but with a hundred concepts in a scrollbox the mark sat below the fold, and
+ * a selection you cannot see is the same as no selection. Measured before the
+ * fix: a thread picked off the cloth marked its card at y=576 while the
+ * panel's box ended at 480 and its scrollTop stayed 0.
+ */
+test("picking on the cloth scrolls the panels to what was picked", async ({ page }) => {
+  await page.goto("/admin/aggregate")
+  await expect(page.locator("#map").first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator(".ywcard").first()).toBeVisible({ timeout: 30_000 })
+
+  /**
+   * A node whose card sorts LATE, so the list has somewhere to scroll to. The
+   * first node on the warp would pass this whether or not anything scrolled.
+   */
+  const marks = page.locator("#map circle")
+  const total = await marks.count()
+  expect(total, "the seeded cohort must draw a warp worth scrolling").toBeGreaterThan(20)
+
+  const seen = await page.locator(".ywcard").count()
+  expect(seen, "the panels must list more cards than fit, or this proves nothing").toBeGreaterThan(10)
+
+  await marks.nth(Math.floor(total * 0.7)).click({ force: true })
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const card = document.querySelector(".ywcard.picked, .ywcard.sel")
+          if (!card) return null
+          const box = card.getBoundingClientRect()
+          const scroller = card.closest(".scrollbox")
+          if (!scroller) return null
+          const within = scroller.getBoundingClientRect()
+          return box.bottom > within.top && box.top < within.bottom
+        }),
+      { timeout: 15_000, message: "the picked card never came into its panel's view" }
+    )
+    .toBe(true)
+})
