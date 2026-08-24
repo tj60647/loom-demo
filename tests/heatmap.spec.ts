@@ -595,3 +595,23 @@ test("the legend counts students, and says it in the singular", async ({ page })
   // The word it used to use for a count that was never people.
   await expect(bar).not.toContainText(/people/i)
 })
+
+/**
+ * THE REQUEST IS ABOUT ONE STUDENT.
+ *
+ * A plain on/off survived a change of student, because the picker re-renders
+ * this viewer without remounting it — so choosing a second student showed
+ * THEIR cards under a button reading "hide cards" that nobody had pressed.
+ * Caught in review on PR #32 and confirmed on the running app before the fix.
+ */
+test("cards asked for one student are not shown for the next", async ({ page }) => {
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
+  await chooseAStudent(page)
+  await cardsToggle(page).click()
+  await expect(page.locator(".pdf-railcard").first()).toBeVisible({ timeout: 25_000 })
+
+  // A different student: their cards must not be on screen unasked.
+  await chooseAStudent(page, "Test User C")
+  await expect(cardsToggle(page)).toHaveText(/show cards/i, { timeout: 25_000 })
+  await expect(page.locator(".pdf-railcard")).toHaveCount(0)
+})

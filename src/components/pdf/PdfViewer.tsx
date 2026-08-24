@@ -339,8 +339,29 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * different one.
    */
   const scopeCardsAvailable = scopePassages.length > 0;
-  const [scopeCardsOn, setScopeCardsOn] = useState(false);
-  const showingScopeCards = scopeCardsAvailable && scopeCardsOn;
+  /**
+   * WHICH STUDENT THE CARDS WERE ASKED FOR, rather than a bare on/off.
+   *
+   * The picker changes `overlayStudentId` without remounting this component,
+   * so a plain boolean survived the change and the next student's cards were
+   * already on screen — measured 2026-08-24: show cards for one student, pick
+   * another from the strip, and five of THEIR cards appear under a button
+   * reading "hide cards" that nobody pressed. "Off until asked for" has to
+   * mean asked for about the person you are looking at.
+   *
+   * Holding the id instead of a flag makes that a DERIVED fact rather than
+   * something to remember to reset: the moment the chosen student differs
+   * from the one the cards were asked for, they are not shown. No effect, no
+   * synchronised setState, and no third state to keep in step.
+   *
+   * It also means coming BACK to that student restores their cards, which is
+   * deliberate: the request was about them, and honouring it where it was made
+   * is not the same as showing somebody else's work unasked. That is the
+   * distinction a bare boolean could not draw.
+   */
+  const [cardsAskedFor, setCardsAskedFor] = useState<string | null>(null);
+  const showingScopeCards =
+    scopeCardsAvailable && cardsAskedFor !== null && cardsAskedFor === overlayStudentId;
   // Covers the whole window, chrome included — the reading takes the screen.
   const [isFullscreen, setIsFullscreen] = useState(false);
   /**
@@ -3393,15 +3414,15 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               the button reads as an instruction either way round. */}
           {scopeCardsAvailable && !isNarrow && (
             <button
-              className={`btn mini ${scopeCardsOn ? "" : "ghost"}`}
-              onClick={() => setScopeCardsOn((on) => !on)}
-              aria-pressed={scopeCardsOn}
+              className={`btn mini ${showingScopeCards ? "" : "ghost"}`}
+              onClick={() => setCardsAskedFor(showingScopeCards ? null : overlayStudentId)}
+              aria-pressed={showingScopeCards}
               data-tip={
-                scopeCardsOn
+                showingScopeCards
                   ? "hide this student's passage cards"
                   : "show this student's passage cards in the margin"
               }
-            >{scopeCardsOn ? "hide cards" : "show cards"}</button>
+            >{showingScopeCards ? "hide cards" : "show cards"}</button>
           )}
 
           {/* Only where there is canonical page text to search — a viewer
