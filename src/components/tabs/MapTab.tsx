@@ -1127,7 +1127,11 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
           className="tinput"
           placeholder="Your one-line — the take, in a sentence."
           value={activeMap?.essence ?? ""}
-          onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapEssence(m.id, v)) }}
+          onChange={e => {
+            const v = e.target.value
+            if (activeMap) setMapEssence(activeMap.id, v)
+            else void ensureActiveMap().then(m => setMapEssence(m.id, v))
+          }}
           onBlur={flushMapText}
         />
         <p className="hint" style={{ marginTop: 8 }}>Arranging and articulating feed each other: as the projection settles, say in one short paragraph what it is about and what holds it together. One-line, paragraph, tiers and arrangement belong to this projection — switch projections and each keeps its own.</p>
@@ -1135,7 +1139,11 @@ export default function MapTab({ practice = false, focusProjectionId, onThrowPai
           id="yourRead2"
           placeholder="Write your read of this projection here — a paragraph is enough. Trace a prompt above if you want your threads laid out to work from."
           value={activeMap?.read ?? ""}
-          onChange={e => { const v = e.target.value; void ensureActiveMap().then(m => setMapRead(m.id, v)) }}
+          onChange={e => {
+            const v = e.target.value
+            if (activeMap) setMapRead(activeMap.id, v)
+            else void ensureActiveMap().then(m => setMapRead(m.id, v))
+          }}
           onBlur={flushMapText}
         />
         </>
