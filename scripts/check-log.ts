@@ -11,7 +11,7 @@
  * structure throwing inside the logger and taking the request with it, and a
  * level that does not reach the stream a reader filters on.
  */
-import { log, logError, logInfo, logWarn } from "../src/lib/log"
+import { clamp, CLAMP, log, logError, logInfo, logWarn } from "../src/lib/log"
 
 let failures = 0
 
@@ -84,6 +84,36 @@ const survived = capture(() => log("warn", "weird.fields", { circular }))
 check("it still emits the event", survived.line?.event, "weird.fields")
 check("and says the fields were the problem", survived.line?.fieldsUnserializable, true)
 check("on the right stream", survived.stream, "warn")
+
+console.log("\na caller cannot spend the three reserved keys")
+/**
+ * The quietest failure of the lot: a field named `event` overwrote the event
+ * name, so the line stayed valid JSON, plausible on screen, and unfindable by
+ * the name it was logged under. The caller's value is kept under a prefix
+ * rather than dropped — it was worth passing, it is just not the frame.
+ * Copilot found this on #35.
+ */
+const collided = capture(() =>
+  logWarn("ingest.failed", { event: "upload", level: "debug", at: "yesterday", file: "a.pdf" })
+)
+check("the event name is the logger's", collided.line?.event, "ingest.failed")
+check("the level is the logger's", collided.line?.level, "warn")
+check("the timestamp is the logger's", (collided.line?.at as string)?.startsWith("20"), true)
+check("the caller's event survives, prefixed", collided.line?.caller_event, "upload")
+check("so does their level", collided.line?.caller_level, "debug")
+check("so does their timestamp", collided.line?.caller_at, "yesterday")
+check("and their ordinary fields are untouched", collided.line?.file, "a.pdf")
+
+console.log("\nforeign text is cut before it becomes a line")
+/**
+ * An upstream that answers with an HTML error page would otherwise put the
+ * whole page in one log line — the case that took `auth.link-send-failed`'s
+ * body through `clamp` (#35).
+ */
+check("a long string is cut to the limit", clamp("x".repeat(5_000)).length, CLAMP)
+check("a short one is untouched", clamp("boom"), "boom")
+check("a non-string is empty, never 'undefined'", clamp(undefined), "")
+check("an object does not stringify itself in", clamp({ a: 1 }), "")
 
 console.log(
   failures === 0

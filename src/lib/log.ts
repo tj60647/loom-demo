@@ -74,6 +74,34 @@ function plain(value: unknown): unknown {
 }
 
 /**
+ * THE THREE KEYS EVERY QUERY IS BUILT ON, which is why a caller cannot spend
+ * them. `logWarn("ingest.failed", { event: "upload" })` used to overwrite the
+ * event name with "upload", leaving a line that is valid JSON, plausible on
+ * screen, and unfindable by the name it was logged under — the failure is
+ * silent at the moment it matters most (Copilot caught this on #35). The
+ * caller's value is kept under a prefix rather than dropped: their field was
+ * worth passing, it is just not the frame.
+ */
+const RESERVED = new Set(["at", "level", "event"])
+
+/**
+ * Foreign text, cut to a length before it becomes a log line.
+ *
+ * For anything this process did not write: an upstream error body, a header, a
+ * report POSTed by a browser. One line per event only holds if the fields
+ * cannot be arbitrarily long, and a 40KB HTML error page from an API is a
+ * plausible way to lose a day's logs. Newlines need no handling — JSON.stringify
+ * escapes them, so the line stays one line.
+ *
+ * 600 is the client crash reporter's number, chosen there as "long enough for a
+ * real stack's first frames"; shared so both ends cut at the same place.
+ */
+export const CLAMP = 600
+export function clamp(value: unknown, limit = CLAMP): string {
+  return typeof value === "string" ? value.slice(0, limit) : ""
+}
+
+/**
  * Emit one line.
  *
  * NEVER THROWS. A logger that can fail is a logger that takes down the path it
@@ -84,7 +112,9 @@ function plain(value: unknown): unknown {
 export function log(level: LogLevel, event: string, fields: LogFields = {}): void {
   try {
     const shaped: Record<string, unknown> = { at: new Date().toISOString(), level, event }
-    for (const [key, value] of Object.entries(fields)) shaped[key] = plain(value)
+    for (const [key, value] of Object.entries(fields)) {
+      shaped[RESERVED.has(key) ? `caller_${key}` : key] = plain(value)
+    }
     method[level](JSON.stringify(shaped))
   } catch {
     // Last resort: say what happened without the fields that broke it, so the

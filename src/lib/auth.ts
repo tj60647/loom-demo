@@ -15,7 +15,7 @@ import {
   verifiedCandidates,
 } from "@/lib/signIn"
 import { recordAuthEvent } from "@/lib/authEvent"
-import { logError, logInfo, logWarn } from "@/lib/log"
+import { clamp, logError, logInfo, logWarn } from "@/lib/log"
 
 const ADMIN_FALLBACK_EMAILS = new Set([
   "tjm@tjmcleish.com",
@@ -123,10 +123,14 @@ function guestEmailProvider(): Provider {
         // throwing here is what turns it into the EmailSignin page. The
         // address is already known to the roster, so logging it reveals
         // nothing the sender did not have.
+        // CLAMPED: the body is Resend's, not ours, and an upstream that
+        // answers with an HTML error page would put the whole page in one log
+        // line (Copilot, #35). The status is the fact worth querying on; the
+        // body is context, and 600 characters of it is enough to read.
         logError("auth.link-send-failed", {
           email: identifier,
           status: res.status,
-          body: await res.text(),
+          body: clamp(await res.text()),
         })
         throw new Error("could not send the sign-in link")
       }

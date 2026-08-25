@@ -16,15 +16,10 @@
  * stream as everything else and answers 204. That is the whole job.
  */
 import { NextResponse } from "next/server"
-import { logWarn } from "@/lib/log"
-
-/** Long enough for a real stack's first frames, short enough that a body
- *  cannot be used to write an essay into the log. */
-const LIMIT = 600
-
-function clamp(value: unknown): string {
-  return typeof value === "string" ? value.slice(0, LIMIT) : ""
-}
+/** `clamp` moved into the logger on #35, where the upstream-body fix needed
+ *  the same cut: long enough for a real stack's first frames, short enough
+ *  that a body cannot be used to write an essay into the log. */
+import { clamp, logWarn } from "@/lib/log"
 
 export async function POST(request: Request) {
   let body: unknown = null
