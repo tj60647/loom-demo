@@ -25,17 +25,33 @@ export type AdminNavCourse = {
  * strip was fixed for once already (TJ, 2026-08-21, the Courses catalog). So
  * each page declares what it reads, and the strip draws only that.
  */
-const SCOPES: Record<
-  string,
-  {
-    section: boolean
-    reading: boolean
-    student: boolean
-    oneReading?: boolean
-    /** Does the page redraw for `?graph=individual`? Only the one that reads it. */
-    emphasis?: boolean
-  }
-> = {
+/**
+ * Named rather than inlined so DEFAULT_SCOPE can wear it too. Left inline, the
+ * fallback below widened `scope` to a union without the optional members, and
+ * `scope.oneReading` stopped compiling.
+ */
+type Scope = {
+  section: boolean
+  reading: boolean
+  student: boolean
+  oneReading?: boolean
+  /** Does the page redraw for `?graph=individual`? Only the one that reads it. */
+  emphasis?: boolean
+}
+
+const SCOPES: Record<string, Scope> = {
+  // The roster narrows by section and always has: `courseRoster.filter(row =>
+  // row.sectionId === sectionId)` in src/app/admin/page.tsx. Declared rather
+  // than left to the default, so the default can fail closed.
+  "/admin": { section: true, reading: false, student: false },
+  /**
+   * One student's page is about that student. It read no scope at all and drew
+   * a section picker anyway, because a dynamic pathname — `/admin/user/8f3…`,
+   * different on every visit — can never match a literal key and so fell
+   * through to a default that said section:true. Copilot caught it on #36;
+   * the prefix lookup below is what makes an entry here take effect.
+   */
+  "/admin/user": { section: false, reading: false, student: false },
   // The catalog's panels always show every section, and a course is the whole
   // subject of the page.
   "/admin/courses": { section: false, reading: false, student: false },
@@ -73,7 +89,15 @@ const SCOPES: Record<
    */
   "/admin/library": { section: false, reading: false, student: false },
 }
-const DEFAULT_SCOPE = { section: true, reading: false, student: false }
+/**
+ * NOTHING, and that is the point. This used to draw a section picker, so a
+ * route that simply forgot to declare itself got one whether or not the page
+ * beneath it read the value — a control that silently scopes nothing, which
+ * is the exact incongruity this strip was built to end. Failing closed makes
+ * the omission visible as a missing control rather than a lying one, and
+ * scripts/check-scope.ts refuses an admin route with no entry at all.
+ */
+const DEFAULT_SCOPE: Scope = { section: false, reading: false, student: false }
 
 // Layouts don't receive searchParams, so the nav resolves the active course and
 // section from the URL itself. This mirrors resolveCourseId/resolveSectionId on
@@ -92,7 +116,16 @@ export default function AdminNav({ courses }: { courses: AdminNavCourse[] }) {
   // select would name a course the page is not showing. Excluding it instead
   // lets the healing effect below correct the URL to what is on screen.
   const onCatalog = pathname === "/admin/courses"
-  const scope = SCOPES[pathname] ?? DEFAULT_SCOPE
+  /**
+   * THE LONGEST DECLARED PREFIX WINS, so a dynamic route is declarable at all.
+   * `/admin/user/[id]` renders as a different pathname on every visit and
+   * could never match a literal key; an exact lookup dropped it on the default
+   * and drew it a picker its page never reads.
+   */
+  const scopeKey = Object.keys(SCOPES)
+    .filter((key) => pathname === key || pathname.startsWith(`${key}/`))
+    .sort((a, b) => b.length - a.length)[0]
+  const scope = (scopeKey && SCOPES[scopeKey]) || DEFAULT_SCOPE
   const candidates = onCatalog ? courses : courses.filter((course) => !course.isArchived)
   const liveCourses = courses.filter((course) => !course.isArchived)
 
