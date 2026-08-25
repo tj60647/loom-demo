@@ -48,13 +48,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
    */
   const find = (firstParam(resolved.find) ?? "").trim().toLowerCase()
   /**
-   * Fetched only when the tab is open. It is an admin-only read of everyone's
+   * Fetched only when the tab is open — an admin-only read of everyone's
    * sign-in attempts, and a page that loads it to render a tab nobody clicked
    * is a page that reads it on every roster visit.
+   *
+   * IN THE SAME Promise.all as the rest, not awaited ahead of it. Awaited
+   * first it added its whole round trip to the front of the page for the one
+   * view that asks for it, in series with three queries it has nothing to do
+   * with (Copilot, #35). Conditional in the array instead, so the tab costs
+   * what it costs and nothing costs it twice.
    */
-  const signIns =
-    isAdmin && firstParam(resolved.view) === "signins" ? await getRecentAuthEvents(40) : []
-  const [course, courseSections, courseRoster] = await Promise.all([
+  const wantsSignIns = isAdmin && firstParam(resolved.view) === "signins"
+  const [course, courseSections, courseRoster, signIns] = await Promise.all([
     getCourse(courseId),
     listSections(courseId),
     /**
@@ -69,6 +74,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
      * row already carries `sectionId`.
      */
     getRoster(courseId, null),
+    wantsSignIns
+      ? getRecentAuthEvents(40)
+      : Promise.resolve([] as Awaited<ReturnType<typeof getRecentAuthEvents>>),
   ])
   const roster = sectionId
     ? courseRoster.filter((row) => row.sectionId === sectionId)
