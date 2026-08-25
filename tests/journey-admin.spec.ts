@@ -144,6 +144,65 @@ test("the cohort map renders the section's woven concepts", async ({ page }) => 
   await expect(page.locator(".passagequote").first()).toContainText("Test User A")
 })
 
+/**
+ * THE STRIP'S SECTION IS THE MAP'S SECTION.
+ *
+ * Written the day the Heatmaps tab was found ignoring the same picker (TJ,
+ * 2026-08-25: "selecting a section seems to have not effect… is there not a
+ * test for this?" — there was not, on any page: this picker and the one in
+ * tests/heatmap.spec.ts are the whole of the strip's coverage).
+ *
+ * The Cohort Graph was never broken — `sectionId` narrows `memberIds` in
+ * getAggregateLoomData and every later query filters on that set — so this
+ * spec is here to keep it that way rather than to prove a fix. It is the
+ * cheap half of the same pair: scripts/check-scope.ts proves the page READS
+ * the scope, and only a count either side of the change proves it NARROWS by
+ * it. The Heatmaps bug is precisely the gap between those two sentences.
+ *
+ * This test writes nothing — the picker is a GET and the map is a query — but
+ * the FILE stays in the write project, because the invitation test above it
+ * mutates. READ_ONLY in playwright.config is per file, not per test.
+ */
+test("choosing a section narrows the cohort map", async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.goto("/admin/aggregate")
+  await expect(page.locator("#map").first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText("Aggregate data is temporarily unavailable")).toHaveCount(0)
+
+  const nodes = page.locator("#map circle")
+  await expect(nodes.first()).toBeVisible({ timeout: 20_000 })
+  // Settle before counting: the map lays out after the data arrives, so a
+  // count taken at first paint is of a graph still growing.
+  await expect.poll(() => nodes.count(), { timeout: 20_000 }).toBeGreaterThan(2)
+  const whole = await nodes.count()
+
+  const picker = page.getByLabel("Select active section")
+  const section = await picker.locator("option").evaluateAll((opts) =>
+    (opts as HTMLOptionElement[]).find((o) => o.value && /section 1/i.test(o.textContent ?? ""))?.value ?? null
+  )
+  expect(section, "seed missing Section 1 — run `npm run seed:demo`").not.toBeNull()
+  await picker.selectOption(section!)
+  await expect(page).toHaveURL(/section=/, { timeout: 20_000 })
+
+  /**
+   * FEWER NODES, and still a map. Both halves matter: a section filter that
+   * emptied the canvas would satisfy "narrows" while being just as broken as
+   * one that changed nothing, and an empty graph is what a wrong id produces
+   * (resolveSectionId narrows to nobody rather than widening to everybody).
+   *
+   * Measured on the seed at 1536: 209 nodes for the whole course, 69 for
+   * Section 1, 2 for an empty section.
+   */
+  await expect
+    .poll(() => nodes.count(), {
+      timeout: 25_000,
+      message: "the section's map never became smaller than the whole course's",
+    })
+    .toBeLessThan(whole)
+  expect(await nodes.count(), "a section with woven work must still draw one").toBeGreaterThan(2)
+  await expect(page.locator("#map").first()).toBeVisible()
+})
+
 test("readings say which version of their file they serve", async ({ page }) => {
   await page.goto("/admin/library")
   // "Readings" exactly — the page also carries an "All Readings" section head.

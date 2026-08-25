@@ -101,6 +101,21 @@ interface PdfViewerProps {
    * without the other.
    */
   defaultOverlayBand?: OverlayBand;
+  /**
+   * THE SECTION THE PAGE IS SCOPED TO, chosen in the strip above the viewer.
+   *
+   * Heatmaps declared `section: true` in AdminNav's SCOPES and then never gave
+   * the choice to the drawing: the strip's picker moved a query parameter that
+   * only the margin cards read, while the heat went on showing the whole
+   * cohort. Two controls that look like one fact, and the one that reads as
+   * the page's scope did nothing (TJ, 2026-08-25: "selecting a section seems
+   * to have no effect, why?").
+   *
+   * Given one, the overlay opens on THAT section rather than the cohort, and
+   * the picker beside it offers this section against all of them instead of
+   * listing every section a second time.
+   */
+  scopeSectionId?: string | null;
   /** Which view the reader lands in. Undefined is one page — see the state. */
   defaultViewMode?: "page" | "strip" | "matrix";
   /**
@@ -219,7 +234,7 @@ type HighlightEntry = {
 
 export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber, focusPassageId, initialSearch, onGotoOpenPassage,
   onGotoOpenConcept, onPageChange, workOpen, onToggleWork, workPanel, noOwnWork = false, overlayStudentId = null,
-  defaultOverlayBand, defaultViewMode, overlayPicker = false,
+  defaultOverlayBand, defaultViewMode, overlayPicker = false, scopeSectionId = null,
   scopePassages = EMPTY_PASSAGES, scopeConcepts = EMPTY_CONCEPTS }: PdfViewerProps) {
   // `readOnly` is Open Loom (src/lib/viewUser.ts, TJ 2026-08-21): the
   // student's highlights, rail cards, search and page-turning all stay — they
@@ -235,7 +250,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   const isStaff = !!readings.course?.isStaff;
   const courseSections = readings.course?.sections ?? [];
   // Which section is being compared; "" is every section — the cohort.
-  const [overlaySection, setOverlaySection] = useState<string>("");
+  // Seeded from the page's scope, so the drawing agrees with the strip on the
+  // first render rather than after somebody touches the picker.
+  const [overlaySection, setOverlaySection] = useState<string>(scopeSectionId ?? "");
   /**
    * THE LOADED DOCUMENT, AND WHICH URL IT IS — the two together, never apart.
    *
@@ -770,7 +787,38 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * the same way it runs on a change, and no first paint shows an empty page
    * that is about to fill.
    */
-  const [overlayBand, setOverlayBand] = useState<OverlayBand | null>(defaultOverlayBand ?? null);
+  const [overlayBand, setOverlayBand] = useState<OverlayBand | null>(
+    // A scoped section outranks the surface's default band: the reader asked
+    // for one section, so "all sections" would be answering a question they
+    // did not ask.
+    scopeSectionId ? "section" : defaultOverlayBand ?? null
+  );
+  /**
+   * THE STRIP OUTRANKS THE PICKER — on every render, not only the first.
+   *
+   * Seeding the two states above from `scopeSectionId` is right on mount and
+   * WRONG afterwards: choosing a section in the strip is a client-side
+   * navigation, so this component stays mounted, `useState` never reads the
+   * new prop, and the heat goes on drawing the cohort while the strip says
+   * Section 1. That is the bug as TJ found it (2026-08-25, "selecting a
+   * section seems to have not effect"), and the seed alone does not fix it.
+   *
+   * Derived rather than an effect for the reason the compiler insists on:
+   * nothing here has to happen after a paint.
+   *
+   * ONLY THE COHORT BAND IS NARROWED, and the precision is the whole of it.
+   * Written first as "any band, when scoped, becomes section", which silently
+   * broke the student picker: choosing a name sets the band to "student" (the
+   * effect below), a scoped section rewrote that to "section", and the wash
+   * showed the section instead of the person whose name was on screen. Caught
+   * in review on #36; the spec pairing a section with a student is what holds
+   * it now. A band of `null` stays null for the same kind of reason — "off"
+   * is a refusal the reader made, and a section change is no reason to
+   * overrule it.
+   */
+  const scopedSection = scopeSectionId ?? overlaySection;
+  const scopedBand: OverlayBand | null =
+    scopeSectionId && overlayBand === "cohort" ? "section" : overlayBand;
   const [overlay, setOverlay] = useState<PassagesOverlay | null>(null);
   // Busy from the start when a band is: otherwise the status bar's "could not
   // be loaded" branch — which reads !overlay && !busy — flashes an error under
@@ -1328,13 +1376,13 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   // a reload. `busy` is set by the handler, so fresh heat replaces old heat in
   // place instead of flashing "reading…".
   useEffect(() => {
-    if (!overlayBand || !sourceId) return;
+    if (!scopedBand || !sourceId) return;
     let cancelled = false;
     getPassagesOverlay(
       sourceId,
-      overlayBand,
-      overlaySection || null,
-      overlayBand === "student" ? overlayStudentId : null
+      scopedBand,
+      scopedSection || null,
+      scopedBand === "student" ? overlayStudentId : null
     )
       .then((data) => { if (!cancelled) setOverlay(data); })
       .catch((error) => {
@@ -1345,7 +1393,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       })
       .finally(() => { if (!cancelled) setOverlayBusy(false); });
     return () => { cancelled = true; };
-  }, [overlayBand, overlaySection, sourceId, ownCaptureCount, overlayStudentId]);
+  }, [scopedBand, scopedSection, sourceId, ownCaptureCount, overlayStudentId]);
 
   /**
    * The strip's student picker drives the wash directly: choosing a name
@@ -3387,7 +3435,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                    one — so the control read "off" while the wash was on and
                    the status bar was reporting it (TJ saw exactly this on the
                    Heatmaps tab, 2026-08-22). */
-                value={overlayBand === "cohort" ? "all" : overlayBand ? overlaySection : "off"}
+                value={scopedBand === "cohort" ? "all" : scopedBand ? scopedSection : "off"}
                 onChange={(e) => {
                   const v = e.target.value;
                   if (v === "off") { setOverlayBand(null); setOverlay(null); return; }
@@ -3396,8 +3444,22 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 }}
               >
                 <option value="off">off</option>
-                <option value="all">All sections</option>
-                {courseSections.map((sec) => (
+                {/* NOT OFFERED ON A SCOPED PAGE. "All sections" beside a strip
+                    that says Section 1 is the disagreement itself, one click
+                    away — and it would be drawn as the section anyway, since
+                    the scope narrows the band above. Off and the scoped
+                    section are the two honest answers there. */}
+                {!scopeSectionId && <option value="all">All sections</option>}
+                {/* WHERE THE PAGE IS SCOPED TO A SECTION, that section is the
+                    only one offered — the strip above chose it, and listing
+                    every section again is the second control that let the two
+                    disagree in the first place. Unscoped, the full list stands,
+                    which is what the reading station and an unscoped Heatmaps
+                    still need. */}
+                {(scopeSectionId
+                  ? courseSections.filter((sec) => sec.id === scopeSectionId)
+                  : courseSections
+                ).map((sec) => (
                   <option key={sec.id} value={sec.id}>{sec.name}</option>
                 ))}
               </select>
@@ -3524,17 +3586,39 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           without saying why reads as a broken feature, and the commonest
           reason here — you have not coded this reading yet — is the point of
           the gate rather than a fault. */}
-      {overlayBand && sourceId && (
+      {scopedBand && sourceId && (
         <div className={`pdf-overlay-bar${noOwnWork ? " floating" : ""}`} role="status">
+          {/* THREE BANDS, THREE SENTENCES. This read "the cohort" for a
+              chosen student — the binary predates the student band (2026-08-22)
+              and nobody widened it, so the bar announced the wrong comparison
+              for the whole time one person's wash was loading. */}
           {!overlay && overlayBusy && (
-            <span>reading {overlayBand === "section" ? "that section" : "the cohort"}…</span>
+            <span>
+              reading{" "}
+              {scopedBand === "section"
+                ? "that section"
+                : scopedBand === "student"
+                  ? "their marks"
+                  : "the cohort"}
+              …
+            </span>
           )}
           {!overlay && !overlayBusy && <span>The comparison could not be loaded just now.</span>}
           {overlay?.blocked && <span>{overlayBlockMessage(overlay.blocked, overlay.band)}</span>}
           {overlay && !overlay.blocked && overlay.contributors === 0 && (
+            /* The same binary, and here it produced a sentence about the wrong
+               person: a chosen student who has marked nothing said "Nobody in
+               the cohort has marked this reading yet", which is false about the
+               cohort and unhelpful about them. */
             <span>
-              Nobody in {overlay.band === "section" ? "that section" : "the cohort"} has
-              marked this reading yet.
+              {overlay.band === "student" ? (
+                "They have not marked this reading yet."
+              ) : (
+                <>
+                  Nobody in {overlay.band === "section" ? "that section" : "the cohort"} has
+                  marked this reading yet.
+                </>
+              )}
             </span>
           )}
           {overlay && !overlay.blocked && overlay.contributors > 0 && (

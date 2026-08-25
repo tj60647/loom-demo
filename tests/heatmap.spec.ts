@@ -679,3 +679,144 @@ test("the student picker is alphabetical, with All students held at the top", as
   const inOrder = [...people].sort((a, b) => a.localeCompare(b))
   expect(people).toEqual(inOrder)
 })
+
+/**
+ * THE STRIP'S SECTION IS THE HEAT'S SECTION (TJ, 2026-08-25: "selecting a
+ * section seems to have no effect, why? is there not a test for this?").
+ *
+ * There was not, which is why it survived. AdminNav declared `section: true`
+ * for this page and the value reached the margin cards alone — the heat went
+ * on drawing the whole cohort while the strip said Faculty. The page's own
+ * comment asserted the opposite, which is how it stayed invisible.
+ *
+ * The peer DENOMINATOR is what proves it: "8 of 13 marked" unscoped against
+ * "8 of 8 marked" in a section is the query having been narrowed. Counting
+ * rects would not — a section whose members made every mark draws the same
+ * rectangles either way.
+ */
+test("choosing a section narrows the heat, not just the margin", async ({ page }) => {
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
+  const bar = page.locator(".pdf-overlay-bar")
+  await expect(bar).toBeVisible({ timeout: 25_000 })
+
+  const peersOf = async () => {
+    const text = await bar.innerText()
+    const match = /(\d+)\s+of\s+(\d+)\s+marked/.exec(text.replace(/\s+/g, " "))
+    return match ? Number(match[2]) : NaN
+  }
+  const whole = await peersOf()
+  expect(whole, "the cohort band must report a denominator").toBeGreaterThan(1)
+
+  // A section the seed actually populates, so the comparison is meaningful.
+  const picker = page.getByLabel("Select active section")
+  const section = await picker.locator("option").evaluateAll((opts) =>
+    (opts as HTMLOptionElement[]).find((o) => o.value && /section 1/i.test(o.textContent ?? ""))?.value ?? null
+  )
+  expect(section, "seed missing Section 1 — run `npm run seed:demo`").not.toBeNull()
+  await picker.selectOption(section!)
+  await expect(page).toHaveURL(/section=/, { timeout: 15_000 })
+  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+  await expect(bar).toBeVisible({ timeout: 25_000 })
+
+  /**
+   * The two controls agree FIRST, and that half is synchronous: the Overlay
+   * picker renders with the scoped section and offers only it, since listing
+   * every section again is the second control that let the strip and the
+   * drawing disagree in the first place.
+   */
+  const overlay = page.getByLabel("Which section to compare")
+  await expect(overlay).toHaveValue(section!, { timeout: 20_000 })
+  // Off, and that section. "All sections" is not offered here: beside a strip
+  // reading Section 1 it is the disagreement itself, one click away.
+  await expect(overlay.locator("option")).toHaveCount(2)
+  await expect(overlay.locator('option[value="all"]')).toHaveCount(0)
+
+  /**
+   * The denominator follows asynchronously — the overlay refetches after the
+   * page settles, so reading it once races that request. Polled rather than
+   * waited on with a clock, for the reason pdf-viewer.spec.ts learned the
+   * hard way.
+   */
+  await expect
+    .poll(peersOf, {
+      timeout: 25_000,
+      message: "the section's band never became smaller than the whole cohort's",
+    })
+    .toBeLessThan(whole)
+})
+
+/**
+ * A CHOSEN STUDENT OUTRANKS THE SECTION SCOPE.
+ *
+ * The gap this closes was opened by the commit above it. Deriving the band
+ * from the page's scope was written as "any band, once scoped, is the section
+ * band", which is right for the cohort band and silently wrong for the third
+ * one: choosing a name sets the band to "student", the scope rewrote it back
+ * to "section", and the wash showed the section while the strip named a
+ * person. Every spec passed, because none of them had ever put a section and
+ * a student on screen together (Copilot caught it in review on #36).
+ *
+ * THE PEER DENOMINATOR IS THE TELL, again, and for a new reason: the bar
+ * suppresses the fraction below two peers, since "1 of 1 marked" is a
+ * tautology when the band IS one person. So the section band SHOWS "8 of 8
+ * marked" and the student band shows no fraction at all — and before the fix,
+ * choosing a student left the fraction on screen, because the query was still
+ * the section's.
+ */
+test("with a section scoped, the wash still follows a chosen student", async ({ page }) => {
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
+  const bar = page.locator(".pdf-overlay-bar")
+  await expect(bar).toBeVisible({ timeout: 25_000 })
+  const fraction = () => bar.innerText().then((t) => /\d+\s+of\s+\d+\s+marked/.test(t.replace(/\s+/g, " ")))
+
+  const sections = page.getByLabel("Select active section")
+  const section = await sections.locator("option").evaluateAll((opts) =>
+    (opts as HTMLOptionElement[]).find((o) => o.value && /section 1/i.test(o.textContent ?? ""))?.value ?? null
+  )
+  expect(section, "seed missing Section 1 — run `npm run seed:demo`").not.toBeNull()
+  await sections.selectOption(section!)
+  await expect(page.getByLabel("Which section to compare")).toHaveValue(section!, { timeout: 20_000 })
+  await expect.poll(fraction, { timeout: 25_000, message: "the section band must report a fraction" }).toBe(true)
+
+  // Somebody from that section — the student picker follows the section, so
+  // whoever is offered here is in it.
+  const students = page.getByLabel("Select active student")
+  const student = await students.locator("option").evaluateAll(
+    (opts) => (opts as HTMLOptionElement[]).find((o) => o.value)?.value ?? null
+  )
+  expect(student, "seed missing a student in Section 1 — run `npm run seed:demo`").not.toBeNull()
+  await students.selectOption(student!)
+  await expect(page).toHaveURL(/student=/, { timeout: 20_000 })
+
+  /**
+   * THE SETTLED BAR, MATCHED POSITIVELY — and that difference is the whole
+   * assertion.
+   *
+   * Written first as "poll until the fraction is ABSENT", which passed against
+   * the bug it was written for: the refetch puts "reading that section…" on
+   * the bar for a frame, that frame carries no fraction, and a poll for an
+   * absence latches onto it and goes green while the wash settles back to the
+   * section. It is the trap pair-and-throw.spec.ts documents, in a new place.
+   *
+   * So this matches a shape only the settled student band can produce — the
+   * ramp legend reads "1 STUDENT", because the band is one person, where the
+   * section band reads "1 … 8 STUDENTS". Measured live at 1536: fixed, the bar
+   * reads "5 passages · 1 STUDENT"; against the bug it reads "8 of 8 marked ·
+   * 22 passages · 1 · 8 STUDENTS", which never matches however long it polls.
+   */
+  await expect
+    .poll(() => bar.innerText().then((text) => text.replace(/\s+/g, " ").trim()), {
+      timeout: 25_000,
+      message: "the wash is still the section's — a chosen student must be the band",
+    })
+    .toMatch(/passages? 1 STUDENT$/)
+  expect(await fraction(), "one person is not a fraction of a cohort").toBe(false)
+
+  // And back. Clearing the picker returns to the section, not to the whole
+  // cohort and not to nothing — the scope is still on.
+  await students.selectOption("")
+  await expect
+    .poll(fraction, { timeout: 25_000, message: "clearing the student must restore the section band" })
+    .toBe(true)
+  await expect(page.getByLabel("Which section to compare")).toHaveValue(section!)
+})
