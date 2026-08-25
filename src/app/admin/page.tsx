@@ -245,8 +245,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <>
           <div className="rosterfilter">
             <span className="cap" style={{ padding: "4px 0" }}>
+              {/* PLAIN, because this is the one place a professor arrives at
+                  mid-problem. The first version explained the feature's own
+                  history — "decisions are kept from the moment this shipped" —
+                  which tells a reader nothing about what they are looking at
+                  (TJ, 2026-08-25: "this 'sign-ins' language is odd"). */}
               {signIns.length === 0
-                ? "nothing recorded yet — decisions are kept from the moment this shipped"
+                ? `nothing yet — attempts appear here as they happen, kept ${AUTH_EVENT_DAYS} days`
                 : `the last ${signIns.length}, newest first · kept ${AUTH_EVENT_DAYS} days`}
             </span>
           </div>
@@ -256,7 +261,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <span className="rostercol">when</span>
                 <span className="rostercol">address</span>
                 <span className="rostercol">outcome</span>
-                <span className="rostercol">door</span>
+                {/* "via", not "door": github and email are how they arrived,
+                    and "door" is this repo's voice rather than a word a reader
+                    can act on. */}
+                <span className="rostercol">via</span>
               </div>
               {signIns.map((event) => (
                 <div key={event.id} className="signinrow">
@@ -284,8 +292,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           ) : (
             <div className="card empty">
               <span className="cap">
-                No sign-in has been decided since this began recording. A refusal will name the
-                address it turned away, which is the thing the server could never say before.
+                Nobody has signed in or been turned away yet. Each attempt will show the address
+                it used and whether it was let in.
               </span>
             </div>
           )}
