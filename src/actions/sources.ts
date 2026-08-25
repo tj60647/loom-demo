@@ -704,7 +704,7 @@ async function ingestReading(data: {
       await readingStorage.put(getSourceCoverKey(source.id), coverBuffer)
       coverRendered = true
     } catch (error) {
-      logWarn("ingest.cover-failed", { cause: error })
+      logWarn("ingest.cover-failed", { userId: data.userId, cause: error })
     }
 
     // The per-page images the viewer's contact sheet reads. Off the request
@@ -727,7 +727,7 @@ async function ingestReading(data: {
         if (still.length === 0) return
         await renderSourcePageImages(source.id, buffer)
       } catch (error) {
-        logWarn("ingest.page-images-failed", { cause: error })
+        logWarn("ingest.page-images-failed", { userId: data.userId, cause: error })
       }
     })
 
@@ -737,7 +737,7 @@ async function ingestReading(data: {
     try {
       pass = (await recordHeuristicScore(source.id, pages, { coverRendered })).pass
     } catch (error) {
-      logWarn("ingest.score-failed", { cause: error })
+      logWarn("ingest.score-failed", { userId: data.userId, cause: error })
     }
 
     // The attach comes LAST, so the score exists to gate it: a reading that did
@@ -1185,7 +1185,7 @@ export async function deleteSource(formData: FormData) {
   results.forEach((result, i) => {
     if (result.status === "rejected") {
       failedKeys.push(keyList[i])
-      logError("source.blob-not-removed", { key: keyList[i], cause: result.reason })
+      logError("source.blob-not-removed", { sourceId, key: keyList[i], cause: result.reason })
     }
   })
   if (failedKeys.length > 0) {

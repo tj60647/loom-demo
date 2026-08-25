@@ -253,7 +253,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               {signIns.map((event) => (
                 <div key={event.id} className="signinrow">
                   <span className="rosterstamp">{new Date(event.at).toLocaleString()}</span>
-                  <span className="rosteremail">{event.email}</span>
+                  {/* The address where there is one; the provider's handle
+                      where there is not, which is the `no-verified-email`
+                      refusal. Never blank: a row that names nobody cannot be
+                      told from the next row that names nobody. */}
+                  <span className="rosteremail">
+                    {event.email || event.handle || "—"}
+                  </span>
                   {/* Allowed is the quiet case and refused is the one being
                       looked for, so only refusals take the red. */}
                   <span className={event.outcome === "allowed" ? "cap" : "cap sigrefused"}>

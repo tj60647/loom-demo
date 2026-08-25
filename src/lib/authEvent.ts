@@ -71,11 +71,14 @@ export async function recordAuthEvent(entry: {
   email: string
   outcome: AuthOutcome
   provider?: string
+  /** A display name, for the refusal that has no address to name. */
+  handle?: string
 }): Promise<void> {
   const row = {
     email: entry.email,
     outcome: entry.outcome,
     provider: entry.provider ?? "",
+    handle: entry.handle ?? "",
   }
   // The operational half first: it costs nothing and survives a database that
   // is the reason the row could not be written.

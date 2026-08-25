@@ -891,6 +891,19 @@ export const authEvents = pgTable(
     outcome: text("outcome").notNull(),
     /** `github` | `email` — which door was tried. */
     provider: text("provider").default("").notNull(),
+    /**
+     * WHO, WHERE THERE IS NO ADDRESS TO NAME.
+     *
+     * A `no-verified-email` refusal means GitHub confirmed no address at all,
+     * so `email` above is empty and the row names nobody — six such refusals
+     * cannot be told from one person retrying six times. The provider does
+     * hand over a display name (GitHub's `name`, falling back to the login),
+     * and that is a public handle rather than a private address, so keeping it
+     * does not cross the line the identity resolver draws in src/lib/auth.ts.
+     *
+     * Empty wherever the address is enough, which is every other outcome.
+     */
+    handle: text("handle").default("").notNull(),
   },
   (row) => ({
     // Reading is always "the recent ones", and pruning is always "the old

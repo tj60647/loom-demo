@@ -142,7 +142,7 @@ async function pruneViews(
       }
     }
   } catch (e) {
-    logWarn("views.prune-failed", { cause: e })
+    logWarn("views.prune-failed", { userId, courseId, cause: e })
   }
 }
 
@@ -398,12 +398,14 @@ export async function createPassage(data: { conceptIds?: string[], source: strin
         pageContentHash = data.pageContentHash ?? page.contentHash
         if (canonicalIndex === -1) {
           logWarn("passage.anchor-not-found", {
+            userId,
             sourceId: data.sourceId,
             pageNumber: data.pageNumber,
             kept: "client-offsets",
           })
         } else {
           logWarn("passage.text-layer-differs", {
+            userId,
             sourceId: data.sourceId,
             pageNumber: data.pageNumber,
             kept: "client-offsets",

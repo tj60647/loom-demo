@@ -751,7 +751,7 @@ export async function getAggregateLoomData(
  * member who is not an admin should meet the same door here as everywhere else.
  */
 export async function getRecentAuthEvents(limit = 40): Promise<
-  { id: string; at: Date; email: string; outcome: string; provider: string }[]
+  { id: string; at: Date; email: string; outcome: string; provider: string; handle: string }[]
 > {
   await checkAdmin()
   return db

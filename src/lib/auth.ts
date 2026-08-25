@@ -239,8 +239,29 @@ export const authOptions: NextAuthOptions = {
     // The guest provider runs this too, and once *before* any mail goes out
     // (NextAuth calls it with email.verificationRequest at the send step), so
     // an address no course invited never receives a link. Both doors, one gate.
-    async signIn({ user, account }) {
+    async signIn({ user, account, email }) {
       const verdict = await decideSignIn(user.email, emailHasAppAccess)
+      /**
+       * THE GUEST DOOR ASKS TWICE, so it must not be written down twice.
+       *
+       * NextAuth calls this once at the SEND step (`email.verificationRequest`
+       * is true, and the comment above says why that is deliberate: an
+       * uninvited address never receives a link) and again when the link is
+       * CLICKED. Both evaluate the same address and reach the same verdict, so
+       * recording both would put two rows differing only in `at` against one
+       * sign-in, and the Sign-ins tab would read as somebody trying twice.
+       *
+       * The SEND step is the one kept, because it is the one that can be
+       * refused: a refusal there ends the flow and no click ever follows, so
+       * skipping it would lose exactly the decision worth having. The click
+       * that follows an allowed send tells us nothing the send did not.
+       *
+       * Unreachable today — the guest provider is registered only where
+       * RESEND_API_KEY and EMAIL_FROM are both set (`emailSignInConfigured`),
+       * which is no environment yet. Fixed while the code is in hand rather
+       * than left for whoever turns that door on.
+       */
+      const alreadyRecordedAtSend = account?.provider === "email" && !email?.verificationRequest
       /**
        * RECORDED HERE RATHER THAN INSIDE `decideSignIn`, which stays pure —
        * scripts/check-auth.ts exercises it with an injected predicate and no
@@ -252,7 +273,7 @@ export const authOptions: NextAuthOptions = {
        * reaches `user`. It goes to the operational log from the override
        * itself, where it is known — `auth.identity`.
        */
-      await recordAuthEvent({
+      if (!alreadyRecordedAtSend) await recordAuthEvent({
         email: normalizeEmail(user.email) || String(user.email ?? ""),
         outcome:
           verdict === true
@@ -261,6 +282,13 @@ export const authOptions: NextAuthOptions = {
               ? "no-verified-email"
               : "not-on-roster",
         provider: account?.provider ?? "",
+        /**
+         * Only worth carrying where the address is empty, which is the
+         * `no-verified-email` refusal: GitHub confirmed nothing, so without a
+         * name the row is anonymous and six refusals cannot be told from one
+         * person trying six times. Everywhere else the address IS the name.
+         */
+        handle: normalizeEmail(user.email) ? "" : (user.name ?? "").slice(0, 120),
       })
       return verdict
     },
