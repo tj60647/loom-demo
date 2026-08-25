@@ -1,8 +1,8 @@
 "use server"
 
 import { db } from "@/db"
-import { users, concepts, passages, passageConcepts, edges, links, cloths, sources, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
+import { users, concepts, passages, passageConcepts, edges, links, cloths, sources, courseMemberships, courseAllowedEmails, sections, sessions, authEvents } from "@/db/schema"
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, emailHasAppAccess, isAdminUser } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
@@ -732,4 +732,30 @@ export async function getAggregateLoomData(
     console.error("[getAggregateLoomData] Failed to load passages for aggregate view", error)
     return { concepts: allConcepts, passages: [], edges: allEdges, links: allLinks, members, passagesUnavailable: true }
   }
+}
+
+/**
+ * THE GATE'S RECENT DECISIONS — who was let in, who was refused, and when.
+ *
+ * TJ, 2026-08-24, on why this has to be a surface rather than a table you
+ * could query: "you found Cheng's problem because he emailed you." A record
+ * nobody looks at answers questions only after somebody thinks to ask one, and
+ * the shape worth noticing — six refusals in seventy-one seconds — is exactly
+ * the shape nobody thinks to ask about.
+ *
+ * ADMIN ONLY (TJ, same day). A refusal names an address, and the whole point
+ * of a refusal is that the address is on NO roster — so it is not a fact about
+ * any one faculty member's course, and the per-course read gate has nothing to
+ * narrow it by. `checkAdmin` redirects rather than returning empty: a staff
+ * member who is not an admin should meet the same door here as everywhere else.
+ */
+export async function getRecentAuthEvents(limit = 40): Promise<
+  { id: string; at: Date; email: string; outcome: string; provider: string }[]
+> {
+  await checkAdmin()
+  return db
+    .select()
+    .from(authEvents)
+    .orderBy(desc(authEvents.at))
+    .limit(Math.max(1, Math.min(200, limit)))
 }

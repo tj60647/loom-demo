@@ -1,4 +1,4 @@
-import { getRoster, getStaffViewer } from "@/actions/admin"
+import { getRecentAuthEvents, getRoster, getStaffViewer } from "@/actions/admin"
 import { firstParam, getCourse, listSections, resolveSectionId } from "@/lib/courses"
 import InviteLearners from "@/components/admin/InviteLearners"
 import RosterTable from "@/components/admin/RosterTable"
@@ -46,6 +46,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
    * reason — you are asking about a person, not about a section.
    */
   const find = (firstParam(resolved.find) ?? "").trim().toLowerCase()
+  /**
+   * Fetched only when the tab is open. It is an admin-only read of everyone's
+   * sign-in attempts, and a page that loads it to render a tab nobody clicked
+   * is a page that reads it on every roster visit.
+   */
+  const signIns =
+    isAdmin && firstParam(resolved.view) === "signins" ? await getRecentAuthEvents(40) : []
   const [course, courseSections, courseRoster] = await Promise.all([
     getCourse(courseId),
     listSections(courseId),
@@ -86,6 +93,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const view =
     requestedView === "invited" ? "invited"
     : requestedView === "invite" && isAdmin ? "invite"
+    : requestedView === "signins" && isAdmin ? "signins"
     : "enrolled"
   const filterNoResponse = view === "invited" && firstParam(resolved.filter) === "noresponse"
   /**
@@ -199,6 +207,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 Invite learners
               </a>
             )}
+            {isAdmin && (
+              <a
+                className={view === "signins" ? "on" : undefined}
+                href={`${baseHref}&view=signins`}
+                data-tip="who the sign-in gate let in and turned away, most recent first"
+              >
+                Sign-ins
+              </a>
+            )}
             <span className="rostertabsline">
               {course?.name}
               {sectionName ? ` · ${sectionName}` : " · all sections"}
@@ -206,7 +223,59 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           </>
         }
       >
-      {      view === "invite" ? (
+      {      view === "signins" ? (
+        /**
+         * WHAT THE GATE DECIDED, most recent first.
+         *
+         * The list is the point rather than any one row: a refusal on its own
+         * is a person having a bad morning, and six in seventy-one seconds is
+         * somebody stuck against a wall. Production carried exactly that on
+         * 2026-08-24 and nobody could see it, because the only trace was a
+         * `/auth/error` line in a vendor log with the address stripped off.
+         */
+        <>
+          <div className="rosterfilter">
+            <span className="cap" style={{ padding: "4px 0" }}>
+              {signIns.length === 0
+                ? "nothing recorded yet — decisions are kept from the moment this shipped"
+                : `the last ${signIns.length}, newest first · kept 180 days`}
+            </span>
+          </div>
+          {signIns.length > 0 ? (
+            <div className="card rosterlist" style={{ marginTop: "10px" }}>
+              <div className="signinhead">
+                <span className="rostercol">when</span>
+                <span className="rostercol">address</span>
+                <span className="rostercol">outcome</span>
+                <span className="rostercol">door</span>
+              </div>
+              {signIns.map((event) => (
+                <div key={event.id} className="signinrow">
+                  <span className="rosterstamp">{new Date(event.at).toLocaleString()}</span>
+                  <span className="rosteremail">{event.email}</span>
+                  {/* Allowed is the quiet case and refused is the one being
+                      looked for, so only refusals take the red. */}
+                  <span className={event.outcome === "allowed" ? "cap" : "cap sigrefused"}>
+                    {event.outcome === "allowed"
+                      ? "allowed"
+                      : event.outcome === "no-verified-email"
+                        ? "no confirmed address"
+                        : "not on a roster"}
+                  </span>
+                  <span className="cap">{event.provider || "—"}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="card empty">
+              <span className="cap">
+                No sign-in has been decided since this began recording. A refusal will name the
+                address it turned away, which is the thing the server could never say before.
+              </span>
+            </div>
+          )}
+        </>
+      ) : view === "invite" ? (
         <div className="card">
           <h2>Invite learners</h2>
           <p className="hint" style={{ marginTop: "10px" }}>
