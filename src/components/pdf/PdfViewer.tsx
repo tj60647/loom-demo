@@ -804,14 +804,21 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * section seems to have not effect"), and the seed alone does not fix it.
    *
    * Derived rather than an effect for the reason the compiler insists on:
-   * nothing here has to happen after a paint. A scoped page cannot be showing
-   * the cohort band, so a band that survives from before the scope is narrowed
-   * to it — but a band of `null` stays null, because "off" is a refusal the
-   * reader made and a section change is no reason to overrule it.
+   * nothing here has to happen after a paint.
+   *
+   * ONLY THE COHORT BAND IS NARROWED, and the precision is the whole of it.
+   * Written first as "any band, when scoped, becomes section", which silently
+   * broke the student picker: choosing a name sets the band to "student" (the
+   * effect below), a scoped section rewrote that to "section", and the wash
+   * showed the section instead of the person whose name was on screen. Caught
+   * in review on #36; the spec pairing a section with a student is what holds
+   * it now. A band of `null` stays null for the same kind of reason — "off"
+   * is a refusal the reader made, and a section change is no reason to
+   * overrule it.
    */
   const scopedSection = scopeSectionId ?? overlaySection;
   const scopedBand: OverlayBand | null =
-    scopeSectionId && overlayBand ? "section" : overlayBand;
+    scopeSectionId && overlayBand === "cohort" ? "section" : overlayBand;
   const [overlay, setOverlay] = useState<PassagesOverlay | null>(null);
   // Busy from the start when a band is: otherwise the status bar's "could not
   // be loaded" branch — which reads !overlay && !busy — flashes an error under
@@ -3581,15 +3588,37 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
           the gate rather than a fault. */}
       {scopedBand && sourceId && (
         <div className={`pdf-overlay-bar${noOwnWork ? " floating" : ""}`} role="status">
+          {/* THREE BANDS, THREE SENTENCES. This read "the cohort" for a
+              chosen student — the binary predates the student band (2026-08-22)
+              and nobody widened it, so the bar announced the wrong comparison
+              for the whole time one person's wash was loading. */}
           {!overlay && overlayBusy && (
-            <span>reading {scopedBand === "section" ? "that section" : "the cohort"}…</span>
+            <span>
+              reading{" "}
+              {scopedBand === "section"
+                ? "that section"
+                : scopedBand === "student"
+                  ? "their marks"
+                  : "the cohort"}
+              …
+            </span>
           )}
           {!overlay && !overlayBusy && <span>The comparison could not be loaded just now.</span>}
           {overlay?.blocked && <span>{overlayBlockMessage(overlay.blocked, overlay.band)}</span>}
           {overlay && !overlay.blocked && overlay.contributors === 0 && (
+            /* The same binary, and here it produced a sentence about the wrong
+               person: a chosen student who has marked nothing said "Nobody in
+               the cohort has marked this reading yet", which is false about the
+               cohort and unhelpful about them. */
             <span>
-              Nobody in {overlay.band === "section" ? "that section" : "the cohort"} has
-              marked this reading yet.
+              {overlay.band === "student" ? (
+                "They have not marked this reading yet."
+              ) : (
+                <>
+                  Nobody in {overlay.band === "section" ? "that section" : "the cohort"} has
+                  marked this reading yet.
+                </>
+              )}
             </span>
           )}
           {overlay && !overlay.blocked && overlay.contributors > 0 && (
