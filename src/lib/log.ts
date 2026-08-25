@@ -5,9 +5,13 @@
  * who: "we need better logging then, correct? overall all the logs seem sparse
  * and difficult to interpret."
  *
- * WHAT WAS SPARSE ABOUT THEM. Surveyed the same day: 49 `console` calls across
- * src/, 40 of them carrying an ad-hoc `[tag]` prefix, and every one of them
- * about a FAILURE. Nothing recorded a decision the system made while working
+ * WHAT WAS SPARSE ABOUT THEM. Surveyed the same day: 50 `console` calls across
+ * src/ — 35 on server paths in 18 files, 15 in client components — most
+ * carrying an ad-hoc `[tag]` prefix, and every one of them about a FAILURE.
+ * (The first telling of this said 49 and 40. Both were wrong: the survey's own
+ * output was 28 warns + 21 errors + 1 log, which is 50, and the tag figure was
+ * a same-line grep that misses a call whose tag sits on a continuation line.
+ * Recounted with check-logging.ts's own regex against `git archive dev`.) Nothing recorded a decision the system made while working
  * exactly as designed — which is most of what you want to know afterwards. A
  * refused sign-in is not an error; it is the gate doing its job, and it left no
  * trace at all.
@@ -42,8 +46,9 @@ export type LogLevel = "info" | "warn" | "error"
 export type LogFields = Record<string, unknown>
 
 /**
- * WHY LEVELS ARE DEFINED HERE RATHER THAN LEFT TO TASTE. The 49 calls this
- * replaces used 28 warns and 21 errors more or less interchangeably, which
+ * WHY LEVELS ARE DEFINED HERE RATHER THAN LEFT TO TASTE. The 50 calls this
+ * replaces used 28 warns, 21 errors and 1 log more or less interchangeably,
+ * which
  * makes the level useless as a filter — the first thing anyone reaches for.
  *
  *   error  a person has to act; something is broken and stays broken

@@ -50,6 +50,8 @@ export async function recordEvent(
   try {
     await db.insert(graphEvents).values({ userId, courseId, kind, entityType, entityId, payload })
   } catch (e) {
-    logWarn("event.record-failed", { kind, cause: e })
+    // `userId` and `courseId` are two lines above in the signature: without
+    // them this says "an event failed" where it could say whose.
+    logWarn("event.record-failed", { kind, userId, courseId, cause: e })
   }
 }

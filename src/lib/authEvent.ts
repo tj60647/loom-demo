@@ -49,10 +49,19 @@ export async function pruneAuthEvents(days = AUTH_EVENT_DAYS): Promise<number> {
 /**
  * Record one decision.
  *
- * NEVER THROWS, and never blocks the answer. A gate that fails closed because
- * its audit trail is unavailable would turn a logging outage into an outage —
- * the same rule `recordEvent` follows in src/lib/graphEvent.ts, and the reason
- * both swallow rather than propagate.
+ * NEVER THROWS. A gate that failed closed because its audit trail was
+ * unavailable would turn a logging outage into an outage — the same rule
+ * `recordEvent` follows in src/lib/graphEvent.ts, and the reason both swallow
+ * rather than propagate.
+ *
+ * IT DOES COST THE SIGN-IN A ROUND TRIP, and saying otherwise would be a lie:
+ * the caller awaits it, so the redirect waits on one INSERT, and on one write
+ * in twenty-five a DELETE as well. That is the deliberate price of the record
+ * — at a course's volume it is a few tens of milliseconds on a path taken once
+ * a session. The way to remove it is Vercel's `waitUntil`, which hands the
+ * write to the platform after the response goes out; `@vercel/functions` is
+ * not a dependency here, and adding one to save 40ms on sign-in is not a trade
+ * worth making today. Revisit if this ever runs somewhere busy.
  *
  * The line also goes to the operational log, so a refusal is visible in
  * `vercel logs` in the moment AND in the table next week. Two audiences: the

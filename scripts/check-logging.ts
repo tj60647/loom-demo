@@ -1,7 +1,7 @@
 /**
  * NO RAW `console` ON THE SERVER.
  *
- * The 49 calls this rule replaced were the whole complaint (TJ, 2026-08-24:
+ * The 50 calls this rule replaced were the whole complaint (TJ, 2026-08-24:
  * "overall all the logs seem sparse and difficult to interpret"). They were
  * converted in one pass; without a rule they come back one merge at a time,
  * because `console.warn` is what everybody's fingers type.

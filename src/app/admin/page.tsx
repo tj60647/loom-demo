@@ -1,4 +1,5 @@
 import { getRecentAuthEvents, getRoster, getStaffViewer } from "@/actions/admin"
+import { AUTH_EVENT_DAYS } from "@/lib/authEvent"
 import { firstParam, getCourse, listSections, resolveSectionId } from "@/lib/courses"
 import InviteLearners from "@/components/admin/InviteLearners"
 import RosterTable from "@/components/admin/RosterTable"
@@ -238,7 +239,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             <span className="cap" style={{ padding: "4px 0" }}>
               {signIns.length === 0
                 ? "nothing recorded yet — decisions are kept from the moment this shipped"
-                : `the last ${signIns.length}, newest first · kept 180 days`}
+                : `the last ${signIns.length}, newest first · kept ${AUTH_EVENT_DAYS} days`}
             </span>
           </div>
           {signIns.length > 0 ? (
