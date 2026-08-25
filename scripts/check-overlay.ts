@@ -441,6 +441,22 @@ check("one against a peak of three is still the faintest", heatBand(1, 3), 1)
  * everywhere, when what happened is the opposite.
  */
 check("nobody agreeing with anybody is the faintest, not the darkest", heatBand(1, 1), 1)
+
+/**
+ * A BAND OF ONE IS THE OTHER CASE ENTIRELY (TJ, 2026-08-24: "when the heatmap
+ * is showing one student, this should be the darkest of the ramp, this appears
+ * to be the lightest").
+ *
+ * Both arrive as maxCount 1 and they mean opposite things. Many people who
+ * never agreed is a convergence question answered "none" — the faintest step.
+ * ONE person has no convergence question at all: every run they marked carries
+ * the whole band, so 1 is the densest run and the relative rule puts it at the
+ * top. The peer count is what tells the two apart.
+ */
+check("one student's marks are the top of their own scale", heatBand(1, 1, 1), 5)
+check("and still the top however the max is read", heatBand(1, 5, 1), 5)
+check("two people who never agreed stay faint", heatBand(1, 1, 2), 1)
+check("a band of one still draws nothing where nothing was marked", heatBand(0, 1, 1), 0)
 /**
  * The case this is built for: ~60 looms on one reading (TJ, 2026-08-22). The
  * ramp must not saturate — the old absolute min(count, 5) painted 5 people and

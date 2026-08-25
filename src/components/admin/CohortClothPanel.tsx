@@ -282,6 +282,41 @@ export default function CohortClothPanel({
   }
 
   /**
+   * PICKING ON THE DRAWING REVEALS THE CARD (TJ, 2026-08-24: "should selecting
+   * a node or a link in the graph change what is shown in the concepts and
+   * threads? like we had selected one in their respective panels?").
+   *
+   * It already CHANGED it — the panels have always marked the picked card,
+   * `picked` on a concept and `sel` on a thread — but with 104 concepts and 69
+   * threads in two scrollboxes the mark was usually below the fold. Measured
+   * before this: picking a thread off the cloth marked its card at y=576 while
+   * the panel's box ended at 480 and its scrollTop stayed 0. A selection you
+   * cannot see is the same as no selection.
+   *
+   * `block: "nearest"` so a card already on screen is left exactly where it
+   * is: clicking a card must never make the list jump under the cursor, which
+   * is the failure mode of scrolling on every selection.
+   *
+   * Deferred a frame because the lists re-render with the new mark, and the
+   * element scrolled has to be the one that came out of that render.
+   */
+  const picked = `${selConcepts.join(",")}|${selThreads.join(",")}`
+  useEffect(() => {
+    const one = selConcepts.length === 1 && selThreads.length === 0
+    const oneThread = selThreads.length === 1 && selConcepts.length === 0
+    if (!one && !oneThread) return
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .querySelector(one ? ".canvasmenu .ywconcept.picked" : ".canvasmenu .ywthread.sel")
+        ?.scrollIntoView({ block: "nearest" })
+    })
+    return () => window.cancelAnimationFrame(frame)
+    // `picked` is the selection as one string — the arrays are rebuilt each
+    // render and would re-run this on every one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picked])
+
+  /**
    * What the drawing is told. One of anything keeps its own type, so a single
    * concept still lights its whole connected component and a single thread
    * still draws red — the behaviours that existed before multi-select. Any
@@ -428,6 +463,16 @@ export default function CohortClothPanel({
       const ends = [conceptById.get(edge.fromId), conceptById.get(edge.toId)].filter(
         (c): c is NonNullable<typeof c> => Boolean(c)
       )
+      /**
+       * What stands between the two concepts, and what is left to trail.
+       * `labelOf` before the legacy `handle`, the same resolution the cards
+       * use — a thread carrying a Link object and an empty handle used to
+       * read as unlabelled here.
+       */
+      const label = (labelOf(edge, state.links) ?? "").trim()
+      const description = (edge.sentence ?? "").trim()
+      const said = label || description
+      const trailing = label && description ? description : ""
       pane = (
         <div>
           {/* The read-out's HEADING, not a card: it names what is being read
@@ -436,14 +481,51 @@ export default function CohortClothPanel({
               resolved the card's way though — `labelOf` first, the legacy
               `handle` only as a fallback — because a thread carrying a Link
               object and an empty handle used to read as unlabelled here. */}
+          {/*
+            READ IT AS THE SENTENCE IT IS (TJ, 2026-08-24: "let put the label,
+            or if no label is available the description, between the concepts
+            instead of the badge. this way it reads more like a sentence,
+            which i believe was the intention").
+
+            It used to be a sage BADGE between the two concepts — or, with no
+            Link on the thread, a dashed pill reading the literal word
+            "description" — while the thread's own words trailed after the
+            author's name in quotes. Three facts in a row, and the one that
+            joins the two concepts was the one not standing between them.
+
+            So the middle is what the student SAID: the Link Label first, and
+            the Thread Description where no Link was ever coined. A thread
+            carrying both keeps its description trailing, because the label is
+            the short name for the claim and the description is the claim —
+            losing it to avoid a repetition would cost more than the
+            repetition.
+          */}
           <div className="threadhead">
-            <span className="red">{ends[0] ? conceptNameText(ends[0]) : "?"}</span>{" "}
-            {labelOf(edge, state.links)
-              ? <span className="vpill">{labelOf(edge, state.links)}</span>
-              : <span className="vpill loosev">description</span>}{" "}
+            <span className="red">{ends[0] ? conceptNameText(ends[0]) : "?"}</span>
+            {said ? (
+              <span className="said">{said}</span>
+            ) : (
+              /* THE ARROW THE CARDS DRAW (TJ, 2026-08-24: "in the threads we
+                 use an arrow, right?"). ThreadCard puts `.tarrow` between the
+                 ends of a thread carrying no label, and its comment gives the
+                 reason a stand-in WORD is wrong there: a glyph inside the
+                 label pill reads as "labelled", which is the mistake
+                 /admin/user/[id] made until it adopted that card. Bare here
+                 for the same reason. What is missing is said once, to the
+                 side, below. */
+              <span className="tarrow" aria-hidden="true">→</span>
+            )}
             <span className="red">{ends[1] ? conceptNameText(ends[1]) : "?"}</span>
             <span className="n">{who(edge.userId)}</span>
-            {edge.sentence ? <span className="footsaid">&ldquo;{edge.sentence}&rdquo;</span> : null}
+            {trailing ? <span className="footsaid">&ldquo;{trailing}&rdquo;</span> : null}
+            {/* THE CARD'S OWN WORDS FOR THE ABSENCE. "not described" rather
+                than a phrase invented here: it is what ThreadCard's pill says
+                in this exact state, and that card's comment settled why —
+                "a thread with no label AND no sentence has not been described
+                at all, and calling that 'description' was the one inaccurate
+                thing on the card". The read-out and the cards now agree, and
+                the cloth's dashed arc agrees with both. */}
+            {said ? null : <span className="vpill loosev">not described</span>}
           </div>
 
           <details className="footmore">

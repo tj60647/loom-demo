@@ -38,6 +38,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
   let concepts: LoomState["concepts"] = []
   let passages: LoomState["passages"] = []
   let edges: LoomState["edges"] = []
+  let links: LoomState["links"] = []
   let members: { id: string; name: string }[] = []
   let passagesUnavailable = false
   let aggregateUnavailable = false
@@ -56,6 +57,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     concepts = aggregate.concepts
     passages = aggregate.passages
     edges = aggregate.edges
+    links = aggregate.links
     members = aggregate.members
     passagesUnavailable = aggregate.passagesUnavailable
   } catch (error) {
@@ -63,7 +65,12 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     aggregateUnavailable = true
   }
 
-  const state: LoomState = { concepts, passages, edges, links: [], maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
+    /* `links` is no longer empty here (#34 review): a thread's label is a Link
+     since migration 0024, and `labelOf` cannot resolve `edge.linkId` without
+     them. It read correctly anyway because `edges.handle` is a dual-written
+     copy that labelOf falls back to — but that copy is legacy, and the day it
+     stops being written every thread here would have read as unlabelled. */
+  const state: LoomState = { concepts, passages, edges, links, maps: [], cloths: [], views: { cardTable: { positions: {}, bends: {} } } }
   const names = Object.fromEntries(members.map((member) => [member.id, member.name]))
 
   return (

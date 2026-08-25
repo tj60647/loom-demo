@@ -301,15 +301,32 @@ export function projectHeatSpans(
  * the scale on a handful of sentences. Against a densest run of 37 the steps
  * change at 3, 6, 11 and 18 — asserted in scripts/check-overlay.ts.
  */
-export function heatBand(count: number, maxCount: number): number {
+export function heatBand(count: number, maxCount: number, peers = 0): number {
   if (!(count > 0)) return 0
   /**
-   * NO RANGE TO GRADE. Everyone marked alone and nobody agreed with anybody,
-   * so there is no densest run to be darkest — every run is the same fact.
-   * The faintest step is the honest one: painting a whole reading at the top
-   * would say "they converged everywhere" when what happened is the opposite.
-   * My call, not TJ's, and the one place his "fully relative" rule has to be
-   * given a meaning rather than followed literally.
+   * ONE PERSON IS THE TOP OF THEIR OWN SCALE (TJ, 2026-08-24, looking at the
+   * legend with a single student chosen: "i think when the heatmap is showing
+   * one student, this should be the darkest of the ramp, this appears to be
+   * the lightest").
+   *
+   * He is right, and the case had been folded into the one below it. With a
+   * band of one there is no convergence to grade at all: every run they marked
+   * carries the whole band, so 1 IS the densest run and the relative rule puts
+   * it at the top. Reading it as "nobody agreed" is a category error — there
+   * was nobody to agree with.
+   */
+  if (peers === 1) return 5
+  /**
+   * NO RANGE TO GRADE, which is a different thing. MANY people marked, and
+   * every one of them marked alone — so there is a convergence question and
+   * the answer is none. The faintest step is the honest one: painting a whole
+   * reading at the top would say "they converged everywhere" when what
+   * happened is the opposite.
+   *
+   * Still my call rather than TJ's, and still the one place his "fully
+   * relative" rule has to be given a meaning rather than followed literally.
+   * What changed on 2026-08-24 is that it no longer swallows the single
+   * student, who was never what it was written about.
    */
   if (maxCount <= 1) return 1
   const position = Math.log(Math.min(count, maxCount)) / Math.log(maxCount)

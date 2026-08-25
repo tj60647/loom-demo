@@ -567,6 +567,19 @@ async function main() {
       [0, 1, "What the trades could not say to each other ends up settled in the object.", "makes possible"],
       // Described but not yet coined — the visible unlabeled-link state.
       [2, 3, "You join by doing the work badly next to someone doing it well.", ""],
+      /**
+       * DRAWN AND NEVER SPOKEN — no Link, no description. The third of the
+       * three states a thread can be in, and the only one no seeded account
+       * had: measured 2026-08-24, every bare thread on the dev database
+       * belonged to a REAL person, which is why the read-out's arrow passed
+       * locally and failed on CI's fresh seed.
+       *
+       * Legal by P0.3 ("you can throw now and write it later"), and it is
+       * what ThreadCard's "not described" pill and the cloth's dashed arc are
+       * drawn for. A fixture that cannot reach a state the UI renders is a
+       * fixture that lets that state rot.
+       */
+      [0, 3, "", ""],
     ]
   )
 
@@ -949,7 +962,7 @@ async function main() {
   console.log(`[seed-demo] ${USER_A.email}: ${tally.concepts} concepts · ${tally.passages} passages from 2 readings · ${tally.edges} threads · ${tally.links} links (1 glossed, 1 with no thread) · ${tally.maps} maps`)
   console.log(`[seed-demo] ${USER_B.email}: enrolled, empty`)
   console.log(`[seed-demo] ${USER_C.email}: 3 concepts · 3 passages · 1 thread — a colleague in ${DEMO_SECTION.name}`)
-  console.log(`[seed-demo] ${USER_D.email}: 4 concepts · 4 passages · 2 threads (1 unlabeled) — a colleague in ${DEMO_SECTION.name}`)
+  console.log(`[seed-demo] ${USER_D.email}: 4 concepts · 4 passages · 3 threads (1 unlabeled, 1 never spoken) — a colleague in ${DEMO_SECTION.name}`)
   console.log(`[seed-demo] E-I: ${deepPassages} passages and ${deepMaps} projections across ${readable.length} readings, plus a depth ladder on ${READING_A} (runs of 8, 4, 2 and 1)`)
   console.log(`[seed-demo] ${INVITED_EMAIL}: invited, never signed in`)
   if (unusable.length) {

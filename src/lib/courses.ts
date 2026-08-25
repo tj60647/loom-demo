@@ -174,7 +174,10 @@ export async function listCourseFaculty(courseId: string): Promise<CourseFaculty
         isNull(courseMemberships.removedAt)
       )
     )
-    .orderBy(asc(users.name), asc(users.email))
+    // Case-insensitive for the reason admin/layout.tsx gives at its own
+    // ordering: this database's collation is C.UTF-8, so a plain sort files
+    // every capital ahead of every lowercase letter.
+    .orderBy(asc(sql`lower(${users.name})`), asc(sql`lower(${users.email})`))
 }
 
 /**

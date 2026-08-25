@@ -204,3 +204,172 @@ test.describe("authorization boundary", () => {
     await expect(page).toHaveURL(/\/$/, { timeout: 15_000 })
   })
 })
+
+/**
+ * A THREAD READS AS A SENTENCE (TJ, 2026-08-24: "let put the label, or if no
+ * label is available the description, between the concepts instead of the
+ * badge. this way it reads more like a sentence, which i believe was the
+ * intention").
+ *
+ * The read-out used to put a sage badge between the two concepts — or, with no
+ * Link on the thread, a dashed pill reading the literal word "description" —
+ * and trail the thread's own words after the author's name. Three facts in a
+ * row, with the one that joins the concepts not standing between them.
+ */
+test("the cohort read-out says a thread between its two concepts", async ({ page }) => {
+  await page.goto("/admin/aggregate")
+  const cards = page.locator(".ywthread")
+  await expect(cards.first()).toBeVisible({ timeout: 30_000 })
+
+  /**
+   * Some threads are drawn and never spoken — no Link, no description — and
+   * those keep a dashed pill, since a gap would read as a rendering fault. So
+   * this walks until it finds one with something to say rather than assuming
+   * the first seeded thread has any.
+   */
+  let spoken: string | null = null
+  const head = page.locator(".threadhead")
+  const tries = Math.min(await cards.count(), 8)
+  for (let i = 0; i < tries; i += 1) {
+    await cards.nth(i).click()
+    await expect(head).toBeVisible({ timeout: 15_000 })
+    const shape = await head.evaluate((el) =>
+      Array.from(el.children).map((child) => child.className)
+    )
+    if (shape[1]?.includes("said")) {
+      // BETWEEN the two concepts, which is the whole change: a red name, what
+      // the student said, the other red name.
+      expect(shape[0]).toContain("red")
+      expect(shape[2]).toContain("red")
+      spoken = (await head.locator(".said").innerText()).trim()
+      break
+    }
+  }
+
+  expect(spoken, "no seeded thread carries a label or a description — run `npm run seed:demo`").not.toBeNull()
+  expect(spoken!.length).toBeGreaterThan(0)
+  // And it is the student's words, never the name of the field they are in.
+  expect(spoken).not.toBe("description")
+
+  // The badge that used to stand there is gone from every read-out.
+  await expect(page.locator(".threadhead .vpill", { hasText: /^description$/ })).toHaveCount(0)
+})
+
+/**
+ * A THREAD WITH NOTHING TO SAY KEEPS THE CARDS' ARROW (TJ, 2026-08-24: "in the
+ * threads we use an arrow, right? maybe the side not is ... something like
+ * that that matches language").
+ *
+ * ThreadCard draws `.tarrow` between the ends of an unlabelled thread and
+ * calls the state "not described" on its pill. The read-out now says both the
+ * same way, so the two surfaces and the cloth's dashed arc agree.
+ */
+test("an undescribed thread reads as an arrow, and says what is missing", async ({ page }) => {
+  await page.goto("/admin/aggregate")
+  await expect(page.locator(".ywthread").first()).toBeVisible({ timeout: 30_000 })
+
+  /**
+   * NARROWED TO THE FIXTURE, not walked from the top of a list of seventy.
+   *
+   * The first version clicked the first eight thread cards looking for a bare
+   * one. That passed here and failed on CI, and the difference was the
+   * database rather than the code: every bare thread on the dev machine
+   * belonged to a REAL person, and the seed had none at all. It has one now —
+   * Test User D's "object world talk → apprenticeship", thrown and never
+   * spoken — but there is no reason it should sort into the first eight of
+   * however many the cohort has drawn.
+   *
+   * "apprenticeship" is D's alone among the seeded vocabularies, so the panel
+   * filter cuts the list to that person's two threads: one described, one
+   * not. Which is which is exactly what the read-out is being asked.
+   */
+  await page.locator('input[placeholder="filter threads"]').fill("apprenticeship")
+  const cards = page.locator(".ywthread")
+  await expect(cards.first()).toBeVisible({ timeout: 15_000 })
+  const count = await cards.count()
+  expect(count, "the seed must give Test User D threads onto 'apprenticeship'").toBeGreaterThan(0)
+
+  const head = page.locator(".threadhead")
+  let found = false
+  for (let i = 0; i < count; i += 1) {
+    await cards.nth(i).click()
+    await expect(head).toBeVisible({ timeout: 15_000 })
+    const parts = await head.evaluate((el) =>
+      Array.from(el.children).map((child) => child.className)
+    )
+    if (parts[1]?.includes("tarrow")) {
+      // An arrow between the two concepts, never a stand-in word.
+      expect(parts[0]).toContain("red")
+      expect(parts[2]).toContain("red")
+      // And the absence named once, to the side, in the cards' own words.
+      await expect(head.locator(".vpill")).toHaveText("not described")
+      found = true
+      break
+    }
+  }
+  expect(found, "the seed must carry one thread with neither a label nor a description").toBe(true)
+})
+
+/**
+ * PICKING ON THE DRAWING REVEALS THE CARD (TJ, 2026-08-24: "should selecting a
+ * node or a link in the graph change what is shown in the concepts and
+ * threads? like we had selected one in their respective panels?").
+ *
+ * It always CHANGED it — the panels have marked the picked card all along —
+ * but with a hundred concepts in a scrollbox the mark sat below the fold, and
+ * a selection you cannot see is the same as no selection. Measured before the
+ * fix: a thread picked off the cloth marked its card at y=576 while the
+ * panel's box ended at 480 and its scrollTop stayed 0.
+ */
+test("picking on the cloth scrolls the panels to what was picked", async ({ page }) => {
+  await page.goto("/admin/aggregate")
+  await expect(page.locator("#map").first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator(".ywconcept").first()).toBeVisible({ timeout: 30_000 })
+
+  const cards = page.locator(".ywconcept")
+  expect(
+    await cards.count(),
+    "the panel must list more concepts than fit, or this proves nothing"
+  ).toBeGreaterThan(10)
+
+  /**
+   * THE SCROLL ITSELF IS THE ASSERTION, not the visibility.
+   *
+   * Two earlier shapes of this test were wrong and both passed. One clicked a
+   * node 70% along the warp — the MAP's order, while the panel sorts by name,
+   * so the card could already be in view and nothing had to move (caught in
+   * review on #34). The next tried to target one named concept, and could
+   * not: the cloth's labels are rotated and packed along 208 nodes, so a
+   * click aimed at "XYZ" landed on a neighbour's hit target and selected
+   * "knowledge diagramming" instead.
+   *
+   * So this does not care WHICH concept it lands on. It presses nodes until
+   * the panel's scrollbox has moved off zero, which can only happen if the
+   * pick was below the fold — and then requires the marked card to be in
+   * view. A run where nothing ever scrolled fails rather than passing quietly.
+   */
+  const scroller = page.locator(".canvasmenu.atleft .scrollbox").first()
+  expect(await scroller.evaluate((el) => el.scrollTop), "the panel starts at rest").toBe(0)
+
+  const nodes = page.locator("#map circle")
+  const total = await nodes.count()
+  let scrolled = false
+  for (let i = 0; i < 6 && !scrolled; i += 1) {
+    await nodes.nth(Math.floor((total * (i + 1)) / 8)).click({ force: true })
+    await page.waitForTimeout(1_200)
+    scrolled = (await scroller.evaluate((el) => el.scrollTop)) > 0
+  }
+  expect(scrolled, "no pick ever moved the concepts panel").toBe(true)
+
+  // And what it scrolled to is the card that was picked.
+  const picked = page.locator(".ywconcept.picked").first()
+  await expect(picked).toBeVisible({ timeout: 10_000 })
+  expect(
+    await picked.evaluate((el) => {
+      const box = el.getBoundingClientRect()
+      const within = el.closest(".scrollbox")!.getBoundingClientRect()
+      return box.bottom > within.top && box.top < within.bottom
+    }),
+    "the panel scrolled, but not to the picked card"
+  ).toBe(true)
+})

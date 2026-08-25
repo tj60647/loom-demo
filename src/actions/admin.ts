@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/db"
-import { users, concepts, passages, passageConcepts, edges, cloths, sources, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
+import { users, concepts, passages, passageConcepts, edges, links, cloths, sources, courseMemberships, courseAllowedEmails, sections, sessions } from "@/db/schema"
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { getServerSession } from "next-auth/next"
 import { authOptions, emailHasAppAccess, isAdminUser } from "@/lib/auth"
@@ -650,7 +650,7 @@ export async function getAggregateLoomData(
 ) {
   const courseId = await resolveCourseId(courseIdRaw)
   if (!courseId) {
-    return { concepts: [], passages: [], edges: [], members: [], passagesUnavailable: false }
+    return { concepts: [], passages: [], edges: [], links: [], members: [], passagesUnavailable: false }
   }
   await checkCourseFaculty(courseId)
 
@@ -662,7 +662,7 @@ export async function getAggregateLoomData(
   const userIds = studentId ? memberIds.filter((id) => id === studentId) : memberIds
 
   if (userIds.length === 0) {
-    return { concepts: [], passages: [], edges: [], members: [], passagesUnavailable: false }
+    return { concepts: [], passages: [], edges: [], links: [], members: [], passagesUnavailable: false }
   }
 
   const allConcepts = await db
@@ -673,6 +673,21 @@ export async function getAggregateLoomData(
     .select()
     .from(edges)
     .where(and(eq(edges.courseId, courseId), inArray(edges.userId, userIds)))
+  /**
+   * THE LINKS THE THREADS POINT AT, because a thread's label is a Link now
+   * (migration 0024) and `labelOf` cannot resolve `edge.linkId` without them.
+   *
+   * This page passed `links: []` and got away with it: `edges.handle` is a
+   * dual-written copy of the Link Label, still written on every label write
+   * (actions/loom.ts), so `labelOf` fell through to the handle and read the
+   * right word. The day that copy stops being written — it is legacy and
+   * AGENTS.md says so — every thread on the cohort graph would have quietly
+   * read as unlabelled. Caught in review on #34.
+   */
+  const allLinks = await db
+    .select()
+    .from(links)
+    .where(and(eq(links.courseId, courseId), inArray(links.userId, userIds)))
 
   // Who wove what: the aggregate pools every student's rows, so the same
   // label can appear once per student — attribution is what tells them apart.
@@ -696,7 +711,7 @@ export async function getAggregateLoomData(
       )
     const folded = await foldConceptIds(allPassages)
     if (!sourceId) {
-      return { concepts: allConcepts, passages: folded, edges: allEdges, members, passagesUnavailable: false }
+      return { concepts: allConcepts, passages: folded, edges: allEdges, links: allLinks, members, passagesUnavailable: false }
     }
     // Evidenced HERE: the concepts these passages point at, and the threads
     // whose ends both survive that. A thread with one end outside the reading
@@ -708,12 +723,13 @@ export async function getAggregateLoomData(
       concepts: scopedConcepts,
       passages: folded,
       edges: scopedEdges,
+      links: allLinks,
       members,
       passagesUnavailable: false,
     }
   } catch (error) {
     // Fail soft so aggregate map still renders if passage schema/data is temporarily inconsistent.
     console.error("[getAggregateLoomData] Failed to load passages for aggregate view", error)
-    return { concepts: allConcepts, passages: [], edges: allEdges, members, passagesUnavailable: true }
+    return { concepts: allConcepts, passages: [], edges: allEdges, links: allLinks, members, passagesUnavailable: true }
   }
 }

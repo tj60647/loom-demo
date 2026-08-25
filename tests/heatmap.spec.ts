@@ -615,3 +615,67 @@ test("cards asked for one student are not shown for the next", async ({ page }) 
   await expect(cardsToggle(page)).toHaveText(/show cards/i, { timeout: 25_000 })
   await expect(page.locator(".pdf-railcard")).toHaveCount(0)
 })
+
+/**
+ * ONE STUDENT IS THE TOP OF THEIR OWN SCALE (TJ, 2026-08-24: "i think when the
+ * heatmap is showing one student, this should be the darkest of the ramp, this
+ * appears to be the lightest").
+ *
+ * Both a lone student and a whole cohort who never agreed arrive as maxCount 1,
+ * and they mean opposite things. Many people who never converged is a question
+ * answered "none" — the faintest step. One person has no convergence question
+ * at all: every run they marked carries the whole band. The peer count is what
+ * tells the two apart (heatRects.heatBand).
+ */
+test("one student's marks are drawn at the darkest step, not the faintest", async ({ page }) => {
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
+  await chooseAStudent(page)
+
+  const drawn = page.locator(".pdf-kept-heat rect")
+  await expect(drawn.first()).toBeVisible({ timeout: 25_000 })
+
+  // Every mark at the top step, because every run is the densest run.
+  const bands = await drawn.evaluateAll((els) =>
+    Array.from(new Set(els.map((el) => el.getAttribute("data-heat"))))
+  )
+  expect(bands).toEqual(["5"])
+
+  /**
+   * And the legend agrees: one swatch, and it is the dark end. Two swatch
+   * counts of one exist and they draw opposite ends — which one is showing is
+   * how a reader tells the two cases apart, so asserting "one swatch" alone
+   * would pass on the faint one this replaced.
+   */
+  const swatches = page.locator(".pdf-overlay-scale i")
+  await expect(swatches).toHaveCount(1)
+  await expect(swatches.first()).toHaveAttribute("data-heat", "5")
+  // No low end to name when one swatch is the whole scale.
+  await expect(page.locator(".pdf-overlay-scale .cap")).toHaveCount(1)
+  await expect(page.locator(".pdf-overlay-bar")).toContainText(/1 student/i)
+})
+
+/**
+ * THE STUDENT PICKER READS IN ORDER (TJ, 2026-08-24: "the student dropdown
+ * should be in alphabetical order. keep all students at the top").
+ *
+ * It followed whatever order the roster query returned — neither alphabetical
+ * nor stable enough to learn, which makes a picker of sixty names one you
+ * scroll twice.
+ */
+test("the student picker is alphabetical, with All students held at the top", async ({ page }) => {
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
+  const picker = page.getByLabel("Select active student")
+  await expect(picker).toBeVisible({ timeout: 20_000 })
+
+  const names = await picker.locator("option").evaluateAll((opts) =>
+    (opts as HTMLOptionElement[]).map((o) => (o.textContent ?? "").trim())
+  )
+  expect(names.length, "the seed must place students in this course").toBeGreaterThan(2)
+
+  // The scope you come back to, not one of the people — so it does not sort.
+  expect(names[0]).toBe("All students")
+
+  const people = names.slice(1)
+  const inOrder = [...people].sort((a, b) => a.localeCompare(b))
+  expect(people).toEqual(inOrder)
+})

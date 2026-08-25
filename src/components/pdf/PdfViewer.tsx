@@ -1651,7 +1651,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                      */
                     el.setAttribute(
                       "data-heat",
-                      String(heatBand(span.count, overlayRef.current?.maxCount ?? 1))
+                      String(heatBand(span.count, overlayRef.current?.maxCount ?? 1, overlayRef.current?.peers ?? 0))
                     );
                     // The count is reported in the status line, in words. A
                     // per-span label would put "3 people" between a screen
@@ -3603,16 +3603,29 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                 className={`pdf-overlay-scale${viewMode === "matrix" ? " flat" : ""}`}
                 data-tip="the darkest step is the densest run in THIS reading, whatever number that is — the scale is its own range, so shades never compare between readings; read the number, not the colour. You are never in the count: an overlay always leaves the viewer out."
               >
-                <span className="cap">1</span>
+                {/* The low end of the range, and there is no range to have a
+                    low end of when one swatch is the whole scale. */}
+                {overlay.peers === 1 || overlay.maxCount <= 1 ? null : <span className="cap">1</span>}
                 {/* THE WHOLE RAMP, because the whole ramp is in play. The
                     scale is fully relative, so a reading whose densest run is
                     three people still spreads those three counts across the
                     five steps — drawing three swatches would describe a scale
-                    the page is not using. The one exception is a reading where
-                    nobody agreed with anybody: there is no range then, every
-                    run paints the faintest step, and one swatch is the whole
-                    truth. */}
-                {(overlay.maxCount <= 1 ? [1] : [1, 2, 3, 4, 5]).map((step) => (
+                    the page is not using.
+
+                    Two exceptions, and they draw OPPOSITE ends. A band of one
+                    person has no convergence to grade, so their marks are the
+                    top of their own scale and the swatch is the darkest (TJ,
+                    2026-08-24: "when the heatmap is showing one student, this
+                    should be the darkest of the ramp"). A band of MANY where
+                    nobody agreed with anybody has a convergence question whose
+                    answer is none, so it stays the faintest. Both draw one
+                    swatch; which one it is says which case you are in. */}
+                {(overlay.peers === 1
+                  ? [5]
+                  : overlay.maxCount <= 1
+                    ? [1]
+                    : [1, 2, 3, 4, 5]
+                ).map((step) => (
                   <i key={step} data-heat={step} aria-hidden="true" />
                 ))}
                 {/* STUDENTS, and singular when there is one. "1 people" was
@@ -3852,6 +3865,8 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
                  fit-all — where no page has a text layer to measure. */
               heatRects={heatRectsByPage}
               heatMax={overlay?.maxCount ?? 1}
+              /* A band of one has no convergence to grade: see heatBand. */
+              heatPeers={overlay?.peers ?? 0}
               pdf={pdfProxy}
               numPages={numPages ?? 0}
               basePageWidth={matrixBaseWidth}
