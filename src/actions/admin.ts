@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache"
 import { ensureFacultySection, listFacultyCourseIds, resolveCourseId, resolveSectionId } from "@/lib/courses"
 
 import { redirect } from "next/navigation"
+import { logWarn } from "@/lib/log"
 
 export async function checkAdmin() {
   const session = await getServerSession(authOptions)
@@ -729,7 +730,7 @@ export async function getAggregateLoomData(
     }
   } catch (error) {
     // Fail soft so aggregate map still renders if passage schema/data is temporarily inconsistent.
-    console.error("[getAggregateLoomData] Failed to load passages for aggregate view", error)
+    logWarn("aggregate.passages-failed", { cause: error })
     return { concepts: allConcepts, passages: [], edges: allEdges, links: allLinks, members, passagesUnavailable: true }
   }
 }

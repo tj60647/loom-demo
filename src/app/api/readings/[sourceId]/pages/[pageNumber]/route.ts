@@ -3,6 +3,7 @@ import { getSourceFileMeta } from "@/actions/sources"
 import { ensureSourcePageImages, getSourcePageImageKey, PAGE_IMAGE_WIDTHS, type PageImageWidth } from "@/lib/pdfPages"
 import { readingStorage } from "@/lib/storage"
 import { hashText } from "@/lib/hash"
+import { logError } from "@/lib/log"
 
 /**
  * One pre-rendered page image, at one of the fixed widths (?w=320|1280).
@@ -65,7 +66,7 @@ export async function GET(
     if (message === "Not found") {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
-    console.error(`[readings] failed to serve page image ${sourceId} p${page} w${width}:`, error)
+    logError("page-image.serve-failed", { sourceId, pageNumber: page, width, cause: error })
     return NextResponse.json({ error: "Could not read this image" }, { status: 500 })
   }
 }

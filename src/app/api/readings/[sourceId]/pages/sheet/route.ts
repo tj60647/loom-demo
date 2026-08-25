@@ -3,6 +3,7 @@ import { getSourceFileMeta } from "@/actions/sources"
 import { ensureSourceSheet, getSourceSheetKey, SHEET_WIDTH } from "@/lib/pdfPages"
 import { readingStorage } from "@/lib/storage"
 import { hashText } from "@/lib/hash"
+import { logError } from "@/lib/log"
 
 /**
  * The whole-document sheet: the matrix contact sheet as one image, so the
@@ -44,7 +45,7 @@ export async function GET(
     if (message === "Not found") {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
-    console.error(`[readings] failed to serve sheet for ${sourceId}:`, error)
+    logError("sheet.serve-failed", { sourceId, cause: error })
     return NextResponse.json({ error: "Could not read this image" }, { status: 500 })
   }
 }

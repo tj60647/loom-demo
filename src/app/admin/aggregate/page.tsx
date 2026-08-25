@@ -2,6 +2,7 @@ import { getAggregateLoomData, getStaffViewer } from "@/actions/admin"
 import CohortClothPanel from "@/components/admin/CohortClothPanel"
 import { firstParam, resolveSectionId } from "@/lib/courses"
 import type { LoomState } from "@/lib/types"
+import { logError } from "@/lib/log"
 
 type AggregatePageSearchParams = {
   course?: string | string[]
@@ -61,7 +62,7 @@ export default async function AggregateLoomPage({ searchParams }: { searchParams
     members = aggregate.members
     passagesUnavailable = aggregate.passagesUnavailable
   } catch (error) {
-    console.error("[AggregateLoomPage] Aggregate query failed", error)
+    logError("aggregate.query-failed", { cause: error })
     aggregateUnavailable = true
   }
 

@@ -15,7 +15,7 @@ import {
   verifiedCandidates,
 } from "@/lib/signIn"
 import { recordAuthEvent } from "@/lib/authEvent"
-import { logInfo } from "@/lib/log"
+import { logError, logInfo, logWarn } from "@/lib/log"
 
 const ADMIN_FALLBACK_EMAILS = new Set([
   "tjm@tjmcleish.com",
@@ -123,9 +123,11 @@ function guestEmailProvider(): Provider {
         // throwing here is what turns it into the EmailSignin page. The
         // address is already known to the roster, so logging it reveals
         // nothing the sender did not have.
-        console.error(
-          `[auth] Resend refused the sign-in link for ${identifier}: ${res.status} ${await res.text()}`
-        )
+        logError("auth.link-send-failed", {
+          email: identifier,
+          status: res.status,
+          body: await res.text(),
+        })
         throw new Error("could not send the sign-in link")
       }
     },
@@ -190,7 +192,7 @@ export const authOptions: NextAuthOptions = {
             // address must not authorize anybody. The student gets the
             // "no confirmed email" screen; this line is how we tell the two
             // causes apart afterwards.
-            console.error(`[auth] GET /user/emails failed: ${res.status} ${res.statusText}`)
+            logWarn("auth.emails-fetch-failed", { status: res.status, statusText: res.statusText })
           }
 
           const resolution = await resolveIdentityEmail(candidates, emailHasAppAccess)

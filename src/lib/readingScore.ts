@@ -31,6 +31,7 @@ import { probeHighlights } from "@/lib/highlightProbe"
 import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
 import { readingStorage } from "@/lib/storage"
 import { isJudgeConfigured, judgeModelName, requestChatCompletion } from "@/lib/openrouter"
+import { logWarn } from "@/lib/log"
 
 /**
  * Share of pages a line must appear on before it is page furniture rather than
@@ -886,7 +887,7 @@ export async function judgeSourceScore(sourceId: string) {
       })
       .where(eq(sourceScores.sourceId, sourceId))
   } catch (error) {
-    console.warn(`[Loom] Extraction judge failed for source ${sourceId}`, error)
+    logWarn("score.judge-failed", { sourceId, cause: error })
   }
 }
 
@@ -932,13 +933,13 @@ export async function rescoreSource(sourceId: string) {
         await readingStorage.put(getSourceCoverKey(sourceId), coverBuffer)
         coverRendered = true
       } catch (error) {
-        console.warn(`[Loom] Cover re-render failed for source ${sourceId}`, error)
+        logWarn("score.cover-rerender-failed", { sourceId, cause: error })
         coverRendered = false
       }
     } catch (error) {
       // The blob itself was unreachable: nothing was measured, so nothing
       // about the previous verdict changes.
-      console.warn(`[Loom] Rescore could not fetch the file for source ${sourceId}`, error)
+      logWarn("score.file-unavailable", { sourceId, cause: error })
     }
   }
 

@@ -30,6 +30,7 @@
 import { PDFDocument, StandardFonts } from "pdf-lib"
 import { createCanvas } from "@napi-rs/canvas"
 import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
+import { logWarn } from "@/lib/log"
 
 /**
  * Render resolution for the replacement page image. High enough that the page
@@ -161,7 +162,12 @@ export async function repairPageTextLayers(
         for (const box of boxes) {
           if (!box.text.trim()) continue
           const { safe, dropped } = winAnsiSafe(box.text, font)
-          if (dropped > 0) console.warn(`[textLayerRepair] p${transcription.pageNumber}: ${dropped} unencodable character(s) became spaces`)
+          if (dropped > 0)
+            logWarn("repair.unencodable-characters", {
+              pageNumber: transcription.pageNumber,
+              dropped,
+              became: "spaces",
+            })
           if (!safe.trim()) continue
           replacement.drawText(safe, {
             x: box.x,
@@ -177,7 +183,12 @@ export async function repairPageTextLayers(
         // the page. Selection and search work; the highlight rectangle is
         // approximate, which the review record says plainly.
         const { safe, dropped } = winAnsiSafe(transcription.text, font)
-        if (dropped > 0) console.warn(`[textLayerRepair] p${transcription.pageNumber}: ${dropped} unencodable character(s) became spaces`)
+        if (dropped > 0)
+          logWarn("repair.unencodable-characters", {
+            pageNumber: transcription.pageNumber,
+            dropped,
+            became: "spaces",
+          })
         const lines = safe.split("\n").filter((line) => line.trim())
         const lineHeight = Math.min(14, Math.max(8, (height - 72) / Math.max(1, lines.length)))
         lines.forEach((line, lineIndex) => {

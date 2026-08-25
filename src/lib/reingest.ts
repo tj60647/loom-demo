@@ -33,6 +33,7 @@ import { renderSourcePageImages } from "@/lib/pdfPages"
 import { readingStorage } from "@/lib/storage"
 import { recordHeuristicScore } from "@/lib/readingScore"
 import { hashText } from "@/lib/hash"
+import { logWarn } from "@/lib/log"
 
 export type ReingestResult = {
   sourceId: string
@@ -99,7 +100,7 @@ export async function reingestSource(
   } catch (error) {
     // A reading whose opening pages are genuinely blank has no cover to render.
     // That is recorded by the score, not a reason to fail the re-ingest.
-    console.warn("[Loom] Cover render failed during re-ingest", error)
+    logWarn("reingest.cover-failed", { cause: error })
   }
 
   // And the page images — the viewer's contact sheet reads THESE, not the
@@ -109,7 +110,7 @@ export async function reingestSource(
   try {
     await renderSourcePageImages(sourceId, buffer)
   } catch (error) {
-    console.warn("[Loom] Page image render failed during re-ingest", error)
+    logWarn("reingest.page-images-failed", { cause: error })
   }
 
   await recordHeuristicScore(sourceId, pages, { coverRendered, structure })
