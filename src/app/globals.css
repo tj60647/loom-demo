@@ -1844,7 +1844,13 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 /* The gate's decisions. Four columns, the address given the room since it is
    what a reader scans for; the outcome sits beside it rather than being
    inferred from a colour alone. */
-.signinhead,.signinrow{display:grid;grid-template-columns:150px minmax(200px,1fr) 160px 90px;gap:6px 14px;align-items:center;padding:5px 14px}
+/* FIVE COLUMNS FOR FOUR FIELDS. The slack used to sit on `address`, which at
+   1536 made it ~950px wide and threw `outcome` and `via` against the right
+   edge with a 700px gulf between a row's own facts. The fifth column carries
+   no element — grid simply leaves it empty — so the four read as one group at
+   the left while the rules still span the card. Measured at 1536 on the
+   running app, 2026-08-25. */
+.signinhead,.signinrow{display:grid;grid-template-columns:150px minmax(220px,330px) 170px 90px 1fr;gap:6px 14px;align-items:center;padding:5px 14px}
 .signinhead{border-bottom:1px solid var(--rule);padding-top:7px;padding-bottom:7px}
 .signinrow{border-top:1px solid var(--rule)}
 .signinrow:first-of-type{border-top:0}
