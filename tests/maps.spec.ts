@@ -127,8 +127,22 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
   const essenceSaved = responseCarrying(page, 'One line written by the Playwright suite.');
   await page.locator('#mapEssence').blur();
   await essenceSaved;
+
+  // Controlled text updates must happen in the input event. Deferring them
+  // through a resolved Promise makes React replace the textarea value after
+  // each keypress, which moves the caret to the end.
+  const paragraph = page.locator('#yourRead2');
+  await paragraph.fill('Alpha omega.');
+  await paragraph.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(6, 6));
+  await paragraph.pressSequentially('middle ', { delay: 50 });
+  await expect(paragraph).toHaveValue('Alpha middle omega.');
+  expect(await paragraph.evaluate((element: HTMLTextAreaElement) => element.selectionStart)).toBe(13);
+  const paragraphSaved = responseCarrying(page, 'Alpha middle omega.');
+  await paragraph.blur();
+  await paragraphSaved;
+
   // The claim under test is that THIS map kept its own name, tiers and
-  // essence across a reload — so select it by name rather than leaning on
+  // text across a reload — so select it by name rather than leaning on
   // which map the switcher happens to open on. That default (most recently
   // updated) is a client-side cursor, not an artifact, and asserting it here
   // made the test fail for a reason it was never about.
@@ -141,6 +155,7 @@ test('a new map holds its own tiers and essence', async ({ page }) => {
     await tempChip.click();
     await expect(tempChip).toHaveClass(/on/, { timeout: 5000 });
     await expect(page.locator('#mapEssence')).toHaveValue('One line written by the Playwright suite.', { timeout: 2000 });
+    await expect(page.locator('#yourRead2')).toHaveValue('Alpha middle omega.', { timeout: 2000 });
     if (hasConcepts) {
       await expect(page.locator('#triageList .trow').first().locator('.tierchips .tchip').first()).toHaveClass(/on/, { timeout: 2000 });
     }
