@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { logError } from "@/lib/log"
 
 /**
  * The server half of src/lib/reads.ts: answer a GET by running a server-side
@@ -28,7 +29,7 @@ export async function respondWithRead(
     if (message === "Not found") {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
-    console.error(`[reads] ${label} failed:`, error)
+    logError("read.failed", { read: label, cause: error })
     const shown = opts?.errors === "verbatim" ? message : "Could not read just now"
     return NextResponse.json({ error: shown }, { status: 500 })
   }

@@ -13,6 +13,7 @@ import { scopeFromKey, scopeOf } from "@/lib/scope"
 import type { Passage, CardTableView, GraphEvent, Link, LoomMap, LoomViews, PassageTier, Tier } from "@/lib/types"
 import { textLayerProjection } from "@/lib/pdfText"
 import { authorizeSourceAccess } from "@/actions/sources"
+import { logWarn } from "@/lib/log"
 
 async function getUserId() {
   const session = await getServerSession(authOptions)
@@ -141,7 +142,7 @@ async function pruneViews(
       }
     }
   } catch (e) {
-    console.warn("[pruneViews] failed", e)
+    logWarn("views.prune-failed", { userId, courseId, cause: e })
   }
 }
 
@@ -396,9 +397,19 @@ export async function createPassage(data: { conceptIds?: string[], source: strin
       } else {
         pageContentHash = data.pageContentHash ?? page.contentHash
         if (canonicalIndex === -1) {
-          console.warn(`[createPassage] Could not anchor passage content to sourcePage ${data.sourceId}#${data.pageNumber}; falling back to client-provided offsets.`)
+          logWarn("passage.anchor-not-found", {
+            userId,
+            sourceId: data.sourceId,
+            pageNumber: data.pageNumber,
+            kept: "client-offsets",
+          })
         } else {
-          console.warn(`[createPassage] Browser text layer differs from sourcePage ${data.sourceId}#${data.pageNumber}; preserving client-provided offsets.`)
+          logWarn("passage.text-layer-differs", {
+            userId,
+            sourceId: data.sourceId,
+            pageNumber: data.pageNumber,
+            kept: "client-offsets",
+          })
         }
       }
     }

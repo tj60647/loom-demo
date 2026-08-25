@@ -1,5 +1,6 @@
 import { db } from "@/db"
 import { graphEvents } from "@/db/schema"
+import { logWarn } from "@/lib/log"
 
 /** What an event can be about. Stored as text; this union is the vocabulary. */
 export type EventEntity =
@@ -49,6 +50,8 @@ export async function recordEvent(
   try {
     await db.insert(graphEvents).values({ userId, courseId, kind, entityType, entityId, payload })
   } catch (e) {
-    console.warn(`[recordEvent] failed to record ${kind}`, e)
+    // `userId` and `courseId` are two lines above in the signature: without
+    // them this says "an event failed" where it could say whose.
+    logWarn("event.record-failed", { kind, userId, courseId, cause: e })
   }
 }

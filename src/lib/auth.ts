@@ -11,8 +11,11 @@ import {
   guestLinkEmail,
   normalizeEmail,
   resolveIdentityEmail,
+  SIGN_IN_ERROR,
   verifiedCandidates,
 } from "@/lib/signIn"
+import { recordAuthEvent } from "@/lib/authEvent"
+import { clamp, logError, logInfo, logWarn } from "@/lib/log"
 
 const ADMIN_FALLBACK_EMAILS = new Set([
   "tjm@tjmcleish.com",
@@ -120,9 +123,15 @@ function guestEmailProvider(): Provider {
         // throwing here is what turns it into the EmailSignin page. The
         // address is already known to the roster, so logging it reveals
         // nothing the sender did not have.
-        console.error(
-          `[auth] Resend refused the sign-in link for ${identifier}: ${res.status} ${await res.text()}`
-        )
+        // CLAMPED: the body is Resend's, not ours, and an upstream that
+        // answers with an HTML error page would put the whole page in one log
+        // line (Copilot, #35). The status is the fact worth querying on; the
+        // body is context, and 600 characters of it is enough to read.
+        logError("auth.link-send-failed", {
+          email: identifier,
+          status: res.status,
+          body: clamp(await res.text()),
+        })
         throw new Error("could not send the sign-in link")
       }
     },
@@ -187,10 +196,27 @@ export const authOptions: NextAuthOptions = {
             // address must not authorize anybody. The student gets the
             // "no confirmed email" screen; this line is how we tell the two
             // causes apart afterwards.
-            console.error(`[auth] GET /user/emails failed: ${res.status} ${res.statusText}`)
+            logWarn("auth.emails-fetch-failed", { status: res.status, statusText: res.statusText })
           }
 
           const resolution = await resolveIdentityEmail(candidates, emailHasAppAccess)
+          /**
+           * HOW MANY CONFIRMED ADDRESSES GITHUB OFFERED, said here because
+           * here is the only place that knows. It is the number a refusal
+           * most wants — "GitHub confirmed two addresses for them and the
+           * roster knew neither" is the whole diagnosis — and it cannot ride
+           * to the signIn callback, whose `user` is the provider's four
+           * mapped fields.
+           *
+           * The addresses themselves are not logged. A person's other
+           * identities are not ours to keep, and the count answers the
+           * question.
+           */
+          logInfo("auth.identity", {
+            candidates: candidates.length,
+            outcome: resolution.status,
+            email: resolution.email ?? "",
+          })
           profile.email = resolution.email
 
           // The full GitHub profile, not just Profile's four fields — the
@@ -217,8 +243,58 @@ export const authOptions: NextAuthOptions = {
     // The guest provider runs this too, and once *before* any mail goes out
     // (NextAuth calls it with email.verificationRequest at the send step), so
     // an address no course invited never receives a link. Both doors, one gate.
-    async signIn({ user }) {
-      return decideSignIn(user.email, emailHasAppAccess)
+    async signIn({ user, account, email }) {
+      const verdict = await decideSignIn(user.email, emailHasAppAccess)
+      /**
+       * THE GUEST DOOR ASKS TWICE, so it must not be written down twice.
+       *
+       * NextAuth calls this once at the SEND step (`email.verificationRequest`
+       * is true, and the comment above says why that is deliberate: an
+       * uninvited address never receives a link) and again when the link is
+       * CLICKED. Both evaluate the same address and reach the same verdict, so
+       * recording both would put two rows differing only in `at` against one
+       * sign-in, and the Sign-ins tab would read as somebody trying twice.
+       *
+       * The SEND step is the one kept, because it is the one that can be
+       * refused: a refusal there ends the flow and no click ever follows, so
+       * skipping it would lose exactly the decision worth having. The click
+       * that follows an allowed send tells us nothing the send did not.
+       *
+       * Unreachable today — the guest provider is registered only where
+       * RESEND_API_KEY and EMAIL_FROM are both set (`emailSignInConfigured`),
+       * which is no environment yet. Fixed while the code is in hand rather
+       * than left for whoever turns that door on.
+       */
+      const alreadyRecordedAtSend = account?.provider === "email" && !email?.verificationRequest
+      /**
+       * RECORDED HERE RATHER THAN INSIDE `decideSignIn`, which stays pure —
+       * scripts/check-auth.ts exercises it with an injected predicate and no
+       * database, and a gate that writes cannot be checked that way.
+       *
+       * How many addresses GitHub confirmed is NOT recorded here, though it is
+       * the number a refusal most wants: the provider's own `profile()` maps
+       * four fields and drops anything the userinfo override adds, so it never
+       * reaches `user`. It goes to the operational log from the override
+       * itself, where it is known — `auth.identity`.
+       */
+      if (!alreadyRecordedAtSend) await recordAuthEvent({
+        email: normalizeEmail(user.email) || String(user.email ?? ""),
+        outcome:
+          verdict === true
+            ? "allowed"
+            : verdict.includes(SIGN_IN_ERROR.noVerifiedEmail)
+              ? "no-verified-email"
+              : "not-on-roster",
+        provider: account?.provider ?? "",
+        /**
+         * Only worth carrying where the address is empty, which is the
+         * `no-verified-email` refusal: GitHub confirmed nothing, so without a
+         * name the row is anonymous and six refusals cannot be told from one
+         * person trying six times. Everywhere else the address IS the name.
+         */
+        handle: normalizeEmail(user.email) ? "" : (user.name ?? "").slice(0, 120),
+      })
+      return verdict
     },
     async session({ session, user }) {
       if (session.user) {

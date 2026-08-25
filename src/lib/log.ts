@@ -1,0 +1,132 @@
+/**
+ * ONE LINE PER EVENT, SHAPED TO BE QUERIED RATHER THAN READ.
+ *
+ * TJ, 2026-08-24, after a student could not sign in and the logs could not say
+ * who: "we need better logging then, correct? overall all the logs seem sparse
+ * and difficult to interpret."
+ *
+ * WHAT WAS SPARSE ABOUT THEM. Surveyed the same day: 50 `console` calls across
+ * src/ — 35 on server paths in 18 files, 15 in client components — most
+ * carrying an ad-hoc `[tag]` prefix, and every one of them about a FAILURE.
+ * (The first telling of this said 49 and 40. Both were wrong: the survey's own
+ * output was 28 warns + 21 errors + 1 log, which is 50, and the tag figure was
+ * a same-line grep that misses a call whose tag sits on a continuation line.
+ * Recounted with check-logging.ts's own regex against `git archive dev`.) Nothing recorded a decision the system made while working
+ * exactly as designed — which is most of what you want to know afterwards. A
+ * refused sign-in is not an error; it is the gate doing its job, and it left no
+ * trace at all.
+ *
+ * The other half was shape. Free prose cannot be filtered: "who was refused
+ * yesterday" is a question about fields, and `console.warn("[auth] refused: " +
+ * why)` has no fields. Vercel attaches console output to the request that
+ * produced it (each row in `vercel logs --json` carries its own `logs[]`), so a
+ * line that arrives as JSON becomes something you can search on rather than
+ * something you have to read.
+ *
+ * WHAT THIS IS NOT. Not pino, not winston. In a serverless function the process
+ * is gone before a transport is worth configuring, and the platform already
+ * does collection, correlation and retention. All that is missing is the shape,
+ * which is twenty lines.
+ *
+ * Not durable either. Vendor runtime logs age out, and anything you will want
+ * next week — who was refused, who was invited, who was removed — belongs in a
+ * row you own. This is the operational half; see the audit records for the
+ * other.
+ */
+
+export type LogLevel = "info" | "warn" | "error"
+
+/**
+ * The fields every line carries, so a query can rely on them existing.
+ *
+ * `event` is a dotted name — `auth.refused`, `ingest.failed` — for the same
+ * reason `graph_event.kind` is (`concept.create`, `passage.capture`): a
+ * vocabulary you can group by beats a sentence you have to match.
+ */
+export type LogFields = Record<string, unknown>
+
+/**
+ * WHY LEVELS ARE DEFINED HERE RATHER THAN LEFT TO TASTE. The 50 calls this
+ * replaces used 28 warns, 21 errors and 1 log more or less interchangeably,
+ * which
+ * makes the level useless as a filter — the first thing anyone reaches for.
+ *
+ *   error  a person has to act; something is broken and stays broken
+ *   warn   handled and degraded — a fallback ran, a retry saved it
+ *   info   a business event worth counting, working as designed
+ */
+const method: Record<LogLevel, (line: string) => void> = {
+  info: (line) => console.log(line),
+  warn: (line) => console.warn(line),
+  error: (line) => console.error(line),
+}
+
+/**
+ * An Error is not JSON — `JSON.stringify(new Error("x"))` is `{}`, which is the
+ * single most common way a log line ends up saying nothing. Unwrapped here so
+ * a caller can pass the caught thing directly and still get a message.
+ */
+function plain(value: unknown): unknown {
+  if (value instanceof Error) {
+    return { name: value.name, message: value.message, stack: value.stack?.split("\n").slice(0, 4) }
+  }
+  return value
+}
+
+/**
+ * THE THREE KEYS EVERY QUERY IS BUILT ON, which is why a caller cannot spend
+ * them. `logWarn("ingest.failed", { event: "upload" })` used to overwrite the
+ * event name with "upload", leaving a line that is valid JSON, plausible on
+ * screen, and unfindable by the name it was logged under — the failure is
+ * silent at the moment it matters most (Copilot caught this on #35). The
+ * caller's value is kept under a prefix rather than dropped: their field was
+ * worth passing, it is just not the frame.
+ */
+const RESERVED = new Set(["at", "level", "event"])
+
+/**
+ * Foreign text, cut to a length before it becomes a log line.
+ *
+ * For anything this process did not write: an upstream error body, a header, a
+ * report POSTed by a browser. One line per event only holds if the fields
+ * cannot be arbitrarily long, and a 40KB HTML error page from an API is a
+ * plausible way to lose a day's logs. Newlines need no handling — JSON.stringify
+ * escapes them, so the line stays one line.
+ *
+ * 600 is the client crash reporter's number, chosen there as "long enough for a
+ * real stack's first frames"; shared so both ends cut at the same place.
+ */
+export const CLAMP = 600
+export function clamp(value: unknown, limit = CLAMP): string {
+  return typeof value === "string" ? value.slice(0, limit) : ""
+}
+
+/**
+ * Emit one line.
+ *
+ * NEVER THROWS. A logger that can fail is a logger that takes down the path it
+ * was watching — the same reason `recordEvent` swallows its own errors
+ * (src/lib/graphEvent.ts). A circular structure in a caller's fields is a bug
+ * worth knowing about, not worth a 500.
+ */
+export function log(level: LogLevel, event: string, fields: LogFields = {}): void {
+  try {
+    const shaped: Record<string, unknown> = { at: new Date().toISOString(), level, event }
+    for (const [key, value] of Object.entries(fields)) {
+      shaped[RESERVED.has(key) ? `caller_${key}` : key] = plain(value)
+    }
+    method[level](JSON.stringify(shaped))
+  } catch {
+    // Last resort: say what happened without the fields that broke it, so the
+    // event is still on the record.
+    try {
+      method[level](JSON.stringify({ at: new Date().toISOString(), level, event, fieldsUnserializable: true }))
+    } catch {
+      /* nothing left to try, and a log line is not worth an exception */
+    }
+  }
+}
+
+export const logInfo = (event: string, fields?: LogFields) => log("info", event, fields)
+export const logWarn = (event: string, fields?: LogFields) => log("warn", event, fields)
+export const logError = (event: string, fields?: LogFields) => log("error", event, fields)
