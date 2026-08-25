@@ -63,6 +63,15 @@ const SCOPES: Record<
    * than corrected, because it described a strip that no longer exists.)
    */
   "/admin/heatmaps": { section: true, reading: true, student: true, oneReading: true },
+  /**
+   * The Library is course-wide, like the catalog beside it: a reading belongs
+   * to a course and no section owns one. It drew a section picker through
+   * DEFAULT_SCOPE and read the value nowhere — the same incongruity the header
+   * above says this strip was fixed for once already. Found 2026-08-25
+   * alongside the Heatmaps one, when TJ asked why choosing a section did
+   * nothing; scripts/check-scope.ts now fails on the next one.
+   */
+  "/admin/library": { section: false, reading: false, student: false },
 }
 const DEFAULT_SCOPE = { section: true, reading: false, student: false }
 
