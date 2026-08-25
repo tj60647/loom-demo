@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getSourceForCover } from "@/actions/sources"
 import { readingStorage } from "@/lib/storage"
 import { getSourceCoverKey, renderPdfCoverImage } from "@/lib/pdfCover"
+import { logWarn } from "@/lib/log"
 
 const MIN_COVER_BYTES = 2048
 
@@ -67,7 +68,7 @@ export async function GET(
         try {
           await readingStorage.put(coverKey, coverBuffer)
         } catch (error) {
-          console.warn("[Loom] Failed to persist generated cover image", error)
+          logWarn("cover.persist-failed", { cause: error })
         }
 
         return new NextResponse(new Uint8Array(coverBuffer), {
@@ -78,7 +79,7 @@ export async function GET(
           },
         })
       } catch (error) {
-        console.warn("[Loom] Failed to render cover image", error)
+        logWarn("cover.render-failed", { cause: error })
         return new NextResponse(renderCoverFallbackSvg(source.title), {
           status: 200,
           headers: {

@@ -5,6 +5,7 @@ import { asc, eq } from 'drizzle-orm';
 import crypto from 'crypto';
 import { ensureFacultySection } from '@/lib/courses';
 import { isBranchPreview, previewLoginDecision, sessionCookieNames } from '@/lib/previewLogin';
+import { logWarn } from "@/lib/log"
 
 // Non-production test backdoor: mints a session directly, bypassing OAuth.
 //
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
     // The reason is logged, never returned: on a public preview URL the
     // difference between "no secret configured" and "key does not match" is a
     // hint, and 403 with nothing in it is the same answer to every prod.
-    console.warn(`[test-login] refused: ${decision.why}`);
+    logWarn("preview-login.refused", { why: decision.why });
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
 

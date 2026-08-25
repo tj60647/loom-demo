@@ -32,6 +32,7 @@ import { draftMetadataFromPages, type MetadataDraft } from "@/lib/metadataDraft"
 import { MAX_READING_BYTES, MAX_READING_LABEL, formatBytes, isClientUploadPathname } from "@/lib/readingUpload"
 import { revalidatePath } from "next/cache"
 import { resolveCourseId, resolveCourseIdForUser } from "@/lib/courses"
+import { logError, logWarn } from "@/lib/log"
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -703,7 +704,7 @@ async function ingestReading(data: {
       await readingStorage.put(getSourceCoverKey(source.id), coverBuffer)
       coverRendered = true
     } catch (error) {
-      console.warn("[Loom] Failed to generate PDF cover image", error)
+      logWarn("ingest.cover-failed", { userId: data.userId, cause: error })
     }
 
     // The per-page images the viewer's contact sheet reads. Off the request
@@ -726,7 +727,7 @@ async function ingestReading(data: {
         if (still.length === 0) return
         await renderSourcePageImages(source.id, buffer)
       } catch (error) {
-        console.warn("[Loom] Failed to render page images at ingest", error)
+        logWarn("ingest.page-images-failed", { userId: data.userId, cause: error })
       }
     })
 
@@ -736,7 +737,7 @@ async function ingestReading(data: {
     try {
       pass = (await recordHeuristicScore(source.id, pages, { coverRendered })).pass
     } catch (error) {
-      console.warn("[Loom] Failed to score extraction quality", error)
+      logWarn("ingest.score-failed", { userId: data.userId, cause: error })
     }
 
     // The attach comes LAST, so the score exists to gate it: a reading that did
@@ -891,7 +892,7 @@ export async function rescoreSourceAction(formData: FormData) {
   try {
     await reingestSource(sourceId, await readingStorage.get(source.storageKey))
   } catch (error) {
-    console.warn("[Loom] Re-ingest failed during rescore; falling back to a rubric replay", error)
+    logWarn("reingest.rescore-fell-back", { to: "rubric-replay", cause: error })
     await rescoreSource(sourceId)
   }
 
@@ -1184,7 +1185,7 @@ export async function deleteSource(formData: FormData) {
   results.forEach((result, i) => {
     if (result.status === "rejected") {
       failedKeys.push(keyList[i])
-      console.error(`[deleteSource] blob not removed: ${keyList[i]}`, result.reason)
+      logError("source.blob-not-removed", { sourceId, key: keyList[i], cause: result.reason })
     }
   })
   if (failedKeys.length > 0) {

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { getSourceFileMeta, getSourceFileStream } from "@/actions/sources"
 import { hashText } from "@/lib/hash"
+import { logError } from "@/lib/log"
 
 /**
  * A Content-Disposition a browser can actually receive. HTTP header values are
@@ -97,7 +98,7 @@ export async function GET(
     if (message === "Not found") {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
-    console.error(`[readings] failed to serve ${sourceId}:`, error)
+    logError("reading.serve-failed", { sourceId, cause: error })
     return NextResponse.json({ error: "Could not read this file" }, { status: 500 })
   }
 }

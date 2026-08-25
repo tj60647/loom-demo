@@ -34,6 +34,7 @@ import { sourcePages, sources } from "@/db/schema"
 import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
 import { spreadLayout, pageX } from "@/lib/spreadLayout"
 import { readingStorage } from "@/lib/storage"
+import { logWarn } from "@/lib/log"
 
 export const PAGE_IMAGE_WIDTHS = [320, 1280] as const
 export type PageImageWidth = (typeof PAGE_IMAGE_WIDTHS)[number]
@@ -193,7 +194,7 @@ export async function renderSourcePageImages(
         rendered += 1
       } catch (error) {
         failed.push(pageNumber)
-        console.warn(`[Loom] Page image render failed for ${sourceId} p${pageNumber}`, error)
+        logWarn("pages.image-render-failed", { sourceId, pageNumber, cause: error })
       }
     }
   } finally {
@@ -203,7 +204,7 @@ export async function renderSourcePageImages(
   try {
     await composeAndStoreSheet(sourceId, thumbs)
   } catch (error) {
-    console.warn(`[Loom] Sheet compose failed for ${sourceId}`, error)
+    logWarn("pages.sheet-compose-failed", { sourceId, cause: error })
   }
 
   return { sourceId, pageCount: doc.numPages, rendered, failed }
@@ -253,7 +254,7 @@ export async function ensureSourceSheet(sourceId: string): Promise<void> {
     await ensureSourcePageImages(sourceId)
   } catch (error) {
     sheetInflight.delete(sourceId)
-    console.warn(`[Loom] ensureSourceSheet failed for ${sourceId}`, error)
+    logWarn("pages.sheet-failed", { sourceId, cause: error })
   }
 }
 
@@ -286,6 +287,6 @@ export async function ensureSourcePageImages(sourceId: string): Promise<void> {
   } catch (error) {
     // A real failure clears the gate so a later request can retry.
     inflight.delete(sourceId)
-    console.warn(`[Loom] ensureSourcePageImages failed for ${sourceId}`, error)
+    logWarn("pages.images-failed", { sourceId, cause: error })
   }
 }

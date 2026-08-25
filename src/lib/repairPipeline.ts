@@ -22,6 +22,7 @@ import { isGarbled, isGarbledToken, lowercaseBodyTokens, measurePageGarble } fro
 import { computeConsensus } from "@/lib/repairConsensus"
 import { readingStorage } from "@/lib/storage"
 import { VISION_READERS, requestVisionCompletion } from "@/lib/openrouter"
+import { logWarn } from "@/lib/log"
 
 /**
  * Render scale for the crops a model reads and a person reviews. Higher than
@@ -202,7 +203,7 @@ export async function detectRepairsForSource(
    * verdict is the trigger: scanned pages get a full-page proposal.
    */
   const structure = await probePdfStructure(buffer).catch((error) => {
-    console.warn("[repair] structure probe failed; scanned-page detection off this run", error)
+    logWarn("repair.structure-probe-failed", { scannedPageDetection: "off", cause: error })
     return null
   })
   const scannedPageNumbers = new Set(
@@ -641,7 +642,7 @@ export async function transcribeRepairRegion(repairId: string) {
             }
           : null
       } catch (error) {
-        console.warn(`[repair] ${reader.model} failed on ${repairId}`, error)
+        logWarn("repair.reader-failed", { model: reader.model, repairId, cause: error })
         failures.push({
           model: reader.model,
           reason: error instanceof Error ? error.message.slice(0, 160) : String(error).slice(0, 160),

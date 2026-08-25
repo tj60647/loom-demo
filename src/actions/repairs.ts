@@ -26,6 +26,7 @@ import { detectRepairsForSource, repairSettings, transcribeRepairRegion } from "
 import { ACCEPTED_OVERLAP_FLOOR } from "@/lib/repairReview"
 import { MIN_KEPT_TEXT_SHARE, acceptRepairDecision, applyAcceptedRepairs } from "@/lib/repairApply"
 import { consensusSettings } from "@/lib/repairConsensus"
+import { logWarn } from "@/lib/log"
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions)
@@ -65,7 +66,7 @@ async function attempt<T extends object>(
   try {
     return { ok: true, ...(await act()) }
   } catch (error) {
-    console.error("[repair] refused", error)
+    logWarn("repair.refused", { cause: error })
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
@@ -223,7 +224,7 @@ export async function transcribeAllRepairs(sourceId: string) {
         try {
           await transcribeRepairRegion(repair.id)
         } catch (error) {
-          console.warn(`[repair] batch could not read ${repair.id}`, error)
+          logWarn("repair.batch-unreadable", { repairId: repair.id, cause: error })
         }
       }
       revalidate()
