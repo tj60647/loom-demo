@@ -679,3 +679,68 @@ test("the student picker is alphabetical, with All students held at the top", as
   const inOrder = [...people].sort((a, b) => a.localeCompare(b))
   expect(people).toEqual(inOrder)
 })
+
+/**
+ * THE STRIP'S SECTION IS THE HEAT'S SECTION (TJ, 2026-08-25: "selecting a
+ * section seems to have no effect, why? is there not a test for this?").
+ *
+ * There was not, which is why it survived. AdminNav declared `section: true`
+ * for this page and the value reached the margin cards alone — the heat went
+ * on drawing the whole cohort while the strip said Faculty. The page's own
+ * comment asserted the opposite, which is how it stayed invisible.
+ *
+ * The peer DENOMINATOR is what proves it: "8 of 13 marked" unscoped against
+ * "8 of 8 marked" in a section is the query having been narrowed. Counting
+ * rects would not — a section whose members made every mark draws the same
+ * rectangles either way.
+ */
+test("choosing a section narrows the heat, not just the margin", async ({ page }) => {
+  await openHeatmaps(page, SEEDED_WITH_MARKS)
+  const bar = page.locator(".pdf-overlay-bar")
+  await expect(bar).toBeVisible({ timeout: 25_000 })
+
+  const peersOf = async () => {
+    const text = await bar.innerText()
+    const match = /(\d+)\s+of\s+(\d+)\s+marked/.exec(text.replace(/\s+/g, " "))
+    return match ? Number(match[2]) : NaN
+  }
+  const whole = await peersOf()
+  expect(whole, "the cohort band must report a denominator").toBeGreaterThan(1)
+
+  // A section the seed actually populates, so the comparison is meaningful.
+  const picker = page.getByLabel("Select active section")
+  const section = await picker.locator("option").evaluateAll((opts) =>
+    (opts as HTMLOptionElement[]).find((o) => o.value && /section 1/i.test(o.textContent ?? ""))?.value ?? null
+  )
+  expect(section, "seed missing Section 1 — run `npm run seed:demo`").not.toBeNull()
+  await picker.selectOption(section!)
+  await expect(page).toHaveURL(/section=/, { timeout: 15_000 })
+  await expect(page.getByText("Loading PDF...")).toBeHidden({ timeout: 30_000 })
+  await expect(bar).toBeVisible({ timeout: 25_000 })
+
+  /**
+   * The two controls agree FIRST, and that half is synchronous: the Overlay
+   * picker renders with the scoped section and offers only it, since listing
+   * every section again is the second control that let the strip and the
+   * drawing disagree in the first place.
+   */
+  const overlay = page.getByLabel("Which section to compare")
+  await expect(overlay).toHaveValue(section!, { timeout: 20_000 })
+  // Off, and that section. "All sections" is not offered here: beside a strip
+  // reading Section 1 it is the disagreement itself, one click away.
+  await expect(overlay.locator("option")).toHaveCount(2)
+  await expect(overlay.locator('option[value="all"]')).toHaveCount(0)
+
+  /**
+   * The denominator follows asynchronously — the overlay refetches after the
+   * page settles, so reading it once races that request. Polled rather than
+   * waited on with a clock, for the reason pdf-viewer.spec.ts learned the
+   * hard way.
+   */
+  await expect
+    .poll(peersOf, {
+      timeout: 25_000,
+      message: "the section's band never became smaller than the whole cohort's",
+    })
+    .toBeLessThan(whole)
+})

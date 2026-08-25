@@ -21,6 +21,7 @@ export default function HeatmapReader({
   sourceId,
   title,
   studentId,
+  scopeSectionId,
   scopePassages,
   scopeConcepts,
 }: {
@@ -28,6 +29,8 @@ export default function HeatmapReader({
   title: string
   /** Chosen in the scope strip; null means the whole class, by band. */
   studentId: string | null
+  /** The section chosen in the strip, which the heat is drawn for. */
+  scopeSectionId: string | null
   /**
    * The chosen student's passages in this reading, and the concepts they
    * evidence — empty unless exactly one student is chosen (TJ, 2026-08-23:
@@ -69,6 +72,7 @@ export default function HeatmapReader({
       // question being asked.
       overlayPicker
       overlayStudentId={studentId}
+      scopeSectionId={scopeSectionId}
       // The cards the toggle shows, and the concepts they are filed under.
       // Empty for "All students", which is what hides the toggle entirely.
       scopePassages={scopePassages}

@@ -56,8 +56,16 @@ export default async function HeatmapsPage({
     )
   }
 
-  // Resolved but not displayed: the section is what the Overlay picker inside
-  // the viewer compares against, and the strip above is where it is chosen.
+  /**
+   * THE SECTION THE HEAT IS DRAWN FOR.
+   *
+   * This comment used to say the strip "is where it is chosen" for the
+   * viewer's Overlay picker. That was false: the value was resolved here and
+   * handed to nothing but the margin cards, so the picker went on comparing
+   * against the whole cohort while the strip said Faculty (TJ, 2026-08-25:
+   * "selecting a section seems to have no effect, why?"). It is passed to the
+   * viewer now, and AdminNav's SCOPES declaration for this page is true again.
+   */
   const sectionId = await resolveSectionId(courseId, firstParam(resolved.section))
   const studentId = firstParam(resolved.student) ?? null
 
@@ -117,6 +125,7 @@ export default async function HeatmapsPage({
             sourceId={reading.id}
             title={reading.title}
             studentId={studentId}
+            scopeSectionId={sectionId}
             scopePassages={scope?.passages ?? []}
             scopeConcepts={scope?.concepts ?? []}
           />
