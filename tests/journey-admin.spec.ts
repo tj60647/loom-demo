@@ -432,3 +432,46 @@ test("picking on the cloth scrolls the panels to what was picked", async ({ page
     "the panel scrolled, but not to the picked card"
   ).toBe(true)
 })
+
+/**
+ * THE MARK IS THE WAY HOME (TJ, 2026-08-25, asked where the home button went).
+ *
+ * It had never been one: `header .wordmark` was a plain div on every surface
+ * that draws this header, so the one control every reader already knows how to
+ * click did nothing, and from the admin shell the only route back was
+ * `00 · Library` in the journey bar — which reads as a station among stations
+ * rather than the way out.
+ *
+ * The reading station is the exception and keeps its own house: 01 stands this
+ * header down entirely, which is why HomeIcon exists at all. So the two never
+ * appear together, and neither is redundant.
+ */
+test("the wordmark goes home, and does not dress as a link to do it", async ({ page }) => {
+  await page.goto("/admin")
+  const mark = page.locator("header .wordmark")
+  await expect(mark).toBeVisible({ timeout: 20_000 })
+  await expect(mark).toHaveAttribute("href", "/")
+
+  /**
+   * NAMED, because the accessible name would otherwise be the whole mark —
+   * "Loom lay the warp · throw the weft · dev" is not a destination.
+   */
+  await expect(mark).toHaveAttribute("aria-label", /home/i)
+
+  // Still the mark: no underline, no link colour. A wordmark that turns blue
+  // on hover is a different wordmark.
+  const dressed = await mark.evaluate((el) => {
+    const css = getComputedStyle(el)
+    return { decoration: css.textDecorationLine, color: css.color }
+  })
+  expect(dressed.decoration).toBe("none")
+  expect(dressed.color, "the mark keeps the ink colour").toBe("rgb(26, 25, 22)")
+
+  // And it is the first thing a keyboard reaches, which is where a route out
+  // belongs.
+  await page.keyboard.press("Tab")
+  await expect(mark).toBeFocused()
+
+  await mark.click()
+  await expect(page).toHaveURL(/\/$/, { timeout: 20_000 })
+})

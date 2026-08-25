@@ -67,19 +67,34 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
   return (
     <>
       <header>
-        <div className="wordmark">
+        {/* THE MARK GOES HOME (TJ, 2026-08-25). It was a plain div on every
+            surface that draws this header, so the one thing every reader
+            already knows how to click did nothing — and from the admin shell
+            the only route back was `00 · Library` in the journey bar, which
+            reads as a station among stations rather than the way out.
+
+            This does NOT duplicate the house in the reading station's bar:
+            01 Reading stands this header down entirely, which is why that
+            control had to be drawn in the first place (HomeIcon.tsx).
+
+            A Link, so it middle-clicks, opens in a tab and shows its target
+            on hover — the same reasons Workbench gives for the house being a
+            route rather than a button. `aria-label` because the accessible
+            name would otherwise carry the tagline, and "Loom lay the warp
+            throw the weft dev" is not a destination. */}
+        <Link href="/" className="wordmark" aria-label="Loom — home">
           <svg width="17" height="12" viewBox="0 0 26 18" fill="none" strokeWidth="1.8">
             <path d="M2 15 L7 4 L12 15 L17 4 L22 15" stroke="#a8843f"/>
             {isDev && <path d="M1 9.5 L23 9.5" stroke="#b23a2b" strokeWidth="1.6"/>}
           </svg>
-          <div>
+          <div aria-hidden="true">
             Loom
             <small>
               lay the warp · throw the weft
               {isDev && <span style={{ color: "var(--red)" }}> · dev</span>}
             </small>
           </div>
-        </div>
+        </Link>
         <div className="spacer"></div>
         {/* The save light moved to the journey bar (TJ, 2026-08-17) — see
             SaveLight.tsx. It has to survive the reading station, and the
