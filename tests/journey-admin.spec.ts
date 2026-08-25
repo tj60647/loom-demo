@@ -458,14 +458,30 @@ test("the wordmark goes home, and does not dress as a link to do it", async ({ p
    */
   await expect(mark).toHaveAttribute("aria-label", /home/i)
 
-  // Still the mark: no underline, no link colour. A wordmark that turns blue
-  // on hover is a different wordmark.
+  /**
+   * Still the mark: no underline, and Loom's own ink rather than a browser's
+   * idea of what a link looks like.
+   *
+   * AGAINST THE TOKEN, NOT A LITERAL. This read `toBe("rgb(26, 25, 22)")`,
+   * which fails the day --ink moves by a shade even though nothing is wrong
+   * (Copilot, #38). Nor is "inherits its parent" the thing to assert: the rule
+   * DECLARES var(--ink) rather than deflecting to whatever is around it (TJ,
+   * 2026-08-25: "we should own the color, not the user"), so what is checked
+   * is that the mark wears the token — which still fails if a user agent's
+   * link colour ever reaches it.
+   */
   const dressed = await mark.evaluate((el) => {
+    const probe = document.createElement("span")
+    probe.style.color = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim()
+    document.body.appendChild(probe)
+    const ink = getComputedStyle(probe).color
+    probe.remove()
     const css = getComputedStyle(el)
-    return { decoration: css.textDecorationLine, color: css.color }
+    return { decoration: css.textDecorationLine, color: css.color, ink }
   })
   expect(dressed.decoration).toBe("none")
-  expect(dressed.color, "the mark keeps the ink colour").toBe("rgb(26, 25, 22)")
+  expect(dressed.ink, "--ink must resolve to a colour for this to mean anything").toMatch(/^rgb/)
+  expect(dressed.color, "the mark wears Loom's ink, whatever --ink is today").toBe(dressed.ink)
 
   // And it is the first thing a keyboard reaches, which is where a route out
   // belongs.

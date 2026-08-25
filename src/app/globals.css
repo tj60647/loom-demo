@@ -88,9 +88,16 @@ h1,h2,h3{font-family:var(--display);font-weight:500;margin:0}
 header{border-bottom:1px solid var(--rule);padding:10px 26px 8px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--paper)}
 /* A link since 2026-08-25, so it must not wear a link's colour or rule: the
    mark is the mark, and the only thing that changes on hover is the cursor
-   the browser already gives it. */
-.wordmark{font-family:var(--display);font-size:24px;font-weight:600;line-height:1;display:flex;align-items:center;gap:9px;color:inherit;text-decoration:none}
-.wordmark:hover,.wordmark:focus-visible{text-decoration:none;color:inherit}
+   the browser already gives it.
+
+   `var(--ink)` and not `inherit` (TJ, 2026-08-25: "we should own the color,
+   not the user"). Inheriting only DEFLECTS the user agent's link colour — it
+   says "whatever is around me", so the mark's colour becomes a property of
+   wherever the header is dropped, and every future context is a chance for it
+   to come out some other shade. Declared, the mark wears Loom's ink because
+   Loom said so, and a theme that moves --ink moves the mark with it. */
+.wordmark{font-family:var(--display);font-size:24px;font-weight:600;line-height:1;display:flex;align-items:center;gap:9px;color:var(--ink);text-decoration:none}
+.wordmark:hover,.wordmark:focus-visible,.wordmark:visited,.wordmark:active{text-decoration:none;color:var(--ink)}
 /* Reachable by keyboard, and visibly so — the ring sits off the glyphs rather
    than through them. */
 .wordmark:focus-visible{outline:2px solid var(--ochre);outline-offset:4px;border-radius:3px}

@@ -83,7 +83,19 @@ export default function Header({ deployEnv, isBranchPreview = false }: { deployE
             name would otherwise carry the tagline, and "Loom lay the warp
             throw the weft dev" is not a destination. */}
         <Link href="/" className="wordmark" aria-label="Loom — home">
-          <svg width="17" height="12" viewBox="0 0 26 18" fill="none" strokeWidth="1.8">
+          {/* Hidden from assistive tech, and not a tab stop: the link carries
+              the name, so an unlabelled "graphic" announced inside it is one
+              more thing to hear and nothing to act on. The same two attributes
+              HomeIcon and GuideIcon carry (Copilot, #38). */}
+          <svg
+            width="17"
+            height="12"
+            viewBox="0 0 26 18"
+            fill="none"
+            strokeWidth="1.8"
+            aria-hidden="true"
+            focusable="false"
+          >
             <path d="M2 15 L7 4 L12 15 L17 4 L22 15" stroke="#a8843f"/>
             {isDev && <path d="M1 9.5 L23 9.5" stroke="#b23a2b" strokeWidth="1.6"/>}
           </svg>
