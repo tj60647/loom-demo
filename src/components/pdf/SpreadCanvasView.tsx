@@ -1400,7 +1400,11 @@ export default function SpreadCanvasView({
       }
     }
     return out;
-  }, [heatRects, heatMax, layout, basePageWidth]);
+  // `heatPeers` belongs here: it changes every level when the band is one
+  // person (heatBand), so a scope change with the same rects and the same
+  // max would otherwise redraw the previous scope's steps. Caught in
+  // review on #34.
+  }, [heatRects, heatMax, heatPeers, layout, basePageWidth]);
 
   const cards = useMemo(() => {
     if (!cardsOn || !layout) return [];

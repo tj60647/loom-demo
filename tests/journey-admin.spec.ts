@@ -324,34 +324,52 @@ test("an undescribed thread reads as an arrow, and says what is missing", async 
 test("picking on the cloth scrolls the panels to what was picked", async ({ page }) => {
   await page.goto("/admin/aggregate")
   await expect(page.locator("#map").first()).toBeVisible({ timeout: 30_000 })
-  await expect(page.locator(".ywcard").first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator(".ywconcept").first()).toBeVisible({ timeout: 30_000 })
+
+  const cards = page.locator(".ywconcept")
+  expect(
+    await cards.count(),
+    "the panel must list more concepts than fit, or this proves nothing"
+  ).toBeGreaterThan(10)
 
   /**
-   * A node whose card sorts LATE, so the list has somewhere to scroll to. The
-   * first node on the warp would pass this whether or not anything scrolled.
+   * THE SCROLL ITSELF IS THE ASSERTION, not the visibility.
+   *
+   * Two earlier shapes of this test were wrong and both passed. One clicked a
+   * node 70% along the warp — the MAP's order, while the panel sorts by name,
+   * so the card could already be in view and nothing had to move (caught in
+   * review on #34). The next tried to target one named concept, and could
+   * not: the cloth's labels are rotated and packed along 208 nodes, so a
+   * click aimed at "XYZ" landed on a neighbour's hit target and selected
+   * "knowledge diagramming" instead.
+   *
+   * So this does not care WHICH concept it lands on. It presses nodes until
+   * the panel's scrollbox has moved off zero, which can only happen if the
+   * pick was below the fold — and then requires the marked card to be in
+   * view. A run where nothing ever scrolled fails rather than passing quietly.
    */
-  const marks = page.locator("#map circle")
-  const total = await marks.count()
-  expect(total, "the seeded cohort must draw a warp worth scrolling").toBeGreaterThan(20)
+  const scroller = page.locator(".canvasmenu.atleft .scrollbox").first()
+  expect(await scroller.evaluate((el) => el.scrollTop), "the panel starts at rest").toBe(0)
 
-  const seen = await page.locator(".ywcard").count()
-  expect(seen, "the panels must list more cards than fit, or this proves nothing").toBeGreaterThan(10)
+  const nodes = page.locator("#map circle")
+  const total = await nodes.count()
+  let scrolled = false
+  for (let i = 0; i < 6 && !scrolled; i += 1) {
+    await nodes.nth(Math.floor((total * (i + 1)) / 8)).click({ force: true })
+    await page.waitForTimeout(1_200)
+    scrolled = (await scroller.evaluate((el) => el.scrollTop)) > 0
+  }
+  expect(scrolled, "no pick ever moved the concepts panel").toBe(true)
 
-  await marks.nth(Math.floor(total * 0.7)).click({ force: true })
-
-  await expect
-    .poll(
-      () =>
-        page.evaluate(() => {
-          const card = document.querySelector(".ywcard.picked, .ywcard.sel")
-          if (!card) return null
-          const box = card.getBoundingClientRect()
-          const scroller = card.closest(".scrollbox")
-          if (!scroller) return null
-          const within = scroller.getBoundingClientRect()
-          return box.bottom > within.top && box.top < within.bottom
-        }),
-      { timeout: 15_000, message: "the picked card never came into its panel's view" }
-    )
-    .toBe(true)
+  // And what it scrolled to is the card that was picked.
+  const picked = page.locator(".ywconcept.picked").first()
+  await expect(picked).toBeVisible({ timeout: 10_000 })
+  expect(
+    await picked.evaluate((el) => {
+      const box = el.getBoundingClientRect()
+      const within = el.closest(".scrollbox")!.getBoundingClientRect()
+      return box.bottom > within.top && box.top < within.bottom
+    }),
+    "the panel scrolled, but not to the picked card"
+  ).toBe(true)
 })
