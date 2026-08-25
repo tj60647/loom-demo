@@ -838,3 +838,66 @@ export const edges = pgTable(
     ),
   })
 )
+
+/**
+ * EVERY SIGN-IN DECISION, KEPT.
+ *
+ * TJ, 2026-08-24, after a student wrote to say he could not get in and nothing
+ * on the server could say which address he had presented: "we need better
+ * logging then, correct?"
+ *
+ * The gate had no memory. `decideSignIn` returned an allow or a redirect and
+ * recorded neither, so the only trace of a refusal was a `/auth/error` request
+ * in Vercel's log — which keeps the timestamp and DROPS the query string, so
+ * not even the address survived. Checked against production on 2026-08-24: 20
+ * refusals over two days, twelve of them in two bursts of five and six minutes
+ * apart, and not one of them attributable to a person.
+ *
+ * BOTH OUTCOMES, not only refusals (TJ, same day). "When did Cheng last get
+ * in?" is as much the question as "why can't he", and a table that only
+ * remembers failures cannot answer the first — nor tell you that a burst of
+ * refusals ended in a success, which is the shape of somebody solving it.
+ *
+ * WHAT IT DELIBERATELY DOES NOT KEEP is the candidate list. GitHub hands Loom
+ * every confirmed address on the account, and storing them would hoard a
+ * person's other identities to answer a question the outcome already answers.
+ * The COUNT would have been worth keeping and there is no clean way to get it
+ * here: the GitHub provider's own `profile()` maps four fields and drops
+ * anything the userinfo override adds, so a `candidates` column would have
+ * read 0 forever. It goes to the operational log instead, where the count is
+ * known — the `auth.identity` line in src/lib/auth.ts.
+ *
+ * PRUNED AT 180 DAYS (TJ, same day). A row per attempt grows without bound,
+ * and an audit trail nobody bounds becomes a liability rather than a record —
+ * see pruneAuthEvents.
+ */
+export const authEvents = pgTable(
+  "auth_event",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    at: timestamp("at").defaultNow().notNull(),
+    /**
+     * The address the gate was ASKED ABOUT — the one `decideSignIn` tested and
+     * allowed or refused. On a first GitHub sign-in that is the identity
+     * resolver's pick; on a returning one it is the address Loom stored; on
+     * the guest door it is what was typed. Lowercased by normalizeEmail
+     * before it ever reaches here.
+     */
+    email: text("email").notNull(),
+    /** `allowed` | `not-on-roster` | `no-verified-email`. The union is the
+     *  vocabulary, not a constraint — the same choice graph_event.kind makes. */
+    outcome: text("outcome").notNull(),
+    /** `github` | `email` — which door was tried. */
+    provider: text("provider").default("").notNull(),
+  },
+  (row) => ({
+    // Reading is always "the recent ones", and pruning is always "the old
+    // ones" — one descending index serves both.
+    recent: index("auth_event_at_idx").on(row.at),
+    // "Has this person ever got in?" is the question a professor actually
+    // asks, and it is asked by address.
+    byEmail: index("auth_event_email_idx").on(row.email),
+  })
+)

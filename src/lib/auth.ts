@@ -11,8 +11,11 @@ import {
   guestLinkEmail,
   normalizeEmail,
   resolveIdentityEmail,
+  SIGN_IN_ERROR,
   verifiedCandidates,
 } from "@/lib/signIn"
+import { recordAuthEvent } from "@/lib/authEvent"
+import { logInfo } from "@/lib/log"
 
 const ADMIN_FALLBACK_EMAILS = new Set([
   "tjm@tjmcleish.com",
@@ -191,6 +194,23 @@ export const authOptions: NextAuthOptions = {
           }
 
           const resolution = await resolveIdentityEmail(candidates, emailHasAppAccess)
+          /**
+           * HOW MANY CONFIRMED ADDRESSES GITHUB OFFERED, said here because
+           * here is the only place that knows. It is the number a refusal
+           * most wants — "GitHub confirmed two addresses for them and the
+           * roster knew neither" is the whole diagnosis — and it cannot ride
+           * to the signIn callback, whose `user` is the provider's four
+           * mapped fields.
+           *
+           * The addresses themselves are not logged. A person's other
+           * identities are not ours to keep, and the count answers the
+           * question.
+           */
+          logInfo("auth.identity", {
+            candidates: candidates.length,
+            outcome: resolution.status,
+            email: resolution.email ?? "",
+          })
           profile.email = resolution.email
 
           // The full GitHub profile, not just Profile's four fields — the
@@ -217,8 +237,30 @@ export const authOptions: NextAuthOptions = {
     // The guest provider runs this too, and once *before* any mail goes out
     // (NextAuth calls it with email.verificationRequest at the send step), so
     // an address no course invited never receives a link. Both doors, one gate.
-    async signIn({ user }) {
-      return decideSignIn(user.email, emailHasAppAccess)
+    async signIn({ user, account }) {
+      const verdict = await decideSignIn(user.email, emailHasAppAccess)
+      /**
+       * RECORDED HERE RATHER THAN INSIDE `decideSignIn`, which stays pure —
+       * scripts/check-auth.ts exercises it with an injected predicate and no
+       * database, and a gate that writes cannot be checked that way.
+       *
+       * How many addresses GitHub confirmed is NOT recorded here, though it is
+       * the number a refusal most wants: the provider's own `profile()` maps
+       * four fields and drops anything the userinfo override adds, so it never
+       * reaches `user`. It goes to the operational log from the override
+       * itself, where it is known — `auth.identity`.
+       */
+      await recordAuthEvent({
+        email: normalizeEmail(user.email) || String(user.email ?? ""),
+        outcome:
+          verdict === true
+            ? "allowed"
+            : verdict.includes(SIGN_IN_ERROR.noVerifiedEmail)
+              ? "no-verified-email"
+              : "not-on-roster",
+        provider: account?.provider ?? "",
+      })
+      return verdict
     },
     async session({ session, user }) {
       if (session.user) {

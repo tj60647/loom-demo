@@ -204,6 +204,13 @@
       "when": 1787365188070,
       "tag": "0028_section_lead_user",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1787634163427,
+      "tag": "0029_overconfident_frightful_four",
+      "breakpoints": true
     }
   ]
 }
