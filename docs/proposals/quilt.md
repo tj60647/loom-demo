@@ -1,6 +1,13 @@
 # Quilt — proposal
 
-**Status: proposal.** A Quilt brings several students' Cloths together on one
+**Status: proposal — held for the quilting discussion.** The open questions
+below are deliberately unanswered: they are the agenda for a group discussion
+about quilting, not a gate TJ answers alone ("can we just leave the open
+questions for now as things the group needs to address in a discussion about
+'quilting'?" — TJ, 2026-08-26). Under AGENTS.md, nothing is implemented while
+they stand; that is the holding mechanism, and it needs no further lock.
+
+A Quilt brings several students' Cloths together on one
 canvas, where the participants co-construct a **Projection** — the reframe TJ
 ruled on 2026-08-26 ("bringing multiple cloths together in a knowledge graph
 and co-constructing a projection on a canvas that participants can access",
@@ -117,7 +124,10 @@ all, and whether the surface shows "last edited by X" or a fuller ledger.
   model's current shape; the branch question stays open in
   [weekly-concept-map.md](weekly-concept-map.md)).
 
-## Open questions
+## Open questions — the agenda for the quilting discussion
+
+Each question carries a recommendation so the discussion starts from a
+position rather than a blank page; none of it is decided.
 
 1. **Who makes a quilt?** (TJ: "how does a user make one?") Options: faculty
    only, from the teaching plane (matches how sections and invitations work;
