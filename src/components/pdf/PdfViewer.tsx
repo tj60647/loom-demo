@@ -2002,8 +2002,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               /**
                * WHITESPACE-BLIND, deliberately. The offsets live in the text
                * layer's node space; `content` came from selection.toString(),
-               * which renders a "
-" for every line that node space does not
+               * which renders a "\n" for every line that node space does not
                * carry — so strict equality would refuse every multi-line
                * passage. Flattening whitespace on both sides keeps the claim
                * that matters: the same letters, in the same order, at the
