@@ -28,6 +28,24 @@
  * increase — which also means a reading left dirty by an earlier run cannot
  * turn this green or red on its own.
  *
+ * WHY THE FILE IS CALLED `zz-`. Playwright orders files by path, so this one
+ * ran near the front as `capture-leaders.spec.ts` — and then every later spec
+ * inherited state from a run that captures and deletes a passage. That flipped
+ * latent failures all over the suite: two CI runs failed on four specs between
+ * them, none of which touch capture, and none the same twice.
+ *
+ * THE COUPLING IS NOT THIS FILE'S. It reproduces on master with no new spec at
+ * all: `npx playwright test tests/overlay.spec.ts tests/pdf-viewer.spec.ts`
+ * fails there (1 failed, 8 passed) while either file alone passes. So the
+ * suite is order-dependent already, and any spec added early in the alphabet
+ * would have exposed it. Running last means this one inherits the suite's
+ * state rather than imposing its own: full suite 118 passed, 0 failed, where
+ * the same code as `capture-leaders.spec.ts` gave 117 passed, 1 failed.
+ *
+ * That is a workaround and it is written here rather than buried in a
+ * filename. The order-dependence deserves its own branch; it will bite the
+ * next person who adds a spec whose name sorts early.
+ *
  * IT WRITES, and cleans up in afterEach rather than at the end of the body:
  * three earlier runs of this spec failed after saving, stranded their captures
  * on the seed, and the next run then measured five real passages at one anchor
