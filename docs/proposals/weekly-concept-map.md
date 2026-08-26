@@ -90,9 +90,8 @@ The branch answers with **two unrelated features fused**:
    has, needing one axis widened (group scope, several hands) rather than a
    new object kind. It is also a candidate answer to the 2026-08-11 weave
    ruling's precondition ("until the faculty and the authors of the app agree
-   on what it means"). The reframed idea proceeds as its own proposal:
-   `docs/proposals/co-constructed-projection.md` (pending TJ's go to draft
-   it).
+   on what it means"). The reframed idea proceeds as its own proposal,
+   named by TJ the same day ("call it a quilt"): [quilt.md](quilt.md).
 2. **The vault export: parked, not refused.** "im n[o]t sure where or how we
    should support obsidian" (TJ, 2026-08-26). No home named, so nothing is
    built; the question stays open here rather than moving to archive, and
