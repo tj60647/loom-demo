@@ -96,4 +96,7 @@ The branch answers with **two unrelated features fused**:
    should support obsidian" (TJ, 2026-08-26). No home named, so nothing is
    built; the question stays open here rather than moving to archive, and
    revives if a home is named.
-3. **The branch: unanswered.** Not deleted; the question stands.
+3. **The branch: kept.** "keep as the prototype's storage" (TJ, 2026-08-26).
+   `origin/weekly-concept-map` stays as the prototype's archive — its limion
+   captures and share link are the record of what was tried. Never merge from
+   it; anything wanted is rebuilt against the current model.
