@@ -781,6 +781,19 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   }, [viewMode, stageEl]);
   
   const [highlightRect, setHighlightRect] = useState<{top: number, left: number, text: string, pageNum?: number, startOffset?: number, endOffset?: number, pageContentHash?: string} | null>(null);
+  /**
+   * THE MEASUREMENT, CALLABLE AT CLICK TIME — not only when the selection
+   * settles. `highlightRect` is a snapshot, and on a large scan it can be a
+   * snapshot of a HALF-RENDERED page: pdf.js streams this text layer over
+   * seconds (measured on Boundary Objects p3 at 1280: 50 spans / 1146 chars
+   * when the reader can already select, 93 / 2736 when it settles). A capture
+   * click that consumed the stale snapshot anchored the draft against a page
+   * that no longer read that way — reproduced 5 times in 12 runs of the
+   * capture flow. handleCaptureClick re-measures through this ref so the
+   * anchor is as fresh as a click can make it; the marking pass's slice check
+   * (see `sliceHolds`) covers the layer growing later still.
+   */
+  const measureSelectionRef = useRef<(() => {top: number, left: number, text: string, pageNum?: number, startOffset?: number, endOffset?: number, pageContentHash?: string} | null) | null>(null);
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   /**
    * A CAPTURE IN PROGRESS, ON THE RAIL (TJ, 2026-08-19: "the capture passage is
@@ -1098,7 +1111,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   }, [numPages, pageNumber]);
 
   useEffect(() => {
-    const handleSelection = () => {
+    const measureSelection = () => {
       const selection = window.getSelection();
       const rawText = selection?.toString() ?? "";
       const text = rawText.trim();
@@ -1144,10 +1157,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            * on a page caption and ends in the text is a real capture, and the
            * cross-page case below already handles the rest.
            */
-          if (!startPageNode && !endPageNode) {
-            setHighlightRect(null);
-            return;
-          }
+          if (!startPageNode && !endPageNode) return null;
           /**
            * The anchor is not always inside a page. In the matrix the page
            * caption sits between one page and the next, so a drag begun on it
@@ -1217,7 +1227,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
         }
 
         if (rect) {
-          setHighlightRect({
+          return {
             top: rect.top,
             left: rect.left + rect.width / 2,
             text,
@@ -1225,11 +1235,14 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
             startOffset,
             endOffset,
             pageContentHash
-          });
+          };
         }
-      } else {
-        setHighlightRect(null);
       }
+      return null;
+    };
+    measureSelectionRef.current = measureSelection;
+    const handleSelection = () => {
+      setHighlightRect(measureSelection());
     };
     
     /**
@@ -1412,6 +1425,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     return () => {
       document.removeEventListener("mouseup", handleSelection);
       document.removeEventListener("selectionchange", onSelectionChange);
+      // The ref holds this run's closure (over pageNumber, among others); a
+      // click landing between cleanup and the next run must fall back to the
+      // snapshot rather than measure with a stale page.
+      measureSelectionRef.current = null;
       document.removeEventListener("pointerdown", onPenDown, true);
       document.removeEventListener("pointermove", onPenMove, true);
       document.removeEventListener("pointerup", onPenUp, true);
@@ -1956,12 +1973,50 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
               });
             }
 
+            /**
+             * THE LAYER'S TEXT, in the same coordinate space the offsets were
+             * measured in — for the slice check below.
+             */
+            const liveText = (layer as HTMLElement).textContent || "";
             pagePassages.forEach(passage => {
               const hasOffsets = passage.startOffset != null && passage.endOffset != null;
+              /**
+               * THE SLICE IS THE REAL QUESTION, and the hash was only ever a
+               * proxy for it. What the gate must establish is "the words at
+               * these offsets are still these words"; hashing the WHOLE layer
+               * answers a stricter question that a merely STREAMING layer
+               * fails. pdf.js delivers this text layer over seconds on a large
+               * scan — measured on Boundary Objects p3: 1146 chars when the
+               * reader can already select, 2736 when it settles, the early
+               * text a stable prefix of the late — so a passage captured
+               * before the layer settled carried a hash that could never
+               * match again, was demoted to fuzzy matching, and fuzzy found
+               * nothing. The capture flow failed 5 of 12 runs on exactly
+               * this, and a passage SAVED in that window was permanently
+               * fuzzy, including for every future session.
+               *
+               * The slice comparison asks the real question directly, so it
+               * also heals any such passage already in the database: stale
+               * hash, valid offsets, exact highlight.
+               */
+              /**
+               * WHITESPACE-BLIND, deliberately. The offsets live in the text
+               * layer's node space; `content` came from selection.toString(),
+               * which renders a "\n" for every line that node space does not
+               * carry — so strict equality would refuse every multi-line
+               * passage. Flattening whitespace on both sides keeps the claim
+               * that matters: the same letters, in the same order, at the
+               * anchored place.
+               */
+              const flat = (t: string) => t.replace(/\s+/g, "");
+              const sliceHolds =
+                hasOffsets &&
+                passage.content != null &&
+                flat(liveText.slice(passage.startOffset!, passage.endOffset!)) === flat(passage.content);
               const offsetsTrusted = hasOffsets && (
                 // No stored hash (legacy passage captured before this check
                 // existed) — fall back to trusting the offsets as before.
-                passage.pageContentHash == null || passage.pageContentHash === liveHash
+                passage.pageContentHash == null || passage.pageContentHash === liveHash || sliceHolds
               );
 
               /**
@@ -2156,12 +2211,25 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
 
   const handleCaptureClick = () => {
     if (!highlightRect) return;
+    /**
+     * RE-MEASURED AGAINST THE LIVE SELECTION, not read from the snapshot. The
+     * selection survives a click on this button (verified — it is still there
+     * seconds later), so the offsets and the page hash can be taken from the
+     * text layer AS IT IS NOW rather than as it was when the reader stopped
+     * selecting. The selection is gone the moment the reader focuses a field
+     * in the form, which is why this happens HERE and not later: the click is
+     * the last moment the selection is reliably alive. See
+     * measureSelectionRef; the marking pass's slice check carries it from
+     * here.
+     */
+    const fresh = measureSelectionRef.current?.() ?? null;
+    const source = fresh ?? highlightRect;
     const target: CaptureTarget = {
-      text: highlightRect.text,
-      pageNum: highlightRect.pageNum,
-      startOffset: highlightRect.startOffset,
-      endOffset: highlightRect.endOffset,
-      pageContentHash: highlightRect.pageContentHash,
+      text: source.text,
+      pageNum: source.pageNum,
+      startOffset: source.startOffset,
+      endOffset: source.endOffset,
+      pageContentHash: source.pageContentHash,
     };
     setHighlightRect(null);
     if (!railAvailable) {
