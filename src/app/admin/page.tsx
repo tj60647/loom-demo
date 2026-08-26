@@ -131,7 +131,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
    * you cannot learn. Anything else follows, alphabetically.
    */
   const ROLE_ORDER = ["learner", "faculty"]
-  const ROLE_CHIPS = [...new Set(enrolled.map((row) => (row.role ?? "").toLowerCase()).filter(Boolean))]
+  /**
+   * BUILT FROM THE TAB YOU ARE ON. Enrolled rows carry the role they hold;
+   * invited rows carry the role their invitation will grant, derived in
+   * getRoster by the same rule auth.ts applies on first sign-in. Either way
+   * the chips describe the list under them rather than a list somewhere else.
+   */
+  const rolesInView = view === "invited" ? invitedAll : enrolled
+  const ROLE_CHIPS = [...new Set(rolesInView.map((row) => (row.role ?? "").toLowerCase()).filter(Boolean))]
     .sort((a, b) => {
       const ai = ROLE_ORDER.indexOf(a)
       const bi = ROLE_ORDER.indexOf(b)
@@ -171,10 +178,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   )
   const roleHref = (roles: Set<string>) => {
     const value = [...roles].sort().join(",")
-    return `${baseHref}&view=enrolled${value ? `&role=${value}` : ""}`
+    // The tab you are on, not always Enrolled: the chips are on both now, and
+    // a filter that jumped you to the other list would be answering a question
+    // you did not ask.
+    const stay = view === "invited" ? "invited" : "enrolled"
+    const silent = view === "invited" && filterNoResponse ? "&filter=noresponse" : ""
+    return `${baseHref}&view=${stay}${silent}${value ? `&role=${value}` : ""}`
   }
   const baseHref = `/admin?course=${encodeURIComponent(courseId)}${sectionId ? `&section=${encodeURIComponent(sectionId)}` : ""}`
-  const invitedPeople = filterNoResponse ? noResponse : invitedAll
+  const invitedShown = filterNoResponse ? noResponse : invitedAll
+  const invitedPeople = roleFilter.size
+    ? invitedShown.filter((row) => roleFilter.has((row.role ?? "").toLowerCase()))
+    : invitedShown
 
   const enrolledPeople = roleFilter.size
     ? enrolled.filter((row) => roleFilter.has((row.role ?? "").toLowerCase()))
@@ -183,7 +198,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const scope = [
     view,
     view === "invited" && filterNoResponse ? "no_response" : "",
-    view === "enrolled" && roleFilter.size ? [...roleFilter].sort().join("_") : "",
+    roleFilter.size ? [...roleFilter].sort().join("_") : "",
     sectionName ?? "",
   ]
     .filter(Boolean)
@@ -335,15 +350,40 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
       ) : view === "invited" ? (
         <>
-          {/* The one filter: the silent. Everyone else on this tab already
-              answered by enrolling. */}
+          {/* TWO FILTERS HERE NOW: the silent, and the role the invitation
+              will grant (TJ, 2026-08-26: "the filter is not on invited, only
+              enrolled, it should be on invited as well"). They compose — the
+              silent faculty is a real question, and it was two lists and a
+              squint before. */}
           <div className="rosterfilter">
             <a
               className={filterNoResponse ? "on" : undefined}
-              href={`${baseHref}&view=invited${filterNoResponse ? "" : "&filter=noresponse"}`}
+              href={`${baseHref}&view=invited${filterNoResponse ? "" : "&filter=noresponse"}${
+                roleFilter.size ? `&role=${[...roleFilter].sort().join(",")}` : ""
+              }`}
             >
               {filterNoResponse ? "▣" : "▢"} no response yet <span className="pill loose">{noResponseCount}</span>
             </a>
+            <span className="rosterfiltersep" aria-hidden="true" />
+            {/* "Everyone" is the reset, exactly as on Enrolled. */}
+            <a className={roleFilter.size === 0 ? "on" : undefined} href={roleHref(new Set())}>
+              {roleFilter.size === 0 ? "▣" : "▢"} everyone{" "}
+              <span className="pill loose">{invitedShown.length}</span>
+            </a>
+            {ROLE_CHIPS.map(({ value, label }) => {
+              const picked = roleFilter.has(value)
+              const next = new Set(roleFilter)
+              if (picked) next.delete(value)
+              else next.add(value)
+              return (
+                <a key={value} className={picked ? "on" : undefined} href={roleHref(next)}>
+                  {picked ? "▣" : "▢"} {label}{" "}
+                  <span className="pill loose">
+                    {invitedShown.filter((row) => (row.role ?? "").toLowerCase() === value).length}
+                  </span>
+                </a>
+              )
+            })}
             <RosterDownload people={invitedPeople} courseName={course?.name} scope={scope} />
           </div>
           {invitedPeople.length > 0 ? (

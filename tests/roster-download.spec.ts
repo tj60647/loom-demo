@@ -360,3 +360,63 @@ test("the roster sorts by email, both ways", async ({ page }) => {
     [...names].sort((a, b) => a.localeCompare(b))
   )
 })
+/**
+ * THE INVITED TAB FILTERS BY ROLE TOO.
+ *
+ * TJ, 2026-08-26: "the filter is not on invited, only enrolled, it should be
+ * on invited as well."
+ *
+ * WHY IT WAS NOT, and why that reason was wrong. A pending invitation carries
+ * no role of its own — `course_allowed_email` is courseId, email, sectionId,
+ * createdAt — so getRoster stamped every pending row "LEARNER" and the tab had
+ * nothing to filter on. But the role is not unknown, it is DERIVED: an
+ * invitation addressed to the section with slug "faculty" enrols as FACULTY, a
+ * site admin's address as INSTRUCTOR, everybody else as LEARNER
+ * (enrolInvitedCourses, src/lib/auth.ts). The column was stating a default as
+ * a fact, and on the dev seed it was wrong for 7 of 22 rows.
+ *
+ * The two rules must stay in step. This spec asserts the derivation the tab
+ * depends on: whoever is invited to the Faculty Section is filtered as faculty
+ * BEFORE they have signed in.
+ */
+test("the invited tab filters by the role each invitation will grant", async ({ page }) => {
+  await page.goto("/admin?view=invited")
+  const chips = page.locator(".rosterfilter a")
+  await expect(chips.first()).toBeVisible({ timeout: 20_000 })
+
+  const labels = (await chips.allTextContents()).map((t) => t.replace(/\s+/g, " ").trim().toLowerCase())
+  expect(labels.some((t) => t.includes("no response")), "the silence filter is gone").toBe(true)
+  expect(
+    labels.some((t) => t.includes("faculty")),
+    "the invited tab offers no role chips — see roleAnInvitationGrants in getRoster"
+  ).toBe(true)
+
+  const rows = () => page.locator(".rosterrow").count()
+  const all = await rows()
+  expect(all, "nobody is invited — run `npm run seed:demo`").toBeGreaterThan(1)
+
+  const faculty = page.locator(".rosterfilter a", { hasText: /faculty/i }).first()
+  await faculty.click()
+  await expect(page).toHaveURL(/role=faculty/, { timeout: 15_000 })
+  const narrowed = await rows()
+  expect(narrowed, "the faculty chip narrowed nothing").toBeLessThan(all)
+  expect(narrowed, "the faculty chip emptied the tab").toBeGreaterThan(0)
+
+  /**
+   * EVERY REMAINING ROW IS IN A FACULTY SECTION. This is the assertion that
+   * fails against the old hard-coded "LEARNER": with every pending row stamped
+   * the same, the chip would either not exist or narrow to nothing.
+   */
+  const sections = await page.locator(".rosterrow").evaluateAll((rows) =>
+    rows.map((r) => (r.textContent ?? "").toLowerCase())
+  )
+  expect(
+    sections.every((text) => text.includes("faculty")),
+    "a row survived the faculty filter without being in a faculty section"
+  ).toBe(true)
+
+  // The two filters compose rather than replacing each other.
+  await page.locator(".rosterfilter a", { hasText: /no response/i }).first().click()
+  await expect(page).toHaveURL(/role=faculty/, { timeout: 15_000 })
+  await expect(page).toHaveURL(/filter=noresponse/)
+})
