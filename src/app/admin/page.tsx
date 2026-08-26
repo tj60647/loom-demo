@@ -117,10 +117,33 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
    * invitation named (src/lib/auth.ts, enrolInvitedCourses), so filtering the
    * Invited tab by role would filter on a value that does not exist.
    */
-  const ROLE_CHIPS = [
-    { value: "learner", label: "learners" },
-    { value: "faculty", label: "faculty" },
-  ] as const
+  /**
+   * DRAWN FROM THE ROLES ON THE ROSTER, not from a list of the two we expect.
+   * `enrolInvitedCourses` writes INSTRUCTOR for an admin who joins by
+   * invitation (src/lib/auth.ts), and a hard-coded pair had no chip for that:
+   * such a person could not be filtered for, appeared in no chip's count, and
+   * made "everyone" larger than the chips added up to — with nothing on screen
+   * saying why. Dev carries only LEARNER and FACULTY today, so this changes
+   * nothing visible there and holds when a third appears.
+   *
+   * LEARNERS AND FACULTY KEEP THE FRONT: they are the two a professor reaches
+   * for, and an order that shuffles when somebody's role changes is an order
+   * you cannot learn. Anything else follows, alphabetically.
+   */
+  const ROLE_ORDER = ["learner", "faculty"]
+  const ROLE_CHIPS = [...new Set(enrolled.map((row) => (row.role ?? "").toLowerCase()).filter(Boolean))]
+    .sort((a, b) => {
+      const ai = ROLE_ORDER.indexOf(a)
+      const bi = ROLE_ORDER.indexOf(b)
+      if (ai !== bi) return (ai === -1 ? ROLE_ORDER.length : ai) - (bi === -1 ? ROLE_ORDER.length : bi)
+      return a.localeCompare(b)
+    })
+    .map((value) => ({
+      value,
+      // "learner" reads as a role, "learners" as a group you are picking — and
+      // the chip is a filter, so it names the group.
+      label: value === "faculty" ? "faculty" : `${value}s`,
+    }))
   /**
    * A SET, NOT A CHOICE (TJ, 2026-08-24: "we should be able to pick more than
    * one of these"). The chips were already drawn as checkboxes — ▢ and ▣ —

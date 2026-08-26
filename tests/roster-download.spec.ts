@@ -305,3 +305,50 @@ test("the roster does not scroll sideways at the desktop floor", async ({ page }
   expect(fit.over, "the roster row must fit its card at 1280").toBeLessThanOrEqual(0)
   expect(fit.bodyOver, "and the page must not scroll sideways either").toBeLessThanOrEqual(0)
 })
+
+/**
+ * THE ROSTER SORTS BY ADDRESS, NOT ONLY BY NAME.
+ *
+ * TJ, 2026-08-26: "we need sort by email on the roster." The first column
+ * carries both — the name in ink, the address under it — and only the name
+ * could order the table. The address is the half a professor has in hand when
+ * a student writes in, and the half that groups a class by institution.
+ *
+ * ALPHABETICAL IN THE READER'S SENSE, not the database's: the comparator
+ * lowercases, because `C.UTF-8` collation puts every capital ahead of every
+ * lowercase letter and "Zoe@" would sort before "adam@" (the same trap the
+ * student picker hit on 2026-08-24).
+ */
+test("the roster sorts by email, both ways", async ({ page }) => {
+  await page.goto("/admin")
+  const headers = page.locator(".rosterhead button")
+  await expect(headers.first()).toBeVisible({ timeout: 20_000 })
+
+  const emailSort = page.locator(".rosterhead button", { hasText: /^email/ })
+  await expect(emailSort, "the roster offers no sort by email").toHaveCount(1)
+
+  const addresses = () =>
+    page.locator(".rosterrow .rosteremail").evaluateAll((els) =>
+      els.map((el) => (el.textContent ?? "").trim().toLowerCase()).filter(Boolean)
+    )
+
+  await emailSort.click()
+  await expect(page.locator(".rosterhead button.on")).toHaveText(/email/)
+  const asc = await addresses()
+  expect(asc.length, "no addresses on the roster — run `npm run seed:demo`").toBeGreaterThan(3)
+  expect(asc, "ascending must be A→Z by address").toEqual([...asc].sort((a, b) => a.localeCompare(b)))
+
+  await emailSort.click()
+  const desc = await addresses()
+  expect(desc, "a second click must reverse it").toEqual([...asc].reverse())
+
+  /**
+   * AND THE NAME SORT IS STILL ITS OWN. Two buttons in one column is only
+   * worth it if they do different things — a spec that clicked email and
+   * checked "something moved" would pass with both wired to the name.
+   */
+  await page.locator(".rosterhead button", { hasText: /^name/ }).click()
+  await expect(page.locator(".rosterhead button.on")).toHaveText(/name/)
+  const byName = await addresses()
+  expect(byName, "sorting by name must not produce the address order").not.toEqual(asc)
+})

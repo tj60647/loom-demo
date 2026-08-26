@@ -38,7 +38,7 @@ export type RosterPerson = {
   acceptedAt: Date | string | null
 }
 
-type SortKey = "name" | "role" | "cloths" | "concepts" | "edges" | "section" | "invited" | "accepted"
+type SortKey = "name" | "email" | "role" | "cloths" | "concepts" | "edges" | "section" | "invited" | "accepted"
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
@@ -125,6 +125,15 @@ export default function RosterTable({
       (a.name ?? a.email).localeCompare(b.name ?? b.email)
     const value: Record<SortKey, (p: RosterPerson) => string | number> = {
       name: (p) => (p.name ?? p.email).toLowerCase(),
+      /**
+       * BY ADDRESS (TJ, 2026-08-26: "we need sort by email on the roster").
+       * The column already shows both — the name in ink, the address under it
+       * — so it sorts by either, and this is the half a professor has in hand
+       * when a student writes in. Lowercased for the reason the student picker
+       * is: the database collates in C.UTF-8, where every capital sorts before
+       * every lowercase letter, so "Zoe@" would come before "adam@".
+       */
+      email: (p) => (p.email ?? "").toLowerCase(),
       role: (p) => p.role,
       cloths: (p) => p.clothsCount,
       concepts: (p) => p.conceptsCount,
@@ -177,7 +186,14 @@ export default function RosterTable({
   return (
     <div className="card rosterlist" style={{ marginTop: "10px" }}>
       <div className="rosterhead">
-        {head("name", "name")}
+        {/* One column, two orders. The cell carries the name over the
+            address, so it offers a sort for each rather than making the
+            reader guess which one "name" means. */}
+        <span className="rosterheadpair">
+          {head("name", "name")}
+          <span aria-hidden="true">·</span>
+          {head("email", "email")}
+        </span>
         <span className="rostercol">open loom</span>
         {head("cloths", "cloths")}
         {head("concepts", "concepts")}
