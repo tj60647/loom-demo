@@ -1251,7 +1251,18 @@ export default function SpreadCanvasView({
       for (const [el, id] of cardIdByEl.current) {
         const host = el as HTMLElement;
         next[id] = host.offsetHeight;
-        nextPassageCards[id] = host.querySelector<HTMLElement>(".pdf-railcard")?.offsetHeight ?? CARD_FALLBACK_H;
+        /**
+         * WHATEVER CARD THIS STACK HOLDS — `.pdf-railcard` OR the draft's own
+         * `.pdf-draftcard`. Querying only the former meant the capture form
+         * never measured: the lookup returned null, the leader fell back to
+         * CARD_FALLBACK_H, and it aimed at `top + 44` on a form 263px tall.
+         * Measured on the running app at 1536: the line ended 87px above the
+         * card it was pointing at, in open space — which is what a reader sees
+         * as a stray line when the form opens (TJ, 2026-08-26: "the multiple
+         * leaders when i click things is not [desired]").
+         */
+        nextPassageCards[id] =
+          host.querySelector<HTMLElement>(".pdf-railcard, .pdf-draftcard")?.offsetHeight ?? CARD_FALLBACK_H;
       }
       setCardHeights((prev) => {
         const nk = Object.keys(next);
@@ -1610,7 +1621,12 @@ export default function SpreadCanvasView({
                  Close in it keeps its + and its invitation, so it stays. */
               if (!(draft && c.passage.id === draft.passage.id)
                   && seesMoreThanASpread && c.concepts.length === 0) return null;
-              const h = (passageCardHeights[id] ?? CARD_FALLBACK_H) * cs;
+              // Not drawn until measured — see the twin of this line in
+              // ConceptRail: a leader aimed at CARD_FALLBACK_H flashes at a
+              // place no card is, then snaps.
+              const measured = passageCardHeights[id];
+              if (measured == null) return null;
+              const h = measured * cs;
               const x2 = c.anchor.side === "left" ? s.x + layout.railW : s.x + layout.unitW - layout.railW;
               return <path key={id} d={`M ${c.anchor.edgeX} ${c.anchor.midY} L ${x2} ${top + h / 2}`} />;
             })}
