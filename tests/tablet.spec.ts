@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test"
+import { test, expect, type Locator, type Page } from "@playwright/test"
+import { deleteConceptInVocabulary, deletePassageInPassagesView } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 test.beforeEach(() => test.setTimeout(150_000))
@@ -30,8 +31,17 @@ test.beforeEach(() => test.setTimeout(150_000))
  * below: nothing here may assert about text on a page that has none.
  */
 
+/** Press a control through Playwright's touchscreen rather than its mouse. */
+async function touch(page: Page, target: Locator) {
+  await expect(target).toBeVisible({ timeout: 20_000 })
+  await target.scrollIntoViewIfNeeded()
+  const box = await target.boundingBox()
+  expect(box, "touch target has no rendered box").not.toBeNull()
+  await page.touchscreen.tap(box!.x + box!.width / 2, box!.y + box!.height / 2)
+}
+
 /** Turn to a page that actually carries text, and say so if none does. */
-async function pageWithText(page: import("@playwright/test").Page) {
+async function pageWithText(page: Page) {
   const spans = () =>
     page.evaluate(() =>
       [...document.querySelectorAll(".react-pdf__Page__textContent")].reduce(
@@ -43,7 +53,7 @@ async function pageWithText(page: import("@playwright/test").Page) {
     if ((await spans()) > 5) return true
     const next = page.getByRole("button", { name: "Next Page" })
     if (!(await next.count()) || !(await next.first().isEnabled())) return false
-    await next.first().click()
+    await touch(page, next.first())
     await page.waitForTimeout(6_000)
   }
   return (await spans()) > 5
@@ -103,6 +113,77 @@ test("pen-typed pointer input selects reading text and arms capture", async ({ p
   await expect(page.locator("#captureNow")).toBeVisible({ timeout: 15_000 })
 })
 
+test("a browser selection can be saved through touch controls and survives reload", async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto("/", { waitUntil: "domcontentloaded" })
+  const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
+  await expect(card, "seed missing — run `npm run seed:demo` first").toBeVisible({ timeout: 20_000 })
+  await touch(page, card.locator("a.shelfmain"))
+  await expect(page).toHaveURL(/\/reading\//, { timeout: 20_000 })
+  await expect(page.locator(".react-pdf__Page").first()).toBeAttached({ timeout: 60_000 })
+  expect(await pageWithText(page), "no page of this reading drew selectable text").toBe(true)
+
+  /**
+   * Playwright cannot perform iPadOS's native long-press selection. Build the
+   * Selection Safari would report, then use touchscreen input for every control
+   * in the capture path. The pen-typed gesture itself is covered above.
+   */
+  const selected = await page.evaluate(() => {
+    const layer = [...document.querySelectorAll(".react-pdf__Page__textContent")].find(
+      (candidate) => candidate.querySelectorAll("span").length > 5
+    )
+    const spans = layer
+      ? [...layer.querySelectorAll("span")].filter((span) => (span.textContent ?? "").trim().length > 0)
+      : []
+    const start = spans.findIndex((span) => (span.textContent ?? "").trim().length >= 20)
+    if (start < 0) return ""
+    let end = start
+    let length = (spans[start].textContent ?? "").length
+    while (end + 1 < spans.length && length < 100) {
+      end += 1
+      length += (spans[end].textContent ?? "").length
+    }
+    const range = document.createRange()
+    range.setStartBefore(spans[start].firstChild ?? spans[start])
+    range.setEndAfter(spans[end].firstChild ?? spans[end])
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    document.dispatchEvent(new Event("selectionchange"))
+    return (selection?.toString() ?? "").trim()
+  })
+  expect(selected.length).toBeGreaterThanOrEqual(20)
+
+  const capture = page.locator("#captureNow")
+  await expect(capture).toBeVisible({ timeout: 15_000 })
+  await touch(page, capture)
+  await expect(page.locator("#capturePassageSave")).toBeVisible({ timeout: 10_000 })
+
+  // This prefix is recognised by scripts/clean-fixtures.ts, so a failed run
+  // cannot strand the passage even if it never reaches the cleanup below.
+  const conceptName = `Test Concept for Tablet Touch ${Date.now().toString(36)}`
+  await touch(page, page.locator("#captureConceptToggle"))
+  await page.locator("#captureConcept").fill(conceptName)
+  await touch(page, page.locator("#capturePassageSave"))
+  await expect(page.locator("#capturePassageSave")).toHaveCount(0, { timeout: 30_000 })
+
+  await touch(page, page.getByRole("button", { name: "In your work ›" }))
+  const savedRow = page.locator("#yourwork .ywpassage", { hasText: conceptName })
+  await expect(savedRow).toBeVisible({ timeout: 15_000 })
+  const passageId = await savedRow.getAttribute("data-passage-id")
+  expect(passageId).toMatch(/^[0-9a-f-]{36}$/)
+
+  await page.reload({ waitUntil: "domcontentloaded" })
+  await expect(page.locator(".pdf-shell")).toBeVisible({ timeout: 30_000 })
+  await touch(page, page.locator("#yourwork-toggle"))
+  await expect(page.locator(`#yourwork [data-passage-id="${passageId}"]`)).toContainText(conceptName, {
+    timeout: 20_000,
+  })
+
+  await deletePassageInPassagesView(page, passageId!)
+  await deleteConceptInVocabulary(page, conceptName)
+})
+
 test("the narrow layout says what Loom is built for, without getting in the way", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" })
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 20_000 })
@@ -118,7 +199,7 @@ test("the narrow layout says what Loom is built for, without getting in the way"
 
   // It can be put away, and it stays away — a standing banner on every visit
   // would be the getting-in-the-way this is meant to avoid.
-  await notice.getByRole("button", { name: /dismiss/i }).click()
+  await touch(page, notice.getByRole("button", { name: /dismiss/i }))
   await expect(notice).toHaveCount(0)
   await page.reload({ waitUntil: "domcontentloaded" })
   await expect(page.locator(".shelfcard").first()).toBeVisible({ timeout: 20_000 })

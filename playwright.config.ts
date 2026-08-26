@@ -124,7 +124,9 @@ export default defineConfig({
      * reaches that path before the OS claims the gesture. Only a real device
      * can answer it.
      *
-     * Read-only by construction: it drives one spec that captures nothing.
+     * Its save-path spec writes one passage and one `Test Concept for …`,
+     * removes both through the UI, and uses the fixture-sweep-recognised concept
+     * prefix so a failed run cannot strand either row.
      */
     {
       name: 'tablet',
