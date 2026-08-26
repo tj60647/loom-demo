@@ -432,3 +432,62 @@ test("picking on the cloth scrolls the panels to what was picked", async ({ page
     "the panel scrolled, but not to the picked card"
   ).toBe(true)
 })
+
+/**
+ * THE MARK IS THE WAY HOME (TJ, 2026-08-25, asked where the home button went).
+ *
+ * It had never been one: `header .wordmark` was a plain div on every surface
+ * that draws this header, so the one control every reader already knows how to
+ * click did nothing, and from the admin shell the only route back was
+ * `00 · Library` in the journey bar — which reads as a station among stations
+ * rather than the way out.
+ *
+ * The reading station is the exception and keeps its own house: 01 stands this
+ * header down entirely, which is why HomeIcon exists at all. So the two never
+ * appear together, and neither is redundant.
+ */
+test("the wordmark goes home, and does not dress as a link to do it", async ({ page }) => {
+  await page.goto("/admin")
+  const mark = page.locator("header .wordmark")
+  await expect(mark).toBeVisible({ timeout: 20_000 })
+  await expect(mark).toHaveAttribute("href", "/")
+
+  /**
+   * NAMED, because the accessible name would otherwise be the whole mark —
+   * "Loom lay the warp · throw the weft · dev" is not a destination.
+   */
+  await expect(mark).toHaveAttribute("aria-label", /home/i)
+
+  /**
+   * Still the mark: no underline, and Loom's own ink rather than a browser's
+   * idea of what a link looks like.
+   *
+   * AGAINST THE TOKEN, NOT A LITERAL. This read `toBe("rgb(26, 25, 22)")`,
+   * which fails the day --ink moves by a shade even though nothing is wrong
+   * (Copilot, #38). Nor is "inherits its parent" the thing to assert: the rule
+   * DECLARES var(--ink) rather than deflecting to whatever is around it (TJ,
+   * 2026-08-25: "we should own the color, not the user"), so what is checked
+   * is that the mark wears the token — which still fails if a user agent's
+   * link colour ever reaches it.
+   */
+  const dressed = await mark.evaluate((el) => {
+    const probe = document.createElement("span")
+    probe.style.color = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim()
+    document.body.appendChild(probe)
+    const ink = getComputedStyle(probe).color
+    probe.remove()
+    const css = getComputedStyle(el)
+    return { decoration: css.textDecorationLine, color: css.color, ink }
+  })
+  expect(dressed.decoration).toBe("none")
+  expect(dressed.ink, "--ink must resolve to a colour for this to mean anything").toMatch(/^rgb/)
+  expect(dressed.color, "the mark wears Loom's ink, whatever --ink is today").toBe(dressed.ink)
+
+  // And it is the first thing a keyboard reaches, which is where a route out
+  // belongs.
+  await page.keyboard.press("Tab")
+  await expect(mark).toBeFocused()
+
+  await mark.click()
+  await expect(page).toHaveURL(/\/$/, { timeout: 20_000 })
+})
