@@ -13,12 +13,13 @@ test.beforeEach(() => test.setTimeout(150_000))
  * `devices['iPad Pro 11']` — 834 x 1194, touch, portrait.
  *
  * WHAT IT SETTLES: Safari's engine renders the app, a reading draws a real
- * text layer at that size, a drag over the words selects them, and the
- * selection arms a capture.
+ * text layer at that size, and Loom turns pen-typed pointer input over those
+ * words into the live selection that arms a capture.
  *
- * WHAT IT CANNOT: whether an Apple PENCIL drag selects or scrolls. That is
- * iPadOS gesture arbitration, it lives in the OS, and no emulator has it. A
- * mouse drag here is evidence about the app, never about the Pencil.
+ * WHAT IT CANNOT: whether a real Apple Pencil reaches that handler before
+ * iPadOS claims the gesture. Playwright has no Pencil input; the PointerEvents
+ * below are synthetic and test Loom's path, never the operating system's
+ * arbitration. That last fact still needs a real device.
  *
  * A CORRECTION THIS FILE OWES ITS OWN EXISTENCE TO. The first pass at this
  * concluded "Loom renders no selectable text below 900px" — measured, and
@@ -48,7 +49,7 @@ async function pageWithText(page: import("@playwright/test").Page) {
   return (await spans()) > 5
 }
 
-test("a reading opens on Safari at an iPad, and its words can be selected and captured", async ({ page }) => {
+test("pen-typed pointer input selects reading text and arms capture", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" })
   const card = page.locator(".shelfcard", { hasText: "Object Worlds" }).first()
   await expect(card, "seed missing — run `npm run seed:demo` first").toBeVisible({ timeout: 20_000 })
@@ -65,31 +66,37 @@ test("a reading opens on Safari at an iPad, and its words can be selected and ca
     "no page of this reading drew a text layer on WebKit at an iPad"
   ).toBe(true)
 
-  /**
-   * A DRAG SELECTS. Trusted input through the engine's own selection path, not
-   * a Range built in script the way tests/pdf-viewer.spec.ts does — the point
-   * here is precisely whether dragging works, which a scripted Range would
-   * assume rather than test.
-   */
-  const line = await page.evaluate(() => {
+  const selected = await page.evaluate(() => {
     const layer = [...document.querySelectorAll(".react-pdf__Page__textContent")].find(
       (l) => l.querySelectorAll("span").length > 5
     )
-    if (!layer) return null
-    const span = [...layer.querySelectorAll("span")]
-      .map((el) => ({ box: el.getBoundingClientRect(), chars: (el.textContent ?? "").trim().length }))
-      .find((s) => s.chars > 10 && s.box.width > 40 && s.box.height > 2)
-    return span ? { x: span.box.x, y: span.box.y, w: span.box.width, h: span.box.height } : null
+    if (!layer) return ""
+    const target = [...layer.querySelectorAll("span")].find((el) => {
+      const box = el.getBoundingClientRect()
+      return (el.textContent ?? "").trim().length > 10 && box.width > 40 && box.height > 2
+    })
+    if (!target) return ""
+    const box = target.getBoundingClientRect()
+
+    const y = box.y + box.height / 2
+    const fire = (type: string, x: number, buttons: number) =>
+      target.dispatchEvent(new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 41,
+        pointerType: "pen",
+        isPrimary: true,
+        button: 0,
+        buttons,
+        clientX: x,
+        clientY: y,
+      }))
+    fire("pointerdown", box.x + 2, 1)
+    fire("pointermove", box.x + box.width - 2, 1)
+    fire("pointerup", box.x + box.width - 2, 0)
+    return (window.getSelection()?.toString() ?? "").trim()
   })
-  expect(line, "no line of text wide enough to drag across").not.toBeNull()
-
-  await page.mouse.move(line!.x + 2, line!.y + line!.h / 2)
-  await page.mouse.down()
-  await page.mouse.move(line!.x + line!.w - 2, line!.y + line!.h / 2, { steps: 20 })
-  await page.mouse.up()
-
-  const selected = await page.evaluate(() => (window.getSelection()?.toString() ?? "").trim())
-  expect(selected.length, `drag selected "${selected}"`).toBeGreaterThan(5)
+  expect(selected.length, `pen path selected "${selected}"`).toBeGreaterThan(5)
 
   // …and the selection arms the capture, which is the act the whole station is
   // for. Selectable text nobody can keep would be a hollow pass.
