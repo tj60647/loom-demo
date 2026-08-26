@@ -34,7 +34,7 @@
  * and blamed the code. Cleanup that only runs on success is not cleanup.
  */
 import { test, expect, type Page } from "@playwright/test"
-import { deletePassageInPassagesView, openReading } from "./helpers"
+import { deletePassageInPassagesView, openReading, openYourWork } from "./helpers"
 
 test.use({ storageState: "playwright/.auth/testa.json" })
 test.beforeEach(() => test.setTimeout(180_000))
@@ -58,8 +58,7 @@ test.afterEach(async ({ page }) => {
     // to "/" and hung there until the hook's budget ran out.
     if (!(await page.locator("#yourwork").isVisible().catch(() => false))) {
       await openReading(page, "Object Worlds")
-      await page.locator("#yourwork-toggle").click()
-      await expect(page.locator("#yourwork")).toBeVisible({ timeout: 30_000 })
+      await openYourWork(page, "passages")
     }
     await deletePassageInPassagesView(page, id)
   } catch {
@@ -147,8 +146,14 @@ test("saving a passage never adds a second leader from one place in the text", a
     ;(window as unknown as { __leaderStop: boolean }).__leaderStop = true
   })
 
-  // The id FIRST, so a failing assertion below still leaves a cleanable trail.
-  await page.locator("#yourwork-toggle").click()
+  /**
+   * The id FIRST, so a failing assertion below still leaves a cleanable trail.
+   * Through the helper, not a bare click on the toggle: it checks
+   * `aria-expanded` before pressing — a blind click closes a panel that is
+   * already open — and polls until the sheet's 200ms slide has settled, which
+   * Playwright's actionability check does not wait for (Copilot, #41).
+   */
+  await openYourWork(page, "passages")
   const row = page.locator("#yourwork .ywpassage").filter({ hasText: selected.slice(0, 24) }).first()
   await expect(row).toBeVisible({ timeout: 20_000 })
   strandedId = await row.getAttribute("data-passage-id")
@@ -166,4 +171,58 @@ test("saving a passage never adds a second leader from one place in the text", a
       frames.filter((f) => f.dupes > baseline).length
     } of ${frames.length} frames — the draft and its optimistic twin are both on screen (see isDraftTwin in PdfViewer)`
   ).toBeLessThanOrEqual(baseline)
+})
+
+/**
+ * AND IT MUST NOT HIDE WORK THAT WAS ALREADY THERE.
+ *
+ * The first version of the fix matched the optimistic row by anchor alone, so
+ * it could not tell "the echo of this save" from "a passage that was on the
+ * page before I started". Opening a capture over already-marked text therefore
+ * erased that passage's card and highlight for as long as the editor stayed
+ * open — and the editor stays open while a note is being typed. Measured
+ * before the second fix: 1 rail card, then 0.
+ *
+ * Nothing covered it, which is how it shipped: the spec above asserts what a
+ * save may not ADD, and this one asserts what opening a capture may not TAKE
+ * AWAY. Copilot found it on #41 by reading the predicate against this file's
+ * own stated premise — that two passages at one anchor are legitimate.
+ *
+ * READ-ONLY: it opens the editor and abandons it. Nothing is saved, so there
+ * is nothing to sweep.
+ */
+test("opening a capture over marked text leaves that passage's card alone", async ({ page }) => {
+  await openReading(page, "Object Worlds")
+  const marks = page.locator(".loom-passage-highlight")
+  await expect(marks.first(), "seed has no marked passage on this spread — run `npm run seed:demo`").toBeVisible({
+    timeout: 60_000,
+  })
+  // The cards follow the marks by a beat — the anchors are measured from the
+  // painted marks — so counting on the mark alone reads zero.
+  await expect(page.locator(".pdf-railcard").first()).toBeVisible({ timeout: 30_000 })
+  const cardsBefore = await page.locator(".pdf-railcard").count()
+  expect(cardsBefore, "this spread must carry at least one existing card").toBeGreaterThan(0)
+
+  // Select exactly what is already marked — the same words, so the same anchor.
+  await page.evaluate(() => {
+    const marked = [...document.querySelectorAll(".loom-passage-highlight")]
+    const range = document.createRange()
+    range.setStartBefore(marked[0])
+    range.setEndAfter(marked[marked.length - 1])
+    const selection = getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }))
+  })
+  await page.locator("#captureNow").click()
+  await expect(page.locator(".pdf-draftcard")).toBeVisible({ timeout: 20_000 })
+
+  // The draft is a card BESIDE the existing one, never instead of it.
+  await expect(page.locator(".pdf-railcard")).toHaveCount(cardsBefore)
+  await expect(marks.first()).toBeVisible()
+
+  // Escape abandons the draft, and everything is as it was.
+  await page.locator(".pdf-draftcard").press("Escape")
+  await expect(page.locator(".pdf-draftcard")).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.locator(".pdf-railcard")).toHaveCount(cardsBefore)
 })

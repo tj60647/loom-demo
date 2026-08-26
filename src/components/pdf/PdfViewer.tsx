@@ -230,8 +230,16 @@ export const DRAFT_ID = "draft";
  * "same page" alone would hide a passage that merely shares a page with the
  * draft.
  */
-export function isDraftTwin(passage: Passage, draft: CaptureTarget | null): boolean {
+export function isDraftTwin(
+  passage: Passage,
+  draft: CaptureTarget | null,
+  /** The passage ids that existed when this draft opened. */
+  known: ReadonlySet<string>
+): boolean {
   if (!draft || draft.startOffset == null || draft.endOffset == null) return false
+  // Already on the page before the capture began, so it is somebody's earlier
+  // reading of these words and not this save's echo.
+  if (known.has(passage.id)) return false
   return (
     passage.startOffset === draft.startOffset &&
     passage.endOffset === draft.endOffset &&
@@ -795,6 +803,26 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
   const [draft, setDraft] = useState<CaptureTarget | null>(null);
   const draftRef = useRef<CaptureTarget | null>(null);
   useEffect(() => { draftRef.current = draft; }, [draft]);
+  /**
+   * WHAT WAS ALREADY THERE WHEN THIS CAPTURE BEGAN — the half of `isDraftTwin`
+   * that keeps it from hiding somebody's earlier work.
+   *
+   * Anchor alone cannot tell the optimistic row from a passage that was on the
+   * page all along, and two passages at one anchor is a legitimate thing to
+   * have: capture a sentence, then capture it again under another concept. The
+   * first version of this fix matched on anchor only, so opening a capture over
+   * already-marked text erased that passage's card and highlight for as long as
+   * the editor stayed open — measured, 1 rail card to 0 (Copilot caught it on
+   * #41; the spec now covers it).
+   *
+   * Held as state AND a ref because both readers need it and neither may use
+   * the other's: the rail filter runs during render, where the compiler forbids
+   * reading a ref, and the marking pass runs from a callback with no access to
+   * the render's closure.
+   */
+  const [draftKnownIds, setDraftKnownIds] = useState<ReadonlySet<string>>(() => new Set());
+  const draftKnownRef = useRef<ReadonlySet<string>>(new Set());
+  useEffect(() => { draftKnownRef.current = draftKnownIds; }, [draftKnownIds]);
   const [captureData, setCaptureData] = useState<CaptureTarget | null>(null);
 
   // Find in this reading. The query runs server-side against the canonical
@@ -1810,7 +1838,10 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       // two marks over one range nest, and the second unmark strips whichever
       // finished first. See isDraftTwin.
       const passages = d
-        ? [...passagesRef.current.filter((p) => !isDraftTwin(p, d)), draftAsPassage(d, sourceName)]
+        ? [
+            ...passagesRef.current.filter((p) => !isDraftTwin(p, d, draftKnownRef.current)),
+            draftAsPassage(d, sourceName),
+          ]
         : passagesRef.current;
       /**
        * ONE MECHANISM PER VIEW, never two on one page.
@@ -2148,6 +2179,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
      * that arithmetic, so it owns the move — see its draft effect, which also
      * centres the selection while it is in there.
      */
+    // Snapshotted with the draft, not read later: by the time the save lands,
+    // the optimistic row is already in the list and indistinguishable by anchor.
+    setDraftKnownIds(new Set(passagesRef.current.map((p) => p.id)));
     setDraft(target);
   };
 
@@ -2401,8 +2435,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * is open, so the rail's memos do not recompute on every render.
    */
   const cardPassages = useMemo(
-    () => (draft ? cardPassagesAll.filter((p) => !isDraftTwin(p, draft)) : cardPassagesAll),
-    [cardPassagesAll, draft]
+    () =>
+      draft ? cardPassagesAll.filter((p) => !isDraftTwin(p, draft, draftKnownIds)) : cardPassagesAll,
+    [cardPassagesAll, draft, draftKnownIds]
   );
   const cardConcepts = showingScopeCards ? scopeConcepts : state.concepts;
   /**
