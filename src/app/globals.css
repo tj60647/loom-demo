@@ -1880,6 +1880,13 @@ header .btn{display:inline-flex;align-items:center;justify-content:center}
 .rosterhead .rostercol{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
 .rosterhead button:hover{color:var(--ink)}
 .rosterhead button.on{color:var(--ochre)}
+/* Two sorts over one column — name over address. The separator is quiet and
+   the buttons keep the header's own type; nothing here changes the grid. */
+/* Between two kinds of filter — the silence, and the role — so the row reads
+   as two questions rather than one long list of chips. */
+.rosterfiltersep{width:1px;height:14px;background:var(--rule);margin:0 3px}
+.rosterheadpair{display:flex;align-items:baseline;gap:5px;min-width:0}
+.rosterheadpair > span[aria-hidden]{font-family:var(--mono);font-size:10px;color:var(--dot)}
 .rosterrow{border-bottom:1px dotted var(--rule)}
 .rosterrow:last-child{border-bottom:none}
 .rosterwho{min-width:0}

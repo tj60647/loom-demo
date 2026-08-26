@@ -305,3 +305,118 @@ test("the roster does not scroll sideways at the desktop floor", async ({ page }
   expect(fit.over, "the roster row must fit its card at 1280").toBeLessThanOrEqual(0)
   expect(fit.bodyOver, "and the page must not scroll sideways either").toBeLessThanOrEqual(0)
 })
+
+/**
+ * THE ROSTER SORTS BY ADDRESS, NOT ONLY BY NAME.
+ *
+ * TJ, 2026-08-26: "we need sort by email on the roster." The first column
+ * carries both — the name in ink, the address under it — and only the name
+ * could order the table. The address is the half a professor has in hand when
+ * a student writes in, and the half that groups a class by institution.
+ *
+ * ALPHABETICAL IN THE READER'S SENSE, not the database's: the comparator
+ * lowercases, because `C.UTF-8` collation puts every capital ahead of every
+ * lowercase letter and "Zoe@" would sort before "adam@" (the same trap the
+ * student picker hit on 2026-08-24).
+ */
+test("the roster sorts by email, both ways", async ({ page }) => {
+  await page.goto("/admin")
+  const headers = page.locator(".rosterhead button")
+  await expect(headers.first()).toBeVisible({ timeout: 20_000 })
+
+  const emailSort = page.locator(".rosterhead button", { hasText: /^email/ })
+  await expect(emailSort, "the roster offers no sort by email").toHaveCount(1)
+
+  const addresses = () =>
+    page.locator(".rosterrow .rosteremail").evaluateAll((els) =>
+      els.map((el) => (el.textContent ?? "").trim().toLowerCase()).filter(Boolean)
+    )
+
+  await emailSort.click()
+  await expect(page.locator(".rosterhead button.on")).toHaveText(/email/)
+  const asc = await addresses()
+  expect(asc.length, "no addresses on the roster — run `npm run seed:demo`").toBeGreaterThan(3)
+  expect(asc, "ascending must be A→Z by address").toEqual([...asc].sort((a, b) => a.localeCompare(b)))
+
+  await emailSort.click()
+  const desc = await addresses()
+  expect(desc, "a second click must reverse it").toEqual([...asc].reverse())
+
+  /**
+   * AND THE NAME SORT STILL SORTS BY NAME. Written first as "the name order
+   * must differ from the address order", which is true of this seed and not
+   * true in principle: a roster whose names and addresses happen to run in the
+   * same direction — "Test User A" at test-user-a@ — would fail a spec with
+   * both sorts wired correctly (Copilot, #43). So it asserts the property
+   * instead of the difference, which is also the thing worth knowing.
+   */
+  await page.locator(".rosterhead button", { hasText: /^name/ }).click()
+  await expect(page.locator(".rosterhead button.on")).toHaveText(/name/)
+  const names = await page.locator(".rosterrow .rostername").evaluateAll((els) =>
+    els.map((el) => (el.textContent ?? "").trim().toLowerCase()).filter(Boolean)
+  )
+  expect(names.length, "no names on the roster — run `npm run seed:demo`").toBeGreaterThan(3)
+  expect(names, "the name sort must order the name column A→Z").toEqual(
+    [...names].sort((a, b) => a.localeCompare(b))
+  )
+})
+/**
+ * THE INVITED TAB FILTERS BY ROLE TOO.
+ *
+ * TJ, 2026-08-26: "the filter is not on invited, only enrolled, it should be
+ * on invited as well."
+ *
+ * WHY IT WAS NOT, and why that reason was wrong. A pending invitation carries
+ * no role of its own — `course_allowed_email` is courseId, email, sectionId,
+ * createdAt — so getRoster stamped every pending row "LEARNER" and the tab had
+ * nothing to filter on. But the role is not unknown, it is DERIVED: an
+ * invitation addressed to the section with slug "faculty" enrols as FACULTY, a
+ * site admin's address as INSTRUCTOR, everybody else as LEARNER
+ * (enrolInvitedCourses, src/lib/auth.ts). The column was stating a default as
+ * a fact, and on the dev seed it was wrong for 7 of 22 rows.
+ *
+ * The two rules must stay in step. This spec asserts the derivation the tab
+ * depends on: whoever is invited to the Faculty Section is filtered as faculty
+ * BEFORE they have signed in.
+ */
+test("the invited tab filters by the role each invitation will grant", async ({ page }) => {
+  await page.goto("/admin?view=invited")
+  const chips = page.locator(".rosterfilter a")
+  await expect(chips.first()).toBeVisible({ timeout: 20_000 })
+
+  const labels = (await chips.allTextContents()).map((t) => t.replace(/\s+/g, " ").trim().toLowerCase())
+  expect(labels.some((t) => t.includes("no response")), "the silence filter is gone").toBe(true)
+  expect(
+    labels.some((t) => t.includes("faculty")),
+    "the invited tab offers no role chips — see roleAnInvitationGrants in getRoster"
+  ).toBe(true)
+
+  const rows = () => page.locator(".rosterrow").count()
+  const all = await rows()
+  expect(all, "nobody is invited — run `npm run seed:demo`").toBeGreaterThan(1)
+
+  const faculty = page.locator(".rosterfilter a", { hasText: /faculty/i }).first()
+  await faculty.click()
+  await expect(page).toHaveURL(/role=faculty/, { timeout: 15_000 })
+  const narrowed = await rows()
+  expect(narrowed, "the faculty chip narrowed nothing").toBeLessThan(all)
+  expect(narrowed, "the faculty chip emptied the tab").toBeGreaterThan(0)
+
+  /**
+   * EVERY REMAINING ROW IS IN A FACULTY SECTION. This is the assertion that
+   * fails against the old hard-coded "LEARNER": with every pending row stamped
+   * the same, the chip would either not exist or narrow to nothing.
+   */
+  const sections = await page.locator(".rosterrow").evaluateAll((rows) =>
+    rows.map((r) => (r.textContent ?? "").toLowerCase())
+  )
+  expect(
+    sections.every((text) => text.includes("faculty")),
+    "a row survived the faculty filter without being in a faculty section"
+  ).toBe(true)
+
+  // The two filters compose rather than replacing each other.
+  await page.locator(".rosterfilter a", { hasText: /no response/i }).first().click()
+  await expect(page).toHaveURL(/role=faculty/, { timeout: 15_000 })
+  await expect(page).toHaveURL(/filter=noresponse/)
+})

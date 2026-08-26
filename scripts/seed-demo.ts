@@ -46,6 +46,9 @@ import {
 } from "../src/db/schema"
 import { eq, asc, ilike, isNotNull, and } from "drizzle-orm"
 import { textLayerProjection } from "../src/lib/pdfText"
+// The one rule for what a faculty section IS — slug "faculty" — kept in the
+// library rather than restated here, so the seed cannot drift from auth.ts.
+import { ensureFacultySection } from "../src/lib/courses"
 
 const DEMO_DOMAIN = "@loom.local"
 const USER_A = { email: "test-user-a@loom.local", name: "Test User A" }
@@ -108,6 +111,16 @@ const DEEP_LABELS = [
 
 /** The address on the roster that has been invited and has never signed in. */
 const INVITED_EMAIL = "test-invited@loom.local"
+/**
+ * A SECOND INVITATION, ADDRESSED TO THE FACULTY SECTION.
+ *
+ * The seed had one pending invitation and it was a learner's, so the case that
+ * makes the Invited tab's role filter mean anything — an invitation that will
+ * enrol as FACULTY (enrolInvitedCourses, src/lib/auth.ts) — existed on the dev
+ * database and nowhere a fresh seed could show it. The spec written for that
+ * filter passed locally and failed in CI for exactly that reason.
+ */
+const INVITED_FACULTY_EMAIL = "test-invited-faculty@loom.local"
 
 /** The discussion section A and the two colleagues share (model §2: every
  *  account belongs to a Section). B stays unplaced on purpose — "not placed in
@@ -958,6 +971,19 @@ async function main() {
     courseId: course.id, email: INVITED_EMAIL, sectionId: demoSection.id,
   })
 
+  /**
+   * AND ONE ADDRESSED TO THE FACULTY SECTION. Not decoration: the roster shows
+   * a pending row the role its invitation will grant, and with every seeded
+   * invitation a learner's there was nothing to tell a working filter from a
+   * broken one.
+   */
+  const facultySectionId = await ensureFacultySection(course.id)
+  await db.delete(courseAllowedEmails)
+    .where(and(eq(courseAllowedEmails.courseId, course.id), eq(courseAllowedEmails.email, INVITED_FACULTY_EMAIL)))
+  await db.insert(courseAllowedEmails).values({
+    courseId: course.id, email: INVITED_FACULTY_EMAIL, sectionId: facultySectionId,
+  })
+
   const tally = { concepts: conceptRows.length, passages: 10, edges: 6, links: 6, maps: 2 }
   console.log(`[seed-demo] ${USER_A.email}: ${tally.concepts} concepts · ${tally.passages} passages from 2 readings · ${tally.edges} threads · ${tally.links} links (1 glossed, 1 with no thread) · ${tally.maps} maps`)
   console.log(`[seed-demo] ${USER_B.email}: enrolled, empty`)
@@ -965,6 +991,7 @@ async function main() {
   console.log(`[seed-demo] ${USER_D.email}: 4 concepts · 4 passages · 3 threads (1 unlabeled, 1 never spoken) — a colleague in ${DEMO_SECTION.name}`)
   console.log(`[seed-demo] E-I: ${deepPassages} passages and ${deepMaps} projections across ${readable.length} readings, plus a depth ladder on ${READING_A} (runs of 8, 4, 2 and 1)`)
   console.log(`[seed-demo] ${INVITED_EMAIL}: invited, never signed in`)
+  console.log(`[seed-demo] ${INVITED_FACULTY_EMAIL}: invited to the Faculty Section — enrols as FACULTY`)
   if (unusable.length) {
     console.log(`[seed-demo] ${unusable.length} reading(s) skipped — their page text yields no usable sentence:`)
     for (const t of unusable) console.log(`[seed-demo]   ${t.slice(0, 64)}`)

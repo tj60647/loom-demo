@@ -306,6 +306,32 @@ export async function getRoster(
   ])
 
   const sectionById = new Map(courseSections.map((s) => [s.id, s.name]))
+  /**
+   * THE ROLE AN INVITATION WILL GRANT — knowable now, and it used to say
+   * "LEARNER" for everybody.
+   *
+   * A pending invitation carries no role of its own (course_allowed_email has
+   * courseId, email, sectionId and createdAt), which is why this was hard-coded
+   * — but the role is not unknown, it is DERIVED, by exactly the rule
+   * `enrolInvitedCourses` applies on first sign-in (src/lib/auth.ts): an
+   * invitation addressed to the section with slug "faculty" enrols as FACULTY,
+   * a site admin's address as INSTRUCTOR, everybody else as LEARNER.
+   *
+   * So somebody invited to the Faculty Section read as a learner on the Invited
+   * tab until the moment they signed in and became faculty — the column was
+   * stating a default as a fact (TJ, 2026-08-26: "the filter is not on invited,
+   * only enrolled, it should be on invited as well"). The two rules must stay
+   * in step; if auth.ts changes how a role is chosen, this changes with it.
+   */
+  const facultySectionIds = new Set(
+    courseSections.filter((s) => s.slug === "faculty").map((s) => s.id)
+  )
+  const roleAnInvitationGrants = (email: string, invitedSectionId: string | null) =>
+    invitedSectionId && facultySectionIds.has(invitedSectionId)
+      ? "FACULTY"
+      : isAdminUser({ email })
+        ? "INSTRUCTOR"
+        : "LEARNER"
   const invitedByEmail = new Map(invited.map((row) => [row.email.toLowerCase(), row]))
 
   const rows: RosterRow[] = enrolled.map((u) => ({
@@ -342,7 +368,7 @@ export async function getRoster(
       status: "pending",
       sectionId: row.sectionId,
       sectionName: row.sectionId ? sectionById.get(row.sectionId) ?? null : null,
-      role: "LEARNER",
+      role: roleAnInvitationGrants(row.email, row.sectionId),
       // A pending invitation has no loom yet, so every count is a true zero.
       conceptsCount: 0,
       conceptsEvidenced: 0,
