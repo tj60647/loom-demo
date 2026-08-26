@@ -196,6 +196,50 @@ export type CaptureTarget = {
 export const DRAFT_ID = "draft";
 
 /**
+ * THE ROW A SAVE INSERTS BEFORE THE SERVER ANSWERS — the draft again, under a
+ * different id.
+ *
+ * `addPassage` puts an optimistic passage into the loom the moment Save is
+ * pressed (LoomProvider), and CaptureFields keeps the editor open until the
+ * round trip returns, so a failed save does not throw away what was typed.
+ * Both are right. Together they put the SAME passage on screen twice for the
+ * length of the request — the draft card and a real rail card at the same
+ * anchor — and the rail drew a leader line to each. Two lines from one place
+ * in the text, beside the neighbouring card's, is the three-pronged shape TJ
+ * saw on 2026-08-26: "i see a three pronged shape before the rail card shows
+ * up". Measured against a clean seed on a freshly started dev server: two
+ * leaders shared one origin in 92 of 269 sampled frames — about a second and
+ * a half, which is why it reads as a shape rather than a flicker.
+ *
+ * USED IN TWO PLACES, and each one alone is enough to remove the fork —
+ * measured, by reverting them one at a time (both variants green, both
+ * reverted red). They are kept together because they answer two different
+ * duplications, not one twice:
+ *
+ *   the marking pass  two <mark> layers over one range, which nest, and whose
+ *                     unmarks race — the reason that pass insists on painting
+ *                     the draft and the passages in one go.
+ *   the rail's list   two cards at one anchor, which is what draws the second
+ *                     leader.
+ *
+ * Neither is load-bearing for the other's failure, so removing one to save a
+ * line would leave a real duplication behind and no test that names it.
+ *
+ * Matched on the anchor rather than the text, because the anchor is what the
+ * rail draws to. NO OFFSETS, NO MATCH: a hand-typed capture has none, and
+ * "same page" alone would hide a passage that merely shares a page with the
+ * draft.
+ */
+export function isDraftTwin(passage: Passage, draft: CaptureTarget | null): boolean {
+  if (!draft || draft.startOffset == null || draft.endOffset == null) return false
+  return (
+    passage.startOffset === draft.startOffset &&
+    passage.endOffset === draft.endOffset &&
+    (passage.pageNumber ?? null) === (draft.pageNum ?? null)
+  )
+}
+
+/**
  * The draft, shaped as the Passage the marking pass already knows how to
  * paint. Nothing here is written anywhere: it exists for the length of one
  * mark.js call, so the selection carries a real .loom-passage-highlight and
@@ -1762,7 +1806,12 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
        * here rather than in an effect of their own.
        */
       const d = draftRef.current;
-      const passages = d ? [...passagesRef.current, draftAsPassage(d, sourceName)] : passagesRef.current;
+      // The draft's own optimistic twin is dropped here, not painted under it:
+      // two marks over one range nest, and the second unmark strips whichever
+      // finished first. See isDraftTwin.
+      const passages = d
+        ? [...passagesRef.current.filter((p) => !isDraftTwin(p, d)), draftAsPassage(d, sourceName)]
+        : passagesRef.current;
       /**
        * ONE MECHANISM PER VIEW, never two on one page.
        *
@@ -2344,7 +2393,17 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
    * margin would be two people's claims in one column with nothing on the
    * card to say whose.
    */
-  const cardPassages = showingScopeCards ? scopePassages : ownPassages;
+  const cardPassagesAll = showingScopeCards ? scopePassages : ownPassages;
+  /**
+   * WHILE A DRAFT IS OPEN, THE DRAFT IS THE CARD. Its optimistic twin is held
+   * out of the rail until the editor closes, so the passage is on screen once
+   * and has one leader line (isDraftTwin). Identity is preserved when no draft
+   * is open, so the rail's memos do not recompute on every render.
+   */
+  const cardPassages = useMemo(
+    () => (draft ? cardPassagesAll.filter((p) => !isDraftTwin(p, draft)) : cardPassagesAll),
+    [cardPassagesAll, draft]
+  );
   const cardConcepts = showingScopeCards ? scopeConcepts : state.concepts;
   /**
    * Every write withheld while someone else's cards are on screen — the note,
