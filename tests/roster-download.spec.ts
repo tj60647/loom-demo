@@ -343,12 +343,20 @@ test("the roster sorts by email, both ways", async ({ page }) => {
   expect(desc, "a second click must reverse it").toEqual([...asc].reverse())
 
   /**
-   * AND THE NAME SORT IS STILL ITS OWN. Two buttons in one column is only
-   * worth it if they do different things — a spec that clicked email and
-   * checked "something moved" would pass with both wired to the name.
+   * AND THE NAME SORT STILL SORTS BY NAME. Written first as "the name order
+   * must differ from the address order", which is true of this seed and not
+   * true in principle: a roster whose names and addresses happen to run in the
+   * same direction — "Test User A" at test-user-a@ — would fail a spec with
+   * both sorts wired correctly (Copilot, #43). So it asserts the property
+   * instead of the difference, which is also the thing worth knowing.
    */
   await page.locator(".rosterhead button", { hasText: /^name/ }).click()
   await expect(page.locator(".rosterhead button.on")).toHaveText(/name/)
-  const byName = await addresses()
-  expect(byName, "sorting by name must not produce the address order").not.toEqual(asc)
+  const names = await page.locator(".rosterrow .rostername").evaluateAll((els) =>
+    els.map((el) => (el.textContent ?? "").trim().toLowerCase()).filter(Boolean)
+  )
+  expect(names.length, "no names on the roster — run `npm run seed:demo`").toBeGreaterThan(3)
+  expect(names, "the name sort must order the name column A→Z").toEqual(
+    [...names].sort((a, b) => a.localeCompare(b))
+  )
 })
