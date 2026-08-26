@@ -1177,11 +1177,177 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       selectionTimer = window.setTimeout(handleSelection, 300);
     };
 
+    type CaretBoundary = { node: Node; offset: number };
+    type CaretDocument = Document & {
+      caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    };
+    type StylusTouch = Touch & { touchType?: string };
+
+    /**
+     * A stylus path that does not depend on the browser turning a drag into a
+     * native text selection. Finger input is deliberately absent: it keeps the
+     * browser's existing long-press selection and scrolling behaviour.
+     *
+     * The resulting Range becomes the live document Selection rather than
+     * private component state. That sends it through the same offset/hash
+     * measurement above and leaves native selection handles able to refine it.
+     */
+    const caretAt = (layer: HTMLElement, clientX: number, clientY: number): CaretBoundary | null => {
+      const box = layer.getBoundingClientRect();
+      const x = Math.min(Math.max(clientX, box.left + 1), box.right - 1);
+      const y = Math.min(Math.max(clientY, box.top + 1), box.bottom - 1);
+      const doc = document as CaretDocument;
+      const position = doc.caretPositionFromPoint?.(x, y);
+      if (position && layer.contains(position.offsetNode)) {
+        return { node: position.offsetNode, offset: position.offset };
+      }
+      const range = doc.caretRangeFromPoint?.(x, y);
+      if (range && layer.contains(range.startContainer)) {
+        return { node: range.startContainer, offset: range.startOffset };
+      }
+      return null;
+    };
+
+    const selectedRange = (a: CaretBoundary, b: CaretBoundary) => {
+      const aMarker = document.createRange();
+      aMarker.setStart(a.node, a.offset);
+      aMarker.collapse(true);
+      const bMarker = document.createRange();
+      bMarker.setStart(b.node, b.offset);
+      bMarker.collapse(true);
+      const range = document.createRange();
+      if (aMarker.compareBoundaryPoints(Range.START_TO_START, bMarker) <= 0) {
+        range.setStart(a.node, a.offset);
+        range.setEnd(b.node, b.offset);
+      } else {
+        range.setStart(b.node, b.offset);
+        range.setEnd(a.node, a.offset);
+      }
+      return range;
+    };
+
+    let stylusSelection: {
+      layer: HTMLElement;
+      start: CaretBoundary;
+      hasRange: boolean;
+    } | null = null;
+
+    const beginStylusSelection = (target: EventTarget | null, clientX: number, clientY: number) => {
+      const layer = (target as Element | null)?.closest<HTMLElement>(".react-pdf__Page__textContent");
+      if (!layer) return false;
+      const start = caretAt(layer, clientX, clientY);
+      if (!start) return false;
+      stylusSelection = { layer, start, hasRange: false };
+      window.getSelection()?.removeAllRanges();
+      handleSelection();
+      return true;
+    };
+
+    const moveStylusSelection = (clientX: number, clientY: number) => {
+      if (!stylusSelection) return;
+      const end = caretAt(stylusSelection.layer, clientX, clientY);
+      if (!end) return;
+      const range = selectedRange(stylusSelection.start, end);
+      if (range.collapsed) return;
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      stylusSelection.hasRange = true;
+    };
+
+    const finishStylusSelection = () => {
+      if (!stylusSelection) return;
+      const hasRange = stylusSelection.hasRange;
+      stylusSelection = null;
+      if (hasRange) handleSelection();
+    };
+
+    const cancelStylusSelection = () => {
+      if (!stylusSelection) return;
+      stylusSelection = null;
+      window.getSelection()?.removeAllRanges();
+      handleSelection();
+    };
+
+    const stopStylusGesture = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const onPenDown = (event: PointerEvent) => {
+      if (event.pointerType !== "pen" || event.button !== 0) return;
+      if (beginStylusSelection(event.target, event.clientX, event.clientY)) {
+        stopStylusGesture(event);
+      }
+    };
+    const onPenMove = (event: PointerEvent) => {
+      if (event.pointerType !== "pen" || !stylusSelection) return;
+      stopStylusGesture(event);
+      moveStylusSelection(event.clientX, event.clientY);
+    };
+    const onPenUp = (event: PointerEvent) => {
+      if (event.pointerType !== "pen" || !stylusSelection) return;
+      stopStylusGesture(event);
+      moveStylusSelection(event.clientX, event.clientY);
+      finishStylusSelection();
+    };
+    const onPenCancel = (event: PointerEvent) => {
+      if (event.pointerType !== "pen" || !stylusSelection) return;
+      stopStylusGesture(event);
+      cancelStylusSelection();
+    };
+
+    const stylusTouch = (touches: TouchList) =>
+      Array.from(touches).find((touch) => (touch as StylusTouch).touchType === "stylus");
+    const onStylusTouchStart = (event: TouchEvent) => {
+      const touch = stylusTouch(event.changedTouches);
+      if (!touch) return;
+      if (beginStylusSelection(touch.target, touch.clientX, touch.clientY)) {
+        stopStylusGesture(event);
+      }
+    };
+    const onStylusTouchMove = (event: TouchEvent) => {
+      const touch = stylusTouch(event.changedTouches);
+      if (!touch || !stylusSelection) return;
+      stopStylusGesture(event);
+      moveStylusSelection(touch.clientX, touch.clientY);
+    };
+    const onStylusTouchEnd = (event: TouchEvent) => {
+      const touch = stylusTouch(event.changedTouches);
+      if (!touch || !stylusSelection) return;
+      stopStylusGesture(event);
+      moveStylusSelection(touch.clientX, touch.clientY);
+      finishStylusSelection();
+    };
+    const onStylusTouchCancel = (event: TouchEvent) => {
+      const touch = stylusTouch(event.changedTouches);
+      if (!touch || !stylusSelection) return;
+      stopStylusGesture(event);
+      cancelStylusSelection();
+    };
+
     document.addEventListener("mouseup", handleSelection);
     document.addEventListener("selectionchange", onSelectionChange);
+    document.addEventListener("pointerdown", onPenDown, { capture: true, passive: false });
+    document.addEventListener("pointermove", onPenMove, { capture: true, passive: false });
+    document.addEventListener("pointerup", onPenUp, { capture: true, passive: false });
+    document.addEventListener("pointercancel", onPenCancel, { capture: true, passive: false });
+    document.addEventListener("touchstart", onStylusTouchStart, { capture: true, passive: false });
+    document.addEventListener("touchmove", onStylusTouchMove, { capture: true, passive: false });
+    document.addEventListener("touchend", onStylusTouchEnd, { capture: true, passive: false });
+    document.addEventListener("touchcancel", onStylusTouchCancel, { capture: true, passive: false });
     return () => {
       document.removeEventListener("mouseup", handleSelection);
       document.removeEventListener("selectionchange", onSelectionChange);
+      document.removeEventListener("pointerdown", onPenDown, true);
+      document.removeEventListener("pointermove", onPenMove, true);
+      document.removeEventListener("pointerup", onPenUp, true);
+      document.removeEventListener("pointercancel", onPenCancel, true);
+      document.removeEventListener("touchstart", onStylusTouchStart, true);
+      document.removeEventListener("touchmove", onStylusTouchMove, true);
+      document.removeEventListener("touchend", onStylusTouchEnd, true);
+      document.removeEventListener("touchcancel", onStylusTouchCancel, true);
       window.clearTimeout(selectionTimer);
     };
   }, [pageNumber]);

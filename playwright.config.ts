@@ -116,16 +116,17 @@ export default defineConfig({
      * two projects, both Desktop Chrome, and WebKit was not even installed.
      *
      * WHAT IT CAN SETTLE: that Safari's engine renders the app, that a reading
-     * draws its text layer at a tablet viewport, and that a drag over the
-     * words selects them and arms a capture. All three now hold, and this
-     * exists so they cannot quietly stop holding.
+     * draws its text layer at a tablet viewport, and that Loom turns a
+     * pen-typed PointerEvent over those words into a selection that arms a
+     * capture. Those events are synthetic: Playwright has no Pencil input.
      *
-     * WHAT IT CANNOT: iPadOS gesture arbitration — whether an Apple Pencil
-     * drag selects or scrolls. That lives in the OS, no emulator has it, and
-     * only a real device can answer it. Nothing here should be read as
-     * evidence about the Pencil.
+     * WHAT IT CANNOT: iPadOS gesture arbitration — whether a real Apple Pencil
+     * reaches that path before the OS claims the gesture. Only a real device
+     * can answer it.
      *
-     * Read-only by construction: it drives one spec that captures nothing.
+     * Its save-path spec writes one passage and one `Test Concept for …`,
+     * removes both through the UI, and uses the fixture-sweep-recognised concept
+     * prefix so a failed run cannot strand either row.
      */
     {
       name: 'tablet',
