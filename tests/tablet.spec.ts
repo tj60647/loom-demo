@@ -111,6 +111,41 @@ test("pen-typed pointer input selects reading text and arms capture", async ({ p
   // …and the selection arms the capture, which is the act the whole station is
   // for. Selectable text nobody can keep would be a hollow pass.
   await expect(page.locator("#captureNow")).toBeVisible({ timeout: 15_000 })
+
+  const afterCancel = await page.evaluate(() => {
+    const target = [...document.querySelectorAll(".react-pdf__Page__textContent span")].find((el) => {
+      const box = el.getBoundingClientRect()
+      return (el.textContent ?? "").trim().length > 10 && box.width > 40 && box.height > 2
+    })
+    if (!target) return "no target"
+    const box = target.getBoundingClientRect()
+    const y = box.y + box.height / 2
+    const fire = (type: string, x: number, buttons: number) =>
+      target.dispatchEvent(new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 42,
+        pointerType: "pen",
+        isPrimary: true,
+        button: 0,
+        buttons,
+        clientX: x,
+        clientY: y,
+      }))
+
+    // A tap must clear the earlier passage rather than re-arm it.
+    fire("pointerdown", box.x + 2, 1)
+    fire("pointerup", box.x + 2, 0)
+    if (window.getSelection()?.toString()) return "tap retained selection"
+
+    // An interrupted drag is not a completed selection.
+    fire("pointerdown", box.x + 2, 1)
+    fire("pointermove", box.x + box.width - 2, 1)
+    fire("pointercancel", box.x + box.width - 2, 0)
+    return window.getSelection()?.toString() ?? ""
+  })
+  expect(afterCancel).toBe("")
+  await expect(page.locator("#captureNow")).toHaveCount(0)
 })
 
 test("a browser selection can be saved through touch controls and survives reload", async ({ page }) => {

@@ -1230,6 +1230,7 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
     let stylusSelection: {
       layer: HTMLElement;
       start: CaretBoundary;
+      hasRange: boolean;
     } | null = null;
 
     const beginStylusSelection = (target: EventTarget | null, clientX: number, clientY: number) => {
@@ -1237,7 +1238,9 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       if (!layer) return false;
       const start = caretAt(layer, clientX, clientY);
       if (!start) return false;
-      stylusSelection = { layer, start };
+      stylusSelection = { layer, start, hasRange: false };
+      window.getSelection()?.removeAllRanges();
+      handleSelection();
       return true;
     };
 
@@ -1250,11 +1253,20 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       const selection = window.getSelection();
       selection?.removeAllRanges();
       selection?.addRange(range);
+      stylusSelection.hasRange = true;
     };
 
     const finishStylusSelection = () => {
       if (!stylusSelection) return;
+      const hasRange = stylusSelection.hasRange;
       stylusSelection = null;
+      if (hasRange) handleSelection();
+    };
+
+    const cancelStylusSelection = () => {
+      if (!stylusSelection) return;
+      stylusSelection = null;
+      window.getSelection()?.removeAllRanges();
       handleSelection();
     };
 
@@ -1280,6 +1292,11 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       moveStylusSelection(event.clientX, event.clientY);
       finishStylusSelection();
     };
+    const onPenCancel = (event: PointerEvent) => {
+      if (event.pointerType !== "pen" || !stylusSelection) return;
+      stopStylusGesture(event);
+      cancelStylusSelection();
+    };
 
     const stylusTouch = (touches: TouchList) =>
       Array.from(touches).find((touch) => (touch as StylusTouch).touchType === "stylus");
@@ -1303,28 +1320,34 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
       moveStylusSelection(touch.clientX, touch.clientY);
       finishStylusSelection();
     };
+    const onStylusTouchCancel = (event: TouchEvent) => {
+      const touch = stylusTouch(event.changedTouches);
+      if (!touch || !stylusSelection) return;
+      stopStylusGesture(event);
+      cancelStylusSelection();
+    };
 
     document.addEventListener("mouseup", handleSelection);
     document.addEventListener("selectionchange", onSelectionChange);
     document.addEventListener("pointerdown", onPenDown, { capture: true, passive: false });
     document.addEventListener("pointermove", onPenMove, { capture: true, passive: false });
     document.addEventListener("pointerup", onPenUp, { capture: true, passive: false });
-    document.addEventListener("pointercancel", onPenUp, { capture: true, passive: false });
+    document.addEventListener("pointercancel", onPenCancel, { capture: true, passive: false });
     document.addEventListener("touchstart", onStylusTouchStart, { capture: true, passive: false });
     document.addEventListener("touchmove", onStylusTouchMove, { capture: true, passive: false });
     document.addEventListener("touchend", onStylusTouchEnd, { capture: true, passive: false });
-    document.addEventListener("touchcancel", onStylusTouchEnd, { capture: true, passive: false });
+    document.addEventListener("touchcancel", onStylusTouchCancel, { capture: true, passive: false });
     return () => {
       document.removeEventListener("mouseup", handleSelection);
       document.removeEventListener("selectionchange", onSelectionChange);
       document.removeEventListener("pointerdown", onPenDown, true);
       document.removeEventListener("pointermove", onPenMove, true);
       document.removeEventListener("pointerup", onPenUp, true);
-      document.removeEventListener("pointercancel", onPenUp, true);
+      document.removeEventListener("pointercancel", onPenCancel, true);
       document.removeEventListener("touchstart", onStylusTouchStart, true);
       document.removeEventListener("touchmove", onStylusTouchMove, true);
       document.removeEventListener("touchend", onStylusTouchEnd, true);
-      document.removeEventListener("touchcancel", onStylusTouchEnd, true);
+      document.removeEventListener("touchcancel", onStylusTouchCancel, true);
       window.clearTimeout(selectionTimer);
     };
   }, [pageNumber]);
