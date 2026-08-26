@@ -188,6 +188,7 @@ test("a browser selection can be saved through touch controls and survives reloa
     return (selection?.toString() ?? "").trim()
   })
   expect(selected.length).toBeGreaterThanOrEqual(20)
+  const selectedExcerpt = selected.split(/\s+/).slice(0, 8).join(" ")
 
   const capture = page.locator("#captureNow")
   await expect(capture).toBeVisible({ timeout: 15_000 })
@@ -205,17 +206,26 @@ test("a browser selection can be saved through touch controls and survives reloa
   await touch(page, page.getByRole("button", { name: "In your work ›" }))
   const savedRow = page.locator("#yourwork .ywpassage", { hasText: conceptName })
   await expect(savedRow).toBeVisible({ timeout: 15_000 })
+  await expect(savedRow.locator(".passage")).toContainText(selectedExcerpt)
   const passageId = await savedRow.getAttribute("data-passage-id")
   expect(passageId).toMatch(/^[0-9a-f-]{36}$/)
 
   await page.reload({ waitUntil: "domcontentloaded" })
   await expect(page.locator(".pdf-shell")).toBeVisible({ timeout: 30_000 })
   await touch(page, page.locator("#yourwork-toggle"))
-  await expect(page.locator(`#yourwork [data-passage-id="${passageId}"]`)).toContainText(conceptName, {
+  const reloadedRow = page.locator(`#yourwork [data-passage-id="${passageId}"]`)
+  await expect(reloadedRow).toContainText(conceptName, {
     timeout: 20_000,
   })
+  await expect(reloadedRow.locator(".passage")).toContainText(selectedExcerpt)
 
   await deletePassageInPassagesView(page, passageId!)
+  // Confirm the server-side delete before removing the test concept that makes
+  // this passage recognisable to the failed-run fixture sweep.
+  await page.reload({ waitUntil: "domcontentloaded" })
+  await expect(page.locator(".pdf-shell")).toBeVisible({ timeout: 30_000 })
+  await touch(page, page.locator("#yourwork-toggle"))
+  await expect(page.locator(`#yourwork [data-passage-id="${passageId}"]`)).toHaveCount(0)
   await deleteConceptInVocabulary(page, conceptName)
 })
 
