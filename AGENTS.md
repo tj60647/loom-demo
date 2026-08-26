@@ -9,6 +9,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 1. **`docs/loom-model-build.md` is the authority** — what things *are* (objects, tabs, red lines). Where docs disagree, it wins.
 2. **`docs/loom-refactor-spec.md` is the work order** — how the code gets there, executed in phase sequence (P0 → P1 → P2 → P3).
 3. **`docs/archive/` is superseded** — historical only. Never implement from anything in it.
+4. **`docs/proposals/` is intent, not authority** (adopted 2026-08-26; the
+   process: `docs/structured-intake.md`). A proposal ranks below
+   `loom-model-build.md` and `contracts.md` and must cite them rather than
+   restate them; where a proposal and the model disagree, the model wins until
+   the model itself is amended. Nothing is implemented from a proposal whose
+   numbered questions are unanswered. On shipping, the file is rewritten as a
+   record and moves to `docs/`; on refusal, it moves to `docs/archive/`.
 
 **Vocabulary** (full map: refactor spec §F): `maps` = **Projections**,
 `maps.essence` = **Projection One-line**, `maps.read` = **Projection
