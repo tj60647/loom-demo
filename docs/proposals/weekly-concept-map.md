@@ -73,3 +73,28 @@ The branch answers with **two unrelated features fused**:
    after harvesting this description — or keep it as the prototype's storage?
    (The same question will arise for `prototype/add-concept-to-passage`;
    answering the pattern once is fine.)
+
+---
+
+## Decisions
+
+1. **The shared graph, as prototyped: refused; the idea, reframed.** "i think
+   that proposal is quite old and out of touch with the current state of the
+   app… the group connect is still an open question, although i think it is
+   about bringing multiple cloths together in a knowledge graph and
+   co-constructing a projection on a canvas that participants can access"
+   (TJ, 2026-08-26). The reframe splits the idea along the model's grain:
+   assembly of cloths is a READ (every concept and thread stays owned — the
+   cohort graph's shape, widened to participants and a chosen set of cloths),
+   and the shared artifact is a **Projection** — an object the model already
+   has, needing one axis widened (group scope, several hands) rather than a
+   new object kind. It is also a candidate answer to the 2026-08-11 weave
+   ruling's precondition ("until the faculty and the authors of the app agree
+   on what it means"). The reframed idea proceeds as its own proposal:
+   `docs/proposals/co-constructed-projection.md` (pending TJ's go to draft
+   it).
+2. **The vault export: parked, not refused.** "im n[o]t sure where or how we
+   should support obsidian" (TJ, 2026-08-26). No home named, so nothing is
+   built; the question stays open here rather than moving to archive, and
+   revives if a home is named.
+3. **The branch: unanswered.** Not deleted; the question stands.
