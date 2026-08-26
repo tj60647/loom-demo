@@ -244,3 +244,133 @@ test("opening a capture over marked text leaves that passage's card alone", asyn
   await expect(page.locator(".pdf-draftcard")).toHaveCount(0, { timeout: 10_000 })
   await expect(page.locator(".pdf-railcard")).toHaveCount(cardsBefore)
 })
+
+/**
+ * EVERY LEADER ENDS ON A CARD — in every frame of a transition, not only at rest.
+ *
+ * TJ, 2026-08-26: "the leaders are desired, the multiple leaders when i click
+ * things is not. why are there multiple leaders show in transitions?"
+ *
+ * They were never multiple. There was always one leader per card; what made it
+ * read as an extra prong was a leader that ENDED WHERE NO CARD WAS. Two causes,
+ * both in the height the line aims at:
+ *
+ *   the draft was never measured   ConceptRail measured the stack's
+ *                                  `.pdf-railcard`, and the capture form is a
+ *                                  `.pdf-draftcard`. The lookup returned null,
+ *                                  the leader used CARD_FALLBACK_H, and it
+ *                                  aimed at `top + 44` on a form 263px tall —
+ *                                  87px above the card, in open space, for as
+ *                                  long as the form stayed open.
+ *   the first frames of any card   the height arrives from a ResizeObserver a
+ *                                  frame after mount, so until then every
+ *                                  leader aimed at the same constant and then
+ *                                  snapped.
+ *
+ * Measured on the running app at 1536 before the fix: 230 of 243 sampled frames
+ * carried a leader pointing at nothing. After: 0 of 243.
+ *
+ * READ-ONLY: opens the capture form and abandons it.
+ */
+test("every leader lands on the card it belongs to, throughout a transition", async ({ page }) => {
+  await openReading(page, "Object Worlds")
+  await expect(page.locator(".pdf-railcard").first()).toBeVisible({ timeout: 60_000 })
+
+  /** How far each leader's endpoint sits from the nearest card's middle. */
+  const misses = () =>
+    page.evaluate(() => {
+      const svg = document.querySelector(".pdf-rail-leaders")
+      if (!svg) return []
+      const box = svg.getBoundingClientRect()
+      const ends = [...svg.querySelectorAll("path")]
+        .map((n) => (n.getAttribute("d") ?? "").match(/L ([\d.]+) ([\d.]+)/))
+        .filter(Boolean)
+        .map((m) => +m![2] + box.top)
+      const middles = [...document.querySelectorAll(".pdf-railcard, .pdf-draftcard")].map((el) => {
+        const r = el.getBoundingClientRect()
+        return r.top + r.height / 2
+      })
+      if (!middles.length) return []
+      return ends.map((y) => Math.round(Math.min(...middles.map((m) => Math.abs(y - m)))))
+    })
+
+  // 24px: a leader may aim at a card's middle and be a hair off through
+  // rounding and the rail's scale factor, but not land in open space.
+  const TOLERANCE = 24
+  expect(Math.max(0, ...(await misses())), "a leader misses its card at rest").toBeLessThanOrEqual(TOLERANCE)
+
+  await page.evaluate(() => {
+    const spans = [...document.querySelectorAll(".loom-text-layer span, .textLayer span")].filter(
+      (s) => (s.textContent ?? "").trim().length > 30 && !s.querySelector(".loom-passage-highlight")
+    )
+    const span = spans[Math.min(12, spans.length - 1)]
+    const range = document.createRange()
+    range.selectNodeContents(span)
+    const selection = getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }))
+  })
+  await page.locator("#captureNow").click()
+  await expect(page.locator(".pdf-draftcard")).toBeVisible({ timeout: 20_000 })
+  await page.locator("#captureConceptToggle").click()
+
+  /**
+   * A RUN OF FRAMES, NOT ONE FRAME. Measuring is inherently a frame behind the
+   * DOM: opening the concept disclosure grows the card from 263px to 447px,
+   * the ResizeObserver fires after that layout, and for exactly one frame the
+   * leader still aims at the old middle — measured at 92px off, corrected 16ms
+   * later. That is the cost of measure-then-render, and one frame is not worth
+   * a redesign.
+   *
+   * What must never happen is a miss that STAYS. The unmeasured draft was 87px
+   * off for as long as the form was open — hundreds of frames. So the
+   * assertion is on the longest unbroken run: two frames is the machine
+   * catching up, thirty is a line pointing at nothing.
+   */
+  const runs = await page.evaluate(
+    ({ tolerance, ms }) =>
+      new Promise<{ longestRun: number; worst: number; frames: number }>((resolve) => {
+        const start = performance.now()
+        let run = 0
+        let longestRun = 0
+        let worst = 0
+        let frames = 0
+        const tick = () => {
+          frames += 1
+          const svg = document.querySelector(".pdf-rail-leaders")
+          const box = svg?.getBoundingClientRect()
+          const ends =
+            svg && box
+              ? [...svg.querySelectorAll("path")]
+                  .map((n) => /L ([0-9.]+) ([0-9.]+)/.exec(n.getAttribute("d") ?? ""))
+                  .filter((m): m is RegExpExecArray => !!m)
+                  .map((m) => Number(m[2]) + box.top)
+              : []
+          const middles = [...document.querySelectorAll(".pdf-railcard, .pdf-draftcard")].map((el) => {
+            const r = el.getBoundingClientRect()
+            return r.top + r.height / 2
+          })
+          const miss = middles.length
+            ? Math.max(0, ...ends.map((y) => Math.min(...middles.map((m) => Math.abs(y - m)))))
+            : 0
+          worst = Math.max(worst, Math.round(miss))
+          run = miss > tolerance ? run + 1 : 0
+          longestRun = Math.max(longestRun, run)
+          if (performance.now() - start < ms) requestAnimationFrame(tick)
+          else resolve({ longestRun, worst, frames })
+        }
+        tick()
+      }),
+    { tolerance: TOLERANCE, ms: 2_500 }
+  )
+
+  expect(runs.frames, "the sampler never ran").toBeGreaterThan(30)
+  expect(
+    runs.longestRun,
+    `a leader stayed off its card for ${runs.longestRun} frames (worst ${runs.worst}px) — see the draft's height in ConceptRail's ResizeObserver`
+  ).toBeLessThanOrEqual(2)
+
+  await page.locator(".pdf-draftcard").press("Escape")
+  await expect(page.locator(".pdf-draftcard")).toHaveCount(0, { timeout: 10_000 })
+})

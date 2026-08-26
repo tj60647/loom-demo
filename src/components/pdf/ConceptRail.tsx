@@ -427,7 +427,18 @@ export default function ConceptRails({
       for (const [el, id] of cardIdByEl.current) {
         const host = el as HTMLElement;
         next[id] = host.offsetHeight;
-        nextPassageCards[id] = host.querySelector<HTMLElement>(".pdf-railcard")?.offsetHeight ?? CARD_FALLBACK_H;
+        /**
+         * WHATEVER CARD THIS STACK HOLDS — `.pdf-railcard` OR the draft's own
+         * `.pdf-draftcard`. Querying only the former meant the capture form
+         * never measured: the lookup returned null, the leader fell back to
+         * CARD_FALLBACK_H, and it aimed at `top + 44` on a form 263px tall.
+         * Measured on the running app at 1536: the line ended 87px above the
+         * card it was pointing at, in open space — which is what a reader sees
+         * as a stray line when the form opens (TJ, 2026-08-26: "the multiple
+         * leaders when i click things is not [desired]").
+         */
+        nextPassageCards[id] =
+          host.querySelector<HTMLElement>(".pdf-railcard, .pdf-draftcard")?.offsetHeight ?? CARD_FALLBACK_H;
       }
       setCardHeights((prev) => {
         const nk = Object.keys(next);
@@ -645,7 +656,17 @@ export default function ConceptRails({
             const top = placement.tops[id];
             if (top == null) return null;
             const s = placement.scales[c.anchor.side];
-            const h = (passageCardHeights[id] ?? CARD_FALLBACK_H) * s;
+            /**
+             * NOT DRAWN UNTIL THE CARD HAS BEEN MEASURED. The height arrives
+             * from the ResizeObserver a frame after the card mounts, and until
+             * then this aimed at CARD_FALLBACK_H — so opening or closing
+             * anything in the margin flashed a line at a place no card was,
+             * then snapped it. One frame without a line is quieter than one
+             * frame with a wrong one.
+             */
+            const measured = passageCardHeights[id];
+            if (measured == null) return null;
+            const h = measured * s;
             const x2 = c.anchor.side === "left" ? RAIL_W : wrapSize.w - RAIL_W;
             return <path key={id} d={`M ${c.anchor.edgeX} ${c.anchor.midY} L ${x2} ${top + h / 2}`} />;
           })}
