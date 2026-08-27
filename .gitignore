@@ -72,3 +72,6 @@ eng.traineddata
 # kickoff): a dev-server child holds stdout open, so a pipe never sees EOF.
 run.txt
 run*.txt
+
+# Local Claude Code state (settings, task locks) — per-machine, never shared.
+.claude/
