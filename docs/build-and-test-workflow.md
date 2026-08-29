@@ -268,3 +268,30 @@ What is still open is listed in
 touch this workflow are that a PR closed *without merging* can leave its
 database behind, and that the guest email door is advertised on the sign-in
 page while being configured nowhere.
+
+## Who holds CI's keys, and what changes on handoff
+
+Every automated check runs on credentials that belong to a person, not to
+the repository. Read from the workflows on 2026-08-27:
+
+| job | workflow | secret | what it is |
+| --- | --- | --- | --- |
+| `checks` | ci.yml | `CI_DATABASE_URL` (optional — lint, typecheck and the static checks run without it) | a connection string into the `ci` branch of the Neon project |
+| `e2e` | ci.yml | `CI_DATABASE_URL`, `CI_BLOB_READ_WRITE_TOKEN`, `CI_NEXTAUTH_SECRET` | the same `ci` branch, seeded with the demo cohort the suite asserts on; a blob token; any string |
+| `provision` / `teardown` | preview-db.yml | `NEON_API_KEY`, `VERCEL_TOKEN` | a personal Neon API key and Vercel token, used to create one Neon branch per PR (`preview/pr-N`, parent `preview`) and point the Vercel preview at it |
+
+**When the repository changes hands**, GitHub moves these secrets with it —
+so CI would go on running on the previous owner's tokens. The previous owner
+deletes `NEON_API_KEY` and `VERCEL_TOKEN` before transferring; from then on
+`provision` and `teardown` fail visibly until the new owner adds their own,
+and `e2e` fails when `CI_DATABASE_URL` stops resolving. `checks` keeps
+running regardless. **Production is untouched by any of this — CI never
+connects to it.**
+
+To restore full CI under new ownership: a `ci` branch in the new Neon
+project (`npx drizzle-kit migrate`, then `npm run seed:sources` and
+`npm run seed:demo`) → `CI_DATABASE_URL`; a blob token →
+`CI_BLOB_READ_WRITE_TOKEN`; any string → `CI_NEXTAUTH_SECRET`; the owner's
+Neon API key and Vercel token → `NEON_API_KEY`, `VERCEL_TOKEN`; and a
+`preview` branch as the per-PR template — the parent must never be `main`
+(preview-db.yml says why: production holds real students' work).
