@@ -27,11 +27,31 @@ Nothing is auto-generated. The tool only counts your own throws. The structure e
 
 ## The Theory Behind the Tool
 
-Loom is built on foundational ideas from design theory, sociology, and ethnographic coding (see the [concept deck](./docs/presentations/coupled_spaces_deck_v12.pdf) for a deeper dive). These three are also the seeded library — the PDFs themselves are not in the repo, since they are published and copyrighted and this repo is public (see [storage/readings/.gitkeep](./storage/readings/.gitkeep)):
+Loom is built on foundational ideas from design theory, sociology, and
+ethnographic coding (see the [concept deck](./docs/presentations/coupled_spaces_deck_v12.pdf)
+for a deeper dive):
 
-- **Object Worlds (Bucciarelli):** Each discipline inhabits its own world with its own instruments and language. A mechanical engineer might name a connection "is the bottleneck for," while a humanist might say it "betrays" the text. Loom makes these differing worldviews visible and actionable.
-- **Communities of Practice (Wenger):** Shared vocabularies are learned by participating in a community, not just by being told. Loom enables a class or team to grow its own shared edge-vocabulary over time by doing the work together.
-- **Boundary Objects (Star):** How do people from distinct fields coordinate around one shared object without agreeing on exactly what it means? Loom serves as a cross-tongue boundary object—flexible enough to be locally useful, but robust enough to hold a common identity across groups.
+- **Object Worlds** — Bucciarelli, L. L. (1994). *Designing Engineers.* MIT
+  Press. Each discipline inhabits its own world with its own instruments and
+  language. A mechanical engineer might name a connection "is the bottleneck
+  for," while a humanist might say it "betrays" the text. Loom makes these
+  differing worldviews visible and actionable.
+
+- **Communities of Practice** — Wenger, E. (1998). *Communities of Practice:
+  Learning, Meaning, and Identity.* Cambridge University Press. Shared
+  vocabularies are learned by participating in a community, not just by being
+  told. Loom enables a class or team to grow its own shared edge-vocabulary
+  over time by doing the work together.
+
+- **Boundary Objects** — Star, S. L. (2010). This is Not a Boundary Object:
+  Reflections on the Origin of a Concept. *Science, Technology, & Human
+  Values*, 35(5), 601–617. How do people from distinct fields coordinate
+  around one shared object without agreeing on exactly what it means? Loom
+  serves as a cross-tongue boundary object — flexible enough to be locally
+  useful, but robust enough to hold a common identity across groups.
+
+Course readings are provided to enrolled students within the application and
+are not distributed here.
 
 ---
 
