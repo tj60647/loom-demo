@@ -10,8 +10,14 @@
 # data, so any check pointed at `/` saw a healthy site. The outage ended when a
 # person complained, which is not a monitoring strategy.
 #
-# `/api/sources` is the cheapest honest question: it answers 200 with a JSON
-# array only when the database is reachable, and 500 when it is not.
+# `/api/health` exists for exactly this question and answers only it: 200
+# {"ok":true} when a `select 1` reaches the database, 503 when it does not.
+#
+# It replaced `/api/sources` here, which worked but for the wrong reason. The
+# outage surfaced on `/reading/[sourceId]` — 29 5xx that day against 7 on
+# `/api/sources`, and all seven of those were a person running curl during the
+# diagnosis. Asking a route real users happen to hit ties this check to a data
+# shape that may change; `/api/health` has no payload to drift.
 #
 # TWO LIMITS OF DOING THIS HERE, both real:
 #   - GitHub delays scheduled workflows under load; treat the interval as a
@@ -41,9 +47,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: GET /api/sources
+      - name: GET /api/health
         env:
-          URL: https://loom.tjmcleish.com/api/sources
+          URL: https://loom.tjmcleish.com/api/health
         run: |
           set -uo pipefail
 
@@ -52,9 +58,8 @@ jobs:
           # generous timeout keeps that from reading as an outage.
           for attempt in 1 2 3; do
             code=$(curl -s -o /tmp/body -w '%{http_code}' --max-time 30 "$URL" || echo 000)
-            head -c 1 /tmp/body > /tmp/first 2>/dev/null || true
-            if [ "$code" = "200" ] && [ "$(cat /tmp/first 2>/dev/null)" = "[" ]; then
-              echo "ok — attempt $attempt returned 200 with a JSON array"
+            if [ "$code" = "200" ] && grep -q '"ok":true' /tmp/body 2>/dev/null; then
+              echo "ok — attempt $attempt returned 200 {\"ok\":true}"
               exit 0
             fi
             echo "attempt $attempt: status $code"
@@ -68,7 +73,8 @@ jobs:
           head -c 300 /tmp/body || true
           echo
           echo
-          echo "A 500 with {\"error\":\"Could not read just now\"} is the signature of"
-          echo "a stale DATABASE_URL. The site will still serve pages; sign-in will"
-          echo "not work. docs/build-and-test-workflow.md says what to do."
+          echo "503 {\"ok\":false} is the signature of a stale DATABASE_URL: the site"
+          echo "will still serve pages, and sign-in will not work. What to do is in"
+          echo "docs/build-and-test-workflow.md. A 000 means the request never"
+          echo "completed at all — check the domain and the deployment first."
           exit 1
