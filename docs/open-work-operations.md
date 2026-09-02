@@ -200,6 +200,43 @@ restarting. A procedure that recurs can go one step further and become a skill;
 
 ---
 
+## 3a. What `dev` is for. **A decision, not a task**
+
+Found while checking something else, and worth settling before more laptops are
+pointed at it.
+
+While production was down the team could not demo from the deployed site, so
+they set up local environments and demoed from those. It worked. **But an outage
+does not only stop work, it displaces it** — and the fallback path here routes
+to the Neon `dev` branch, which was cut from `main` and currently holds **60
+real accounts, 32 readings and 926 passages** of actual coursework. Measured
+2026-09-02.
+
+So the rule in `.env.example` — local points at `dev`, never `main` — is doing
+less than it appears. It protects production from being *written* to, which is
+its stated purpose (`seed:demo` wipes whatever database it is aimed at). It is
+**not** a claim that local development works on anonymous data, and
+[data-environments.md](data-environments.md)'s "real student work stays in one
+place" is true of `preview` and `ci-suite` and not of `dev`.
+
+None of it was necessary for a demo. `npm run seed:demo` builds a synthetic
+cohort for exactly this: `test-user-a@loom.local` with a worked loom across two
+readings, `test-user-b` as the fresh-account experience, two colleagues besides.
+A demo needs a convincing loom, not a real one.
+
+**The decision.** `dev` currently serves two audiences with different needs —
+developers, who want a seeded fixture they can wipe, and alpha testers, for whom
+realistic data may be the point. It cannot be both while it is a copy of
+production. If the answer is "seeded", re-seed it; if the answer is "realistic",
+say so explicitly and treat a `dev` credential as carrying student data, which
+changes who may hold one. Either is defensible; the current state is the one
+that is not, because it is undeclared.
+
+Worth folding into §2: the new Neon project is the natural moment to cut a
+`dev` branch that was never a copy of production in the first place.
+
+---
+
 ## 4. Ownership. **TJ's call, and it expires on 2026-09-11**
 
 Not technical, and it gates the value of everything above. Responsibility for
