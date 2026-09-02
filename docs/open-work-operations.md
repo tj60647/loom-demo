@@ -58,13 +58,34 @@ connection strings to that role. On 1 September the role's password rotated as a
 side effect of connecting an unrelated app to the store, and every one of those
 copies went stale at once. Loom was down about ten hours.
 
-**Why Loom is the one that has to move, and not the others.** The other seven
-apps share a trust boundary: same owner, same stakes, same consequences. A
-shared key across apps that share a trust boundary is a defensible design.
-`loom-db` is the exception on all three counts — a different owner after
-2026-09-11, real student work since 2026-08-22, and students who cannot do the
-reading when it is down. **Moving it fixes the exposure for every other app at
-the same time**, because none of them would hold a key to student work any more.
+**Why Loom is the one that has to move, and not the others.** The other
+applications there share a trust boundary: same owner, same stakes, same
+consequences. A shared key across applications that share a trust boundary is a
+defensible design. `loom-db` is the exception on all three counts — a different
+owner after 2026-09-11, real student work since 2026-08-22, and students who
+cannot do the reading when it is down. **Moving it also removes Loom's data
+from the reach of every other key on that server.**
+
+### Why not the cheaper fix
+
+There is one, and it should be considered and rejected explicitly rather than
+overlooked, because on the evidence of the outage alone it looks sufficient:
+**give Loom its own Neon role scoped to `loom-db`**, whose password the
+Marketplace integration does not manage. Rotations of `neondb_owner` would stop
+reaching it. No window, no dump and restore, no risk to student data. If the
+credential were the whole problem, this would be the right answer.
+
+It is not enough, for a reason that has nothing to do with credentials. After
+2026-09-11 the database would still sit inside a Neon project **owned and
+administered by someone who has left the project**, alongside applications Loom
+has nothing to do with, where ordinary maintenance by that owner can still
+affect it. A scoped role fixes the breakage; only moving the database fixes the
+arrangement.
+
+So: **the shared credential is why this is urgent; the handoff is why it is
+necessary.** If the migration cannot be completed before the 11th, the scoped
+role is a reasonable stopgap — but it is a stopgap, and this paragraph is the
+reason to say so out loud rather than let it become the resting state.
 
 ### The sequence
 
