@@ -150,9 +150,37 @@ person. Realistically an external uptime check on
 which makes it the one piece of this that someone without infrastructure
 permissions can own.
 
-> A health route nobody polls is a diagnostic, not a monitor. On 1 September a
-> sibling app had an `/api/health` returning 503 for two days and nobody saw it,
-> because nothing was asking.
+> A health route nobody polls is a diagnostic, not a monitor. An `/api/health`
+> returning 503 that nothing is asking is indistinguishable from one returning
+> 200.
+
+### Diagnosis happens at the command line, not in a dashboard
+
+Worth recording because it is the access question behind §4, and because the
+next person should not start where this one did. None of the 1 September
+diagnosis happened in a console. It was `vercel logs --json`, `vercel api`,
+`vercel metrics` and `neonctl`.
+
+That is not incidental. The answer came from **correlating three sources no
+single dashboard shows together** — the application's error, Neon's operation
+log, and the Marketplace store's own record of when it rotated a secret. Their
+timestamps agree to the second, and that agreement is the evidence. A console
+shows one system at a time.
+
+| Question | Command |
+| --- | --- |
+| What is the app actually failing on? | `vercel logs <prod-url> --json` — look for `adapter_error_*` |
+| Is it the database or the app's copy of the credential? | `neonctl connection-string <branch> --project-id <id> --database-name <db> --pooled --role-name <role>`, then run the failing query |
+| Is the schema behind? | `npx tsx scripts/check-prod-migrations.ts` |
+| How bad, and on which route? | `vercel metrics vercel.request.count -p <project> --filter "http_status ge 500" --group-by route` |
+| When did the credential last change? | the role's `updated_at`, and the store's `secretRotationCompletedAt` |
+
+Two consequences. **The access to arrange is CLI-capable credentials**, not
+only dashboard seats — and those carry real reach, so granting them is an
+access decision rather than a convenience. And **the tools reward being driven
+in bulk, including by an agent**: the finding that explained why CI stayed green
+was comparing one role's `updated_at` across five branches, which is one shell
+loop and a great deal of clicking otherwise.
 
 ---
 
