@@ -15,22 +15,24 @@ Loom is a tool for emergent sense-making and collaborative synthesis. It provide
 
 Loom was born from the intersection of ethnographic research, theory, and practice. It is designed to help individuals and cross-disciplinary teams build shared understanding not by enforcing uniformity, but by negotiating differences.
 
-The core workflow is simple:
-1. **Read & Capture:** Keep the passages worth keeping — the author's words, verbatim, with citation. Name the concept each passage evidences (a short noun phrase, often the author's own term), and gloss it in your own words in the working definition.
-2. **Throw:** Pick two concepts and connect them.
-3. **Name the Relation:** Define the "edge" between these ideas yourself, using your own phrasing or pulling a verb from one of the "tongues" (disciplinary thought styles).
+The work runs one reading at a time, through five stations — **00 Library · 01 Reading · 02 Linking · 03 Knowledge Graph · 04 Vocabulary**:
 
-Nothing is auto-generated. The tool only counts your own throws. The structure emerges organically from your coding: from open codes first, to axial reads across texts.
+1. **Open a Reading.** The Library holds the course's Readings, grouped by week. The card *is* the door: the whole card opens that text and whatever you have already built behind it. You can also add a reading of your own — something the course doesn't include, carded by hand so its passages still have a door.
+2. **Capture Passages.** Highlight in the text and capture on the rail beside the words: the author's sentence, verbatim, with its citation. Name a Concept the passage evidences if you have one — a short noun phrase, often the author's own term — and describe it in your own words. If the word hasn't arrived yet, save without one; an Unlabeled Passage is a whole capture, not half of one, and you can name it later.
+3. **Throw a Thread.** Pick two Concepts and write how they hang together, as a sentence you would defend out loud. Long and awkward is fine: the sentence *is* the Thread. Afterwards, if you want, give it a short Link Label so one of your own words can recur across readings.
+4. **Arrange a Projection.** Sort your Concepts into tiers and lay them out as cards on a board — general above, specific below. Each arrangement is a Projection, with its own title, one-line and description; keep several, and each can say something different about the same Cloth. The concept-map kit hands the whole thing off to paper for the map you draw by hand.
+5. **Read your Vocabulary back.** Every Concept you have named and every Link Label you have given, across all your readings — because a Concept does not belong to a text; a Passage does. Meeting the same idea in a second text joins its evidence and says so.
+
+Nothing is auto-generated. No model reads your work, ranks it, scores it, or suggests what to write; the tool holds what you made and counts it, and an empty state is a fact about where you have got to rather than a fault to fix. The structure emerges organically from your own coding: from open codes first, to axial reads across texts.
 
 ## Features
 
-- **Bite-Sized Capture:** Keep the passages that matter as discrete units — the author's words, verbatim, with their citation — each filed under a concept you name.
-- **Intentional Connections ("Throws"):** The power of Loom lies in the edges. You decide exactly how two concepts relate. 
-- **Disciplinary "Tongues":** The verbs we reach for to name a relation (e.g., *constrains*, *refutes*, *betrays*) aren't neutral; each belongs to a specific way of seeing the world. When you coin a term, Loom offers registers from several fields—"Cause & system", "Stance & value"—as suggestions to tap or ignore. You pick the word, or write your own; the machine never names the relation.
-- **The Woven Graph:** View your interconnected graph ("Read"), then write your own "axial read" across texts. Loom lays your threads out as material and counts what it sees; you write the reading, and copy it out as a draft.
-- **The Card Table ("Map"):** Sort your concepts into tiers (primary / secondary / tertiary), then arrange them as cards on a three-band table—general above, specific below. The tool draws the links you already threw and counts what it sees; the sorting and arranging are yours. The "map kit" hands the whole thing off to paper for the real, hand-drawn concept map.
-- **Your Artifact:** Export your graph as JSON (the spec §6 contract: the `graph` is the artifact, `views` are your arrangements riding along) or as markdown for Obsidian and notes. Import and reset round it out—your work is never locked in.
-- **The Cloth, Over Time:** Loom keeps an append-only history of your own acts—capture, throw, coin, re-tier—and replays how your weave grew. It counts; it never grades. Reset clears the cloth, not the history.
+- **Passages, kept whole:** Keep the passages that matter as discrete units — the author's words, verbatim, with their citation — each carrying as many Concepts as you choose to file it under, or none. Capture happens on the rail beside the words, so you never leave the text to record what you just read.
+- **Threads you name yourself:** The power of Loom lies in the Threads. You decide exactly how two Concepts relate, and you write it as a sentence; the machine never names the relation. Labelling that Thread's Link is a separate, later, optional act — a short word so one of yours can recur. Two rows of suggestions sit under the label field and neither commits anything: your own Link Labels used before, and a few everyday verbs to tap or ignore.
+- **The Cloth, and Projections of it:** Your captures, concepts and threads for one reading make a Cloth. On **03 · Knowledge Graph** the Cloth is drawn as arcs — pick a pair there and throw a Thread in place — and each arrangement you build from it is a Projection with its own title, one-line and paragraph. Keep several; they can say quite different things about the same cloth.
+- **Tiers and the board:** Sort your Concepts into tiers — primary, secondary, tertiary, plus *set aside* and unsorted, which are different states and stay different. Then arrange them as cards on the board, general above, specific below; dropping a card into another band re-tiers it. Tiers belong to the Projection, not the Concept, so the same idea can be primary in one arrangement and tertiary in another. The tool draws the threads you already threw and counts what it sees — "Counted, not judged." The concept-map kit hands the whole thing off to paper for the real, hand-drawn concept map.
+- **Your work leaves as files:** Download happens at the object, never as one bundle — the Cloth at 01, its Threads at 02, a Projection and the Capture Log at 03, your Vocabulary at 04. Each comes out as JSON and as Markdown, carrying a provenance header. There is no import: these are outbound artifacts — a portfolio, a hand-in, your own copy — and nothing is locked in.
+- **The Cloth, Over Time:** Loom keeps an append-only history of your own acts — capture, throw, coin, re-tier — and replays how your weave grew. It counts; it never grades. Starting over clears the cloth, not the history.
 
 ## The Theory Behind the Tool
 
@@ -47,14 +49,14 @@ for a deeper dive):
 - **Communities of Practice** — Wenger, E. (1998). *Communities of Practice:
   Learning, Meaning, and Identity.* Cambridge University Press. Shared
   vocabularies are learned by participating in a community, not just by being
-  told. Loom enables a class or team to grow its own shared edge-vocabulary
-  over time by doing the work together.
+  told. Loom enables a class or team to grow its own shared vocabulary of
+  Concepts and Link Labels over time by doing the work together.
 
 - **Boundary Objects** — Star, S. L. (2010). This is Not a Boundary Object:
   Reflections on the Origin of a Concept. *Science, Technology, & Human
   Values*, 35(5), 601–617. How do people from distinct fields coordinate
   around one shared object without agreeing on exactly what it means? Loom
-  serves as a cross-tongue boundary object — flexible enough to be locally
+  serves as a cross-disciplinary boundary object — flexible enough to be locally
   useful, but robust enough to hold a common identity across groups.
 
 Course readings are provided to enrolled students within the application and
