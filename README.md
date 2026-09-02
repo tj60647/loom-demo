@@ -34,6 +34,51 @@ Nothing is auto-generated. No model reads your work, ranks it, scores it, or sug
 - **Your work leaves as files:** Download happens at the object, never as one bundle — the Cloth at 01, its Threads at 02, a Projection and the Capture Log at 03, your Vocabulary at 04. Each comes out as JSON and as Markdown, carrying a provenance header. There is no import: these are outbound artifacts — a portfolio, a hand-in, your own copy — and nothing is locked in.
 - **The Cloth, Over Time:** Loom keeps an append-only history of your own acts — capture, throw, coin, re-tier — and replays how your weave grew. It counts; it never grades. Starting over clears the cloth, not the history.
 
+## The words Loom uses
+
+Loom names a small number of things precisely, and the words carry the design.
+Definitions here are short; the authority for all of them is
+[docs/loom-model-build.md](./docs/loom-model-build.md) §2, which gives each one
+in full along with the ruling behind it.
+
+- **Reading** — a text in the course: title, authors, date, the PDF. *It is not
+  yours.* A reading may also be one you add yourself — a paper or a book the
+  course doesn't hold, carded by hand so the passages you take from it still
+  have a door.
+- **Library** — station 00, the shelf of Readings grouped by week. Every card is
+  a door, and it opens the work you already have behind that text.
+- **Cloth** — what you kept from one Reading, and what you take that to be. One
+  Cloth per Reading per person. It is deliberately *not* raw evidence:
+  choosing a passage is already your judgment, so a Cloth carries a title and a
+  description of your own.
+- **Passage** — the author's words, kept verbatim with their citation, anchored
+  to the page they came from. A Passage may carry any number of Concepts, or
+  none.
+- **Unlabeled Passage** — a Passage you kept without naming a Concept. A whole
+  capture, not half of one; it may stay that way forever.
+- **Concept** — an idea you name, with a description in your own words. It
+  belongs to you rather than to a text, so meeting it again in a second Reading
+  joins the evidence. A Concept may be named *before* anything supports it, and
+  a Concept with no evidence is a visible state, never a fault.
+- **Thread** — how two Concepts hang together, written as a sentence you would
+  defend out loud. The sentence is the Thread. Threads are directed and join
+  exactly two Concepts.
+- **Link** — an optional short label for a Thread's verb, plus a gloss of what
+  you mean by it. Like a Concept it is yours and spans readings, so renaming it
+  reaches every Thread that uses it — that is how a vocabulary of your own
+  accumulates.
+- **Projection** — one way of projecting a Cloth so it can be read: an ordering,
+  or a board of cards in tier bands with the threads drawn. Each has its own
+  title, one-line and description, and its own tiers. Keep several over one
+  Cloth; they can say quite different things.
+- **Tier** — where you rank a Concept in a Projection: primary, secondary,
+  tertiary, *set aside*, or unranked. Tiers belong to the Projection, so the
+  same idea can be primary in one and tertiary in another.
+- **Vocabulary** — station 04: every Concept you have named and every Link you
+  have given, across all your readings.
+- **Capture Log** — the append-only record of your own acts, in the order you
+  made them. It counts; it never grades. It survives starting over.
+
 ## The Theory Behind the Tool
 
 Loom is built on foundational ideas from design theory, sociology, and
@@ -71,6 +116,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with `create-next-a
 Start here:
 
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — branches, the PR gate (green CI + owner review), tests, local setup.
+- [docs/glossary.md](./docs/glossary.md) — the same terms as above plus their code names, because the schema still speaks the July vocabulary: `edges` is a Thread, `maps` is a Projection, `sources` is a Reading.
 - [docs/contracts.md](./docs/contracts.md) — every contract surface: schema, server actions, API routes, export/import formats, invariants.
 - [docs/deployments.md](./docs/deployments.md) — local / dev / production environments, CI secrets, smoke tests.
 - [docs/reading-quality.md](./docs/reading-quality.md) — extraction scoring, defect diagnosis, and which repairs are safe to run.
