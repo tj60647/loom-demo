@@ -154,7 +154,7 @@ my month"; a change branch is a ten-minute read.
    stale compiled schema masked it all day, and the first clean rebuild took
    every `source` query down. The failure surfaces far from the cause.)
    Whoever lands the PR applies the migration to the Neon `dev` branch —
-   and `ci`, so the e2e gate stays truthful.
+   and `ci-suite`, so the e2e gate stays truthful.
 4. **Merge to `dev` deploys the alias automatically.** Both developers and
    the alpha testers now exercise the *combination* on real (dev-branch)
    data with real sign-in. Experiments soak here; disagreements get settled
@@ -285,7 +285,7 @@ stops offering a sign-in that cannot complete.
 - `checks` (lint + types + build) needs no secrets and runs on every PR,
   including forks.
 - `e2e` runs the Playwright journey suite against a **third Neon branch,
-  `ci`**, created once from `dev`. It migrates, seeds readings and demo
+  `ci-suite`**, created once from `dev`. It migrates, seeds readings and demo
   accounts, then runs the suite via `next dev` (the backdoor needs a
   non-production build). Runs queue on a shared concurrency group because the
   suite owns its demo account exclusively.
@@ -294,7 +294,7 @@ Repository secrets to configure (Settings → Secrets → Actions):
 
 | Secret | Value |
 | --- | --- |
-| `CI_DATABASE_URL` | Neon `ci` branch connection string |
+| `CI_DATABASE_URL` | Neon `ci-suite` branch connection string |
 | `CI_BLOB_READ_WRITE_TOKEN` | a blob read-write token (same store) |
 | `CI_NEXTAUTH_SECRET` | any fresh random string (optional; has a default) |
 

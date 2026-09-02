@@ -80,7 +80,7 @@ nothing flows upward from anywhere but code.
 | **Git ref** | working tree | PR head | any non-`dev` branch | `dev` | `master` |
 | **URL** | `localhost:3000/3100` | ephemeral | `loom-demo-git-<branch>-aroughidea.vercel.app` | `loom-demo-git-dev-aroughidea.vercel.app` | `loom.aroughidea.com` |
 | **URL stable?** | n/a | no | **yes, per branch** (live) | yes | yes |
-| **Neon branch** | `dev` | `ci` | `preview/pr-<n>`, cut per PR from the `preview` template | `dev` | `main` |
+| **Neon branch** | `dev` | `ci-suite` | `preview/pr-<n>`, cut per PR from the `preview` template | `dev` | `main` |
 | **Blob namespace** | `env/local/` | `env/ci/` | `env/preview-<branch>/` | `env/dev/` | bare keys |
 | **`NODE_ENV`** | `development` | `development` | `production` | `production` | `production` |
 | **`VERCEL_ENV`** | unset | unset | `preview` | `preview` | `production` |
@@ -101,7 +101,7 @@ scopes; "branch" means a git-branch-scoped override.
 
 | Credential | production | dev alias | feature preview | CI | local |
 | --- | --- | --- | --- | --- | --- |
-| `DATABASE_URL` | Production scope → `main` | Preview + branch `dev` → `dev` | Preview + PR branch → `preview/pr-<n>`, written by CI; unscoped Preview → the template | `CI_DATABASE_URL` secret → `ci` | `.env.local` → `dev` |
+| `DATABASE_URL` | Production scope → `main` | Preview + branch `dev` → `dev` | Preview + PR branch → `preview/pr-<n>`, written by CI; unscoped Preview → the template | `CI_DATABASE_URL` secret → `ci-suite` | `.env.local` → `dev` |
 | `NEXTAUTH_SECRET` | Production, unique | Preview + branch `dev`, unique | Preview unscoped, unique | repo secret | `.env.local` |
 | `GITHUB_ID` / `GITHUB_SECRET` | production OAuth app | dev OAuth app (branch-scoped) | unused — GitHub cannot complete a sign-in on a preview | dummy | dummy |
 | `BLOB_READ_WRITE_TOKEN`, `BLOB_STORE_ID` | project-wide, one store | same | same | `CI_BLOB_READ_WRITE_TOKEN` | `.env.local` |
@@ -137,7 +137,7 @@ rollback here (migrations are forward-only) and the blob store has no undelete.
 | Regenerate a derived asset (cover, page image, sheet) | own namespace | own namespace | own namespace | own namespace | yes |
 | Delete a reading (`deleteSource`) | own namespace only | own namespace only | own namespace only | own namespace only | yes, admin |
 | Delete a blob object outright | **no** | **no** | **no** | **no** | yes |
-| `seed:demo` (wipes the demo course) | yes, against `dev` | yes, against `ci` | no | yes | **never** |
+| `seed:demo` (wipes the demo course) | yes, against `dev` | yes, against `ci-suite` | no | yes | **never** |
 
 Every cell above is now what the storage layer actually does — see `blobNamespace` in [src/lib/storage.ts](../src/lib/storage.ts), and the assertions in `npm run check:blobns`.
 
@@ -145,7 +145,7 @@ Every cell above is now what the storage layer actually does — see `blobNamesp
 
 ### One long-lived branch per environment, and one per open PR
 
-`main` (production), `dev` (alpha testers), `ci` (the e2e suite), and
+`main` (production), `dev` (alpha testers), `ci-suite` (the e2e suite), and
 `preview` — which is not an environment but a **template**: the readings, the
 course structure and the fixture accounts, and nobody's real work.
 
@@ -194,7 +194,7 @@ never be one.
    (`npx drizzle-kit generate --name=what_changed`). Never `db push` to a shared
    branch — a schema pushed rather than migrated leaves no record, and a stale
    compiled schema on someone's dev server will mask it for a day.
-2. Whoever lands the PR applies it to the **`dev`** Neon branch, and to **`ci`**
+2. Whoever lands the PR applies it to the **`dev`** Neon branch, and to **`ci-suite`**
    so the e2e gate stays truthful.
 3. The **`preview`** branch is refreshed from `dev` — see the runbook — or
    re-cut. A preview running new code against an old schema fails in ways
@@ -284,7 +284,7 @@ the runbook.
 | Real student work | `main` only | Never copied downward without scrubbing. |
 | Alpha tester work | `dev` | Survives every deploy. Not disposable — testers are people. |
 | QA churn | `preview/pr-<n>` | Disposable by definition — deleted when the PR closes. |
-| Suite fixtures | `ci` | A contract: `test-user-a` carries 3 maps from 2 readings. Restore with `seed:demo`, don't repurpose. |
+| Suite fixtures | `ci-suite` | A contract: `test-user-a` carries 3 maps from 2 readings. Restore with `seed:demo`, don't repurpose. |
 | Reading PDFs | the one blob store, shared | Source of truth, irreplaceable. Only production may delete. |
 | Derived assets | namespaced per environment | Regenerable. Losing one costs a re-render. |
 
