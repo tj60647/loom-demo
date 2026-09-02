@@ -205,12 +205,16 @@ restarting. A procedure that recurs can go one step further and become a skill;
 Found while checking something else, and worth settling before more laptops are
 pointed at it.
 
-While production was down the team could not demo from the deployed site, so
-they set up local environments and demoed from those. It worked. **But an outage
-does not only stop work, it displaces it** — and the fallback path here routes
-to the Neon `dev` branch, which was cut from `main` and currently holds **60
-real accounts, 32 readings and 926 passages** of actual coursework. Measured
+**The measured fact:** the Neon `dev` branch has `main` as its parent and
+currently holds **60 real accounts, 32 readings and 926 passages** of actual
+coursework — accounts at `berkeley.edu`, not fixtures. Read from the database on
 2026-09-02.
+
+**Why it matters:** `.env.example` points local development at `dev`. So the
+documented setup — the one a new developer follows on their first day, and the
+one anybody falls back to when the deployed site is unavailable — puts real
+student records on a laptop screen. That is a property of the documented path,
+independent of who has used it or when.
 
 So the rule in `.env.example` — local points at `dev`, never `main` — is doing
 less than it appears. It protects production from being *written* to, which is
