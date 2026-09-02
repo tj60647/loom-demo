@@ -175,12 +175,28 @@ shows one system at a time.
 | How bad, and on which route? | `vercel metrics vercel.request.count -p <project> --filter "http_status ge 500" --group-by route` |
 | When did the credential last change? | the role's `updated_at`, and the store's `secretRotationCompletedAt` |
 
-Two consequences. **The access to arrange is CLI-capable credentials**, not
-only dashboard seats — and those carry real reach, so granting them is an
-access decision rather than a convenience. And **the tools reward being driven
-in bulk, including by an agent**: the finding that explained why CI stayed green
-was comparing one role's `updated_at` across five branches, which is one shell
-loop and a great deal of clicking otherwise.
+Those commands were run by a coding agent working in this repository, which is
+worth saying plainly rather than leaving as an implication — it is the method to
+reach for, not an incidental detail of who happened to be at the keyboard.
+
+**This repository is already set up for it, and that is part of what the team
+inherits.** [AGENTS.md](../AGENTS.md) carries the document precedence, the
+vocabulary map and the conventions specifically so an agent working here does
+not go wrong — the `byte`/Passage rule and the "verify a claim before writing it
+in a comment" rule are both there because an agent got them wrong once. This
+file records the commands and the sequence so a later session resumes instead of
+restarting. A procedure that recurs can go one step further and become a skill;
+`~/.claude/skills/vercel-domain/SKILL.md` is the existing precedent.
+
+**So what needs arranging is two things**, and only one of them is technical:
+
+- **A coding agent set up against this repository, with the `vercel` and `neon`
+  CLIs authenticated.** Not dashboard seats — the environment-variable wall at
+  the start of this incident was a dashboard seat, and it could not have
+  answered the question for anyone.
+- **A decision about who holds those credentials.** An agent driving them has
+  exactly the reach of the token it uses. That is an access decision and belongs
+  in the table in §4, not in a tooling note.
 
 ---
 
