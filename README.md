@@ -79,6 +79,34 @@ in full along with the ruling behind it.
 - **Capture Log** — the append-only record of your own acts, in the order you
   made them. It counts; it never grades. It survives starting over.
 
+### Where these words come from
+
+The vocabulary is borrowed on purpose, from three directions, and knowing which
+is which explains why the words behave differently.
+
+- **The weaving metaphor — Loom, Cloth, Thread, Quilt, Join —** is John Cain's,
+  developed as a way to think about *fabricating* a knowledge graph rather than
+  merely storing one, and to tie the graph's terms together into something that
+  hangs on a single image. That is why it lives in object names only: the
+  navigation says Library, Reading, Linking, Knowledge Graph, Vocabulary, while
+  the things you make are cloths and threads. (Attributed to John Cain by TJ,
+  2026-09-02; the metaphor set is recorded at
+  [loom-model-build.md](./docs/loom-model-build.md) §3.)
+- **Passage, Concept, Link and Tier** come from concept mapping — Novak &
+  Gowin's *Learning How to Learn*, a course reading, and from Dubberly. Novak
+  and Gowin sorted cards on a table, which is where the board and its tiers
+  come from directly.
+- **Gloss, note, description, label** are the attributes rather than the
+  elements, and they are drawn from the publishing and knowledge-organisation
+  traditions where each already means something exact.
+
+**Quilt is the one that is not finished.** Connecting two or more Cloths from
+different Readings through shared Concepts is named in the model and its
+substrate ships — cross-Reading Concept recurrence is what makes it possible —
+but the Quilt itself is a proposal, held open for a group discussion rather than
+built. See [docs/proposals/quilt.md](./docs/proposals/quilt.md); under
+`AGENTS.md` a proposal is intent, not authority, so do not expect it in the app.
+
 ## The Theory Behind the Tool
 
 Loom is built on foundational ideas from design theory, sociology, and

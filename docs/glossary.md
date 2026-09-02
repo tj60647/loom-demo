@@ -45,6 +45,34 @@ rows persist unrendered. The *Keep* station was dissolved the same day —
 download happens at each object now, and **there is no import**. If a document
 describes any of these as current, that document is stale.
 
+## Where the words come from, and how well that is sourced
+
+Support gets asked "why is it called that", and the honest answer differs by
+term. Marked below by how firmly each is recorded, because this section is the
+kind that attracts confident invention.
+
+| Family | Source | How well sourced |
+| --- | --- | --- |
+| **Loom · Cloth · Thread · Quilt · Join** | John Cain's weaving metaphor, for *fabricating* a knowledge graph rather than storing one — a single image the graph's terms can hang together on | **Attested, not documented.** Attributed to Cain by TJ, 2026-09-02. The repo records the metaphor set — `loom-model-build.md` §3: "the weaving metaphor — Cloth, Thread, Quilt, Join — lives in object names only" — but names no author. If Cain's authorship matters for a citation, ask before printing it |
+| **Passage · Concept · Link · Tier** | Concept mapping: Novak & Gowin, *Learning How to Learn* (a course reading), and Dubberly | **Novak & Gowin: documented.** `contracts.md:208` — "Novak & Gowin is the book the board's method comes from"; `:517` — "Novak and Gowin used cards on a table", which is the board and its tiers directly. **Dubberly: attested only** (TJ, 2026-09-02); no reference in the repo |
+| **Gloss · Note · Description · Label** | The attributes rather than the elements, taken from publishing and knowledge-organisation traditions where each already means something exact | **Attested** (TJ, 2026-09-02). No specific discipline is named, and none should be invented |
+
+Two consequences worth holding on to:
+
+**The metaphor lives in object names only.** Navigation is plain — Library,
+Reading, Linking, Knowledge Graph, Vocabulary — while the things a student makes
+are cloths and threads. That split is deliberate (`loom-model-build.md` §3), so
+"rename the tab to Weaving" is a change to the design, not a copy tweak.
+
+**Quilt is named but not built.** `loom-model-build.md:13` puts it in v1 scope —
+"connecting 2+ Cloths from different Readings via shared Concepts. The v1
+substrate ships: cross-Reading Concept recurrence" — while the object itself is
+deferred alongside Join, and [proposals/quilt.md](proposals/quilt.md) is
+explicitly held for a group discussion. Under `AGENTS.md` a proposal ranks below
+the model and nothing is implemented from one whose questions are unanswered.
+Expect students and faculty to use the word for the course's group work in weeks
+12–14 (`course-deployment-notes.md`) and not find a Quilt in the app.
+
 ## Stations
 
 Numbers come from array position in `JourneyNav.tsx`, never hand-written, so
