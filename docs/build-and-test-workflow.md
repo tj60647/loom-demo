@@ -268,3 +268,68 @@ What is still open is listed in
 touch this workflow are that a PR closed *without merging* can leave its
 database behind, and that the guest email door is advertised on the sign-in
 page while being configured nowhere.
+
+## Who holds CI's keys, and what changes on handoff
+
+Every automated check runs on credentials that belong to a person, not to the
+repository. Read from the workflows on 2026-09-02:
+
+| job | workflow | secret | what it is |
+| --- | --- | --- | --- |
+| `checks` | ci.yml | `CI_DATABASE_URL` (optional — lint, typecheck and the static checks run without it) | a connection string into the `ci` branch of the Neon project |
+| `checks` → **production migration drift**, only on the way into `master` | ci.yml | `PROD_DATABASE_URL` | a **read-only** string for the role `ci_migration_reader` on `main`. See below — this is the one place CI touches production |
+| `e2e` | ci.yml | `CI_DATABASE_URL`, `CI_BLOB_READ_WRITE_TOKEN`, `CI_NEXTAUTH_SECRET` | the same `ci` branch, seeded with the demo cohort the suite asserts on; a blob token; any string |
+| `provision` / `teardown` | preview-db.yml | `NEON_API_KEY`, `VERCEL_TOKEN` | a personal Neon API key and Vercel token, used to create one Neon branch per PR (`preview/pr-N`, parent `preview`) and point the Vercel preview at it |
+| `database` | heartbeat.yml | none | a public URL; it only asks whether production can answer |
+
+**CI does reach production, and only here.** An earlier draft of this section
+claimed it never did. That stopped being true on 2026-09-02, when
+`PROD_DATABASE_URL` was configured so the drift check would stop skipping
+green. The check reads exactly one thing —
+
+```sql
+select count(*)::int as n from drizzle.__drizzle_migrations
+```
+
+— and the role it uses can read nothing else. Verified by connecting as it:
+`drizzle.__drizzle_migrations` allowed; `public.user`, `public.session`,
+`public.course`, `public.passage` and `create table` all denied. This
+repository is public and three people hold write, so the credential is built
+to be worth nothing if it leaks: the worst it permits is counting rows in a
+migrations table.
+
+**When the repository changes hands**, GitHub moves these secrets with it — so
+CI would go on running on the previous owner's tokens. The previous owner
+deletes `NEON_API_KEY`, `VERCEL_TOKEN` and `PROD_DATABASE_URL` before
+transferring; from then on `provision` and `teardown` fail visibly until the
+new owner adds their own, `e2e` fails when `CI_DATABASE_URL` stops resolving,
+and the drift check returns to skipping green. `checks` keeps running
+regardless.
+
+To restore full CI under new ownership: a `ci` branch in the new Neon project
+(`npx drizzle-kit migrate`, then `npm run seed:sources` and `npm run
+seed:demo`) → `CI_DATABASE_URL`; a blob token → `CI_BLOB_READ_WRITE_TOKEN`;
+any string → `CI_NEXTAUTH_SECRET`; the owner's Neon API key and Vercel token →
+`NEON_API_KEY`, `VERCEL_TOKEN`; a read-only role on `main` →
+`PROD_DATABASE_URL`; and a `preview` branch as the per-PR template — the
+parent must never be `main` (preview-db.yml says why: production holds real
+students' work).
+
+### The failure this section exists to prevent
+
+`DATABASE_URL` in Vercel is typed **Sensitive**, which means write-only: a
+pull returns the literal string `"encrypted"`, to the account owner as much as
+to anyone else. It cannot be read back and compared, so a stale value is
+invisible until something fails.
+
+On 2026-09-01 one went stale. Attaching the Neon Marketplace store to a second
+Vercel project rotated the shared `neondb_owner` password at 16:37:52Z and
+wrote the new credentials into *that* project; this one is not linked to the
+store, so nothing updated it here. Sign-in was down for about ten hours while
+every page still answered 200.
+
+Two consequences worth carrying forward. A Sensitive value can only ever be
+re-fetched from its source or regenerated — never recovered from Vercel; and
+because this project is not connected to its own Neon store, any future
+rotation will break it the same way. `heartbeat.yml` bounds how long that goes
+unnoticed; it does not prevent it.
