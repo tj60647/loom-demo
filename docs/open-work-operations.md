@@ -146,9 +146,24 @@ threshold would not have fired against an overall error rate of 0.234%.
 
 **Missing, and the point of the whole exercise:** an alert that reaches a
 person. Realistically an external uptime check on
-`https://loom.tjmcleish.com/api/health` — it needs no Vercel or Neon access,
+`https://loom.aroughidea.com/api/health` — it needs no Vercel or Neon access,
 which makes it the one piece of this that someone without infrastructure
 permissions can own.
+
+**Ask on the hostname students use.** Four hostnames answer for this project.
+Measured 30 Aug – 2 Sep: `loom.aroughidea.com` took **27,608** requests,
+`loom.tjmcleish.com` **145** — and most of those 145 were one person running
+`curl` during the incident. They resolve to the same deployment today, which is
+what makes the wrong choice dangerous rather than untidy: if the hostname
+students use breaks while another still answers, a monitor on the other reports
+green through a total outage. The heartbeat was pointed at the wrong one until
+2026-09-02 and is now on `loom.aroughidea.com`.
+
+**And one for §4:** every hostname students reach Loom through sits on a domain
+registered to the departing owner. Whoever holds `aroughidea.com` after the
+handoff controls whether students can reach the tool at all, and no DNS access
+is listed in the ownership table below. That is a fifth system, and it is the
+only one where the failure is total and instant.
 
 > A health route nobody polls is a diagnostic, not a monitor. An `/api/health`
 > returning 503 that nothing is asking is indistinguishable from one returning
@@ -252,6 +267,13 @@ the Loom deployment spans four systems that do not share an owner by default:
 | Neon project | the database, branches, roles | — |
 | GitHub repository | code, Actions secrets, branch protection | — |
 | Monitoring | who is paged, and who acts | — |
+| **DNS for `aroughidea.com`** | **whether students can reach Loom at all** | — |
+
+The last row was missed until 2026-09-02 and is the one where failure is total
+and instant. Students arrive on `loom.aroughidea.com`, a domain registered to
+the departing owner; nothing about the deployment matters if that record stops
+resolving. It is also the only system here whose loss cannot be repaired from
+inside the repository.
 
 Each needs a name, a first responder and a deputy. **An unowned alert is noise;
 an unowned credential is the next outage.**
