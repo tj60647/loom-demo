@@ -141,8 +141,10 @@ The knowledge graph is kept strictly apart from its projections:
 
 | Table | Holds | §6 role |
 | --- | --- | --- |
-| `concept`, `passage`, `edge` | The student's graph, including `concept.tier` (placement's *meaning*). | `graph` — the artifact |
-| `read` | "Your read", one row per student × course. | `graph.read` |
+| `concept`, `passage`, `edge` | The student's graph. Placement's *meaning* is **not** here: Concept Tiers are per-Projection (`maps.tiers`). The `passage.tier` column is a different thing — the Passage Tier, riding the passage. | `graph` — the artifact |
+| `cloth` | One Cloth per student × scope: its title and description. | `graph.cloths[]` |
+| `map` | A Projection — its name, one-line (`essence`), paragraph (`read`), and its own `tiers`. Several may sit over one Cloth. | `graph.maps[]` |
+| `link` | A Link: the User-level Label and gloss a Thread points at (`edge.linkId`). Travels in the Vocabulary download, not in `graph`. | — |
 | `view` | Student-authored geometry per view key (`cardTable`: positions, bends). A new view adds a row, never a column on a concept or edge. Only student gestures write here — derived layout is computed for display and discarded. | `views` — projections |
 | `graph_event` | Append-only history of the student's own acts. Survives reset and import; rendered only as exploratory counts/replay ("the cloth, over time"), never judgment. | development history |
 
