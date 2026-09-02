@@ -149,6 +149,7 @@ Start here:
 - [docs/deployments.md](./docs/deployments.md) — local / dev / production environments, CI secrets, smoke tests.
 - [docs/reading-quality.md](./docs/reading-quality.md) — extraction scoring, defect diagnosis, and which repairs are safe to run.
 - [docs/audit-2026-08-02.md](./docs/audit-2026-08-02.md) — the full journey audit and alpha assessment.
+- [docs/incident-2026-09-01.md](./docs/incident-2026-09-01.md) — the sign-in outage: why every automated check stayed green while no student could log in, and what now watches for it.
 - Tests: `npm run check`, then `npx playwright test` (see CONTRIBUTING for the Windows/3100 variant and the seeded demo accounts the suite relies on).
 
 ### Getting Started
