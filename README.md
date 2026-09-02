@@ -206,7 +206,7 @@ Three invariants worth preserving if you touch this:
 - **The dimensions are not compensatory.** `pass` requires *every* scored dimension to clear 3, not the mean, **and** requires `coverage` and `legibility` to have values at all — so `pass` is three-valued, and the card renders the third as "Unverified" rather than as a quiet pass. A PDF whose fonts carry no ToUnicode map scores 5 on coverage and anchorability while being pure mojibake; averaging would call it usable.
 - **A clean byte count is not legibility.** Any future tightening should be tested against text that is *valid characters in the wrong order or the wrong mapping*, not just against mojibake — that's the case a byte-level check cannot see.
 
-The score is advisory. A reading below the bar is flagged "Needs review", never auto-hidden — see red line #7 in the [spec](./docs/loom-spec-v1.md).
+The score is advisory. A reading below the bar is flagged "Needs review", never auto-hidden — see red line #7 in the [model build](./docs/loom-model-build.md) §6.
 
 What happens *next* — what the defect actually is, which repair it needs, and which repairs are safe to run against a reading students have worked in — is [docs/reading-quality.md](./docs/reading-quality.md).
 
@@ -216,7 +216,7 @@ Behind **Edit** on the Readings tab, *Draft from PDF* asks a model to read the r
 
 The description is deliberately **one sentence, and deliberately not a summary**. It orients a student toward the text — what territory it is in, what it is doing there — without handing over what it concludes. Arriving at the argument is the student's work; a description that states the thesis has already done it for them. "Examines how X and Y coordinate without agreement", not "argues that X enables Y because Z".
 
-It proposes; it never stores. The draft lands in the form fields, the instructor corrects it against the PDF and saves, and `metadataProvenance` records which fields were drafted rather than typed. That review step is load-bearing rather than polite: unlike the extraction judge, this produces text students read (title and author on every card, description when published), so red line #6 admits it **only** as a proposal an instructor has accepted — see exception (b) in the [spec](./docs/loom-spec-v1.md) §4/§5. Auto-filling on upload, a bulk "draft all", or anything writing straight to the row would take it back outside the line.
+It proposes; it never stores. The draft lands in the form fields, the instructor corrects it against the PDF and saves, and `metadataProvenance` records which fields were drafted rather than typed. That review step is load-bearing rather than polite: unlike the extraction judge, this produces text students read (title and author on every card, description when published), so red line #6 admits it **only** as a proposal an instructor has accepted — see exception (b) in the [model build](./docs/loom-model-build.md) §6. Auto-filling on upload, a bulk "draft all", or anything writing straight to the row would take it back outside the line.
 
 Like the judge it is optional: with no `OPENROUTER_API_KEY` the button says so and the metadata is typed by hand.
 
