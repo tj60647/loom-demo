@@ -49,7 +49,20 @@ jobs:
     steps:
       - name: GET /api/health
         env:
-          URL: https://loom.tjmcleish.com/api/health
+          # THE HOSTNAME IS PART OF THE CHECK, not an address for it.
+          #
+          # Four hostnames answer for this project. Measured over 30 Aug - 2 Sep,
+          # students arrive on loom.aroughidea.com: 27,608 requests against 145
+          # on loom.tjmcleish.com, and most of those 145 were one person running
+          # curl during an incident.
+          #
+          # They resolve to the same deployment today, which is exactly why
+          # picking the wrong one is dangerous rather than merely untidy: if the
+          # hostname students use breaks while another still answers, a monitor
+          # on the other one reports green through a total outage. That is the
+          # failure this workflow exists to catch, so it must ask on the door
+          # students actually walk through.
+          URL: https://loom.aroughidea.com/api/health
         run: |
           set -uo pipefail
 
