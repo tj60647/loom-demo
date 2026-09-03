@@ -273,28 +273,33 @@ Worth folding into §2: the new Neon project is the natural moment to cut a
 ## 4. Move off one person's accounts. **TJ's call, and the window is limited**
 
 **The goal, in TJ's words: as much as possible moves out of his personal
-accounts into a collective one that several people can reach.** Naming a
-responsible person is the smaller half; the accounts themselves are the
-thing, because an account only one person can open is a dependency on that
-person that no handover document can remove.
+accounts into a collective one that several people can reach.**
+
+**Two decisions, and the order matters.** First, where each of these should live
+and who should be able to get in. Only then, roles — who is called first, who
+deputises, who approves a change to student data. Assigning a role before the
+accounts move produces a name beside a door that name cannot open, and an
+account only one person can open stays a dependency on that person whatever any
+handover document says.
 
 Not technical, and it gates the value of everything above. Access to
 the Loom deployment spans five systems, each with its own account:
 
-| System | What it controls | Owner |
-|---|---|---|
-| Vercel project | deployment, Sensitive variables, alert rules | — |
-| Neon project | the database, branches, roles | — |
-| GitHub repository | code, Actions secrets, branch protection | — |
-| Monitoring | who is paged, and who acts | — |
-| **DNS for `aroughidea.com`** | **whether students can reach Loom at all** | — |
+| System | What it controls | Where it should live | Who can get in |
+|---|---|---|---|
+| Vercel project | deployment, Sensitive variables, alert rules | — — | — |
+| Neon project | the database, branches, roles | — — | — |
+| GitHub repository | code, Actions secrets, branch protection | — — | — |
+| Monitoring | who is paged, and who acts | — — | — |
+| **DNS for `aroughidea.com`** | **whether students can reach Loom at all** | — — | — |
 
 The DNS row is listed for completeness rather than concern: students arrive on
 `loom.aroughidea.com`, so someone should be able to change that record, and the
 table would be wrong without it. TJ is content with the arrangement as it
 stands.
 
-Each needs a name, a first responder and a deputy. **An unowned alert is noise;
+Fill the last two columns first. Roles — first responder, deputy — follow once
+there is more than one person who can act. **An unowned alert is noise;
 an unowned credential is the next outage.**
 
 The failure this prevents is not hypothetical. During the incident the person
