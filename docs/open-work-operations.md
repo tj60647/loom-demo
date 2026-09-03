@@ -223,11 +223,24 @@ currently holds **60 real accounts, 32 readings and 926 passages** of actual
 coursework — accounts at `berkeley.edu`, not fixtures. Read from the database on
 2026-09-02.
 
-**Why it matters:** `.env.example` points local development at `dev`. So the
-documented setup — the one a new developer follows on their first day, and the
-one anybody falls back to when the deployed site is unavailable — puts real
-student records on a laptop screen. That is a property of the documented path,
-independent of who has used it or when.
+**Why it matters:** `.env.example` instructs you to fetch a connection string
+for `dev`, so the documented first-day setup shows real student work on screen.
+
+**Two things it does *not* mean**, because both are easy to read into it:
+
+- **Nothing is copied to the laptop.** The local app connects over the network
+  to Neon and displays what is there. No student data is stored locally.
+- **Local work cannot reach students.** Captures, edits and deletions made
+  while running locally are written to `dev`, never to `main` — they are
+  independent databases, and generated files go to a separate blob drawer
+  (`blobNamespace` in `src/lib/storage.ts`, asserted by `npm run
+  check:blobns`). Production is safe from local development.
+
+What is true is narrower and still worth deciding: student work is *visible*
+during local development, to whoever is set up locally. For faculty that is
+unremarkable — they see the same through the app. It is worth stating because
+"local development" usually implies a scratch database, and because the next
+person set up locally may not be faculty.
 
 So the rule in `.env.example` — local points at `dev`, never `main` — is doing
 less than it appears. It protects production from being *written* to, which is
