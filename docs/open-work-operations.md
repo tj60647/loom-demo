@@ -287,11 +287,11 @@ the Loom deployment spans five systems, each with its own account:
 
 | System | What it controls | Where it should live | Who can get in |
 |---|---|---|---|
-| Vercel project | deployment, Sensitive variables, alert rules | — — | — |
-| Neon project | the database, branches, roles | — — | — |
-| GitHub repository | code, Actions secrets, branch protection | — — | — |
-| Monitoring | who is paged, and who acts | — — | — |
-| **DNS for `aroughidea.com`** | **whether students can reach Loom at all** | — — | — |
+| Vercel project | deployment, Sensitive variables, alert rules | — | — |
+| Neon project | the database, branches, roles | — | — |
+| GitHub repository | code, Actions secrets, branch protection | — | — |
+| Monitoring | who is paged, and who acts | — | — |
+| **DNS for `aroughidea.com`** | **whether students can reach Loom at all** | — | — |
 
 The DNS row is listed for completeness rather than concern: students arrive on
 `loom.aroughidea.com`, so someone should be able to change that record, and the
