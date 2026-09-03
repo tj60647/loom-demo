@@ -1,5 +1,8 @@
 # Open work — operations, and the handoff
 
+**Scope: Loom: Frameworks**, the deployment students use. Where this file says
+"Loom" it means that deployment, not the tool in general.
+
 **Written 2026-09-02, after the outage of 1–2 September.** The product sequence
 is [open-work.md](open-work.md); this is its counterpart for the things Loom
 *runs on* — deployment, credentials, monitoring, and who is responsible for
