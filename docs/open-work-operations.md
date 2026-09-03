@@ -267,10 +267,16 @@ Worth folding into §2: the new Neon project is the natural moment to cut a
 
 ---
 
-## 4. Ownership. **TJ's call, and it expires on 2026-09-11**
+## 4. Move off one person's accounts. **TJ's call, and it expires on 2026-09-11**
 
-Not technical, and it gates the value of everything above. Responsibility for
-the Loom deployment spans four systems that do not share an owner by default:
+**The goal, in TJ's words: as much as possible moves out of his personal
+accounts into a collective one that several people can reach.** Naming a
+responsible person is the smaller half; the accounts themselves are the
+thing, because an account only one person can open is a dependency on that
+person that no handover document can remove.
+
+Not technical, and it gates the value of everything above. Access to
+the Loom deployment spans five systems, each with its own account:
 
 | System | What it controls | Owner |
 |---|---|---|
