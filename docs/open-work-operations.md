@@ -159,11 +159,9 @@ students use breaks while another still answers, a monitor on the other reports
 green through a total outage. The heartbeat was pointed at the wrong one until
 2026-09-02 and is now on `loom.aroughidea.com`.
 
-**And one for §4:** every hostname students reach Loom through sits on a domain
-registered to the departing owner. Whoever holds `aroughidea.com` after the
-handoff controls whether students can reach the tool at all, and no DNS access
-is listed in the ownership table below. That is a fifth system, and it is the
-only one where the failure is total and instant.
+**A note for §4:** the hostname students use sits on `aroughidea.com`, so DNS is
+a fifth system someone should be able to reach. Added to the ownership table
+below for completeness.
 
 > A health route nobody polls is a diagnostic, not a monitor. An `/api/health`
 > returning 503 that nothing is asking is indistinguishable from one returning
@@ -269,11 +267,10 @@ the Loom deployment spans four systems that do not share an owner by default:
 | Monitoring | who is paged, and who acts | — |
 | **DNS for `aroughidea.com`** | **whether students can reach Loom at all** | — |
 
-The last row was missed until 2026-09-02 and is the one where failure is total
-and instant. Students arrive on `loom.aroughidea.com`, a domain registered to
-the departing owner; nothing about the deployment matters if that record stops
-resolving. It is also the only system here whose loss cannot be repaired from
-inside the repository.
+The DNS row is listed for completeness rather than concern: students arrive on
+`loom.aroughidea.com`, so someone should be able to change that record, and the
+table would be wrong without it. TJ is content with the arrangement as it
+stands.
 
 Each needs a name, a first responder and a deputy. **An unowned alert is noise;
 an unowned credential is the next outage.**
