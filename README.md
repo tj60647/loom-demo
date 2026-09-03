@@ -15,22 +15,97 @@ Loom is a tool for emergent sense-making and collaborative synthesis. It provide
 
 Loom was born from the intersection of ethnographic research, theory, and practice. It is designed to help individuals and cross-disciplinary teams build shared understanding not by enforcing uniformity, but by negotiating differences.
 
-The core workflow is simple:
-1. **Read & Capture:** Keep the passages worth keeping — the author's words, verbatim, with citation. Name the concept each passage evidences (a short noun phrase, often the author's own term), and gloss it in your own words in the working definition.
-2. **Throw:** Pick two concepts and connect them.
-3. **Name the Relation:** Define the "edge" between these ideas yourself, using your own phrasing or pulling a verb from one of the "tongues" (disciplinary thought styles).
+The work runs one reading at a time, through five stations — **00 Library · 01 Reading · 02 Linking · 03 Knowledge Graph · 04 Vocabulary**:
 
-Nothing is auto-generated. The tool only counts your own throws. The structure emerges organically from your coding: from open codes first, to axial reads across texts.
+1. **Open a Reading.** The Library holds the course's Readings, grouped by week. The card *is* the door: the whole card opens that text and whatever you have already built behind it. You can also add a reading of your own — something the course doesn't include, carded by hand so its passages still have a door.
+2. **Capture Passages.** Highlight in the text and capture on the rail beside the words: the author's sentence, verbatim, with its citation. Name a Concept the passage evidences if you have one — a short noun phrase, often the author's own term — and describe it in your own words. If the word hasn't arrived yet, save without one; an Unlabeled Passage is a whole capture, not half of one, and you can name it later.
+3. **Throw a Thread.** Pick two Concepts and write how they hang together, as a sentence you would defend out loud. Long and awkward is fine: the sentence *is* the Thread. Afterwards, if you want, give it a short Link Label so one of your own words can recur across readings.
+4. **Arrange a Projection.** Sort your Concepts into tiers and lay them out as cards on a board — general above, specific below. Each arrangement is a Projection, with its own title, one-line and description; keep several, and each can say something different about the same Cloth. The concept-map kit hands the whole thing off to paper for the map you draw by hand.
+5. **Read your Vocabulary back.** Every Concept you have named and every Link Label you have given, across all your readings — because a Concept does not belong to a text; a Passage does. Meeting the same idea in a second text joins its evidence and says so.
+
+Nothing is auto-generated. No model reads your work, ranks it, scores it, or suggests what to write; the tool holds what you made and counts it, and an empty state is a fact about where you have got to rather than a fault to fix. The structure emerges organically from your own coding: from open codes first, to axial reads across texts.
 
 ## Features
 
-- **Bite-Sized Capture:** Keep the passages that matter as discrete units — the author's words, verbatim, with their citation — each filed under a concept you name.
-- **Intentional Connections ("Throws"):** The power of Loom lies in the edges. You decide exactly how two concepts relate. 
-- **Disciplinary "Tongues":** The verbs we reach for to name a relation (e.g., *constrains*, *refutes*, *betrays*) aren't neutral; each belongs to a specific way of seeing the world. When you coin a term, Loom offers registers from several fields—"Cause & system", "Stance & value"—as suggestions to tap or ignore. You pick the word, or write your own; the machine never names the relation.
-- **The Woven Graph:** View your interconnected graph ("Read"), then write your own "axial read" across texts. Loom lays your threads out as material and counts what it sees; you write the reading, and copy it out as a draft.
-- **The Card Table ("Map"):** Sort your concepts into tiers (primary / secondary / tertiary), then arrange them as cards on a three-band table—general above, specific below. The tool draws the links you already threw and counts what it sees; the sorting and arranging are yours. The "map kit" hands the whole thing off to paper for the real, hand-drawn concept map.
-- **Your Artifact:** Export your graph as JSON (the spec §6 contract: the `graph` is the artifact, `views` are your arrangements riding along) or as markdown for Obsidian and notes. Import and reset round it out—your work is never locked in.
-- **The Cloth, Over Time:** Loom keeps an append-only history of your own acts—capture, throw, coin, re-tier—and replays how your weave grew. It counts; it never grades. Reset clears the cloth, not the history.
+- **Passages, kept whole:** Keep the passages that matter as discrete units — the author's words, verbatim, with their citation — each carrying as many Concepts as you choose to file it under, or none. Capture happens on the rail beside the words, so you never leave the text to record what you just read.
+- **Threads you name yourself:** The power of Loom lies in the Threads. You decide exactly how two Concepts relate, and you write it as a sentence; the machine never names the relation. Labelling that Thread's Link is a separate, later, optional act — a short word so one of yours can recur. Two rows of suggestions sit under the label field and neither commits anything: your own Link Labels used before, and a few everyday verbs to tap or ignore.
+- **The Cloth, and Projections of it:** Your captures, concepts and threads for one reading make a Cloth. On **03 · Knowledge Graph** the Cloth is drawn as arcs — pick a pair there and throw a Thread in place — and each arrangement you build from it is a Projection with its own title, one-line and paragraph. Keep several; they can say quite different things about the same cloth.
+- **Tiers and the board:** Sort your Concepts into tiers — primary, secondary, tertiary, plus *set aside* and unsorted, which are different states and stay different. Then arrange them as cards on the board, general above, specific below; dropping a card into another band re-tiers it. Tiers belong to the Projection, not the Concept, so the same idea can be primary in one arrangement and tertiary in another. The tool draws the threads you already threw and counts what it sees — "Counted, not judged." The concept-map kit hands the whole thing off to paper for the real, hand-drawn concept map.
+- **Your work leaves as files:** Download happens at the object, never as one bundle — the Cloth at 01, its Threads at 02, a Projection and the Capture Log at 03, your Vocabulary at 04. Each comes out as JSON and as Markdown, carrying a provenance header. There is no import: these are outbound artifacts — a portfolio, a hand-in, your own copy — and nothing is locked in.
+- **The Cloth, Over Time:** Loom keeps an append-only history of your own acts — capture, throw, coin, re-tier — and replays how your weave grew. It counts; it never grades. Starting over clears the cloth, not the history.
+
+## The words Loom uses
+
+Loom names a small number of things precisely, and the words carry the design.
+Definitions here are short; the authority for all of them is
+[docs/loom-model-build.md](./docs/loom-model-build.md) §2, which gives each one
+in full along with the ruling behind it.
+
+- **Reading** — a text in the course: title, authors, date, the PDF. *It is not
+  yours.* A reading may also be one you add yourself — a paper or a book the
+  course doesn't hold, carded by hand so the passages you take from it still
+  have a door.
+- **Library** — station 00, the shelf of Readings grouped by week. Every card is
+  a door, and it opens the work you already have behind that text.
+- **Cloth** — what you kept from one Reading, and what you take that to be. One
+  Cloth per Reading per person. It is deliberately *not* raw evidence:
+  choosing a passage is already your judgment, so a Cloth carries a title and a
+  description of your own.
+- **Passage** — the author's words, kept verbatim with their citation, anchored
+  to the page they came from. A Passage may carry any number of Concepts, or
+  none.
+- **Unlabeled Passage** — a Passage you kept without naming a Concept. A whole
+  capture, not half of one; it may stay that way forever.
+- **Concept** — an idea you name, with a description in your own words. It
+  belongs to you rather than to a text, so meeting it again in a second Reading
+  joins the evidence. A Concept may be named *before* anything supports it, and
+  a Concept with no evidence is a visible state, never a fault.
+- **Thread** — how two Concepts hang together, written as a sentence you would
+  defend out loud. The sentence is the Thread. Threads are directed and join
+  exactly two Concepts.
+- **Link** — an optional short label for a Thread's verb, plus a gloss of what
+  you mean by it. Like a Concept it is yours and spans readings, so renaming it
+  reaches every Thread that uses it — that is how a vocabulary of your own
+  accumulates.
+- **Projection** — one way of projecting a Cloth so it can be read: an ordering,
+  or a board of cards in tier bands with the threads drawn. Each has its own
+  title, one-line and description, and its own tiers. Keep several over one
+  Cloth; they can say quite different things.
+- **Tier** — where you rank a Concept in a Projection: primary, secondary,
+  tertiary, *set aside*, or unranked. Tiers belong to the Projection, so the
+  same idea can be primary in one and tertiary in another.
+- **Vocabulary** — station 04: every Concept you have named and every Link you
+  have given, across all your readings.
+- **Capture Log** — the append-only record of your own acts, in the order you
+  made them. It counts; it never grades. It survives starting over.
+
+### Where these words come from
+
+The vocabulary is borrowed on purpose, from three directions, and knowing which
+is which explains why the words behave differently.
+
+- **The weaving metaphor — Loom, Cloth, Thread, Quilt, Join —** is John Cain's,
+  developed as a way to think about *fabricating* a knowledge graph rather than
+  merely storing one, and to tie the graph's terms together into something that
+  hangs on a single image. That is why it lives in object names only: the
+  navigation says Library, Reading, Linking, Knowledge Graph, Vocabulary, while
+  the things you make are cloths and threads. (Attributed to John Cain by TJ,
+  2026-09-02; the metaphor set is recorded at
+  [loom-model-build.md](./docs/loom-model-build.md) §3.)
+- **Passage, Concept, Link and Tier** come from concept mapping — Novak &
+  Gowin's *Learning How to Learn*, a course reading, and from Dubberly. Novak
+  and Gowin sorted cards on a table, which is where the board and its tiers
+  come from directly.
+- **Gloss, note, description, label** are the attributes rather than the
+  elements, and they are drawn from the publishing and knowledge-organisation
+  traditions where each already means something exact.
+
+**Quilt is the one that is not finished.** Connecting two or more Cloths from
+different Readings through shared Concepts is named in the model and its
+substrate ships — cross-Reading Concept recurrence is what makes it possible —
+but the Quilt itself is a proposal, held open for a group discussion rather than
+built. See [docs/proposals/quilt.md](./docs/proposals/quilt.md); under
+`AGENTS.md` a proposal is intent, not authority, so do not expect it in the app.
 
 ## The Theory Behind the Tool
 
@@ -47,14 +122,14 @@ for a deeper dive):
 - **Communities of Practice** — Wenger, E. (1998). *Communities of Practice:
   Learning, Meaning, and Identity.* Cambridge University Press. Shared
   vocabularies are learned by participating in a community, not just by being
-  told. Loom enables a class or team to grow its own shared edge-vocabulary
-  over time by doing the work together.
+  told. Loom enables a class or team to grow its own shared vocabulary of
+  Concepts and Link Labels over time by doing the work together.
 
 - **Boundary Objects** — Star, S. L. (2010). This is Not a Boundary Object:
   Reflections on the Origin of a Concept. *Science, Technology, & Human
   Values*, 35(5), 601–617. How do people from distinct fields coordinate
   around one shared object without agreeing on exactly what it means? Loom
-  serves as a cross-tongue boundary object — flexible enough to be locally
+  serves as a cross-disciplinary boundary object — flexible enough to be locally
   useful, but robust enough to hold a common identity across groups.
 
 Course readings are provided to enrolled students within the application and
@@ -69,10 +144,12 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with `create-next-a
 Start here:
 
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — branches, the PR gate (green CI + owner review), tests, local setup.
+- [docs/glossary.md](./docs/glossary.md) — the same terms as above plus their code names, because the schema still speaks the July vocabulary: `edges` is a Thread, `maps` is a Projection, `sources` is a Reading.
 - [docs/contracts.md](./docs/contracts.md) — every contract surface: schema, server actions, API routes, export/import formats, invariants.
 - [docs/deployments.md](./docs/deployments.md) — local / dev / production environments, CI secrets, smoke tests.
 - [docs/reading-quality.md](./docs/reading-quality.md) — extraction scoring, defect diagnosis, and which repairs are safe to run.
 - [docs/audit-2026-08-02.md](./docs/audit-2026-08-02.md) — the full journey audit and alpha assessment.
+- [docs/incident-2026-09-01.md](./docs/incident-2026-09-01.md) — the sign-in outage: why every automated check stayed green while no student could log in, and what now watches for it.
 - Tests: `npm run check`, then `npx playwright test` (see CONTRIBUTING for the Windows/3100 variant and the seeded demo accounts the suite relies on).
 
 ### Getting Started
@@ -139,20 +216,22 @@ The knowledge graph is kept strictly apart from its projections:
 
 | Table | Holds | §6 role |
 | --- | --- | --- |
-| `concept`, `passage`, `edge` | The student's graph, including `concept.tier` (placement's *meaning*). | `graph` — the artifact |
-| `read` | "Your read", one row per student × course. | `graph.read` |
+| `concept`, `passage`, `edge` | The student's graph. Placement's *meaning* is **not** here: Concept Tiers are per-Projection (`maps.tiers`). The `passage.tier` column is a different thing — the Passage Tier, riding the passage. | `graph` — the artifact |
+| `cloth` | One Cloth per student × scope: its title and description. | `graph.cloths[]` |
+| `map` | A Projection — its name, one-line (`essence`), paragraph (`read`), and its own `tiers`. Several may sit over one Cloth. | `graph.maps[]` |
+| `link` | A Link: the User-level Label and gloss a Thread points at (`edge.linkId`). Travels in the Vocabulary download, not in `graph`. | — |
 | `view` | Student-authored geometry per view key (`cardTable`: positions, bends). A new view adds a row, never a column on a concept or edge. Only student gestures write here — derived layout is computed for display and discarded. | `views` — projections |
 | `graph_event` | Append-only history of the student's own acts. Survives reset and import; rendered only as exploratory counts/replay ("the cloth, over time"), never judgment. | development history |
 
 ### Reading-first
 
-**The reading is the entry point.** The course's chain of transformations — text → notes → concepts → weave → map → chalk talk — runs per text, twice a week, twenty-six times, so `/` is a shelf of readings grouped by course week and each one opens its own workbench at `/reading/[sourceId]`: the text, the coding log, Throw and Read, scoped to that reading. A reading is the only scope there is: `/weave`, the whole-weave workbench, was retired on 2026-08-11 (TJ — “poorly defined and not supported in the course… it should not be in the app as an idea until the faculty and authors of the app agree on what it means to have a ‘full weave’”). The Library still searches everything — it is the entry point to the whole contents — and a hit opens the reading its work lives in.
+**The reading is the entry point.** The course's chain of transformations — text → notes → concepts → weave → map → chalk talk — runs per text, twice a week, twenty-six times, so `/` is a shelf of readings grouped by course week and each one opens its own workbench at `/reading/[sourceId]`: the text, the coding log, Linking, Knowledge Graph and Vocabulary, scoped to that reading. A reading is the only scope there is: `/weave`, the whole-weave workbench, was retired on 2026-08-11 (TJ — “poorly defined and not supported in the course… it should not be in the app as an idea until the faculty and authors of the app agree on what it means to have a ‘full weave’”). The Library still searches everything — it is the entry point to the whole contents — and a hit opens the reading its work lives in.
 
-**A concept does not belong to a reading — a passage does.** A concept emerges from a reading and may then be evidenced in several; spec §2 makes one label one concept, reused across readings and weeks, and that reuse is the island-bridging the course is for. So scope is read off the route, and which readings a concept is *evidenced in* is **derived** from its passages (`src/lib/scope.ts`), computed per render and discarded. Nothing owns a concept and nothing re-homes it: a reading is a door into one graph, never one of twenty-six graphs, and meeting the same idea in a second text joins its evidence and says so.
+**A concept does not belong to a reading — a passage does.** A concept emerges from a reading and may then be evidenced in several; identity is by object, not label string ([model build](./docs/loom-model-build.md) §2), so a concept is reused across readings and weeks, and that reuse is the island-bridging the course is for. So scope is read off the route, and which readings a concept is *evidenced in* is **derived** from its passages (`src/lib/scope.ts`), computed per render and discarded. Nothing owns a concept and nothing re-homes it: a reading is a door into one graph, never one of twenty-six graphs, and meeting the same idea in a second text joins its evidence and says so.
 
-Threads that run out of a reading are the payoff, not the leftovers: an edge belongs to every scope containing either endpoint, so a bridge appears in both readings and in the whole weave, with its own counted band. Concepts from other readings stay reachable in Throw behind a disclosure — never removed, because threading this week's text to an earlier one is what weeks 6–13 are for.
+Threads that run out of a reading are the payoff, not the leftovers: an edge belongs to every scope containing either endpoint, so a bridge belongs to both readings and is counted in the workbench footer as "N threads out". Concepts from other readings stay reachable on Linking behind a disclosure — never removed, because threading this week's text to an earlier one is what weeks 6–13 are for.
 
-`04 Map` is honest per reading now that placement is per-map: each map carries its own tiers (`maps.tiers`), so a reading's map sorts only against that reading's concepts. The linear passes proposal that preceded parallel sibling maps is superseded — historical argument in [the archived strategy doc](./docs/archive/reading-scope-and-map-passes.md).
+**03 Knowledge Graph** is honest per reading now that placement is per-map: each map carries its own tiers (`maps.tiers`), so a reading's map sorts only against that reading's concepts. The linear passes proposal that preceded parallel sibling maps is superseded — historical argument in [the archived strategy doc](./docs/archive/reading-scope-and-map-passes.md).
 
 ### The reading library
 
@@ -204,7 +283,7 @@ Three invariants worth preserving if you touch this:
 - **The dimensions are not compensatory.** `pass` requires *every* scored dimension to clear 3, not the mean, **and** requires `coverage` and `legibility` to have values at all — so `pass` is three-valued, and the card renders the third as "Unverified" rather than as a quiet pass. A PDF whose fonts carry no ToUnicode map scores 5 on coverage and anchorability while being pure mojibake; averaging would call it usable.
 - **A clean byte count is not legibility.** Any future tightening should be tested against text that is *valid characters in the wrong order or the wrong mapping*, not just against mojibake — that's the case a byte-level check cannot see.
 
-The score is advisory. A reading below the bar is flagged "Needs review", never auto-hidden — see red line #7 in the [spec](./docs/loom-spec-v1.md).
+The score is advisory. A reading below the bar is flagged "Needs review", never auto-hidden — see red line #7 in the [model build](./docs/loom-model-build.md) §6.
 
 What happens *next* — what the defect actually is, which repair it needs, and which repairs are safe to run against a reading students have worked in — is [docs/reading-quality.md](./docs/reading-quality.md).
 
@@ -214,7 +293,7 @@ Behind **Edit** on the Readings tab, *Draft from PDF* asks a model to read the r
 
 The description is deliberately **one sentence, and deliberately not a summary**. It orients a student toward the text — what territory it is in, what it is doing there — without handing over what it concludes. Arriving at the argument is the student's work; a description that states the thesis has already done it for them. "Examines how X and Y coordinate without agreement", not "argues that X enables Y because Z".
 
-It proposes; it never stores. The draft lands in the form fields, the instructor corrects it against the PDF and saves, and `metadataProvenance` records which fields were drafted rather than typed. That review step is load-bearing rather than polite: unlike the extraction judge, this produces text students read (title and author on every card, description when published), so red line #6 admits it **only** as a proposal an instructor has accepted — see exception (b) in the [spec](./docs/loom-spec-v1.md) §4/§5. Auto-filling on upload, a bulk "draft all", or anything writing straight to the row would take it back outside the line.
+It proposes; it never stores. The draft lands in the form fields, the instructor corrects it against the PDF and saves, and `metadataProvenance` records which fields were drafted rather than typed. That review step is load-bearing rather than polite: unlike the extraction judge, this produces text students read (title and author on every card, description when published), so red line #6 admits it **only** as a proposal an instructor has accepted — see exception (b) in the [model build](./docs/loom-model-build.md) §6. Auto-filling on upload, a bulk "draft all", or anything writing straight to the row would take it back outside the line.
 
 Like the judge it is optional: with no `OPENROUTER_API_KEY` the button says so and the metadata is typed by hand.
 

@@ -9,6 +9,11 @@ The ordering principle: **fix what is wrong before building what is missing, and
 do not build anything that a pending ruling could throw away.** One ruling (05
 Weave) gates four items; taking it first is worth more than any code below it.
 
+**This file is the product sequence.** What Loom *runs on* — deployment,
+credentials, monitoring, and who is responsible for them — is
+[open-work-operations.md](open-work-operations.md), written after the outage of
+1–2 September 2026.
+
 ---
 
 ## Phase 0 — defects. **DONE 2026-08-09**

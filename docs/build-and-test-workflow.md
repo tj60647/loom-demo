@@ -104,8 +104,20 @@ cannot tell you the picture has quietly fallen behind the build.
 ### 6. CI gates it
 
 - `checks` — eslint + tsc + build. No secrets; runs on every PR including forks.
-- `e2e` — the Playwright journey suite against the Neon `ci` branch, seeded, via
+- `e2e` — the Playwright journey suite against the Neon `ci-suite` branch, seeded, via
   `next dev` (the backdoor needs a non-production build).
+
+> **Three things wear the letters CI, and they are not the same thing.**
+> `ci.yml` is this workflow. `ci-suite` is a **Neon database branch** — one of
+> five, beside `main`, `dev`, `staging` and `preview`. `CI_DATABASE_URL` is the
+> repository secret that points the first at the second.
+>
+> The branch was called `ci` until 2026-09-02 and was renamed because that
+> collision cost real time during the 1 September outage: "ci was archived"
+> reads as *the workflow was disabled* when it meant *the database branch was in
+> Neon's cold storage*. The secret keeps its name — it is named for its
+> consumer, which is correct — and the rename could not break it, because a
+> connection string embeds the endpoint host, never the branch name.
 
 Both are required on `dev` **and** `master`. **Fork PRs can never pass `e2e`** —
 GitHub withholds secrets from fork runs — so mirror the branch into this repo or
@@ -114,7 +126,7 @@ add the contributor as a collaborator. Check the *job* conclusion, not the run's
 ### 7. Merge to `dev`
 
 The alias redeploys automatically. Whoever lands the PR applies any migration to
-the Neon `dev` branch and to `ci`, so the gate stays truthful.
+the Neon `dev` branch and to `ci-suite`, so the gate stays truthful.
 
 ### 8. Soak
 
@@ -199,7 +211,7 @@ URL, and why a magic link *would* (it points back at whatever host issued it).
 | When | Who | Against |
 | --- | --- | --- |
 | Same commit as the schema edit | the author | — (`drizzle-kit generate`) |
-| At PR landing | whoever lands it | Neon `dev`, and `ci` |
+| At PR landing | whoever lands it | Neon `dev`, and `ci-suite` |
 | Before preview QA of that branch | whoever needs it | `preview` (**target**) — refresh or re-cut |
 | At merge to `master` | whoever merges | production `DATABASE_URL` |
 
@@ -276,9 +288,9 @@ repository. Read from the workflows on 2026-09-02:
 
 | job | workflow | secret | what it is |
 | --- | --- | --- | --- |
-| `checks` | ci.yml | `CI_DATABASE_URL` (optional — lint, typecheck and the static checks run without it) | a connection string into the `ci` branch of the Neon project |
+| `checks` | ci.yml | `CI_DATABASE_URL` (optional — lint, typecheck and the static checks run without it) | a connection string into the `ci-suite` branch of the Neon project |
 | `checks` → **production migration drift**, only on the way into `master` | ci.yml | `PROD_DATABASE_URL` | a **read-only** string for the role `ci_migration_reader` on `main`. See below — this is the one place CI touches production |
-| `e2e` | ci.yml | `CI_DATABASE_URL`, `CI_BLOB_READ_WRITE_TOKEN`, `CI_NEXTAUTH_SECRET` | the same `ci` branch, seeded with the demo cohort the suite asserts on; a blob token; any string |
+| `e2e` | ci.yml | `CI_DATABASE_URL`, `CI_BLOB_READ_WRITE_TOKEN`, `CI_NEXTAUTH_SECRET` | the same `ci-suite` branch, seeded with the demo cohort the suite asserts on; a blob token; any string |
 | `provision` / `teardown` | preview-db.yml | `NEON_API_KEY`, `VERCEL_TOKEN` | a personal Neon API key and Vercel token, used to create one Neon branch per PR (`preview/pr-N`, parent `preview`) and point the Vercel preview at it |
 | `database` | heartbeat.yml | none | a public URL; it only asks whether production can answer |
 
@@ -306,7 +318,7 @@ new owner adds their own, `e2e` fails when `CI_DATABASE_URL` stops resolving,
 and the drift check returns to skipping green. `checks` keeps running
 regardless.
 
-To restore full CI under new ownership: a `ci` branch in the new Neon project
+To restore full CI under new ownership: a `ci-suite` branch in the new Neon project
 (`npx drizzle-kit migrate`, then `npm run seed:sources` and `npm run
 seed:demo`) → `CI_DATABASE_URL`; a blob token → `CI_BLOB_READ_WRITE_TOKEN`;
 any string → `CI_NEXTAUTH_SECRET`; the owner's Neon API key and Vercel token →
