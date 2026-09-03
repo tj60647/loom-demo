@@ -11,9 +11,9 @@ The ordering principle: **restore, then merge what is already built, then remove
 the thing that will cause it again.** The last item is not technical and gates
 the value of everything above it.
 
-**The hard date is 2026-09-11**, TJ's exit. Items marked **TJ's call** are forks
-the work cannot pass without an answer, and after that date some of them cannot
-be answered at all.
+Items marked **TJ's call** are forks
+the work cannot pass without an answer, and several can only be answered while
+TJ is still available to answer them.
 
 ---
 
@@ -62,7 +62,7 @@ copies went stale at once. Loom was down about ten hours.
 applications there share a trust boundary: same owner, same stakes, same
 consequences. A shared key across applications that share a trust boundary is a
 defensible design. `loom-db` is the exception on all three counts — a different
-owner after 2026-09-11, real student work since 2026-08-22, and students who
+owner after the handover, real student work since 2026-08-22, and students who
 cannot do the reading when it is down. **Moving it also removes Loom's data
 from the reach of every other key on that server.**
 
@@ -76,7 +76,7 @@ reaching it. No window, no dump and restore, no risk to student data. If the
 credential were the whole problem, this would be the right answer.
 
 It is not enough, for a reason that has nothing to do with credentials. After
-2026-09-11 the database would still sit inside a Neon project **owned and
+the handover the database would still sit inside a Neon project **owned and
 administered by someone who has left the project**, alongside applications Loom
 has nothing to do with, where ordinary maintenance by that owner can still
 affect it. A scoped role fixes the breakage; only moving the database fixes the
@@ -267,7 +267,7 @@ Worth folding into §2: the new Neon project is the natural moment to cut a
 
 ---
 
-## 4. Move off one person's accounts. **TJ's call, and it expires on 2026-09-11**
+## 4. Move off one person's accounts. **TJ's call, and the window is limited**
 
 **The goal, in TJ's words: as much as possible moves out of his personal
 accounts into a collective one that several people can reach.** Naming a
