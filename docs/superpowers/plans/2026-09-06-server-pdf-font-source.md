@@ -584,7 +584,8 @@ Open the preview URL, sign in, and go to
 Re-run the listing from Step 2.
 
 - **PASS:** 19 `w1280` images with **sizes that differ from each other**, in the 40 KB–200 KB range. Task 1 is confirmed on the runtime that broke, and Task 4 may proceed.
-- **FAIL:** 19 images of identical size (~4,330 bytes). The font source is not the cause, or is not reaching the Lambda. **Stop.** Check whether the trace landed — `vercel build` output, or add a temporary route that reports `existsSync(pdfjsStandardFontsUrl() + "FoxitSerif.pfb")` — and do not proceed to Task 4.
+- **FAIL:** **no images at all**, and `pages.image-render-failed` in the runtime logs carrying `page has N text items and rendered blank`. Task 2 now catches the blank before it is stored, so a still-broken render leaves nothing behind rather than 19 white files — a clearer signal than the one this step was first written against. The font source is not the cause, or is not reaching the Lambda. **Stop.** Check whether the trace landed (`vercel build` output, or a temporary route reporting `existsSync(pdfjsStandardFontsUrl() + "FoxitSerif.pfb")`) and do not proceed to Task 4.
+- **Also FAIL, and worse:** 19 images of identical size (~4,330 bytes). That would mean Task 2's guard did not fire either, and both need investigating before anything else.
 
 Confirm the page looks right in the preview's Canvas view as well as measuring the bytes: a screenshot is what TJ reviews, and a green byte count is not a picture.
 
