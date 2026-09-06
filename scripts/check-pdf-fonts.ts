@@ -92,19 +92,28 @@ async function main() {
   console.warn = (...args: unknown[]) => {
     warnings.push(args.map(String).join(" "))
   }
-  const loadingTask = pdfjsLib.getDocument({
-    data: new Uint8Array(minimalPdfWithNonEmbeddedFont()),
-    useWorkerFetch: false,
-    isEvalSupported: false,
-    wasmUrl: pdfjsWasmUrl(),
-    useWasm: false,
-    ...renderFontOptions(),
-  })
-  const doc = await loadingTask.promise
-  const page = await doc.getPage(1)
-  await page.getOperatorList()
-  console.warn = originalWarn
-  await destroyPdf(doc, loadingTask)
+  // Restored in a `finally`, and the whole walk is inside the `try`, because
+  // every step of it can throw: getDocument itself does so synchronously on a
+  // malformed standardFontDataUrl ("Invalid factory url … must include
+  // trailing slash"), which is one of the states this check exists to catch.
+  // An override left in place would then swallow the rest of the run's
+  // warnings — including the one being tested for.
+  try {
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(minimalPdfWithNonEmbeddedFont()),
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      wasmUrl: pdfjsWasmUrl(),
+      useWasm: false,
+      ...renderFontOptions(),
+    })
+    const doc = await loadingTask.promise
+    const page = await doc.getPage(1)
+    await page.getOperatorList()
+    await destroyPdf(doc, loadingTask)
+  } finally {
+    console.warn = originalWarn
+  }
 
   const fontWarning = warnings.find((w) => /font data|standardFontDataUrl/i.test(w))
   check("pdf.js raises no font-data warning", !fontWarning, fontWarning ?? "")
