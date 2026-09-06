@@ -31,7 +31,7 @@ import { createCanvas, loadImage } from "@napi-rs/canvas"
 import { asc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { sourcePages, sources } from "@/db/schema"
-import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
+import { destroyPdf, loadPdfjs, pdfjsWasmUrl, renderFontOptions } from "@/lib/pdfjs"
 import { spreadLayout, pageX } from "@/lib/spreadLayout"
 import { readingStorage } from "@/lib/storage"
 import { logWarn } from "@/lib/log"
@@ -147,9 +147,13 @@ export async function renderSourcePageImages(
     data: new Uint8Array(data),
     useWorkerFetch: false,
     isEvalSupported: false,
-    useSystemFonts: true,
     wasmUrl: pdfjsWasmUrl(),
     useWasm: false,
+    // The fonts come from the package, never from the host: see
+    // renderFontOptions. Without this a PDF that embeds no font renders as a
+    // white page on a machine with no font files and perfectly on one that has
+    // them — which is how 19 blank pages reached blob on 2026-09-06.
+    ...renderFontOptions(),
   })
   const doc = await loadingTask.promise
 

@@ -1,5 +1,5 @@
 import { createCanvas } from "@napi-rs/canvas"
-import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
+import { destroyPdf, loadPdfjs, pdfjsWasmUrl, renderFontOptions } from "@/lib/pdfjs"
 
 /**
  * Covers render to a fixed WIDTH rather than a fixed scale.
@@ -51,9 +51,12 @@ export async function renderPdfCoverImage(data: Buffer): Promise<Buffer> {
     data: new Uint8Array(data),
     useWorkerFetch: false,
     isEvalSupported: false,
-    useSystemFonts: true,
     wasmUrl: pdfjsWasmUrl(),
     useWasm: false,
+    // Same font wiring as the page renderer, for the same reason: a cover
+    // drawn from a PDF that embeds no font must not depend on the machine
+    // drawing it. See renderFontOptions.
+    ...renderFontOptions(),
   })
   const doc = await loadingTask.promise
 

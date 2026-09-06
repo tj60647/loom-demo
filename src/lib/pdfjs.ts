@@ -80,6 +80,54 @@ export function pdfjsWasmUrl() {
 }
 
 /**
+ * Where pdf.js finds a substitute face for a font a PDF does NOT embed.
+ *
+ * A PLAIN PATH, not a file:// URL — deliberately unlike `pdfjsWasmUrl` above,
+ * and the difference is load-bearing. pdf.js fetches this one, and Node's
+ * fetch cannot open file://. Measured 2026-09-06, all four forms, against
+ * c22aff33-…pdf: no parameter gives "Ensure that the `standardFontDataUrl`
+ * API parameter is provided"; the file:// form gives "Unable to load font
+ * data at: file:///…"; a Windows path with backslashes THROWS "Invalid
+ * factory url … must include trailing slash"; forward slashes with a trailing
+ * slash loads. The first two fail the way the outage did — one warning, then a
+ * white page on a host with no fonts, and a page that looks perfect on a
+ * laptop that owns the font.
+ */
+export function pdfjsStandardFontsUrl() {
+  return nodeModulePath("pdfjs-dist", "standard_fonts/").replace(/\\/g, "/")
+}
+
+/**
+ * The font half of the options for the two paths that RENDER a page to a
+ * canvas — `renderSourcePageImages` and `renderPdfCoverImage`.
+ *
+ * Not the whole options object: the note at the top of this file is right that
+ * each caller owns its own, and `extractPdfPageText`'s in particular are the
+ * substrate every stored highlight offset was measured against. This is only
+ * the font wiring, which is the part that has to be got right in one place —
+ * on 2026-09-06 a reading rendered 19 blank pages in production because it was
+ * got wrong in two.
+ *
+ * `useSystemFonts: false` is a choice, and NOT the trade it looks like. The
+ * obvious reading — host font where it exists, substitute where it doesn't —
+ * assumes the host's font is the better one. Measured 2026-09-06, page 1 of
+ * c22aff33-…pdf at 1280px, rendered both ways: it is not. The host path gives
+ * a sans-serif face with broken letter spacing ("T he A tlantic M onthly");
+ * the shipped substitute gives correct Times-like serif text. 131,020 pixels
+ * differ, 88.6% of everything inked on the page, and the difference is the
+ * substitute being right.
+ *
+ * The reason is name matching. This PDF names its font `TimesNewRoman`, one
+ * word, which @napi-rs/canvas does not resolve to "Times New Roman". It falls
+ * back to a default face with different advance widths, and pdf.js sets every
+ * glyph on the PDF's own metrics — Times' positions, another font's shapes. So
+ * `true` would not buy fidelity; it would buy whatever the host guesses.
+ */
+export function renderFontOptions() {
+  return { useSystemFonts: false as const, standardFontDataUrl: pdfjsStandardFontsUrl() }
+}
+
+/**
  * Release a document. pdf.js legacy builds disagree on where `destroy` lives —
  * on the document in some versions, only on the loading task in others (the
  * installed build has it on neither in the Node path), so try both and tolerate

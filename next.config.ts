@@ -49,6 +49,13 @@ const nextConfig: NextConfig = {
       "./node_modules/pdfjs-dist/legacy/build/pdf.mjs",
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
       "./node_modules/pdfjs-dist/wasm/**",
+      // The substitute faces for a font a PDF does not embed (804KB, 16
+      // files). Same hazard as the two lines above it: the path is resolved at
+      // runtime, so tracing cannot see it, and without this the
+      // standardFontDataUrl parameter points at a directory that is not in the
+      // deployment. A reading rendered 19 blank pages on 2026-09-06 for want
+      // of it.
+      "./node_modules/pdfjs-dist/standard_fonts/**",
     ],
   },
 };
