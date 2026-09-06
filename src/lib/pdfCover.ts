@@ -1,4 +1,5 @@
 import { createCanvas } from "@napi-rs/canvas"
+import { isCanvasVisuallyBlank } from "@/lib/canvasInk"
 import { destroyPdf, loadPdfjs, pdfjsWasmUrl, renderFontOptions } from "@/lib/pdfjs"
 
 /**
@@ -17,28 +18,6 @@ import { destroyPdf, loadPdfjs, pdfjsWasmUrl, renderFontOptions } from "@/lib/pd
 const COVER_TARGET_WIDTH = 320
 /** How far to look for a page with ink on it before giving up on a cover. */
 const COVER_PAGE_ATTEMPTS = 4
-
-function isCanvasVisuallyBlank(context: ReturnType<ReturnType<typeof createCanvas>["getContext"]>, width: number, height: number) {
-  const { data } = context.getImageData(0, 0, width, height)
-  let meaningfulPixels = 0
-  const sampleStride = 16
-
-  for (let index = 0; index < data.length; index += 4 * sampleStride) {
-    const red = data[index]
-    const green = data[index + 1]
-    const blue = data[index + 2]
-    const alpha = data[index + 3]
-
-    if (alpha > 0 && (red < 245 || green < 245 || blue < 245)) {
-      meaningfulPixels += 1
-      if (meaningfulPixels >= 24) {
-        return false
-      }
-    }
-  }
-
-  return true
-}
 
 export function getSourceCoverKey(sourceId: string) {
   return `covers/${sourceId}.png`

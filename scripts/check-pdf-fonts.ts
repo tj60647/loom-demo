@@ -9,9 +9,9 @@
  * and machine-shaped: with the parameter missing (or given in the wrong form)
  * pdf.js warns once and renders a white page, and on any developer machine
  * that owns a matching font the page looks fine anyway. Measured 2026-09-06
- * against c22aff33-…pdf ("As We May Think"), whose 19 stored page images were
- * 4,330 bytes each of pure white — 1280x1657, one distinct colour, not one
- * non-white pixel.
+ * against c22aff33-…pdf ("As We May Think"), whose 19 stored page images came
+ * out identical at 4,330 B each and pure white — 1280x1657, one distinct
+ * colour, not one non-white pixel.
  *
  * The fixture is built here rather than checked in: a four-object PDF that
  * names Times-Roman and embeds nothing is the whole test case, and generating
