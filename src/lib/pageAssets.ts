@@ -34,7 +34,7 @@ export const PAGE_RENDER_VERSION = 2
  * The validator for one stored page asset, in one place so the page route and
  * the sheet route cannot drift apart.
  *
- * Two things can change these bytes and both belong in the key. A repair mints
+ * Two things can change a stored image and both belong in the key. A repair mints
  * a new `storageKey`, which is what the original design covered. A change to
  * the renderer does not touch the key at all, which is what
  * PAGE_RENDER_VERSION is for.

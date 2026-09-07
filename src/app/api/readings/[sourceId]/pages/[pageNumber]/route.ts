@@ -10,7 +10,7 @@ import { logError } from "@/lib/log"
  *
  * The happy path is the covers model: a small cached WebP streamed from blob
  * behind an auth check that never touches the PDF. The ETag comes from
- * pageAssetETag, which covers BOTH ways these bytes change: a repair mints a
+ * pageAssetETag, which covers BOTH ways this image changes: a repair mints a
  * new storageKey, and a change to the renderer bumps PAGE_RENDER_VERSION. It
  * used to be the storage key alone, on the assumption that an untouched
  * reading's images never change — which stopped being true on 2026-09-06,

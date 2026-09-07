@@ -6,7 +6,7 @@
  *
  * Pure, no fixtures and no network, so it runs inside `npm run check`. It
  * earns that place because the failure it guards is invisible from the server
- * side: the route is correct, the stored bytes are correct, and the reader is
+ * side: the route is correct, the stored image is correct, and the reader is
  * still looking at last week's image because we told their browser nothing had
  * changed.
  *
