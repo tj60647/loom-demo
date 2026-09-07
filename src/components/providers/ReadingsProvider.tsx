@@ -157,6 +157,13 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
     // there looking like the removal had failed.
     const forced = nonce !== lastNonceRef.current
     lastNonceRef.current = nonce
+    // Someone else is already reading. React runs child effects before parent
+    // ones, so on a session change the Shelf's arrival call gets here first and
+    // starts the read; without this the floor would pass for both of them and
+    // the same list would be fetched twice on every return to the tab. Caught
+    // by the read-count assertion in tests/shelf-refetch.spec.ts, which is what
+    // that assertion is for.
+    if (!forced && inFlightRef.current) return
     if (!forced && hasDataRef.current && Date.now() - lastReadRef.current < REREAD_AFTER_MS) return
 
     let live = true
