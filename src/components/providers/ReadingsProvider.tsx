@@ -97,8 +97,11 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
-  /** When the list was last read, so the re-read below can rate-limit itself. */
+  /** When the list was last read SUCCESSFULLY — the staleness floor below
+   *  measures from this, so a failed read does not count as a fresh one. */
   const lastReadRef = useRef(0)
+  /** A re-read is in flight; stops a burst of focus events overlapping. */
+  const inFlightRef = useRef(false)
 
   useEffect(() => {
     // Deferred rather than set synchronously, the way LoomProvider does it: a
@@ -155,12 +158,15 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
    *    to a loading state every time you alt-tab. `refresh()` remains the loud
    *    path, for a change the reader just made themselves and should see
    *    acknowledged.
-   *  - RATE-LIMITED. `focus` fires on every return from a dialog or another
-   *    window; without the floor, a flurry of alt-tabbing would be a flurry of
-   *    queries.
+   *  - RATE-LIMITED, by two separate guards. `focus` fires on every return
+   *    from a dialog or another window, so a floor keeps a flurry of alt-
+   *    tabbing from being a flurry of queries, and an in-flight flag keeps a
+   *    burst from starting overlapping fetches. The floor measures from the
+   *    last SUCCESSFUL read, so a failure does not buy itself a quiet window.
    *  - SILENT ON FAILURE. A background re-read that fails leaves the good list
    *    in place rather than replacing a working shelf with an error the reader
-   *    did nothing to cause.
+   *    did nothing to cause — and leaves the timestamp alone, so the next
+   *    return to the tab tries again.
    *
    * Both events, because they answer different questions: `visibilitychange`
    * catches a return to a hidden tab, `focus` catches a window that regained
@@ -171,21 +177,37 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
     let live = true
     const reread = () => {
       if (document.visibilityState === "hidden") return
+      // Two different guards, deliberately not one. `inFlight` stops a burst of
+      // focus events starting overlapping fetches; `lastReadRef` is the last
+      // SUCCESSFUL read and is what the staleness floor measures. Marking an
+      // attempt as if it were a success would lock a failed re-read out for the
+      // whole window — the reader comes back to a stale shelf and coming back
+      // again does nothing.
+      if (inFlightRef.current) return
       if (Date.now() - lastReadRef.current < REREAD_AFTER_MS) return
-      lastReadRef.current = Date.now()
+      inFlightRef.current = true
       getSources()
         .then((rows) => {
+          lastReadRef.current = Date.now()
           if (live) {
             setReadings(rows as ReadingMeta[])
             setError(null)
           }
         })
         .catch(() => {
-          // Deliberately not surfaced: see SILENT ON FAILURE above.
+          // Deliberately not surfaced: see SILENT ON FAILURE above. The
+          // timestamp is left alone too, so the next return to the tab retries.
+        })
+        .finally(() => {
+          inFlightRef.current = false
         })
       getActiveCourse()
         .then((c) => { if (live) setCourse(c) })
-        .catch(() => { /* the header label is decoration; see above */ })
+        // Unlike the first read, this does NOT blank the label on failure. The
+        // effect above sets it to null because there is nothing to keep; here
+        // there is a good label already on screen, and a background lookup that
+        // failed is not a reason to take it away.
+        .catch(() => { /* keep the label we have */ })
     }
     document.addEventListener("visibilitychange", reread)
     window.addEventListener("focus", reread)
