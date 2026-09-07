@@ -31,7 +31,8 @@ import { createCanvas, loadImage } from "@napi-rs/canvas"
 import { asc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { sourcePages, sources } from "@/db/schema"
-import { destroyPdf, loadPdfjs, pdfjsWasmUrl } from "@/lib/pdfjs"
+import { isCanvasVisuallyBlank } from "@/lib/canvasInk"
+import { destroyPdf, loadPdfjs, pdfjsWasmUrl, renderFontOptions } from "@/lib/pdfjs"
 import { spreadLayout, pageX } from "@/lib/spreadLayout"
 import { readingStorage } from "@/lib/storage"
 import { logWarn } from "@/lib/log"
@@ -147,9 +148,13 @@ export async function renderSourcePageImages(
     data: new Uint8Array(data),
     useWorkerFetch: false,
     isEvalSupported: false,
-    useSystemFonts: true,
     wasmUrl: pdfjsWasmUrl(),
     useWasm: false,
+    // The fonts come from the package, never from the host: see
+    // renderFontOptions. Without this a PDF that embeds no font renders as a
+    // white page on a machine with no font files and perfectly on one that has
+    // them — which is how 19 blank pages reached blob on 2026-09-06.
+    ...renderFontOptions(),
   })
   const doc = await loadingTask.promise
 
@@ -174,6 +179,22 @@ export async function renderSourcePageImages(
         context.fillStyle = "#ffffff"
         context.fillRect(0, 0, canvas.width, canvas.height)
         await page.render({ canvasContext: context, viewport }).promise
+
+        // A render that draws nothing does not throw — it leaves the white
+        // fill above exactly as it was, and `rendered += 1` below would call
+        // that a success. That is how 19 blank images reached blob on
+        // 2026-09-06 (measured: 1280x1657, one distinct colour, zero non-white
+        // pixels) with nothing in any log to say so.
+        //
+        // Only a page that HAS text and drew none is a failure: scanned books
+        // are full of genuinely empty versos, and failing those would strip
+        // their cached images and make this warning noise on every scan.
+        if (isCanvasVisuallyBlank(context, canvas.width, canvas.height)) {
+          const { items } = await page.getTextContent()
+          if (items.length > 0) {
+            throw new Error(`page has ${items.length} text items and rendered blank`)
+          }
+        }
 
         const smallCanvas = createCanvas(
           small,
