@@ -2,6 +2,13 @@
 
 **Weaving Knowledge Through Shared Practice**
 
+[![production heartbeat](https://github.com/tj60647/loom-demo/actions/workflows/heartbeat.yml/badge.svg)](https://github.com/tj60647/loom-demo/actions/workflows/heartbeat.yml)
+
+Green means production can reach its database. **Red means students cannot sign
+in** — and the site will still load, which is why this light exists at all. What
+to do is in [build-and-test-workflow.md](docs/build-and-test-workflow.md); the
+check itself is [heartbeat.yml](.github/workflows/heartbeat.yml).
+
 Loom is a tool for emergent sense-making and collaborative synthesis. It provides a space where reading, capturing, and connecting ideas form a living knowledge graph—built entirely by you and your community, without auto-generation.
 
 ## What is Loom?
