@@ -17,6 +17,7 @@
  */
 import { readFileSync } from "fs"
 import path from "path"
+import { hashText } from "../src/lib/hash"
 import { PAGE_RENDER_VERSION, pageAssetETag } from "../src/lib/pageAssets"
 
 let failures = 0
@@ -39,11 +40,20 @@ console.log("\nthe renderer version is part of the validator")
   check("a different storage key gives a different ETag", a !== b)
 
   // The property that matters, stated as the bug that motivated it: with the
-  // key held constant, the version alone must move the tag. Recomputed rather
-  // than hard-coded, so this keeps testing the real function after a bump.
+  // key held constant, the version alone must move the tag.
+  //
+  // Both sides are HASHED. An earlier draft compared the real ETag against an
+  // unhashed literal, which differ whatever the function does — so the check
+  // passed with the version deleted from the input, which is precisely the
+  // regression it exists to catch. Verified by deleting it: this assertion now
+  // fails, and did not before.
   const withVersion = pageAssetETag("key-a", "1", 1280)
-  const withoutVersion = `W/"${"key-a:1:1280"}"`
-  check("the version is in the hashed input", withVersion !== withoutVersion)
+  const unversioned = `W/"${hashText("key-a:1:1280")}"`
+  check(
+    "the version is in the hashed input",
+    withVersion !== unversioned,
+    "pageAssetETag produced the tag it would produce with no version at all"
+  )
   check(
     "PAGE_RENDER_VERSION is a whole number above zero",
     Number.isInteger(PAGE_RENDER_VERSION) && PAGE_RENDER_VERSION > 0,
@@ -58,10 +68,15 @@ for (const route of ROUTES) {
   check(`${name} calls pageAssetETag`, /pageAssetETag\s*\(/.test(src))
   // A route that builds its own weak validator is a route that will not notice
   // the next version bump — which is exactly how the two got to be separate.
+  //
+  // Tested by the import rather than by the shape of the template. Hand-hashing
+  // needs hashText, and an import statement cannot appear in prose — whereas
+  // matching on `W/"${` fails the moment a comment quotes the old code, which
+  // the comment in the page route very nearly does.
   check(
-    `${name} does not hand-build a validator`,
-    !/W\/\\?"\$\{/.test(src),
-    "found a `W/\"${...}\"` template — call pageAssetETag instead"
+    `${name} does not hash its own validator`,
+    !/from ["']@\/lib\/hash["']/.test(src),
+    "imports hashText — call pageAssetETag instead of building a validator here"
   )
 }
 
