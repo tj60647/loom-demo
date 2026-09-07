@@ -221,11 +221,15 @@ export default memo(function PageSlot({
               }}
             >
               {showImg && (
-                // The pre-rendered page. Absolute under everything: the
-                // native raster blits over it, and until that lands (or when
-                // there is no raster at all) this IS the page. Sized by the
-                // box, not the image — the manifest's aspect and the render's
-                // agree, both being the page's own.
+                // The pre-rendered page, at the BOTTOM of the slot: the native
+                // raster paints over it (.pdf-raster carries z-index 1) and
+                // the text layer over both. It used to be the other way round
+                // — an absolute sibling outpaints an in-flow one — which is
+                // what let a blank image hide a good render on 2026-09-06.
+                // Until the raster lands, or where there is no raster at all,
+                // this IS the page. Sized by the box, not the image — the
+                // manifest's aspect and the render's agree, both being the
+                // page's own.
                 <img
                   className="pdf-slot-img"
                   src={`${pageImageBase}/${pageNumber}?w=${srcW}`}
@@ -255,7 +259,10 @@ export default memo(function PageSlot({
                   the whole text layer (selection, highlights, heat) painted
                   one page-height too low and clipped to invisibility. */}
               {showText && (
-                <div className="pdf-slot-text" style={{ position: "absolute", inset: 0 }}>
+                // zIndex 2 keeps the text layer above a raster that now carries
+                // z-index 1 — selection, highlights and heat must stay on top
+                // of both under-layers.
+                <div className="pdf-slot-text" style={{ position: "absolute", inset: 0, zIndex: 2 }}>
                   <Page
                     pageNumber={pageNumber}
                     width={baseWidth}
