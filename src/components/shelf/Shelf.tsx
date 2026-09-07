@@ -8,7 +8,7 @@
 // scored: no completion, no checkmarks, no "not started" — red line #7 holds
 // only if the shelf reports what the student did and never grades it.
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { useLoom } from "@/components/providers/LoomProvider"
@@ -35,7 +35,16 @@ export default function Shelf({ isPreviewDeployment = false }: { isPreviewDeploy
   // shows the STUDENT's library — cards, tallies, cloth rows all stay — but
   // nothing that would add to it or take from it is drawn.
   const { state, isLoading, readOnly } = useLoom()
-  const { readings: sources, isLoading: loadingShelf, error, refresh } = useReadings()
+  const { readings: sources, isLoading: loadingShelf, error, refresh, revalidateIfStale } = useReadings()
+  // Arriving at the Library re-reads the syllabus if it has gone stale. The
+  // provider fetches once and lives above the router, so an in-app navigation
+  // — admin screens back to here — otherwise showed the list as it was when
+  // the tab was opened, including readings since removed from the course
+  // (reported 2026-09-07). The floor and the quiet are in the provider; this
+  // is only the signal that someone has arrived.
+  useEffect(() => {
+    revalidateIfStale()
+  }, [revalidateIfStale])
   const tallies = useMemo(() => tallyByReading(state), [state])
   const { confirm, notify } = useDialog()
   const [removing, setRemoving] = useState<string | null>(null)

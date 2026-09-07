@@ -7,7 +7,7 @@
 // (2010)". All of them want the same small list, and none of them should
 // re-fetch it.
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { getSources, getActiveCourse } from "@/lib/reads"
 
@@ -78,13 +78,20 @@ type ReadingsContextValue = {
   titleOf: (sourceId: string | null | undefined) => string
   /** Re-read the shelf, e.g. after the student adds a reading of their own. */
   refresh: () => void
+  /**
+   * Re-read the syllabus IF it is old enough to be worth re-reading. Quiet:
+   * unlike `refresh` it never shows a loading state, so a reader arriving at
+   * the Library does not see the shelf blink. Call it on arrival; the floor
+   * below decides whether anything happens.
+   */
+  revalidateIfStale: () => void
 }
 
 /**
- * How stale the syllabus may be before a tab returning to the front re-reads
- * it. Long enough that alt-tabbing between two windows costs one query rather
- * than one per switch; short enough that a reader who steps away and comes
- * back is not looking at a syllabus from before the change.
+ * How stale the syllabus may be before arriving at the Library re-reads it.
+ * Long enough that stepping in and out of a reading costs no queries; short
+ * enough that someone coming back from the admin screens is not looking at a
+ * syllabus from before their own edit.
  */
 const REREAD_AFTER_MS = 30_000
 
@@ -97,11 +104,22 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
-  /** When the list was last read SUCCESSFULLY — the staleness floor below
-   *  measures from this, so a failed read does not count as a fresh one. */
+  /**
+   * When the list was last read SUCCESSFULLY — the staleness floor measures
+   * from this, so a failed read does not buy itself a quiet window.
+   *
+   * 0 means no successful read yet, and `revalidateIfStale` treats it as
+   * "nothing to revalidate" rather than as infinitely stale. That matters
+   * because React runs child effects before parent ones: the Shelf's arrival
+   * call fires BEFORE this provider's own first read, and without the sentinel
+   * every cold load would fetch the list twice.
+   */
   const lastReadRef = useRef(0)
-  /** A re-read is in flight; stops a burst of focus events overlapping. */
+  /** A read is in flight; stops two callers starting overlapping fetches. */
   const inFlightRef = useRef(false)
+  /** Something has been shown at least once, so a re-read need not announce
+   *  itself as loading. */
+  const hasDataRef = useRef(false)
 
   useEffect(() => {
     // Deferred rather than set synchronously, the way LoomProvider does it: a
@@ -111,14 +129,24 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
         setReadings([])
         setCourse(null)
         setIsLoading(false)
+        hasDataRef.current = false
       }, 0)
       return () => window.clearTimeout(clear)
     }
     let live = true
-    const start = window.setTimeout(() => setIsLoading(true), 0)
+    // Announce loading only when there is nothing on screen yet. This effect
+    // re-runs on every session change, and next-auth refetches the session
+    // whenever the tab comes back to the front (SessionProvider's own
+    // visibilitychange listener, refetchOnWindowFocus defaults to true), so
+    // without this the shelf blinked back to a loading state on every return.
+    const start = window.setTimeout(() => {
+      if (!hasDataRef.current) setIsLoading(true)
+    }, 0)
+    inFlightRef.current = true
     getSources()
       .then((rows) => {
         lastReadRef.current = Date.now()
+        hasDataRef.current = true
         if (live) {
           setReadings(rows as ReadingMeta[])
           setError(null)
@@ -128,6 +156,7 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
         if (live) setError(e instanceof Error ? e.message : "Failed to load your readings")
       })
       .finally(() => {
+        inFlightRef.current = false
         if (live) setIsLoading(false)
       })
     // The course label is decoration on a header that must not fail because of
@@ -142,80 +171,56 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
   }, [session, nonce])
 
   /**
-   * Re-read the syllabus when the tab comes back to the front.
+   * Re-read on arrival, if the list has gone stale.
    *
-   * The effect above runs once per page load, so a change to the course —
-   * an admin removing a reading, or adding one — never reached a tab that was
-   * already open. `revalidatePath("/")` cannot bridge it either: `/` renders
-   * this client component, so there is no server-rendered list to invalidate,
-   * and the call is a no-op for the shelf. Until this, what a reader saw was
-   * the syllabus as it stood when they opened the tab (reported 2026-09-07,
-   * a reading removed from a course that went on being listed).
+   * The effect above runs once per page load and on each session change. That
+   * covers returning to the tab — next-auth refetches the session on
+   * visibilitychange, which changes the session object and re-runs it — but it
+   * does NOT cover arriving at the Library by an ordinary in-app navigation,
+   * because nothing about the session changes and the provider never unmounts.
    *
-   * Three properties, each deliberate:
+   * That is the case this exists for, and the one that was reported on
+   * 2026-09-07: an admin removed a reading from a course, moved from the admin
+   * screens to the Library in the same tab, and the removed reading was still
+   * listed. `revalidatePath("/")` cannot help — `/` renders a client
+   * component, so there is no server-rendered list to invalidate.
    *
-   *  - QUIET. It never touches `isLoading`, so the shelf does not blink back
-   *    to a loading state every time you alt-tab. `refresh()` remains the loud
-   *    path, for a change the reader just made themselves and should see
-   *    acknowledged.
-   *  - RATE-LIMITED, by two separate guards. `focus` fires on every return
-   *    from a dialog or another window, so a floor keeps a flurry of alt-
-   *    tabbing from being a flurry of queries, and an in-flight flag keeps a
-   *    burst from starting overlapping fetches. The floor measures from the
-   *    last SUCCESSFUL read, so a failure does not buy itself a quiet window.
-   *  - SILENT ON FAILURE. A background re-read that fails leaves the good list
-   *    in place rather than replacing a working shelf with an error the reader
-   *    did nothing to cause — and leaves the timestamp alone, so the next
-   *    return to the tab tries again.
-   *
-   * Both events, because they answer different questions: `visibilitychange`
-   * catches a return to a hidden tab, `focus` catches a window that regained
-   * focus without ever being hidden.
+   * Quiet, rate-limited and silent on failure: it must not blink the shelf,
+   * stepping in and out of a reading must not be a query each time, and a
+   * background read that fails must leave the good list alone rather than
+   * replace a working shelf with an error the reader did not cause.
    */
-  useEffect(() => {
+  const revalidateIfStale = useCallback(() => {
     if (!session) return
-    let live = true
-    const reread = () => {
-      if (document.visibilityState === "hidden") return
-      // Two different guards, deliberately not one. `inFlight` stops a burst of
-      // focus events starting overlapping fetches; `lastReadRef` is the last
-      // SUCCESSFUL read and is what the staleness floor measures. Marking an
-      // attempt as if it were a success would lock a failed re-read out for the
-      // whole window — the reader comes back to a stale shelf and coming back
-      // again does nothing.
-      if (inFlightRef.current) return
-      if (Date.now() - lastReadRef.current < REREAD_AFTER_MS) return
-      inFlightRef.current = true
-      getSources()
-        .then((rows) => {
-          lastReadRef.current = Date.now()
-          if (live) {
-            setReadings(rows as ReadingMeta[])
-            setError(null)
-          }
-        })
-        .catch(() => {
-          // Deliberately not surfaced: see SILENT ON FAILURE above. The
-          // timestamp is left alone too, so the next return to the tab retries.
-        })
-        .finally(() => {
-          inFlightRef.current = false
-        })
-      getActiveCourse()
-        .then((c) => { if (live) setCourse(c) })
-        // Unlike the first read, this does NOT blank the label on failure. The
-        // effect above sets it to null because there is nothing to keep; here
-        // there is a good label already on screen, and a background lookup that
-        // failed is not a reason to take it away.
-        .catch(() => { /* keep the label we have */ })
-    }
-    document.addEventListener("visibilitychange", reread)
-    window.addEventListener("focus", reread)
-    return () => {
-      live = false
-      document.removeEventListener("visibilitychange", reread)
-      window.removeEventListener("focus", reread)
-    }
+    if (inFlightRef.current) return
+    // No successful read yet: the provider's own first read is in flight or
+    // about to be, and there is nothing here to revalidate. The cost is that a
+    // first read which FAILED is not retried on arrival — the reader sees the
+    // error and reloads, as they did before this existed.
+    if (lastReadRef.current === 0) return
+    if (Date.now() - lastReadRef.current < REREAD_AFTER_MS) return
+    inFlightRef.current = true
+    getSources()
+      .then((rows) => {
+        lastReadRef.current = Date.now()
+        hasDataRef.current = true
+        setReadings(rows as ReadingMeta[])
+        setError(null)
+      })
+      .catch(() => {
+        // Left unsurfaced, and the timestamp left alone so the next arrival
+        // tries again.
+      })
+      .finally(() => {
+        inFlightRef.current = false
+      })
+    getActiveCourse()
+      .then((c) => setCourse(c))
+      // Unlike the first read, this does NOT blank the label on failure. There
+      // the label is absent and there is nothing to keep; here a good one is
+      // already on screen, and a failed background lookup is not a reason to
+      // take it away.
+      .catch(() => { /* keep the label we have */ })
   }, [session])
 
   const value = useMemo<ReadingsContextValue>(() => {
@@ -228,8 +233,9 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
       error,
       titleOf: (sourceId) => (sourceId && byId.get(sourceId)?.title) || "another reading",
       refresh: () => setNonce((n) => n + 1),
+      revalidateIfStale,
     }
-  }, [readings, course, isLoading, error])
+  }, [readings, course, isLoading, error, revalidateIfStale])
 
   return <ReadingsContext.Provider value={value}>{children}</ReadingsContext.Provider>
 }
