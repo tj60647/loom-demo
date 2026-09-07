@@ -66,6 +66,11 @@ test('the shelf reads the syllabus once on a cold load', async ({ page }) => {
 });
 
 test('returning to the tab updates the shelf without blanking it', async ({ page }) => {
+  // The staleness floor applies to the session-driven read too, so the clock
+  // has to move past it. Waiting it out for real would be 30 seconds taken
+  // from every other PR: the e2e job holds a global lock.
+  await page.clock.install();
+
   let served = 0;
   await page.route('**/api/auth/session', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(SESSION) })
@@ -86,9 +91,10 @@ test('returning to the tab updates the shelf without blanking it', async ({ page
   await page.goto('/');
   await expect(page.getByText(DROPPED)).toBeVisible({ timeout: 15000 });
 
-  // A return to the tab. visibilityState stays "visible" throughout, which is
-  // what next-auth's own handler requires — it listens for the event, not for
-  // a change of state.
+  // Past the floor, then a return to the tab. visibilityState stays "visible"
+  // throughout, which is what next-auth's own handler requires — it listens
+  // for the event, not for a change of state.
+  await page.clock.fastForward('00:31');
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
 
   // Mid-read, the old list is still standing. Before this change the provider
@@ -98,4 +104,9 @@ test('returning to the tab updates the shelf without blanking it', async ({ page
 
   await expect(page.getByText(DROPPED)).toHaveCount(0, { timeout: 15000 });
   await expect(page.getByText(KEPT)).toBeVisible();
+
+  // Exactly one re-read. This is the assertion that caught the duplicate
+  // listener an earlier draft added: without it, a second path re-reading the
+  // same list on the same event would pass unnoticed.
+  expect(served).toBe(2);
 });

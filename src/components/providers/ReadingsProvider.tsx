@@ -120,6 +120,9 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
   /** Something has been shown at least once, so a re-read need not announce
    *  itself as loading. */
   const hasDataRef = useRef(false)
+  /** The last `nonce` this effect acted on, so a deliberate `refresh()` can be
+   *  told apart from the session object merely being replaced. */
+  const lastNonceRef = useRef(0)
 
   useEffect(() => {
     // Deferred rather than set synchronously, the way LoomProvider does it: a
@@ -129,16 +132,36 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
         setReadings([])
         setCourse(null)
         setIsLoading(false)
-        hasDataRef.current = false
       }, 0)
+      // The refs go back to their starting state with the data. They describe
+      // a list that no longer exists, and carrying them across a sign-out
+      // would tell the NEXT person's first read that the shelf is fresh.
+      hasDataRef.current = false
+      lastReadRef.current = 0
+      inFlightRef.current = false
       return () => window.clearTimeout(clear)
     }
+    // This effect re-runs on every session change, and next-auth refetches the
+    // session whenever the tab comes back to the front — SessionProvider's own
+    // visibilitychange listener, `refetchOnWindowFocus` defaulting to true —
+    // handing back a new object each time whether or not anything changed. So
+    // "the session changed" is not by itself a reason to re-read the syllabus,
+    // and without this floor every return to the tab spent a query.
+    //
+    // Safe against a genuine change of person because signing out clears the
+    // refs above: a new sign-in always has hasData false and reads.
+    //
+    // `refresh()` is exempt, and must be. It is the loud path a reader takes
+    // after doing something themselves — taking one of their own readings off
+    // the shelf — and a floor that swallowed it would leave the card sitting
+    // there looking like the removal had failed.
+    const forced = nonce !== lastNonceRef.current
+    lastNonceRef.current = nonce
+    if (!forced && hasDataRef.current && Date.now() - lastReadRef.current < REREAD_AFTER_MS) return
+
     let live = true
-    // Announce loading only when there is nothing on screen yet. This effect
-    // re-runs on every session change, and next-auth refetches the session
-    // whenever the tab comes back to the front (SessionProvider's own
-    // visibilitychange listener, refetchOnWindowFocus defaults to true), so
-    // without this the shelf blinked back to a loading state on every return.
+    // Announce loading only when there is nothing on screen yet, so a re-read
+    // does not blink the shelf back to its loading state.
     const start = window.setTimeout(() => {
       if (!hasDataRef.current) setIsLoading(true)
     }, 0)
