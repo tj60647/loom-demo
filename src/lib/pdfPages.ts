@@ -138,6 +138,13 @@ export type PageImageRenderResult = {
  * the JS fallback codecs; the WASM binaries do not load from file:// here).
  * Per-page failures warn and continue: one blank or hostile page must not
  * cost the other hundred their images.
+ *
+ * IF YOU CHANGE WHAT THIS DRAWS, bump PAGE_RENDER_VERSION in
+ * src/lib/pageAssets.ts. The keys below are overwritten in place, so a
+ * re-render replaces the bytes without changing anything a browser can see —
+ * and it will go on serving the old image from cache until that version moves.
+ * That is what kept blank pages on screen for a reader a day after they were
+ * fixed (2026-09-06).
  */
 export async function renderSourcePageImages(
   sourceId: string,

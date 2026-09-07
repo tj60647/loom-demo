@@ -1,17 +1,21 @@
 import { NextResponse, after } from "next/server"
 import { getSourceFileMeta } from "@/actions/sources"
 import { ensureSourcePageImages, getSourcePageImageKey, PAGE_IMAGE_WIDTHS, type PageImageWidth } from "@/lib/pdfPages"
+import { pageAssetETag } from "@/lib/pageAssets"
 import { readingStorage } from "@/lib/storage"
-import { hashText } from "@/lib/hash"
 import { logError } from "@/lib/log"
 
 /**
  * One pre-rendered page image, at one of the fixed widths (?w=320|1280).
  *
  * The happy path is the covers model: a small cached WebP streamed from blob
- * behind an auth check that never touches the PDF. The ETag derives from the
- * source's storageKey — repairs mint a NEW key, so a repaired reading's
- * images revalidate as changed while an untouched reading answers 304.
+ * behind an auth check that never touches the PDF. The ETag comes from
+ * pageAssetETag, which covers BOTH ways these bytes change: a repair mints a
+ * new storageKey, and a change to the renderer bumps PAGE_RENDER_VERSION. It
+ * used to be the storage key alone, on the assumption that an untouched
+ * reading's images never change — which stopped being true on 2026-09-06,
+ * when a re-render replaced 19 blank pages under an unchanged key and every
+ * browser that had cached the blank ones went on being told 304.
  *
  * A miss serves 404 and queues one whole-document generation via after() —
  * never a render inline: a cold matrix open can miss a hundred times at
@@ -37,7 +41,7 @@ export async function GET(
 
   try {
     const { source } = await getSourceFileMeta(sourceId)
-    const etag = `W/"${hashText(`${source.storageKey}:${page}:${width}`)}"`
+    const etag = pageAssetETag(source.storageKey, String(page), width)
     const headers = {
       "Cache-Control": "private, max-age=3600",
       ETag: etag,

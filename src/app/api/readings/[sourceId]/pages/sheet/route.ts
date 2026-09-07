@@ -1,16 +1,18 @@
 import { NextResponse, after } from "next/server"
 import { getSourceFileMeta } from "@/actions/sources"
 import { ensureSourceSheet, getSourceSheetKey, SHEET_WIDTH } from "@/lib/pdfPages"
+import { pageAssetETag } from "@/lib/pageAssets"
 import { readingStorage } from "@/lib/storage"
-import { hashText } from "@/lib/hash"
 import { logError } from "@/lib/log"
 
 /**
  * The whole-document sheet: the matrix contact sheet as one image, so the
  * view at fit needs one cached fetch instead of one per page. Same contract
  * as the per-page route beside this one — covers-style auth without bytes,
- * ETag off the storage key, and a miss that queues one cheap compose (from
- * the stored thumbs; no PDF is touched) rather than answering slowly.
+ * a shared ETag (see pageAssetETag: the storage key AND the renderer version,
+ * because a re-render changes these bytes without changing the key), and a
+ * miss that queues one cheap compose (from the stored thumbs; no PDF is
+ * touched) rather than answering slowly.
  */
 export async function GET(
   request: Request,
@@ -19,7 +21,7 @@ export async function GET(
   const { sourceId } = await params
   try {
     const { source } = await getSourceFileMeta(sourceId)
-    const etag = `W/"${hashText(`${source.storageKey}:sheet:${SHEET_WIDTH}`)}"`
+    const etag = pageAssetETag(source.storageKey, "sheet", SHEET_WIDTH)
     const headers = {
       "Cache-Control": "private, max-age=3600",
       ETag: etag,
