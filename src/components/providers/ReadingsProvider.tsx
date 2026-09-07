@@ -7,7 +7,7 @@
 // (2010)". All of them want the same small list, and none of them should
 // re-fetch it.
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { getSources, getActiveCourse } from "@/lib/reads"
 
@@ -80,6 +80,14 @@ type ReadingsContextValue = {
   refresh: () => void
 }
 
+/**
+ * How stale the syllabus may be before a tab returning to the front re-reads
+ * it. Long enough that alt-tabbing between two windows costs one query rather
+ * than one per switch; short enough that a reader who steps away and comes
+ * back is not looking at a syllabus from before the change.
+ */
+const REREAD_AFTER_MS = 30_000
+
 const ReadingsContext = createContext<ReadingsContextValue | null>(null)
 
 export function ReadingsProvider({ children }: { children: ReactNode }) {
@@ -89,6 +97,8 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
+  /** When the list was last read, so the re-read below can rate-limit itself. */
+  const lastReadRef = useRef(0)
 
   useEffect(() => {
     // Deferred rather than set synchronously, the way LoomProvider does it: a
@@ -105,6 +115,7 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
     const start = window.setTimeout(() => setIsLoading(true), 0)
     getSources()
       .then((rows) => {
+        lastReadRef.current = Date.now()
         if (live) {
           setReadings(rows as ReadingMeta[])
           setError(null)
@@ -126,6 +137,64 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(start)
     }
   }, [session, nonce])
+
+  /**
+   * Re-read the syllabus when the tab comes back to the front.
+   *
+   * The effect above runs once per page load, so a change to the course —
+   * an admin removing a reading, or adding one — never reached a tab that was
+   * already open. `revalidatePath("/")` cannot bridge it either: `/` renders
+   * this client component, so there is no server-rendered list to invalidate,
+   * and the call is a no-op for the shelf. Until this, what a reader saw was
+   * the syllabus as it stood when they opened the tab (reported 2026-09-07,
+   * a reading removed from a course that went on being listed).
+   *
+   * Three properties, each deliberate:
+   *
+   *  - QUIET. It never touches `isLoading`, so the shelf does not blink back
+   *    to a loading state every time you alt-tab. `refresh()` remains the loud
+   *    path, for a change the reader just made themselves and should see
+   *    acknowledged.
+   *  - RATE-LIMITED. `focus` fires on every return from a dialog or another
+   *    window; without the floor, a flurry of alt-tabbing would be a flurry of
+   *    queries.
+   *  - SILENT ON FAILURE. A background re-read that fails leaves the good list
+   *    in place rather than replacing a working shelf with an error the reader
+   *    did nothing to cause.
+   *
+   * Both events, because they answer different questions: `visibilitychange`
+   * catches a return to a hidden tab, `focus` catches a window that regained
+   * focus without ever being hidden.
+   */
+  useEffect(() => {
+    if (!session) return
+    let live = true
+    const reread = () => {
+      if (document.visibilityState === "hidden") return
+      if (Date.now() - lastReadRef.current < REREAD_AFTER_MS) return
+      lastReadRef.current = Date.now()
+      getSources()
+        .then((rows) => {
+          if (live) {
+            setReadings(rows as ReadingMeta[])
+            setError(null)
+          }
+        })
+        .catch(() => {
+          // Deliberately not surfaced: see SILENT ON FAILURE above.
+        })
+      getActiveCourse()
+        .then((c) => { if (live) setCourse(c) })
+        .catch(() => { /* the header label is decoration; see above */ })
+    }
+    document.addEventListener("visibilitychange", reread)
+    window.addEventListener("focus", reread)
+    return () => {
+      live = false
+      document.removeEventListener("visibilitychange", reread)
+      window.removeEventListener("focus", reread)
+    }
+  }, [session])
 
   const value = useMemo<ReadingsContextValue>(() => {
     const byId = new Map(readings.map((r) => [r.id, r]))
