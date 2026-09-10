@@ -3096,13 +3096,26 @@ export default function PdfViewer({ url, sourceName, sourceId, initialPageNumber
            controls would otherwise take the press and start an unfile instead
            of a pan — the cursor already says grab, and this makes it true. */
         .pdf-spread-viewport.space-pan .pdf-railcard-stack :is(button, input, textarea) { pointer-events: none; }
-        /* The matrix raster path: our canvas below, react-pdf's text layer
-           laid absolutely over it — the Page div itself paints nothing. The
-           scale wrapper clips to the slot's zoomed footprint so the transform
-           never bleeds into a neighbouring cell. */
+        /* The matrix raster path: the pre-rendered image at the bottom, our
+           canvas over it once pdf.js has drawn, react-pdf's text layer over
+           both — ordered by the z-indexes below, NOT by DOM order. The Page
+           div itself paints nothing. The scale wrapper clips to the slot's
+           zoomed footprint so the transform never bleeds into a neighbouring
+           cell. */
         .pdf-slot-scale { overflow: hidden; }
         .pdf-slot-inner { position: relative; background: #fff; }
-        .pdf-raster { display: block; height: auto; }
+        /* z-index, because painting here is not what the DOM order suggests:
+           an absolutely-positioned sibling paints above an in-flow one
+           whatever the source says, so before this the image covered the
+           canvas. Verified in Chromium on this exact markup (2026-09-06): the
+           hit-test read text, then img, then raster, and the composited pixel
+           was the image's. That is why the native tier had never been visible,
+           and why 19 blank images could hide a correct render of "As We May
+           Think" for 17.9 hours.
+           relative, not absolute: PageRaster sizes this canvas itself, so
+           taking it out of flow would change the layout as well as the
+           painting. */
+        .pdf-raster { display: block; height: auto; position: relative; z-index: 1; }
         /* The Page div itself paints nothing; positioning lives on the
            .pdf-slot-text wrapper (inline, in PageSlot) because react-pdf
            puts position:relative INLINE on this div and no selector wins
