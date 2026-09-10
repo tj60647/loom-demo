@@ -7,7 +7,7 @@
 // (2010)". All of them want the same small list, and none of them should
 // re-fetch it.
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { getSources, getActiveCourse } from "@/lib/reads"
 
@@ -78,7 +78,22 @@ type ReadingsContextValue = {
   titleOf: (sourceId: string | null | undefined) => string
   /** Re-read the shelf, e.g. after the student adds a reading of their own. */
   refresh: () => void
+  /**
+   * Re-read the syllabus IF it is old enough to be worth re-reading. Quiet:
+   * unlike `refresh` it never shows a loading state, so a reader arriving at
+   * the Library does not see the shelf blink. Call it on arrival; the floor
+   * below decides whether anything happens.
+   */
+  revalidateIfStale: () => void
 }
+
+/**
+ * How stale the syllabus may be before arriving at the Library re-reads it.
+ * Long enough that stepping in and out of a reading costs no queries; short
+ * enough that someone coming back from the admin screens is not looking at a
+ * syllabus from before their own edit.
+ */
+const REREAD_AFTER_MS = 30_000
 
 const ReadingsContext = createContext<ReadingsContextValue | null>(null)
 
@@ -89,6 +104,25 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
+  /**
+   * When the list was last read SUCCESSFULLY — the staleness floor measures
+   * from this, so a failed read does not buy itself a quiet window.
+   *
+   * 0 means no successful read yet, and `revalidateIfStale` treats it as
+   * "nothing to revalidate" rather than as infinitely stale. That matters
+   * because React runs child effects before parent ones: the Shelf's arrival
+   * call fires BEFORE this provider's own first read, and without the sentinel
+   * every cold load would fetch the list twice.
+   */
+  const lastReadRef = useRef(0)
+  /** A read is in flight; stops two callers starting overlapping fetches. */
+  const inFlightRef = useRef(false)
+  /** Something has been shown at least once, so a re-read need not announce
+   *  itself as loading. */
+  const hasDataRef = useRef(false)
+  /** The last `nonce` this effect acted on, so a deliberate `refresh()` can be
+   *  told apart from the session object merely being replaced. */
+  const lastNonceRef = useRef(0)
 
   useEffect(() => {
     // Deferred rather than set synchronously, the way LoomProvider does it: a
@@ -99,12 +133,50 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
         setCourse(null)
         setIsLoading(false)
       }, 0)
+      // The refs go back to their starting state with the data. They describe
+      // a list that no longer exists, and carrying them across a sign-out
+      // would tell the NEXT person's first read that the shelf is fresh.
+      hasDataRef.current = false
+      lastReadRef.current = 0
+      inFlightRef.current = false
       return () => window.clearTimeout(clear)
     }
+    // This effect re-runs on every session change, and next-auth refetches the
+    // session whenever the tab comes back to the front — SessionProvider's own
+    // visibilitychange listener, `refetchOnWindowFocus` defaulting to true —
+    // handing back a new object each time whether or not anything changed. So
+    // "the session changed" is not by itself a reason to re-read the syllabus,
+    // and without this floor every return to the tab spent a query.
+    //
+    // Safe against a genuine change of person because signing out clears the
+    // refs above: a new sign-in always has hasData false and reads.
+    //
+    // `refresh()` is exempt, and must be. It is the loud path a reader takes
+    // after doing something themselves — taking one of their own readings off
+    // the shelf — and a floor that swallowed it would leave the card sitting
+    // there looking like the removal had failed.
+    const forced = nonce !== lastNonceRef.current
+    lastNonceRef.current = nonce
+    // Someone else is already reading. React runs child effects before parent
+    // ones, so on a session change the Shelf's arrival call gets here first and
+    // starts the read; without this the floor would pass for both of them and
+    // the same list would be fetched twice on every return to the tab. Caught
+    // by the read-count assertion in tests/shelf-refetch.spec.ts, which is what
+    // that assertion is for.
+    if (!forced && inFlightRef.current) return
+    if (!forced && hasDataRef.current && Date.now() - lastReadRef.current < REREAD_AFTER_MS) return
+
     let live = true
-    const start = window.setTimeout(() => setIsLoading(true), 0)
+    // Announce loading only when there is nothing on screen yet, so a re-read
+    // does not blink the shelf back to its loading state.
+    const start = window.setTimeout(() => {
+      if (!hasDataRef.current) setIsLoading(true)
+    }, 0)
+    inFlightRef.current = true
     getSources()
       .then((rows) => {
+        lastReadRef.current = Date.now()
+        hasDataRef.current = true
         if (live) {
           setReadings(rows as ReadingMeta[])
           setError(null)
@@ -114,6 +186,7 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
         if (live) setError(e instanceof Error ? e.message : "Failed to load your readings")
       })
       .finally(() => {
+        inFlightRef.current = false
         if (live) setIsLoading(false)
       })
     // The course label is decoration on a header that must not fail because of
@@ -127,6 +200,59 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
     }
   }, [session, nonce])
 
+  /**
+   * Re-read on arrival, if the list has gone stale.
+   *
+   * The effect above runs once per page load and on each session change. That
+   * covers returning to the tab — next-auth refetches the session on
+   * visibilitychange, which changes the session object and re-runs it — but it
+   * does NOT cover arriving at the Library by an ordinary in-app navigation,
+   * because nothing about the session changes and the provider never unmounts.
+   *
+   * That is the case this exists for, and the one that was reported on
+   * 2026-09-07: an admin removed a reading from a course, moved from the admin
+   * screens to the Library in the same tab, and the removed reading was still
+   * listed. `revalidatePath("/")` cannot help — `/` renders a client
+   * component, so there is no server-rendered list to invalidate.
+   *
+   * Quiet, rate-limited and silent on failure: it must not blink the shelf,
+   * stepping in and out of a reading must not be a query each time, and a
+   * background read that fails must leave the good list alone rather than
+   * replace a working shelf with an error the reader did not cause.
+   */
+  const revalidateIfStale = useCallback(() => {
+    if (!session) return
+    if (inFlightRef.current) return
+    // No successful read yet: the provider's own first read is in flight or
+    // about to be, and there is nothing here to revalidate. The cost is that a
+    // first read which FAILED is not retried on arrival — the reader sees the
+    // error and reloads, as they did before this existed.
+    if (lastReadRef.current === 0) return
+    if (Date.now() - lastReadRef.current < REREAD_AFTER_MS) return
+    inFlightRef.current = true
+    getSources()
+      .then((rows) => {
+        lastReadRef.current = Date.now()
+        hasDataRef.current = true
+        setReadings(rows as ReadingMeta[])
+        setError(null)
+      })
+      .catch(() => {
+        // Left unsurfaced, and the timestamp left alone so the next arrival
+        // tries again.
+      })
+      .finally(() => {
+        inFlightRef.current = false
+      })
+    getActiveCourse()
+      .then((c) => setCourse(c))
+      // Unlike the first read, this does NOT blank the label on failure. There
+      // the label is absent and there is nothing to keep; here a good one is
+      // already on screen, and a failed background lookup is not a reason to
+      // take it away.
+      .catch(() => { /* keep the label we have */ })
+  }, [session])
+
   const value = useMemo<ReadingsContextValue>(() => {
     const byId = new Map(readings.map((r) => [r.id, r]))
     return {
@@ -137,8 +263,9 @@ export function ReadingsProvider({ children }: { children: ReactNode }) {
       error,
       titleOf: (sourceId) => (sourceId && byId.get(sourceId)?.title) || "another reading",
       refresh: () => setNonce((n) => n + 1),
+      revalidateIfStale,
     }
-  }, [readings, course, isLoading, error])
+  }, [readings, course, isLoading, error, revalidateIfStale])
 
   return <ReadingsContext.Provider value={value}>{children}</ReadingsContext.Provider>
 }
