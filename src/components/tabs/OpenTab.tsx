@@ -537,9 +537,10 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
   /**
    * The three kinds a Concept can be, relative to THIS reading (TJ,
    * 2026-08-09). `scope.ts` already computes them — `evidenced` (a passage
-   * here) and `hasPassage` (a passage anywhere) — but `isIn` buckets the first
-   * and third together, because both belong in this reading's warp and both
-   * are linkable here. That is right for scoping and under-drawn for reading:
+   * here) and `hasPassage` (a passage anywhere) — but `isIn` buckets evidenced-here
+   * together with empty-evidence that belongs in this warp (named here, or
+   * unstamped). Both are in this reading's warp and both are linkable here.
+   * That is right for scoping and under-drawn for reading:
    * one is evidence you hold, the other is a name you are carrying.
    *
    * KINDS, NEVER STAGES. Nothing here is further along than anything else, and
@@ -550,11 +551,10 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
    * own word for the third, and it is "a designation, never a warning".
    *
    * A concept in `scoped.concepts` with no passage HERE can only be one with
-   * no passage anywhere — `scope.ts`'s `isIn` is `evidenced.has(id) ||
-   * !hasPassage.has(id)`, so anything evidenced elsewhere is in
-   * `scoped.outside`. That is why the card's "no evidence" tag is true in this
-   * panel without a second query, and why its "N elsewhere" branch cannot fire
-   * here at all.
+   * no passage anywhere — evidenced-elsewhere and name-ahead-elsewhere both
+   * land in `scoped.outside`. That is why the card's "no evidence" tag is true
+   * in this panel without a second query, and why its "N elsewhere" branch
+   * cannot fire here at all.
    *
    * The `here`/`namedOnly` split that used to stand here went on 2026-08-18
    * with the two headings it fed; the kinds above are still the kinds, they
@@ -678,10 +678,9 @@ export default function OpenTab({ onGotoPassage, focusPassageId, focusConceptId,
               the fact on the row; this panel split the same concepts under
               "Concepts in this reading" and "Concepts with no evidence".
 
-              The heading was not WRONG — `scope.ts`'s `isIn` is
-              `evidenced.has(id) || !hasPassage.has(id)`, so a concept
-              evidenced only in another text is in `scoped.outside` and never
-              in this list, and "no evidence" here did mean nowhere. It was
+              The heading was not WRONG — a concept evidenced only in another
+              text, or named-ahead in another text, is in `scoped.outside` and
+              never in this list, and "no evidence" here did mean nowhere. It was
               redundant, and it moved things: a concept jumped from one
               heading to the other the moment you filed a passage under it,
               which is a row changing place under the cursor at the instant

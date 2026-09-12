@@ -3,10 +3,14 @@
 // A CONCEPT DOES NOT BELONG TO A READING — A PASSAGE DOES. A concept emerges from
 // a reading and may then be evidenced in several: one User-level object,
 // referenced by passages across readings (identity by object, not label —
-// ruling 36). The stored relations are the passage's `sourceId` and its concept
-// pointers (`passage_concept`), and everything below derives from them per render
-// and throws the result away. Nothing here owns a concept, re-homes one, or
-// writes.
+// ruling 36). Membership is derived per render and thrown away. Nothing here
+// owns a concept, re-homes one, or writes.
+//
+// The one stored exception: `concept.mintedInSourceId`, the reading the student
+// was in when they named it. It is not "the concept's reading" — there isn't
+// one — it is where a name-ahead concept stands until a passage evidences it
+// somewhere. Without that stamp the empty-evidence case used to appear in every
+// warp, which is how one reading's graph leaked into the next.
 //
 // A reading is a door into one graph, never one of many graphs.
 
@@ -46,7 +50,7 @@ export function soleSourceId(scope: Scope): string | null {
  * cross-reading facts alongside rather than hidden.
  */
 export type ScopedGraph = {
-  /** Concepts evidenced in this scope, in capture order. */
+  /** Concepts in this scope, in capture order. */
   concepts: Concept[]
   /** Passages captured from this scope's readings. */
   passages: Passage[]
@@ -67,12 +71,13 @@ export type ScopedGraph = {
  * the scope's readings. It is not thereby the reading's — the same concept is
  * evidenced in every reading whose passages support it.
  *
- * Two deliberate exceptions:
- * - the whole weave (`key === ''`) contains everything, with no bridges and
- *   nothing outside;
- * - a concept with NO passages appears in every scope, flagged "no evidence" by
- *   its tab. Red line #4 already makes that a visible failure state, so it
- *   stays visible rather than being placed by an invented reading link.
+ * Empty-evidence placement (a Concept may precede its evidence, model §Concept):
+ * - named in a reading (`mintedInSourceId` in scope) → in that warp, not others;
+ * - named with no reading on the act (`mintedInSourceId` null) → every warp,
+ *   the previous rule, kept for the handful of unstamped rows.
+ *
+ * Whole weave (`key === ''`) contains everything, with no bridges and nothing
+ * outside.
  */
 export function scopedGraph(state: LoomState, scope: Scope): ScopedGraph {
   if (isWholeWeave(scope)) {
@@ -98,11 +103,21 @@ export function scopedGraph(state: LoomState, scope: Scope): ScopedGraph {
     }
   })
 
-  const isIn = (conceptId: string) => evidenced.has(conceptId) || !hasPassage.has(conceptId)
-
+  const inWarp = new Set<string>()
   const concepts: Concept[] = []
   const outside: Concept[] = []
-  state.concepts.forEach((c) => (isIn(c.id) ? concepts : outside).push(c))
+  state.concepts.forEach((c) => {
+    const yes =
+      evidenced.has(c.id) ||
+      (!hasPassage.has(c.id) && (!c.mintedInSourceId || inScope.has(c.mintedInSourceId)))
+    if (yes) {
+      concepts.push(c)
+      inWarp.add(c.id)
+    } else {
+      outside.push(c)
+    }
+  })
+  const isIn = (conceptId: string) => inWarp.has(conceptId)
 
   const edges: Edge[] = []
   const bridges: Edge[] = []
@@ -140,35 +155,29 @@ export type ReadingTally = { passages: number; concepts: number; threads: number
 /**
  * What the shelf shows on each card. Pure counting over the student's own
  * captures — no completion, no grade, no comparison (red line #7).
+ *
+ * Uses `scopedGraph` so the card and the tabs cannot disagree about what
+ * "this reading" holds: evidenced concepts, name-ahead concepts minted here,
+ * and unstamped empty-evidence concepts (in every warp).
  */
 export function tallyByReading(state: LoomState): Map<string, ReadingTally> {
-  const conceptsBySource = new Map<string, Set<string>>()
-  const passageCount = new Map<string, number>()
-
+  const sourceIds = new Set<string>()
   state.passages.forEach((b) => {
-    if (!b.sourceId) return
-    passageCount.set(b.sourceId, (passageCount.get(b.sourceId) ?? 0) + 1)
-    const set = conceptsBySource.get(b.sourceId) ?? new Set<string>()
-    b.conceptIds.forEach((id) => set.add(id))
-    conceptsBySource.set(b.sourceId, set)
+    if (b.sourceId) sourceIds.add(b.sourceId)
+  })
+  state.concepts.forEach((c) => {
+    if (c.mintedInSourceId) sourceIds.add(c.mintedInSourceId)
   })
 
   const tallies = new Map<string, ReadingTally>()
-  // Keyed by passage count, not by concept map: a reading whose only captures are
-  // unlabeled passages still counts — the passage is the act, not the label.
-  passageCount.forEach((count, sourceId) => {
-    const conceptIds = conceptsBySource.get(sourceId) ?? new Set<string>()
-    // A thread counts for a reading when either end is evidenced in it — the
-    // same rule the workbench uses, so the card and the tab agree.
-    const threads = state.edges.filter(
-      (e) => conceptIds.has(e.fromId) || conceptIds.has(e.toId)
-    ).length
+  sourceIds.forEach((sourceId) => {
+    const graph = scopedGraph(state, scopeOf([sourceId]))
+    if (!graph.passages.length && !graph.concepts.length) return
     tallies.set(sourceId, {
-      passages: count,
-      concepts: conceptIds.size,
-      threads,
+      passages: graph.passages.length,
+      concepts: graph.concepts.length,
+      threads: graph.edges.length + graph.bridges.length,
     })
   })
-
   return tallies
 }

@@ -49,7 +49,7 @@ const at = new Date("2026-08-11T12:00:00Z")
 const SRC = "reading-1"
 
 const concept = (id: string): Concept => ({
-  id, courseId: null, userId: "u", label: id, def: "", note: "", createdAt: at,
+  id, courseId: null, userId: "u", label: id, def: "", note: "", mintedInSourceId: null, createdAt: at,
 })
 const passage = (id: string, conceptIds: string[] = []): Passage => ({
   id, courseId: null, userId: "u", conceptIds, source: "S", sourceId: SRC, location: "p. 1",

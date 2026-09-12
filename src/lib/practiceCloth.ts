@@ -182,6 +182,7 @@ export function buildPracticeCloth(
     label: c.label,
     def: c.def,
     note: "",
+    mintedInSourceId: sourceId,
     createdAt: at,
   }))
   const conceptIds = new Set(concepts.map((c) => c.id))
