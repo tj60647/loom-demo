@@ -238,19 +238,17 @@ export async function getUserLoomData() {
 }
 
 /**
- * `atSourceId` records WHERE THE ACT HAPPENED, not where the concept lives.
- * A Concept belongs to the User and to no reading (a Passage does) — that is
- * the model and it does not change here. But naming one is something you do
- * while reading something, and the Capture Log is read per reading, so an
- * event that cannot say where it happened is an act the log must drop. This
- * matters most for the legal state of naming a concept BEFORE finding
- * evidence (TJ, 2026-08-10): evidence-derived placement has nothing to work
- * with until a passage arrives, and without this stamp that act would appear
- * in no reading's log at all.
+ * `atSourceId` is where the student named this. A Concept still belongs to the
+ * User, not to a reading — passages evidence it across readings — but a name
+ * with no passage yet stands in that reading's warp (`mintedInSourceId`) rather
+ * than in every reading. The Capture Log uses the same stamp so the act is
+ * filed where it happened. Null is meaningful: the act carried no reading, and
+ * those rows still appear in every warp.
  */
 export async function createConcept(data: { label: string, def?: string, note?: string, atSourceId?: string | null }) {
   const userId = await getUserId()
   const courseId = await resolveActiveCourseId(userId)
+  const mintedInSourceId = data.atSourceId ?? null
 
   const newConcept = await db.insert(concepts).values({
     courseId,
@@ -258,12 +256,13 @@ export async function createConcept(data: { label: string, def?: string, note?: 
     label: data.label,
     def: data.def || "",
     note: data.note || "",
+    mintedInSourceId,
   }).returning()
 
   await recordEvent(userId, courseId, "concept.create", "concept", newConcept[0].id, {
     label: data.label,
     def: data.def || "",
-    sourceId: data.atSourceId ?? null,
+    sourceId: mintedInSourceId,
   })
   return newConcept[0]
 }
@@ -468,8 +467,8 @@ export async function createPassage(data: { conceptIds?: string[], source: strin
   // outliving its rows is the whole point. Null is meaningful — an untethered
   // passage belongs to no reading. Costs no migration; the payload is jsonb.
   // Concept and thread events carry it too, via the client's atSourceId (see
-  // the docstring above createConcept): a concept does not belong to a reading,
-  // but the ACT happened in one, and only the caller knows which was open.
+  // the docstring above createConcept): the concept is user-level, but the ACT
+  // happened in a reading, and only the caller knows which was open.
   await recordEvent(userId, courseId, "passage.capture", "passage", passageId, {
     conceptIds,
     sourceId: data.sourceId ?? null,
@@ -1149,7 +1148,7 @@ export async function getGraphEvents(): Promise<GraphEvent[]> {
   userConcepts.filter((c) => !covered.has(c.id)).forEach((c) =>
     synthesized.push({
       id: `synth-c-${c.id}`, userId, courseId, kind: "concept.create", entityType: "concept",
-      entityId: c.id, payload: { label: c.label, synthesized: true }, at: c.createdAt,
+      entityId: c.id, payload: { label: c.label, sourceId: c.mintedInSourceId ?? null, synthesized: true }, at: c.createdAt,
     })
   )
   userPassages.filter((b) => !covered.has(b.id)).forEach((b) =>
@@ -1328,10 +1327,10 @@ export async function resetLoom() {
  * "a concept does not belong to a text; a passage does". Deleting them from a
  * reading-scoped act would reach into work that belongs to every other
  * reading, and would take a concept the student named AHEAD of its evidence —
- * a legal first-class state the model protects. What the student is left with
- * is some concepts carrying no evidence, which is a state the app already
- * names and draws ("no evidence"), not damage. The dialog says so before they
- * commit rather than letting them discover it after.
+ * a legal first-class state the model protects. After this reading's passages
+ * go, a concept named here with no remaining evidence still stands in this
+ * warp as "no evidence" (`mintedInSourceId`), not in every other reading. The
+ * dialog says so before they commit rather than letting them discover it after.
  *
  * Takes a sourceId and still no userId — the reading is WHICH, the session is
  * WHOSE, and those are different questions. `authorizeSourceAccess` is the

@@ -522,6 +522,13 @@ export const concepts = pgTable(
     label: text("label").notNull(),
     def: text("def").default(""),
     note: text("note").default(""),
+    // Where the student was when they named this. Not "the concept's reading"
+    // — a Concept still belongs to the User — but the empty-evidence warp is
+    // this reading until a passage evidences it somewhere. Null = the act
+    // carried no reading, and scopedGraph still places those in every warp.
+    mintedInSourceId: text("mintedInSourceId").references(() => sources.id, {
+      onDelete: "set null",
+    }),
     // No tier here: Concept Tiers are per-map (`maps.tiers`). The concept.tier
     // mirror was dropped in 0021 (docs/loom-refactor-spec.md P0.5).
     createdAt: timestamp("createdAt").defaultNow().notNull(),
