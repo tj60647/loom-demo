@@ -93,7 +93,7 @@ The [template](../.github/pull_request_template.md) asks for four things; two
 are non-negotiable — **red lines** (does the change go near "no AI in student
 judgment", "work never inaccessible", "render and count, never decide"? say why
 it holds) and **spec impact** (behavior diverging from
-[loom-model-build.md](loom-model-build.md) bumps the spec in the same PR; TJ
+[loom-model-build.md](loom-model-build.md) bumps the spec in the same PR; the project owner
 ratifies — a commit message is not a ratification).
 
 If you changed how a student, faculty member or admin moves through Loom, update

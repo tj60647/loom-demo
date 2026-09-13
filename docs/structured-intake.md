@@ -34,11 +34,12 @@ intake.
    the problem in the reader's terms; where it sits in the model, citing
    [loom-model-build.md](loom-model-build.md) by section; which
    [contracts.md](contracts.md) rulings constrain it; explicit non-goals; and
-   **open questions, numbered** — each a decision reserved for TJ.
-2. **Gate** — TJ answers the numbered questions. Answers are transcribed into
-   the document as quoted rulings — `"…" (TJ, date)` — the citation form the
-   repo already uses, so later work quotes a ruling rather than an impression
-   of one.
+   **open questions, numbered** — each a decision reserved for the project
+   owner.
+2. **Gate** — the project owner answers the numbered questions. Answers are
+   transcribed into the document as quoted rulings — `"…" (name, date)`,
+   naming whoever ruled — the citation form the repo already uses, so later
+   work quotes a ruling rather than an impression of one.
 3. **Plan + tasks** — appended to the same file after the gate: hosts, reuse,
    any migration with its expand-only argument, and the commit sequence —
    which, under one-decision-per-commit, IS the task list. The evidence is
@@ -119,12 +120,12 @@ recommendations"* (TJ, 2026-08-26), which resolved them as:
 <What this deliberately does not do. The most load-bearing section.>
 
 ## Open questions
-1. <A decision reserved for TJ. Numbered so the answer can cite it.>
+1. <A decision reserved for the project owner. Numbered so the answer can cite it.>
 
 ---
 <!-- After the gate: -->
 ## Decisions
-1. <The answer, quoted: "..." (TJ, date)>
+1. <The answer, quoted: "..." (name, date)>
 
 ## Plan
 <Hosts, reuse, migration + expand-only argument, evidence named in advance.>
