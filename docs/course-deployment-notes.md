@@ -93,7 +93,7 @@ Light-touch, from artifacts already collected — used to teach, not to publish:
   *(That check now has a tool: `npm run diagnose:readings` reports every reading's extraction score, names the defect behind a bad one, and says which repair it needs. It is read-only. See [reading-quality.md](reading-quality.md).)*
 - Daily 3 pm PT calls this week to close the spec.
 - **Homework (LX):** take the E-Lab field guide's CAVEAT method and make a loom from a reading; read Novak & Gowin and compare/contrast. JC to gather the field guide and a "paper of record" for axial coding (Glaser ch. 1).
-- **Examples to produce (the project owner):** worked examples that show the journey, not just the product — readings → highlights → bytes → threads — including good and bad practice (Goofus & Gallant).
+- **Examples to produce (the project owner):** worked examples that show the journey, not just the product — readings → highlights → passages → threads — including good and bad practice (Goofus & Gallant).
 
 ## 10. Open questions (parking lot)
 
