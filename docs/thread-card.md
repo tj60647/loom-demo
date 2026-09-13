@@ -169,5 +169,5 @@ was.
 - **A3, 04 · Vocabulary.** Its rows are *inside a Link Label*, the label is
   therefore known and shown by the parent, and its sentence is an editable
   field rather than a quotation. Converting it means deciding whether the label
-  is said twice, which is a question for TJ rather than a refactor. Named here
+  is said twice, which is a question for the project owner rather than a refactor. Named here
   so the omission is a decision and not an oversight.

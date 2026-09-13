@@ -1,6 +1,6 @@
 # The screen snip — a scoped proposal
 
-**Status: NOT BUILT. Proposed 2026-08-09. TJ's call.**
+**Status: NOT BUILT. Proposed 2026-08-09. The project owner's call.**
 
 Raised by TJ alongside capture-by-hand: the concept maps in *Learning How to
 Learn* carry no text layer, so selection cannot reach them, and typing out a

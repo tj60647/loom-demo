@@ -163,7 +163,7 @@ frame that `/workflows` and `/access` already use) versus **route-only**
 reloads on return). Recommendation: dual surface — the holdings render
 identically either way, which `contracts.md` already states.
 
-## 8. TJ's remaining calls
+## 8. The project owner's remaining calls
 
 1. ~~**The worked example's exit**, once reset is gone (§5.1).~~ **Answered
    2026-08-10** — the practice loom (`/sandbox`) replaced it. The example is
