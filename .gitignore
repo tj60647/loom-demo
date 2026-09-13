@@ -75,3 +75,7 @@ run*.txt
 
 # Local Claude Code state (settings, task locks) — per-machine, never shared.
 .claude/
+
+# VS Code workspace files record one person's window, including paths to
+# sibling folders on their machine.
+*.code-workspace
