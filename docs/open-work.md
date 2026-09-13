@@ -389,7 +389,7 @@ gaps are now demonstrable rather than suspected:
   The biggest: `cloth_member`, membership-based authorization across **84**
   row-ownership checks, and an export contract that can name more than one
   author. Ratified, not built, not urgent.
-- **5.4 Several modes of reading** inside 01 · Reading. Wanted (the project owner), nothing
+- **5.4 Several modes of reading** inside 01 Reading. Wanted (the project owner), nothing
   specified. **The first of the family landed 2026-08-09**: the margin cards —
   page mode's "Cards" toggle draws every passage whose highlight is drawn on
   the open spread as a read-only card beside its page (`ConceptRail.tsx`,
