@@ -2,7 +2,7 @@
 
 **Written 2026-08-09, after a day of TJ's rulings.** Everything here is recorded
 in more detail somewhere else; this file is only the *sequence*, and the reasons
-for it. Where a line says "TJ's call", it is not a nag — it is a fork the work
+for it. Where a line says "the project owner's call", it is not a nag — it is a fork the work
 cannot pass without an answer.
 
 The ordering principle: **fix what is wrong before building what is missing, and
@@ -256,7 +256,7 @@ Recorded in `MATRIX_NOTES` and rendered on `/access`.
 
 ## Phase 4 — the model doc has drifted, and the matrix proves it
 
-`docs/loom-model-build.md` is the authority, so this is TJ's to correct, but the
+`docs/loom-model-build.md` is the authority, so this is the project owner's to correct, but the
 gaps are now demonstrable rather than suspected:
 
 - **§4** describes Library as one "Admin/Faculty" view including staging. The
@@ -306,8 +306,8 @@ gaps are now demonstrable rather than suspected:
     repair always risks it, so wait until a real vocabulary is observed to silt
     up rather than building a fixer for a mess nobody has made. Delete needs a
     rule for a Link that Threads still use (refuse, or detach them and say how
-    many), and that rule is TJ's, not mine.
-- **5.1f Concept merge — HIDDEN 2026-08-12, and it is TJ's call what happens
+    many), and that rule is the project owner's, not mine.
+- **5.1f Concept merge — HIDDEN 2026-08-12, and it is the project owner's call what happens
   next.** *"hide the merge capability in the concepts list in vocabulary. we
   need to resolve what this really means and its consequences."* Done as a
   curtain, not a demolition: `MERGE_VISIBLE` in
@@ -438,7 +438,7 @@ gaps are now demonstrable rather than suspected:
   never persisted (red line #7). **The name is ratified: "Spatial"** — the
   model doc reserves "Concept Map" for the external Figma artifact, so no
   model change. `MapTab`'s "draw the real concept map (paper or Figma)" copy
-  retires only when this ships, and the replacement wording is TJ's. After it
+  retires only when this ships, and the replacement wording is the project owner's. After it
   ships: the same toggle on the faculty `CohortClothPanel` (attribution is
   already legal there), no per-student pill coloring in v1.
   **Still gated, recorded so nobody reopens them by accident:** the
@@ -474,7 +474,7 @@ gaps are now demonstrable rather than suspected:
   reader: nothing restores from that snapshot, so the reset is recoverable in
   principle and not in practice.
 
-  **The open question is TJ's and it is where it lives, not whether it works.**
+  **The open question is the project owner's and it is where it lives, not whether it works.**
   A toast with Undo is the obvious answer and the wrong one here — `flash`
   self-clears in 1500ms, and this repo already ruled that a missed notice is
   indistinguishable from data loss (the practice band, contracts.md §2c). The
@@ -508,7 +508,7 @@ gaps are now demonstrable rather than suspected:
   UI-and-data-shape work: creating a projection asks its kind; the picker
   holds lists and boards side by side; no migration expected (kind can live
   in the existing per-map view row — the `view` table's own header invites
-  it). **Plan first, TJ reviews, then build** — this is exactly the change
+  it). **Plan first, the project owner reviews, then build** — this is exactly the change
   that went off the rails once when approached as "views inside a
   projection"; the ratified frame is kinds OF projections, never a switcher
   within one.
@@ -549,7 +549,7 @@ in the student workflow diagram**.
 
 **Next: Phase 2.** Its three leads (2.3) are now verified in source and written
 up above with file and line — that was the work the plan asked for before 2.1
-and 2.2 get built. **2.1 and 2.2 are still TJ's calls** and are what to take
+and 2.2 get built. **2.1 and 2.2 are still the project owner's calls** and are what to take
 next; lead **C** (import under-reports what a destructive replace will drop) is
 the one of the three that needs no ruling at all and can be fixed on its own.
 Lead **B** is blocked on whether the weave concept is removed.

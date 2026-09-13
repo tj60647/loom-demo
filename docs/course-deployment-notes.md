@@ -98,7 +98,7 @@ Light-touch, from artifacts already collected — used to teach, not to publish:
 ## 10. Open questions (parking lot)
 
 - Freeze date for [`loom-spec-v1.md`](loom-spec-v1.md) (~1 week per HD/JC); production v1 ~2 weeks (TJ).
-- Reviewer fallback if TJ is unavailable mid-semester (Pete? Kevin?).
+- Reviewer fallback if the project owner is unavailable mid-semester (Pete? Kevin?).
 - Markdown export lives in Lingxiu's fork — reconcile into the production build.
 - Formal term "promotion" — needed, or is recurrence-surfacing enough? (Currently v2.)
 - Naming of the register menus: "tongues" vs. "paradigms" vs. plain "vocabularies."

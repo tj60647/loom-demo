@@ -24,7 +24,7 @@ one section corrected **in place**, because it is the permanent bridge:
   homonym warning
   is client-side at coin-time and the server never forbids (C.7); **merge** was
   built (`mergeConcepts`, logged `concept.merge`) and then its control **hidden
-  2026-08-12** pending TJ's ruling on what merge means (open-work.md 5.1f). The
+  2026-08-12** pending the project owner's ruling on what merge means (open-work.md 5.1f). The
   unlabeled-passages group in the graph view (C.9) was built and then **removed
   2026-08-12** — TJ: "there should not be an unlabeled passages section in the
   knowledge graph"; Unlabeled Passages live in 01's Your work.

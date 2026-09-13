@@ -2,7 +2,7 @@
 
 **Status: proposal — held for the quilting discussion.** The open questions
 below are deliberately unanswered: they are the agenda for a group discussion
-about quilting, not a gate TJ answers alone ("can we just leave the open
+about quilting, not a gate the project owner answers alone ("can we just leave the open
 questions for now as things the group needs to address in a discussion about
 'quilting'?" — TJ, 2026-08-26). Under AGENTS.md, nothing is implemented while
 they stand; that is the holding mechanism, and it needs no further lock.
@@ -163,5 +163,5 @@ position rather than a blank page; none of it is decided.
    loom-model-build.md §1: the weave section stops saying "removed until
    defined" and starts saying "defined as the Quilt" (or the Quilt stands
    beside a still-undefined weave). This is the faculty-agreement moment the
-   2026-08-11 ruling reserved — it is TJ's and the faculty's to make, not a
+   2026-08-11 ruling reserved — it is the project owner's and the faculty's to make, not a
    build detail.

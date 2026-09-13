@@ -209,7 +209,7 @@ not be relaxed under schedule pressure:
   one, not worked around.
 
 **2.4 · Report what was left broken.** Any reading whose diagnosis is
-`manual-review`, or that exceeds the region cap, comes back to JC and TJ as a
+`manual-review`, or that exceeds the region cap, comes back to JC and the project owner as a
 named list with the reason. A silent partial pass on this track is exactly the
 failure mode the punch list was written to end.
 
@@ -317,7 +317,7 @@ Three things to get right. It must record the **page**, not just the reading —
 the pipeline works in regions. It must be **counted, never scored**: this is a
 report about the file, and it must not read to the student as an error they
 made. And it should tell them what happens next, because a flag that vanishes
-gets used once. *TJ's call:* whether a student flag can *trigger* detection on
+gets used once. *The project owner's call:* whether a student flag can *trigger* detection on
 that page automatically (detection is cheap, pure and repeatable, so this is
 affordable) or only queue for a person.
 
