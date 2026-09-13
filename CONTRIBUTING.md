@@ -40,8 +40,8 @@ that are non-negotiable:
   inaccessible, render-and-count-never-decide). If your change is anywhere near
   a red line, say so and say why it holds. Reviewers review against these.
 - **Spec impact** — the spec is the build contract (§7): when behavior diverges
-  from it, the same PR bumps the spec (rev + revision-history entry), and TJ
-  ratifies. A commit message is not a ratification.
+  from it, the same PR bumps the spec (rev + revision-history entry), and the 
+  project owner ratifies. A commit message is not a ratification.
 
 Small PRs, reviewed same-day, beat big ones. A PR that only moves docs or tests
 still goes through the gate — the gate is cheap when the change is.
@@ -49,7 +49,7 @@ still goes through the gate — the gate is cheap when the change is.
 ## Local development
 
 ```bash
-vercel env pull .env.local        # hosted values (or ask TJ)
+vercel env pull .env.local        # hosted values (or ask the project owner)
 npm ci
 npx tsx scripts/check-migrations.ts   # what the DB actually has
 npx drizzle-kit migrate               # apply pending migrations
