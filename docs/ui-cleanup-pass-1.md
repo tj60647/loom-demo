@@ -835,7 +835,7 @@ drawing a visible mark from the same formula is simply what made it legible.
 The comment on that code calls it "wrong by a line or two", which holds for
 one column and not at all for two.
 
-**Second fault, found by the project owner in his own data and not in the test account's:** at
+**Second fault, found by the project owner in their own data and not in the test account's:** at
 Fit a card is about one page wide and sits over its own page, so a
 full-page-width band is almost entirely hidden behind the card that points at
 it, leaving a yellow sliver beside the card that reads as a rendering glitch.

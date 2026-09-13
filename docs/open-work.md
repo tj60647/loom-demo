@@ -49,7 +49,7 @@ the rule is the point, not the wording.
 
 ## Phase 1 — **05 Weave: ruled 2026-08-09, and the answer is "not now"**
 
-> **the project owner, 2026-08-10 — the priority above this whole phase:** *"projections are
+> **The project owner, 2026-08-10 — the priority above this whole phase:** *"projections are
 > more urgent than weave. weave is only useful when we have many examples of
 > cloths and projections to work with. we have cloths. we need to work on
 > projections."* And on scope: *"spatial is not a centerpiece. there is a set
@@ -64,14 +64,14 @@ the rule is the point, not the wording.
 >
 > **Corrected the same day:** an earlier version of this note claimed "the
 > basic projection views (List · Hierarchical · Cards, of which only Cards
-> is built) come first" — wrong frame, mine. the project owner's ruling that followed:
+> is built) come first" — wrong frame, mine. The project owner's ruling that followed:
 > the Cloth is the data; a Projection is one way of projecting it; **each
 > Projection IS a kind** — a list (an ordering) or a board (a layout) —
 > separately titled. Both kinds already exist on 03 as the list and the
 > board; what is NOT built is kind-per-projection (today's map row bundles
 > one ordering + tiers + one layout). See 5.6.
 
-> **the project owner, 2026-08-09:** *"the whole weave path is unresolved. i know we will want a
+> **The project owner, 2026-08-09:** *"the whole weave path is unresolved. i know we will want a
 > way for students to collaborate on a cloth, and there is an idea about a
 > quilt. **the ambiguity about how they manifest should not inform the current
 > design.** the keep will allow downloading of content, but **it is more about
@@ -111,7 +111,7 @@ them added the same week. Hiding a station is not retiring an idea.
 
 What became of the three strandings:
 
-- the **whole-weave Cloth** and **whole-weave Projections** — not rehomed. the project owner:
+- the **whole-weave Cloth** and **whole-weave Projections** — not rehomed. The project owner:
   *"i am not at all worried about losing whole weave."* Rows already at
   `scopeKey ''` stay in the database and render nowhere.
 - **`ShelfSearch`'s links into `/weave`** — repointed. A hit opens the reading

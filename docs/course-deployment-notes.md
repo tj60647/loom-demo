@@ -2,7 +2,7 @@
 
 Living document. Pedagogy, staging, logistics, and governance for running Loom in DES INV 200. Revved over the semester and carried course-to-course.
 
-**Draft** · rev July 29 (folds in the July 28 Hugh/LX check-in and the July 29 Hugh/LX/the project owner call).
+**Draft** · rev July 29 (folds in the July 28 Hugh/LX check-in and the July 29 Hugh/LX/project-owner call).
 **Home:** the repo, beside the code, with a changelog — plus a shared Google Doc for live editing.
 
 ## 1. Provenance: the technique and the tool

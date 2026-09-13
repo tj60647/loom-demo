@@ -199,7 +199,7 @@ Half right, and worth splitting:
 And the ordering matters: adding `clothId` "just in case" would add a column
 whose meaning is undecided, which is worse than not adding it. §7 first.
 
-**the project owner's decision, 2026-08-08: build nothing yet; keep it recorded as deferred.**
+**The project owner's decision, 2026-08-08: build nothing yet; keep it recorded as deferred.**
 That deferral stands with the model doc's existing line — *Join, Quilt, and
 Shared / co-created Cloths are defined, deferred; do not build, do not delete
 stubs.*

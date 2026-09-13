@@ -1,6 +1,6 @@
 # The screen snip — a scoped proposal
 
-**Status: NOT BUILT. Proposed 2026-08-09. the project owner's call.**
+**Status: NOT BUILT. Proposed 2026-08-09. The project owner's call.**
 
 Raised by the project owner alongside capture-by-hand: the concept maps in *Learning How to
 Learn* carry no text layer, so selection cannot reach them, and typing out a
@@ -84,7 +84,7 @@ is a lie about what kind of evidence it is.** A snip is not.
 
 ## 3. Export — settled: the image travels
 
-**the project owner, 2026-08-09: "the snips will be small, i'm not worried about the copyright."**
+**The project owner, 2026-08-09: "the snips will be small, i'm not worried about the copyright."**
 
 That settles what was the only hard question here. A snip **embeds** in the
 export as a base64 data URI, so a Cloth or a Projection still stands alone when

@@ -317,7 +317,7 @@ Three things to get right. It must record the **page**, not just the reading —
 the pipeline works in regions. It must be **counted, never scored**: this is a
 report about the file, and it must not read to the student as an error they
 made. And it should tell them what happens next, because a flag that vanishes
-gets used once. *the project owner's call:* whether a student flag can *trigger* detection on
+gets used once. *The project owner's call:* whether a student flag can *trigger* detection on
 that page automatically (detection is cheap, pure and repeatable, so this is
 affordable) or only queue for a person.
 
