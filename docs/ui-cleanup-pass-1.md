@@ -234,7 +234,7 @@ should never have had to hold.
 
 **Landed.** The toolbar's control now does **both halves** and is named
 `full screen text` for it. The header keeps `full screen` for the whole app, on
-every station. the project owner, 2026-08-17: *"one is to make the app full screen, the other
+every station. The project owner, 2026-08-17: *"one is to make the app full screen, the other
 to make the pdf full screen — this is ok but needs clearer labels."*
 
 Three things that fell out of building it, each worth keeping:

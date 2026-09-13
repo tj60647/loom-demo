@@ -94,7 +94,7 @@ modes** — A4 needs both on a read card, and neither is a different card.
 reduces to `.trip` plus `.tmeta`'s state pill. The Cohort Graph's Threads
 panel is the only user: it is a 316px list of every thread in the course,
 scanned to find one, and a description on each made a wall (the project owner, 2026-08-22:
-"the thread cards need to be simpler, jsut show the thread, not description or
+"the thread cards need to be simpler, just show the thread, not description or
 contributor, that will show up below when selected"). The sentence and the
 student are shown in that page's read-out when a card is picked.
 
