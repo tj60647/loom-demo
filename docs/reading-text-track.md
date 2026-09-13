@@ -73,7 +73,7 @@ patient; the gate is why the ward has no thermometer.
 [reading-quality.md](reading-quality.md) ends its re-ingest section with a
 one-line rule: **"repair before a cohort arrives, not during one."**
 
-**No cohort has arrived. One arrives in about two weeks** (TJ, 2026-08-11 —
+**No cohort has arrived. One arrives in about two weeks** (the project owner, 2026-08-11 —
 so roughly 25 Aug; the real date should replace this line). Every capture in
 the app today is a test: JC's 24 passages on the Novak reading, and whatever
 else is on dev, is disposable data made to find exactly the bugs it found.
@@ -209,7 +209,7 @@ not be relaxed under schedule pressure:
   one, not worked around.
 
 **2.4 · Report what was left broken.** Any reading whose diagnosis is
-`manual-review`, or that exceeds the region cap, comes back to JC and TJ as a
+`manual-review`, or that exceeds the region cap, comes back to JC and the project owner as a
 named list with the reason. A silent partial pass on this track is exactly the
 failure mode the punch list was written to end.
 
@@ -317,7 +317,7 @@ Three things to get right. It must record the **page**, not just the reading —
 the pipeline works in regions. It must be **counted, never scored**: this is a
 report about the file, and it must not read to the student as an error they
 made. And it should tell them what happens next, because a flag that vanishes
-gets used once. *TJ's call:* whether a student flag can *trigger* detection on
+gets used once. *the project owner's call:* whether a student flag can *trigger* detection on
 that page automatically (detection is cheap, pure and repeatable, so this is
 affordable) or only queue for a person.
 

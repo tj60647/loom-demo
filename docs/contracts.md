@@ -27,7 +27,7 @@
 > **Faculty walked through a browser** (2026-08-08): `tests/faculty.spec.ts` signs
 > in as a FACULTY membership for the first time; `/admin/library` gained the
 > `checkAdmin()` redirect it had been missing (§2c).
-> **The Vocabulary station reconciled to the model** (2026-08-08, TJ): it is now
+> **The Vocabulary station reconciled to the model** (2026-08-08, the project owner): it is now
 > the User's holdings (`VocabularyTab` — concepts, link labels, merge); the cloth
 > prompts and the duplicate read editor moved to the Knowledge Graph
 > (`ClothReflection`). See §2b-ii. *(This landed as "03 Vocabulary / 04 Knowledge
@@ -37,7 +37,7 @@
 > **Workflows tab** (2026-08-08): `/admin/workflows` draws the student, faculty
 > and admin flows from `src/lib/workflows.ts`. **Refactor a workflow, update that
 > file** — §2c-ii, enforced by `npm run check`.
-> **A cloth starts in Reading, and the card has one door** (2026-08-08, TJ):
+> **A cloth starts in Reading, and the card has one door** (2026-08-08, the project owner):
 > the card body opens the reading at **01 · Reading** and the cloth's row beneath
 > is **metadata, not a control** — Title (or "Base cloth") + when last edited.
 > There is no Create Cloth button: one cloth per reading per user, so there is no
@@ -49,7 +49,7 @@
 > tests enter through `enterReadingFromCard` in `tests/helpers.ts`, which takes
 > whichever door is there — and *creates a cloth* the first time it meets an
 > unclothed reading.
-> **Overlays are faculty/admin only** (2026-08-08, TJ): students see no Overlay
+> **Overlays are faculty/admin only** (2026-08-08, the project owner): students see no Overlay
 > control at all. `overlayViewer()` returns `not-staff` for a learner, and the
 > two surfaces (the PDF toolbar and Vocabulary's "What others named") render only
 > when `getActiveCourse().isStaff` — a *drawing* decision; the actions re-check
@@ -67,11 +67,11 @@
 > "?" has a listener on every page — it was mounted only on the shelf, Keep and
 > the workbench, which left that button dead on every `/admin` page. It decides
 > for itself where the unprompted pop-up is welcome (not `/admin`, not `/auth`).
-> **Stations 03 and 04 swapped** (2026-08-08, TJ): **03 Knowledge Graph, 04
+> **Stations 03 and 04 swapped** (2026-08-08, the project owner): **03 Knowledge Graph, 04
 > Vocabulary**. Keys stay legacy — `map` is the graph, `read` is Vocabulary —
 > so `?tab=` is unchanged. The workbench footer and student copy follow the bar,
 > which numbers itself.
-> **Cloth cardinality ratified, not built** (2026-08-08, TJ): **one cloth per
+> **Cloth cardinality ratified, not built** (2026-08-08, the project owner): **one cloth per
 > reading per user, but a cloth may have several users.** The `onePerScope`
 > unique already matches the first half; the unbuilt half is **several users** —
 > `cloth_member`, membership-based authorization across the 84 ownership checks,
@@ -81,11 +81,11 @@
 > interpretive apparatus than a cloth does. Because `(user, reading)` still
 > identifies the cloth, **`passage` needs no `clothId`**. See
 > [cloth-cardinality.md](cloth-cardinality.md) and the model doc §2.
-> **The tab list is settled** (2026-08-08, TJ): 00 Reading and 01 Open merged
+> **The tab list is settled** (2026-08-08, the project owner): 00 Reading and 01 Open merged
 > into one **Reading** station (text + capture rail); **05 Weave is hidden**
 > pending a decision, its route intact and linked from Keep; **Keep stays** as a
 > ratified deviation (D4). Six visible stations, numbered 00–05. See §2b-ii.
-> **The rocketcrane branches incorporated as display work** (2026-08-09, TJ:
+> **The rocketcrane branches incorporated as display work** (2026-08-09, the project owner:
 > "all integrations from rocketcrane need to honor the existing data structures
 > and workflows"). Two ideas from the reverted spread canvas (41d5b50) landed
 > inside the existing modes — no schema change, no new write path, no new
@@ -104,11 +104,11 @@
 > one question" was the objection, so its ideas joined the existing answer.
 > The weekly-concept-map branch's spatial view is **pipeline, not built**:
 > open-work.md 5.5.
-> **The matrix IS the spread canvas now** (2026-08-10, TJ: "rebuild Matrix as
+> **The matrix IS the spread canvas now** (2026-08-10, the project owner: "rebuild Matrix as
 > the canvas"): every 2-page spread on one near-square plane
 > (`src/lib/spreadLayout.ts`, asserted by `check:spread`) under ONE transform
 > (`SpreadCanvasView`, d3-zoom back in package.json) — a two-finger scroll
-> pans and a pinch zooms at the cursor (the Figma idiom; TJ 2026-08-19,
+> pans and a pinch zooms at the cursor (the Figma idiom; the project owner 2026-08-19,
 > taking ui-cleanup-pass-1 §12 with the deltaMode tuning that item required,
 > after the map idiom held the view from 2026-08-10), drag pans, and
 > **− / + / Fit** buttons drive the same transform (Fit = everything in view,
@@ -121,7 +121,7 @@
 > reading concepts, not the shrunken text. (It was `--invk` until 2026-08-19,
 > which clamped at 1 and so governed only the zoom-out half: a card on a
 > spread came out twice the size of the same card in page mode.) **Strip is
-> hidden** (TJ, 2026-08-10: "the new view supercedes it") — no button sets
+> hidden** (the project owner, 2026-08-10: "the new view supercedes it") — no button sets
 > it; the render branch stays for cheap restoration; page mode holds the
 > phone. Same ground rules: one capture path, display-only, nothing
 > persisted. Reviewed adversarially before landing; the fixes that came out
@@ -134,21 +134,21 @@
 > exactly (a wider extent let a deep pinch rest where the settle sync would
 > yank it back); and the floating capture button re-seats on every transform
 > write, as it always did on scroll.
-> **The canvas polish pass** (2026-08-10, TJ): rails are ALWAYS reserved —
+> **The canvas polish pass** (2026-08-10, the project owner): rails are ALWAYS reserved —
 > hiding Cards draws into standing margins instead of re-laying the grid
 > under the reader's eye; and the raster path's text layer now rides an
 > absolutely positioned `.pdf-slot-text` wrapper, because react-pdf pins
 > `position:relative` INLINE on its Page div, which beat the stylesheet and
 > painted every matrix text layer — highlights, heat, real mouse selection —
-> one page-height too low and clipped to invisibility. Found by TJ asking
+> one page-height too low and clipped to invisibility. Found by the project owner asking
 > where the highlights went; every DOM-level test had passed over it.
-> **Search is a field, not a button, where there is room** (2026-08-10, TJ):
+> **Search is a field, not a button, where there is room** (2026-08-10, the project owner):
 > the scopebar/shelf search input is persistent on wide screens (`.searchhost`
 > / `.searchtoggle`, globals.css — the button form survives below 900px),
 > never autofocuses, and Escape clears it. The in-reading toolbar search
 > keeps its compact button and its text-only wording — it searches the
 > reading's pages, not the loom.
-> **The field searches the loom, and says so** (2026-08-10, TJ: "it is really
+> **The field searches the loom, and says so** (2026-08-10, the project owner: "it is really
 > about searching the 'loom' scoped by role" — the placeholder is "search
 > your loom…", not an enumeration). Reach as built: reading cards
 > (title A > author B > citation/description C) and every page of text;
@@ -160,7 +160,7 @@
 > room that does not exist. Both queries deliberately unindexed: a handful
 > of rows per user, and an index would be a migration. A cloth hit lands on
 > 01 · Reading; a projection hit on 03 · Knowledge Graph.
-> **The Capture Log moves to 03, scoped to the reading** (2026-08-10, TJ:
+> **The Capture Log moves to 03, scoped to the reading** (2026-08-10, the project owner:
 > *"we are keeping the capture log, i think this goes in the knowledge graph.
 > and is specific to that reading, not all readings"* — and it downloads).
 > It rendered on the Knowledge Graph before, but only at the **whole weave**,
@@ -170,8 +170,8 @@
 > in this reading" cannot be read off the rows. Three rules, in order — the
 > act said so (every event now carries the reading it happened in: passages
 > from their row, concepts and threads from the route, so **naming a concept
-> before any evidence still appears**, TJ's case); its scope said so (cloth
-> and projection events carry `scopeKey`); or **the evidence says so** (TJ's
+> before any evidence still appears**, the project owner's case); its scope said so (cloth
+> and projection events carry `scopeKey`); or **the evidence says so** (the project owner's
 > ruling for pre-stamp acts — a concept places where it has a passage, a
 > thread where both ends do, the same rule contextual search uses). Honest
 > cost, recorded rather than hidden: an OLD entry can surface in a reading
@@ -182,7 +182,7 @@
 > over its own route. Guarded by `check:logscope` (21 assertions) and
 > `tests/object-download.spec.ts`. Keep still shows the whole record until it
 > dissolves.
-> **Download at the object — the three that had none** (2026-08-10, TJ):
+> **Download at the object — the three that had none** (2026-08-10, the project owner):
 > `src/lib/objectExport.ts` adds the **cloth** (on its own card at the head of
 > Your work, 01), the **threads** (02 · Linking, where they are thrown) and
 > the **vocabulary** (04, unscoped like the tab). A Projection already had its
@@ -202,10 +202,10 @@
 > which downloads all three and reads what is inside them. **This is the
 > prerequisite for hiding Keep**: a reading with captures but no projection
 > now has a file.
-> **The practice loom** (`/sandbox`, 2026-08-10, TJ: *"in many games the
+> **The practice loom** (`/sandbox`, 2026-08-10, the project owner: *"in many games the
 > actual interface is used for the tutorial, not screenshots, is that
 > possible?"*): the REAL workbench on a REAL reading — it prefers *Learning
-> How to Learn* (TJ's pick; Novak & Gowin is the book the board's method comes
+> How to Learn* (the project owner's pick; Novak & Gowin is the book the board's method comes
 > from) and falls back to the first reading with a file. A student really
 > drag-selects, really names a concept, really threads, really drags a card —
 > and **nothing is written**. `SandboxLoomProvider` supplies the same context
@@ -222,7 +222,7 @@
 > Deliberately absent: import and the worked example, which would bring in
 > content a student might want to keep. Reset stays — clearing your own
 > practice costs nothing.
-> **Projections have kinds — ratified, not built** (2026-08-10, TJ): the
+> **Projections have kinds — ratified, not built** (2026-08-10, the project owner): the
 > Cloth is the data; a Projection is one way of projecting it, and each
 > Projection IS a kind — a **list** (an ordering) or a **board** (a layout;
 > cards in tier bands, threads drawn) — separately titled, with One-line and
@@ -236,7 +236,7 @@
 > Novak & Gowin citations added to the model doc and the tab copy — the
 > board digitizes their cards-and-arranging practice, and the tiers are
 > their rank-ordering.
-> **Search is contextual** (2026-08-10, TJ: "the search in the library
+> **Search is contextual** (2026-08-10, the project owner: "the search in the library
 > should have a different scope than search in a reading"): the Library's
 > field is the whole loom; a reading's field is THAT READING — its card and
 > pages, its cloth and projections, and the concepts, links and passages
@@ -248,7 +248,7 @@
 > Placeholder follows: "search this reading…". At the whole weave (source
 > null) the field stays loom-wide.
 > **A Link is an object the student owns** (5.1, built 2026-08-11 over three
-> commits; TJ: "links are user-level"). Migration 0024 is **expand-only** —
+> commits; the project owner: "links are user-level"). Migration 0024 is **expand-only** —
 > the `link` table (label + its own gloss), `edge.linkId`, a backfill from
 > the distinct handles, `link_search_idx`. `edge.handle` is DUAL-WRITTEN and
 > stays until Step 4 lands (open-work 5.1d); every reader may still fall back
@@ -257,7 +257,7 @@
 > resolution the server and BOTH providers use — the practice loom cannot
 > call the server, so a second implementation is how they would drift.
 > Three consequences are contract, not decoration. **A Link can exist with no
-> Thread using it** (TJ, 2026-08-10) — coined in Vocabulary with a gloss,
+> Thread using it** (the project owner, 2026-08-10) — coined in Vocabulary with a gloss,
 > counted at zero, findable in search, offered as a chip. **Coin-time chips
 > ATTACH** (`attachLink`), never copy the word; typing a label resolves
 > case-insensitively to the Link already owned, and `updateEdge` returns that
@@ -267,7 +267,7 @@
 > Search grows a `linkLabels` group beside `links`: the objects, scoped to a
 > reading's own threads inside a reading, and unfiltered at the Library where
 > a word coined ahead of use is found.
-> **The whole weave is out of the app** (2026-08-11, TJ: *"we are removing
+> **The whole weave is out of the app** (2026-08-11, the project owner: *"we are removing
 > whole weave as it exists in the app because it is poorly defined and not
 > supported in the course. it should not be in the app as an idea until the
 > faculty and the authors of the app agree on what it means to have a 'full
@@ -277,7 +277,7 @@
 > ThrowTab, MapTab, ClothFold and ClothReflection. `WHOLE_WEAVE` survives only
 > as the internal scope of a surface that is not a reading — the Library —
 > and no student surface writes at `scopeKey ''`. Rows already written there
-> stay where they are and are not rendered; TJ: *"i am not at all worried
+> stay where they are and are not rendered; the project owner: *"i am not at all worried
 > about losing whole weave."*
 >
 > What that ruling protects is named in the same message: *"i am worried about
@@ -297,7 +297,7 @@
 > **The Library's search is unchanged in scope and changed in destination.**
 > It still searches the whole loom — readings, cloths, projections, concepts,
 > link labels, threads, passages — because the Library is the entry point to
-> the whole contents (TJ). What moved is where a hit LEADS: the three
+> the whole contents (the project owner). What moved is where a hit LEADS: the three
 > user-level kinds pointed at `/weave` for want of anywhere else, and now open
 > the reading their work lives in, resolved server-side as **where the first
 > evidence is** (`sourceId` on each hit). A hit with no reading — a concept
@@ -329,16 +329,16 @@
 > the need, and the Library's "New to this?" card now opens it. That card is
 > also the FIRST door to `/sandbox` in the app — the student flow has drawn a
 > `library → practice` edge since the practice loom was built, and nothing
-> took it until now. Still open, and TJ's: the practice loom starts EMPTY, so
+> took it until now. Still open, and the project owner's: the practice loom starts EMPTY, so
 > it teaches the gestures but shows no finished cloth (open-work).
 >
-> **The practice loom becomes the guide** (2026-08-11, TJ: *"the guide should
+> **The practice loom becomes the guide** (2026-08-11, the project owner: *"the guide should
 > always be available, like the tutorials in any game. if the sandbox is the
 > guide, then it should be clearly accessible. it is the instructions,
 > right?"*). Two changes. A **permanent door in the header**, beside the
 > walkthrough, on every page — `/sandbox` had been reachable only by typing
 > the URL. And a **worked cloth** it opens with, on *Oh, the Places You'll
-> Go!* (TJ's pick): four passages, three concepts, two threads, a Link with a
+> Go!* (the project owner's pick): four passages, three concepts, two threads, a Link with a
 > gloss, a cloth and a projection with tiers.
 >
 > The passages are REAL substrings of that reading's text layer, located at
@@ -353,7 +353,7 @@
 > restores the example — which is the "start over" this place would otherwise
 > need a button for.
 >
-> **And the guide itself** (2026-08-11, TJ: *"the guide should walk through
+> **And the guide itself** (2026-08-11, the project owner: *"the guide should walk through
 > opening a reading, highlighting text, labeling a concept, building a thread,
 > sorting the knowledge graph, making a projection, and saving materials for a
 > concept map"* · *"by saving i meant the kit"*). Seven beats
@@ -382,7 +382,7 @@
 > separate screens. The dialog no longer *requires* the second (below), so the
 > beat asks for it and says it can wait.
 >
-> **Rebuilt to the standard pattern** (2026-08-12, TJ: *"this is not a great
+> **Rebuilt to the standard pattern** (2026-08-12, the project owner: *"this is not a great
 > guide… is this not a standard/best practice for these kinds of thing or am i
 > inventing something?"* — he is not). A guided tour has a settled anatomy and
 > the first version had one part of four. Now: a **masked backdrop** (four
@@ -420,7 +420,7 @@
 > read as one, which is what "out of sync with the activities they describe"
 > was pointing at.
 >
-> **And on the thread beat the RING WALKS those three** (2026-08-12, TJ: *"the
+> **And on the thread beat the RING WALKS those three** (2026-08-12, the project owner: *"the
 > glow should move with this"*). The hole stays the union — all three gestures
 > belong to one move, and closing the dim in behind the student would strand
 > anyone who picked the wrong pair — but the ring and the card's copy advance
@@ -433,7 +433,7 @@
 > `scripts/check-practice-guide.ts` asserts exactly that, plus that every
 > move's selector exists in `src/`.
 >
-> **Capturing does not turn the page** (2026-08-12, TJ: *"stage 3 of guide does
+> **Capturing does not turn the page** (2026-08-12, the project owner: *"stage 3 of guide does
 > not stay on page where passage was captured"*). The effect that turns to a
 > page with words on it — the practice reading opens on two covers, where "drag
 > across a line" points at a picture — depended on `state.passages`, so the
@@ -445,7 +445,7 @@
 > and fails if they differ.
 >
 > **The band says where you are, and offers the way out.** Both halves are
-> TJ's, the same day. The promise it used to make went — *"of course everything
+> the project owner's, the same day. The promise it used to make went — *"of course everything
 > should work. i dont expect tutorial to keep my work"* — leaving one sentence.
 > And it gained an **exit guide** (*"add an 'exit guide' button"*): until then
 > the only exits were the browser's Back button and the header, and nothing on
@@ -465,7 +465,7 @@
 > spec synthesised selection with `createRange`, which bypasses hit-testing and
 > would have passed a mask that blocked every drag a student makes.
 >
-> **Corrections the same day, all TJ's:** the header door says **guide**, not
+> **Corrections the same day, all the project owner's:** the header door says **guide**, not
 > "practice" — it names what the student is looking for rather than the
 > sandbox it runs in. The guide **floats** rather than displacing the layout
 > ("like floaters with a small glow"): a card in the corner furthest from its
@@ -480,7 +480,7 @@
 > under the whole board, and the glow was landing three thousand pixels below
 > the fold.
 >
-> **The concept-map kit is a download**, not a clipboard copy (TJ) — it is the
+> **The concept-map kit is a download**, not a clipboard copy (the project owner) — it is the
 > material you draw the real map from, so it belongs in the same folder as the
 > projection rather than in a buffer one Ctrl-C destroys.
 > `<student>-<projection>.concept-map-kit.md`. "Copy your read" is untouched.
@@ -495,7 +495,7 @@
 > keeps the theory — Bucciarelli, Wenger, Star, with Novak & Gowin added for
 > the board.
 >
-> **A passage does not require a concept** (TJ, 2026-08-12). The model has
+> **A passage does not require a concept** (the project owner, 2026-08-12). The model has
 > always said so — an Unlabeled Passage is a legal, first-class state — and
 > the capture form was the one surface in the app that refused it, holding Save
 > disabled until a name was typed. Save is now always live and reads **"Save
@@ -517,11 +517,11 @@
 > thinking (Novak and Gowin used cards on a table) and nothing else in the
 > guide asked for it; its predicate is a card's position changing, the one
 > student gesture the graph does not otherwise record. And the cloth beat —
-> "say what you make of it" — is **gone**: TJ, *"it is a nice to have in a
+> "say what you make of it" — is **gone**: the project owner, *"it is a nice to have in a
 > cloth not a must have."* Arrive · capture · name · thread · project · sort ·
 > board · kit.
 >
-> **Four things a walk through the deployed build found**, all TJ's, none of
+> **Four things a walk through the deployed build found**, all the project owner's, none of
 > them caught by a test that watched only predicates. **The guide had no
 > ending**: the last beat said "Done. Press next." over a button `disabled`
 > because there was nowhere to advance to (*"the instructions are to press
@@ -541,16 +541,16 @@
 > re-finds its target now (it waits for it, rather than looking once 260ms in
 > and giving up, which is why a rebuilt shelf came back dark), and when the
 > target is on the page but off the screen the card grows a **show me** button
-> — TJ's own suggestion, and better than dragging the page back under a student
+> — the project owner's own suggestion, and better than dragging the page back under a student
 > who just chose to look elsewhere. The notice also yields when the cutout
 > reaches it: it must ride above the mask (13% alpha, so underneath it a cutout
 > boundary drew a seam down the sentence) and above the mask it was covering
 > the kit button it was ringing.
 >
-> **Start over comes back, in the header** (2026-08-13, TJ: *"i need a way for
+> **Start over comes back, in the header** (2026-08-13, the project owner: *"i need a way for
 > a user to reset there loom, thus they 'start over'"*). What went away with
 > Keep on 2026-08-11 was the tab, never the exit; a tool you cannot start over
-> in is a tool you are afraid to work in. Two questions were TJ's and both are
+> in is a tool you are afraid to work in. Two questions were the project owner's and both are
 > answered here.
 >
 > **Whose capability.** Everyone's, over their own work — `loom-reset` is
@@ -561,7 +561,7 @@
 > but a sentence the function cannot say. Faculty read a student's loom
 > (`student-loom-read`) and that is where it stops.
 >
-> **Where it lives** (TJ: *"should there be a 'my loom' modal with this?
+> **Where it lives** (the project owner: *"should there be a 'my loom' modal with this?
 > between about and workflows?"*). Yes, and the slot is the argument: a
 > whole-loom surface had nowhere to live once Keep was deleted, and a station
 > is the thing that was deleted — so it is chrome, like About beside it.
@@ -573,7 +573,7 @@
 > Concepts and Links are shown as totals only, never filed under a reading:
 > they are user-level, and grouping them would teach the opposite of the model.
 >
-> **Why deletion and not a watermark** (TJ: *"if everything is timestamped on
+> **Why deletion and not a watermark** (the project owner: *"if everything is timestamped on
 > the user side, couldnt we just reset the clock?"*). It cannot work in this
 > schema. `saveCloth` and `saveView` are `onConflictDoUpdate` against UNIQUE
 > (userId, courseId, scopeKey|key), so rows left in place but hidden are
@@ -586,12 +586,12 @@
 > unique constraint** — not a clock. It is not needed, because the snapshot in
 > the event already is the record (undo: open-work 5.8).
 >
-> **And the narrower exit, at the object** (2026-08-13, TJ: *"where is the
+> **And the narrower exit, at the object** (2026-08-13, the project owner: *"where is the
 > clear cloth/reading? i thought we were adding one"* — he was right; the tier
 > was proposed, agreed in principle and then quietly dropped when "proceed" was
 > read as covering only the modal). `resetReading` lives on the cloth's own
 > card in 01 · Reading, below the download, because the order is the advice.
-> **Concepts, Links and Threads survive it** — TJ's call, and the model's: *a
+> **Concepts, Links and Threads survive it** — the project owner's call, and the model's: *a
 > concept does not belong to a text; a passage does*. Deleting them from a
 > reading-scoped act would reach into every other reading and would take a
 > concept named AHEAD of its evidence, a legal first-class state. What a
@@ -958,7 +958,7 @@ side and is unchanged. Shapes and the pure arithmetic live in
 export async functions, so the client imports the types from there and the two
 functions from here.
 
-Four decisions (TJ, 2026-08-07) are enforced in this module and nowhere else:
+Four decisions (the project owner, 2026-08-07) are enforced in this module and nowhere else:
 
 1. **The gate, per reading.** The archived spec's red line #8 ("the crowd must
    not pre-code the text") carries into v1: an overlay opens on a reading only
@@ -1008,17 +1008,17 @@ Model §3's five tabs against the seven-station journey. Only 03 changed:
 | Station | Component | Holds |
 | --- | --- | --- |
 | 00 Library | — (`/`) | the course's readings; always a link, never a workbench tab |
-| — | `JourneyNav` | **01/02/03/04 render greyed and inert outside a reading** (TJ, 2026-08-09): there is nowhere else for them to be. Keyed off "is this a tab you can work at here", not off a route list, so a surface that gains one of these tabs gets a live station for free. Their `DEFAULT_HREF` pointed at `/weave` until 2026-08-11 and now points at the Library; the entries are never read, because the stations render as spans. `04 Vocabulary` is UNSCOPED in the model and is the one that would be legitimate outside a text — greyed anyway until it gets a library-level surface of its own (keep-at-the-object §7) |
-| — | **`/access`** · `MetaPage` | **Access — the role matrix, its own tab** (TJ, 2026-08-09), staff only: each row cites the file and line that enforces it. `MetaPage` is the shared frame for a reference page — `/workflows` and `/access` change what is *below* the journey instead of replacing the frame, with no station active. **It is Courses' and Readings' shape: journey bar, then the page** (TJ, 2026-08-09: "workflows and access tabs should not spawn a header above their row, they should behave more like courses and readings, but without a specific course"). The heading lives in `<main>` with the content it names, exactly as `/admin/courses` puts its own `<h1>` there. An earlier pass gave these a `.scopebar` — a titled strip *above* the journey that no other staff surface has, so arriving pushed the row you had just clicked in down the page; that, its "‹ library" back link (a second door to what 00 · Library already opens) and its footer are all gone. **No `AdminNav`** — that is the "without a specific course" half: a course/section picker on a page holding no course data would be a control for a scope nothing here reads. The `/access` gate ignores the student lens, as `/admin` does: the lens hides the tab, it is not a lock |
-| — | **`src/lib/capabilities.ts`** | **the role/capability matrix** (TJ, 2026-08-09), rendered on `/workflows` under the flows. The file IS the matrix: every row names the **server gate that refuses**, and `check-workflows.ts` asserts the file exists and the symbol is still in it — a rename fails the build rather than leaving a confident, wrong table. `gate.line` deliberately unasserted. Deriving it found and fixed two holes: `peersOf` excluded `FACULTY` but not `INSTRUCTOR` (an admin's captures counted as a peer), and `createPassage` never authorized its `sourceId` while `attributePassages` did |
-| — | **`src/lib/viewAs.ts`** · `viewAsServer.ts` | **View as student** (TJ, 2026-08-09) — a lens beside the header pill. A **cookie**, because three differences are decided server-side and a client flag could not reach them: `/workflows` (three flows vs one), the Library query (an admin's shelf carries `isVisible=false` rows), and `getActiveCourse` itself. Masked **once**, in `getActiveCourse`, so every `isStaff`/`isAdmin` consumer goes quiet together; `staffTruly` rides along **unmasked for one purpose only** — drawing the control that takes the lens off. **Withholds, never grants**: every use hides a control or NARROWS a query, and no authorization path consults it (`authorizeSourceAccess` deliberately untouched). Not a security boundary |
-| — | `JourneyNav` · `.staffgroup` | **the staff group, right of the journey, in sage** (TJ, 2026-08-09) — Roster · Cohort Graph for FACULTY, plus Readings · Courses for site ADMIN, on **every** surface including `/admin`. Unnumbered: they are not steps on the student's arc. Replaces `AdminNav`'s tab row, which now holds only the course/section pickers. Drawn from `course.isStaff` / `course.isAdmin`; decides what is drawn, never what may be read |
+| — | `JourneyNav` | **01/02/03/04 render greyed and inert outside a reading** (the project owner, 2026-08-09): there is nowhere else for them to be. Keyed off "is this a tab you can work at here", not off a route list, so a surface that gains one of these tabs gets a live station for free. Their `DEFAULT_HREF` pointed at `/weave` until 2026-08-11 and now points at the Library; the entries are never read, because the stations render as spans. `04 Vocabulary` is UNSCOPED in the model and is the one that would be legitimate outside a text — greyed anyway until it gets a library-level surface of its own (keep-at-the-object §7) |
+| — | **`/access`** · `MetaPage` | **Access — the role matrix, its own tab** (the project owner, 2026-08-09), staff only: each row cites the file and line that enforces it. `MetaPage` is the shared frame for a reference page — `/workflows` and `/access` change what is *below* the journey instead of replacing the frame, with no station active. **It is Courses' and Readings' shape: journey bar, then the page** (the project owner, 2026-08-09: "workflows and access tabs should not spawn a header above their row, they should behave more like courses and readings, but without a specific course"). The heading lives in `<main>` with the content it names, exactly as `/admin/courses` puts its own `<h1>` there. An earlier pass gave these a `.scopebar` — a titled strip *above* the journey that no other staff surface has, so arriving pushed the row you had just clicked in down the page; that, its "‹ library" back link (a second door to what 00 · Library already opens) and its footer are all gone. **No `AdminNav`** — that is the "without a specific course" half: a course/section picker on a page holding no course data would be a control for a scope nothing here reads. The `/access` gate ignores the student lens, as `/admin` does: the lens hides the tab, it is not a lock |
+| — | **`src/lib/capabilities.ts`** | **the role/capability matrix** (the project owner, 2026-08-09), rendered on `/workflows` under the flows. The file IS the matrix: every row names the **server gate that refuses**, and `check-workflows.ts` asserts the file exists and the symbol is still in it — a rename fails the build rather than leaving a confident, wrong table. `gate.line` deliberately unasserted. Deriving it found and fixed two holes: `peersOf` excluded `FACULTY` but not `INSTRUCTOR` (an admin's captures counted as a peer), and `createPassage` never authorized its `sourceId` while `attributePassages` did |
+| — | **`src/lib/viewAs.ts`** · `viewAsServer.ts` | **View as student** (the project owner, 2026-08-09) — a lens beside the header pill. A **cookie**, because three differences are decided server-side and a client flag could not reach them: `/workflows` (three flows vs one), the Library query (an admin's shelf carries `isVisible=false` rows), and `getActiveCourse` itself. Masked **once**, in `getActiveCourse`, so every `isStaff`/`isAdmin` consumer goes quiet together; `staffTruly` rides along **unmasked for one purpose only** — drawing the control that takes the lens off. **Withholds, never grants**: every use hides a control or NARROWS a query, and no authorization path consults it (`authorizeSourceAccess` deliberately untouched). Not a security boundary |
+| — | `JourneyNav` · `.staffgroup` | **the staff group, right of the journey, in sage** (the project owner, 2026-08-09) — Roster · Cohort Graph for FACULTY, plus Readings · Courses for site ADMIN, on **every** surface including `/admin`. Unnumbered: they are not steps on the student's arc. Replaces `AdminNav`'s tab row, which now holds only the course/section pickers. Drawn from `course.isStaff` / `course.isAdmin`; decides what is drawn, never what may be read |
 | **01 Reading** | `Workbench` + `PdfViewer` + `OpenTab` + `ClothFold` | **the merged station** — the text, in-reading search, Passages Overlay, capture; the reading-scoped **Capture Log** as **Your work** (`#yourwork`), a sheet that slides over the text — closed by default, toggled from the viewer toolbar, and mounted *inside* `.pdf-shell` so it survives fullscreen; the **Cloth Title/Description** at the head of that sheet; **the margin cards** (2026-08-09, from the reverted spread canvas) — page mode's "Cards" toggle, `ConceptRails`: read-only cards beside each page, leader-lined to their highlights, a door to Your work and never an editor, rails and cards `user-select:none` so a stray drag cannot file text to the wrong page; and **a matrix that zooms as pure transform** (`PageRaster` under a once-rendered text layer), visible pages re-rastering after the gesture settles |
-| 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Threads download here. **Three columns since 2026-08-12** (`.three`) — the warp, the bench, and the threads, which used to be a strip under the bench that you scrolled the whole bench to reach; at ≤1240px the third folds full-width beneath the other two, which is exactly the old shape. **A thrown thread's description is editable in the list** (TJ, 2026-08-12) — it was writable only at throw-time and on 04, filed under whichever label the thread carries, so an unlabelled thread's sentence could be read, quoted in its delete dialog and exported, and changed nowhere. The ENDS stay fixed: re-pointing a thread is a different claim, and throwing a new one says so. Not on the ⌘Z stack, which is label history. It used to carry `ClothFold` at the whole weave, which had no Reading station; that branch went with the whole weave on 2026-08-11, and the Cloth's only editor is 01 · Reading |
-| 03 Knowledge Graph | `MapTab` + **`ClothReflection`** | **TWO SECTIONS** (TJ, 2026-08-12): **The cloth** — the weave and its prompts, side by side — then a third section, **The log** (TJ, 2026-08-12) — it belongs to the cloth rather than to any projection (it records how this cloth came to be and does not change when you switch projections, which is what sitting under them implied) but is a different KIND of thing, so it gets a heading of its own. **No longer a `<details>` fold**: it is a section, so the record loads on arrival — once per scope, guarded by a ref, because the fetch's reading filter closes over `state` and depending on it would refetch on every keystroke. It has **two views of one position**: a **timeline** (the slider, replaying the cloth act by act) and a **list** (every act with its own timestamp, which the timeline cannot show because it holds a single moment). **A row click moves the replay and stays in the list** (TJ, 2026-08-12: reading the record and watching the cloth are different jobs); crossing between the views is a badge that says so — *"on the cloth ›"* per row, *"in the list ›"* on the timeline — and arriving in the list scrolls the marked act into view, without which the door works from act 60 and still strands you. The timeline **plays**, one act per 420ms, stopping at the end rather than looping because the record has one; and **whatever the current act touched glows ochre and fades over a second** — a concept or thread glows itself, a capture glows the concept it was filed under (a passage is not drawn on the cloth). The glow is keyed to a counter rather than the position, so two acts touching one concept pulse twice instead of sitting lit, and it honours `prefers-reduced-motion`. The slider is **ticked by ACT, not by clock** (spacing by clock smears an evening's work into a blur and gives the gap to next week half the bar), thinning above ~180 acts so the strip never goes solid, and it **starts at act 1**, not at 0, which was "before the first recorded act": a state nobody ever made. **One set of ticks, inset by the thumb's radius** — there were two and they could not agree: a browser paints `list=` marks across the whole track while the thumb travels only between its own half-widths, so the drawn strip sat 8px off at each end. The datalist is gone; the strip spans exactly the thumb's travel. The list rows carry **what the act was about**, not just its verb (TJ: *"help the student remember their decision making process"*) — the passage's own words and the student's note on it, the concepts it was filed under, a thread's sentence and ends, which concepts a sort moved and to which tier (`map.retier` records `changed`), which piece of writing was touched, and the citation. Payload first, live rows second, absent when a row is gone — the honest state for a log that outlives its rows. Days are headed where the date turns over. The panel no longer says *"counted, never judged"* (TJ: *"i dont get the counted never judged line, that seems weird"*) — that is the build's own phrase, red line #7, and it had leaked into student copy in two places here; the same phrase still captions 03's cloth prompts and the board mirror. Then **Projections**, headed by the switcher (which projection you are in decides what every column shows) and laid out **1–2–1** (`.projgrid`): **sort · the board · your read**, the board taking half because it is the surface you work on. An explicit `1fr 2fr 1fr` cannot fold itself the way `auto-fit` does, so the fold is a **container query** on `.projwrap` at the sum of the three minimums — the grid's own width, per §2c-iii, which matters because this station's content box is not the viewport. The page title says both acts: *"Examine your cloth — lay out your projection."* **No unlabeled-passages group here** — TJ: *"there should not be an unlabeled passages section in the knowledge graph."* That group stood for model ruling 38 (a projection shows its unattached passages); the passages now appear in 01's **Your work** under `Unlabeled`, which is nearer the words and is where the capture toast points, and they still travel in the cloth and projection exports. The model doc still asks for the group here — **a divergence, logged not papered over**, and TJ's to reconcile. The cloth and the board both lay out to their container down to **480px** and their wrappers scroll below that; each SVG carries a matching `min-width`, without which `width:100%` silently cropped the layout instead of scrolling it. Also: projections, tiers, **the list and the board**: they are one gesture — a prompt on the right lights the cloth on the left — and stacked they could not both be seen while tracing; they are also the material the rest of the station sorts, which is a reason to meet them first. The read stays at the foot, beside the arrangement it describes. `ClothMap` lays out to its container down to **480px** (was a 720 floor that clipped rather than shrank) and `#mapWrap` scrolls below that; its right margin is 96px so the last rotated label lands inside the frame. **Its arcs are clicked through a wide invisible twin** (14px, transparent), the drawn arc is `pointer-events:none` and the warp lines are click-through — SVG hit-testing on a stroke is exactly the stroke, so the panel's promise that you could click "a concept/arc on the cloth" was true of the code and false in the hand: a 1.5px hairline crossed by full-height warp lines, and aiming at an arc mostly selected nothing (TJ, 2026-08-12, by asking whether the sentence was true). Also: projections, tiers, **the list and the board** (the sorted rows and the tiered card-and-thread surface — "board", never "table", which reads as a spreadsheet on a screen; TJ 2026-08-10); the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); **the Capture Log for this reading** (`HistoryPanel` — the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**), downloadable |
+| 02 Linking | `ThrowTab` | links, Description-then-Label. **This reading's concepts only.** Threads download here. **Three columns since 2026-08-12** (`.three`) — the warp, the bench, and the threads, which used to be a strip under the bench that you scrolled the whole bench to reach; at ≤1240px the third folds full-width beneath the other two, which is exactly the old shape. **A thrown thread's description is editable in the list** (the project owner, 2026-08-12) — it was writable only at throw-time and on 04, filed under whichever label the thread carries, so an unlabelled thread's sentence could be read, quoted in its delete dialog and exported, and changed nowhere. The ENDS stay fixed: re-pointing a thread is a different claim, and throwing a new one says so. Not on the ⌘Z stack, which is label history. It used to carry `ClothFold` at the whole weave, which had no Reading station; that branch went with the whole weave on 2026-08-11, and the Cloth's only editor is 01 · Reading |
+| 03 Knowledge Graph | `MapTab` + **`ClothReflection`** | **TWO SECTIONS** (the project owner, 2026-08-12): **The cloth** — the weave and its prompts, side by side — then a third section, **The log** (the project owner, 2026-08-12) — it belongs to the cloth rather than to any projection (it records how this cloth came to be and does not change when you switch projections, which is what sitting under them implied) but is a different KIND of thing, so it gets a heading of its own. **No longer a `<details>` fold**: it is a section, so the record loads on arrival — once per scope, guarded by a ref, because the fetch's reading filter closes over `state` and depending on it would refetch on every keystroke. It has **two views of one position**: a **timeline** (the slider, replaying the cloth act by act) and a **list** (every act with its own timestamp, which the timeline cannot show because it holds a single moment). **A row click moves the replay and stays in the list** (the project owner, 2026-08-12: reading the record and watching the cloth are different jobs); crossing between the views is a badge that says so — *"on the cloth ›"* per row, *"in the list ›"* on the timeline — and arriving in the list scrolls the marked act into view, without which the door works from act 60 and still strands you. The timeline **plays**, one act per 420ms, stopping at the end rather than looping because the record has one; and **whatever the current act touched glows ochre and fades over a second** — a concept or thread glows itself, a capture glows the concept it was filed under (a passage is not drawn on the cloth). The glow is keyed to a counter rather than the position, so two acts touching one concept pulse twice instead of sitting lit, and it honours `prefers-reduced-motion`. The slider is **ticked by ACT, not by clock** (spacing by clock smears an evening's work into a blur and gives the gap to next week half the bar), thinning above ~180 acts so the strip never goes solid, and it **starts at act 1**, not at 0, which was "before the first recorded act": a state nobody ever made. **One set of ticks, inset by the thumb's radius** — there were two and they could not agree: a browser paints `list=` marks across the whole track while the thumb travels only between its own half-widths, so the drawn strip sat 8px off at each end. The datalist is gone; the strip spans exactly the thumb's travel. The list rows carry **what the act was about**, not just its verb (the project owner: *"help the student remember their decision making process"*) — the passage's own words and the student's note on it, the concepts it was filed under, a thread's sentence and ends, which concepts a sort moved and to which tier (`map.retier` records `changed`), which piece of writing was touched, and the citation. Payload first, live rows second, absent when a row is gone — the honest state for a log that outlives its rows. Days are headed where the date turns over. The panel no longer says *"counted, never judged"* (the project owner: *"i dont get the counted never judged line, that seems weird"*) — that is the build's own phrase, red line #7, and it had leaked into student copy in two places here; the same phrase still captions 03's cloth prompts and the board mirror. Then **Projections**, headed by the switcher (which projection you are in decides what every column shows) and laid out **1–2–1** (`.projgrid`): **sort · the board · your read**, the board taking half because it is the surface you work on. An explicit `1fr 2fr 1fr` cannot fold itself the way `auto-fit` does, so the fold is a **container query** on `.projwrap` at the sum of the three minimums — the grid's own width, per §2c-iii, which matters because this station's content box is not the viewport. The page title says both acts: *"Examine your cloth — lay out your projection."* **No unlabeled-passages group here** — the project owner: *"there should not be an unlabeled passages section in the knowledge graph."* That group stood for model ruling 38 (a projection shows its unattached passages); the passages now appear in 01's **Your work** under `Unlabeled`, which is nearer the words and is where the capture toast points, and they still travel in the cloth and projection exports. The model doc still asks for the group here — **a divergence, logged not papered over**, and the project owner's to reconcile. The cloth and the board both lay out to their container down to **480px** and their wrappers scroll below that; each SVG carries a matching `min-width`, without which `width:100%` silently cropped the layout instead of scrolling it. Also: projections, tiers, **the list and the board**: they are one gesture — a prompt on the right lights the cloth on the left — and stacked they could not both be seen while tracing; they are also the material the rest of the station sorts, which is a reason to meet them first. The read stays at the foot, beside the arrangement it describes. `ClothMap` lays out to its container down to **480px** (was a 720 floor that clipped rather than shrank) and `#mapWrap` scrolls below that; its right margin is 96px so the last rotated label lands inside the frame. **Its arcs are clicked through a wide invisible twin** (14px, transparent), the drawn arc is `pointer-events:none` and the warp lines are click-through — SVG hit-testing on a stroke is exactly the stroke, so the panel's promise that you could click "a concept/arc on the cloth" was true of the code and false in the hand: a 1.5px hairline crossed by full-height warp lines, and aiming at an arc mostly selected nothing (the project owner, 2026-08-12, by asking whether the sentence was true). Also: projections, tiers, **the list and the board** (the sorted rows and the tiered card-and-thread surface — "board", never "table", which reads as a spreadsheet on a screen; the project owner 2026-08-10); the cloth and its counted prompts; **the** read (`#mapEssence` / `#yourRead2`); **the Capture Log for this reading** (`HistoryPanel` — the only surface the UI still calls **"Capture Log"**; on 01 the same object reads **Your work**), downloadable |
 | **04 Vocabulary** | **`VocabularyTab`** | **the User's holdings, UNSCOPED** — every Concept and Link Label across all readings; filter; edit Descriptions; recurrence (distinct readings evidencing a concept, links per label); ~~merge Concepts — its only home~~ **merge is HIDDEN, 2026-08-12** (`MERGE_VISIBLE`, below); Concepts/Links Overlays |
-| ~~05 Weave~~ | — | **GONE, route and station, 2026-08-11.** Hiding it had not been enough: `/weave` carried no gate of any kind, and the Library's search results linked into it in four places. **TJ:** *"we are removing whole weave as it exists in the app because it is poorly defined and not supported in the course. it should not be in the app as an idea until the faculty and the authors of the app agree on what it means to have a 'full weave'."* `Workbench` now requires a reading; `WHOLE_WEAVE` survives only as the internal scope of surfaces that are not a reading (the Library), and no student surface writes at `scopeKey ''`. Rows already written there are left where they are — TJ: *"i am not at all worried about losing whole weave"* — and are simply not rendered |
-| ~~05 Keep~~ | — | **GONE, 2026-08-11.** Download happens at each object instead — the cloth at 01, threads at 02, a projection and the Capture Log at 03, vocabulary at 04 — which is what the model said all along (*"Export — both levels: a Cloth … and a Projection"*). Import, "clear the table" and "take it all out" went with it (TJ, 2026-08-10), and so did the worked example, whose only exit was that reset; the practice loom at `/sandbox` replaced it, and the Library's "New to this?" card is now its first door. The bar is the model's five, 00–04 |
+| ~~05 Weave~~ | — | **GONE, route and station, 2026-08-11.** Hiding it had not been enough: `/weave` carried no gate of any kind, and the Library's search results linked into it in four places. **the project owner:** *"we are removing whole weave as it exists in the app because it is poorly defined and not supported in the course. it should not be in the app as an idea until the faculty and the authors of the app agree on what it means to have a 'full weave'."* `Workbench` now requires a reading; `WHOLE_WEAVE` survives only as the internal scope of surfaces that are not a reading (the Library), and no student surface writes at `scopeKey ''`. Rows already written there are left where they are — the project owner: *"i am not at all worried about losing whole weave"* — and are simply not rendered |
+| ~~05 Keep~~ | — | **GONE, 2026-08-11.** Download happens at each object instead — the cloth at 01, threads at 02, a projection and the Capture Log at 03, vocabulary at 04 — which is what the model said all along (*"Export — both levels: a Cloth … and a Projection"*). Import, "clear the table" and "take it all out" went with it (the project owner, 2026-08-10), and so did the worked example, whose only exit was that reset; the practice loom at `/sandbox` replaced it, and the Library's "New to this?" card is now its first door. The bar is the model's five, 00–04 |
 
 **A Concept with no Passages is in scope everywhere.** `scoped()` in
 [scope.ts](../src/lib/scope.ts) reads
@@ -1037,7 +1037,7 @@ reading's captures; 04 Vocabulary is everything you own.** A concept does not
 belong to a reading — a passage does — so the holdings render identically
 inside a reading and at the whole weave. The Overlay alone stays reading-gated.
 
-**What Your work lists** (TJ, 2026-08-12): concepts evidenced here (`In this
+**What Your work lists** (the project owner, 2026-08-12): concepts evidenced here (`In this
 reading`), concepts with no evidence anywhere (`No evidence`), and **this
 reading's Unlabeled Passages** (`Unlabeled` — quote, note, citation, and an
 input that names one when the word arrives). Kinds, never stages. The
@@ -1061,7 +1061,7 @@ Before this pass 03 held the cloth prompts and a *second* read editor
 (`#readEssence`/`#yourRead`) writing the same map fields as 04's; those ids no
 longer exist.
 
-**Merge is behind a curtain** (TJ, 2026-08-12: *"hide the merge capability in
+**Merge is behind a curtain** (the project owner, 2026-08-12: *"hide the merge capability in
 the concepts list in vocabulary. we need to resolve what this really means and
 its consequences."*). `MERGE_VISIBLE` in
 [VocabularyTab.tsx](../src/components/tabs/VocabularyTab.tsx) is `false`; the
@@ -1069,7 +1069,7 @@ its consequences."*). `MERGE_VISIBLE` in
 `concept.merge` event are all untouched, so a merge already performed still
 reads in the Capture Log and one flag restores the control. **This is a build
 state, not a model change** — [loom-model-build.md](loom-model-build.md) still
-gives Vocabulary the merge and stays the authority; the question TJ has put on
+gives Vocabulary the merge and stays the authority; the question the project owner has put on
 it is logged in [open-work.md](open-work.md).
 
 The consequences, because they are copy in five places rather than one control:
@@ -1139,7 +1139,7 @@ Access: gated by `getStaffViewer` — admins **and faculty**, since the page hol
 no course data at all and the student flow is what an instructor most needs to
 read. Learners are returned to `/`.
 
-### 2c-iii. Screen widths — the standard (TJ, 2026-08-12)
+### 2c-iii. Screen widths — the standard (the project owner, 2026-08-12)
 
 **Loom is a desktop tool.** Not a responsive site that happens to run on a
 laptop: it is used at a desk, on a course's readings, next to a PDF. What
@@ -1189,7 +1189,7 @@ second most common "resolution" is 1536×864 — a panel nobody manufactures, an
 **Check a layout at 1280 · 1536 · 1728 · 1920**, and never by assuming a 1920
 panel gives 1920 CSS pixels. Not at phone widths.
 
-**Two controls, and they are not the same one** (TJ, 2026-08-12). The header's
+**Two controls, and they are not the same one** (the project owner, 2026-08-12). The header's
 **full screen** (beside *guide*, every page) is the browser's Fullscreen API on
 `documentElement` — it buys back the ~90–120px of tab strip and URL bar, which
 is the cheapest vertical there is. `useSyncExternalStore` over
@@ -1402,7 +1402,7 @@ delete or replace anything.
 13. **An overlay never resolves to a person, and never opens early.** Both
     overlay actions gate on the viewer's own capture in the reading, exclude
     the viewer and faculty from the peer set, and return counts of people —
-    never a name, an id, or a row that carries one (ruling 28; TJ's four
+    never a name, an id, or a row that carries one (ruling 28; the project owner's four
     decisions, §2c-bis).
 
 ### Known contract debts (tracked, deliberate)

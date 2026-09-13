@@ -4,7 +4,7 @@ Everything PR #10 (`reading-canvas-intent`, Lingxiu) changes, broken into
 pieces that can be taken, changed or refused one at a time.
 
 Written 2026-08-17. Lingxiu is not available and will not be consulted on these;
-TJ decides all of them. So every item below carries a **recommendation** and the
+the project owner decides all of them. So every item below carries a **recommendation** and the
 evidence behind it, rather than a question to route to someone else. Where the
 recommendation rests on a judgment rather than a fact, it says so.
 
@@ -15,7 +15,7 @@ recommendation rests on a judgment rather than a fact, it says so.
 document originally assumed are no longer true, and one route it did not
 contain turned out to be the answer:
 
-- **PRs #20 and #21 were closed unmerged** (TJ, deliberately). Their heads
+- **PRs #20 and #21 were closed unmerged** (the project owner, deliberately). Their heads
   survive as `refs/pull/20/head` and `refs/pull/21/head` if anything is ever
   wanted back from them, but nothing from either reached `dev`.
 - **Item 4, reading focus, is dropped**, and items 5 and 6 fell with it — both
@@ -48,7 +48,7 @@ what is here is good.
 | 8 | Cards edit in place | **Deferred**, then taken in part | the NOTE ships; the concept does not |
 | 9 | The card's subject is the passage | **Deferred with 8** — does not separate | not started |
 | 11 | Zoom floor and ceiling | **Refused** — the current ones are fine | nothing to do |
-| 12 | Trackpad: scroll pans, pinch zooms | **Taken, retuned** (TJ, 2026-08-19) | `SpreadCanvasView.tsx` |
+| 12 | Trackpad: scroll pans, pinch zooms | **Taken, retuned** (the project owner, 2026-08-19) | `SpreadCanvasView.tsx` |
 
 Eight settled, one dropped, two deferred, two refused, one taken with
 changes. **Every item in this table has now been decided.** What is open is no
@@ -151,7 +151,7 @@ proof, and neither the current pattern nor the proposed one changes that.
 
 ## 4. Reading focus · Dropped
 
-**Decision (TJ, 2026-08-17): dropped.** PR #20 was closed unmerged on purpose.
+**Decision (the project owner, 2026-08-17): dropped.** PR #20 was closed unmerged on purpose.
 Nothing below is being built; it is kept because items 5 and 6 were written as
 consequences of it, and because the cost it names is real and will come back if
 reading focus is ever reconsidered.
@@ -229,12 +229,12 @@ conflated by item 6:
 
 Either alone leaves a bar of something else around the text. Getting the text
 onto the actual screen took both buttons, in two places — and the name "Just
-the text" (TJ, 2026-08-12) existed to apologise for a distinction the reader
+the text" (the project owner, 2026-08-12) existed to apologise for a distinction the reader
 should never have had to hold.
 
 **Landed.** The toolbar's control now does **both halves** and is named
 `full screen text` for it. The header keeps `full screen` for the whole app, on
-every station. TJ, 2026-08-17: *"one is to make the app full screen, the other
+every station. the project owner, 2026-08-17: *"one is to make the app full screen, the other
 to make the pdf full screen — this is ok but needs clearer labels."*
 
 Three things that fell out of building it, each worth keeping:
@@ -300,7 +300,7 @@ are noise read aloud.
 
 ## 8. Cards edit in place · Take — half of it shipped 2026-08-19
 
-**TJ, 2026-08-19: "the passage rail card passage note should be editable in
+**the project owner, 2026-08-19: "the passage rail card passage note should be editable in
 place."** So the note is written on the card now, in page mode and on the
 canvas, and the reversal this section asked to be recorded IS recorded — at the
 head of `ConceptRail.tsx`, where the 2026-08-09 read-only ruling is written
@@ -325,7 +325,7 @@ This **reverses the 2026-08-09 read-only ruling** that cards are doors, not
 editors.
 
 **Recommendation: take it, and record the reversal explicitly.** Two grounds.
-TJ's own comment on #9 — quoted in `1f1f8cb` — already moved this way: "each
+the project owner's own comment on #9 — quoted in `1f1f8cb` — already moved this way: "each
 card is paired with its highlight and the highlight IS the passage." And the red
 line the read-only ruling was defending does not say what the code comment
 implies: red line #5 is *"the student's work is never inaccessible or partial"*,
@@ -347,7 +347,7 @@ that to apply to — the card is `role="button"` with an `onClick` that opens
 Your work, per the 2026-08-09 ruling. The commit order says the same:
 `c502f7e` (item 8) then `1f1f8cb` (item 9), and 9's own message reads "name and
 gloss edit in place, **as before**". This document's claim that "9 could go
-first if it separates cleanly" is wrong. TJ passed on 8 on 2026-08-17 ("that is
+first if it separates cleanly" is wrong. the project owner passed on 8 on 2026-08-17 ("that is
 a can of worms"), so 9 is deferred with it.
 
 **And it is not a red-line fix.** Red line #4 is verbatim as quoted
@@ -400,7 +400,7 @@ repo's own rule.
 The `Cards` toggle goes; both rails always show in page mode ("fixed sides").
 
 This document said it *"should not land before 8 — on its own it just removes a
-control."* **TJ overruled that (2026-08-17): "cards goes even if read only,
+control."* **the project owner overruled that (2026-08-17): "cards goes even if read only,
 that is fine."** So it landed alone. The argument still holds in the other
 direction — a toggle that hides the margin is a toggle that hides where the
 work is — and it holds whether or not the card is an editor yet.
@@ -415,7 +415,7 @@ same claim, a control that still exists.
 
 ## 11. Zoom floor and ceiling · Refused
 
-**TJ, 2026-08-17: "i think the current zoom floor and ceiling are fine."**
+**the project owner, 2026-08-17: "i think the current zoom floor and ceiling are fine."**
 Nothing to do. The original write-up follows.
 
 Floor moves from `fitAllK × 0.5` to `fitAllK` exactly, so you can no longer pull
@@ -453,14 +453,14 @@ what is there now.
 **Recommendation: keep the current wheel-zoom.** The change carries no evidence
 that the existing behaviour was failing, and the burden sits with the change.
 The comment attributions make the same point from the other side — the code
-being replaced is marked *"the map-canvas idiom (TJ, 2026-08-10)"* and the
+being replaced is marked *"the map-canvas idiom (the project owner, 2026-08-10)"* and the
 replacement *"(Lingxiu, 2026-08-15)"*.
 
 If you decide you want the Figma idiom after using it, it is takeable — but only
 with `deltaMode`-aware tuning like the handler it replaced had. Do not take it
 as written.
 
-**TJ, 2026-08-19: "take the figma idiom properly in canvas mode, and make sure
+**the project owner, 2026-08-19: "take the figma idiom properly in canvas mode, and make sure
 the zoom is smooth not abrupt."** Taken on that condition, not as written — the
 preference was decided in its favour, the defect was not accepted with it.
 
@@ -502,7 +502,7 @@ Worth stating, because a 621-line deletion invites the assumption that things
 went missing:
 
 - **The minimap** rides along untouched — identical on both branches.
-- **Strip mode** stays hidden, not deleted (TJ, 2026-08-10). Render branch and
+- **Strip mode** stays hidden, not deleted (the project owner, 2026-08-10). Render branch and
   CSS remain, so restoring a button restores the mode.
 - **Page mode's ctrl+wheel zoom** is unchanged; 12 only affects the canvas.
 
@@ -516,7 +516,7 @@ ruling, or already on `feat/reading-toolbar-cleanup`.
    `feat/reading-toolbar-cleanup`.
 2. ~~Item 7~~ — **refused**, and the real defect underneath it fixed on the
    same branch.
-3. ~~Items 13 and 11~~ — **refused**: one was not a bug, the other TJ is happy
+3. ~~Items 13 and 11~~ — **refused**: one was not a bug, the other the project owner is happy
    with as it stands.
 4. **Items 8 + 9** — deferred together. Much of what they wanted has arrived by
    another route (see the second session below): the card is no longer keyed to
@@ -535,11 +535,11 @@ changes, and a test account that wants reseeding. All three app bugs are fixed
 under "The third session": the canvas recenter, the cards at full zoom-out and
 the missing highlights. Of the three diagnoses this document carried into that
 session, one survived contact — and the highlights were fixed by a route it
-did not contain, found in TJ's own description of when the thing breaks.
+did not contain, found in the project owner's own description of when the thing breaks.
 
 ## The second session — what came out of looking at the app
 
-Everything above is PR #10's. Everything here came from TJ working through the
+Everything above is PR #10's. Everything here came from the project owner working through the
 running app on 2026-08-17, and none of it was on anyone's list. It is recorded
 because the branch is 33 commits, and a reader who only had this document would
 think the work stopped at item 10.
@@ -669,7 +669,7 @@ route recorded there.
   lying. `loom-model-build.md` §Concept says a Concept with no Passages "belongs
   to no Reading"; that sentence changes first.
 - **Optional concept name.** The model already allows it ("Label … may be null at
-  capture"). Needs the "one or the other or both" constraint TJ added — which the
+  capture"). Needs the "one or the other or both" constraint the project owner added — which the
   model does not state — a validation, and a display decision across 67 label
   sites.
 
@@ -747,7 +747,7 @@ continuing to travel.
 
 ### The Passages/Concepts switch scrolled away · Done
 
-TJ, 2026-08-18: it "should remain visible". `.yourwork-body` is the sheet's
+the project owner, 2026-08-18: it "should remain visible". `.yourwork-body` is the sheet's
 one scroller and the card inside it is as tall as the list — 3829px of scroll
 on the test account's 11 passages at 1536x900 — so the switch left the top of
 the panel on the first wheel notch, and changing which end of the join you
@@ -773,7 +773,7 @@ is not a function of the viewport.
 
 ### The cards overlapped at full zoom-out · Done — they didn't
 
-TJ, 2026-08-18, working the canvas: "the cards overlap badly." They were not
+the project owner, 2026-08-18, working the canvas: "the cards overlap badly." They were not
 overlapping. Their **labels** were leaving them, and landing on the neighbour.
 
 `.pdf-railcard-chip` is a `<span>`, but it is a flex item of
@@ -795,7 +795,7 @@ that is why it showed at the floor (5.98) and barely at Fit (3.05). The fix is
 containment rather than clamping `--invk`, because a label leaving its card is
 wrong at every zoom, not only past a threshold.
 
-**Two lines before the ellipsis** (TJ: "why not wrap a bit?"). One line was
+**Two lines before the ellipsis** (the project owner: "why not wrap a bit?"). One line was
 the rule for a reason that this change removes: the chip was an inline box, so
 label and × flowed on one line and a wrap pushed the × onto a second row,
 under the word it removes. In a flex row the × is an item beside the label.
@@ -804,7 +804,7 @@ characters and two show 19; at 1920, 16 and then all 22.
 
 ### Highlights at full zoom-out · one attempt withdrawn first
 
-**The first attempt was withdrawn**, shown to TJ and taken back out. What it
+**The first attempt was withdrawn**, shown to the project owner and taken back out. What it
 learned is worth more than the attempt was, and the fix that landed is in the
 section after this one.
 
@@ -835,7 +835,7 @@ drawing a visible mark from the same formula is simply what made it legible.
 The comment on that code calls it "wrong by a line or two", which holds for
 one column and not at all for two.
 
-**Second fault, found by TJ in his own data and not in the test account's:** at
+**Second fault, found by the project owner in his own data and not in the test account's:** at
 Fit a card is about one page wide and sits over its own page, so a
 full-page-width band is almost entirely hidden behind the card that points at
 it, leaving a yellow sliver beside the card that reads as a rendering glitch.
@@ -846,7 +846,7 @@ in them.
 
 ### Highlights at full zoom-out · Done, by keeping what was measured
 
-TJ, 2026-08-18: it works "at almost 'fit', but zoom out just a touch more and
+the project owner, 2026-08-18: it works "at almost 'fit', but zoom out just a touch more and
 it breaks". That sentence is the whole diagnosis, and it pointed at a better
 fix than either the withdrawn arithmetic or the pdf.js route above.
 
@@ -902,7 +902,7 @@ only needed for pages the reader has never zoomed into.
 None of these are in this pass. They are recorded because each was found by
 measuring rather than reading, and would otherwise have to be found again.
 
-**Rename `refilePassage` → `addPassageConcept`** (TJ, 2026-08-17). The name
+**Rename `refilePassage` → `addPassageConcept`** (the project owner, 2026-08-17). The name
 says the opposite of what it does: it does not move a passage from one concept
 to another, it **adds** a filing — inserts a `passage_concept` row and returns
 `[...existing, conceptId]`, throwing only if that pair already exists. The UI

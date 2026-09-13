@@ -1,8 +1,8 @@
 # Open work — the order to take it in
 
-**Written 2026-08-09, after a day of TJ's rulings.** Everything here is recorded
+**Written 2026-08-09, after a day of the project owner's rulings.** Everything here is recorded
 in more detail somewhere else; this file is only the *sequence*, and the reasons
-for it. Where a line says "TJ's call", it is not a nag — it is a fork the work
+for it. Where a line says "the project owner's call", it is not a nag — it is a fork the work
 cannot pass without an answer.
 
 The ordering principle: **fix what is wrong before building what is missing, and
@@ -27,7 +27,7 @@ few lines, and each is currently costing something.
 control, an un-evidenced concept was labelled — in `var(--red)` — *"No passage
 evidences this yet — every concept **should** trace to something you captured."*
 That is an instruction to repair a state the model made first-class the same
-week: *a Concept may precede its evidence* (TJ, 2026-08-08), and red line 4,
+week: *a Concept may precede its evidence* (the project owner, 2026-08-08), and red line 4,
 *"empty states are visible, not blocked"*. Now black, and descriptive: "You may
 have named it ahead of finding it, or its passages may have moved on."
 
@@ -39,7 +39,7 @@ their passage count, because that is the only thing on screen that tells two of
 them apart, and the choice is not recoverable ("There is no unmerge"). The
 `conceptOptions` datalist lost its last consumer and went with it.
 
-*Copy note for TJ:* 0.4's three headings now read "CONCEPTS (most threads first
+*Copy note for the project owner:* 0.4's three headings now read "CONCEPTS (most threads first
 — the number is how many touch each)", "THE LONGEST CHAIN (the most threads that
 connect end to end)" and "NO THREAD TOUCHES THESE YET". Each says what was
 counted and how it was ordered; none says what to do about it. Reword freely —
@@ -49,7 +49,7 @@ the rule is the point, not the wording.
 
 ## Phase 1 — **05 Weave: ruled 2026-08-09, and the answer is "not now"**
 
-> **TJ, 2026-08-10 — the priority above this whole phase:** *"projections are
+> **the project owner, 2026-08-10 — the priority above this whole phase:** *"projections are
 > more urgent than weave. weave is only useful when we have many examples of
 > cloths and projections to work with. we have cloths. we need to work on
 > projections."* And on scope: *"spatial is not a centerpiece. there is a set
@@ -64,14 +64,14 @@ the rule is the point, not the wording.
 >
 > **Corrected the same day:** an earlier version of this note claimed "the
 > basic projection views (List · Hierarchical · Cards, of which only Cards
-> is built) come first" — wrong frame, mine. TJ's ruling that followed:
+> is built) come first" — wrong frame, mine. the project owner's ruling that followed:
 > the Cloth is the data; a Projection is one way of projecting it; **each
 > Projection IS a kind** — a list (an ordering) or a board (a layout) —
 > separately titled. Both kinds already exist on 03 as the list and the
 > board; what is NOT built is kind-per-projection (today's map row bundles
 > one ordering + tiers + one layout). See 5.6.
 
-> **TJ, 2026-08-09:** *"the whole weave path is unresolved. i know we will want a
+> **the project owner, 2026-08-09:** *"the whole weave path is unresolved. i know we will want a
 > way for students to collaborate on a cloth, and there is an idea about a
 > quilt. **the ambiguity about how they manifest should not inform the current
 > design.** the keep will allow downloading of content, but **it is more about
@@ -84,7 +84,7 @@ the rule is the point, not the wording.
 > it — Phase 2 may proceed. Keep is **not** the whole weave's home; the
 > "every reading at once" framing is what this narrows.
 >
-> **Still open, and TJ's:** whether the weave concept is *removed* outright.
+> **Still open, and the project owner's:** whether the weave concept is *removed* outright.
 > Two facts bearing on it, both measured 2026-08-09 —
 > **(1)** the dev DB holds 2 whole-weave cloths and 5 whole-weave projections,
 > but the ones carrying text are `seed-demo.ts` fixtures, not student work;
@@ -96,7 +96,7 @@ the rule is the point, not the wording.
 > landing 0021–0023 *and* a removal together is the highest-risk sequencing this
 > repo has attempted.
 
-**RULED 2026-08-11 — the whole weave is out of the app.** TJ: *"we are
+**RULED 2026-08-11 — the whole weave is out of the app.** the project owner: *"we are
 removing whole weave as it exists in the app because it is poorly defined and
 not supported in the course. it should not be in the app as an idea until the
 faculty and the authors of the app agree on what it means to have a 'full
@@ -111,7 +111,7 @@ them added the same week. Hiding a station is not retiring an idea.
 
 What became of the three strandings:
 
-- the **whole-weave Cloth** and **whole-weave Projections** — not rehomed. TJ:
+- the **whole-weave Cloth** and **whole-weave Projections** — not rehomed. the project owner:
   *"i am not at all worried about losing whole weave."* Rows already at
   `scopeKey ''` stay in the database and render nowhere.
 - **`ShelfSearch`'s links into `/weave`** — repointed. A hit opens the reading
@@ -120,7 +120,7 @@ What became of the three strandings:
   passage's home is the Library's own "passages with no reading" card, which is
   on that page already.
 
-What the ruling protects, in TJ's words: *"i am worried about losing meaningful
+What the ruling protects, in the project owner's words: *"i am worried about losing meaningful
 activities related to reading, passage capture, concept labeling, link
 labeling, building threads, organizing concepts and threads, and building
 projections from a readings cloth."* Every one of those is an act in a reading
@@ -176,7 +176,7 @@ would mean touching the capture path three times. Full analysis:
   joined silently and said nothing. All three now render one shared
   `ReuseOffer`: it fires only when the concept was evidenced in a **different**
   reading, reports the join, and offers *"Not the same idea? Make it a separate
-  concept."* The PDF path carries it inside the capture toast (TJ: that path is
+  concept."* The PDF path carries it inside the capture toast (the project owner: that path is
   the quieter of the two), and a toast with a decision in it does not count
   down. Rationale and the rejected alternatives:
   [naming-decisions.md §2a](naming-decisions.md). Guarded by
@@ -256,7 +256,7 @@ Recorded in `MATRIX_NOTES` and rendered on `/access`.
 
 ## Phase 4 — the model doc has drifted, and the matrix proves it
 
-`docs/loom-model-build.md` is the authority, so this is TJ's to correct, but the
+`docs/loom-model-build.md` is the authority, so this is the project owner's to correct, but the
 gaps are now demonstrable rather than suspected:
 
 - **§4** describes Library as one "Admin/Faculty" view including staging. The
@@ -283,7 +283,7 @@ gaps are now demonstrable rather than suspected:
   Coining ahead of use works, and search finds a Link nothing uses yet.
   **Still open, in order:**
   - **5.1d Drop `edge.handle` — PARKED, 2026-08-12, and the reason matters.**
-    TJ, asked to sequence it: *"i dont know what edge handle is, if it is the
+    the project owner, asked to sequence it: *"i dont know what edge handle is, if it is the
     way to move edge labels in the projection i dont think removal is a good
     idea and dont understand why you propose it."* It is not that. `edge.handle`
     ([types.ts](../src/lib/types.ts)) is a **string** — a legacy copy of the
@@ -299,15 +299,15 @@ gaps are now demonstrable rather than suspected:
     also the `handle` fallback in `usesOf`). Recommendation on the table and
     not overruled: leave it. Revisit only if the dual-write is ever a real
     source of drift.
-  - **5.1e Delete, edit and merge a Link** (TJ, 2026-08-11: future work).
+  - **5.1e Delete, edit and merge a Link** (the project owner, 2026-08-11: future work).
     Editing a Label already fans out to every Thread using it; **deleting** and
     **merging** do not exist. Merge is the one to hold longest — the design
     note's reasoning stands: prevention decides nothing on a student's behalf,
     repair always risks it, so wait until a real vocabulary is observed to silt
     up rather than building a fixer for a mess nobody has made. Delete needs a
     rule for a Link that Threads still use (refuse, or detach them and say how
-    many), and that rule is TJ's, not mine.
-- **5.1f Concept merge — HIDDEN 2026-08-12, and it is TJ's call what happens
+    many), and that rule is the project owner's, not mine.
+- **5.1f Concept merge — HIDDEN 2026-08-12, and it is the project owner's call what happens
   next.** *"hide the merge capability in the concepts list in vocabulary. we
   need to resolve what this really means and its consequences."* Done as a
   curtain, not a demolition: `MERGE_VISIBLE` in
@@ -345,7 +345,7 @@ gaps are now demonstrable rather than suspected:
   picks, silently, three times over. Nothing should be rebuilt until (c) has an
   answer, because every one of those is a place the tool currently decides what
   the student meant — which is red line 2.
-- ~~**The practice loom shows no worked cloth**~~ — **built 2026-08-11.** TJ:
+- ~~**The practice loom shows no worked cloth**~~ — **built 2026-08-11.** the project owner:
   *"the guide should always be available, like the tutorials in any game. if
   the sandbox is the guide, then it should be clearly accessible. it is the
   instructions, right? … include a worked example … lets use Oh, the Places
@@ -374,22 +374,22 @@ gaps are now demonstrable rather than suspected:
   **The practice Library stays as it is** — settled 2026-08-12. It is
   twenty-four cards deep with the one that opens LAST, which is how the glow
   got scrolled away from in the first place; the two cheap answers were to cut
-  the dimmed cards to one or float the live card to the front, and TJ took
+  the dimmed cards to one or float the live card to the front, and the project owner took
   neither: *"i think the library solution as is is fine, it does not
   fictionalize the activity. no cut, no float. leave as is."* The guide scrolls
   to the card on arrival and offers "show me" when you leave it, which is the
   fix. **Do not re-open this.**
-  **Still open:** whether the example should be swappable per course (TJ: "we
+  **Still open:** whether the example should be swappable per course (the project owner: "we
   can change it out later if it seems to conflict with the intention").
 - **5.2 The screen snip** — [screen-snip.md](screen-snip.md). Much smaller than
   it looks: a snip of a library PDF needs **no image storage**, only a rect.
-  TJ settled export (the image embeds). One number open: the size cap, worth
+  the project owner settled export (the image embeds). One number open: the size cap, worth
   measuring against *Learning How to Learn* p56 rather than guessing.
 - **5.3 Cloth co-authorship** — [cloth-cardinality.md](cloth-cardinality.md).
   The biggest: `cloth_member`, membership-based authorization across **84**
   row-ownership checks, and an export contract that can name more than one
   author. Ratified, not built, not urgent.
-- **5.4 Several modes of reading** inside 01 · Reading. Wanted (TJ), nothing
+- **5.4 Several modes of reading** inside 01 · Reading. Wanted (the project owner), nothing
   specified. **The first of the family landed 2026-08-09**: the margin cards —
   page mode's "Cards" toggle draws every passage whose highlight is drawn on
   the open spread as a read-only card beside its page (`ConceptRail.tsx`,
@@ -399,10 +399,10 @@ gaps are now demonstrable rather than suspected:
   display rather than of page layout, recorded here so this item is not
   re-scoped blind. The same pass gave the matrix a zoom that re-renders no
   text layer (`PageRaster.tsx`). Ground rule for anything else from those
-  branches (TJ, 2026-08-09): **integrations honor the existing data structures
+  branches (the project owner, 2026-08-09): **integrations honor the existing data structures
   and workflows** — display-layer only; what would bend either goes here
   instead of being built.
-  **2026-08-10, TJ: "rebuild Matrix as the canvas" — done.** The matrix is
+  **2026-08-10, the project owner: "rebuild Matrix as the canvas" — done.** The matrix is
   the branch's zoomable spread grid now (`spreadLayout.ts` +
   `SpreadCanvasView.tsx`, d3-zoom restored): one transform, Figma-style
   trackpad, slider on the same transform, cards flanking every spread with
@@ -418,11 +418,11 @@ gaps are now demonstrable rather than suspected:
   zooming OUT and did nothing zooming IN, and a card on a spread came out twice
   the size of the identical card in page mode. Dividing by `--k` governs both
   directions; `--invk` has no consumers and is gone.
-- **5.5 "Spatial" — an EXPERIMENTAL projection kind** (TJ, 2026-08-09: *"put
+- **5.5 "Spatial" — an EXPERIMENTAL projection kind** (the project owner, 2026-08-09: *"put
   the spatial graph view on the pipeline, make it a prototype view"*;
   re-framed under the 2026-08-10 kind-per-projection ruling: Spatial would
   be a **third kind of projection** of the cloth — beside the list and the
-  board — laid out by connection density instead of by hand. TJ: *"spatial
+  board — laid out by connection density instead of by hand. the project owner: *"spatial
   is not a centerpiece … experimental and fairly unresolved, not sure it
   will be useful."* Prototype-grade if and when built, never the lead item.
   The original cloth-side-toggle plan below is superseded on placement but
@@ -438,7 +438,7 @@ gaps are now demonstrable rather than suspected:
   never persisted (red line #7). **The name is ratified: "Spatial"** — the
   model doc reserves "Concept Map" for the external Figma artifact, so no
   model change. `MapTab`'s "draw the real concept map (paper or Figma)" copy
-  retires only when this ships, and the replacement wording is TJ's. After it
+  retires only when this ships, and the replacement wording is the project owner's. After it
   ships: the same toggle on the faculty `CohortClothPanel` (attribution is
   already legal there), no per-student pill coloring in v1.
   **Still gated, recorded so nobody reopens them by accident:** the
@@ -465,7 +465,7 @@ gaps are now demonstrable rather than suspected:
   when designed. Recovery for all of it:
   `git show origin/spread-canvas-reading:src/components/pdf/SpreadCanvas.tsx`
   and the two `origin/weekly-concept-map` paths above.
-- **5.8 Undo for start over — deferred 2026-08-13, TJ: *"undo can be future
+- **5.8 Undo for start over — deferred 2026-08-13, the project owner: *"undo can be future
   work, im not sure where it sits in the ui."* The DATA is already there and
   costs nothing more to keep: `resetLoom` writes the whole cleared loom into
   the `graph.reset` payload before deleting anything (verified on a real reset —
@@ -474,7 +474,7 @@ gaps are now demonstrable rather than suspected:
   reader: nothing restores from that snapshot, so the reset is recoverable in
   principle and not in practice.
 
-  **The open question is TJ's and it is where it lives, not whether it works.**
+  **The open question is the project owner's and it is where it lives, not whether it works.**
   A toast with Undo is the obvious answer and the wrong one here — `flash`
   self-clears in 1500ms, and this repo already ruled that a missed notice is
   indistinguishable from data loss (the practice band, contracts.md §2c). The
@@ -486,7 +486,7 @@ gaps are now demonstrable rather than suspected:
   student should mean it. **Do not build it before that call.**
 - **5.7 Keep dissolves; downloads happen at the object — ruled 2026-08-10,
   not built.** Full analysis: **[keep-at-the-object.md](keep-at-the-object.md)**.
-  TJ: Keep is hidden; export/import/reset go away; a Projection downloads at
+  the project owner: Keep is hidden; export/import/reset go away; a Projection downloads at
   the projections row (already built); the Capture Log moves to 03 · Knowledge
   Graph **scoped to one Reading**; and red line 5's "whole-artifact export" is
   read as **by object** — each object exports whole, not everything in one
@@ -497,18 +497,18 @@ gaps are now demonstrable rather than suspected:
   rule** — the Cloth, thread and Vocabulary downloads must exist BEFORE Keep
   hides, or a Reading with captures and no Projection has no file at all.
   Groundwork landed: passage events now stamp `sourceId` (`f78fdf0`). Four
-  calls remain TJ's, listed in the doc's §8 — the worked example's exit once
+  calls remain the project owner's, listed in the doc's §8 — the worked example's exit once
   reset is gone is the one that gates hiding Keep.
 - **5.6 Kind per Projection — ratified 2026-08-10, not built.** The model now
   says each Projection IS a list (an ordering of the cloth) or a board (a
   layout), separately titled — *"i might have 2 orderings of the list, 3
   boards with different layouts. each with a title, line, and description"*
-  (TJ). As built, one map row bundles ordering + tiers + layout and 03 shows
+  (the project owner). As built, one map row bundles ordering + tiers + layout and 03 shows
   list and board together for the selected projection. The unbundling is
   UI-and-data-shape work: creating a projection asks its kind; the picker
   holds lists and boards side by side; no migration expected (kind can live
   in the existing per-map view row — the `view` table's own header invites
-  it). **Plan first, TJ reviews, then build** — this is exactly the change
+  it). **Plan first, the project owner reviews, then build** — this is exactly the change
   that went off the rails once when approached as "views inside a
   projection"; the ratified frame is kinds OF projections, never a switcher
   within one.
@@ -549,7 +549,7 @@ in the student workflow diagram**.
 
 **Next: Phase 2.** Its three leads (2.3) are now verified in source and written
 up above with file and line — that was the work the plan asked for before 2.1
-and 2.2 get built. **2.1 and 2.2 are still TJ's calls** and are what to take
+and 2.2 get built. **2.1 and 2.2 are still the project owner's calls** and are what to take
 next; lead **C** (import under-reports what a destructive replace will drop) is
 the one of the three that needs no ruling at all and can be fixed on its own.
 Lead **B** is blocked on whether the weave concept is removed.

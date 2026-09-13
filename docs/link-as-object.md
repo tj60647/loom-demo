@@ -9,7 +9,7 @@ nothing. The as-built stamp is in contracts.md; the text below is kept as
 written, as the reasoning of record. *(This header said "OPEN … Not built"
 until 2026-08-19 — eight days after the build.)*
 
-Raised by TJ, 2026-08-09.
+Raised by the project owner, 2026-08-09.
 
 This began as a vocabulary worry — *"I have concern that we are misusing Link
 object and Link Label, which is a parameter of the object"* — and turned into a
@@ -51,7 +51,7 @@ shown — `clothMath.recurringHandles()`, `VocabularyTab`'s `labelGroups`, and
 
 ## 2. The tension this creates
 
-Two asymmetries, both noticed by TJ rather than by the code.
+Two asymmetries, both noticed by the project owner rather than by the code.
 
 **A Concept may precede its evidence; a Link may not precede its Thread.**
 Ratified 2026-08-08: naming an idea you expect to meet, glossing it, and *then*
@@ -65,7 +65,7 @@ strings.
 
 ## 3. The UI already has pre-existing Links — it just cannot store them
 
-TJ, 2026-08-09: *"the UI includes sample links that don't know what the
+the project owner, 2026-08-09: *"the UI includes sample links that don't know what the
 concepts to be linked are, correct? The idea of pre-existing links is there."*
 
 Correct, and it predates this discussion. Coining a label offers **two rows of
@@ -98,7 +98,7 @@ Three consequences, and they are the strongest part of the argument:
    Link List, silently. That is the same failure `mergeConcepts` repairs on the
    noun side, happening today on the verb side with nothing to repair it.
 
-## 4. The proposal (TJ, 2026-08-09)
+## 4. The proposal (the project owner, 2026-08-09)
 
 > *"A Thread is Concept–Link–Concept, and it contains the references, correct?
 > Not the link itself."* … *"Can't a Link have a description that is independent
@@ -192,7 +192,7 @@ Per [AGENTS.md](../AGENTS.md) §F the DB may keep the July names, so `edge` does
 
 ## 6. Merge, and the rule that keeps it honest
 
-TJ, 2026-08-09: *"I want to be careful with the mergeConcepts and the
+the project owner, 2026-08-09: *"I want to be careful with the mergeConcepts and the
 mergeLinks. These could be making decisions on the student's behalf and I want
 to avoid that."*
 
@@ -229,7 +229,7 @@ auto-merge would be deciding what the student meant (red line 2).
 ### Prevention beats repair — which revises §5
 
 An earlier draft of this note said `mergeLinks` was **mandatory**. That was
-overstated, and TJ's concern is what exposes it.
+overstated, and the project owner's concern is what exposes it.
 
 The reason near-duplicate labels accumulate today is that tapping a chip runs
 `pickWord(word)` → `setNameDraft(word)`: it **copies a string into a text
@@ -238,7 +238,7 @@ entries with nothing relating them. Under the object model a chip can attach a
 **`linkId`** instead — choosing the object rather than copying its name — and
 the duplicates largely stop being *created*.
 
-That matters for exactly the reason TJ raised: **prevention decides nothing for
+That matters for exactly the reason the project owner raised: **prevention decides nothing for
 anybody; repair always risks it.** Merge should be a rarely-needed escape hatch,
 not load-bearing cleanup. It is still wanted — a student who free-types a label
 they have used before will still make a near-duplicate, and a genuine change of
@@ -278,7 +278,7 @@ coined ones.
 **Do it, as its own phase, with tap-to-attach in the same phase and
 `mergeLinks` deferred until the vocabulary is observed to silt up.**
 
-The change is coherent, it resolves two asymmetries TJ found rather than
+The change is coherent, it resolves two asymmetries the project owner found rather than
 inventing a need, the affordance is already on screen (§3), and the migration
 is additive except for dropping one column. The risk is not technical: it is
 that Links-as-objects **without tap-to-attach** would keep minting near

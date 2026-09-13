@@ -104,7 +104,7 @@ scrolling column is a form, not a card.
   passage gains a pointer, no row is copied. The server throws
   *"Already filed under that concept."* if it is reached anyway.
 
-A Concept with a Description and no Label is legal (TJ, 2026-08-18: *"a concept
+A Concept with a Description and no Label is legal (the project owner, 2026-08-18: *"a concept
 needs either or both a description and a label"*), so a description-only submit
 is a real act, not an accident. Such a concept renders as **(unlabeled
 concept)** in `--ink-soft` everywhere it appears — see `src/lib/conceptName.ts`.

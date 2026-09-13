@@ -68,7 +68,7 @@ deploy lands seven migrations at once, one of them a table rename.
   guarantees it. `loom-model-build.md` §Concept says a Concept with no Passages
   "belongs to no Reading" — that sentence changes first.
 - **Optional concept name.** The model already allows it. Needs the "one or the
-  other or both" constraint TJ added, a validation, and a display decision
+  other or both" constraint the project owner added, a validation, and a display decision
   across 67 label sites.
 - ~~**The Weave.** Whether the concept is removed is still open~~ — **it was
   ruled on 2026-08-11**: the whole weave is out of the app (open-work.md §Phase

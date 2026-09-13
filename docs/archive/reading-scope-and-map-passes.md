@@ -1,7 +1,7 @@
 > SUPERSEDED 2026-08-07 by docs/loom-model-build.md (with docs/loom-refactor-spec.md as the work order). Historical only.
 > §A's substance — reading-first entry, derived scope membership, reference-only readings — and §B.3's per-map tiers are ratified into the model; §B.2's linear map passes were superseded by parallel sibling maps, now Projections (see the `maps` comment in src/db/schema.ts).
 > §A.3/§6.2's "no uncoded byte" is explicitly reversed — Unlabeled Passages are first-class — and label-dedupe identity (§A.4) is overruled by identity-by-object. Do not implement from this file.
-> The §B.4 seeding clause — never offer to seed a fresh scope's tiers from another scope's map — was RATIFIED 2026-08-07 (TJ) into docs/loom-model-build.md §2 Projection; it binds from there, not from here.
+> The §B.4 seeding clause — never offer to seed a fresh scope's tiers from another scope's map — was RATIFIED 2026-08-07 (the project owner) into docs/loom-model-build.md §2 Projection; it binds from there, not from here.
 
 # Reading-first: scope and map passes — strategy
 
@@ -216,7 +216,7 @@ is not an option here — the map is the artifact the chalk talk is built from.
 
 ## 2 · Strategy B — passes (map history and versions)
 
-> **Superseded in part (TJ, 31 July 2026).** Built as **parallel sibling maps**, not
+> **Superseded in part (the project owner, 31 July 2026).** Built as **parallel sibling maps**, not
 > linear passes: a student keeps several named maps per scope, any of them editable,
 > each holding `{ name, essence, read, tiers }` plus its own `views` row (`map:<id>`).
 > §B.2's append-only/sealed-head model and the `‹ ›` bar were deliberately not built —

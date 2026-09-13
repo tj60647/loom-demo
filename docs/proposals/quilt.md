@@ -2,13 +2,13 @@
 
 **Status: proposal — held for the quilting discussion.** The open questions
 below are deliberately unanswered: they are the agenda for a group discussion
-about quilting, not a gate TJ answers alone ("can we just leave the open
+about quilting, not a gate the project owner answers alone ("can we just leave the open
 questions for now as things the group needs to address in a discussion about
-'quilting'?" — TJ, 2026-08-26). Under AGENTS.md, nothing is implemented while
+'quilting'?" — the project owner, 2026-08-26). Under AGENTS.md, nothing is implemented while
 they stand; that is the holding mechanism, and it needs no further lock.
 
 A Quilt brings several students' Cloths together on one
-canvas, where the participants co-construct a **Projection** — the reframe TJ
+canvas, where the participants co-construct a **Projection** — the reframe the project owner
 ruled on 2026-08-26 ("bringing multiple cloths together in a knowledge graph
 and co-constructing a projection on a canvas that participants can access",
 recorded in [weekly-concept-map.md](weekly-concept-map.md) §Decisions), named
@@ -32,7 +32,7 @@ its members have each woven and compose a shared reading of it.
   Concept, Thread, Link and Passage stays owned by its student; the quilt
   presents them with attribution, the shape the cohort graph already proves
   (`/admin/aggregate`: many students' work, one canvas, no shared objects).
-  Individuals keep control of their passages (TJ, 2026-08-26, given as an
+  Individuals keep control of their passages (the project owner, 2026-08-26, given as an
   assumption of the reframe; here it is a commitment).
 - **The co-constructed artifact: a Projection.** An object the model already
   has — One-line (`essence`), Description (`read`), positions and bends.
@@ -75,7 +75,7 @@ that amendment is part of the work, not a side effect (question 6).
 
 ## What co-construction means here — the crux
 
-TJ's question, verbatim: "is a quilt just the preexiting concepts and threads
+the project owner's question, verbatim: "is a quilt just the preexiting concepts and threads
 from the individual participants presented as items to add to a projection?"
 
 **The minimal Quilt says yes**, and it is fully model-clean: the palette is
@@ -84,7 +84,7 @@ the participants' existing concepts and threads; co-construction is
 gestures, attributed), and *the Projection's prose*. Nothing co-authored
 exists as an object; every item on the quilt has exactly one owner.
 
-The unresolved remainder is TJ's next sentence: "it is less clear where
+The unresolved remainder is the project owner's next sentence: "it is less clear where
 co-authored concepts go, co-authoered threads go, co-authored links go."
 Three honest options, gated below (question 4):
 
@@ -104,7 +104,7 @@ Three honest options, gated below (question 4):
 
 ## Attribution — "who adds what"
 
-TJ's question: "how do we track who adds what to the projection name,
+the project owner's question: "how do we track who adds what to the projection name,
 description, sentence, etc."
 
 The mechanism exists: `graph_event` already records acts by kind and author
@@ -129,13 +129,13 @@ all, and whether the surface shows "last edited by X" or a fuller ledger.
 Each question carries a recommendation so the discussion starts from a
 position rather than a blank page; none of it is decided.
 
-1. **Who makes a quilt?** (TJ: "how does a user make one?") Options: faculty
+1. **Who makes a quilt?** (the project owner: "how does a user make one?") Options: faculty
    only, from the teaching plane (matches how sections and invitations work;
    conservative); any participant, who then invites; or both. Recommendation:
    **faculty creates and names the occasion; students do everything else.**
    Creation is course-structure, and course-structure has lived on the
    teaching plane throughout.
-2. **How does a cloth join?** (TJ: "how are cloths added?") Options: each
+2. **How does a cloth join?** (the project owner: "how are cloths added?") Options: each
    owner adds their own cloth (consent — your work enters shared view only by
    your act); the creator assembles; automatic by section. Recommendation:
    **owner adds their own**, because a cloth is a student's work and the
@@ -163,5 +163,5 @@ position rather than a blank page; none of it is decided.
    loom-model-build.md §1: the weave section stops saying "removed until
    defined" and starts saying "defined as the Quilt" (or the Quilt stands
    beside a still-undefined weave). This is the faculty-agreement moment the
-   2026-08-11 ruling reserved — it is TJ's and the faculty's to make, not a
+   2026-08-11 ruling reserved — it is the project owner's and the faculty's to make, not a
    build detail.

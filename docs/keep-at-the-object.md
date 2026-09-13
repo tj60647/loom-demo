@@ -1,14 +1,14 @@
 # Keep at the object
 
-**Status: ruled 2026-08-10 by TJ. §6 steps 1–5 are BUILT; step 6 is in
+**Status: ruled 2026-08-10 by the project owner. §6 steps 1–5 are BUILT; step 6 is in
 progress.** The safety rule held: **Keep cannot hide until its replacements
 exist**, or a student's work is stranded — the precise thing red line 5
-forbids. §9, added 2026-08-11, is the act-by-act assessment TJ asked for, and
+forbids. §9, added 2026-08-11, is the act-by-act assessment the project owner asked for, and
 it is what turned step 6 into three (4a, 4b, 4c — see §9.6).
 
 ---
 
-## 1. What TJ ruled
+## 1. What the project owner ruled
 
 > "i think that keep will be hidden. we want to move to a download at the
 > object, so the downloading of the knowledge graph, the downloading of
@@ -37,7 +37,7 @@ The reassuring finding, and the reason this is smaller than it sounds:
   [loom-model-build.md:139](loom-model-build.md): *"**Export** — both levels: a
   Cloth (the full data — always the whole artifact, never a slice) and a
   Projection."* Note the parenthesis: the model's own phrasing of
-  whole-artifact-ness is **per object**, which is exactly TJ's red-line-5
+  whole-artifact-ness is **per object**, which is exactly the project owner's red-line-5
   interpretation — already written, eighteen months of rulings ago.
 - Tab 3 Linking says *"export the Cloth"* (:161); tab 5 Knowledge Graph says
   *"export a Projection"* (:163). Both are the model's words.
@@ -68,7 +68,7 @@ Projection without navigating there.
 ## 4. The Capture Log — to 03, scoped to the Reading
 
 It rendered at `MapTab.tsx:920-924` behind `wholeWeave &&` — unreachable since
-`/weave` was hidden — which is why it was parked on Keep. TJ's ruling puts it
+`/weave` was hidden — which is why it was parked on Keep. the project owner's ruling puts it
 back on the Knowledge Graph with the scope **inverted**: this Reading, not the
 whole weave. That is what makes it reachable.
 
@@ -85,7 +85,7 @@ whole weave. That is what makes it reachable.
   Concept does not belong to a Reading (a Passage does), and nothing
   server-side knows which Reading was open when one was named.
 
-**Open, TJ's call:** how concept/thread entries appear in a per-Reading log —
+**Open, the project owner's call:** how concept/thread entries appear in a per-Reading log —
 *evidence-derived* (a concept event shows in Reading R when that concept has a
 passage in R; a thread when both ends do — the same rule contextual search now
 uses, derivable with no migration, but entries can appear later when evidence
@@ -136,7 +136,7 @@ any file.
    the concepts they evidence, the threads between those, plus Cloth Title and
    Description. Closes the gap where a Reading with captures but no Projection
    has no file at all. *This is the one that makes hiding Keep safe.*
-2. **Thread download at 02 · Linking** — TJ named it; needs a builder.
+2. **Thread download at 02 · Linking** — the project owner named it; needs a builder.
 3. **Vocabulary download at 04** — concepts + link labels; needs a builder.
 4. **Provenance header on every object export** — student · course · section ·
    when · what object · schema version. Today the header is one field,
@@ -163,16 +163,16 @@ frame that `/workflows` and `/access` already use) versus **route-only**
 reloads on return). Recommendation: dual surface — the holdings render
 identically either way, which `contracts.md` already states.
 
-## 8. TJ's remaining calls
+## 8. the project owner's remaining calls
 
 1. ~~**The worked example's exit**, once reset is gone (§5.1).~~ **Answered
    2026-08-10** — the practice loom (`/sandbox`) replaced it. The example is
    deleted rather than given an exit; see §9.5.
 2. ~~**Concept/thread entries in a per-Reading Log**~~ — **ruled
-   evidence-derived** (TJ, 2026-08-10); built in `src/lib/logScope.ts`.
-3. ~~**Does the Capture Log download?**~~ — **yes** (TJ, 2026-08-10); built.
+   evidence-derived** (the project owner, 2026-08-10); built in `src/lib/logScope.ts`.
+3. ~~**Does the Capture Log download?**~~ — **yes** (the project owner, 2026-08-10); built.
 4. **Vocabulary at the library level** — dual surface or route-only (§7).
-5. **The student-facing whole weave** — new, and §9 is the assessment TJ
+5. **The student-facing whole weave** — new, and §9 is the assessment the project owner
    asked for on 2026-08-11: *"at this moment there should be no student
    facing whole weave projection. at most it appears in the faculty."*
 
@@ -180,7 +180,7 @@ identically either way, which `contracts.md` already states.
 
 ## 9. The Capture Log, act by act (2026-08-11)
 
-TJ, on being asked where the acts that belong to no reading should live:
+the project owner, on being asked where the acts that belong to no reading should live:
 *"i am concerned this question suggests some changes have been overlooked. i
 propose we break this down and assess by act."* This is that breakdown. Every
 row was traced to its emitter and stepped through the placement rule; three
@@ -259,17 +259,17 @@ ahead of their evidence, and the whole-weave capstone.
 
 ### 9.4 The claim that was wrong
 
-I asked TJ where the residue should live "once Keep is gone", on the premise
+I asked the project owner where the residue should live "once Keep is gone", on the premise
 that KeepTab holds the only unscoped view of the record. **That premise is
 false.** `MapTab` mounts the Capture Log with `sourceId={wholeWeave ?
 undefined : …}` — so at `/weave` the Knowledge Graph already shows the whole
 record, residue included, and its download already carries it. Deleting Keep
 does not hide the residue. **The whole weave is what shows it, and the whole
-weave is the thing TJ says should not be student-facing.**
+weave is the thing the project owner says should not be student-facing.**
 
 ### 9.5 The student-facing whole weave — **removed 2026-08-11**
 
-TJ, on reading the four counts below: *"we are removing whole weave as it
+the project owner, on reading the four counts below: *"we are removing whole weave as it
 exists in the app because it is poorly defined and not supported in the course.
 it should not be in the app as an idea until the faculty and the authors of the
 app agree on what it means to have a 'full weave'. i am not at all worried
@@ -283,7 +283,7 @@ route, the station, the seeded whole-weave rows and every `wholeWeave` branch
 came out. The four doors below are repointed at the reading each hit's work
 lives in. What follows is the state that prompted the ruling.
 
-TJ: *"at this moment there should be no student facing whole weave projection.
+the project owner: *"at this moment there should be no student facing whole weave projection.
 at most it appears in the faculty."* That is **not true of the build**, on four
 counts:
 
@@ -318,7 +318,7 @@ but closing the whole weave removed that view at the same stroke, so the two
 could not be sequenced independently. Hence the order actually taken:
 
 - **4a — every act records its reading.** The precondition: nothing can be
-  removed safely while seven of the acts TJ names place only by evidence, or
+  removed safely while seven of the acts the project owner names place only by evidence, or
   not at all. Shipped with the guard in `scripts/check-log-scope.ts`, which
   asserts both halves — that the rule honours a stamp, and that the emitters
   write one.

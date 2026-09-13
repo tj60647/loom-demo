@@ -2,7 +2,7 @@
 
 Living document. Pedagogy, staging, logistics, and governance for running Loom in DES INV 200. Revved over the semester and carried course-to-course.
 
-**Draft** · rev July 29 (folds in the July 28 Hugh/LX check-in and the July 29 Hugh/LX/TJ call).
+**Draft** · rev July 29 (folds in the July 28 Hugh/LX check-in and the July 29 Hugh/LX/the project owner call).
 **Home:** the repo, beside the code, with a changelog — plus a shared Google Doc for live editing.
 
 ## 1. Provenance: the technique and the tool
@@ -65,11 +65,11 @@ Loom is the weave step (and now stages the map step), the structured middle. At 
 
 ## 7. Hosting, data, and governance
 
-**Hosting / auth** (settled 7/29): TJ hosts (Vercel + backend); persistence per signed-in student in the database (Postgres/Neon) — no session-loss; sign-in via GitHub ("like asking them to get a phone number" — the concurrent TDF course already requires GitHub; no student issues historically).
+**Hosting / auth** (settled 7/29): the project owner hosts (Vercel + backend); persistence per signed-in student in the database (Postgres/Neon) — no session-loss; sign-in via GitHub ("like asking them to get a phone number" — the concurrent TDF course already requires GitHub; no student issues historically).
 
 **Data minimization:** student name + graphs, nothing else. Work is exportable (JSON + markdown) so students keep full control of their own data.
 
-**IRB posture** (settled 7/29, on the record): this is a course deployment, not an experiment — a demo students work with, like any class demo (TJ). No IRB filing is being made; the question was raised, discussed deliberately, and decided — not overlooked. If anyone later wants to publish, that is a separate, prior IRB conversation.
+**IRB posture** (settled 7/29, on the record): this is a course deployment, not an experiment — a demo students work with, like any class demo (the project owner). No IRB filing is being made; the question was raised, discussed deliberately, and decided — not overlooked. If anyone later wants to publish, that is a separate, prior IRB conversation.
 
 **Storage stance:** keep data off bCourses (HD preference); store with the hosted tool, exportable and minimal. Weekly class export remains available as a fallback if governance ever demands it.
 
@@ -87,18 +87,18 @@ Light-touch, from artifacts already collected — used to teach, not to publish:
 
 ## 9. Working agreements (July 28–29)
 
-- **Single source of truth:** TJ's GitHub repo holds the code, this document, and the spec, with a changelog; versions travel by check-in, not email. (JC's v10 committed 7/28; v14 to follow.)
+- **Single source of truth:** the project owner's GitHub repo holds the code, this document, and the spec, with a changelog; versions travel by check-in, not email. (JC's v10 committed 7/28; v14 to follow.)
 - **Ratified into production v1:** the reading library (preloaded, standardized "gold" texts approved by HD/JC; students may add papers, with dedupe-and-redirect), in-tool highlights → bytes, and highlight heat maps (subject to the spec's timing red line). OCR quality must be checked before release — several course PDFs are scans.
 
   *(That check now has a tool: `npm run diagnose:readings` reports every reading's extraction score, names the defect behind a bad one, and says which repair it needs. It is read-only. See [reading-quality.md](reading-quality.md).)*
 - Daily 3 pm PT calls this week to close the spec.
 - **Homework (LX):** take the E-Lab field guide's CAVEAT method and make a loom from a reading; read Novak & Gowin and compare/contrast. JC to gather the field guide and a "paper of record" for axial coding (Glaser ch. 1).
-- **Examples to produce (TJ):** worked examples that show the journey, not just the product — readings → highlights → bytes → threads — including good and bad practice (Goofus & Gallant).
+- **Examples to produce (the project owner):** worked examples that show the journey, not just the product — readings → highlights → bytes → threads — including good and bad practice (Goofus & Gallant).
 
 ## 10. Open questions (parking lot)
 
-- Freeze date for [`loom-spec-v1.md`](loom-spec-v1.md) (~1 week per HD/JC); production v1 ~2 weeks (TJ).
-- Reviewer fallback if TJ is unavailable mid-semester (Pete? Kevin?).
+- Freeze date for [`loom-spec-v1.md`](loom-spec-v1.md) (~1 week per HD/JC); production v1 ~2 weeks (the project owner).
+- Reviewer fallback if the project owner is unavailable mid-semester (Pete? Kevin?).
 - Markdown export lives in Lingxiu's fork — reconcile into the production build.
 - Formal term "promotion" — needed, or is recurrence-surfacing enough? (Currently v2.)
 - Naming of the register menus: "tongues" vs. "paradigms" vs. plain "vocabularies."

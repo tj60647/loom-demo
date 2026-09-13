@@ -20,13 +20,13 @@ one section corrected **in place**, because it is the permanent bridge:
 - **P1 — landed.** Unified search is migration 0022 (`concept_search_idx`,
   `edge_search_idx`) + `searchLoom`, grouped by kind (C.8) — though C.8's
   "persistent field" became a **contextual** search docked in the journey bar
-  (TJ, 2026-08-10: loom-wide at the Library, this-reading inside one); the
+  (the project owner, 2026-08-10: loom-wide at the Library, this-reading inside one); the
   homonym warning
   is client-side at coin-time and the server never forbids (C.7); **merge** was
   built (`mergeConcepts`, logged `concept.merge`) and then its control **hidden
-  2026-08-12** pending TJ's ruling on what merge means (open-work.md 5.1f). The
+  2026-08-12** pending the project owner's ruling on what merge means (open-work.md 5.1f). The
   unlabeled-passages group in the graph view (C.9) was built and then **removed
-  2026-08-12** — TJ: "there should not be an unlabeled passages section in the
+  2026-08-12** — the project owner: "there should not be an unlabeled passages section in the
   knowledge graph"; Unlabeled Passages live in 01's Your work.
 - **P2 — landed, and went further than asked.** Every student-read string
   speaks the ruled vocabulary; tongues are removed from `src/` entirely, not
@@ -146,7 +146,7 @@ These are argued *with conviction* in `docs/loom-spec-v1.md` — flag them expli
 |---|---|---|
 | `passage` / `Passage` (was `bytes`; renamed by 0023) | **Passage** | A byte *was* a passage-requiring-a-concept; since P0.1 it is a Passage proper (Concepts optional, 0..n via `passage_concept`). |
 | `passage.content`, offsets, `pageContentHash` | Passage characters + anchoring contract | unchanged semantics |
-| `passage` with zero `passage_concept` rows | **Unlabeled Passage** | legal state; the July spec's "no holding pen" rule is overruled. Shown in the Reading and Your work — **not** in Projections (TJ, 2026-08-12) |
+| `passage` with zero `passage_concept` rows | **Unlabeled Passage** | legal state; the July spec's "no holding pen" rule is overruled. Shown in the Reading and Your work — **not** in Projections (the project owner, 2026-08-12) |
 | `concepts` / `Concept` | **Concept** | already User-level ✔; `def` = Concept Description / Gloss; `note` = extra field, keep |
 | `concepts.tier` | — (none) | mirror column, **dropped by 0021** — Tiers live on Projections |
 | `edges` / `Edge` | **Thread** | the edge row IS the Thread since Links became objects (0024) |

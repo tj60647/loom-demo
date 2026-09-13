@@ -874,7 +874,7 @@ What matters is that each departure is a decision on the record.
 
 ## A2. Divergences to fix
 
-> **Status — 2026-08-01 (TJ).** Items 1 and 2 applied. Item 3 **held** — the
+> **Status — 2026-08-01 (the project owner).** Items 1 and 2 applied. Item 3 **held** — the
 > placeholder stays as it is for now; it is recorded here so the wording is a
 > pending decision rather than an oversight.
 
@@ -902,7 +902,7 @@ What matters is that each departure is a decision on the record.
 
 - v14: loom-v14-example.html:436-441 — a `<nav>` of exactly four buttons, 01 Open · 02 Throw · 03 Read · 04 Map, all four panels on one page (`.panel.active`, :1174-1175)
 - app: src/components/ui/JourneyNav.tsx:21-29 — seven stations, 00 Readings · 01 Open · 02 Throw · 03 Read · 04 Map · 05 Weave · 06 Keep, across four routes; a station you can work at here is a `<button>`, every other is a `<Link className="station">`
-- DELIBERATE (ratified TJ 8/1). v14's visual grammar is preserved exactly — globals.css:30-34 is v14's `nav` rule with `a.station` added to every selector, so a link and a tab are indistinguishable to the eye. The departure is structural, not visual: v14 could keep every panel alive because there was one page, and the app cannot across a route change. Confirm the seven-station bar is the intended reading of v14's four-step nav.
+- DELIBERATE (ratified the project owner 8/1). v14's visual grammar is preserved exactly — globals.css:30-34 is v14's `nav` rule with `a.station` added to every selector, so a link and a tab are indistinguishable to the eye. The departure is structural, not visual: v14 could keep every panel alive because there was one page, and the app cannot across a route change. Confirm the seven-station bar is the intended reading of v14's four-step nav.
 
 **the footer no longer tracks the nav** · _behavior_
 
@@ -926,7 +926,7 @@ What matters is that each departure is a decision on the record.
 
 - v14: loom-v14-example.html:567 `<h2>Your read <span class="n">same one as 03 — write it while you look</span></h2>`; one `state.read` per cloth, two textareas synced (:1180-1183)
 - app: src/components/tabs/MapTab.tsx:806-825 and ReadTab.tsx:425-440 — a read *and* a one-line essence, both stored on the active map, switching with it
-- DELIBERATE (maps, ratified TJ 7/31). v14's "write it while you look" pairing survives; what changed is that there are now several reads, one per map. Both tabs name the map in their heading, which is the mitigation. See A2 item 3 for the one place the old wording was left behind.
+- DELIBERATE (maps, ratified the project owner 7/31). v14's "write it while you look" pairing survives; what changed is that there are now several reads, one per map. Both tabs name the map in their heading, which is the mitigation. See A2 item 3 for the one place the old wording was left behind.
 
 **the header names a course, not a student** · _copy_
 
@@ -938,7 +938,7 @@ What matters is that each departure is a decision on the record.
 
 - v14: loom-v14-example.html:429-430 — `Export .json` and `Reset` in the header; the export is always the whole cloth, and there is nothing smaller to take out
 - app: src/components/tabs/KeepTab.tsx:134-161 and MapTab.tsx:633-644 — `keep .json` / `keep .md` per map, from 04 Map or 06 Keep, alongside the whole-cloth export (KeepTab.tsx:170-176)
-- DELIBERATE (ratified TJ 7/31). This is the largest single departure in round 2 and it is **not yet in the spec** — §3 still says Keep "is always the whole artifact and never a slice of it (red line #5)". See NEXT_SESSION.md open item 2; it needs the spec PR before it can be called settled.
+- DELIBERATE (ratified the project owner 7/31). This is the largest single departure in round 2 and it is **not yet in the spec** — §3 still says Keep "is always the whole artifact and never a slice of it (red line #5)". See NEXT_SESSION.md open item 2; it needs the spec PR before it can be called settled.
 
 **export / import / reset moved to their own station** · _extra_
 

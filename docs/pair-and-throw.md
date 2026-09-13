@@ -15,7 +15,7 @@ Three things went differently, and each says why in its commit:
   seeds `useState` and nothing syncs it while `<Workbench>` is keyed by
   `source.id`, so a same-route push would not change the station at all; and a
   page reading `searchParams` renders dynamically, making every such push a
-  server round-trip — against TJ's "immediately".
+  server round-trip — against the project owner's "immediately".
 - **A plain click on a third node starts the pair over** (the question left
   open below). File-manager idiom: plain click replaces, shift extends, so no
   state requires counting the lit nodes to predict the next click.
@@ -33,7 +33,7 @@ Not authority. `docs/loom-model-build.md` says what things *are*; this says what
 to build and what was already checked. Every fact below was verified in the repo
 on the day it was written — where something is a guess it says so.
 
-## What TJ asked for
+## What the project owner asked for
 
 > "on the cloth, i want to remove the 'what you are tracing' function and
 > legend. i want to add a select 2 nodes and throw them which would put you in
@@ -86,7 +86,7 @@ its comment records why the first attempt (an absolutely-positioned div inside
 the scrollbox) was invisible: `overflow:auto` clipped it and the scrollbox's
 stacking context painted over it. Read that before rewriting it.
 
-The popup needs a cancel `×` (TJ, above) as well as light-dismiss.
+The popup needs a cancel `×` (the project owner, above) as well as light-dismiss.
 
 ### 3. The handoff — the part with no path today
 
@@ -111,7 +111,7 @@ Two options, and the first is recommended:
 `ThrowTab` must consume the pair once and clear it, or a back-navigation
 re-loads the bench. `handleFocusHandled` is the existing precedent for that.
 
-Navigation is **immediate** on pressing the popup's action (TJ). Note the cost
+Navigation is **immediate** on pressing the popup's action (the project owner). Note the cost
 the old popover named and that still holds: stations unmount, so leaving 03
 drops anything unsaved there.
 

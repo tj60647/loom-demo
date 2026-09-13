@@ -29,7 +29,7 @@ The branch answers with **two unrelated features fused**:
 - **The shared graph is weave territory.** The whole weave was **removed from
   the app 2026-08-11** ([loom-model-build.md](../loom-model-build.md) §1: it
   "should not be in the app as an idea until the faculty and the authors of
-  the app agree on what it means to have a 'full weave'" — TJ). "Group
+  the app agree on what it means to have a 'full weave'" — the project owner). "Group
   connect" goes further than the weave ever did: it creates objects owned by
   no single student, which no object in the model supports. The cohort graph
   (`/admin/aggregate`) already draws every student's work on one canvas with
@@ -46,7 +46,7 @@ The branch answers with **two unrelated features fused**:
 
 - The weave removal above, verbatim in the model doc.
 - Rocketcrane integrations are display-layer only — no schema or workflow
-  changes (TJ, recorded 2026-08; this branch's export half complies, its
+  changes (the project owner, recorded 2026-08; this branch's export half complies, its
   shared-graph half does not).
 - Never touch production student work; a rebuilt export writes nothing, so
   it clears this by construction.
@@ -83,7 +83,7 @@ The branch answers with **two unrelated features fused**:
    app… the group connect is still an open question, although i think it is
    about bringing multiple cloths together in a knowledge graph and
    co-constructing a projection on a canvas that participants can access"
-   (TJ, 2026-08-26). The reframe splits the idea along the model's grain:
+   (the project owner, 2026-08-26). The reframe splits the idea along the model's grain:
    assembly of cloths is a READ (every concept and thread stays owned — the
    cohort graph's shape, widened to participants and a chosen set of cloths),
    and the shared artifact is a **Projection** — an object the model already
@@ -91,12 +91,12 @@ The branch answers with **two unrelated features fused**:
    new object kind. It is also a candidate answer to the 2026-08-11 weave
    ruling's precondition ("until the faculty and the authors of the app agree
    on what it means"). The reframed idea proceeds as its own proposal,
-   named by TJ the same day ("call it a quilt"): [quilt.md](quilt.md).
+   named by the project owner the same day ("call it a quilt"): [quilt.md](quilt.md).
 2. **The vault export: parked, not refused.** "im n[o]t sure where or how we
-   should support obsidian" (TJ, 2026-08-26). No home named, so nothing is
+   should support obsidian" (the project owner, 2026-08-26). No home named, so nothing is
    built; the question stays open here rather than moving to archive, and
    revives if a home is named.
-3. **The branch: kept.** "keep as the prototype's storage" (TJ, 2026-08-26).
+3. **The branch: kept.** "keep as the prototype's storage" (the project owner, 2026-08-26).
    `origin/weekly-concept-map` stays as the prototype's archive — its limion
    captures and share link are the record of what was tried. Never merge from
    it; anything wanted is rebuilt against the current model.

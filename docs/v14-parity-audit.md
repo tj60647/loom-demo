@@ -39,7 +39,7 @@ Verified first-hand against the code; ✦ marks entries double-checked by the au
 | **Coaching rails** (per-tab step indicators) | `#throwRail`, `#readRail`, `#mapRail` | Absent throughout. |
 | **Walkthrough steps ④ map and ⑤ after-loom** | `:1138-1157` | App has 4 of 6 steps, older copy. |
 | **Worked example** (Star & Griesemer seed) | `:611-644` | Nothing equivalent in the app. |
-| **Graph history** | — (in no version of the tool; ratified by TJ 2026-07-29) | Append-only event log + exploratory replay view. |
+| **Graph history** | — (in no version of the tool; ratified by the project owner 2026-07-29) | Append-only event log + exploratory replay view. |
 
 ### Partial
 

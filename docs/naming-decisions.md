@@ -1,15 +1,15 @@
 # Where the tool decides what the student meant — the naming paths
 
-**Status: CLOSED. Raised by TJ, 2026-08-09, and ruled the same day.** §1's
+**Status: CLOSED. Raised by the project owner, 2026-08-09, and ruled the same day.** §1's
 homonym hole and §3's trim bug were defects, not decisions, and were fixed with
-Phase 0 of [open-work.md](open-work.md). **§2 and §4 were TJ's calls and are now
+Phase 0 of [open-work.md](open-work.md). **§2 and §4 were the project owner's calls and are now
 ruled and built** — see §2a and §4a below for what shipped and why.
 
 > **§2 — the offer, not the verdict and not the question.** All three capture
 > paths now render one shared component, `ReuseOffer`. It fires only when the
 > concept was already evidenced in a **different** reading, says so, and offers
 > *"Not the same idea? Make it a separate concept."* The PDF path — the busiest
-> — carries it inside the capture toast rather than as its own card, because TJ
+> — carries it inside the capture toast rather than as its own card, because the project owner
 > ruled that path the quieter of the two.
 >
 > **§4 — the Source field is a Citation field.** The override was never real, so
@@ -21,7 +21,7 @@ Red line 2 (`loom-model-build.md` §6, binding):
 
 > The tool never decides what a student meant — ambiguity is resolved by asking.
 
-TJ, in the context of merge: *"these could be making decisions on the student's
+the project owner, in the context of merge: *"these could be making decisions on the student's
 behalf and I want to avoid that."* Merge turned out to be the clean one. This
 note is what the check turned up instead.
 
@@ -173,7 +173,7 @@ escape.
 
 Worth noting the stamp is usually *right* — you are typing a passage while
 reading that text. The defect is the promise, so the fix is a choice: either
-honour the override, or stop offering it. Both are TJ's call, and the second is
+honour the override, or stop offering it. Both are the project owner's call, and the second is
 one string.
 
 ## 4a. What shipped (2026-08-09) — and why NOT "honour it"

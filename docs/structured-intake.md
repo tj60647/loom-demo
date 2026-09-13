@@ -1,7 +1,7 @@
 # Structured intake
 
 **Status: adopted 2026-08-26.** This file was a proposal
-(`docs/proposals/structured-intake.md`) until TJ answered its gate; it is now
+(`docs/proposals/structured-intake.md`) until the project owner answered its gate; it is now
 the record of how a new feature enters Loom. Its own adoption followed the
 process it describes — proposal, numbered questions, recorded answers — and it
 moved here from `proposals/` on shipping, exactly as it says shipped proposals
@@ -34,9 +34,9 @@ intake.
    the problem in the reader's terms; where it sits in the model, citing
    [loom-model-build.md](loom-model-build.md) by section; which
    [contracts.md](contracts.md) rulings constrain it; explicit non-goals; and
-   **open questions, numbered** — each a decision reserved for TJ.
-2. **Gate** — TJ answers the numbered questions. Answers are transcribed into
-   the document as quoted rulings — `"…" (TJ, date)` — the citation form the
+   **open questions, numbered** — each a decision reserved for the project owner.
+2. **Gate** — the project owner answers the numbered questions. Answers are transcribed into
+   the document as quoted rulings — `"…" (the project owner, date)` — the citation form the
    repo already uses, so later work quotes a ruling rather than an impression
    of one.
 3. **Plan + tasks** — appended to the same file after the gate: hosts, reuse,
@@ -88,11 +88,11 @@ this repo's discipline lacks. Revisitable.
 ## The decisions that adopted it
 
 All four gate questions were answered together: *"i will follow your
-recommendations"* (TJ, 2026-08-26), which resolved them as:
+recommendations"* (the project owner, 2026-08-26), which resolved them as:
 
 1. **Threshold** — intake for new surface / new object / migration; smaller
    work builds directly.
-2. **Answers** — chat rulings transcribed into the file as `(TJ, date)`
+2. **Answers** — chat rulings transcribed into the file as `(the project owner, date)`
    quotes, matching how rulings are recorded everywhere else.
 3. **Record's home** — shipped proposals move to `docs/`; `proposals/` holds
    only the undecided and the unbuilt.
@@ -119,12 +119,12 @@ recommendations"* (TJ, 2026-08-26), which resolved them as:
 <What this deliberately does not do. The most load-bearing section.>
 
 ## Open questions
-1. <A decision reserved for TJ. Numbered so the answer can cite it.>
+1. <A decision reserved for the project owner. Numbered so the answer can cite it.>
 
 ---
 <!-- After the gate: -->
 ## Decisions
-1. <The answer, quoted: "..." (TJ, date)>
+1. <The answer, quoted: "..." (the project owner, date)>
 
 ## Plan
 <Hosts, reuse, migration + expand-only argument, evidence named in advance.>

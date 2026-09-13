@@ -5,7 +5,7 @@ authority — `docs/loom-model-build.md` says what a Thread *is*. This says what
 one should look like, and why the answer is not a free choice: two of the three
 objects already have a card, and they set the shape of the third.
 
-> TJ, 2026-08-18: "based on how the concept cards and the passage cards are set
+> the project owner, 2026-08-18: "based on how the concept cards and the passage cards are set
 > up, lets add a parallel 'thread card' to give some structure and consistent
 > ui language."
 
@@ -18,7 +18,7 @@ the other:
   evidence under it" (`ConceptCard.tsx`).
 - **Passage-first** — "the quotation is the subject, and the concepts it
   evidences are said about it … one is a passage with concept, the other is
-  concept with passages" (TJ, 2026-08-13, quoted in `PassageCard.tsx`).
+  concept with passages" (the project owner, 2026-08-13, quoted in `PassageCard.tsx`).
 
 Both were written for the same reason, stated in `PassageCard`: *"the same
 object was drawn three different ways in three places … each hand-rolled where
@@ -93,7 +93,7 @@ modes** — A4 needs both on a read card, and neither is a different card.
 `.sent`, and the caller that sets it also stops passing `by` — so the card
 reduces to `.trip` plus `.tmeta`'s state pill. The Cohort Graph's Threads
 panel is the only user: it is a 316px list of every thread in the course,
-scanned to find one, and a description on each made a wall (TJ, 2026-08-22:
+scanned to find one, and a description on each made a wall (the project owner, 2026-08-22:
 "the thread cards need to be simpler, jsut show the thread, not description or
 contributor, that will show up below when selected"). The sentence and the
 student are shown in that page's read-out when a card is picked.
@@ -169,5 +169,5 @@ was.
 - **A3, 04 · Vocabulary.** Its rows are *inside a Link Label*, the label is
   therefore known and shown by the parent, and its sentence is an editable
   field rather than a quotation. Converting it means deciding whether the label
-  is said twice, which is a question for TJ rather than a refactor. Named here
+  is said twice, which is a question for the project owner rather than a refactor. Named here
   so the omission is a decision and not an oversight.

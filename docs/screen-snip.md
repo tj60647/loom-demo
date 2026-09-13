@@ -1,8 +1,8 @@
 # The screen snip — a scoped proposal
 
-**Status: NOT BUILT. Proposed 2026-08-09. TJ's call.**
+**Status: NOT BUILT. Proposed 2026-08-09. the project owner's call.**
 
-Raised by TJ alongside capture-by-hand: the concept maps in *Learning How to
+Raised by the project owner alongside capture-by-hand: the concept maps in *Learning How to
 Learn* carry no text layer, so selection cannot reach them, and typing out a
 hand-drawn diagram is not a faithful capture of it. The wanted gesture is
 **drag a box on the page and keep what is inside it**.
@@ -11,7 +11,7 @@ This note exists because the handoff scoped it as "a bigger feature: `byte` (now
 no image column and the blob store would need a path for it". That framing is
 half right, and the half that is wrong makes the feature much smaller than it
 looks. What follows is what it would actually cost. The question that used to
-decide it — what a snip does on export — TJ settled on 2026-08-09 (§3).
+decide it — what a snip does on export — the project owner settled on 2026-08-09 (§3).
 
 ---
 
@@ -84,7 +84,7 @@ is a lie about what kind of evidence it is.** A snip is not.
 
 ## 3. Export — settled: the image travels
 
-**TJ, 2026-08-09: "the snips will be small, i'm not worried about the copyright."**
+**the project owner, 2026-08-09: "the snips will be small, i'm not worried about the copyright."**
 
 That settles what was the only hard question here. A snip **embeds** in the
 export as a base64 data URI, so a Cloth or a Projection still stands alone when
@@ -117,7 +117,7 @@ described: per-user blob storage, an upload path, a quota, and an orphan
 lifecycle. It is a different feature that happens to produce a similar-looking
 row, and it should not ride in on the back of this one.
 
-The Library case covers *Learning How to Learn* p56, which is the case TJ
+The Library case covers *Learning How to Learn* p56, which is the case the project owner
 raised.
 
 ---

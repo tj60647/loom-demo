@@ -1,11 +1,11 @@
 # Cloth cardinality — a design note
 
-**Status: partly ruled. Nothing here is built.** Written 2026-08-08 at TJ's
+**Status: partly ruled. Nothing here is built.** Written 2026-08-08 at the project owner's
 request, after they asked to enable three things: a Cloth with more than one
 Reading, a Cloth with more than one User, and a Reading with more than one
 Cloth.
 
-**Ruled since (TJ, 2026-08-08):**
+**Ruled since (the project owner, 2026-08-08):**
 1. **Two Users co-creating / joining a Cloth is wanted.** Keep this axis.
 2. **A Cloth has NOT more than one Reading.** That axis is dropped — §6's
    "many-Readings" row is now moot, and the whole-weave Cloth stays the special
@@ -38,7 +38,7 @@ free and one is a re-keying of the whole graph**. Sections 1–8 work that out;
 
 So today a Cloth is **a name over one Reading's work**, not a container of it.
 That is the mechanical reason a Reading and its Cloth "kind of mean the same
-thing" (TJ, 2026-08-08).
+thing" (the project owner, 2026-08-08).
 
 Worth noticing: **a Cloth with many Readings already exists.** The whole-weave
 Cloth (`scopeKey = ''`) covers every Reading. What is missing is not the
@@ -93,7 +93,7 @@ already legal.
 
 ---
 
-## 4. Against the Overlay rulings (TJ, 2026-08-07)
+## 4. Against the Overlay rulings (the project owner, 2026-08-07)
 
 This is where **many Users per Cloth** bites, and it bites the same way under A
 and B.
@@ -178,7 +178,7 @@ its own Passages and Capture Log). Choosing B costs **the overlay rulings and
 the export contract**, which are newer, more specific, and were ratified more
 recently.
 
-That asymmetry is the argument. But it is TJ's call, not mine.
+That asymmetry is the argument. But it is the project owner's call, not mine.
 
 ---
 
@@ -199,7 +199,7 @@ Half right, and worth splitting:
 And the ordering matters: adding `clothId` "just in case" would add a column
 whose meaning is undecided, which is worse than not adding it. §7 first.
 
-**TJ's decision, 2026-08-08: build nothing yet; keep it recorded as deferred.**
+**the project owner's decision, 2026-08-08: build nothing yet; keep it recorded as deferred.**
 That deferral stands with the model doc's existing line — *Join, Quilt, and
 Shared / co-created Cloths are defined, deferred; do not build, do not delete
 stubs.*
@@ -208,7 +208,7 @@ stubs.*
 
 ## 9. Does multiple-Cloths-per-Reading survive, now that Projections exist?
 
-TJ, 2026-08-08: *"the projection is the lens on a reading. a cloth can have
+the project owner, 2026-08-08: *"the projection is the lens on a reading. a cloth can have
 many projections. maybe there is no reason to have both multiple cloths of
 reading and multiple projections of cloth?"*
 
@@ -228,7 +228,7 @@ Compare what each object actually carries:
 distinguishes a Cloth is that it *holds the evidence*. So: *the Cloth is the
 evidence, the Projection is the lens.*
 
-Refined by TJ the same day, and the refinement matters: **they work together,
+Refined by the project owner the same day, and the refinement matters: **they work together,
 because the evidence is subject to interpretation by the reader.** A Cloth is
 not raw material a Projection then interprets — choosing which Passage to keep
 is already judgment. The difference is **level, not kind**: the Cloth is the
@@ -248,7 +248,7 @@ work on Bucciarelli" and "the Cloth I co-create with Sam on Bucciarelli" are
 two bodies of work with **different access**, and no number of Projections says
 "Sam may see this half and not that half."
 
-Given TJ's ruling 1, this argument is live. Everything below is against.
+Given the project owner's ruling 1, this argument is live. Everything below is against.
 
 ### Against
 
@@ -268,10 +268,10 @@ Given TJ's ruling 1, this argument is live. Everything below is against.
 5. **Cost for no new capability** — cloth ids threaded through scope, a picker,
    and a rule for which Cloth the Reading card's one door opens.
 
-### The rule this yields — RATIFIED (TJ, 2026-08-08)
+### The rule this yields — RATIFIED (the project owner, 2026-08-08)
 
 If co-authorship is the *only* thing multiple Cloths buy, the rule follows —
-and TJ ruled it: *"feels solid."*
+and the project owner ruled it: *"feels solid."*
 
 > **One Cloth per Reading per User — but a Cloth may have several Users.**
 
