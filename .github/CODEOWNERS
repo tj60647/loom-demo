@@ -5,6 +5,6 @@
 * @rocketcrane @tj60647
 
 # The spec is the build contract (docs/loom-spec-v1.md §7): changes to it go
-# by PR reviewed against the §4 red lines, by the project owner specifically.
+# by PR reviewed against the §4 red lines, by a project owner specifically.
 /docs/loom-spec-v1.md @rocketcrane @tj60647
 /docs/course-deployment-notes.md @rocketcrane @tj60647
