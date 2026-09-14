@@ -26,6 +26,7 @@ import {
   users, concepts, passages, passageConcepts, edges, sources, graphEvents,
 } from "../src/db/schema"
 import { eventsForReading } from "../src/lib/logScope"
+import { scopedGraph, scopeOf } from "../src/lib/scope"
 import type { GraphEvent, LoomState } from "../src/lib/types"
 
 async function main() {
@@ -52,21 +53,22 @@ async function main() {
     links.filter((l) => l.passageId === passageId).map((l) => l.conceptId)
 
   const state = {
-    concepts: myConcepts.map((c) => ({ ...c, def: c.def ?? "", note: c.note ?? "" })),
+    concepts: myConcepts.map((c) => ({
+      ...c,
+      def: c.def ?? "",
+      note: c.note ?? "",
+      mintedInSourceId: c.mintedInSourceId ?? null,
+    })),
     passages: myPassages.map((b) => ({ ...b, conceptIds: conceptIdsOf(b.id) })),
     edges: myEdges,
     links: [], maps: [], cloths: [],
     views: { cardTable: { positions: {}, bends: {} } },
   } as unknown as LoomState
 
-  // Scoped exactly as `scopedGraph` does: a concept is in scope when a passage
-  // from this reading evidences it, or when it has no passages anywhere.
-  const here = state.passages.filter((b) => b.sourceId === source.id)
-  const evidenced = new Set(here.flatMap((b) => b.conceptIds))
-  const hasPassage = new Set(state.passages.flatMap((b) => b.conceptIds))
-  const inScope = (id: string) => evidenced.has(id) || !hasPassage.has(id)
-  const liveConcepts = state.concepts.filter((c) => inScope(c.id))
-  const liveEdges = state.edges.filter((e) => inScope(e.fromId) && inScope(e.toId))
+  const graph = scopedGraph(state, scopeOf([source.id]))
+  const liveConcepts = graph.concepts
+  const liveEdges = graph.edges
+  const here = graph.passages
 
   // --- the record, and what it can rebuild -----------------------------------
   const rows = await db.select().from(graphEvents)

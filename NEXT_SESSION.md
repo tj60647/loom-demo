@@ -62,11 +62,11 @@ deploy lands seven migrations at once, one of them a table rename.
 
 ## Waiting on a ruling (model doc first)
 
-- **Expected concepts** — a concept in a reading BEFORE evidence. Needs a
-  `cloth_concept` join, a widened `isIn`, and a third grouping. Today "no
-  evidence here" and "no evidence anywhere" are the same set *because* `isIn`
-  guarantees it. `loom-model-build.md` §Concept says a Concept with no Passages
-  "belongs to no Reading" — that sentence changes first.
+- ~~**Expected concepts** — a concept in a reading BEFORE evidence.~~ **Ruled
+  2026-09-11:** a Concept with no Passages belongs in the Reading it was named
+  in (`mintedInSourceId`), not in every warp. Unstamped empty-evidence still
+  belongs everywhere. No `cloth_concept` join — origin is one column, and
+  `(user, reading)` already identifies the Cloth.
 - **Optional concept name.** The model already allows it. Needs the "one or the
   other or both" constraint TJ added, a validation, and a display decision
   across 67 label sites.

@@ -11,6 +11,14 @@ export type Concept = {
   label: string
   def: string | null
   note: string | null
+  /**
+   * The reading the student was in when they named this. Consulted only while
+   * the concept has no passages: it then belongs in that reading's warp, not
+   * every reading's. Null means the act carried no reading — still in every
+   * warp, the old empty-evidence rule. Once a passage exists, `passage.sourceId`
+   * is membership and this is only a fallback if the evidence later goes.
+   */
+  mintedInSourceId: string | null
   createdAt: Date
 }
 

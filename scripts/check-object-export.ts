@@ -48,7 +48,7 @@ const OTHER = "src-2"
 const scopeKey = scopeOf([READING]).key
 
 const concept = (id: string, label: string): Concept => ({
-  id, courseId: null, userId: "u", label, def: `${label} in my words`, note: "", createdAt: at,
+  id, courseId: null, userId: "u", label, def: `${label} in my words`, note: "", mintedInSourceId: null, createdAt: at,
 })
 const passage = (id: string, conceptIds: string[], sourceId: string | null, content: string): Passage => ({
   id, courseId: null, userId: "u", conceptIds, source: "Src", sourceId, location: "p. 1",

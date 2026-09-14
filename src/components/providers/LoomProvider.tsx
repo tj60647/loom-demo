@@ -353,7 +353,16 @@ export function LoomProvider({
 
   const addConcept = async (label: string, def?: string, note?: string) => {
     const tempId = crypto.randomUUID()
-    const tempConcept: Concept = { id: tempId, courseId: null, userId: session!.user!.id, label, def: def || "", note: note || "", createdAt: new Date() }
+    const tempConcept: Concept = {
+      id: tempId,
+      courseId: null,
+      userId: session!.user!.id,
+      label,
+      def: def || "",
+      note: note || "",
+      mintedInSourceId: soleSourceId(scope),
+      createdAt: new Date(),
+    }
     applyLocal(s => ({ ...s, concepts: [...s.concepts, tempConcept] }))
     try {
       // The reading you were in when you named it — the act's context, which

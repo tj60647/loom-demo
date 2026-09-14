@@ -253,9 +253,9 @@ const MAX_LOOM_HITS = 12
  * one text, so at the Library there is no reading in the row itself to send
  * the reader to. The rule is **where its first evidence is** — the earliest
  * passage of the concept, of either end of the thread, or of either end of
- * any thread carrying the label. Null when there is none, which is a real
- * state and not an error: a concept named ahead of its evidence is legal
- * (red line 4), and its hit is shown without being a door.
+ * any thread carrying the label — and, for a concept with no passage yet,
+ * the reading it was named in (`mintedInSourceId`). Null when there is
+ * neither, which is a real state: an unstamped name-ahead hit has no door.
  *
  * Until 2026-08-11 these three led to `/weave` instead. TJ ruled the whole
  * weave out of the app — "poorly defined and not supported in the course" —
@@ -281,7 +281,8 @@ export type LoomSearchResult = {
  * Search the student's own holdings. Contextual scope (TJ, 2026-08-10):
  * without a sourceId this is the whole loom (the Library's search); with one
  * it is that reading's slice — its passages, its cloth and projections, the
- * concepts evidenced there and the links between them.
+ * concepts in that warp (evidenced here, named here with no passage yet, or
+ * unstamped empty-evidence) and the links between them.
  */
 export async function searchLoom(rawQuery: string, sourceId?: string | null): Promise<LoomSearchResult> {
   const empty: LoomSearchResult = { concepts: [], linkLabels: [], links: [], passages: [], cloths: [], projections: [] }
@@ -298,13 +299,20 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
   const query = normalizeQuery(rawQuery)
   if (query.length < 2) return empty
 
-  // "This reading's concepts" is the scope the workbench draws: the concepts
-  // a passage of this reading evidences. Links follow ThrowTab's rule —
-  // this reading's threads only, both ends evidenced here.
+  // "This reading's concepts" is the scope the workbench draws: evidenced by
+  // a passage of this reading, named here with no passage yet, or named with
+  // no reading on the act (unstamped empty-evidence still belongs everywhere).
   const conceptsHere = sourceId
-    ? sql`(SELECT pc."conceptId" FROM "passage_concept" pc
-           JOIN "passage" p ON p."id" = pc."passageId"
-           WHERE p."userId" = ${userId} AND p."sourceId" = ${sourceId})`
+    ? sql`(
+        SELECT pc."conceptId" FROM "passage_concept" pc
+          JOIN "passage" p ON p."id" = pc."passageId"
+         WHERE p."userId" = ${userId} AND p."sourceId" = ${sourceId}
+        UNION
+        SELECT c."id" FROM "concept" c
+         WHERE c."userId" = ${userId}
+           AND NOT EXISTS (SELECT 1 FROM "passage_concept" pc WHERE pc."conceptId" = c."id")
+           AND (c."mintedInSourceId" = ${sourceId} OR c."mintedInSourceId" IS NULL)
+      )`
     : null
 
   // Same course lens the loom actions resolve — plus the not-yet-adopted
@@ -327,12 +335,15 @@ export async function searchLoom(rawQuery: string, sourceId?: string | null): Pr
   // Each vector repeats its index expression from src/db/schema.ts verbatim.
   // Where a concept's first evidence is. Repeated in shape by the two below.
   const firstReadingOfConcept = (conceptRef: SQL) => sql`
-    (SELECT p."sourceId" FROM "passage_concept" pc
-       JOIN "passage" p ON p."id" = pc."passageId"
-      WHERE pc."conceptId" = ${conceptRef}
-        AND p."userId" = ${userId} AND p."sourceId" IS NOT NULL
-      ORDER BY p."createdAt" ASC, p."id" ASC
-      LIMIT 1)`
+    COALESCE(
+      (SELECT p."sourceId" FROM "passage_concept" pc
+         JOIN "passage" p ON p."id" = pc."passageId"
+        WHERE pc."conceptId" = ${conceptRef}
+          AND p."userId" = ${userId} AND p."sourceId" IS NOT NULL
+        ORDER BY p."createdAt" ASC, p."id" ASC
+        LIMIT 1),
+      (SELECT c."mintedInSourceId" FROM "concept" c WHERE c."id" = ${conceptRef})
+    )`
 
   /**
    * ORDER: relevance first, then the NAME (TJ, 2026-08-19, asking whether these

@@ -32,8 +32,8 @@ function eventDate(e: GraphEvent): Date {
   return e.at instanceof Date ? e.at : new Date(e.at)
 }
 
-function makeConcept(id: string, label: string, at: Date): Concept {
-  return { id, courseId: null, userId: "", label, def: "", note: "", createdAt: at }
+function makeConcept(id: string, label: string, at: Date, mintedInSourceId: string | null = null): Concept {
+  return { id, courseId: null, userId: "", label, def: "", note: "", mintedInSourceId, createdAt: at }
 }
 
 function makePassage(id: string, conceptIds: string[], at: Date): Passage {
@@ -78,7 +78,12 @@ function seedFromSnapshot(
     for (const raw of s.concepts) {
       const c = raw as Record<string, unknown> | null
       if (c && typeof c.id === "string" && typeof c.label === "string") {
-        concepts.set(c.id, makeConcept(c.id, c.label, at))
+        concepts.set(c.id, makeConcept(
+          c.id,
+          c.label,
+          at,
+          typeof c.mintedInSourceId === "string" ? c.mintedInSourceId : null,
+        ))
       }
     }
   }
@@ -125,7 +130,15 @@ function foldEvents(events: GraphEvent[], upTo: number) {
     switch (e.kind) {
       case "concept.create": {
         if (e.entityId && typeof p.label === "string") {
-          concepts.set(e.entityId, makeConcept(e.entityId, p.label, at))
+          concepts.set(
+            e.entityId,
+            makeConcept(
+              e.entityId,
+              p.label,
+              at,
+              typeof p.sourceId === "string" ? p.sourceId : null,
+            ),
+          )
         }
         break
       }

@@ -364,8 +364,8 @@ async function main() {
   let tick = 0
   const at = () => new Date(base + ++tick * 37 * 60 * 1000) // every ~37 minutes
 
-  const C = (label: string, def: string, note = "") => ({
-    userId: userA.id, courseId: course.id, label, def, note, createdAt: at(),
+  const C = (label: string, def: string, note = "", mintedInSourceId: string | null = null) => ({
+    userId: userA.id, courseId: course.id, label, def, note, mintedInSourceId, createdAt: at(),
   })
   const conceptRows = await db.insert(concepts).values([
     C("object worlds", "The discipline-specific world of instruments, language and know-how a designer thinks within."),
@@ -375,10 +375,11 @@ async function main() {
     C("legitimate peripheral participation", "Newcomers belong from the edge: real work, low stakes, growing inward."),
     C("reification", "Meaning settled into a thing — a document, a tool, a term — that then acts back on the practice."),
     C("negotiation of meaning", "Meaning is not transmitted but worked out, continuously, between people and their reifications."),
-    C("shared vocabulary", "The words a group coins for its own relations — the tongue a practice speaks.", "No passage captured for this yet."),
+    C("shared vocabulary", "The words a group coins for its own relations — the tongue a practice speaks.", "No passage captured for this yet.", srcA.id),
   ]).returning()
   // The eighth concept ("shared vocabulary") stays passage-less and untiered on
-  // purpose — the visible no-evidence state — so it is never referenced again.
+  // purpose — the visible no-evidence state — named on reading A so it stands
+  // in that warp only, not in every reading.
   const [oworlds, social, compromise, cop, lpp, reif, negmean] = conceptRows
 
   // Concepts attach through passage_concept rows (P0.1): the passage row carries the

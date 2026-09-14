@@ -240,8 +240,9 @@
 > should have a different scope than search in a reading"): the Library's
 > field is the whole loom; a reading's field is THAT READING — its card and
 > pages, its cloth and projections, and the concepts, links and passages
-> evidenced here (concepts here = evidenced by a passage of this reading;
-> links here = both ends evidenced here, ThrowTab's rule). `searchLoom` /
+> evidenced here (concepts here = evidenced by a passage of this reading,
+> named here with no passage yet, or unstamped empty-evidence; links here =
+> both ends in this warp, ThrowTab's rule). `searchLoom` /
 > `searchReadings` take an optional sourceId that narrows the caller's OWN
 > rows — a forged sourceId narrows, never widens. In reading scope, concept
 > and link hits land in this workbench (04 / 02), not on the /weave doors.
@@ -797,7 +798,7 @@ directly, and the `source_page` it creates has never carried the foreign key
 
 | Table | Columns | Keys / notes |
 | --- | --- | --- |
-| `concept` | id · courseId SET NULL · userId CASCADE · label · def `''` · note `''` · createdAt | No tier (0021 dropped the mirror column — tiers live on `map.tiers`). One-label-one-concept is enforced in code (`updateConcept` clash check), **not** by a DB unique — ruled for replacement by warn-don't-forbid (P1.7) |
+| `concept` | id · courseId SET NULL · userId CASCADE · label · def `''` · note `''` · **mintedInSourceId SET NULL** (the reading the student was in when they named it) · createdAt | No tier (0021 dropped the mirror column — tiers live on `map.tiers`). One-label-one-concept is enforced in code (`updateConcept` clash check), **not** by a DB unique — ruled for replacement by warn-don't-forbid (P1.7). `mintedInSourceId` is not "the concept's reading": membership while there are passages is still the passage trail. It is consulted only for the empty-evidence case, so a name-ahead concept stands in that warp rather than every warp. Null = the act carried no reading, and those rows still appear in every warp. Migration **0030** adds the column and backfills from `graph_event.concept.create` payload `sourceId` |
 | `passage` | id · courseId SET NULL · userId CASCADE · source `''` (free-text citation) · **sourceId SET NULL** (the reading it belongs to) · location `''` · content · pageNumber/startOffset/endOffset/pageContentHash nullable (anchor) · **note `''` · question `''` · isPullQuote false · tier `PassageTier` `''`** · createdAt | A passage belongs to a reading; a concept does not. Concepts attach via `passage_concept` (0..n) — zero rows = an Unlabeled Passage, a legal state. Export field is `text`, column is `content` |
 | `passage_concept` | passageId CASCADE · conceptId CASCADE · createdAt | PK (passageId, conceptId); index on conceptId. The passage↔concept pointers of ruling 37 — refile adds a row, never copies a passage; deleting either end removes pointers only |
 | `edge` | id · courseId SET NULL · userId CASCADE · fromId CASCADE · toId CASCADE · handle `''` · sentence `''` NOT NULL default `''` · createdAt | Directed. Sentence optional at throw (P0.3 golden path); handle is the coined term |
@@ -830,7 +831,7 @@ anywhere in this file** — freshness is client state + `getUserLoomData()` re-f
 | Action | Params | Returns | Writes / events |
 | --- | --- | --- | --- |
 | `getUserLoomData()` | — | `{concepts, passages, edges, maps, cloths, views}` — rows ordered `createdAt, id` (capture order is meaning); each passage carries `conceptIds` folded from `passage_concept` in filing order | read-only; drops orphaned `map:<id>` view rows from the response |
-| `createConcept` | `{label, def?, note?}` | inserted `Concept` | `concept.create` |
+| `createConcept` | `{label, def?, note?, atSourceId?}` | inserted `Concept` | `concept.create` `{label, def, sourceId}`. Writes `mintedInSourceId` from `atSourceId` so a name-ahead concept stands in that reading's warp |
 | `updateConcept` | `id, Partial<{label,def,note}>` | void | no clash check (ruling 36 — homonyms legal; the client warns at coin-time); `concept.rename/update` |
 | `mergeConcepts` | `sourceId, targetId` | fresh `getUserLoomData()` | one batch: pointers repoint (collisions dropped), edges repoint, target inherits missing def/note, source deleted; prunes views/tiers; `concept.merge` {fromId, fromLabel, intoLabel, pointersMoved} |
 | `deleteConcept` | `id` | void | refuses while an edge endpoint; **passages survive** — join rows cascade, they become Unlabeled; prunes views + map tiers; `concept.delete` |
@@ -1038,7 +1039,8 @@ belong to a reading — a passage does — so the holdings render identically
 inside a reading and at the whole weave. The Overlay alone stays reading-gated.
 
 **What Your work lists** (TJ, 2026-08-12): concepts evidenced here (`In this
-reading`), concepts with no evidence anywhere (`No evidence`), and **this
+reading`), concepts with no evidence that belong in this warp (`No evidence` —
+named here, or named with no reading on the act), and **this
 reading's Unlabeled Passages** (`Unlabeled` — quote, note, citation, and an
 input that names one when the word arrives). Kinds, never stages. The
 unlabeled group is the model's own requirement — *"Unlabeled Passages appear in

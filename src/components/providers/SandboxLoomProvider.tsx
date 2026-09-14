@@ -118,11 +118,20 @@ export default function SandboxLoomProvider({
   // --- concepts ---
 
   const addConcept = useCallback(async (label: string, def = "", note = "") => {
-    const c: Concept = { id: newId(), courseId: null, userId: uid, label, def, note, createdAt: now() }
+    const c: Concept = {
+      id: newId(),
+      courseId: null,
+      userId: uid,
+      label,
+      def,
+      note,
+      mintedInSourceId: sourceId,
+      createdAt: now(),
+    }
     setState((s) => ({ ...s, concepts: [...s.concepts, c] }))
     noted()
     return c
-  }, [uid, noted])
+  }, [uid, noted, sourceId])
 
   const editConcept = useCallback(async (id: string, data: Partial<{ label: string; def: string; note: string }>) => {
     setState((s) => ({ ...s, concepts: s.concepts.map((c) => (c.id === id ? { ...c, ...data } : c)) }))
