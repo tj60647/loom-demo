@@ -190,16 +190,19 @@ npm run db:migrate:prod -- --apply  # runs it
 
 On a pull request into `master`, CI runs `npm run check:prodmigrations`, which fails while production's database is behind the code about to ship to it — written after migration 0028 sat unapplied on production for two days and every `/admin` page threw.
 
-#### Graph storage (spec §6)
+#### Graph storage
 
-The knowledge graph is kept strictly apart from its projections:
+The knowledge graph is kept strictly apart from the ways it is arranged:
 
-| Table | Holds | §6 role |
+| Table | Holds | Role |
 | --- | --- | --- |
-| `concept`, `passage`, `edge` | The student's graph, including `concept.tier` (placement's *meaning*). | `graph` — the artifact |
-| `read` | "Your read", one row per student × course. | `graph.read` |
-| `view` | Student-authored geometry per view key (`cardTable`: positions, bends). A new view adds a row, never a column on a concept or edge. Only student gestures write here — derived layout is computed for display and discarded. | `views` — projections |
-| `graph_event` | Append-only history of the student's own acts. Survives reset and import; rendered only as exploratory counts/replay ("the cloth, over time"), never judgment. | development history |
+| `concept`, `passage` (+ `passage_concept`), `edge`, `link` | The student's graph. A concept is one User-level object that passages across readings point at; `concept.mintedInSourceId` is the reading it was named in, consulted only while it has no passages (migration 0030). An `edge` is a Thread, and its label is a `link` (`edge.linkId`) — the student's own Label and gloss (migration 0024). | the graph — the artifact |
+| `cloth` | One per student × course × reading (`scopeKey`): the cloth's title and description. Absorbed the old `read` table in migration 0021. | the cloth's own words |
+| `map` | Projections, several per reading, each with its name, one-line (`essence`), paragraph (`read`) and its own tiers (`tiers`). `concept.tier` was dropped in 0021. | a projection's meaning |
+| `view` | Student-authored geometry per view key — a projection's board under `map:<id>` (positions, bends). A new view adds a row, never a column on a concept or edge. Only student gestures write here — derived layout is computed for display and discarded. | a projection's arrangement |
+| `graph_event` | Append-only history of the student's own acts. Survives reset; rendered only as exploratory counts/replay ("the cloth, over time"), never judgment. Import was removed on 2026-08-11, and its event kinds live on only as historical rows. | development history |
+
+Code speaks the July names and the UI speaks the model's: a `map` is a Projection, an `edge` a Thread, a `source` a Reading (the full map is in [AGENTS.md](./AGENTS.md)). `bytes` are gone — they are `passages` everywhere, the database included, since migration 0023.
 
 ### Reading-first
 
