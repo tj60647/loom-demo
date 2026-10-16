@@ -163,9 +163,12 @@ reaches just as well.
 | `NEXTAUTH_SECRET`, `NEXTAUTH_URL` | yes | NextAuth session signing and callback base. |
 | `GITHUB_ID`, `GITHUB_SECRET` | yes | GitHub OAuth app credentials. |
 | `BLOB_READ_WRITE_TOKEN` | local dev | Vercel Blob access. On Vercel this is resolved from the OIDC token + `BLOB_STORE_ID` instead. |
-| `PREVIEW_LOGIN_SECRET` | Vercel Preview | The key `/api/auth/test-login` wants on a branch preview, where OAuth cannot complete. **Unset means the door needs no key at all** — on a public preview URL that is an open session, so set it wherever previews are built. |
-| `OPENROUTER_API_KEY` | no | Enables the reading-quality judge. Absent, readings are still scored deterministically. |
-| `LOOM_JUDGE_MODEL` | no | Judge model override. Defaults to `anthropic/claude-opus-5` — see the note below before changing it. |
+| `PREVIEW_LOGIN_SECRET` | Vercel Preview | The key `/api/auth/test-login` wants on a branch preview, where OAuth cannot complete. **Unset means the door needs no key at all** — on a public preview URL that is an open session. It is unset today, deliberately: a preview database holds the course readings and fixture accounts, nobody's work ([data-environments.md](./docs/data-environments.md)). Set it to lock previews again. Production and the tester site (the `dev` alias) refuse the door whatever it holds. |
+| `RESEND_API_KEY`, `EMAIL_FROM` | no | The guest door. Set both and the sign-in page grows a folded-away "no GitHub account?" form that mails a sign-in link; the roster still decides, so an address no course invited never receives one. `EMAIL_FROM` must be at a domain verified in Resend. Set neither and GitHub is the only provider. |
+| `OPENROUTER_API_KEY` | no | Enables the reading-quality judge, *Draft from PDF*, and the model readers in page repair. Absent, readings are still scored deterministically and metadata is typed by hand. |
+| `LOOM_JUDGE_MODEL` | no | Judge model override. Defaults to `anthropic/claude-opus-5`; ruled 2026-07-29 not to be downgraded to Haiku, for the reason given in `src/lib/openrouter.ts`. |
+| `LOOM_ENV_FILE` | no | The env file scripts read instead of `.env.local` (above). |
+| `PROD_DATABASE_URL` | CI, by hand | Production's connection string, for the two scripts that touch production's migration table: `npm run check:prodmigrations`, which CI runs on the way into `master` with a read-only role, and `npm run db:migrate:prod`. Falls back to `.env.production.pulled`. |
 
 ### Database migrations
 
