@@ -9,6 +9,12 @@ in** — and the site will still load, which is why this light exists at all. Wh
 to do is in [build-and-test-workflow.md](docs/build-and-test-workflow.md); the
 check itself is [heartbeat.yml](.github/workflows/heartbeat.yml).
 
+Every 15 minutes the check asks `/api/health` on `loom.aroughidea.com`, the
+hostname students actually use. The route answers `200 {"ok":true}` when a
+`select 1` reaches the database and `503 {"ok":false}` when it does not, and
+says nothing more. Why it exists: [the sign-in outage of
+1–2 September 2026](docs/incident-2026-09-01.md).
+
 Loom is a tool for emergent sense-making and collaborative synthesis. It provides a space where reading, capturing, and connecting ideas form a living knowledge graph—built entirely by you and your community, without auto-generation.
 
 ## What is Loom?
