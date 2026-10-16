@@ -22,21 +22,27 @@ Loom is a tool for emergent sense-making and collaborative synthesis. It provide
 Loom was born from the intersection of ethnographic research, theory, and practice. It is designed to help individuals and cross-disciplinary teams build shared understanding not by enforcing uniformity, but by negotiating differences.
 
 The core workflow is simple:
-1. **Read & Capture:** Keep the passages worth keeping — the author's words, verbatim, with citation. Name the concept each passage evidences (a short noun phrase, often the author's own term), and gloss it in your own words in the working definition.
-2. **Throw:** Pick two concepts and connect them.
-3. **Name the Relation:** Define the "edge" between these ideas yourself, using your own phrasing or pulling a verb from one of the "tongues" (disciplinary thought styles).
+1. **Read & Capture:** Keep the passages worth keeping — the author's words, verbatim, with citation. Name the concept each passage evidences (a short noun phrase, often the author's own term), and gloss it in your own words in the working definition. A passage may also wait for its name: saving never requires a concept.
+2. **Throw a Thread:** Pick two concepts from the reading and connect them.
+3. **Name the Relation:** Say how the two hang together in a sentence of your own — that sentence *is* the thread — and, if you like, give it a short label, a **Link**, in your own words. Your Links come back to you as chips to reuse; the machine never names the relation.
 
 Nothing is auto-generated. The tool only counts your own throws. The structure emerges organically from your coding: from open codes first, to axial reads across texts.
 
+The work happens reading by reading, at five stations: **00 Library · 01 Reading · 02 Linking · 03 Knowledge Graph · 04 Vocabulary**. Loom is the middle step, not the deliverable: it gets you to a concept map you draw by hand, and to the talk you build from that.
+
+This version is the individual core: each student weaves their own cloth from each reading. Cloths made together, and cloths joined or quilted across readings, are defined and deferred ([model](./docs/loom-model-build.md) §1).
+
 ## Features
 
-- **Bite-Sized Capture:** Keep the passages that matter as discrete units — the author's words, verbatim, with their citation — each filed under a concept you name.
-- **Intentional Connections ("Throws"):** The power of Loom lies in the edges. You decide exactly how two concepts relate. 
-- **Disciplinary "Tongues":** The verbs we reach for to name a relation (e.g., *constrains*, *refutes*, *betrays*) aren't neutral; each belongs to a specific way of seeing the world. When you coin a term, Loom offers registers from several fields—"Cause & system", "Stance & value"—as suggestions to tap or ignore. You pick the word, or write your own; the machine never names the relation.
-- **The Woven Graph:** View your interconnected graph ("Read"), then write your own "axial read" across texts. Loom lays your threads out as material and counts what it sees; you write the reading, and copy it out as a draft.
-- **The Card Table ("Map"):** Sort your concepts into tiers (primary / secondary / tertiary), then arrange them as cards on a three-band table—general above, specific below. The tool draws the links you already threw and counts what it sees; the sorting and arranging are yours. The "map kit" hands the whole thing off to paper for the real, hand-drawn concept map.
-- **Your Artifact:** Export your graph as JSON (the spec §6 contract: the `graph` is the artifact, `views` are your arrangements riding along) or as markdown for Obsidian and notes. Import and reset round it out—your work is never locked in.
-- **The Cloth, Over Time:** Loom keeps an append-only history of your own acts—capture, throw, coin, re-tier—and replays how your weave grew. It counts; it never grades. Reset clears the cloth, not the history.
+- **Capture at the Text (01 Reading):** Highlight a passage and capture it on the rail beside the words — the author's words, verbatim, with their citation — filed under a concept you name, under several, or under none yet. Read a page at a time or on the canvas, every spread on one zoomable plane. Title your cloth here: your own reading of the text as a whole.
+- **Intentional Connections (02 Linking):** The power of Loom lies in the threads. You decide exactly how two concepts relate, in a sentence that should read aloud; a thread with a sentence and no label yet is the normal place to start.
+- **Your Own Verbs ("Links"):** The verbs we reach for to name a relation (e.g., *constrains*, *refutes*, *betrays*) aren't neutral; each belongs to a specific way of seeing the world. A Link is yours: a short label and, when you want one, a gloss of what you mean by it. Coin one before any thread uses it, rename it and every thread that uses it follows. Loom offers your own Links back as chips and never one of its own. (The instructor "tongue" registers that once offered verbs from several fields are not in this version, and are gone from the code.)
+- **The Knowledge Graph (03):** The cloth draws this reading's concepts and threads; pick a pair on it (click, then shift-click) to throw a thread in place. Then project it: each **projection** sorts your concepts into tiers (primary / secondary / tertiary, or set aside) and arranges them as cards on a **board** — general above, specific below — with a title, a one-line take and a paragraph of your own. Keep several; each can say something different about the same cloth. The tool draws the threads you already threw and counts what it sees; the sorting and arranging are yours. The **concept-map kit** hands the whole thing off for the real, hand-drawn concept map.
+- **Vocabulary (04):** Every concept you have named and every Link you have coined, across all your readings, with how many readings evidence each concept — counted, never ranked.
+- **Search:** One box in the journey bar. At the Library it searches your whole loom — readings and every page of their text, your cloths, projections, concepts, Links and passages; inside a reading it searches that reading's work. A hit opens the reading on the page it quoted. Plain full-text search, no model in the loop.
+- **Download at the Object:** Your work leaves as files where you made it — the cloth at 01, its threads at 02, a projection, its concept-map kit and the Capture Log at 03, your vocabulary at 04 — each one whole, as JSON and as Markdown, headed with whose it is, from which course, and when. The cloth drawing and the board also download as SVG. There is no import: the files are yours to keep, not a way back in.
+- **The Cloth, Over Time:** Loom keeps an append-only Capture Log of your own acts — capture, throw, coin, re-tier — shown on 03 for the open reading, and replays how your weave grew. It counts; it never grades. Starting over clears the work, not the history.
+- **The Practice Loom:** The guide in the header opens the real workbench on a real reading with a worked cloth (`/sandbox`), walked in eight beats — arrive · capture · name · thread · project · sort · board · kit — each ticked by your own act. Nothing there is saved; a reload restores the example.
 
 ## The Theory Behind the Tool
 
