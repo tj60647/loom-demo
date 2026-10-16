@@ -70,15 +70,15 @@ for a deeper dive):
 - **Communities of Practice** — Wenger, E. (1998). *Communities of Practice:
   Learning, Meaning, and Identity.* Cambridge University Press. Shared
   vocabularies are learned by participating in a community, not just by being
-  told. Loom enables a class or team to grow its own shared edge-vocabulary
-  over time by doing the work together.
+  told. In Loom a class grows its own Link labels over a term, by doing the
+  work together.
 
 - **Boundary Objects** — Star, S. L. (2010). This is Not a Boundary Object:
   Reflections on the Origin of a Concept. *Science, Technology, & Human
   Values*, 35(5), 601–617. How do people from distinct fields coordinate
-  around one shared object without agreeing on exactly what it means? Loom
-  serves as a cross-tongue boundary object — flexible enough to be locally
-  useful, but robust enough to hold a common identity across groups.
+  around one shared object without agreeing on exactly what it means? A cloth
+  is meant to be exactly that — flexible enough to be locally useful, but
+  robust enough to hold a common identity across groups.
 
 Course readings are provided to enrolled students within the application and
 are not distributed here.
