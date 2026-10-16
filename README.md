@@ -181,6 +181,15 @@ npx drizzle-kit migrate                        # apply anything pending
 
 Check what the database already has before applying, especially in a shared environment — `drizzle.__drizzle_migrations` is the record of truth, and the journal alone can disagree with it.
 
+Nothing migrates production on its own: CI migrates the CI database, each pull request's preview gets its own migrated branch, and Vercel runs no migration on deploy. Production is migrated deliberately, by hand, when a change goes to `master`:
+
+```bash
+npm run db:migrate:prod             # prints the host and what WOULD run; touches nothing
+npm run db:migrate:prod -- --apply  # runs it
+```
+
+On a pull request into `master`, CI runs `npm run check:prodmigrations`, which fails while production's database is behind the code about to ship to it — written after migration 0028 sat unapplied on production for two days and every `/admin` page threw.
+
 #### Graph storage (spec §6)
 
 The knowledge graph is kept strictly apart from its projections:
