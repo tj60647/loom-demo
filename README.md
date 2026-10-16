@@ -223,7 +223,7 @@ PDFs are uploaded once into a shared, course-agnostic library, then included in 
 A student may also add a reading of their own, for something they are coding that the library does not hold (`source.isOwn`). It sits on their shelf and nobody else's, and is never added to a course. PDF first: uploaded the same way as a course reading, extracted and scored (heuristics only — no judge pass on a private upload), after which the student can draft its details from the PDF and correct them. Without a PDF — a book, a lecture — it is a **reference-only** card with a title and author (`storageKey` null). This exists because reading-first needs every passage to have a door — otherwise a self-found paper's passages fall out of every lens.
 
 - **Readings tab** (`/admin/library`) — the whole library. Upload one or many PDFs at a time, edit shared metadata, and add a reading to a course. Badges show which courses currently include it.
-- **Courses tab** (`/admin/courses`) — each course's full reading list, with the per-course placement, visibility, and removal controls.
+- **Courses tab** (`/admin/courses`) — each course's full reading list, with the per-course placement, visibility (Reveal / Hide), and removal controls.
 
 Uploads are processed independently: one corrupt PDF in a batch fails on its own and is reported by filename, and the rest still land.
 
@@ -235,7 +235,7 @@ The browser asks `/api/readings/upload` for a short-lived token, uploads the fil
 
 The ceiling is **20MB per reading** (`src/lib/readingUpload.ts`), enforced in three places that don't trust each other: the browser (to fail fast with a useful message), the token route (so a crafted client can't exceed it), and the registration action (which re-checks the stored blob's real size and deletes it if it's over). Files upload one at a time, so each succeeds, fails and retries on its own, with per-file progress.
 
-Cover images are rendered from the first page that isn't blank, looking up to four pages in — scanned books routinely open on an empty recto, and treating that as a failure left real readings with no thumbnail. If every one of those pages is blank the reading still uploads; it just records `coverRendered: false`.
+Cover images are rendered from the first page that isn't blank, looking up to four pages in — scanned books routinely open on an empty recto, and treating that as a failure left real readings with no thumbnail. If every one of those pages is blank the reading still uploads, recording `coverRendered: false` — and that holds its `pass` down (`gatePassOnRender`): the four dimensions below all measure extracted text, and a reading whose pages do not render is not usable whatever its text scores.
 
 Covers render to a fixed **width** (320px), not a fixed scale. Page sizes across one course's readings run from 396×612pt digests to 612×792pt Letter, so a fixed scale produced thumbnails between 144px and 234px wide — all of them narrower than the 140px frame at 2× pixel density, so all of them upscaled and soft. Their aspect ratios still differ (0.65–0.81), so the frame fits the whole page inside itself rather than cropping to fill: a document's cover page loses its margins, and sometimes its title, to a crop.
 
@@ -266,7 +266,7 @@ Three invariants worth preserving if you touch this:
 - **The dimensions are not compensatory.** `pass` requires *every* scored dimension to clear 3, not the mean, **and** requires `coverage` and `legibility` to have values at all — so `pass` is three-valued, and the card renders the third as "Unverified" rather than as a quiet pass. A PDF whose fonts carry no ToUnicode map scores 5 on coverage and anchorability while being pure mojibake; averaging would call it usable.
 - **A clean byte count is not legibility.** Any future tightening should be tested against text that is *valid characters in the wrong order or the wrong mapping*, not just against mojibake — that's the case a byte-level check cannot see.
 
-The score is advisory. A reading below the bar is flagged "Needs review", never auto-hidden — see red line #7 in the [spec](./docs/loom-spec-v1.md).
+The score decides one thing: how a reading arrives in a course. A reading that passed arrives visible; one that failed is flagged "Needs review", one with no verdict "Unverified", and either arrives hidden until an admin presses **Reveal** on the Courses tab — the explicit approval that attaching used to skip (2026-08-13). It never hides a reading students can already see; rescoring leaves visibility alone.
 
 What happens *next* — what the defect actually is, which repair it needs, and which repairs are safe to run against a reading students have worked in — is [docs/reading-quality.md](./docs/reading-quality.md).
 
