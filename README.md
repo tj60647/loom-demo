@@ -239,6 +239,14 @@ Cover images are rendered from the first page that isn't blank, looking up to fo
 
 Covers render to a fixed **width** (320px), not a fixed scale. Page sizes across one course's readings run from 396×612pt digests to 612×792pt Letter, so a fixed scale produced thumbnails between 144px and 234px wide — all of them narrower than the 140px frame at 2× pixel density, so all of them upscaled and soft. Their aspect ratios still differ (0.65–0.81), so the frame fits the whole page inside itself rather than cropping to fill: a document's cover page loses its margins, and sometimes its title, to a crop.
 
+Every page is also stored as an image, at 320px and 1280px wide, which the viewer paints in page mode and on the canvas, plus a whole-document sheet of the small ones. They render after the upload has answered — a long scan takes a minute or two — and until they exist the viewer renders from the PDF itself: slower, never wrong. Three rules hold the stored images honest, each from one day (2026-09-06) when they were not:
+
+- **The server renders with fonts we ship.** A PDF that embeds no font asks the host for one by name; a laptop answers, a Vercel function with no font files does not, and pdf.js then draws nothing — no error, correct page size, a white page. That put 19 blank page images into storage for one reading. Both renderers, covers and pages, now take pdf.js's own `standard_fonts` and never the host's (`src/lib/pdfjs.ts`).
+- **A page that has text and drew none of it is a failed render**, not a stored image (`src/lib/canvasInk.ts`). A page that is blank because the paper is — the empty versos of a scanned book — is still stored.
+- **A re-render must reach the browser.** Re-rendering replaces images under the same storage key, so the cache validator also carries `PAGE_RENDER_VERSION` (`src/lib/pageAssets.ts`). Bump it whenever a change alters the pixels, or browsers that cached the old images go on being told `304 Not Modified`.
+
+`check:pdffonts`, `check:canvasink` and `check:pageetag` guard the three.
+
 Because the renderer's output has changed, **rescore re-processes the whole reading** — page text, cover and score together, from the PDF as it stands. Replaying the rubric over stored text could never show the effect of a repaired file, and the old rescore carried the previous cover verdict forward, so a rebuilt cover never moved the score. It refuses on a reading that has highlights: replacing page text moves the substrate their offsets were measured against. See [docs/reading-quality.md](./docs/reading-quality.md).
 
 #### Extraction scoring
