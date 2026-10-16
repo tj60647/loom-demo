@@ -102,32 +102,39 @@ are not distributed here.
 
 ## Developer Guide
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with `create-next-app`.
+A [Next.js](https://nextjs.org) 16 app on React 19: Postgres at Neon through Drizzle, reading PDFs and their images in Vercel Blob, sign-in through NextAuth, deployed on Vercel. Production is `loom.aroughidea.com`. This Next.js has breaking changes from the one most guides describe — read [AGENTS.md](./AGENTS.md) before writing code.
 
 Start here:
 
+- [docs/loom-model-build.md](./docs/loom-model-build.md) — **the authority** on what things are: the objects, the five stations, the red lines. Where docs disagree, it wins.
+- [AGENTS.md](./AGENTS.md) — how the docs rank (`docs/archive/` is superseded, `docs/proposals/` is intent), the code-to-UI vocabulary map, and how commits are written here: one decision each, removals declared.
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — branches, the PR gate (green CI + owner review), tests, local setup.
-- [docs/contracts.md](./docs/contracts.md) — every contract surface: schema, server actions, API routes, export/import formats, invariants.
-- [docs/deployments.md](./docs/deployments.md) — local / dev / production environments, CI secrets, smoke tests.
+- [docs/contracts.md](./docs/contracts.md) — every contract surface: schema, server actions, API routes, download formats, invariants.
+- [docs/data-environments.md](./docs/data-environments.md) — where data lives in every environment, and who may destroy it.
+- [docs/deployments.md](./docs/deployments.md) — standing an environment up, OAuth apps, the sign-in smoke test.
+- [docs/build-and-test-workflow.md](./docs/build-and-test-workflow.md) — how work moves from a branch to production, who holds CI's keys, and what to do when the heartbeat goes red.
 - [docs/reading-quality.md](./docs/reading-quality.md) — extraction scoring, defect diagnosis, and which repairs are safe to run.
+- [docs/incident-2026-09-01.md](./docs/incident-2026-09-01.md) — the sign-in outage record.
 - [docs/audit-2026-08-02.md](./docs/audit-2026-08-02.md) — the full journey audit and alpha assessment.
-- Tests: `npm run check`, then `npx playwright test` (see CONTRIBUTING for the Windows/3100 variant and the seeded demo accounts the suite relies on).
+- Tests: `npm run check` (eslint, tsc, and 24 `scripts/check-*.ts` assertions), then `npx playwright test` (see CONTRIBUTING for the Windows/3100 variant and the seeded demo accounts the suite relies on).
 
 ### Getting Started
 
-First, run the development server:
+Node 22.7 or later. Copy `.env.example` to `.env.local` and fill it in — and point `DATABASE_URL` at the Neon `dev` branch, never `main`: `npm run seed:demo` wipes the demo course on whatever database it names.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci
+npx drizzle-kit migrate      # apply pending migrations
+npm run seed:sources         # the readings + page text; needs the PDFs (see below)
+npm run seed:demo            # test-user-a/b@loom.local demo accounts
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result. You can start editing the page by modifying `app/page.tsx` (or `src/app/page.tsx`). The page auto-updates as you edit the file.
+`seed:sources` reads three PDFs from `storage/readings/` that are **not in the repo** — they are published, copyrighted course readings. Supply your own copies, or skip it and work against the dev database.
+
+Real GitHub OAuth never runs locally. Sign in through the test door instead: `/api/auth/test-login` as the admin, `?as=testa` as the demo learner; production refuses it whatever the request carries. If port 3000 sits in a Windows excluded range, run `npm run dev -- -p 3100` and use `playwright.3100.config.ts`.
+
+Loom is a desktop tool: there are no phone layouts, and none should be added. Check a layout at 1280 · 1536 · 1728 · 1920 CSS px.
 
 ### Environment
 
