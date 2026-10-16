@@ -44,6 +44,17 @@ This version is the individual core: each student weaves their own cloth from ea
 - **The Cloth, Over Time:** Loom keeps an append-only Capture Log of your own acts — capture, throw, coin, re-tier — shown on 03 for the open reading, and replays how your weave grew. It counts; it never grades. Starting over clears the work, not the history.
 - **The Practice Loom:** The guide in the header opens the real workbench on a real reading with a worked cloth (`/sandbox`), walked in eight beats — arrive · capture · name · thread · project · sort · board · kit — each ticked by your own act. Nothing there is saved; a reload restores the example.
 
+## For Faculty and Admins
+
+Access is by invitation: invited → link → authorized. Faculty and admins hold the five stations over their own work too — capabilities add up, they do not replace each other — plus a staff group in the journey bar:
+
+- **Roster** (`/admin`) — sections, students and invitations, and **Open Loom**: one student's whole loom, read-only, drawn with the same cards the student sees.
+- **Cohort Graph** (`/admin/aggregate`) and **Heatmaps** (`/admin/heatmaps`) — read-only comparisons across a section or the whole cohort, and on Heatmaps one student. Counted, never judged; students never see them.
+- **Readings** (`/admin/library`) and **Courses** (`/admin/courses`) — admin only; see [The reading library](#the-reading-library) below.
+- **Workflows** (`/workflows`) — the student, faculty and admin flows, drawn from `src/lib/workflows.ts` — and **Access** (`/access`), the capability matrix.
+
+Feedback stays human, and outside the tool, in this version.
+
 ## The Theory Behind the Tool
 
 Loom is built on foundational ideas from design theory, sociology, and
