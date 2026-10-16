@@ -247,7 +247,7 @@ Every page is also stored as an image, at 320px and 1280px wide, which the viewe
 
 `check:pdffonts`, `check:canvasink` and `check:pageetag` guard the three.
 
-Because the renderer's output has changed, **rescore re-processes the whole reading** — page text, cover and score together, from the PDF as it stands. Replaying the rubric over stored text could never show the effect of a repaired file, and the old rescore carried the previous cover verdict forward, so a rebuilt cover never moved the score. It refuses on a reading that has highlights: replacing page text moves the substrate their offsets were measured against. See [docs/reading-quality.md](./docs/reading-quality.md).
+Because the renderer's output has changed, **rescore re-processes the whole reading** — page text, cover and score together, from the PDF as it stands. Replaying the rubric over stored text could never show the effect of a repaired file, and the old rescore carried the previous cover verdict forward, so a rebuilt cover never moved the score. On a reading that has highlights it re-scores from the stored text and refuses to re-process, saying so: replacing page text moves the substrate their offsets were measured against (`scripts/reingest-readings.ts --force` is the deliberate route). See [docs/reading-quality.md](./docs/reading-quality.md).
 
 #### Extraction scoring
 
