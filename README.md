@@ -80,6 +80,21 @@ for a deeper dive):
   is meant to be exactly that — flexible enough to be locally useful, but
   robust enough to hold a common identity across groups.
 
+- **Open and Axial Coding** — grounded theory (Glaser & Strauss, 1967).
+  Surface candidate codes from primary material (open coding), then relate
+  the codes and name the relations (axial coding) — work long done by hand,
+  with cards, margins and walls of paper. Loom carries that technique from
+  field ethnography into scholarly reading; its lineage is recorded in
+  [course-deployment-notes.md](./docs/course-deployment-notes.md) §1.
+
+- **Concept Maps** — Novak & Gowin (1984). *Learning How to Learn.* Cambridge
+  University Press; and Novak & Cañas (2008). *The Theory Underlying Concept
+  Maps and How to Construct and Use Them.* IHMC. Rank concepts from general
+  to specific, arrange movable cards — general above, specific below — and
+  link them with labelled lines so each connection reads as a proposition.
+  The board digitises that sorting; the map you draw afterwards is where it
+  lands.
+
 Course readings are provided to enrolled students within the application and
 are not distributed here.
 
