@@ -32,8 +32,8 @@ name: heartbeat
 
 on:
   schedule:
-    # Every 15 minutes. The failure this catches lasted ten hours.
-    - cron: "*/15 * * * *"
+    # Every two hours: well inside the ten hours this failure lasted, and Neon can sleep between checks.
+    - cron: "17 */2 * * *"
   workflow_dispatch:
 
 # A run already in flight answers the same question as a new one.
