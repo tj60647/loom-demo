@@ -16,6 +16,23 @@ import PageRaster, { type PdfDoc } from "./PageRaster"
 export type PageTier = "impostor" | "reading" | "native"
 
 /**
+ * Links and form widgets only. Stable identity: react-pdf re-renders the
+ * annotation layer whenever this function changes.
+ *
+ * pdf.js puts a highlight's extracted text in `<mark class="overlaidText">`
+ * (HighlightAnnotationElement.render, pdf.js 5.4, the copy react-pdf 10.4.1
+ * bundles). The pdf.js viewer collapses that mark to 0×0 (`pdf_viewer.css`,
+ * `.overlaidText`). react-pdf's AnnotationLayer.css — the sheet PdfViewer
+ * imports — has no such rule, so the mark lays out at the page's font size
+ * inside the highlight and the clipped slices of it read as type much larger
+ * than the page. The author's yellow is already in the page image and in the
+ * raster; the canvas never mounts this layer.
+ */
+function pageModeAnnotations({ annotations }: { annotations: { subtype?: string }[] }) {
+  return annotations.filter((a) => a.subtype === "Link" || a.subtype === "Widget")
+}
+
+/**
  * One page in a many-page view.
  *
  * Two regimes, one component:
@@ -101,9 +118,11 @@ export default memo(function PageSlot({
    *  sheet carries the cell — instead of white-boxing it and falling back
    *  to a pdf.js render nobody needs at thumbnail size. */
   sheetBehind?: boolean
-  /** Render link/form annotations over the text layer. Page mode wants them
-   *  (a born-digital PDF's links should stay clickable); the matrix leaves
-   *  them off — they cost a layer per page and are not part of coding. */
+  /** Render link and form annotations over the text layer. Page mode wants
+   *  them (a born-digital PDF's links should stay clickable); the matrix
+   *  leaves them off — they cost a layer per page and are not part of
+   *  coding. Highlight markup is not included either way: see
+   *  `pageModeAnnotations`. */
   annotations?: boolean
   /** Render-queue priority for this page's raster; see PageRaster. */
   priority?: (pageNumber: number) => number
@@ -262,6 +281,7 @@ export default memo(function PageSlot({
                     renderMode="none"
                     renderTextLayer
                     renderAnnotationLayer={annotations}
+                    filterAnnotations={annotations ? pageModeAnnotations : undefined}
                     onLoadSuccess={(page) => {
                       if (page.originalWidth) {
                         const a = page.originalHeight / page.originalWidth
